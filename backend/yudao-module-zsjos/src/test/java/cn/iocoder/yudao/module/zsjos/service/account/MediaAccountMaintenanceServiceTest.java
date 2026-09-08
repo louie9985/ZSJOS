@@ -6,13 +6,9 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
-import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarScheduleReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountMaintenanceRevisionDO;
@@ -20,7 +16,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountStageLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMaintenanceRevisionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
-import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,12 +41,10 @@ class MediaAccountMaintenanceServiceTest {
     @Mock private MediaAccountMaintenanceRevisionMapper revisionMapper;
     @Mock private AccountStageLogMapper stageLogMapper;
     @Mock private DictDataApi dictDataApi;
-    @Mock private PermissionApi permissionApi;
-    @Mock private RoleApi roleApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PersonMapper personMapper;
     @Mock private MediaWorkflowEventService workflowEventService;
-    @Mock private MediaDataScopeService mediaDataScopeService;
+    @Mock private MediaAccountCalendarScopeService calendarScopeService;
 
     @Test
     void maintainAllowsArbitraryStageSnapshotsAndNotifiesOnlyOtherParticipant() {
@@ -132,8 +125,8 @@ class MediaAccountMaintenanceServiceTest {
     void calendarUsesParticipantScopeWithoutQueryAllPermission() {
         MediaAccountCalendarPageReqVO req = new MediaAccountCalendarPageReqVO();
         req.setRangeStart(LocalDate.of(2026, 8, 1)); req.setRangeEnd(LocalDate.of(2026, 8, 31));
-        when(mediaDataScopeService.resolve(20L, MediaAccountMaintenanceService.PERMISSION_CALENDAR_QUERY_ALL))
-                .thenReturn(new MediaDataScopeService.Scope(false, Set.of(20L, 21L, 30L)));
+        when(calendarScopeService.resolve(20L))
+                .thenReturn(new MediaAccountCalendarScopeService.Scope(false, Set.of(20L, 21L, 30L)));
         when(accountMapper.selectCalendarPage(req, Set.of(20L, 21L, 30L), false))
                 .thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L));
         when(accountMapper.selectCalendarUnscheduledCount(req, Set.of(20L, 21L, 30L), false)).thenReturn(3L);
@@ -209,8 +202,8 @@ class MediaAccountMaintenanceServiceTest {
     void calendarSupportsQueryAllAndRejectsReversedWindow() {
         MediaAccountCalendarPageReqVO req = new MediaAccountCalendarPageReqVO();
         req.setRangeStart(LocalDate.of(2026, 8, 1)); req.setRangeEnd(LocalDate.of(2026, 8, 31));
-        when(mediaDataScopeService.resolve(20L, MediaAccountMaintenanceService.PERMISSION_CALENDAR_QUERY_ALL))
-                .thenReturn(new MediaDataScopeService.Scope(true, Set.of()));
+        when(calendarScopeService.resolve(20L))
+                .thenReturn(new MediaAccountCalendarScopeService.Scope(true, Set.of()));
         when(accountMapper.selectCalendarPage(req, Set.of(), true)).thenReturn(new PageResult<>(List.of(), 0L));
         when(accountMapper.selectCalendarUnscheduledCount(req, Set.of(), true)).thenReturn(0L);
         service.calendar(req, 20L);
@@ -222,34 +215,14 @@ class MediaAccountMaintenanceServiceTest {
     }
 
     @Test
-    void allCalendarDoesNotApplyAccountObjectScope() {
-        MediaAccountCalendarScheduleReqVO req = new MediaAccountCalendarScheduleReqVO();
-        req.setRangeStart(LocalDate.of(2026, 8, 1)); req.setRangeEnd(LocalDate.of(2026, 8, 31));
-        when(accountMapper.selectCalendarPage(any(MediaAccountCalendarPageReqVO.class), eq(Set.of()), eq(true)))
-                .thenReturn(new PageResult<>(List.of(), 0L));
-        when(accountMapper.selectCalendarUnscheduledCount(any(MediaAccountCalendarPageReqVO.class), eq(Set.of()), eq(true)))
-                .thenReturn(2L);
-
-        assertEquals(2, service.allCalendar(req, 20L).getUnscheduledCount());
-
-        verifyNoInteractions(mediaDataScopeService);
-        ArgumentCaptor<MediaAccountCalendarPageReqVO> pageReq = ArgumentCaptor.forClass(MediaAccountCalendarPageReqVO.class);
-        verify(accountMapper).selectCalendarPage(pageReq.capture(), eq(Set.of()), eq(true));
-        assertEquals(1, pageReq.getValue().getPageNo());
-        assertEquals(-1, pageReq.getValue().getPageSize());
-    }
-
-    @Test
-    void calendarCandidatesReturnOnlyEnabledUsersFromSystemRoles() {
-        when(roleApi.getRoleByCode("content_director")).thenReturn(role(11L, CommonStatusEnum.ENABLE.getStatus()));
-        when(roleApi.getRoleByCode("new_media_operator")).thenReturn(role(12L, CommonStatusEnum.ENABLE.getStatus()));
-        when(permissionApi.getUserRoleIdListByRoleIds(Set.of(11L))).thenReturn(Set.of(30L, 31L));
-        when(permissionApi.getUserRoleIdListByRoleIds(Set.of(12L))).thenReturn(Set.of(20L));
-        when(adminUserApi.getUserList(Set.of(30L, 31L))).thenReturn(List.of(
-                user(31L, "停用编导", CommonStatusEnum.DISABLE.getStatus()),
-                user(30L, "编导乙", CommonStatusEnum.ENABLE.getStatus())));
-        when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(
-                user(20L, "运营甲", CommonStatusEnum.ENABLE.getStatus())));
+    void calendarCandidatesReturnOnlyEnabledUsersFromAuthorizedAccounts() {
+        when(calendarScopeService.resolve(20L)).thenReturn(new MediaAccountCalendarScopeService.Scope(false, Set.of(20L, 30L)));
+        when(accountMapper.selectCalendarCandidateAccounts(Set.of(20L, 30L), false)).thenReturn(List.of(
+                account(), account().setDirectorUserId(31L)));
+        when(adminUserApi.getUserMap(Set.of(20L, 30L, 31L))).thenReturn(Map.of(
+                20L, user(20L, "运营甲", CommonStatusEnum.ENABLE.getStatus()),
+                30L, user(30L, "编导乙", CommonStatusEnum.ENABLE.getStatus()),
+                31L, user(31L, "停用编导", CommonStatusEnum.DISABLE.getStatus())));
 
         var result = service.calendarCandidates(20L);
 
@@ -264,10 +237,6 @@ class MediaAccountMaintenanceServiceTest {
 
     private DictDataRespDTO dict(String value, String label) {
         DictDataRespDTO row = new DictDataRespDTO(); row.setValue(value); row.setLabel(label); return row;
-    }
-
-    private RoleRespDTO role(Long id, Integer status) {
-        RoleRespDTO role = new RoleRespDTO(); role.setId(id); role.setStatus(status); return role;
     }
 
     private AdminUserRespDTO user(Long id, String nickname, Integer status) {

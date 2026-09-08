@@ -76,6 +76,7 @@ export interface ProductAttrVO {
 }
 
 export interface ProductSkuVO {
+  specs?: import('@/utils/productSpecs').ProductSpec[]
   id: number
   spuId: number
   skuRef: string
@@ -116,7 +117,7 @@ export const deleteProduct = (id: number) =>
 export const updateProductStatus = (data: { id: number; status: number }) =>
   request.put({ url: '/zsjos/product/update-status', data })
 
-export const getCategoryTree = () => request.get({ url: '/zsjos/product/category/tree' })
+export const getCategoryTree = (status?: number) => request.get({ url: '/zsjos/product/category/tree', params: status === undefined ? undefined : { status } })
 export const createCategory = (data: Partial<ZsjosProductCategoryVO>) =>
   request.post({ url: '/zsjos/product/category/create', data })
 export const updateCategory = (data: Partial<ZsjosProductCategoryVO>) =>

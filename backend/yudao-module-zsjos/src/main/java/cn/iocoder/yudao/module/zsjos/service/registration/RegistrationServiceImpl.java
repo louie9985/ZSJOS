@@ -1,8 +1,10 @@
 package cn.iocoder.yudao.module.zsjos.service.registration;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.hutool.core.io.FileUtil;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
@@ -31,12 +33,19 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductCategoryMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactExtensionMapper;
 import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -75,6 +84,11 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Resource private RegistrationItemAttachmentMapper attachmentMapper;
     @Resource private RegistrationItemMapper registrationItemMapper;
     @Resource private ServiceRelationMapper serviceRelationMapper;
+    @Resource private DeliveryClassMapper deliveryClassMapper;
+    @Resource private DeliveryClassService deliveryClassService;
+    @Resource private ZsjosProductCategoryMapper productCategoryMapper;
+    @Resource private ZsjosProductMapper productMapper;
+    @Resource private RegistrationClassAssignmentMapper classAssignmentMapper;
     @Resource private RegistrationCommandMapper commandMapper;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderItemMapper orderItemMapper;
@@ -107,11 +121,12 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled())).toList();
         List<RegistrationRouteOptionDO> routeDefinitions = routeOptionMapper.selectByVersionId(template.getPublishedVersionId()).stream()
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled())).toList();
-        if (definitions.stream().noneMatch(item -> ITEM_TYPE_STUDY_PLANNER.equals(item.getItemType())) || routeDefinitions.isEmpty()) {
+        if (definitions.isEmpty()) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
         RegistrationCaseDO registrationCase = new RegistrationCaseDO();
         registrationCase.setOrderId(orderId); registrationCase.setStatus(STATUS_PENDING);
+        registrationCase.setAssignmentMode("class_per_item");
         registrationCase.setChecklistVersionId(template.getPublishedVersionId());
         registrationCase.setRegistrationApprovedAt(approvedAt); registrationCase.setVersion(0);
         try {
@@ -219,6 +234,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             return getCaseForUpdateResult(caseId);
         }
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        if ("class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
         List<RegistrationCaseRouteDO> routes = caseRouteMapper.selectByCaseId(caseId);
         Map<Long, RegistrationRoutesUpdateReqVO.RouteReqVO> requested = reqVO.getRoutes().stream()
                 .collect(Collectors.toMap(RegistrationRoutesUpdateReqVO.RouteReqVO::getRouteId, Function.identity()));
@@ -254,6 +270,47 @@ public class RegistrationServiceImpl implements RegistrationService {
         plannerItem.setCheckedByUserId(plannerId != null ? userId : null);
         plannerItem.setCheckedAt(plannerId != null ? now : null);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
+        touch(registrationCase);
+        return convert(registrationCase, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = "update")
+    public RegistrationCaseRespVO updateClassAssignments(Long caseId, Long userId,
+                                                          RegistrationClassAssignmentsSaveReqVO reqVO) {
+        String fingerprint = reqVO.getAssignments().stream()
+                .sorted(Comparator.comparing(RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO::getOrderItemId))
+                .map(item -> item.getOrderItemId() + ":" + item.getClassId())
+                .collect(Collectors.joining(","));
+        if (!beginCommand(caseId, userId, "update-class-assignments", reqVO.getIdempotencyKey(), fingerprint)) {
+            return getCaseForUpdateResult(caseId);
+        }
+        RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        if (!"class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
+        SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
+        if (order == null) throw exception(REGISTRATION_ORDER_INVALID);
+        List<SalesOrderItemDO> orderItems = orderItemMapper.selectListByOrderId(order.getId());
+        Map<Long, RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO> requested = reqVO.getAssignments().stream()
+                .collect(Collectors.toMap(RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO::getOrderItemId,
+                        Function.identity(), (left, right) -> { throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID); }));
+        if (orderItems.isEmpty() || requested.size() != orderItems.size()
+                || orderItems.stream().anyMatch(item -> !requested.containsKey(item.getId()))) {
+            throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        }
+        for (SalesOrderItemDO orderItem : orderItems) {
+            RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO value = requested.get(orderItem.getId());
+            AssignmentSnapshot snapshot = validateClassAssignment(orderItem, value.getClassId(), false);
+            RegistrationClassAssignmentDO assignment = classAssignmentMapper.selectByCaseAndItem(caseId, orderItem.getId());
+            if (assignment == null) {
+                assignment = new RegistrationClassAssignmentDO();
+                assignment.setRegistrationCaseId(caseId); assignment.setOrderItemId(orderItem.getId());
+                assignment.setVersion(0);
+            } else assignment.setVersion(assignment.getVersion() + 1);
+            applyAssignmentSnapshot(assignment, snapshot, userId);
+            if (assignment.getId() == null) classAssignmentMapper.insert(assignment);
+            else classAssignmentMapper.updateById(assignment);
+        }
         touch(registrationCase);
         return convert(registrationCase, true);
     }
@@ -368,6 +425,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (!beginCommand(caseId, userId, "update-planner", reqVO.getIdempotencyKey(),
                 String.valueOf(reqVO.getStudyPlannerUserId()))) return getCaseForUpdateResult(caseId);
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        if ("class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
         Long previousPlannerId = registrationCase.getStudyPlannerUserId();
         RegistrationCaseRouteDO plannerRoute = caseRouteMapper.selectByCaseId(caseId).stream()
                 .filter(route -> ASSIGNEE_STUDY_PLANNER.equals(route.getAssigneeType())).findFirst()
@@ -400,7 +458,8 @@ public class RegistrationServiceImpl implements RegistrationService {
     public void complete(Long caseId, Long userId, RegistrationVersionReqVO reqVO) {
         if (!beginCommand(caseId, userId, "complete", reqVO.getIdempotencyKey(), "complete")) return;
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
-        SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        SalesOrderDO order = orderMapper.selectByIdForUpdate(registrationCase.getOrderId(), tenantId);
         if (order == null) throw exception(REGISTRATION_ORDER_INVALID);
         if (STATUS_PENDING_APPROVAL.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_PENDING);
         if (STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_REVISION_REQUIRED);
@@ -418,19 +477,42 @@ public class RegistrationServiceImpl implements RegistrationService {
                 && attachments.getOrDefault(item.getId(), List.of()).isEmpty())) {
             throw exception(REGISTRATION_ATTACHMENT_REQUIRED);
         }
-        List<RegistrationCaseRouteDO> routes = caseRouteMapper.selectByCaseId(caseId);
-        List<RegistrationCaseRouteDO> selectedRoutes = routes.stream()
-                .filter(route -> Boolean.TRUE.equals(route.getSelected())).toList();
-        if (selectedRoutes.size() != 1 || !ASSIGNEE_STUDY_PLANNER.equals(selectedRoutes.get(0).getAssigneeType())) {
-            throw exception(REGISTRATION_ROUTE_INVALID);
+        boolean classMode = "class_per_item".equals(registrationCase.getAssignmentMode());
+        Long plannerId = null;
+        DeliveryClassDO pendingClass = null;
+        Map<Long, AssignmentSnapshot> assignments = new HashMap<>();
+        List<SalesOrderItemDO> orderItems = orderItemMapper.selectListByOrderIdForUpdate(order.getId(), tenantId);
+        if (classMode) {
+            Map<Long, RegistrationClassAssignmentDO> saved = classAssignmentMapper
+                    .selectByCaseIdForUpdate(caseId, tenantId).stream()
+                    .collect(Collectors.toMap(RegistrationClassAssignmentDO::getOrderItemId, Function.identity()));
+            if (orderItems.isEmpty() || saved.size() != orderItems.size()
+                    || orderItems.stream().anyMatch(item -> !saved.containsKey(item.getId()))
+                    || saved.values().stream().anyMatch(item -> item.getClassId() == null)) {
+                throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+            }
+            Map<Long, DeliveryClassDO> lockedClasses = new HashMap<>();
+            saved.values().stream().map(RegistrationClassAssignmentDO::getClassId).distinct().sorted()
+                    .forEach(classId -> lockedClasses.put(classId,
+                            deliveryClassMapper.selectByIdForUpdate(classId, tenantId)));
+            for (SalesOrderItemDO orderItem : orderItems) {
+                Long classId = saved.get(orderItem.getId()).getClassId();
+                assignments.put(orderItem.getId(), validateClassAssignment(orderItem, lockedClasses.get(classId)));
+            }
+        } else {
+            List<RegistrationCaseRouteDO> selectedRoutes = caseRouteMapper.selectByCaseId(caseId).stream()
+                    .filter(route -> Boolean.TRUE.equals(route.getSelected())).toList();
+            if (selectedRoutes.size() != 1 || !ASSIGNEE_STUDY_PLANNER.equals(selectedRoutes.get(0).getAssigneeType())) {
+                throw exception(REGISTRATION_ROUTE_INVALID);
+            }
+            if (selectedRoutes.stream().anyMatch(route -> route.getAssigneeUserId() == null
+                    || resolveRouteCandidates(route, userId).stream().noneMatch(candidate -> Objects.equals(candidate.getId(), route.getAssigneeUserId())))) {
+                throw exception(REGISTRATION_ROUTE_ASSIGNEE_INVALID);
+            }
+            plannerId = selectedRoutes.get(0).getAssigneeUserId();
+            pendingClass = deliveryClassMapper.selectPending();
+            if (pendingClass == null) throw exception(REGISTRATION_ROUTE_INVALID);
         }
-        if (selectedRoutes.stream().anyMatch(route -> route.getAssigneeUserId() == null
-                || resolveRouteCandidates(route, userId).stream().noneMatch(candidate -> Objects.equals(candidate.getId(), route.getAssigneeUserId())))) {
-            throw exception(REGISTRATION_ROUTE_ASSIGNEE_INVALID);
-        }
-        Long plannerId = selectedRoutes.stream().filter(route -> ASSIGNEE_STUDY_PLANNER.equals(route.getAssigneeType()))
-                .map(RegistrationCaseRouteDO::getAssigneeUserId).findFirst().orElse(null);
-        Long serviceOwnerId = plannerId;
         LocalDateTime now = LocalDateTime.now();
         for (RegistrationCaseChecklistItemDO item : items) {
             if (ITEM_TYPE_STUDY_PLANNER.equals(item.getItemType()) && !Boolean.TRUE.equals(item.getChecked())) {
@@ -445,10 +527,13 @@ public class RegistrationServiceImpl implements RegistrationService {
             fact.setItemLabelSnapshot(item.getTitleSnapshot()); fact.setOccurredAt(item.getCheckedAt());
             fact.setRecordedAt(now); fact.setRecordedByUserId(item.getCheckedByUserId()); registrationItemMapper.insert(fact);
         }
-        for (SalesOrderItemDO orderItem : orderItemMapper.selectListByOrderId(order.getId())) {
+        for (SalesOrderItemDO orderItem : orderItems) {
+            AssignmentSnapshot assignment = classMode ? assignments.get(orderItem.getId()) : null;
             ServiceRelationDO relation = new ServiceRelationDO();
             relation.setPersonId(order.getPersonId()); relation.setOrderId(order.getId()); relation.setOrderItemId(orderItem.getId());
-            relation.setRegistrationCaseId(caseId); relation.setStatus("active"); relation.setOwnerUserId(serviceOwnerId);
+            relation.setRegistrationCaseId(caseId); relation.setStatus("active");
+            relation.setOwnerUserId(classMode ? assignment.ownerUserId() : plannerId);
+            relation.setClassId(classMode ? assignment.deliveryClass().getId() : pendingClass.getId());
             relation.setAcceptanceStatus("pending"); relation.setServiceSnapshot(orderItem.getProductSnapshot());
             relation.setActivatedAt(now); relation.setVersion(0);
             serviceRelationMapper.insert(relation);
@@ -457,8 +542,13 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (person != null) { person.setIdentityStatus("student"); person.setLastSeenAt(now); person.setVersion(person.getVersion() + 1); personMapper.updateById(person); }
         registrationCase.setStatus(STATUS_COMPLETED); registrationCase.setCompletedByUserId(userId);
         registrationCase.setCompletedAt(now); registrationCase.setVersion(registrationCase.getVersion() + 1); caseMapper.updateById(registrationCase);
-        registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
-                person == null ? null : person.getPersonNo(), plannerId, order.getPersonId());
+        Set<Long> notifiedPlanners = classMode ? assignments.values().stream().map(AssignmentSnapshot::ownerUserId)
+                .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new))
+                : plannerId == null ? Set.of() : Set.of(plannerId);
+        for (Long notifiedPlanner : notifiedPlanners) {
+            registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
+                    person == null ? null : person.getPersonNo(), notifiedPlanner, order.getPersonId());
+        }
     }
 
     @Override
@@ -569,11 +659,76 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
     }
 
+    private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, Long classId, boolean lock) {
+        ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
+        if (product == null || product.getCategoryId() == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        DeliveryClassDO deliveryClass = lock
+                ? deliveryClassMapper.selectByIdForUpdate(classId, TenantContextHolder.getRequiredTenantId())
+                : deliveryClassMapper.selectById(classId);
+        return validateClassAssignment(product, deliveryClass);
+    }
+
+    private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, DeliveryClassDO deliveryClass) {
+        ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
+        if (product == null || product.getCategoryId() == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        return validateClassAssignment(product, deliveryClass);
+    }
+
+    private AssignmentSnapshot validateClassAssignment(ZsjosProductDO product, DeliveryClassDO deliveryClass) {
+        if (deliveryClass == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        if (Boolean.TRUE.equals(deliveryClass.getSystemClass())) {
+            CategorySnapshot category = categorySnapshot(product.getCategoryId());
+            return new AssignmentSnapshot(deliveryClass, product.getCategoryId(), category.name(), category.path(), null);
+        }
+        AdminUserRespDTO homeroom = null;
+        if (deliveryClass.getHomeroomUserId() != null) {
+            try {
+                homeroom = deliveryClassService.validateHomeroom(deliveryClass.getHomeroomUserId());
+            } catch (ServiceException invalidHomeroom) {
+                throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+            }
+        }
+        if (!"SERVING".equals(deliveryClass.getStatus())
+                || !Objects.equals(deliveryClass.getCategoryId(), product.getCategoryId())
+                || homeroom == null || !Objects.equals(homeroom.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
+            throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        }
+        return new AssignmentSnapshot(deliveryClass, deliveryClass.getCategoryId(),
+                deliveryClass.getCategoryNameSnapshot(), deliveryClass.getCategoryPathSnapshot(), homeroom.getId());
+    }
+
+    private CategorySnapshot categorySnapshot(Long categoryId) {
+        ZsjosProductCategoryDO category = productCategoryMapper.selectById(categoryId);
+        if (category == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        List<String> path = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        ZsjosProductCategoryDO cursor = category;
+        while (cursor != null && visited.add(cursor.getId())) {
+            path.add(cursor.getName());
+            if (cursor.getParentId() == null || cursor.getParentId() == 0) break;
+            cursor = productCategoryMapper.selectById(cursor.getParentId());
+        }
+        Collections.reverse(path);
+        return new CategorySnapshot(category.getName(), JsonUtils.toJsonString(path));
+    }
+
+    private void applyAssignmentSnapshot(RegistrationClassAssignmentDO assignment, AssignmentSnapshot snapshot,
+                                         Long userId) {
+        DeliveryClassDO deliveryClass = snapshot.deliveryClass();
+        assignment.setClassId(deliveryClass.getId()); assignment.setClassNoSnapshot(deliveryClass.getClassNo());
+        assignment.setClassNameSnapshot(deliveryClass.getClassName());
+        assignment.setHomeroomUserId(snapshot.ownerUserId());
+        assignment.setHomeroomUserNameSnapshot(deliveryClass.getHomeroomUserNameSnapshot());
+        assignment.setCategoryId(snapshot.categoryId()); assignment.setCategoryNameSnapshot(snapshot.categoryName());
+        assignment.setCategoryPathSnapshot(snapshot.categoryPath()); assignment.setUpdatedByUserId(userId);
+    }
+
     private RegistrationCaseRespVO convert(RegistrationCaseDO registrationCase, boolean details) {
         SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
         RegistrationCaseRespVO result = new RegistrationCaseRespVO();
         result.setId(registrationCase.getId()); result.setOrderId(registrationCase.getOrderId()); result.setStatus(registrationCase.getStatus());
         result.setStatusLabel(registrationStatusLabel(registrationCase.getStatus()));
+        result.setAssignmentMode(registrationCase.getAssignmentMode() == null ? "legacy_planner" : registrationCase.getAssignmentMode());
         result.setStudyPlannerUserId(registrationCase.getStudyPlannerUserId()); result.setRegistrationApprovedAt(registrationCase.getRegistrationApprovedAt());
         result.setCompletedAt(registrationCase.getCompletedAt()); result.setCancelledAt(registrationCase.getCancelledAt());
         result.setCancelReason(registrationCase.getCancelReason()); result.setVersion(registrationCase.getVersion());
@@ -627,6 +782,47 @@ public class RegistrationServiceImpl implements RegistrationService {
                 row.setAssigneeUserName(route.getAssigneeNameSnapshot()); row.setSort(route.getSort());
                 return row;
             }).toList());
+            if ("class_per_item".equals(result.getAssignmentMode()) && order != null) {
+                Map<Long, RegistrationClassAssignmentDO> assignmentMap = classAssignmentMapper
+                        .selectByCaseId(registrationCase.getId()).stream()
+                        .collect(Collectors.toMap(RegistrationClassAssignmentDO::getOrderItemId, Function.identity()));
+                result.setClassAssignments(orderItemMapper.selectListByOrderId(order.getId()).stream().map(orderItem -> {
+                    RegistrationCaseRespVO.ClassAssignmentVO row = new RegistrationCaseRespVO.ClassAssignmentVO();
+                    row.setOrderItemId(orderItem.getId()); row.setProductId(orderItem.getProductId());
+                    ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
+                    if (product != null) row.setCategoryId(product.getCategoryId());
+                    row.setProductName("历史标签缺失");
+                    if (orderItem.getProductSnapshot() != null && !orderItem.getProductSnapshot().isBlank()) {
+                        // A legacy record may retain a reliable name even when its newer typed shape cannot be decoded.
+                        Map<?, ?> rawSnapshot = JsonUtils.parseObjectQuietly(orderItem.getProductSnapshot(), Map.class);
+                        if (rawSnapshot != null && rawSnapshot.get("name") instanceof String name && !name.isBlank()) {
+                            row.setProductName(name);
+                        }
+                        var snapshot = JsonUtils.parseObjectQuietly(orderItem.getProductSnapshot(),
+                                cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.class);
+                        if (snapshot != null) {
+                            row.setSpecs(snapshot.displaySpecs());
+                        }
+                    }
+                    RegistrationClassAssignmentDO assignment = assignmentMap.get(orderItem.getId());
+                    if (assignment != null) {
+                        row.setCategoryId(assignment.getCategoryId()); row.setCategoryName(assignment.getCategoryNameSnapshot());
+                        row.setCategoryPath(assignment.getCategoryPathSnapshot()); row.setClassId(assignment.getClassId());
+                        row.setClassNo(assignment.getClassNoSnapshot()); row.setClassName(assignment.getClassNameSnapshot());
+                        row.setHomeroomUserId(assignment.getHomeroomUserId());
+                        row.setHomeroomUserName(assignment.getHomeroomUserNameSnapshot());
+                        DeliveryClassDO currentClass = deliveryClassMapper.selectById(assignment.getClassId());
+                        row.setSystemClass(currentClass != null && Boolean.TRUE.equals(currentClass.getSystemClass()));
+                        try { validateClassAssignment(orderItem, assignment.getClassId(), false); }
+                        catch (RuntimeException invalid) {
+                            row.setErrorCode("class_unavailable"); row.setErrorReason("所选班级已不可用，请重新选择");
+                        }
+                    } else {
+                        row.setErrorCode("class_required"); row.setErrorReason("请选择班级");
+                    }
+                    return row;
+                }).toList());
+            }
             applyCompletionState(result, registrationCase, order);
         }
         return result;
@@ -655,11 +851,18 @@ public class RegistrationServiceImpl implements RegistrationService {
                 && Boolean.TRUE.equals(item.getAttachmentRequired())
                 && (item.getAttachments() == null || item.getAttachments().isEmpty()))) {
             code = COMPLETION_BLOCK_ATTACHMENT_REQUIRED; reason = "请先上传所有必传附件";
-        } else if (result.getRoutes() == null || result.getRoutes().stream()
+        } else if ("class_per_item".equals(result.getAssignmentMode())
+                && (result.getClassAssignments() == null || result.getClassAssignments().isEmpty()
+                || result.getClassAssignments().stream().anyMatch(item -> item.getClassId() == null
+                || item.getErrorCode() != null))) {
+            code = "class_assignment_required"; reason = "请为每个订单商品选择可用班级";
+        } else if (!"class_per_item".equals(result.getAssignmentMode())
+                && (result.getRoutes() == null || result.getRoutes().stream()
                 .noneMatch(item -> Boolean.TRUE.equals(item.getSelected())
-                        && ASSIGNEE_STUDY_PLANNER.equals(item.getAssigneeType()))) {
+                        && ASSIGNEE_STUDY_PLANNER.equals(item.getAssigneeType())))) {
             code = COMPLETION_BLOCK_PLANNER_REQUIRED; reason = "请先分配学习规划师";
-        } else if (result.getRoutes().stream().filter(item -> Boolean.TRUE.equals(item.getSelected()))
+        } else if (!"class_per_item".equals(result.getAssignmentMode())
+                && result.getRoutes().stream().filter(item -> Boolean.TRUE.equals(item.getSelected()))
                 .anyMatch(route -> !ASSIGNEE_STUDY_PLANNER.equals(route.getAssigneeType())
                         || route.getAssigneeUserId() == null || caseRouteMapper.selectById(route.getId()) == null)) {
             code = COMPLETION_BLOCK_PLANNER_INVALID; reason = "学习规划师分配无效，请重新选择";
@@ -695,4 +898,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             default -> "未知状态";
         };
     }
+
+    private record AssignmentSnapshot(DeliveryClassDO deliveryClass, Long categoryId, String categoryName,
+                                      String categoryPath, Long ownerUserId) {}
+    private record CategorySnapshot(String name, String path) {}
 }

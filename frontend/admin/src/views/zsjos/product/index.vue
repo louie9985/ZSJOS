@@ -70,6 +70,51 @@
             ></template
           >
         </el-tree>
+        <el-collapse v-if="disabledCategories.length" class="mt-16px">
+          <el-collapse-item name="disabled-categories">
+            <template #title>已停用分类（{{ disabledCategoryCount }}）</template>
+            <el-tree :data="disabledCategories" node-key="id" :expand-on-click-node="false">
+              <template #default="{ data }">
+                <span class="tree-node">
+                  <span>{{ data.name }}</span>
+                  <span>
+                    <el-tag size="small" type="info">停用</el-tag>
+                    <el-button
+                      link
+                      size="small"
+                      :loading="isProcessing(`category-status:${data.id}`)"
+                      v-hasPermi="['zsjos:product-category:status']"
+                      @click.stop="toggleCategory(data)"
+                      >启用</el-button
+                    >
+                    <el-button
+                      link
+                      size="small"
+                      v-hasPermi="['zsjos:product-category:update']"
+                      @click.stop="openCategory(data)"
+                      >编辑</el-button
+                    >
+                    <ZsjosPopconfirm
+                      :action="`删除产品分类「${data.name}」`"
+                      danger
+                      @confirm="removeCategory(data)"
+                    >
+                      <el-button
+                        link
+                        size="small"
+                        type="danger"
+                        :loading="isProcessing(`category-delete:${data.id}`)"
+                        v-hasPermi="['zsjos:product-category:delete']"
+                        @click.stop
+                        >删除</el-button
+                      >
+                    </ZsjosPopconfirm>
+                  </span>
+                </span>
+              </template>
+            </el-tree>
+          </el-collapse-item>
+        </el-collapse>
       </el-col>
       <el-col :xs="24" :md="16">
         <div class="panel-heading"
@@ -375,11 +420,10 @@
         >
         <el-table :data="skus" size="small">
           <el-table-column label="SKU名称" prop="skuName" min-width="180" />
-          <el-table-column label="属性组合" min-width="180"
-            ><template #default="scope">{{
-              formatAttrs(scope.row.attrValues)
-            }}</template></el-table-column
-          >
+          <el-table-column v-for="attr in (narrowSkuLayout ? [] : skuSpecColumns)" :key="attr.attrKey" :label="attr.attrName" min-width="130">
+            <template #default="scope">{{ scope.row.specs?.filter(spec => spec.attrKey === attr.attrKey).map(spec => `${spec.label}${spec.labelMissing ? '（历史标签缺失）' : ''}`).join('') || '-' }}</template>
+          </el-table-column>
+          <el-table-column v-if="narrowSkuLayout" label="规格明细" min-width="200"><template #default="scope"><ProductSpecs :product="scope.row" /></template></el-table-column>
           <el-table-column label="价格" width="100"
             ><template #default="scope"
               >¥{{ Number(scope.row.price).toFixed(2) }}</template
@@ -424,9 +468,7 @@
       <el-form-item label="SKU名称" required
         ><el-input v-model="skuForm.skuName" maxlength="200"
       /></el-form-item>
-      <el-form-item label="属性组合"
-        ><el-input :model-value="formatAttrs(skuForm.attrValues)" disabled
-      /></el-form-item>
+      <el-form-item label="属性组合"><ProductSpecs :product="skus.find(sku => sku.id === skuForm.id) || skuForm" /></el-form-item>
       <el-form-item label="价格" required
         ><el-input-number v-model="skuForm.price" :min="0" :precision="2" class="w-full"
       /></el-form-item>
@@ -446,6 +488,9 @@
 </template>
 
 <script setup lang="ts">
+import ProductSpecs from '../components/ProductSpecs.vue'
+import { useMediaQuery } from '@vueuse/core'
+const narrowSkuLayout = useMediaQuery('(max-width: 600px)')
 import type { FormInstance, FormRules } from 'element-plus'
 import * as ProductApi from '@/api/zsjos/product'
 import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
@@ -472,6 +517,7 @@ const withProcessing = async (key: string, task: () => Promise<void>) => {
 }
 const error = ref('')
 const categories = ref<ProductApi.ZsjosProductCategoryVO[]>([])
+const disabledCategories = ref<ProductApi.ZsjosProductCategoryVO[]>([])
 const selectedCategory = ref<ProductApi.ZsjosProductCategoryVO>()
 const products = ref<ProductApi.ZsjosProductVO[]>([])
 const disabledProducts = ref<ProductApi.ZsjosProductVO[]>([])
@@ -520,6 +566,11 @@ const expandedCategoryKeys = computed(() => {
   })
   visit(categories.value)
   return keys
+})
+const disabledCategoryCount = computed(() => {
+  const count = (nodes: ProductApi.ZsjosProductCategoryVO[]): number =>
+    nodes.reduce((total, node) => total + 1 + count(node.children || []), 0)
+  return count(disabledCategories.value)
 })
 const categoryRules: FormRules = {
   name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
@@ -592,7 +643,9 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    categories.value = await ProductApi.getCategoryTree()
+    const [enabledCategories, stoppedCategories] = await Promise.all([ProductApi.getCategoryTree(0), ProductApi.getCategoryTree(1)])
+    categories.value = enabledCategories
+    disabledCategories.value = stoppedCategories
     if (selectedCategory.value) selectedCategory.value = findCategory(selectedCategory.value.id)
     await Promise.all([loadProducts(), loadDisabledProducts()])
   } catch (e: any) {
@@ -718,9 +771,13 @@ const removeProduct = async (row: ProductApi.ZsjosProductVO) => {
 }
 const toggleCategory = async (row: ProductApi.ZsjosProductCategoryVO) => {
   await withProcessing(`category-status:${row.id}`, async () => {
-    await ProductApi.updateCategoryStatus(row.id, row.status === 0 ? 1 : 0)
-    await load()
-    message.success('分类状态已更新')
+    try {
+      await ProductApi.updateCategoryStatus(row.id, row.status === 0 ? 1 : 0)
+      await load()
+      message.success('分类状态已更新')
+    } catch (e: any) {
+      message.error(e?.msg || e?.message || '分类状态更新失败')
+    }
   })
 }
 const removeCategory = async (row?: ProductApi.ZsjosProductCategoryVO) => {
@@ -800,8 +857,7 @@ const generateSku = async () => {
     message.success(count ? `已生成 ${count} 个缺失组合，请设置价格后启用` : '没有需要生成的新组合')
   })
 }
-const formatAttrs = (attrs?: Record<string, string>) =>
-  Object.values(attrs || {}).join(' / ') || '无销售属性'
+const skuSpecColumns = computed(() => [...new Map(skus.value.flatMap(sku => sku.specs || []).map(spec => [spec.attrKey, spec])).values()])
 const openSku = (row: ProductApi.ProductSkuVO) => {
   Object.assign(skuForm, row)
   skuEditDialog.value = true

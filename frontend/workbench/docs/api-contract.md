@@ -72,7 +72,7 @@
 - `GET /zsjos/media-account/{id}/maintenance-history`：分页查看维护版本，接受账号查询或维护功能权限并叠加账号对象读取权限；账号投影仅在两层权限都通过时返回 `VIEW_ACCOUNT_HISTORY`，Workbench 未收到该能力时不得请求或展示历史。Workbench 不再展示或请求后端保留的旧阶段历史接口。
 - Workbench 将状态摘要、维护入口和维护版本归属到具体账号：账号行只根据该账号的 `MAINTAIN_ACCOUNT`/`VIEW_ACCOUNT_HISTORY` 投影操作，选中账号后在“账号”页签内展示完整状态与维护版本，不提供学员级“状态维护”页签；旧 `tab=maintenance` 链接兼容进入 `accounts`。
 - `GET /zsjos/media-account/calendar`：查询与日期窗口相交的当前账号区间，并返回当前范围下的未排期数量；普通用户限本人所属编导/运营账号，`zsjos:media-calendar:query-all` 扩展为全量。
-- `GET /zsjos/media-account/calendar/all`：查询“日历日程”共享页的整窗数据，不传 `pageNo` / `pageSize`，也不使用账号对象可见范围；页面权限为 `zsjos:media-calendar:all-query`。
+- `GET /zsjos/personal-calendar`：查询当前登录用户的个人手工日程；新增、修改、删除使用同路径 REST 命令和独立按钮权限，客户端不提交 owner。
 - `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：旧阶段推进/回退路由已移除；旧客户端请求按标准 404 处理。阶段只能通过账号维护接口作为普通字典字段自由选择。
 - `PUT /zsjos/media-account/{id}`：编辑账号资料，必须携带版本号。
 - `POST /zsjos/media-account/{id}/rescue`：更新挽救状态，必须携带版本号。

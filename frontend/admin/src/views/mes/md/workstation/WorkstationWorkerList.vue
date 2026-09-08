@@ -82,7 +82,7 @@ const isDetail = computed(() => props.formType === 'detail') // 是否详情模�
 
 const loading = ref(false) // 列表的加载中
 const list = ref<MdWorkstationWorkerVO[]>([]) // 列表的数据
-const postList = ref<PostApi.PostVO[]>([]) // 岗位下拉列表
+const postList = ref<PostApi.PostSimpleVO[]>([]) // 岗位下拉列表
 
 /** 查询列表 */
 const getList = async () => {

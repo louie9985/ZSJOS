@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.hutool.core.util.DesensitizedUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
@@ -88,6 +87,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource
     private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
+    @Resource private LeadIdentityMaskingService leadIdentityMaskingService;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
     @Resource private SalesOrderMapper salesOrderMapper;
@@ -355,32 +355,35 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                           Map<Long, PartnerDO> partners) {
         LeadManagementRespVO result = BeanUtils.toBean(lead, LeadManagementRespVO.class);
         result.setSourceChannel(lead.getSourceChannelId());
-        boolean blindIdentity = isBlindIdentity(lead, currentUserId);
-        boolean viewerIsOwner = Objects.equals(currentUserId, lead.getOwnerUserId());
-        boolean viewerIsSubmitter = PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
-                && Objects.equals(currentUserId, lead.getProviderOwnerId());
+        LeadIdentityMaskingService.LeadIdentityViewContext identityContext =
+                leadIdentityMaskingService.resolve(currentUserId, lead);
+        boolean blindIdentity = identityContext.counterpartyMaskingEnabled();
+        boolean viewerIsOwner = identityContext.viewerIsOwner();
+        boolean viewerIsSubmitter = identityContext.viewerIsSubmitter();
         boolean selfSourcedWithoutProvider = SOURCE_SALES_SELF.equals(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 && lead.getSourceProviderUserId() == null;
         result.setSourceUserId(blindIdentity && viewerIsOwner ? null : lead.getSourceUserId());
-        result.setSourceUserName(selfSourcedWithoutProvider ? null : (blindIdentity && viewerIsOwner
-                ? maskedUserName(users, lead.getSourceUserId()) : userName(users, lead.getSourceUserId())));
+        result.setSourceUserName(selfSourcedWithoutProvider ? null : leadIdentityMaskingService.employeeName(
+                identityContext, users, lead.getSourceUserId(), LeadIdentityRole.SOURCE));
         result.setOwnerUserId(blindIdentity && viewerIsSubmitter ? null : lead.getOwnerUserId());
-        result.setOwnerUserName(blindIdentity && viewerIsSubmitter
-                ? maskedUserName(users, lead.getOwnerUserId()) : userName(users, lead.getOwnerUserId()));
+        result.setOwnerUserName(leadIdentityMaskingService.employeeName(
+                identityContext, users, lead.getOwnerUserId(), LeadIdentityRole.OWNER));
         result.setSourceLabel(sourceLabel(lead.getSourceType()));
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
             var partner = detail ? partnerMapper.selectById(lead.getPartnerId()) : partners.get(lead.getPartnerId());
             String partnerName = partner == null ? null : partner.getName();
-            result.setSourceUserName(blindIdentity && viewerIsOwner && partnerName != null
-                    ? DesensitizedUtil.chineseName(partnerName) : partnerName);
+            result.setSourceUserName(leadIdentityMaskingService.partnerName(identityContext, partnerName));
             result.setSourceUserId(null);
         }
-        result.setPendingAssigneeUserName(userName(users, lead.getPendingAssigneeUserId()));
+        result.setPendingAssigneeUserName(leadIdentityMaskingService.employeeName(
+                identityContext, users, lead.getPendingAssigneeUserId(), LeadIdentityRole.OPERATOR));
         result.setPartnerOwnerNameSnapshot(lead.getPartnerOwnerNameSnapshot());
         result.setHandlingStage(LeadHandlingStage.resolve(lead));
-        result.setQualifiedByUserName(userName(users, lead.getQualifiedByUserId()));
-        result.setRecycleSourceOwnerUserName(userName(users, lead.getRecycleSourceOwnerUserId()));
+        result.setQualifiedByUserName(leadIdentityMaskingService.employeeName(
+                identityContext, users, lead.getQualifiedByUserId(), LeadIdentityRole.OPERATOR));
+        result.setRecycleSourceOwnerUserName(leadIdentityMaskingService.employeeName(
+                identityContext, users, lead.getRecycleSourceOwnerUserId(), LeadIdentityRole.OWNER));
         List<String> relationTypes = new ArrayList<>(2);
         if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(currentUserId, lead.getProviderOwnerId())) {
@@ -511,15 +514,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_COMPLAINT, true));
         }
         return actions;
-    }
-
-    private boolean isBlindIdentity(LeadDO lead, Long currentUserId) {
-        // A specified assignment is an explicit mutual identity disclosure between submitter and sales owner.
-        return !DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
-                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                && lead.getSourceUserId() != null && lead.getOwnerUserId() != null
-                && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
-                && !leadObjectPermissionService.canViewUnmaskedIdentity(currentUserId, lead);
     }
 
     private List<String> resolveVisibleTabs(LeadDO lead, Long userId) {
@@ -706,6 +700,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setSkuRef(source.getSkuRef());
         result.setSkuName(source.getSkuNameSnapshot());
         result.setSelectedAttrValues(source.getSelectedAttrValuesJson());
+        result.setSpecs(source.getSelectedSpecsJson() == null ? null : JsonUtils.parseArray(source.getSelectedSpecsJson(),
+                cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO.class));
         result.setPrice(source.getPriceSnapshot());
         result.setCategoryName(source.getCategoryNameSnapshot());
         result.setPrimary(source.getIsPrimary());
@@ -774,16 +770,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (value != null) {
             values.add(value);
         }
-    }
-
-    private static String userName(Map<Long, AdminUserRespDTO> users, Long userId) {
-        AdminUserRespDTO user = userId == null ? null : users.get(userId);
-        return user == null ? null : user.getNickname();
-    }
-
-    private static String maskedUserName(Map<Long, AdminUserRespDTO> users, Long userId) {
-        String name = userName(users, userId);
-        return name == null ? null : DesensitizedUtil.chineseName(name);
     }
 
     private static <T> Map<Long, List<T>> groupByLeadId(List<T> values, Function<T, Long> keyFunction) {

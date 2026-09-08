@@ -1,3 +1,4 @@
+import ProductSpecs from '../components/ProductSpecs'
 import { ReloadOutlined, SendOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Card, Cascader, Col, Descriptions, Form, Input, Radio, Row, Select, Space, Spin, Steps, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -332,7 +333,8 @@ export default function LeadSubmissionPage({
                 key: 'intentions', label: '意向课程', span: { xs: 1, md: 2 },
                 children: intentions.length
                   ? <Space size={[4, 4]} wrap>{intentions.map(item => <Tag key={item.key} color={item.key === primaryKey ? 'blue' : undefined}>
-                    {item.key === primaryKey ? '主意向 · ' : ''}{item.spuName} · {item.skuName}
+                    {item.key === primaryKey ? '主意向 · ' : ''}{item.spuName}<ProductSpecs product={item} />
+                    {item.skuName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}
                   </Tag>)}</Space>
                   : '—'
               },

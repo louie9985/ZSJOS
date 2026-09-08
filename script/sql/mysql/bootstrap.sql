@@ -166,6 +166,13 @@ SOURCE script/sql/mysql/migrations/V182__lead_submitter_feedback.sql;
 SOURCE script/sql/mysql/migrations/V183__student_information_collection.sql;
 SOURCE script/sql/mysql/migrations/V184__repair_work_order_scene_legacy_columns.sql;
 SOURCE script/sql/mysql/migrations/V185__partner_permission_scope_split.sql;
+SOURCE script/sql/mysql/migrations/V186__split_media_and_personal_calendar.sql;
+SOURCE script/sql/mysql/migrations/V187__exam_calendar.sql;
+SOURCE script/sql/mysql/migrations/V188__delivery_class_management.sql;
+SOURCE script/sql/mysql/migrations/V189__pms_menu_and_dictionary.sql;
+SOURCE script/sql/mysql/migrations/V190__delivery_class_product_scope.sql;
+-- Current development baseline correction; no business/permission data writes.
+SOURCE script/sql/mysql/exam-calendar-product-scope.sql;
 
 
 INSERT IGNORE INTO `zsjos_module_schema_version`

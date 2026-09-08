@@ -13,5 +13,10 @@ public record LeadProductCatalogRespVO(List<Category> categoryTree, List<Spu> sp
                       String level2CategoryName, String spuRef, String spuName, List<Attr> attrs) {}
     public record Attr(String attrKey, String attrName, Boolean required, List<Value> values) {}
     public record Value(String value, String label) {}
-    public record Sku(String spuRef, String skuRef, String skuName, Map<String, String> attrValues, BigDecimal price) {}
+    public record Sku(String spuRef, String skuRef, String skuName, Map<String, String> attrValues, BigDecimal price,
+                      List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs) {
+        public Sku(String spuRef, String skuRef, String skuName, Map<String, String> attrValues, BigDecimal price) {
+            this(spuRef, skuRef, skuName, attrValues, price, null);
+        }
+    }
 }

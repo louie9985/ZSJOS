@@ -24,7 +24,7 @@ class LeadSubmitterFeedbackServiceContextTest {
                 beans.registerSingleton("leadMapper", mock(LeadMapper.class));
                 beans.registerSingleton("attachmentMapper", mock(LeadSubmitterFeedbackAttachmentMapper.class));
                 beans.registerSingleton("permission", mock(LeadSubmitterFeedbackPermissionProvider.class));
-                beans.registerSingleton("identityPermission", mock(LeadObjectPermissionService.class));
+                beans.registerSingleton("identityMaskingService", mock(LeadIdentityMaskingService.class));
                 beans.registerSingleton("partnerAccountService", mock(PartnerAccountService.class));
                 beans.registerSingleton("adminUserApi", mock(AdminUserApi.class));
                 beans.registerSingleton("fileApi", mock(FileApi.class));

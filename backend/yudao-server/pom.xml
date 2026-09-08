@@ -136,6 +136,15 @@
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
 
+
+        <!-- PMS 相关模块。默认注释，保证编译速度 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-pms</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+
         <!-- HRM 模块 -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>

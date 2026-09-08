@@ -1,5 +1,17 @@
 # Data and Permission Flow
 
+## Account and personal calendars
+
+The account calendar is a projection of media-account maintenance dates. Page permission, account relationship
+scope and filters are cumulative: ordinary users see accounts where they are director or operator;
+`zsjos:media-calendar:query-managed` enables the bounded System department scope; only
+`zsjos:media-calendar:query-all` grants all-account visibility. Generic unbounded department scope does not
+substitute for that explicit permission. Filter candidates are derived from the already-authorized account set.
+
+`/calendar/personal` uses the independent tenant-owned `zsjos_personal_calendar_event` source. Its query and
+commands always bind `owner_user_id` to the current ADMIN user. The first version supports manual events only,
+with no work-plan aggregation and no administrator read/manage-other-user bypass.
+
 ## Student Information Collection
 
 Collection operations use independent `zsjos:student-info-form:*` menu/button permissions
@@ -247,13 +259,25 @@ Maintenance and legacy history accept either the account-query or account-mainte
 then independently require account-object read access. Account projections expose `VIEW_ACCOUNT_HISTORY`
 only after both layers pass, and Workbench must not probe either history endpoint without that capability.
 
-The server-owned top-level `/calendar` directory contains the relative `overview` and `all` children.
+The server-owned top-level `/calendar` directory contains the relative `overview` and `personal` children.
 The account Gantt projection shows only complete current date pairs that intersect the requested
 natural-date window. The ordinary `zsjos:media-calendar:query` scope is resolved in the backend by
-System department data permission, then intersected with each account's director/operator ownership;
-`zsjos:media-calendar:query-all` remains only the account-calendar all-account override. The shared
-`日历日程` page uses its own page permission `zsjos:media-calendar:all-query` and intentionally does
-not apply account object scope.
+the current user's director/operator ownership. `zsjos:media-calendar:query-managed` explicitly enables
+bounded System department scope, while `zsjos:media-calendar:query-all` is the only all-account override.
+The personal child reads only the current user's manual personal events.
+
+The server-owned Calendar `/calendar` menu contains the relative `exam-calendar` page alongside account and personal calendars. Its query permission
+is available to configured employee roles, while create, edit, publish and revoke operations require the
+independent `zsjos:exam-calendar:manage` button permission. Runtime authorization never derives management
+access from role or post names. Exact schedules use one natural date and derive published/upcoming/in-progress/
+ended display state in `Asia/Shanghai`; rough schedules use an inclusive date range and remain outside the month
+grid. Both forms select one category or one product with optional single-valued specification conditions.
+Product-domain validation resolves matching enabled SKUs; publication freezes their membership and labels.
+Historical projections use stored labels, not current product configuration. Other business selectors retain
+their existing complete-SKU and explicitly unknown-product branches; partial conditions are exam-only. The
+upcoming window uses the global Infra key `zsjos.exam-calendar.upcoming-days`, defaulting to three on invalid data.
+Role assignment exposes separate query (73612) and manage (73611) leaves under the exam-calendar page (73610).
+The query leaf makes read-only access selectable without selecting the manage leaf through a parent checkbox.
 
 ```text
 role-to-menu assignments
@@ -533,7 +557,7 @@ otherwise
 - `zsjos_lead.last_activity_at` 是客资最近业务活动时间。基本资料和提交人补充、派单与归属变化、跟进、判定与挂起恢复、申诉/投诉处理、公海协作、正式提交人反馈，以及直接改变非复购 Lead 状态的订单流程都在各自业务事务中推进该值；已有业务事件时间时使用事件时间，否则同一操作生成一次当前时间。写入只接受晚于现值的时间，补偿或乱序事件不能将其改旧。查看详情、选择记录、标记已读、上传未提交的临时附件和发送任务提醒不推进该值，通用 `update_time` 也不作为替代。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 统一客资页固定使用 `relationScope=all`，对提交人与负责人两类已授权关系取去重并集，不再让前端通过“我提交的/我负责的”切换关系范围；旧接口传入 `submitted` 或 `owned` 仍必须具备对应关系权限。页面保留单选的简单状态标签，`simpleStatus` 只在上述关系并集内追加生命周期条件。跨订单、学员、商机或审批入口只可用内部 `leadId` 深链读取指定详情，绝不把该关系人的客资加入管理列表。
-- 详情响应由服务端投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。`visibleTabs` 由独立 System 功能权限与统一对象关系共同决定；申诉页签对拥有申诉读取/审核能力的用户可见，也对当前 Lead 原提交人可见，但申诉记录接口仍校验 Lead 对象可读和同一申诉读取规则。`flow-history` 仅在当前用户持有 `zsjos:lead-detail:flow-read` 时投影，流转接口还必须通过同一个 Lead 对象读取检查。前端不得根据角色名、详情 mode 或关系字符串推断。跟进、申诉、投诉、订单和流转记录接口仍分别执行对象校验，隐藏页签不构成授权。
+- 详情响应由服务端投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。Lead 详情域的员工/兼职身份展示统一由 `LeadIdentityMaskingService` 按当前查看人和 Lead 关系实时投影，覆盖判定人、待接销售、回收来源负责人、跟进操作人及流转记录原/新负责人和操作人；历史快照不回写。相互脱敏只作用于提交人与负责人双方：负责人查看时隐藏提交人，员工提交人查看时隐藏负责人，第三方员工或无关操作人查看时不隐藏双方；完整身份权限继续覆盖该规则。合作方提交身份与 System 员工用户使用独立 ID 命名空间，合作方账号 ID 不参与员工身份匹配。`visibleTabs` 由独立 System 功能权限与统一对象关系共同决定；申诉页签对拥有申诉读取/审核能力的用户可见，也对当前 Lead 原提交人可见，但申诉记录接口仍校验 Lead 对象可读和同一申诉读取规则。`flow-history` 仅在当前用户持有 `zsjos:lead-detail:flow-read` 时投影，流转接口还必须通过同一个 Lead 对象读取检查。前端不得根据角色名、详情 mode 或关系字符串推断。跟进、申诉、投诉、订单和流转记录接口仍分别执行对象校验，隐藏页签不构成授权。
 - 客资流转记录是现有事实的只读合并投影：`zsjos_business_event` 提供判定、挂起、恢复、申诉和跟进等业务事件，`zsjos_lead_assignment_history` 提供派单、接单、抢单、转派、回收和释放等归属事件，`zsjos_lead_aging_pool_event` 提供公海进入、协作人分配/变更和退出等事件；提交节点来自 Lead 已持久化的提交时间。业务事件通过 `related_object_refs.assignmentHistoryId` 排除对应的重复分配记录，结果按实际发生时间及原始数值 ID 倒序。该投影不补造仓库未记录的历史，不修改三类来源记录，也不建立第二套流转事实表。
 - 流转记录的事件码、状态码和来源关联由服务端映射为中文显示值。自动与指定派单以分配历史中是否存在持久化规则引用区分，不能从人员或节点显示名称推断。历史 `lead_appeal_overturned` 即使保存的是申诉审核状态，也按稳定事件语义投影为客资“无效 → 有效”；提交申诉和维持原判不产生客资状态变化，历史 `converted` 状态码兼容显示为“有效”，均不改写原事件。原因与备注必须分字段投影：业务原因使用来源记录的原因或原因标签快照，提交说明、判定说明和跟进内容使用已有备注事实，不得复制同一文本填充两个字段。三类来源表只保存人员 ID 而没有统一的姓名快照，因此员工事件通过 System 用户解析当前昵称，兼职提交通过当前 Partner 记录解析名称；主体已删除且无来源快照时显示“未知账号”，不得虚构历史姓名。事件证据引用解析为短时 Infra 文件预览地址，仍受租户、功能权限和 Lead 对象权限保护；Workbench 仅为图片和 PDF 提供预览入口，不提供下载按钮。
 - Lead 业务通知统一深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={目标页签}`。申诉结果进入 `appeals`，投诉结果进入 `complaints`，跟进和提醒进入 `follow-ups`，其余场景进入 `overview`；申诉提交给审核人的待办入口仍优先进入独立申诉处理页。实时弹窗、消息铃铛和消息中心复用同一动作解析。`tab` 只是导航意图，Workbench 必须用详情响应的 `visibleTabs` 再校验，不可见时回退概览，不能据此扩大对象或接口权限。
@@ -726,6 +750,19 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 
 ### Registration fulfillment and students (V073)
 
+- V188 后新报名固定使用 `class_per_item`，按每个订单商品保存班级选择；正式班班主任成为该课程
+  服务的 owner，明确选择租户待分班时 owner 为空。旧 `legacy_planner` 路线只为历史报名兼容，
+  不再成为新报名完成条件。存量服务关系只补充真实租户待分班 `classId`，原 owner 保留。
+- 班级管理列表累积校验 `query-managed` 与部门 DataPermission；本人班级列表只按当前班主任关系。
+  单班读取、更新、结课继续经过 `delivery-class` 对象权限。待分班是主管可读的租户系统对象，
+  不可编辑或结课；主管直调另需 `direct-transfer`，不能由查询权限隐式获得。
+- 班主任变化、主管直调和 BPM 调班共用服务归属迁移边界：原子更新课程服务 owner 与未完成业务
+  待办，不重置接收状态，不改写联系、学习计划、督学、协作者或已完成任务历史。System 通知场景
+  根据原、新 owner 定向通知；待分班转正式班只通知新 owner。
+- 正式班之间的规划师调班使用 BPM `zsjos_class_transfer`，节点 `originalSupervisorReview`，审核人取
+  申请人当前部门负责人。ZSJOS 只保存申请状态、业务快照和流程实例引用；通过时重新校验源归属、
+  服务版本和目标班，陈旧申请标记 `invalidated`。任务、审批动作与流程历史仍由 BPM 持有。
+
 ### Student service stages and configurable forms (V126)
 
 - 学员服务阶段由服务关系维护固定状态机：首联、制定学习计划、常规督学、考前通知与冲刺、考后回访、成绩通知、证书通知与邮寄、持续回访、结束服务；“考期确认与报名资料”不再是活动阶段，历史记录保留原快照。
@@ -789,6 +826,17 @@ submissions freeze the Partner as provider and copy an employee contribution onl
 record exists. Duplicate reactivation preserves the original canonical attribution and `counted_at`. Current
 Partner ownership grants the employee read scope only; it does not rewrite history, send provider notifications,
 or authorize proxy commands.
+
+## Exam and product snapshot repair contract
+
+Only exam schedules accept partial specification conditions. Exam options remain manage-authorized and price-free;
+historical query projections read frozen snapshots without product-management permission. Updating an unchanged
+Lead selection preserves display labels but retains the pre-existing price recalculation behavior. Student
+`attributeValues` remains a legacy raw-value projection; named specifications use the additive `specs` contract.
+Registration display never substitutes current product names for missing historical snapshots.
+Exam save/publication and catalog mutations coordinate with database row locks and READ_COMMITTED transactions:
+existing schedule, product, ascending category IDs, then SKU rows. Category-only mutations never acquire product
+or schedule locks. Catalog changes after publication do not alter frozen SKU membership or historical labels.
 
 # Public media-screen access
 

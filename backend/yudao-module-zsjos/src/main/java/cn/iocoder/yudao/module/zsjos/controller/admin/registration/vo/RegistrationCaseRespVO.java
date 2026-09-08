@@ -17,6 +17,7 @@ public class RegistrationCaseRespVO {
     private String leadNo;
     private String status;
     private String statusLabel;
+    private String assignmentMode;
     private Long studyPlannerUserId;
     private String studyPlannerUserName;
     private LocalDateTime registrationApprovedAt;
@@ -29,6 +30,7 @@ public class RegistrationCaseRespVO {
     private String completionBlockReason;
     private List<ItemVO> items;
     private List<RouteVO> routes;
+    private List<ClassAssignmentVO> classAssignments;
 
     @Data
     public static class ItemVO {
@@ -70,5 +72,24 @@ public class RegistrationCaseRespVO {
         private Long assigneeUserId;
         private String assigneeUserName;
         private Integer sort;
+    }
+
+    @Data
+    public static class ClassAssignmentVO {
+        private Long orderItemId;
+        private Long productId;
+        private String productName;
+        private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
+        private Long categoryId;
+        private String categoryName;
+        private String categoryPath;
+        private Long classId;
+        private String classNo;
+        private String className;
+        private Boolean systemClass;
+        private Long homeroomUserId;
+        private String homeroomUserName;
+        private String errorCode;
+        private String errorReason;
     }
 }

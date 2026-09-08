@@ -2,8 +2,11 @@ package cn.iocoder.yudao.module.zsjos.service.registration;
 
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosObjectPermissionProvider;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +24,8 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
             "read", "accept", "contact", "assign", "update-basic-info", "delivery-stage");
 
     @Resource private ServiceRelationMapper relationMapper;
+    @Resource private DeliveryClassMapper deliveryClassMapper;
+    @Resource private DeliveryClassScopeService deliveryClassScopeService;
     @Resource private PermissionApi permissionApi;
 
     @Override public String getBizType() { return "student-service"; }
@@ -29,8 +34,15 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        if ("direct-transfer".equals(action) && Set.of("active", "paused", "completed").contains(relation.getStatus())) {
+            DeliveryClassDO source = relation.getClassId() == null ? null : deliveryClassMapper.selectById(relation.getClassId());
+            return source != null && (Boolean.TRUE.equals(source.getSystemClass())
+                    || deliveryClassScopeService.contains(userId, source.getDeptId()));
+        }
         if (Objects.equals(relation.getOwnerUserId(), userId)) {
             if ("read".equals(action) && Set.of("active", "paused", "completed").contains(relation.getStatus())) return true;
+            if ("class-transfer".equals(action)
+                    && Set.of("active", "paused", "completed").contains(relation.getStatus())) return true;
             return "active".equals(relation.getStatus()) && OWNER_ACTIONS.contains(action);
         }
         if ("read".equals(action) && "accepted".equals(relation.getAcceptanceStatus())

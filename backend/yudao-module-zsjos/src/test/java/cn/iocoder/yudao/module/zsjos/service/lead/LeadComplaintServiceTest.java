@@ -40,10 +40,22 @@ class LeadComplaintServiceTest {
     @Mock private LeadSubmissionIdentityService identityService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private FileApi fileApi;
+    @Mock private LeadIdentityMaskingService identityMaskingService;
 
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(identityMaskingService.resolve(anyLong(), any()))
+                .thenReturn(new LeadIdentityMaskingService.LeadIdentityViewContext(40L,
+                        LeadIdentityMaskingService.SourceIdentityType.EMPLOYEE, 10L, null, 20L,
+                        false, false, true, false));
+        lenient().when(identityMaskingService.employeeName(any(), anyMap(), any(), any()))
+                .thenAnswer(invocation -> {
+                    Map<Long, AdminUserRespDTO> users = invocation.getArgument(1);
+                    Long id = invocation.getArgument(2);
+                    AdminUserRespDTO user = users.get(id);
+                    return user == null ? null : user.getNickname();
+                });
     }
 
     @AfterEach

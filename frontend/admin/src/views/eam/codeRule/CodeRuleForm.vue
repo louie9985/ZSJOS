@@ -11,7 +11,7 @@
         <el-tree-select
           v-model="formData.categoryId"
           :data="categoryTree"
-          :props="{ label: 'name', children: 'children', value: 'id' }"
+          :props="{ label: 'name', children: 'children' }"
           check-strictly
           node-key="id"
           clearable

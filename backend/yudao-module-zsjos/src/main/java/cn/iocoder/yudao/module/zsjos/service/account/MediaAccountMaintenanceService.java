@@ -6,9 +6,6 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
-import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.*;
@@ -21,7 +18,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMaintenanceRe
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
-import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -33,7 +29,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.BIZ_TYPE_MEDIA_ACCOUNT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -43,9 +38,6 @@ public class MediaAccountMaintenanceService {
     public static final String DICT_STAGE = "zsjos_media_account_stage";
     public static final String DICT_PRIMARY_PROBLEM = "zsjos_media_account_primary_problem";
     public static final String DICT_EXECUTION_MEASURE = "zsjos_media_account_execution_measure";
-    public static final String PERMISSION_CALENDAR_QUERY_ALL = "zsjos:media-calendar:query-all";
-    private static final String ROLE_CONTENT_DIRECTOR = "content_director";
-    private static final String ROLE_NEW_MEDIA_OPERATOR = "new_media_operator";
 
     private static final LinkedHashMap<String, String> FIELD_NAMES = new LinkedHashMap<>();
     static {
@@ -63,12 +55,10 @@ public class MediaAccountMaintenanceService {
     @Resource private AccountStageLogMapper stageLogMapper;
     @Resource private MediaAccountObjectPermissionProvider objectPermissionProvider;
     @Resource private DictDataApi dictDataApi;
-    @Resource private PermissionApi permissionApi;
-    @Resource private RoleApi roleApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PersonMapper personMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
-    @Resource private MediaDataScopeService mediaDataScopeService;
+    @Resource private MediaAccountCalendarScopeService calendarScopeService;
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "maintenance")
     @Transactional(rollbackFor = Exception.class)
@@ -154,29 +144,19 @@ public class MediaAccountMaintenanceService {
 
     public MediaAccountCalendarRespVO calendar(MediaAccountCalendarPageReqVO req, Long userId) {
         if (req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(MEDIA_ACCOUNT_MAINTENANCE_INVALID);
-        MediaDataScopeService.Scope scope = mediaDataScopeService.resolve(userId, PERMISSION_CALENDAR_QUERY_ALL);
+        MediaAccountCalendarScopeService.Scope scope = calendarScopeService.resolve(userId);
         return calendarResult(req, scope.userIds(), scope.all());
     }
 
-    public MediaAccountCalendarRespVO allCalendar(MediaAccountCalendarScheduleReqVO req, Long userId) {
-        if (req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(MEDIA_ACCOUNT_MAINTENANCE_INVALID);
-        MediaAccountCalendarPageReqVO pageReq = new MediaAccountCalendarPageReqVO();
-        pageReq.setPageNo(1);
-        pageReq.setPageSize(PAGE_SIZE_NONE);
-        pageReq.setRangeStart(req.getRangeStart());
-        pageReq.setRangeEnd(req.getRangeEnd());
-        pageReq.setKeyword(req.getKeyword());
-        pageReq.setCurrentStatusValue(req.getCurrentStatusValue());
-        pageReq.setStageValue(req.getStageValue());
-        pageReq.setDirectorUserId(req.getDirectorUserId());
-        pageReq.setOperatorUserId(req.getOperatorUserId());
-        return calendarResult(pageReq, Set.of(), true);
-    }
-
     public MediaAccountCalendarCandidatesRespVO calendarCandidates(Long userId) {
+        MediaAccountCalendarScopeService.Scope scope = calendarScopeService.resolve(userId);
+        List<MediaAccountDO> accounts = accountMapper.selectCalendarCandidateAccounts(scope.userIds(), scope.all());
+        Map<Long, AdminUserRespDTO> users = userMap(accounts.stream()
+                .flatMap(row -> java.util.stream.Stream.of(row.getDirectorUserId(), row.getOwnerOperatorUserId()))
+                .toList());
         MediaAccountCalendarCandidatesRespVO result = new MediaAccountCalendarCandidatesRespVO();
-        result.setDirectors(roleUsers(ROLE_CONTENT_DIRECTOR));
-        result.setOperators(roleUsers(ROLE_NEW_MEDIA_OPERATOR));
+        result.setDirectors(candidateUsers(accounts.stream().map(MediaAccountDO::getDirectorUserId).toList(), users));
+        result.setOperators(candidateUsers(accounts.stream().map(MediaAccountDO::getOwnerOperatorUserId).toList(), users));
         return result;
     }
 
@@ -196,12 +176,9 @@ public class MediaAccountMaintenanceService {
         return result;
     }
 
-    private List<MediaAccountCalendarCandidatesRespVO.UserRespVO> roleUsers(String roleCode) {
-        RoleRespDTO role = roleApi.getRoleByCode(roleCode);
-        if (role == null || !Objects.equals(role.getStatus(), CommonStatusEnum.ENABLE.getStatus())) return List.of();
-        Set<Long> userIds = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
-        if (userIds == null || userIds.isEmpty()) return List.of();
-        return adminUserApi.getUserList(userIds).stream()
+    private List<MediaAccountCalendarCandidatesRespVO.UserRespVO> candidateUsers(
+            Collection<Long> candidateIds, Map<Long, AdminUserRespDTO> users) {
+        return candidateIds.stream().filter(Objects::nonNull).distinct().map(users::get)
                 .filter(user -> user != null && Objects.equals(user.getStatus(), CommonStatusEnum.ENABLE.getStatus()))
                 .sorted(Comparator.comparing(MediaAccountMaintenanceService::userName)
                         .thenComparing(AdminUserRespDTO::getId, Comparator.nullsLast(Long::compareTo)))

@@ -45,13 +45,14 @@
 
 ## 日历日程
 
-`GET /zsjos/media-account/calendar/all` 需要独立页面权限 `zsjos:media-calendar:all-query`。响应结构与账号日历一致，但查询不带 `pageNo` / `pageSize`，由后端一次性返回当前日期窗口内的完整共享日程结果。
+原 `GET /zsjos/media-account/calendar/all` 共享账号排期接口已经退役。个人工作日程不得复用媒体账号维护日期。
 
-日历日程是登录员工使用的共享日程视图，不使用账号对象可见范围，也不复用 `zsjos:media-calendar:query-all`。它仍受当前租户、逻辑删除、日期区间、关键字、状态、阶段、编导和运营筛选约束。`unscheduledCount` 与账号日历保持同一计算口径：当前其他筛选下缺少开始或结束日期的账号数。Workbench 以独立月历界面呈现该视图：左侧提供搜索、迷你月历和候选人筛选，右侧使用主月格展示日程，避免与账号日历的账号排期时间轴重复。
+账号日历全量能力为 `zsjos:media-calendar:query-all`；主管范围能力为
+`zsjos:media-calendar:query-managed`。普通页面用户只匹配本人编导或运营关系；持有管理范围权限时才叠加 System 返回的有界部门用户集合。System 的无界部门 `ALL` 不替代账号日历全量权限。
 
 ## 日历筛选候选人
 
-`GET /zsjos/media-account/calendar/candidates` 需要 `zsjos:media-calendar:query` 或 `zsjos:media-calendar:all-query`。响应：
+`GET /zsjos/media-account/calendar/candidates` 需要 `zsjos:media-calendar:query`。响应：
 
 ```json
 {
@@ -60,7 +61,12 @@
 }
 ```
 
-候选池由 System 角色编码解析：编导为 `content_director`，运营为 `new_media_operator`，并只返回启用角色下的启用用户。前端不得再用 `/system/user/simple-list` 的全量用户列表作为生产筛选候选池。
+候选池从当前授权账号集合中提取实际编导和运营，再通过 System 用户 API 过滤停用用户。它不按角色、岗位或名称推断，也不返回授权范围外人员。
+
+## 我的日历
+
+`GET /zsjos/personal-calendar`、`POST /zsjos/personal-calendar`、`PUT /zsjos/personal-calendar/{id}` 和
+`DELETE /zsjos/personal-calendar/{id}` 分别使用 `query/create/update/delete` 权限。首版只承载手工个人日程，所有查询和命令固定使用当前登录用户作为 owner；不接受客户端 owner 字段，不聚合工作计划，也不提供管理员代看或代管旁路。
 
 ## 已移除的旧阶段流转
 

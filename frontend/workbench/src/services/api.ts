@@ -470,6 +470,53 @@ export type AssignmentLog = {
   createTime: Timestamp;
 };
 export type PageResult<T> = { list: T[]; total: number };
+export type ExamScheduleType = 'EXACT' | 'ROUGH';
+export type ExamScheduleRecordStatus = 'DRAFT' | 'PUBLISHED' | 'REVOKED';
+export type ExamScheduleDisplayStatus = ExamScheduleRecordStatus | 'UPCOMING' | 'IN_PROGRESS' | 'ENDED';
+export type ExamCategoryOption = {
+  id: number;
+  name: string;
+  path: Array<{ id: number; name: string }>;
+};
+export type ExamSchedule = {
+  productId?: number;
+  productNameSnapshot?: string;
+  scheduleName?: string;
+  selectedAttrs?: Record<string, string>;
+  selectedSpecs?: import('./productSpecs').ProductSpec[];
+  frozenSkus?: ExamProductOption['skus'];
+  id: number;
+  scheduleType: ExamScheduleType;
+  exactDate?: string;
+  roughStartDate?: string;
+  roughEndDate?: string;
+  categoryId: number;
+  categoryNameSnapshot: string;
+  categoryPathSnapshot: Array<{ id: number; name: string }>;
+  recordStatus: ExamScheduleRecordStatus;
+  displayStatus: ExamScheduleDisplayStatus;
+  remark?: string;
+  publishedAt?: Timestamp;
+  createTime?: Timestamp;
+  updateTime?: Timestamp;
+};
+export type ExamScheduleInput = {
+  clearedInvalidAttrs?: string[];
+  scheduleType: ExamScheduleType;
+  exactDate?: string;
+  roughStartDate?: string;
+  roughEndDate?: string;
+  categoryId?: number;
+  productId?: number;
+  selectedAttrs?: Record<string, string>;
+  remark?: string;
+};
+export type ExamProductOption = {
+  productId: number; productRef: string; productName: string; categoryId: number;
+  categoryPath: Array<{ id: number; name: string }>;
+  attrs: import('./productSpecs').ProductAttr[];
+  skus: Array<{ id: number; skuRef: string; skuName: string; attrValues: Record<string, string>; specs: import('./productSpecs').ProductSpec[] }>;
+};
 export type CursorPageResult<T> = {
   list: T[];
   nextCursor?: string;
@@ -509,6 +556,7 @@ export type RegistrationCase = {
   leadNo?: string;
   status: string;
   statusLabel?: string;
+  assignmentMode?: "legacy_planner" | "class_per_item";
   studyPlannerUserId?: number;
   studyPlannerUserName?: string;
   registrationApprovedAt?: Timestamp;
@@ -532,6 +580,14 @@ export type RegistrationCase = {
     attachments?: RegistrationAttachment[];
   }>;
   routes?: RegistrationRoute[];
+  classAssignments?: RegistrationClassAssignment[];
+};
+export type RegistrationClassAssignment = {
+  orderItemId: number; productId: number; productName?: string; categoryId: number;
+  specs?: import('./productSpecs').ProductSpec[];
+  categoryName?: string; categoryPath?: string; classId?: number; classNo?: string;
+  className?: string; systemClass?: boolean; homeroomUserId?: number;
+  homeroomUserName?: string; errorCode?: string; errorReason?: string;
 };
 export type StudyPlanner = { id: number; nickname: string };
 export type RegistrationRouteOption = {
@@ -598,6 +654,7 @@ export type MyStudent = {
     skuName?: string;
     categoryPath?: string[];
     attributeValues?: string[];
+    specs?: import('./productSpecs').ProductSpec[];
     productSnapshot?: string;
     status: string;
     activatedAt?: Timestamp;
@@ -1045,6 +1102,7 @@ export type LeadCatalogItem = {
   }>;
 };
 export type LeadCatalogSku = {
+  specs?: import('./productSpecs').ProductSpec[];
   spuRef: string;
   skuRef: string;
   skuName: string;
@@ -1164,6 +1222,7 @@ export type SalesDispatchStatus = {
   effectiveStatus: "online" | "busy" | "offline";
 };
 export type ManagedLeadProduct = {
+  specs?: import('./productSpecs').ProductSpec[];
   id: number;
   spuRef?: string;
   spuName?: string;
@@ -1676,6 +1735,7 @@ export type SalesOrder = {
     skuName: string;
     categoryPath: string[];
     attrValues: Record<string, string>;
+    specs?: import('./productSpecs').ProductSpec[];
     actualAmount: number;
   }>;
   paymentVouchers: SalesOrderVoucher[];
@@ -2285,6 +2345,7 @@ export type ProductSaveRequest = {
   remark?: string;
 };
 export type ProductSku = {
+  specs?: import('./productSpecs').ProductSpec[];
   id: number;
   spuId: number;
   skuRef: string;
@@ -2522,6 +2583,25 @@ export const normalizeRequestError = (error: unknown): unknown => {
     );
   }
   return error;
+};
+export type PersonalCalendarEvent = {
+  id: number;
+  title: string;
+  description?: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  allDay: boolean;
+  status: string;
+  sourceType: string;
+  createTime: Timestamp;
+  updateTime: Timestamp;
+};
+export type PersonalCalendarEventInput = {
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
 };
 export type AnnouncementCursorParams = { cursor?: string; limit?: number };
 
@@ -2887,7 +2967,45 @@ export function buildMenuTree(
   });
 }
 
+export type DeliveryClass = {
+  id: number; classNo: string; className: string; systemClass: boolean;
+  categoryId?: number; categoryNameSnapshot?: string; categoryPathSnapshot?: string;
+  examScheduleId?: number; examScheduleSnapshot?: string; homeroomUserId?: number;
+  homeroomUserNameSnapshot?: string; deptId?: number; deptNameSnapshot?: string;
+  status: string; studentCount: number; version: number;
+  productId?: number; productNameSnapshot?: string; selectedAttrs?: Record<string, string>;
+  selectedSpecs?: import('./productSpecs').ProductSpec[]; selectedSkus?: ExamProductOption['skus'];
+}
+export type DeliveryClassStudent = {
+  serviceRelationId: number; personId: number; personNo?: string; studentName?: string;
+  categoryId?: number; categoryName?: string;
+  serviceStatus: string; acceptanceStatus?: string; ownerUserId?: number; ownerUserName?: string;
+  activatedAt?: string; version: number;
+}
+export type DeliveryClassOption = { id: number; classNo: string; className: string; systemClass: boolean; categoryId?: number; categoryName?: string; examScheduleId?: number; examScheduleName?: string; homeroomUserId?: number; homeroomUserName?: string }
+export type HomeroomCandidate = { id: number; name: string; deptId?: number; deptName?: string }
+export type DeliveryClassCategoryOption = { id: number; parentId: number; name: string }
+export type DeliveryClassExamOption = { id: number; scheduleType: string; displayName: string }
+export type DeliveryClassProductOption = ExamProductOption
+export type ClassTransfer = { id: number; serviceRelationId: number; fromClassName: string; targetClassName: string; status: string; reason: string; processInstanceId?: string; submittedAt: string; resolutionReason?: string }
+
 export const api = {
+  deliveryClasses: {
+    page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number }, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
+    get: async (id: number) => unwrap<DeliveryClass>(await http.get(`/zsjos/delivery-class/${id}`)),
+    students: async (id: number, pageNo = 1, pageSize = 50) => unwrap<PageResult<DeliveryClassStudent>>(await http.get(`/zsjos/delivery-class/${id}/students`, { params: { pageNo, pageSize } })),
+    options: async (categoryId: number, includePending = true) => unwrap<DeliveryClassOption[]>(await http.get('/zsjos/delivery-class/options', { params: { categoryId, includePending } })),
+    candidates: async () => unwrap<HomeroomCandidate[]>(await http.get('/zsjos/delivery-class/homeroom-candidates')),
+    products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
+    categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
+    exams: async (categoryId: number, productId?: number) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId } })),
+    create: async (data: { className?: string; productId: number; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
+    update: async (id: number, data: { className?: string; productId: number; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
+    complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
+    directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
+    requestTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<number>(await http.post(`/zsjos/class-transfer/service/${relationId}`, data)),
+    transferPage: async (params: { pageNo: number; pageSize: number; status?: string }) => unwrap<PageResult<ClassTransfer>>(await http.get('/zsjos/class-transfer/my-page', { params }))
+  },
   login: async (
     username: string,
     password: string,
@@ -3048,6 +3166,49 @@ export const api = {
     unwrap<SalesUser[]>(
       await http.get("/zsjos/lead/self-sourced/new-media-providers"),
     ),
+  personalCalendar: {
+    list: async (params: { rangeStart: string; rangeEnd: string }) =>
+      unwrap<PersonalCalendarEvent[]>(await http.get('/zsjos/personal-calendar', { params })),
+    create: async (data: PersonalCalendarEventInput) =>
+      unwrap<number>(await http.post('/zsjos/personal-calendar', data)),
+    update: async (id: number, data: PersonalCalendarEventInput) =>
+      unwrap<boolean>(await http.put(`/zsjos/personal-calendar/${id}`, data)),
+    delete: async (id: number) =>
+      unwrap<boolean>(await http.delete(`/zsjos/personal-calendar/${id}`)),
+  },
+  examCalendar: {
+    productOptions: async () => unwrap<ExamProductOption[]>(await http.get('/zsjos/exam-calendar/product-options')),
+    exactPage: async (params: {
+      pageNo: number;
+      pageSize: number;
+      rangeStart?: string;
+      rangeEnd?: string;
+      categoryId?: number;
+      displayStatus?: string;
+    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/page', { params })),
+    roughPage: async (params: {
+      pageNo: number;
+      pageSize: number;
+      rangeStart?: string;
+      rangeEnd?: string;
+      categoryId?: number;
+    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/rough', { params })),
+    categoryOptions: async () => unwrap<ExamCategoryOption[]>(
+      await http.get('/zsjos/exam-calendar/category-options'),
+    ),
+    create: async (data: ExamScheduleInput) => unwrap<number>(
+      await http.post('/zsjos/exam-calendar/create', data),
+    ),
+    update: async (id: number, data: ExamScheduleInput) => unwrap<boolean>(
+      await http.put(`/zsjos/exam-calendar/update/${id}`, data),
+    ),
+    publish: async (id: number) => unwrap<boolean>(
+      await http.post(`/zsjos/exam-calendar/publish/${id}`),
+    ),
+    revoke: async (id: number) => unwrap<boolean>(
+      await http.post(`/zsjos/exam-calendar/revoke/${id}`),
+    ),
+  },
   mediaAccount: {
     create: async (data: {
       studentPersonId: number;
@@ -3132,18 +3293,6 @@ export const api = {
     }) =>
       unwrap<MediaAccountCalendarResult>(
         await http.get("/zsjos/media-account/calendar", { params }),
-      ),
-    calendarAll: async (params: {
-      rangeStart: string;
-      rangeEnd: string;
-      keyword?: string;
-      currentStatusValue?: string;
-      stageValue?: string;
-      directorUserId?: number;
-      operatorUserId?: number;
-    }) =>
-      unwrap<MediaAccountCalendarResult>(
-        await http.get("/zsjos/media-account/calendar/all", { params }),
       ),
     calendarCandidates: async () =>
       unwrap<MediaAccountCalendarCandidates>(
@@ -4604,13 +4753,21 @@ export const api = {
     unwrap<boolean>(
       await http.delete("/zsjos/product/delete", { params: { id } }),
     ),
-  productCategoryTree: async () =>
-    unwrap<ProductCategory[]>(await http.get("/zsjos/product/category/tree")),
+  productCategoryTree: async (status?: number) =>
+    unwrap<ProductCategory[]>(await http.get("/zsjos/product/category/tree", { params: status === undefined ? undefined : { status } })),
   createProductCategory: async (data: ProductCategorySaveRequest) =>
     unwrap<number>(await http.post("/zsjos/product/category/create", data)),
   updateProductCategory: async (
     data: ProductCategorySaveRequest & { id: number },
   ) => unwrap<boolean>(await http.put("/zsjos/product/category/update", data)),
+  deleteProductCategory: async (id: number) =>
+    unwrap<boolean>(
+      await http.delete("/zsjos/product/category/delete", { params: { id } }),
+    ),
+  updateProductCategoryStatus: async (id: number, status: number) =>
+    unwrap<boolean>(
+      await http.put("/zsjos/product/category/update-status", { id, status }),
+    ),
   updateProductConfigStatus: async (id: number, status: number) =>
     unwrap<boolean>(
       await http.put("/zsjos/product/update-status", { id, status }),
@@ -4995,6 +5152,8 @@ export const api = {
     unwrap<RegistrationCase>(
       await http.put(`/zsjos/registration/${id}/routes`, data),
     ),
+  updateRegistrationClassAssignments: async (id: number, data: { version: number; idempotencyKey: string; assignments: Array<{ orderItemId: number; classId: number }> }) =>
+    unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/class-assignments`, data)),
   uploadRegistrationAttachment: async (
     id: number,
     itemId: number,

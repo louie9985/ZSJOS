@@ -49,6 +49,7 @@ public class LeadComplaintService {
     @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private LeadIdentityMaskingService identityMaskingService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private FileApi fileApi;
 
@@ -136,8 +137,9 @@ public class LeadComplaintService {
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         List<LeadComplaintDO> rows = complaintMapper.selectListByLeadId(leadId);
-        Map<Long, String> userNames = userNames(rows);
-        return rows.stream().map(row -> toResp(row, lead, userNames)).toList();
+        LeadIdentityMaskingService.LeadIdentityViewContext context = identityMaskingService.resolve(userId, lead);
+        Map<Long, AdminUserRespDTO> users = identityUsers(rows);
+        return rows.stream().map(row -> toResp(row, lead, users, context)).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -212,6 +214,19 @@ public class LeadComplaintService {
         return result;
     }
 
+    private LeadComplaintRespVO toResp(LeadComplaintDO row, LeadDO lead,
+                                       Map<Long, AdminUserRespDTO> users,
+                                       LeadIdentityMaskingService.LeadIdentityViewContext context) {
+        LeadComplaintRespVO result = toResp(row, lead, Map.of());
+        result.setComplainantUserName(identityMaskingService.employeeName(context, users,
+                row.getComplainantUserId(), LeadIdentityRole.SOURCE));
+        result.setSalesUserName(identityMaskingService.employeeName(context, users,
+                row.getSalesUserId(), LeadIdentityRole.OWNER));
+        result.setHandlerUserName(identityMaskingService.employeeName(context, users,
+                row.getHandlerUserId(), LeadIdentityRole.OPERATOR));
+        return result;
+    }
+
     private Map<Long, String> userNames(List<LeadComplaintDO> rows) {
         Set<Long> ids = rows.stream().flatMap(row -> java.util.stream.Stream.of(
                         row.getComplainantUserId(), row.getSalesUserId(), row.getHandlerUserId()))
@@ -220,6 +235,15 @@ public class LeadComplaintService {
         return adminUserApi.getUserList(ids).stream().filter(user -> user.getNickname() != null)
                 .collect(Collectors.toMap(AdminUserRespDTO::getId, AdminUserRespDTO::getNickname,
                         (left, right) -> left));
+    }
+
+    private Map<Long, AdminUserRespDTO> identityUsers(List<LeadComplaintDO> rows) {
+        Set<Long> ids = rows.stream().flatMap(row -> java.util.stream.Stream.of(
+                        row.getComplainantUserId(), row.getSalesUserId(), row.getHandlerUserId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) return Map.of();
+        return adminUserApi.getUserList(ids).stream()
+                .collect(Collectors.toMap(AdminUserRespDTO::getId, item -> item, (left, right) -> left));
     }
 
     private String nameOf(Map<Long, String> userNames, Long userId) {

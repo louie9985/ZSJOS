@@ -1,5 +1,10 @@
 # ZSJOS 全角色目标权限矩阵
 
+## 考期查看与管理
+
+“日历 → 考期日历”保留独立可勾选的查看（73612，`zsjos:exam-calendar:query`）与管理（73611，`zsjos:exam-calendar:manage`）叶子。
+查看用户读取已发布考期的历史规格快照；管理用户才可获取产品规格选项并创建、编辑草稿、发布、撤销。不要求产品配置权限，不按角色名授权。
+
 ## 客资销售反馈权限（V182）
 
 新增 `zsjos:lead:submitter-feedback:read`（查看）与
@@ -47,6 +52,19 @@ holders of `zsjos:media-account:query` receive `zsjos:media-calendar:query`, hol
 receive `zsjos:media-account:maintenance`, and holders of account `query-all` receive
 `zsjos:media-calendar:query-all`. Runtime object scope still limits maintenance and ordinary calendar
 queries to the assigned director/operator unless the independent all-account permission is present.
+
+V186 retires V161's shared `/calendar/all` page and does not copy its grants to the new personal calendar.
+Account-calendar `query-managed` and `query-all` are independently administrator-configured; the former consumes
+only bounded System department scope and the latter alone grants all accounts. The new personal-calendar page
+and create/update/delete buttons are added to eligible tenant packages without automatic role grants.
+
+V187 adds `zsjos:exam-calendar:query` for page access and `zsjos:exam-calendar:manage` for every mutation.
+The page is a child of Calendar menu 73600, resolving to `/calendar/exam-calendar`.
+The role tree exposes sibling button leaves 73612 (query) and 73611 (manage) under page 73610.
+Read-only roles select the query leaf; managers select both. The parent page retains the query route contract.
+It initially grants query to every enabled internal role whose tenant package exposes the page, and grants manage
+to enabled `exam_manager` and `exam_specialist` roles. These are initial server-owned role-menu assignments only;
+backend and Workbench runtime behavior checks permission identifiers and never role names.
 
 ## 全部角色目标
 
@@ -102,3 +120,13 @@ queries to the assigned director/operator unless the independent all-account per
 V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` My Students. The retired new-media Student Operations permissions and graduation initiation buttons are no longer part of the baseline. V120 restores the shared `/zsjos/media-students` page grant for enabled `new_media_operator` roles after V103's historical director-only cleanup. Registration public-pool permissions remain intentionally separate; role names and departments never imply them.
 
 V083 grants `content_director` only My Students. Runtime route candidates use the stable content-director post code and the persisted department subtree; this menu grant does not change candidate eligibility or public-pool access.
+
+### Delivery class permissions (V188)
+
+- `zsjos:delivery-class:query-managed`、`create`、`update`、`complete` 和 `direct-transfer` 独立配置；
+  管理查询仍受部门 DataPermission 限制，主管查询权不自动授予任何写操作。
+- `zsjos:delivery-class:query-my` 只开放本人担任班主任的班级；班主任候选还必须同时持有
+  `zsjos:student:query-my`。`zsjos:class-transfer:create` 与 `query` 分别控制发起和查看本人申请。
+- V188 初始授权从既有菜单关系继承，不在运行时代码检查角色名：拥有报名履约管理页 73001 的
+  角色继承班级管理能力，拥有原“我的学员”页 73020 的角色继承“我的班级”和调班申请能力。
+  73020 变为隐藏但可路由的学员详情深链，现有 `serviceRelationId` 操作契约保持不变。

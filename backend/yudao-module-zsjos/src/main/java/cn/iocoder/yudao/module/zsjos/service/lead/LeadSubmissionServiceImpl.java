@@ -486,6 +486,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             productMap.put("spuRef", product.productRef()); productMap.put("spuName", product.name());
             productMap.put("skuRef", product.skuRef()); productMap.put("skuName", product.skuName());
             productMap.put("price", product.price()); productMap.put("selectedAttrValues", product.selectedAttrValuesJson());
+            productMap.put("specs", product.specs());
             productMap.put("categoryId", product.categoryId()); productMap.put("categoryName", product.categoryName());
             productMap.put("categoryPath", product.categoryPath());
             productMap.put("level1CategoryId", product.level1CategoryId()); productMap.put("level1CategoryName", product.level1CategoryName());
@@ -541,6 +542,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             record.setSpuRef(snapshot.productRef()); record.setSpuNameSnapshot(snapshot.name());
             record.setSkuRef(snapshot.skuRef()); record.setSkuNameSnapshot(snapshot.skuName());
             record.setSelectedAttrValuesJson(snapshot.selectedAttrValuesJson()); record.setPriceSnapshot(snapshot.price());
+            record.setSelectedSpecsJson(JsonUtils.toJsonString(snapshot.specs()));
             record.setSpuUnknown(snapshot.spuUnknown()); record.setSkuUnknown(snapshot.skuUnknown());
             record.setCategoryId(snapshot.categoryId()); record.setCategoryNameSnapshot(snapshot.categoryName());
             record.setCategoryPathSnapshot(JsonUtils.toJsonString(snapshot.categoryPath()));

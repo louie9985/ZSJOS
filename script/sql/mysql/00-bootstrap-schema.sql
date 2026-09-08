@@ -4581,6 +4581,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_intended_product` (
   `sku_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sku_name_snapshot` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `selected_attr_values_json` json DEFAULT NULL,
+  `selected_specs_json` json DEFAULT NULL COMMENT 'SKU规格标签快照',
   `price_snapshot` decimal(10,2) DEFAULT NULL,
   `spu_unknown` bit(1) NOT NULL DEFAULT b'0',
   `sku_unknown` bit(1) NOT NULL DEFAULT b'0',
@@ -5258,6 +5259,39 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_category` (
   KEY `idx_tenant_parent_level` (`tenant_id`,`parent_id`,`level`,`sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 产品分类';
 
+-- zsjos_exam_schedule
+CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '考期安排编号',
+  `tenant_id` bigint NOT NULL COMMENT '租户编号',
+  `schedule_type` varchar(16) NOT NULL COMMENT '时间类型：EXACT/ROUGH',
+  `exact_date` date DEFAULT NULL COMMENT '精确考试日期',
+  `rough_start_date` date DEFAULT NULL COMMENT '粗略开始日期',
+  `rough_end_date` date DEFAULT NULL COMMENT '粗略结束日期',
+  `category_id` bigint NOT NULL COMMENT '产品分类编号',
+  `product_id` bigint DEFAULT NULL COMMENT '考期产品编号，空表示分类范围',
+  `product_name_snapshot` varchar(255) DEFAULT NULL COMMENT '产品名称快照',
+  `selected_attrs_json` json DEFAULT NULL COMMENT '已选规格条件',
+  `selected_specs_json` json DEFAULT NULL COMMENT '已选规格字段和值标签快照',
+  `frozen_skus_json` json DEFAULT NULL COMMENT '发布时适用SKU快照',
+  `category_name_snapshot` varchar(100) NOT NULL COMMENT '分类名称快照',
+  `category_path_snapshot` json NOT NULL COMMENT '分类路径快照',
+  `record_status` varchar(16) NOT NULL DEFAULT 'DRAFT' COMMENT '记录状态',
+  `remark` varchar(1000) DEFAULT NULL COMMENT '备注',
+  `published_at` datetime DEFAULT NULL COMMENT '发布时间',
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_exam_schedule_exact` (`tenant_id`,`schedule_type`,`exact_date`,`record_status`,`deleted`),
+  KEY `idx_exam_schedule_rough` (`tenant_id`,`schedule_type`,`rough_start_date`,`rough_end_date`,`record_status`,`deleted`),
+  KEY `idx_exam_schedule_category` (`tenant_id`,`category_id`,`deleted`),
+  CONSTRAINT `chk_exam_schedule_type` CHECK (`schedule_type` IN ('EXACT','ROUGH')),
+  CONSTRAINT `chk_exam_schedule_status` CHECK (`record_status` IN ('DRAFT','PUBLISHED','REVOKED')),
+  CONSTRAINT `chk_exam_schedule_dates` CHECK ((`schedule_type`='EXACT' AND `exact_date` IS NOT NULL AND `rough_start_date` IS NULL AND `rough_end_date` IS NULL) OR (`schedule_type`='ROUGH' AND `exact_date` IS NULL AND `rough_start_date` IS NOT NULL AND `rough_end_date` IS NOT NULL AND `rough_end_date` >= `rough_start_date`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考期安排';
+
 -- zsjos_product_sku
 CREATE TABLE IF NOT EXISTS `zsjos_product_sku` (
   `id` bigint NOT NULL AUTO_INCREMENT,
@@ -5347,6 +5381,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_registration_case` (
   `order_id` bigint NOT NULL COMMENT '有效订单编号',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '报名服务状态',
   `checklist_version_id` bigint DEFAULT NULL COMMENT '清单版本',
+  `assignment_mode` varchar(24) NOT NULL DEFAULT 'legacy_planner' COMMENT '分班模式',
   `study_planner_user_id` bigint DEFAULT NULL COMMENT '学习规划师',
   `registration_approved_at` datetime DEFAULT NULL COMMENT '报名节点通过时间',
   `completed_by_user_id` bigint DEFAULT NULL COMMENT '最终完成人',
@@ -5418,6 +5453,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `order_id` bigint NOT NULL COMMENT '来源有效订单编号',
   `order_item_id` bigint NOT NULL COMMENT '来源订单项编号',
   `registration_case_id` bigint NOT NULL COMMENT '激活报名服务单编号',
+  `class_id` bigint DEFAULT NULL COMMENT '交付班级编号',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '服务关系状态',
   `owner_user_id` bigint DEFAULT NULL COMMENT '学生服务负责人用户编号',
   `acceptance_status` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT '接收状态',
@@ -5465,6 +5501,64 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   KEY `idx_tenant_registration_case` (`tenant_id`,`registration_case_id`),
   KEY `idx_tenant_operator_status` (`tenant_id`,`operator_user_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 学生服务关系';
+
+CREATE TABLE IF NOT EXISTS `zsjos_delivery_class` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `class_no` varchar(40) NOT NULL, `class_name` varchar(100) NOT NULL,
+  `system_class` bit(1) NOT NULL DEFAULT b'0',
+  `product_id` bigint DEFAULT NULL COMMENT '班级产品编号',
+  `product_name_snapshot` varchar(255) DEFAULT NULL COMMENT '班级产品名称快照',
+  `selected_attrs_json` json DEFAULT NULL COMMENT '班级规格条件快照',
+  `selected_specs_json` json DEFAULT NULL COMMENT '班级规格标签快照',
+  `selected_skus_json` json DEFAULT NULL COMMENT '班级适用 SKU 快照',
+  `pending_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`system_class`=b'1' AND `deleted`=b'0') THEN `tenant_id` ELSE NULL END) STORED,
+  `category_id` bigint DEFAULT NULL, `category_name_snapshot` varchar(255) DEFAULT NULL,
+  `category_path_snapshot` json DEFAULT NULL, `exam_schedule_id` bigint DEFAULT NULL,
+  `exam_schedule_snapshot` varchar(255) DEFAULT NULL, `homeroom_user_id` bigint DEFAULT NULL,
+  `homeroom_user_name_snapshot` varchar(100) DEFAULT NULL, `dept_id` bigint DEFAULT NULL,
+  `dept_name_snapshot` varchar(100) DEFAULT NULL, `status` varchar(24) NOT NULL DEFAULT 'SERVING',
+  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_delivery_class_no` (`tenant_id`,`class_no`,`deleted`),
+  UNIQUE KEY `uk_delivery_pending_guard` (`pending_guard`),
+  KEY `idx_delivery_class_scope` (`tenant_id`,`dept_id`,`status`,`homeroom_user_id`,`deleted`),
+  KEY `idx_delivery_class_category` (`tenant_id`,`category_id`,`exam_schedule_id`,`status`,`deleted`),
+  CONSTRAINT `chk_delivery_class_status` CHECK (`status` IN ('SERVING','COMPLETED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='交付班级';
+
+CREATE TABLE IF NOT EXISTS `zsjos_registration_class_assignment` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `registration_case_id` bigint NOT NULL, `order_item_id` bigint NOT NULL,
+  `class_id` bigint NOT NULL, `class_no_snapshot` varchar(40) NOT NULL, `class_name_snapshot` varchar(100) NOT NULL,
+  `homeroom_user_id` bigint DEFAULT NULL, `homeroom_user_name_snapshot` varchar(100) DEFAULT NULL,
+  `category_id` bigint NOT NULL, `category_name_snapshot` varchar(255) DEFAULT NULL,
+  `category_path_snapshot` json DEFAULT NULL, `updated_by_user_id` bigint NOT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_registration_class_item` (`tenant_id`,`registration_case_id`,`order_item_id`,`deleted`),
+  KEY `idx_registration_class_target` (`tenant_id`,`class_id`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报名逐商品分班草稿';
+
+CREATE TABLE IF NOT EXISTS `zsjos_class_transfer_request` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `service_relation_version` int NOT NULL,
+  `from_class_id` bigint NOT NULL, `from_class_no_snapshot` varchar(40) NOT NULL, `from_class_name_snapshot` varchar(100) NOT NULL,
+  `target_class_id` bigint NOT NULL, `target_class_no_snapshot` varchar(40) NOT NULL, `target_class_name_snapshot` varchar(100) NOT NULL,
+  `from_homeroom_user_id` bigint NOT NULL, `from_homeroom_user_name_snapshot` varchar(100) DEFAULT NULL,
+  `target_homeroom_user_id` bigint NOT NULL, `target_homeroom_user_name_snapshot` varchar(100) DEFAULT NULL,
+  `applicant_user_id` bigint NOT NULL, `reviewer_user_id` bigint NOT NULL, `reason` varchar(500) NOT NULL,
+  `status` varchar(24) NOT NULL,
+  `active_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`status`='pending' AND `deleted`=b'0') THEN `service_relation_id` ELSE NULL END) STORED,
+  `process_instance_id` varchar(64) DEFAULT NULL, `submitted_at` datetime NOT NULL, `finished_at` datetime DEFAULT NULL,
+  `resolution_reason` varchar(500) DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_class_transfer_active` (`tenant_id`,`active_guard`),
+  UNIQUE KEY `uk_class_transfer_process` (`tenant_id`,`process_instance_id`,`deleted`),
+  KEY `idx_class_transfer_applicant` (`tenant_id`,`applicant_user_id`,`status`,`create_time`),
+  CONSTRAINT `chk_class_transfer_status` CHECK (`status` IN ('pending','approved','rejected','cancelled','invalidated'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程服务调班申请';
 
 CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_version` (
   `id` bigint NOT NULL AUTO_INCREMENT, `version_no` int NOT NULL, `status` varchar(24) NOT NULL,

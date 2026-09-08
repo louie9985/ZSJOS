@@ -31,7 +31,7 @@ class LeadSubmitterFeedbackServiceTest {
     @Mock private LeadSubmitterFeedbackMapper feedbackMapper;
     @Mock private LeadSubmitterFeedbackAttachmentMapper attachmentMapper;
     @Mock private LeadSubmitterFeedbackPermissionProvider permission;
-    @Mock private LeadObjectPermissionService identityPermission;
+    @Mock private LeadIdentityMaskingService identityMaskingService;
     @Mock private PartnerAccountService partnerAccountService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private FileApi fileApi;
@@ -39,6 +39,12 @@ class LeadSubmitterFeedbackServiceTest {
 
     @BeforeEach void setup() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(identityMaskingService.resolve(anyLong(), any()))
+                .thenReturn(new LeadIdentityMaskingService.LeadIdentityViewContext(40L,
+                        LeadIdentityMaskingService.SourceIdentityType.EMPLOYEE, 10L, null, 20L,
+                        false, false, true, false));
+        lenient().when(identityMaskingService.snapshotName(any(), anyString(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         var assistant = new org.apache.ibatis.builder.MapperBuilderAssistant(new org.apache.ibatis.session.Configuration(), "feedback-test");
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(assistant, LeadDO.class);
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(assistant, LeadSubmitterFeedbackAttachmentDO.class);
@@ -166,5 +172,32 @@ class LeadSubmitterFeedbackServiceTest {
         assertTrue(service.pagePartner(1L, 90L, new PageParam()).getList().isEmpty());
         lead.setProviderOwnerId(51L);
         assertThrows(ServiceException.class, () -> service.pagePartner(1L, 90L, new PageParam()));
+    }
+
+    @Test void ownerReadMasksPartnerSubmitterSnapshotThroughPartnerProjection() {
+        var lead = lead(); lead.setProviderOwnerType("partner"); lead.setProviderOwnerId(50L);
+        var context = new LeadIdentityMaskingService.LeadIdentityViewContext(20L,
+                LeadIdentityMaskingService.SourceIdentityType.PARTNER, null, 50L, 20L,
+                false, true, false, true);
+        var row = new LeadSubmitterFeedbackDO();
+        row.setId(7L); row.setSalesUserId(20L); row.setSalesNameSnapshot("销售");
+        row.setPartnerId(50L); row.setSubmitterNameSnapshot("兼职提交人");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(permission.canRead(lead, 20L)).thenReturn(true);
+        when(identityMaskingService.resolve(20L, lead)).thenReturn(context);
+        when(identityMaskingService.snapshotName(context, "销售", 20L, LeadIdentityRole.OWNER))
+                .thenReturn("销售");
+        when(identityMaskingService.partnerName(context, "兼职提交人")).thenReturn("兼***");
+        when(feedbackMapper.page(eq(1L), any(), isNull(), eq(20L)))
+                .thenReturn(new PageResult<>(List.of(row), 1L));
+        when(attachmentMapper.listByFeedback(7L)).thenReturn(List.of());
+
+        var result = service.page(1L, 20L, new PageParam());
+
+        assertEquals("销售", result.getList().get(0).getSalesName());
+        assertEquals("兼***", result.getList().get(0).getSubmitterName());
+        verify(identityMaskingService).partnerName(context, "兼职提交人");
+        verify(identityMaskingService, never()).snapshotName(
+                context, "兼职提交人", null, LeadIdentityRole.SOURCE);
     }
 }

@@ -1,3 +1,4 @@
+import ProductSpecs from './ProductSpecs'
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Empty, Image, Space, Table, Tag, Timeline, Typography } from 'antd'
 import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
@@ -278,7 +279,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <section className="sales-order-content-section">
           <div className="sales-order-section-heading"><Typography.Text strong>成交课程</Typography.Text></div>
           <Table rowKey="id" size="small" pagination={false} dataSource={order.items} columns={[
-            { title: '课程', render: (_, item) => [item.categoryPath?.join(' / '), item.productName, item.skuName].filter(Boolean).join(' / ') || '-' },
+            { title: '课程', render: (_, item) => <div><strong>{item.productName || item.skuName || '-'}</strong><div>{item.categoryPath?.join(' / ')}</div><ProductSpecs product={item} />{item.skuName && item.skuName !== item.productName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}</div> },
             { title: '实际成交金额', width: 150, render: (_, item) => `¥${Number(item.actualAmount).toFixed(2)}` }
           ]}/>
         </section>

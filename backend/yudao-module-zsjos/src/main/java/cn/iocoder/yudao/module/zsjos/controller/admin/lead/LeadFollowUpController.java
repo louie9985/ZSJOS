@@ -39,7 +39,7 @@ public class LeadFollowUpController {
             @PathVariable("id") Long id,
             @RequestParam(value = "pageNo", defaultValue = "1") @Min(1) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = "10") @Min(1) int pageSize) {
-        return success(followUpService.getPage(id, pageNo, pageSize));
+        return success(followUpService.getPage(id, pageNo, pageSize, getLoginUserId()));
     }
 
     @PostMapping("/{id}/follow-ups")

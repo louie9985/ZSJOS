@@ -21,11 +21,13 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
     private static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private ZsjosProductMapper productMapper;
+    @Resource private ProductCategoryLocks categoryLocks;
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long create(ZsjosProductCategorySaveReqVO reqVO) {
         validateCashbackRule(reqVO);
         Long parentId = reqVO.getParentId() == null ? 0L : reqVO.getParentId();
+        categoryLocks.mutation(null, parentId);
         int level = resolveChildLevel(parentId, null);
         validateName(parentId, reqVO.getName(), null);
         ZsjosProductCategoryDO category = BeanUtils.toBean(reqVO, ZsjosProductCategoryDO.class);
@@ -34,8 +36,9 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         categoryMapper.insert(category); return category.getId();
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void update(ZsjosProductCategorySaveReqVO reqVO) {
+        categoryLocks.mutation(reqVO.getId(), reqVO.getParentId());
         validateCashbackRule(reqVO);
         ZsjosProductCategoryDO current = validateExists(reqVO.getId());
         Long parentId = reqVO.getParentId() == null ? 0L : reqVO.getParentId();
@@ -48,6 +51,9 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
             int subtreeHeight = all.stream().filter(item -> descendants.contains(item.getId()))
                     .mapToInt(item -> item.getLevel() - current.getLevel()).max().orElse(0);
             if (newLevel + subtreeHeight > MAX_DEPTH) throw exception(PRODUCT_CATEGORY_LEVEL_INVALID);
+        }
+        if (!Objects.equals(current.getStatus(), reqVO.getStatus())) {
+            validateStatusTransition(current, reqVO.getStatus(), parentId);
         }
         validateName(parentId, reqVO.getName(), current.getId());
         ZsjosProductCategoryDO update = BeanUtils.toBean(reqVO, ZsjosProductCategoryDO.class);
@@ -67,8 +73,9 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         }
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void delete(Long id) {
+        categoryLocks.mutation(id, null);
         ZsjosProductCategoryDO current = validateExists(id);
         if (categoryMapper.selectCountByParentId(id) > 0 || productMapper.selectCountByCategoryId(id) > 0) {
             throw exception(PRODUCT_CATEGORY_IN_USE);
@@ -76,11 +83,10 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         categoryMapper.deleteById(current.getId());
     }
 
-    @Override public void updateStatus(Long id, Integer status) {
-        if (!CommonStatusEnum.ENABLE.getStatus().equals(status) && !CommonStatusEnum.DISABLE.getStatus().equals(status)) {
-            throw exception(PRODUCT_CATEGORY_STATUS_INVALID);
-        }
-        validateExists(id);
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED) public void updateStatus(Long id, Integer status) {
+        categoryLocks.mutation(id, null);
+        ZsjosProductCategoryDO current = validateExists(id);
+        validateStatusTransition(current, status, current.getParentId());
         ZsjosProductCategoryDO update = new ZsjosProductCategoryDO(); update.setId(id); update.setStatus(status);
         categoryMapper.updateById(update);
     }
@@ -89,8 +95,9 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         return BeanUtils.toBean(validateExists(id), ZsjosProductCategoryRespVO.class);
     }
 
-    @Override public List<ZsjosProductCategoryRespVO> getTree() {
-        List<ZsjosProductCategoryDO> all = categoryMapper.selectList();
+    @Override public List<ZsjosProductCategoryRespVO> getTree(Integer status) {
+        List<ZsjosProductCategoryDO> all = new ArrayList<>(categoryMapper.selectList());
+        if (status != null) all.removeIf(item -> !Objects.equals(item.getStatus(), status));
         Map<Long, ZsjosProductCategoryRespVO> map = new LinkedHashMap<>();
         all.sort(Comparator.comparing(ZsjosProductCategoryDO::getSort).thenComparing(ZsjosProductCategoryDO::getId));
         all.forEach(item -> {
@@ -100,10 +107,32 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         });
         List<ZsjosProductCategoryRespVO> roots = new ArrayList<>();
         for (ZsjosProductCategoryRespVO item : map.values()) {
-            if (item.getParentId() == 0) roots.add(item);
+            if (item.getParentId() == 0 || !map.containsKey(item.getParentId())) roots.add(item);
             else { ZsjosProductCategoryRespVO parent = map.get(item.getParentId()); if (parent != null) { if (parent.getChildren() == null) parent.setChildren(new ArrayList<>()); parent.getChildren().add(item); } }
         }
         return roots;
+    }
+
+    private void validateStatusTransition(ZsjosProductCategoryDO current, Integer status, Long parentId) {
+        if (!CommonStatusEnum.ENABLE.getStatus().equals(status)
+                && !CommonStatusEnum.DISABLE.getStatus().equals(status)) {
+            throw exception(PRODUCT_CATEGORY_STATUS_INVALID);
+        }
+        if (CommonStatusEnum.DISABLE.getStatus().equals(status)) {
+            boolean hasEnabledChildren = categoryMapper.selectListByParentId(current.getId()).stream()
+                    .anyMatch(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()));
+            if (hasEnabledChildren) throw exception(PRODUCT_CATEGORY_HAS_ENABLED_CHILDREN);
+            if (productMapper.selectCountByCategoryIdAndStatus(current.getId(), CommonStatusEnum.ENABLE.getStatus()) > 0) {
+                throw exception(PRODUCT_CATEGORY_HAS_PRODUCTS);
+            }
+            return;
+        }
+        if (parentId != null && parentId != 0) {
+            ZsjosProductCategoryDO parent = validateExists(parentId);
+            if (!CommonStatusEnum.ENABLE.getStatus().equals(parent.getStatus())) {
+                throw exception(PRODUCT_CATEGORY_PARENT_DISABLED);
+            }
+        }
     }
 
     private ZsjosProductCategoryDO validateExists(Long id) {

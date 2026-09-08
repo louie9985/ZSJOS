@@ -47,6 +47,7 @@ export interface SpuItem {
 }
 
 export interface SkuItem {
+  specs?: import('../utils/productSpecs').ProductSpec[]
   spuRef: string
   skuRef: string
   skuName: string
@@ -272,6 +273,7 @@ export interface LeadAction {
 }
 
 export interface LeadProductItem {
+  specs?: import('../utils/productSpecs').ProductSpec[]
   spuRef: string
   spuName: string
   skuRef?: string

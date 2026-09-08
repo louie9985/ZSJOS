@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { SpuItem, SkuItem, CategoryNode } from '@/api/lead'
+import ProductSpecs from './ProductSpecs.vue'
+import { catalogSpecs, specText, type ProductSpec } from '../utils/productSpecs'
 
 /**
  * 意向课程选择器
@@ -13,6 +15,8 @@ export interface SelectedProduct {
   skuRef?: string
   skuName?: string
   attrValues?: Record<string, string>
+  specs?: ProductSpec[]
+  selectedAttrValues?: string
   price?: number
   spuUnknown: boolean
   skuUnknown: boolean
@@ -180,11 +184,7 @@ function selectSku(sku: SkuItem) {
 }
 
 function skuAttrSummary(sku: SkuItem) {
-  return selectedSpu.value?.attrs.flatMap(attr => {
-    const value = sku.attrValues[attr.attrKey]
-    if (value == null) return []
-    return [attr.values.find(option => option.value === value)?.label || value]
-  }).join(' · ') || ''
+  return (sku.specs ?? catalogSpecs(sku.attrValues, selectedSpu.value?.attrs)).map(specText).join(' · ')
 }
 
 function formatPrice(price?: number) {
@@ -203,6 +203,7 @@ function confirmSpu() {
     skuRef: sku?.skuRef,
     skuName: sku?.skuName,
     attrValues: sku?.attrValues,
+    specs: sku ? sku.specs ?? catalogSpecs(sku.attrValues, spu.attrs) : [],
     price: sku?.price,
     spuUnknown: false,
     skuUnknown: !hasCatalogSku,
@@ -268,7 +269,7 @@ function addUnknown() {
             主意向
           </van-tag>
           <span class="product-picker__item-name">{{ item.spuName }}</span>
-          <span v-if="item.skuName" class="product-picker__item-meta">{{ item.skuName }}<template v-if="item.price != null"> · ¥{{ item.price }}</template></span>
+          <ProductSpecs :product="item" /><span v-if="item.skuName" class="product-picker__item-meta">{{ item.skuName }}<template v-if="item.price != null"> · ¥{{ item.price }}</template></span>
         </div>
         <div class="product-picker__item-actions">
           <van-button
@@ -463,7 +464,8 @@ function addUnknown() {
 }
 .product-picker__item-info {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 1;
   min-width: 0;
 }
@@ -472,9 +474,10 @@ function addUnknown() {
   color: var(--h5-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.product-picker__item-meta{margin-left:6px;color:var(--h5-text-secondary);font-size:11px;white-space:nowrap}
+.product-picker__item-meta{color:var(--h5-text-secondary);font-size:11px;white-space:normal;overflow-wrap:anywhere}
 .product-picker__item-actions {
   display: flex;
   align-items: center;
@@ -744,7 +747,8 @@ function addUnknown() {
   color: var(--h5-text-secondary);
   font-size: 11px;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .product-picker__sku-value {
   display: flex;

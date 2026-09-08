@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -83,6 +84,9 @@ class LeadManagementServiceImplTest {
     private DeptApi deptApi;
     @Mock
     private LeadObjectPermissionService leadObjectPermissionService;
+    @Spy
+    @InjectMocks
+    private LeadIdentityMaskingService leadIdentityMaskingService;
     @Mock
     private OpportunityMapper opportunityMapper;
     @Mock
@@ -124,6 +128,8 @@ class LeadManagementServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "leadIdentityMaskingService",
+                new LeadIdentityMaskingService(leadObjectPermissionService));
         org.mockito.Mockito.lenient().when(remarkHistoryService.get(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(new LeadRemarkHistoryService.History(java.util.List.of(), false, false, java.util.Map.of()));
@@ -238,6 +244,7 @@ class LeadManagementServiceImplTest {
     void detailBlindsSubmitterAndOwnerIdentitiesForOrdinaryCounterpart() {
         LeadDO lead = actionLead("submitted", "owned", true);
         lead.setDispatchMode("auto");
+        lead.setQualifiedByUserId(20L);
         AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("提交销售");
         AdminUserRespDTO owner = user(20L, 0); owner.setNickname("负责销售");
         when(leadMapper.selectById(1L)).thenReturn(lead);
@@ -252,6 +259,7 @@ class LeadManagementServiceImplTest {
         assertEquals("提交销售", result.getSourceUserName());
         assertEquals(10L, result.getSourceUserId());
         assertNotEquals("负责销售", result.getOwnerUserName());
+        assertEquals(result.getOwnerUserName(), result.getQualifiedByUserName());
         assertEquals(null, result.getOwnerUserId());
     }
 
@@ -318,6 +326,8 @@ class LeadManagementServiceImplTest {
         LeadDO lead = actionLead("submitted", "owned", true);
         lead.setSourceType("partner");
         lead.setPartnerId(80L);
+        lead.setProviderOwnerType("partner");
+        lead.setProviderOwnerId(80L);
         PartnerDO partner = new PartnerDO();
         partner.setId(80L);
         partner.setName("张三");
@@ -344,6 +354,8 @@ class LeadManagementServiceImplTest {
         lead.setNextFollowUpAt(nextFollowUpAt);
         lead.setSourceType("partner");
         lead.setPartnerId(80L);
+        lead.setProviderOwnerType("partner");
+        lead.setProviderOwnerId(80L);
         PartnerDO partner = new PartnerDO();
         partner.setId(80L);
         partner.setName("张三");
@@ -410,6 +422,7 @@ class LeadManagementServiceImplTest {
     void detailHidesSubmitterForNewSalesSelfSourcedLeadWithoutProvider() {
         LeadDO lead = actionLead("submitted", "owned", true);
         lead.setSourceType("sales_self_sourced");
+        lead.setSourceProviderRecorded(true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -419,6 +432,26 @@ class LeadManagementServiceImplTest {
         LeadManagementRespVO result = service.getLead(1L, 30L);
 
         assertEquals(null, result.getSourceUserName());
+    }
+
+    @Test
+    void detailPreservesHistoricalSalesSelfSourcedSubmitterWhenProviderWasNotRecorded() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setSourceType("sales_self_sourced");
+        lead.setSourceProviderRecorded(null);
+        AdminUserRespDTO submitter = user(10L, 0);
+        submitter.setNickname("历史提交人");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals("历史提交人", result.getSourceUserName());
+        lead.setSourceProviderRecorded(false);
+        assertEquals("历史提交人", service.getLead(1L, 30L).getSourceUserName());
     }
 
     @Test

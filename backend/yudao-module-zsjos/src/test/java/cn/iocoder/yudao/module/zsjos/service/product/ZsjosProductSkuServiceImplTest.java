@@ -43,6 +43,7 @@ class ZsjosProductSkuServiceImplTest {
     @Mock private ZsjosProductAttrValueMapper attrValueMapper;
     @Mock private ZsjosProductSkuMapper skuMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
+    @Mock private ProductCategoryLocks categoryLocks;
 
     @BeforeEach
     void setUp() {
@@ -54,7 +55,7 @@ class ZsjosProductSkuServiceImplTest {
         lenient().when(productMapper.selectByIdForUpdate(anyLong(), eq(1L))).thenReturn(product);
         var category = new cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO();
         category.setId(100L); category.setParentId(0L); category.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        lenient().when(categoryMapper.selectByIdForUpdate(100L, 1L)).thenReturn(category);
+        lenient().when(categoryLocks.paths(List.of(100L))).thenReturn(Map.of(100L, category));
     }
 
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -94,7 +95,7 @@ class ZsjosProductSkuServiceImplTest {
 
         assertEquals(10L, service.createSku(create));
         verify(productMapper).selectByIdForUpdate(1L, 1L);
-        verify(categoryMapper).selectByIdForUpdate(100L, 1L);
+        verify(categoryLocks).paths(List.of(100L));
         verify(skuMapper).insert(argThat((ZsjosProductSkuDO sku) ->
                 CommonStatusEnum.ENABLE.getStatus().equals(sku.getStatus())));
 
@@ -128,7 +129,7 @@ class ZsjosProductSkuServiceImplTest {
         var disabledCategory = new cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO();
         disabledCategory.setId(100L); disabledCategory.setParentId(0L);
         disabledCategory.setStatus(CommonStatusEnum.DISABLE.getStatus());
-        when(categoryMapper.selectByIdForUpdate(100L, 1L)).thenReturn(disabledCategory);
+        when(categoryLocks.paths(List.of(100L))).thenReturn(Map.of(100L, disabledCategory));
 
         ServiceException error = assertThrows(ServiceException.class, () -> service.generateSkus(1L));
 
@@ -159,7 +160,7 @@ class ZsjosProductSkuServiceImplTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.generateSkus(1L));
 
         assertEquals(PRODUCT_SKU_COMBINATION_LIMIT.getCode(), error.getCode());
-        verify(categoryMapper).selectByIdForUpdate(100L, 1L);
+        verify(categoryLocks).paths(List.of(100L));
         verify(skuMapper, never()).insert(any(ZsjosProductSkuDO.class));
     }
 
@@ -171,6 +172,29 @@ class ZsjosProductSkuServiceImplTest {
 
         assertEquals(PRODUCT_SKU_COMBINATION_LIMIT.getCode(), error.getCode());
         verifyNoInteractions(productService, attrMapper, attrValueMapper, skuMapper);
+    }
+
+    @Test void skuListReadsMetadataOnceInsteadOfPerSku() {
+        var first = new ZsjosProductSkuDO(); first.setId(1L); first.setSpuId(1L); first.setAttrValuesJson("{}");
+        var second = new ZsjosProductSkuDO(); second.setId(2L); second.setSpuId(1L); second.setAttrValuesJson("{}");
+        when(skuMapper.selectListBySpuId(1L)).thenReturn(List.of(first, second));
+        when(attrMapper.selectListBySpuId(1L)).thenReturn(List.of());
+        when(attrValueMapper.selectListByAttrIds(List.of())).thenReturn(List.of());
+        assertEquals(2, service.getSkuList(1L).size());
+        verify(productService).getProduct(1L);
+        verify(attrMapper).selectListBySpuId(1L);
+        verify(attrValueMapper).selectListByAttrIds(List.of());
+    }
+
+    @Test void deletionRechecksSkuAfterLockingItsProduct() {
+        var sku = new ZsjosProductSkuDO(); sku.setId(10L); sku.setSpuId(1L); sku.setSkuRef("sku-1");
+        when(skuMapper.selectById(10L)).thenReturn(sku, null);
+        assertThrows(ServiceException.class, () -> service.deleteSku(10L));
+        var order = inOrder(skuMapper, productMapper);
+        order.verify(skuMapper).selectById(10L);
+        order.verify(productMapper).selectByIdForUpdate(1L, 1L);
+        order.verify(skuMapper).selectById(10L);
+        verify(skuMapper, never()).deleteById(anyLong());
     }
 
     private ZsjosProductSkuSaveReqVO skuRequest(Long spuId, Integer status) {

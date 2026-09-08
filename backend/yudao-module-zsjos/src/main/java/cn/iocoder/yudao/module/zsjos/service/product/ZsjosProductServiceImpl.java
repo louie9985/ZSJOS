@@ -28,9 +28,11 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private ZsjosProductSkuMapper skuMapper;
+    @Resource private ProductCategoryLocks categoryLocks;
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long createProduct(ZsjosProductSaveReqVO reqVO) {
+        categoryLocks.paths(List.of(reqVO.getCategoryId()));
         validateCashbackRule(reqVO.getValidCashbackAmount(), reqVO.getDealCashbackRate());
         ZsjosProductCategoryDO category = validateLeafCategory(reqVO.getCategoryId());
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) availablePath(category.getId(), true);
@@ -42,10 +44,11 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
         return product.getId();
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void updateProduct(ZsjosProductSaveReqVO reqVO) {
         validateCashbackRule(reqVO.getValidCashbackAmount(), reqVO.getDealCashbackRate());
-        ZsjosProductDO existing = validateExists(reqVO.getId());
+        ZsjosProductDO existing = lockProduct(reqVO.getId());
+        categoryLocks.paths(List.of(existing.getCategoryId(), reqVO.getCategoryId()));
         validateLeafCategory(reqVO.getCategoryId());
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) availablePath(reqVO.getCategoryId(), true);
         validateProductName(reqVO.getCategoryId(), reqVO.getName(), existing.getId());
@@ -54,7 +57,7 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
         productMapper.updateById(update);
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void deleteProduct(Long id) {
         ZsjosProductDO product = productMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (product == null) throw exception(PRODUCT_NOT_EXISTS);
@@ -67,11 +70,13 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
         productMapper.deleteById(id);
     }
 
-    @Override public void updateStatus(ZsjosProductStatusReqVO reqVO) {
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void updateStatus(ZsjosProductStatusReqVO reqVO) {
         if (!Set.of(CommonStatusEnum.ENABLE.getStatus(), CommonStatusEnum.DISABLE.getStatus()).contains(reqVO.getStatus())) {
             throw exception(PRODUCT_NOT_ENABLE);
         }
-        ZsjosProductDO existing = validateExists(reqVO.getId());
+        ZsjosProductDO existing = lockProduct(reqVO.getId());
+        categoryLocks.paths(List.of(existing.getCategoryId()));
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) availablePath(existing.getCategoryId(), true);
         ZsjosProductDO update = new ZsjosProductDO(); update.setId(reqVO.getId()); update.setStatus(reqVO.getStatus());
         productMapper.updateById(update);
@@ -89,11 +94,31 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
 
     @Override public List<ZsjosProductSimpleRespVO> getEnabledSimpleList() {
         List<ZsjosProductSimpleRespVO> result = new ArrayList<>();
+        Map<Long, ZsjosProductCategoryDO> categories = new HashMap<>();
+        Set<Long> parents = new HashSet<>();
+        categoryMapper.selectList().forEach(category -> {
+            categories.put(category.getId(), category); parents.add(category.getParentId());
+        });
         for (ZsjosProductDO item : productMapper.selectEnabledList()) {
-            CategoryPath path = availablePath(item.getCategoryId(), false);
+            CategoryPath path = availablePath(item.getCategoryId(), categories, parents);
             if (path != null) result.add(toSimple(item, path));
         }
         return result;
+    }
+
+    private CategoryPath availablePath(Long id, Map<Long, ZsjosProductCategoryDO> categories, Set<Long> parents) {
+        if (id == null || parents.contains(id)) return null;
+        List<ZsjosProductCategoryPathNodeVO> path = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        while (id != null && id != 0) {
+            var category = categories.get(id);
+            if (category == null || !visited.add(id) || visited.size() > MAX_DEPTH
+                    || !CommonStatusEnum.ENABLE.getStatus().equals(category.getStatus())) return null;
+            path.add(new ZsjosProductCategoryPathNodeVO(id, category.getName())); id = category.getParentId();
+        }
+        if (id == null) return null;
+        Collections.reverse(path);
+        return new CategoryPath(List.copyOf(path));
     }
 
     @Override public List<LeadProductSnapshot> validateEnabledProducts(Collection<String> refs) {
@@ -112,6 +137,12 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
 
     private ZsjosProductDO validateExists(Long id) {
         ZsjosProductDO product = productMapper.selectById(id);
+        if (product == null) throw exception(PRODUCT_NOT_EXISTS);
+        return product;
+    }
+
+    private ZsjosProductDO lockProduct(Long id) {
+        var product = productMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (product == null) throw exception(PRODUCT_NOT_EXISTS);
         return product;
     }

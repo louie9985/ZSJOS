@@ -20,6 +20,8 @@ public class ServiceRelationDO extends TenantBaseDO {
     private Long orderId;
     private Long orderItemId;
     private Long registrationCaseId;
+    /** Delivery class; null is retained only for legacy rows before class migration. */
+    private Long classId;
     private String status;
     private Long ownerUserId;
     private String acceptanceStatus;

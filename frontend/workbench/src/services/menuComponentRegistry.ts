@@ -3,7 +3,10 @@ export const WORKBENCH_COMPONENT = {
   SUBORDINATE_SALES: 'subordinateSales',
   SUBORDINATE_PARTNER: 'subordinatePartner',
   MEDIA_CALENDAR: 'mediaCalendar',
-  MEDIA_ALL_CALENDAR: 'mediaAllCalendar'
+  PERSONAL_CALENDAR: 'personalCalendar',
+  EXAM_CALENDAR: 'examCalendar'
+  ,CLASS_MANAGEMENT: 'classManagement'
+  ,MY_CLASSES: 'myClasses'
 } as const
 
 export type WorkbenchComponent = typeof WORKBENCH_COMPONENT[keyof typeof WORKBENCH_COMPONENT]
@@ -13,7 +16,10 @@ const COMPONENT_REGISTRY: Record<string, WorkbenchComponent> = {
   'zsjos/subordinateSales/index': WORKBENCH_COMPONENT.SUBORDINATE_SALES,
   'zsjos/subordinatePartner/index': WORKBENCH_COMPONENT.SUBORDINATE_PARTNER,
   'zsjos/mediaCalendar/index': WORKBENCH_COMPONENT.MEDIA_CALENDAR,
-  'zsjos/mediaCalendarAll/index': WORKBENCH_COMPONENT.MEDIA_ALL_CALENDAR
+  'zsjos/personalCalendar/index': WORKBENCH_COMPONENT.PERSONAL_CALENDAR,
+  'zsjos/examCalendar/index': WORKBENCH_COMPONENT.EXAM_CALENDAR
+  ,'zsjos/class-management': WORKBENCH_COMPONENT.CLASS_MANAGEMENT
+  ,'zsjos/my-classes': WORKBENCH_COMPONENT.MY_CLASSES
 }
 
 export function resolveWorkbenchComponent(component?: string) {

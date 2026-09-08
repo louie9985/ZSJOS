@@ -86,6 +86,8 @@ public class LeadSubmitterActionService {
         LeadCategorySnapshotService.Selection category = Objects.equals(lead.getLeadCategory(), req.getLeadCategory())
                 ? null : categorySnapshotService.requireEnabled(req.getLeadCategory());
         List<LeadProductSnapshot> snapshots = products(req.getIntendedProducts());
+        var existingProducts = productMapper.selectListByLeadId(leadId);
+        snapshots = snapshots.stream().map(s -> s.retainSelection(existingProducts)).toList();
         Map<String,Object> before = Map.of("provinceCode", Objects.toString(lead.getProvinceCode(), ""),
                 "cityCode", Objects.toString(lead.getCityCode(), ""), "leadCategory", Objects.toString(lead.getLeadCategory(), ""),
                 "remark", Objects.toString(lead.getRemark(), ""));
@@ -294,6 +296,11 @@ public class LeadSubmitterActionService {
         for(int i=0;i<requested.size();i++){ LeadProductReqVO item=requested.get(i); LeadProductSnapshot s=snapshots.get(i); LeadIntendedProductDO row=new LeadIntendedProductDO();
             row.setLeadId(leadId); row.setProductRef(s.productRef()); row.setProductNameSnapshot(s.name()); row.setSpuRef(s.productRef()); row.setSpuNameSnapshot(s.name());
             row.setSkuRef(s.skuRef()); row.setSkuNameSnapshot(s.skuName()); row.setSelectedAttrValuesJson(s.selectedAttrValuesJson()); row.setPriceSnapshot(s.price());
+            row.setSelectedSpecsJson(JsonUtils.toJsonString(s.specs()));
+            row.setCategoryId(s.categoryId()); row.setCategoryNameSnapshot(s.categoryName());
+            row.setCategoryPathSnapshot(JsonUtils.toJsonString(s.categoryPath()));
+            row.setLevel1CategoryId(s.level1CategoryId()); row.setLevel1CategoryNameSnapshot(s.level1CategoryName());
+            row.setLevel2CategoryId(s.level2CategoryId()); row.setLevel2CategoryNameSnapshot(s.level2CategoryName());
             row.setSpuUnknown(s.spuUnknown()); row.setSkuUnknown(s.skuUnknown()); row.setIsPrimary(item.getPrimary()); row.setSort(i); productMapper.insert(row); }
     }
     private record Region(String provinceCode,String provinceName,String cityCode,String cityName) {}

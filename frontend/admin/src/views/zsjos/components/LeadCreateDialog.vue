@@ -67,7 +67,7 @@
               ><el-option
                 v-for="item in skuOptions"
                 :key="item.skuRef"
-                :label="item.skuName"
+                :label="skuLabel(item)"
                 :value="item.skuRef" /></el-select></el-form-item></el-col
       ></el-row>
       <el-form-item v-if="!selfSourced" label="派单方式" prop="dispatchMode"
@@ -100,6 +100,7 @@
   </el-dialog>
 </template>
 <script setup lang="ts">
+import { catalogSpecs, specText } from '@/utils/productSpecs'
 import type { FormInstance, FormRules } from 'element-plus'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
@@ -119,6 +120,8 @@ const sourceOptions = ref<DictDataVO[]>([])
 const categoryOptions = ref<DictDataVO[]>([])
 const sales = ref<Array<{ id: number; nickname: string }>>([])
 const catalog = reactive<{ spus: any[]; skus: any[] }>({ spus: [], skus: [] })
+const skuLabel = (sku: { spuRef: string; skuName: string; attrValues: Record<string, string>; specs?: import('@/utils/productSpecs').ProductSpec[] }) =>
+  [sku.skuName, (sku.specs ?? catalogSpecs(sku.attrValues, catalog.spus.find(spu => spu.spuRef === sku.spuRef)?.attrs)).map(specText).join(' · ')].filter(Boolean).join(' · ')
 const canSpecifySales = computed(() => userStore.getPermissions.has('zsjos:lead:submit:specify'))
 const emptyForm = () => ({
   name: '',

@@ -17,6 +17,8 @@ public interface RegistrationService {
     RegistrationCaseRespVO updateChecklistItem(Long caseId, Long itemId, Long userId, RegistrationChecklistItemUpdateReqVO reqVO);
     RegistrationCaseRespVO updateStudyPlanner(Long caseId, Long userId, RegistrationPlannerUpdateReqVO reqVO);
     RegistrationCaseRespVO updateRoutes(Long caseId, Long userId, RegistrationRoutesUpdateReqVO reqVO);
+    RegistrationCaseRespVO updateClassAssignments(Long caseId, Long userId,
+                                                   RegistrationClassAssignmentsSaveReqVO reqVO);
     RegistrationAttachmentUploadRespVO uploadAttachment(Long caseId, Long itemId, Long userId, Integer version,
                                                          String idempotencyKey, MultipartFile file) throws IOException;
     RegistrationCaseRespVO deleteAttachment(Long caseId, Long itemId, Long attachmentId, Long userId,

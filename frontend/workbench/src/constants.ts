@@ -80,6 +80,8 @@ export const APP_ROUTES = {
   REGISTRATION_POOL: '/zsjos/registration-pool',
   REGISTRATION_CHECKLIST_CONFIG: '/zsjos/registration-checklist-config',
   MY_STUDENTS: '/zsjos/my-students',
+  CLASS_MANAGEMENT: '/zsjos/class-management',
+  MY_CLASSES: '/zsjos/my-classes',
   STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
   STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
@@ -117,7 +119,8 @@ export const APP_ROUTES = {
   MEDIA_REVIEWS: '/zsjos/reviews',
   MEDIA_STUDENTS: '/zsjos/media-students',
   MEDIA_CALENDAR: '/calendar/overview',
-  MEDIA_ALL_CALENDAR: '/calendar/all'
+  PERSONAL_CALENDAR: '/calendar/personal',
+  EXAM_CALENDAR: '/calendar/exam-calendar'
 } as const
 
 export type AuthPlatform = 'PC' | 'MOBILE'
@@ -163,6 +166,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.REGISTRATION_POOL,
   APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG,
   APP_ROUTES.MY_STUDENTS,
+  APP_ROUTES.CLASS_MANAGEMENT,
+  APP_ROUTES.MY_CLASSES,
   APP_ROUTES.STUDENT_CONTACT_CONFIG,
   APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS,
   APP_ROUTES.TODAY_TASKS,
@@ -199,7 +204,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MEDIA_REVIEWS,
   APP_ROUTES.MEDIA_STUDENTS,
   APP_ROUTES.MEDIA_CALENDAR,
-  APP_ROUTES.MEDIA_ALL_CALENDAR
+  APP_ROUTES.PERSONAL_CALENDAR,
+  APP_ROUTES.EXAM_CALENDAR
 ])
 
 // ========== Dictionaries ==========

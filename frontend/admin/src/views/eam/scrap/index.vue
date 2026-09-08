@@ -112,8 +112,11 @@ const queryParams = reactive({
 
 const scrapStatusName = (status: number) =>
   ({ 0: '审批中', 1: '已报废', 2: '已驳回' })[status] ?? '未知'
-const scrapStatusType = (status: number) =>
-  ({ 0: 'warning', 1: 'danger', 2: 'info' })[status] ?? 'info'
+const scrapStatusType = (status: number): 'warning' | 'danger' | 'info' => {
+  if (status === 0) return 'warning'
+  if (status === 1) return 'danger'
+  return 'info'
+}
 
 const getList = async () => {
   loading.value = true

@@ -78,6 +78,9 @@ class MyStudentServiceImplTest {
         assertEquals("营养课程 - 线上班", result.getSkuName());
         assertEquals(List.of("中医营养学", "基础课程"), result.getCategoryPath());
         assertEquals(List.of("线上", "一天"), result.getAttributeValues());
+        assertEquals(List.of("delivery：线上（历史标签缺失）", "period：一天（历史标签缺失）"),
+                result.getSpecs().stream().map(cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO::displayText).toList());
+        assertEquals(2, result.getSpecs().size());
     }
 
     @Test

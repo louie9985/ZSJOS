@@ -4,6 +4,7 @@ import { cloneDeep } from 'lodash-es'
 import remainingRouter from '@/router/modules/remaining'
 import { flatMultiLevelRoutes, generateRoute } from '@/utils/routerHelper'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
+import { getAuthenticatedLandingPath } from '@/utils/authenticatedLanding'
 
 const { wsCache } = useCache()
 
@@ -12,6 +13,7 @@ export interface PermissionState {
   addRouters: AppRouteRecordRaw[]
   menuTabRouters: AppRouteRecordRaw[]
   menuRootPath: string
+  defaultLandingPath: string
 }
 
 export const usePermissionStore = defineStore('permission', {
@@ -19,7 +21,8 @@ export const usePermissionStore = defineStore('permission', {
     routers: [],
     addRouters: [],
     menuTabRouters: [],
-    menuRootPath: ''
+    menuRootPath: '',
+    defaultLandingPath: '/403'
   }),
   getters: {
     getRouters(): AppRouteRecordRaw[] {
@@ -33,6 +36,9 @@ export const usePermissionStore = defineStore('permission', {
     },
     getMenuRootPath(): string {
       return this.menuRootPath
+    },
+    getDefaultLandingPath(): string {
+      return this.defaultLandingPath
     }
   },
   actions: {
@@ -45,6 +51,7 @@ export const usePermissionStore = defineStore('permission', {
           res = roleRouters as AppCustomRouteRecordRaw[]
         }
         const routerMap: AppRouteRecordRaw[] = generateRoute(res)
+        this.defaultLandingPath = getAuthenticatedLandingPath(res)
         // 动态路由，404一定要放到最后面
         // preschooler：vue-router@4以后已支持静态404路由，此处可不再追加
         this.addRouters = routerMap.concat([

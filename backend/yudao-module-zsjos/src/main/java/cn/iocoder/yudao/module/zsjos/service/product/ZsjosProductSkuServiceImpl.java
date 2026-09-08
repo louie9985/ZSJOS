@@ -33,6 +33,7 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     @Resource private ZsjosProductAttrValueMapper attrValueMapper;
     @Resource private ZsjosProductSkuMapper skuMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
+    @Resource private ProductCategoryLocks categoryLocks;
 
     @Override
     public List<ZsjosProductAttrRespVO> getAttrs(Long spuId) {
@@ -46,10 +47,81 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
                 .map(value -> new ZsjosProductAttrRespVO.Value(value.getValue(), value.getLabel(), value.getSort())).toList())).toList();
     }
 
+    private List<ZsjosProductAttrRespVO> enabledAttrs(Long spuId) {
+        var attrs = attrMapper.selectListBySpuId(spuId).stream()
+                .filter(a -> CommonStatusEnum.ENABLE.getStatus().equals(a.getStatus())).toList();
+        var values = attrValueMapper.selectListByAttrIds(attrs.stream().map(ZsjosProductAttrDO::getId).toList());
+        return attrs.stream().map(a -> new ZsjosProductAttrRespVO(a.getAttrKey(), a.getAttrName(), a.getRequired(), a.getSort(),
+                values.stream().filter(v -> Objects.equals(v.getAttrId(), a.getId())
+                        && CommonStatusEnum.ENABLE.getStatus().equals(v.getStatus()))
+                        .map(v -> new ZsjosProductAttrRespVO.Value(v.getValue(), v.getLabel(), v.getSort())).toList())).toList();
+    }
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    public List<ExamProductScopeRespVO> getExamProductOptions() {
+        var enabled = productService.getEnabledSimpleList();
+        if (enabled.isEmpty()) return List.of();
+        var products = productMapper.selectListByRefs(enabled.stream().map(ZsjosProductSimpleRespVO::productRef).toList());
+        var byRef = enabled.stream().collect(Collectors.toMap(ZsjosProductSimpleRespVO::productRef, p -> p));
+        List<ExamProductScopeRespVO> result = new ArrayList<>();
+        for (int start = 0; start < products.size(); start += 200) {
+            var batch = products.subList(start, Math.min(start + 200, products.size()));
+            var ids = batch.stream().map(ZsjosProductDO::getId).toList();
+            var attrs = attrMapper.selectListBySpuIds(ids).stream()
+                    .filter(a -> CommonStatusEnum.ENABLE.getStatus().equals(a.getStatus())).toList();
+            var values = attrValueMapper.selectListByAttrIds(attrs.stream().map(ZsjosProductAttrDO::getId).toList()).stream()
+                    .filter(v -> CommonStatusEnum.ENABLE.getStatus().equals(v.getStatus()))
+                    .collect(Collectors.groupingBy(ZsjosProductAttrValueDO::getAttrId));
+            var byProduct = attrs.stream().collect(Collectors.groupingBy(ZsjosProductAttrDO::getSpuId));
+            var skus = skuMapper.selectEnabledListBySpuIds(ids).stream().collect(Collectors.groupingBy(ZsjosProductSkuDO::getSpuId));
+            for (var product : batch) {
+                var metadata = byProduct.getOrDefault(product.getId(), List.of()).stream().map(a ->
+                        new ZsjosProductAttrRespVO(a.getAttrKey(), a.getAttrName(), a.getRequired(), a.getSort(),
+                                values.getOrDefault(a.getId(), List.of()).stream().map(v ->
+                                        new ZsjosProductAttrRespVO.Value(v.getValue(), v.getLabel(), v.getSort())).toList())).toList();
+                var scope = examScope(product, byRef.get(product.getProductRef()).categoryPath(), Map.of(), metadata,
+                        skus.getOrDefault(product.getId(), List.of()));
+                if (!scope.skus().isEmpty()) result.add(scope);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public ExamProductScopeRespVO resolveExamScope(Long productId, Map<String, String> selected) {
+        var product = lockEnabledProduct(productId);
+        var snapshot = productService.validateEnabledProducts(List.of(product.getProductRef())).getFirst();
+        var result = examScope(product, snapshot.categoryPath(), selected == null ? Map.of() : selected,
+                enabledAttrs(productId), skuMapper.selectEnabledListBySpuIds(List.of(productId)));
+        if (result.skus().isEmpty()) throw exception(EXAM_SCHEDULE_SKU_NO_MATCH);
+        return result;
+    }
+
+    private ExamProductScopeRespVO examScope(ZsjosProductDO product, List<ZsjosProductCategoryPathNodeVO> path,
+                                       Map<String, String> selected, List<ZsjosProductAttrRespVO> attrs,
+                                       List<ZsjosProductSkuDO> candidates) {
+        for (var entry : selected.entrySet()) {
+            if (attrs.stream().noneMatch(a -> a.attrKey().equals(entry.getKey())
+                    && a.values().stream().anyMatch(v -> Objects.equals(v.value(), entry.getValue())))) {
+                throw exception(PRODUCT_ATTR_INVALID);
+            }
+        }
+        var skus = candidates.stream().filter(s -> {
+            var values = parseAttrs(s.getAttrValuesJson());
+            return selected.entrySet().stream().allMatch(e -> Objects.equals(values.get(e.getKey()), e.getValue()))
+                    && values.entrySet().stream().allMatch(e -> attrs.stream().anyMatch(a -> a.attrKey().equals(e.getKey())
+                    && a.values().stream().anyMatch(v -> Objects.equals(v.value(), e.getValue()))))
+                    && attrs.stream().filter(a -> Boolean.TRUE.equals(a.required())).allMatch(a -> values.containsKey(a.attrKey()));
+        }).map(s -> new ExamProductScopeRespVO.Sku(s.getId(), s.getSkuRef(), s.getSkuName(), parseAttrs(s.getAttrValuesJson()),
+                ProductSpecVO.resolve(parseAttrs(s.getAttrValuesJson()), attrs))).toList();
+        return new ExamProductScopeRespVO(product.getId(), product.getProductRef(), product.getName(), product.getCategoryId(),
+                path, attrs, ProductSpecVO.resolve(selected, attrs), skus);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void saveAttrs(ZsjosProductAttrSaveReqVO reqVO) {
-        productService.getProduct(reqVO.getSpuId());
         lockProduct(reqVO.getSpuId());
         Set<String> names = new HashSet<>();
         Set<String> keys = new HashSet<>();
@@ -83,7 +155,7 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         }
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long createSku(ZsjosProductSkuSaveReqVO reqVO) {
         lockEnabledProduct(reqVO.getSpuId());
         validatePrice(reqVO.getPrice());
@@ -97,7 +169,7 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public int generateSkus(Long spuId) {
         if (maxGeneratedCombinations <= 0) {
             throw exception(PRODUCT_SKU_COMBINATION_LIMIT);
@@ -138,11 +210,12 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         return created;
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void updateSku(ZsjosProductSkuSaveReqVO reqVO) {
+        lockProduct(reqVO.getSpuId());
         ZsjosProductSkuDO existing = validateSkuExists(reqVO.getId());
         if (!Objects.equals(existing.getSpuId(), reqVO.getSpuId())) throw exception(PRODUCT_SKU_SPU_IMMUTABLE);
-        productService.getProduct(reqVO.getSpuId()); lockProduct(reqVO.getSpuId()); validatePrice(reqVO.getPrice());
+        validatePrice(reqVO.getPrice());
         String json = canonicalAttrs(reqVO.getSpuId(), reqVO.getAttrValues()); String hash = DigestUtil.sha256Hex(json);
         ZsjosProductSkuDO same = skuMapper.selectBySpuIdAndHash(reqVO.getSpuId(), hash);
         if (same != null && !Objects.equals(same.getId(), reqVO.getId())) throw exception(PRODUCT_SKU_DUPLICATE);
@@ -150,20 +223,21 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         update.setStatus(null); skuMapper.updateById(update);
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void deleteSku(Long id) {
-        ZsjosProductSkuDO sku = validateSkuExists(id);
+        ZsjosProductSkuDO sku = lockSkuProduct(id);
         if (intendedProductMapper.selectCountBySkuRef(sku.getSkuRef()) > 0) throw exception(PRODUCT_SKU_IN_USE);
         skuMapper.deleteById(id);
     }
 
-    @Override public void updateSkuStatus(ZsjosProductSkuStatusReqVO reqVO) {
-        ZsjosProductSkuDO existing = validateSkuExists(reqVO.getId());
+    @Override @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void updateSkuStatus(ZsjosProductSkuStatusReqVO reqVO) {
+        ZsjosProductSkuDO existing = lockSkuProduct(reqVO.getId());
         if (!Set.of(CommonStatusEnum.ENABLE.getStatus(), CommonStatusEnum.DISABLE.getStatus()).contains(reqVO.getStatus())) {
             throw exception(PRODUCT_SKU_INVALID);
         }
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) {
-            ZsjosProductDO spu = productMapper.selectById(existing.getSpuId());
+            ZsjosProductDO spu = lockEnabledProduct(existing.getSpuId());
             if (spu == null) throw exception(PRODUCT_SKU_INVALID);
             productService.validateEnabledProducts(List.of(spu.getProductRef()));
             canonicalAttrs(spu.getId(), parseAttrs(existing.getAttrValuesJson()));
@@ -173,7 +247,8 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
 
     @Override public ZsjosProductSkuRespVO getSku(Long id) { return toResp(validateSkuExists(id)); }
     @Override public List<ZsjosProductSkuRespVO> getSkuList(Long spuId) {
-        productService.getProduct(spuId); return skuMapper.selectListBySpuId(spuId).stream().map(this::toResp).toList();
+        var attrs = getAttrs(spuId);
+        return skuMapper.selectListBySpuId(spuId).stream().map(sku -> toResp(sku, attrs)).toList();
     }
 
     @Override
@@ -195,7 +270,8 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
                     attrs.stream().map(attr -> new LeadProductCatalogRespVO.Attr(attr.attrKey(), attr.attrName(), attr.required(),
                             attr.values().stream().map(value -> new LeadProductCatalogRespVO.Value(value.value(), value.label())).toList())).toList()));
             catalogSkus.addAll(skus.getOrDefault(spu.getId(), List.of()).stream().map(sku -> new LeadProductCatalogRespVO.Sku(
-                    item.productRef(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice())).toList());
+                    item.productRef(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(),
+                    ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), attrs))).toList());
         }
         return new LeadProductCatalogRespVO(buildCategoryTree(products), spus, catalogSkus);
     }
@@ -239,7 +315,8 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         ZsjosProductSkuDO sku = skuRef == null ? null : skuMapper.selectBySkuRef(skuRef);
         if (sku == null || !Objects.equals(sku.getSpuId(), product.getId())
                 || !CommonStatusEnum.ENABLE.getStatus().equals(sku.getStatus())) throw exception(PRODUCT_SKU_INVALID);
-        return spu.withSku(sku.getSkuRef(), sku.getSkuName(), sku.getAttrValuesJson(), sku.getPrice());
+        return spu.withSku(sku.getSkuRef(), sku.getSkuName(), sku.getAttrValuesJson(), sku.getPrice())
+                .withSpecs(ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), getAttrs(product.getId())));
     }
 
     private String canonicalAttrs(Long spuId, Map<String, String> requested) {
@@ -265,14 +342,14 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         return product;
     }
     private ZsjosProductDO lockEnabledProduct(Long spuId) {
-        Long tenantId = TenantContextHolder.getRequiredTenantId();
         ZsjosProductDO product = lockProduct(spuId);
         if (!CommonStatusEnum.ENABLE.getStatus().equals(product.getStatus())) throw exception(PRODUCT_REFS_INVALID);
+        var categories = categoryLocks.paths(List.of(product.getCategoryId()));
         Set<Long> visited = new HashSet<>();
         Long categoryId = product.getCategoryId();
         int depth = 0;
         while (categoryId != null && categoryId != 0L && depth++ < 10 && visited.add(categoryId)) {
-            ZsjosProductCategoryDO category = categoryMapper.selectByIdForUpdate(categoryId, tenantId);
+            ZsjosProductCategoryDO category = categories.get(categoryId);
             if (category == null || !CommonStatusEnum.ENABLE.getStatus().equals(category.getStatus())) {
                 throw exception(PRODUCT_REFS_INVALID);
             }
@@ -282,11 +359,19 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         return product;
     }
     private ZsjosProductSkuDO validateSkuExists(Long id) { ZsjosProductSkuDO sku = skuMapper.selectById(id); if (sku == null) throw exception(PRODUCT_SKU_NOT_EXISTS); return sku; }
+    private ZsjosProductSkuDO lockSkuProduct(Long id) {
+        Long productId = validateSkuExists(id).getSpuId();
+        lockProduct(productId);
+        var current = validateSkuExists(id);
+        if (!Objects.equals(productId, current.getSpuId())) throw exception(PRODUCT_CATALOG_CHANGED);
+        return current;
+    }
     private ZsjosProductSkuDO toSku(ZsjosProductSkuSaveReqVO req, String json, String hash) {
         ZsjosProductSkuDO sku = new ZsjosProductSkuDO(); sku.setId(req.getId()); sku.setSpuId(req.getSpuId());
         sku.setSkuName(req.getSkuName()); sku.setAttrValuesJson(json); sku.setAttrValuesHash(hash); sku.setPrice(req.getPrice());
         sku.setStatus(req.getStatus()); sku.setSort(req.getSort()); sku.setRemark(req.getRemark()); return sku;
     }
-    private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku) { return new ZsjosProductSkuRespVO(sku.getId(), sku.getSpuId(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(), sku.getStatus(), sku.getSort(), sku.getRemark(), sku.getUpdateTime()); }
+    private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku) { return toResp(sku, getAttrs(sku.getSpuId())); }
+    private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku, List<ZsjosProductAttrRespVO> attrs) { return new ZsjosProductSkuRespVO(sku.getId(), sku.getSpuId(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(), sku.getStatus(), sku.getSort(), sku.getRemark(), sku.getUpdateTime(), ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), attrs)); }
     @SuppressWarnings("unchecked") private Map<String, String> parseAttrs(String json) { return json == null ? Map.of() : JsonUtils.parseObject(json, Map.class); }
 }

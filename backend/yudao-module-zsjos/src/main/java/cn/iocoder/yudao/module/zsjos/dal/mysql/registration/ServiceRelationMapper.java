@@ -23,6 +23,20 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     List<ServiceRelationDO> selectExamNoticeCandidates(@Param("tenantId") Long tenantId);
     @Select("SELECT * FROM zsjos_service_relation WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     ServiceRelationDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    @Select("SELECT * FROM zsjos_service_relation WHERE class_id=#{classId} AND tenant_id=#{tenantId} "
+            + "AND status IN ('active','paused','completed') AND deleted=b'0' FOR UPDATE")
+    List<ServiceRelationDO> selectClassRelationsForUpdate(@Param("classId") Long classId,
+                                                           @Param("tenantId") Long tenantId);
+
+    default int transferClass(Long id, Long classId, Long ownerUserId, Integer version) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getClassId, classId)
+                .set(ServiceRelationDO::getOwnerUserId, ownerUserId)
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
     @Select("SELECT * FROM zsjos_service_relation WHERE person_id=#{personId} AND status='active' "
             + "AND acceptance_status='accepted' AND tenant_id=#{tenantId} AND deleted=b'0' ORDER BY id FOR UPDATE")
     List<ServiceRelationDO> selectActiveAcceptedByPersonForUpdate(@Param("personId") Long personId,

@@ -12,6 +12,11 @@ import java.util.List;
 
 @Mapper
 public interface ZsjosProductCategoryMapper extends BaseMapperX<ZsjosProductCategoryDO> {
+    @org.apache.ibatis.annotations.Options(useCache = false, flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
+    @Select("SELECT * FROM zsjos_product_category WHERE deleted = b'0'")
+    List<ZsjosProductCategoryDO> selectCurrentList();
+
+    @org.apache.ibatis.annotations.Options(useCache = false, flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
     @Select("SELECT * FROM zsjos_product_category WHERE id = #{id} AND tenant_id = #{tenantId} " +
             "AND deleted = b'0' FOR UPDATE")
     ZsjosProductCategoryDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);

@@ -1,0 +1,86 @@
+.exam-calendar-page {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.exam-calendar-page .page-heading,
+.exam-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+}
+
+.exam-calendar-page .page-heading h4 { margin: 0; }
+.exam-calendar-filter { min-width: 180px; }
+.exam-calendar-page .ant-spin-nested-loading,
+.exam-calendar-page .ant-spin-container { min-height: 0; height: 100%; }
+.exam-calendar-page .ant-picker-calendar { height: 100%; overflow: auto; }
+
+.exam-calendar-events {
+  display: grid;
+  gap: var(--crm-sp-1);
+}
+
+.exam-calendar-event {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-1);
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  color: var(--crm-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.exam-calendar-event > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exam-calendar-event .ant-tag { flex: 0 0 auto; margin: 0; }
+.exam-calendar-event { align-items: flex-start; flex-wrap: wrap; }
+.exam-calendar-event > span:first-child { white-space: normal; overflow-wrap: anywhere; }
+.exam-calendar-event .product-specs { max-height: 3em; overflow: hidden; }
+.exam-calendar-detail strong { overflow-wrap: anywhere; }
+.exam-calendar-overflow { padding-inline: var(--crm-sp-2); }
+.exam-calendar-event.tone-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
+.exam-calendar-event.tone-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
+.exam-calendar-event.tone-published { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
+
+.exam-calendar-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--crm-gap);
+}
+
+.exam-calendar-detail > div {
+  display: grid;
+  gap: var(--crm-sp-1);
+  min-width: 0;
+  padding: var(--crm-sp-3);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.exam-calendar-detail .wide { grid-column: 1 / -1; }
+.exam-calendar-detail span { color: var(--crm-text-secondary); }
+
+@media (max-width: 768px) {
+  .exam-calendar-page { height: auto; min-height: 100%; }
+  .exam-calendar-page .page-heading,
+  .exam-calendar-toolbar { align-items: stretch; flex-direction: column; }
+  .exam-calendar-filter { width: 100%; }
+  .exam-calendar-detail { grid-template-columns: 1fr; }
+  .exam-calendar-detail .wide { grid-column: auto; }
+}

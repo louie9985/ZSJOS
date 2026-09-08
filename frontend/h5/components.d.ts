@@ -14,6 +14,7 @@ declare module 'vue' {
     LiquidSegmentedControl: typeof import('./src/components/LiquidSegmentedControl.vue')['default']
     LiquidTabbar: typeof import('./src/components/LiquidTabbar.vue')['default']
     ProductPicker: typeof import('./src/components/ProductPicker.vue')['default']
+    ProductSpecs: typeof import('./src/components/ProductSpecs.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VanBadge: typeof import('vant/es')['Badge']

@@ -41,7 +41,7 @@ public class LeadFlowHistoryService {
     @Resource private FileApi fileApi;
 
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "flow-read")
-    public List<LeadFlowHistoryRespVO> getHistory(Long leadId) {
+    public List<LeadFlowHistoryRespVO> getHistory(Long leadId, Long viewerId) {
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         List<BusinessEventDO> events = eventMapper.selectByLeadId(leadId);
@@ -69,17 +69,19 @@ public class LeadFlowHistoryService {
             addUser(userIds, item.getCollaboratorUserId());
         });
         Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(userIds);
+        LeadIdentityMaskingService.LeadIdentityViewContext identityContext =
+                leadIdentityMaskingService.resolve(viewerId, lead);
 
         List<LeadFlowHistoryRespVO> result = new ArrayList<>();
         PartnerDO partner = lead.getPartnerId() == null ? null : partnerMapper.selectById(lead.getPartnerId());
-        LeadFlowHistoryRespVO submitted = submission(lead, users, partner);
+        LeadFlowHistoryRespVO submitted = submission(lead, users, partner, identityContext);
         var remarks = LeadRemarkHistoryService.project(lead, events, null, true);
         if (remarks.hasLegacy()) submitted.setRemark(null);
         result.add(submitted);
-        events.forEach(event -> result.add(fromEvent(event, users, followUps, assignmentsById)));
+        events.forEach(event -> result.add(fromEvent(event, users, followUps, assignmentsById, identityContext)));
         assignments.stream().filter(item -> !referencedAssignments.contains(item.getId()))
-                .forEach(item -> result.add(fromAssignment(item, users)));
-        agingEvents.forEach(item -> result.add(fromAging(item, users)));
+                .forEach(item -> result.add(fromAssignment(item, users, identityContext)));
+        agingEvents.forEach(item -> result.add(fromAging(item, users, identityContext)));
         result.sort(Comparator.comparing(LeadFlowHistoryRespVO::getOccurredAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparingInt(LeadFlowHistoryService::sameTimeOrder)
@@ -88,11 +90,15 @@ public class LeadFlowHistoryService {
         return result;
     }
 
-    private LeadFlowHistoryRespVO submission(LeadDO lead, Map<Long, AdminUserRespDTO> users, PartnerDO partner) {
+    @Resource private LeadIdentityMaskingService leadIdentityMaskingService;
+
+    private LeadFlowHistoryRespVO submission(LeadDO lead, Map<Long, AdminUserRespDTO> users, PartnerDO partner,
+                                             LeadIdentityMaskingService.LeadIdentityViewContext context) {
         LeadFlowHistoryRespVO vo = base("lead:" + lead.getId(),
                 lead.getSubmittedAt() == null ? lead.getCreateTime() : lead.getSubmittedAt(), "客资", "客资提交",
                 lead.getPartnerId() != null ? "兼职端" : "员工工作台",
-                partner == null ? name(users, lead.getSourceUserId()) : partner.getName(), null);
+                partner == null ? leadIdentityMaskingService.employeeName(context, users, lead.getSourceUserId(), LeadIdentityRole.SOURCE)
+                        : leadIdentityMaskingService.partnerName(context, partner.getName()), null);
         vo.setLeadStatusAfter("已提交");
         vo.setAssignmentStatusAfter("未分配");
         vo.setRemark(lead.getRemark());
@@ -101,14 +107,15 @@ public class LeadFlowHistoryService {
 
     private LeadFlowHistoryRespVO fromEvent(BusinessEventDO event, Map<Long, AdminUserRespDTO> users,
                                              Map<Long, LeadFollowUpRecordDO> followUps,
-                                             Map<Long, LeadAssignmentHistoryDO> assignmentsById) {
+                                             Map<Long, LeadAssignmentHistoryDO> assignmentsById,
+                                             LeadIdentityMaskingService.LeadIdentityViewContext context) {
         String node = eventLabel(event.getEventType());
         boolean system = event.getOperatorUserId() == null || event.getOperatorUserId() == 0;
         LeadAssignmentHistoryDO assignment = optionalLong(event.getRelatedObjectRefs(), "assignmentHistoryId")
                 .map(assignmentsById::get).orElse(null);
         LeadFlowHistoryRespVO vo = base("event:" + event.getId(), event.getOccurredAt(), businessObject(event.getEventType()),
                 node, eventSource(event, assignment, system),
-                system ? "系统" : name(users, event.getOperatorUserId()), eventReason(event, assignment));
+                system ? "系统" : leadIdentityMaskingService.employeeName(context, users, event.getOperatorUserId(), LeadIdentityRole.OPERATOR), eventReason(event, assignment));
         vo.setRemark(eventRemark(event, followUps));
         if (LeadSupplementSnapshot.EVENT.equals(event.getEventType())) {
             Map<?, ?> payload = LeadRemarkHistoryService.payload(event);
@@ -119,10 +126,10 @@ public class LeadFlowHistoryService {
             }
         }
         applyEventTransitions(vo, event);
-        vo.setFromOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "fromOwnerUserId")
-                .orElse(assignment == null ? null : assignment.getFromOwnerUserId())));
-        vo.setToOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "toOwnerUserId")
-                .orElse(assignment == null ? null : firstNonNull(assignment.getToOwnerUserId(), assignment.getCandidateUserId()))));
+        vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, optionalLong(event.getRelatedObjectRefs(), "fromOwnerUserId")
+                .orElse(assignment == null ? null : assignment.getFromOwnerUserId()), LeadIdentityRole.OWNER));
+        vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, optionalLong(event.getRelatedObjectRefs(), "toOwnerUserId")
+                .orElse(assignment == null ? null : firstNonNull(assignment.getToOwnerUserId(), assignment.getCandidateUserId())), LeadIdentityRole.OWNER));
         if (vo.getAssignmentStatusAfter() == null && assignment != null) {
             vo.setAssignmentStatusBefore(assignmentBefore(assignment.getActionType()));
             vo.setAssignmentStatusAfter(assignmentAfter(assignment.getActionType()));
@@ -131,24 +138,26 @@ public class LeadFlowHistoryService {
         return vo;
     }
 
-    private LeadFlowHistoryRespVO fromAssignment(LeadAssignmentHistoryDO item, Map<Long, AdminUserRespDTO> users) {
+    private LeadFlowHistoryRespVO fromAssignment(LeadAssignmentHistoryDO item, Map<Long, AdminUserRespDTO> users,
+                                                  LeadIdentityMaskingService.LeadIdentityViewContext context) {
         LeadFlowHistoryRespVO vo = base("assignment:" + item.getId(), item.getOccurredAt(), "客资分配",
                 assignmentLabel(item.getActionType()), assignmentSource(item),
-                name(users, item.getOperatorUserId()), item.getReason());
-        vo.setFromOwner(name(users, item.getFromOwnerUserId()));
-        vo.setToOwner(name(users, item.getToOwnerUserId() != null ? item.getToOwnerUserId() : item.getCandidateUserId()));
+                leadIdentityMaskingService.employeeName(context, users, item.getOperatorUserId(), LeadIdentityRole.OPERATOR), item.getReason());
+        vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, item.getFromOwnerUserId(), LeadIdentityRole.OWNER));
+        vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, item.getToOwnerUserId() != null ? item.getToOwnerUserId() : item.getCandidateUserId(), LeadIdentityRole.OWNER));
         vo.setAssignmentStatusBefore(assignmentBefore(item.getActionType()));
         vo.setAssignmentStatusAfter(assignmentAfter(item.getActionType()));
         return vo;
     }
 
-    private LeadFlowHistoryRespVO fromAging(LeadAgingPoolEventDO item, Map<Long, AdminUserRespDTO> users) {
+    private LeadFlowHistoryRespVO fromAging(LeadAgingPoolEventDO item, Map<Long, AdminUserRespDTO> users,
+                                            LeadIdentityMaskingService.LeadIdentityViewContext context) {
         boolean system = item.getOperatorUserId() == null || item.getOperatorUserId() == 0;
         LeadFlowHistoryRespVO vo = base("aging:" + item.getId(), item.getOccurredAt(), "公海",
                 agingLabel(item.getEventType()), system ? "系统任务" : "公海处理",
-                system ? "系统" : name(users, item.getOperatorUserId()), item.getReason());
-        vo.setFromOwner(name(users, item.getPreviousCollaboratorUserId()));
-        vo.setToOwner(name(users, item.getCollaboratorUserId()));
+                system ? "系统" : leadIdentityMaskingService.employeeName(context, users, item.getOperatorUserId(), LeadIdentityRole.OPERATOR), item.getReason());
+        vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, item.getPreviousCollaboratorUserId(), LeadIdentityRole.OWNER));
+        vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, item.getCollaboratorUserId(), LeadIdentityRole.OWNER));
         return vo;
     }
 

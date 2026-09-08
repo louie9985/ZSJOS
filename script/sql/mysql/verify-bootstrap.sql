@@ -104,12 +104,9 @@ SELECT 'media_account_maintenance_calendar' AS check_name,
           AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_media_account'
                AND column_name IN ('current_status_value','current_status_label_snapshot','s_stage_label_snapshot','primary_problems_json','execution_measure_value','execution_measure_label_snapshot','adjustment_direction','maintenance_start_date','maintenance_end_date'))=9
           AND (SELECT COUNT(*) FROM system_dict_type WHERE type IN ('zsjos_media_account_current_status','zsjos_media_account_stage','zsjos_media_account_primary_problem','zsjos_media_account_execution_measure') AND deleted=b'0')=4
-          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73600,73601,73602,73603,73604) AND status=0 AND deleted=b'0')=5
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73600,73601,73602,73603) AND status=0 AND deleted=b'0')=4
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73600 AND parent_id=0 AND path='/calendar' AND type=1 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73601 AND parent_id=73600 AND path='overview' AND permission='zsjos:media-calendar:query' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73604 AND parent_id=73600 AND path='all'
-                      AND permission='zsjos:media-calendar:all-query' AND component='zsjos/mediaCalendarAll/index'
-                      AND workbench_render_mode='native' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73603 AND parent_id=7022 AND type=3
                       AND permission='zsjos:media-account:maintenance' AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND status=0 AND deleted=b'0')
@@ -2034,20 +2031,16 @@ SELECT 'V160 registration close-service button' AS check_name,
                  AND permission='zsjos:registration:close' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 
-SELECT 'V161 media calendar schedule view' AS check_name,
+SELECT 'V161 retired media calendar schedule view' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V161')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V161')
           AND EXISTS (SELECT 1 FROM system_menu
                WHERE id=73604 AND parent_id=73600 AND name='日历日程' AND path='all'
                  AND permission='zsjos:media-calendar:all-query'
                  AND component='zsjos/mediaCalendarAll/index'
-                 AND workbench_render_mode='native' AND status=0 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu account_calendar_grant
-               WHERE account_calendar_grant.menu_id IN (73600,73601) AND account_calendar_grant.deleted=b'0'
-                 AND NOT EXISTS (SELECT 1 FROM system_role_menu all_calendar_grant
-                   WHERE all_calendar_grant.role_id=account_calendar_grant.role_id
-                     AND all_calendar_grant.tenant_id=account_calendar_grant.tenant_id
-                     AND all_calendar_grant.menu_id=73604 AND all_calendar_grant.deleted=b'0')),
+                  AND workbench_render_mode='native' AND status=1 AND visible=b'0' AND deleted=b'0')
+           AND EXISTS (SELECT 1 FROM system_menu
+                WHERE id=73604 AND status=1 AND visible=b'0' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 
 SELECT 'V178 lead submit specify permission' AS check_name,
@@ -2115,3 +2108,171 @@ SELECT 'V174 complete ZSJOS business audit' AS check_name,
                  AND column_name IN ('source_type','trace_id','request_method','request_path','result_status',
                                      'result_code','result_message','finished_at','duration_ms'))=9,
           'PASS','FAIL') AS result;
+SELECT 'V186 calendar permission split' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V186')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V186')
+          AND EXISTS (SELECT 1 FROM information_schema.tables
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_personal_calendar_event')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_personal_calendar_event'
+                 AND column_name IN ('id','tenant_id','owner_user_id','title','description','start_time','end_time',
+                                     'all_day','status','source_type','source_id','creator','create_time','updater',
+                                     'update_time','deleted','deleted_time'))=17
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_personal_calendar_event'
+                        AND index_name='idx_personal_calendar_owner_start')
+          AND EXISTS (SELECT 1 FROM information_schema.table_constraints
+                      WHERE constraint_schema=DATABASE() AND table_name='zsjos_personal_calendar_event'
+                        AND constraint_name='chk_personal_calendar_time_range' AND constraint_type='CHECK')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73605 AND parent_id=73600 AND path='personal'
+                      AND permission='zsjos:personal-calendar:query' AND status=0 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73606 AND parent_id=73605
+                      AND permission='zsjos:personal-calendar:create' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73607 AND parent_id=73605
+                      AND permission='zsjos:personal-calendar:update' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73608 AND parent_id=73605
+                      AND permission='zsjos:personal-calendar:delete' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73609 AND parent_id=73601
+                      AND permission='zsjos:media-calendar:query-managed' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73602 AND parent_id=73601
+                      AND permission='zsjos:media-calendar:query-all' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+                          WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73600','$')
+                            AND (NOT JSON_CONTAINS(package_row.menu_ids,'73605','$')
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73606','$')
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73607','$')
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73608','$')
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73609','$')))
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu
+                          WHERE menu_id=73604 AND deleted=b'0' AND creator='migration-V161'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V187 exam calendar' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V187')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V187')
+          AND EXISTS (SELECT 1 FROM information_schema.tables
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_exam_schedule')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_exam_schedule'
+                        AND index_name='idx_exam_schedule_exact')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73610 AND parent_id=73600
+                      AND path='exam-calendar' AND permission='zsjos:exam-calendar:query'
+                      AND component='zsjos/examCalendar/index' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73611 AND parent_id=73610
+                      AND permission='zsjos:exam-calendar:manage' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73612 AND parent_id=73610
+                      AND permission='zsjos:exam-calendar:query' AND type=3 AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu source
+                          WHERE source.menu_id=73610 AND source.deleted=b'0'
+                            AND NOT EXISTS (SELECT 1 FROM system_role_menu query_grant
+                              WHERE query_grant.role_id=source.role_id AND query_grant.tenant_id=source.tenant_id
+                                AND query_grant.menu_id=73612 AND query_grant.deleted=b'0'))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+                          WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73610','$')
+                            AND NOT JSON_CONTAINS(package_row.menu_ids,'73612','$'))
+          AND EXISTS (SELECT 1 FROM infra_config WHERE config_key='zsjos.exam-calendar.upcoming-days'
+                      AND value='3' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+                          JOIN system_tenant tenant_row ON tenant_row.id=role_row.tenant_id
+                            AND tenant_row.status=0 AND tenant_row.deleted=b'0'
+                          JOIN system_tenant_package package_row ON package_row.id=tenant_row.package_id
+                            AND package_row.status=0 AND package_row.deleted=b'0'
+                            AND JSON_CONTAINS(package_row.menu_ids,'73610','$')
+                          WHERE role_row.status=0 AND role_row.deleted=b'0'
+                            AND NOT EXISTS (SELECT 1 FROM system_role_menu role_menu
+                                            WHERE role_menu.role_id=role_row.id
+                                              AND role_menu.tenant_id=role_row.tenant_id
+                                              AND role_menu.menu_id=73610 AND role_menu.deleted=b'0'))
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+                          WHERE role_row.code IN ('exam_manager','exam_specialist')
+                            AND role_row.status=0 AND role_row.deleted=b'0'
+                            AND NOT EXISTS (SELECT 1 FROM system_role_menu role_menu
+                                            WHERE role_menu.role_id=role_row.id
+                                              AND role_menu.tenant_id=role_row.tenant_id
+                                              AND role_menu.menu_id=73611 AND role_menu.deleted=b'0'))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+                          WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73600','$')
+                            AND (NOT JSON_CONTAINS(package_row.menu_ids,'73610','$')
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73611','$'))),
+          'PASS','FAIL') AS result;
+
+SELECT 'Exam product scope columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='zsjos_exam_schedule'
+             AND column_name IN ('product_id','product_name_snapshot','selected_attrs_json','selected_specs_json','frozen_skus_json'))=5
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                      AND table_name='zsjos_lead_intended_product' AND column_name='selected_specs_json'), 'PASS', 'FAIL') AS result;
+
+SELECT 'V188 delivery class schema' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V188')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V188')
+          AND (SELECT COUNT(*) FROM information_schema.tables
+               WHERE table_schema=DATABASE() AND table_name IN
+                 ('zsjos_delivery_class','zsjos_registration_class_assignment','zsjos_class_transfer_request'))=3
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_delivery_class'
+                 AND column_name='pending_guard' AND extra LIKE '%STORED GENERATED%')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+               WHERE table_schema=DATABASE() AND table_name='zsjos_delivery_class'
+                 AND index_name='uk_delivery_pending_guard' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+               WHERE table_schema=DATABASE() AND table_name='zsjos_class_transfer_request'
+                 AND index_name='uk_class_transfer_active' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_registration_case'
+                 AND column_name='assignment_mode' AND data_type='varchar'
+                 AND character_maximum_length=24 AND is_nullable='NO'
+                 AND column_default='legacy_planner' AND column_comment='分班模式')
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
+                 AND column_name='class_id' AND data_type='bigint' AND is_nullable='YES'
+                 AND column_default IS NULL AND column_comment='交付班级编号')
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
+                 AND column_name='owner_user_id' AND data_type='bigint' AND is_nullable='YES'
+                 AND column_default IS NULL AND column_comment='学生服务负责人用户编号'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V188 pending class and UTF-8 snapshot' AS check_name,
+       IF(NOT EXISTS (SELECT 1 FROM system_tenant tenant_row
+              WHERE tenant_row.status=0 AND tenant_row.deleted=b'0'
+                AND (SELECT COUNT(*) FROM zsjos_delivery_class class_row
+                     WHERE class_row.tenant_id=tenant_row.id AND class_row.system_class=b'1'
+                       AND class_row.deleted=b'0')<>1)
+          AND NOT EXISTS (SELECT 1 FROM zsjos_service_relation
+                          WHERE class_id IS NULL AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_delivery_class
+                          WHERE system_class=b'1' AND deleted=b'0'
+                            AND (class_no<>'PENDING' OR class_name<>'待分班'
+                              OR HEX(class_name)<>'E5BE85E58886E78FAD')),
+          'PASS','FAIL') AS result;
+
+SELECT 'V188 delivery class menus and package coverage' AS check_name,
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
+                   WHERE path='/zsjos' AND parent_id=0 AND deleted=b'0' ORDER BY id LIMIT 1)
+                   AND path='class-management' AND permission='zsjos:delivery-class:query-managed'
+                   AND component='zsjos/class-management' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73624 AND path='my-classes'
+                      AND permission='zsjos:delivery-class:query-my'
+                      AND component='zsjos/my-classes' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
+                      AND permission='zsjos:student:query-my' AND status=0 AND visible=b'0' AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73621,73622,73623,73625,73626,73627)
+               AND type=3 AND deleted=b'0')=6
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+               WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73000','$')
+                 AND (NOT JSON_CONTAINS(package_row.menu_ids,'73620','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73621','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73622','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73623','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73625','$')))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+               WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73020','$')
+                 AND (NOT JSON_CONTAINS(package_row.menu_ids,'73624','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73626','$')
+                   OR NOT JSON_CONTAINS(package_row.menu_ids,'73627','$'))),
+          'PASS','FAIL') AS result;
+
+SELECT tenant_id,class_no,class_name,HEX(class_name) AS class_name_hex
+FROM zsjos_delivery_class WHERE system_class=b'1' AND deleted=b'0' ORDER BY tenant_id;

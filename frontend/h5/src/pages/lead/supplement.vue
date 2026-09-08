@@ -60,6 +60,8 @@ async function loadForm() {
       spuName: product.spuName,
       skuRef: product.skuRef,
       skuName: product.skuName,
+      specs: product.specs,
+      selectedAttrValues: product.selectedAttrValues,
       spuUnknown: !product.spuRef,
       skuUnknown: !product.skuRef,
       primary: product.primary

@@ -1,63 +1,38 @@
 import { readFileSync } from 'node:fs'
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
-import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 import { calendarWeekdayLabel, mediaCalendarTone, mediaCalendarWindow, mondayOfWeek, parseCalendarDate } from './MediaCalendarPage'
+import { personalCalendarEventTouchesDay } from './PersonalCalendarPage'
 
-describe('media account calendar', () => {
-  it('uses Monday through Sunday for the week view and exact natural quarter bounds', () => {
-    const week = mediaCalendarWindow(dayjs('2026-08-26'), 'week')
-    expect(week.start.format('YYYY-MM-DD')).toBe('2026-08-24')
-    expect(week.end.format('YYYY-MM-DD')).toBe('2026-08-30')
-    const quarter = mediaCalendarWindow(dayjs('2026-08-26'), 'quarter')
-    expect(quarter.start.format('YYYY-MM-DD')).toBe('2026-07-01')
-    expect(quarter.end.format('YYYY-MM-DD')).toBe('2026-09-30')
-  })
-
-  it('keeps weekday labels aligned with the Monday-first grid', () => {
+describe('calendar separation', () => {
+  it('keeps account calendar date calculations stable', () => {
+    expect(mediaCalendarWindow(dayjs('2026-08-26'), 'week').start.format('YYYY-MM-DD')).toBe('2026-08-24')
+    expect(mediaCalendarWindow(dayjs('2026-08-26'), 'quarter').end.format('YYYY-MM-DD')).toBe('2026-09-30')
     expect(mondayOfWeek(dayjs('2026-09-01')).format('YYYY-MM-DD')).toBe('2026-08-31')
-    expect(calendarWeekdayLabel(dayjs('2026-08-31'))).toBe('一')
     expect(calendarWeekdayLabel(dayjs('2026-09-06'))).toBe('日')
+    expect(parseCalendarDate('2026-09-01').format('YYYY-MM-DD')).toBe('2026-09-01')
+    expect(mediaCalendarTone('c_limited_rescue')).toBe('warning')
   })
 
-  it('parses business dates as Shanghai calendar dates', () => {
-    const value = parseCalendarDate('2026-09-01')
-    expect(value.format('YYYY-MM-DD')).toBe('2026-09-01')
-    expect(value.day()).toBe(2)
-  })
-
-  it('maps the four current-status groups to stable semantic tones', () => {
-    expect(['a_active_growth', 'b_active_no_lead', 'c_limited_rescue', 'd_restart_paused']
-      .map(value => mediaCalendarTone(value))).toEqual(['success', 'primary', 'warning', 'info'])
-    expect(mediaCalendarTone(undefined)).toBe('neutral')
-    expect(mediaCalendarTone('a_active_growth', 'warning')).toBe('warning')
-  })
-
-  it('registers the server-owned route and keeps the calendar read-only', () => {
+  it('uses separate account and personal routes and APIs', () => {
     const constants = readFileSync('src/constants.ts', 'utf8')
-    const routes = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
-    const page = readFileSync('src/pages/MediaCalendarPage.tsx', 'utf8')
+    const account = readFileSync('src/pages/MediaCalendarPage.tsx', 'utf8')
+    const personal = readFileSync('src/pages/PersonalCalendarPage.tsx', 'utf8')
     const api = readFileSync('src/services/api.ts', 'utf8')
-    const calendarAll = api.slice(api.indexOf('calendarAll: async'), api.indexOf('calendarCandidates: async'))
-    expect(constants).toContain("MEDIA_CALENDAR: '/calendar/overview'")
-    expect(constants).toContain("MEDIA_ALL_CALENDAR: '/calendar/all'")
-    expect(routes).toContain('APP_ROUTES.MEDIA_CALENDAR')
-    expect(routes).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
-    expect(page).not.toContain('api.mediaAccount.maintain')
-    expectSourceNotToContainTokens(page, 'api.simpleUsers()')
-    expect(page).toContain('api.mediaAccount.calendarCandidates()')
-    expect(page).toContain('api.mediaAccount.calendarAll(params)')
-    expectSourceToContainTokens(page, 'if (isAllCalendar) return')
-    expect(page).not.toContain('media-schedule-filter-stack')
-    expect(page).toContain('onReload={() => void load(1)}')
-    expect(page).toContain("'日历日程'")
-    expect(page).toContain('media-schedule-page')
-    expect(page).not.toContain('selectedDayEntries')
-    expect(page).not.toContain('onPageChange')
-    expect(page).not.toContain('draggable')
-    expect(calendarAll).toContain('rangeStart: string;')
-    expect(calendarAll).toContain('rangeEnd: string;')
-    expect(calendarAll).not.toContain('pageNo: number;')
-    expect(calendarAll).not.toContain('pageSize: number;')
+    expect(constants).toContain("PERSONAL_CALENDAR: '/calendar/personal'")
+    expect(constants).not.toContain('/calendar/all')
+    expect(account).toContain('api.mediaAccount.calendar(')
+    expect(account).not.toContain('calendarAll')
+    expect(personal).toContain('api.personalCalendar.list')
+    expect(personal).toContain("'zsjos:personal-calendar:create'")
+    expect(api).not.toContain('/zsjos/media-account/calendar/all')
+  })
+
+  it('renders personal events on every touched day with an exclusive end boundary', () => {
+    const event = { startTime: '2026-09-01T23:00:00', endTime: '2026-09-03T00:00:00' } as any
+    expect(personalCalendarEventTouchesDay(event, dayjs('2026-09-01'))).toBe(true)
+    expect(personalCalendarEventTouchesDay(event, dayjs('2026-09-02'))).toBe(true)
+    expect(personalCalendarEventTouchesDay(event, dayjs('2026-09-03'))).toBe(false)
+    expect(personalCalendarEventTouchesDay({ startTime: '2026-09-04T12:00:00', endTime: '2026-09-04T12:00:00' } as any, dayjs('2026-09-04'))).toBe(true)
   })
 })

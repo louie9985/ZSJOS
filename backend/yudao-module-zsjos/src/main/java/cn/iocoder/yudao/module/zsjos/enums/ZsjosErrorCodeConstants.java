@@ -3,6 +3,33 @@ package cn.iocoder.yudao.module.zsjos.enums;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
+    ErrorCode DELIVERY_CLASS_NOT_EXISTS = new ErrorCode(1_900_019_001, "班级不存在");
+    ErrorCode DELIVERY_CLASS_CATEGORY_INVALID = new ErrorCode(1_900_019_002, "班级产品分类无效");
+    ErrorCode DELIVERY_CLASS_SCHEDULE_INVALID = new ErrorCode(1_900_019_003, "班级考期无效或与产品分类不匹配");
+    ErrorCode DELIVERY_CLASS_USER_INVALID = new ErrorCode(1_900_019_004, "班主任账号不存在或已停用");
+    ErrorCode DELIVERY_CLASS_STATE_INVALID = new ErrorCode(1_900_019_005, "当前班级状态不允许该操作");
+    ErrorCode DELIVERY_CLASS_VERSION_CONFLICT = new ErrorCode(1_900_019_006, "班级已被其他人修改，请刷新后重试");
+    ErrorCode DELIVERY_CLASS_PERMISSION_DENIED = new ErrorCode(1_900_019_007, "无权查看该班级");
+    ErrorCode DELIVERY_CLASS_CATEGORY_LOCKED = new ErrorCode(1_900_019_008, "班级已有学员，产品分类不可修改");
+    ErrorCode DELIVERY_CLASS_TRANSFER_INVALID = new ErrorCode(1_900_019_009, "目标班级不可接收该课程服务");
+    ErrorCode REGISTRATION_CLASS_ASSIGNMENT_INVALID = new ErrorCode(1_900_019_010, "请为每个订单商品选择同产品分类的可用班级");
+    ErrorCode REGISTRATION_CLASS_ASSIGNMENT_CONFLICT = new ErrorCode(1_900_019_011, "报名分班已被其他人修改，请刷新后重试");
+    ErrorCode CLASS_TRANSFER_NOT_EXISTS = new ErrorCode(1_900_019_012, "调班申请不存在");
+    ErrorCode CLASS_TRANSFER_INVALID = new ErrorCode(1_900_019_013, "当前课程服务不允许发起或执行调班");
+    ErrorCode CLASS_TRANSFER_ACTIVE = new ErrorCode(1_900_019_014, "该课程服务已有待审批的调班申请");
+    ErrorCode CLASS_TRANSFER_SUPERVISOR_INVALID = new ErrorCode(1_900_019_015, "直属主管未配置、已停用或不能处理审批");
+    ErrorCode CLASS_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_019_016, "调班审批流程尚未部署或暂不可用");
+    ErrorCode EXAM_SCHEDULE_NOT_EXISTS = new ErrorCode(1_900_018_001, "考期安排不存在");
+    ErrorCode EXAM_SCHEDULE_TYPE_INVALID = new ErrorCode(1_900_018_002, "考期时间类型无效");
+    ErrorCode EXAM_SCHEDULE_TIME_INVALID = new ErrorCode(1_900_018_003, "考期日期配置无效");
+    ErrorCode EXAM_SCHEDULE_CATEGORY_INVALID = new ErrorCode(1_900_018_004, "产品分类不存在或已停用");
+    ErrorCode EXAM_SCHEDULE_STATE_INVALID = new ErrorCode(1_900_018_005, "当前考期状态不允许该操作");
+    ErrorCode EXAM_SCHEDULE_PERMISSION_DENIED = new ErrorCode(1_900_018_006, "无权管理考期安排");
+    ErrorCode EXAM_SCHEDULE_ENDED_IMMUTABLE = new ErrorCode(1_900_018_007, "已结束考期不能修改");
+    ErrorCode EXAM_SCHEDULE_SKU_NO_MATCH = new ErrorCode(1_900_018_008, "所选规格未匹配到有效 SKU，请重新选择");
+    ErrorCode EXAM_SCHEDULE_SCOPE_INVALID = new ErrorCode(1_900_018_009, "考期必须选择一个分类或一个产品范围");
+    ErrorCode EXAM_SCHEDULE_SCOPE_CLEAR_REQUIRED = new ErrorCode(1_900_018_010, "原规格条件已失效，请明确清除或替换后保存");
+    ErrorCode PRODUCT_CATALOG_CHANGED = new ErrorCode(1_900_018_011, "产品目录已发生变化，请刷新后重试");
     ErrorCode LEAD_FEEDBACK_STATE_INVALID = new ErrorCode(1_900_003_120, "当前客资状态不允许回复提交人");
     ErrorCode LEAD_FEEDBACK_VERSION_CONFLICT = new ErrorCode(1_900_003_121, "客资已发生变化，请刷新后重试");
     ErrorCode LEAD_FEEDBACK_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_122, "本次发送标识已用于其他反馈内容");
@@ -195,6 +222,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCT_CATEGORY_NAME_DUPLICATE = new ErrorCode(1_900_004_009, "同一上级下分类名称已存在");
     ErrorCode PRODUCT_CATEGORY_IN_USE = new ErrorCode(1_900_004_010, "分类存在下级分类或产品，不能删除，请改为停用");
     ErrorCode PRODUCT_CATEGORY_STATUS_INVALID = new ErrorCode(1_900_004_011, "产品分类状态无效");
+    ErrorCode PRODUCT_CATEGORY_HAS_ENABLED_CHILDREN = new ErrorCode(1_900_004_021, "请先停用该分类下的启用子分类");
+    ErrorCode PRODUCT_CATEGORY_HAS_PRODUCTS = new ErrorCode(1_900_004_022, "请先停用该分类下的启用课程");
+    ErrorCode PRODUCT_CATEGORY_PARENT_DISABLED = new ErrorCode(1_900_004_023, "请先启用上级分类后再启用当前分类");
     ErrorCode PRODUCT_SKU_NOT_EXISTS = new ErrorCode(1_900_004_012, "课程 SKU 不存在");
     ErrorCode PRODUCT_SKU_INVALID = new ErrorCode(1_900_004_013, "课程 SKU 已停用、属性无效或不属于所选课程");
     ErrorCode PRODUCT_SKU_DUPLICATE = new ErrorCode(1_900_004_014, "同一课程下已存在相同属性组合的 SKU");
@@ -379,6 +409,10 @@ public interface ZsjosErrorCodeConstants {
 
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
+
+    ErrorCode PERSONAL_CALENDAR_EVENT_NOT_EXISTS = new ErrorCode(1_900_017_001, "个人日程不存在");
+    ErrorCode PERSONAL_CALENDAR_PERMISSION_DENIED = new ErrorCode(1_900_017_002, "无权查看或操作该个人日程");
+    ErrorCode PERSONAL_CALENDAR_TIME_INVALID = new ErrorCode(1_900_017_003, "日程结束时间不得早于开始时间");
 
     ErrorCode FEEDBACK_TYPE_INVALID = new ErrorCode(1_900_016_001, "反馈类型无效");
     ErrorCode FEEDBACK_NOT_OPEN = new ErrorCode(1_900_016_002, "该类反馈暂未开放，请联系管理员配置分派负责人");

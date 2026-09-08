@@ -1,3 +1,4 @@
+import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -184,7 +185,7 @@ const SIMPLE_STATUS_OPTIONS: Array<{ key: LeadSimpleStatusSelection; label: stri
 
 function productText(lead: ManagedLead) {
   const product = lead.primaryProduct
-  return product ? [product.spuName || '未明确课程', product.skuName].filter(Boolean).join(' / ') : '未填写意向产品'
+  return product ? [product.spuName || '未明确课程', productSpecText(product) || product.skuName].filter(Boolean).join(' / ') : '未填写意向产品'
 }
 
 function LeadStateTags({ lead }: { lead: ManagedLead }) {

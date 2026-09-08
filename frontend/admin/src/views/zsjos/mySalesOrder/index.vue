@@ -44,6 +44,7 @@
           detail.decisionReason || detail.terminationReason || '-'
         }}</el-descriptions-item>
       </el-descriptions>
+      <OrderProductSummary v-if="detail && !detailError" :items="detail.items" />
     </div>
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
@@ -120,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import OrderProductSummary from '../components/OrderProductSummary.vue'
 import { reactive, ref } from 'vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
 import { useMessage } from '@/hooks/web/useMessage'

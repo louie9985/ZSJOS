@@ -1,6 +1,6 @@
 <template>
   <ContentWrap>
-    <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="-mb-15px">
+    <el-form :model="queryParams" :inline="true" class="-mb-15px">
       <el-form-item>
         <el-button v-hasPermi="['eam:repair:create']" type="primary" @click="openForm()">
           <Icon icon="ep:plus" class="mr-5px" /> 送修登记
@@ -62,7 +62,7 @@
 
   <!-- 维修完成 -->
   <Dialog v-model="finishVisible" title="维修完成" width="520px">
-    <el-form ref="finishFormRef" :model="finishForm" label-width="100px">
+    <el-form :model="finishForm" label-width="100px">
       <el-form-item label="资产">
         <span>{{ current.assetCode }} {{ current.assetName }}</span>
       </el-form-item>
@@ -120,7 +120,6 @@ const { t } = useI18n()
 const loading = ref(false)
 const total = ref(0)
 const list = ref<RepairApi.RepairVO[]>([])
-const queryFormRef = ref()
 const queryParams = reactive({ pageNo: 1, pageSize: 10, assetId: undefined })
 
 const getList = async () => {
@@ -141,7 +140,6 @@ const openForm = () => {
 
 const finishVisible = ref(false)
 const finishLoading = ref(false)
-const finishFormRef = ref()
 const current = ref<RepairApi.RepairVO>({} as RepairApi.RepairVO)
 const finishForm = ref<RepairApi.RepairFinishVO>({ id: 0 })
 

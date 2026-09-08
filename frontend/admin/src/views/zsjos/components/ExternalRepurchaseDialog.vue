@@ -58,7 +58,7 @@
               ><el-option
                 v-for="i in skuOptions"
                 :key="i.skuRef"
-                :label="i.skuName"
+                :label="skuLabel(i)"
                 :value="i.skuRef" /></el-select></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
@@ -165,6 +165,7 @@
   </el-dialog>
 </template>
 <script setup lang="ts">
+import { catalogSpecs, specText } from '@/utils/productSpecs'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
@@ -179,6 +180,8 @@ const formRef = ref<FormInstance>()
 const areas = ref<any[]>([])
 const dicts = ref<DictDataVO[]>([])
 const catalog = reactive<{ spus: any[]; skus: any[] }>({ spus: [], skus: [] })
+const skuLabel = (sku: { spuRef: string; skuName: string; attrValues: Record<string, string>; specs?: import('@/utils/productSpecs').ProductSpec[] }) =>
+  [sku.skuName, (sku.specs ?? catalogSpecs(sku.attrValues, catalog.spus.find(spu => spu.spuRef === sku.spuRef)?.attrs)).map(specText).join(' · ')].filter(Boolean).join(' · ')
 type VoucherItem = {
   uid: string
   name: string

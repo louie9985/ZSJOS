@@ -1,8 +1,10 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+考期产品／规格选项仅管理权限可读取，查看和管理仍使用独立叶子权限；仅考期允许部分规格。三端产品展示覆盖见 [产品规格展示清单](product-spec-presentation.md)。
+
 本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 的路由与直接访问使用原授权 `menus`，导航使用 System 计算的 `workbenchMenus` 投影；编排只改变分组、顺序和导航显隐，不改变本表的正式 URL、组件或权限身份。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
 
-`/zsjos/tasks/today` 是员工工作台“首页”。密码登录或已有令牌恢复并重新读取权限菜单后，拥有该授权菜单的用户固定进入首页；未获授权的用户进入首个可访问的服务端菜单。首页按权限分别加载业务待办、BPM 审批计数和公告，并从月历跳转到服务端授权的 `/calendar/all` 日历日程页。
+`/zsjos/tasks/today` 是员工工作台“首页”。密码登录或已有令牌恢复并重新读取权限菜单后，拥有该授权菜单的用户固定进入首页；未获授权的用户进入首个可访问的服务端菜单。首页按权限分别加载业务待办、BPM 审批计数和公告，并从月历跳转到服务端授权的 `/calendar/personal`“我的日历”。Vue Admin 不再提供独立静态 `/index` 首页；访问 `/` 或旧 `/index` 时按同一服务端授权规则进入本工作台首页或首个可访问页面。
 
 审批中心是 BPM 任务统一入口，不复制业务审批页。能接入员工端业务页的流程由服务端统一定位接口深链到真实业务页，未接入流程回到完整 BPM 表单。待办任务和已办任务的左侧列表使用系统 20 条追加懒加载模式，不提供前端分页器。
 
@@ -53,7 +55,9 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 35 | 未读消息 | `/messages/unread` | `MessageInboxPage(view=unread)` | `system/notify/my/unread/index` |
 | 36 | 报名履约公共池 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
-| 38 | 我的学员 | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
+| 38 | 我的学员（隐藏深链） | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
+| 38.1 | 班级管理 | `/zsjos/class-management` | `DeliveryClassPage(manage)` | `zsjos/class-management` |
+| 38.2 | 我的班级 | `/zsjos/my-classes` | `DeliveryClassPage` | `zsjos/my-classes` |
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
 | 40 | 采访表单配置 | `/zsjos/director-config/interview-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
 | 40.1 | 定位卡模板配置 | `/zsjos/director-config/positioning-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
@@ -62,8 +66,9 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
-| 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage(scope=account)` | `zsjos/mediaCalendar/index` |
-| 47.1 | 日历日程 | `/calendar/all` | `MediaCalendarPage(scope=all)` | `zsjos/mediaCalendarAll/index` |
+| 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage` | `zsjos/mediaCalendar/index` |
+| 47.1 | 我的日历 | `/calendar/personal` | `PersonalCalendarPage` | `zsjos/personalCalendar/index` |
+| 47.2 | 考期日历（日历子菜单） | `/calendar/exam-calendar` | `ExamCalendarPage` | `zsjos/examCalendar/index` |
 | 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |

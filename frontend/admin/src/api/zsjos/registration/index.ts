@@ -47,6 +47,7 @@ export interface RegistrationCase {
   leadNo?: string
   status: 'pending' | 'processing' | 'completed' | 'cancelled'
   statusLabel?: string
+  assignmentMode?: 'legacy_planner' | 'class_per_item'
   studyPlannerUserId?: number
   studyPlannerUserName?: string
   registrationApprovedAt: string
@@ -57,6 +58,23 @@ export interface RegistrationCase {
   completionBlockReason?: string
   items: RegistrationChecklistItem[]
   routes: RegistrationRoute[]
+  classAssignments?: RegistrationClassAssignment[]
+}
+
+export interface RegistrationClassAssignment {
+  orderItemId: number
+  productId: number
+  productName?: string
+  specs?: import('@/utils/productSpecs').ProductSpec[]
+  categoryId: number
+  categoryName?: string
+  categoryPath?: string
+  classId?: number
+  className?: string
+  systemClass?: boolean
+  homeroomUserName?: string
+  errorCode?: string
+  errorReason?: string
 }
 
 export interface StudyPlanner {
@@ -73,6 +91,7 @@ export interface StudentService {
   skuName?: string
   categoryPath?: string[]
   attributeValues?: string[]
+  specs?: import('@/utils/productSpecs').ProductSpec[]
   productSnapshot?: string
   status: string
   activatedAt: string
@@ -114,6 +133,12 @@ export const updateRegistrationRoutes = (
     url: `/zsjos/registration/${id}/routes`,
     data: { routes, version, idempotencyKey: crypto.randomUUID() }
   })
+
+export const updateRegistrationClassAssignments = (
+  id: number,
+  assignments: Array<{ orderItemId: number; classId: number }>,
+  version: number
+) => request.put<RegistrationCase>({ url: `/zsjos/registration/${id}/class-assignments`, data: { assignments, version, idempotencyKey: crypto.randomUUID() } })
 
 export const uploadRegistrationAttachment = (
   id: number,

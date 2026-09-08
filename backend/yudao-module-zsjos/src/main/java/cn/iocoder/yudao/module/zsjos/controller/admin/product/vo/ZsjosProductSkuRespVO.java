@@ -6,4 +6,5 @@ import java.util.Map;
 
 public record ZsjosProductSkuRespVO(Long id, Long spuId, String skuRef, String skuName,
                                     Map<String, String> attrValues, BigDecimal price, Integer status,
-                                    Integer sort, String remark, LocalDateTime updateTime) {}
+                                    Integer sort, String remark, LocalDateTime updateTime,
+                                    java.util.List<ProductSpecVO> specs) {}

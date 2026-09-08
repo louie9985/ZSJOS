@@ -9,6 +9,7 @@ import { useDictStoreWithOut } from '@/store/modules/dict'
 import { useUserStoreWithOut } from '@/store/modules/user'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { parseRouteLocation } from '@/utils/routeParams'
+import { resolveAuthenticatedRouteTarget } from '@/utils/authenticatedLanding'
 
 const { start, done } = useNProgress()
 
@@ -23,6 +24,7 @@ const whiteList = [
   '/register',
   '/oauthLogin/gitee'
 ]
+const whiteListPrefixes = ['/pms/kb/document/share']
 
 // 路由加载前
 router.beforeEach(async (to, from) => {
@@ -50,21 +52,21 @@ router.beforeEach(async (to, from) => {
           permissionStore.getAddRouters.forEach((route) => {
             router.addRoute(route as unknown as RouteRecordRaw) // 动态添加可访问路由表
           })
-          const redirectPath = from.query.redirect
-          // 修复跳转时不带参数的问题
-          const redirect = typeof redirectPath === 'string' ? redirectPath : to.fullPath
-          const redirectLocation = parseRouteLocation(redirect)
-          const nextData =
-            to.fullPath === redirect
-              ? { ...to, replace: true }
-              : { ...redirectLocation, replace: true }
-          return nextData
-        } else {
-          return true
         }
+        const redirect = resolveAuthenticatedRouteTarget({
+          currentPath: to.path,
+          explicitRedirect:
+            typeof from.query.redirect === 'string' ? from.query.redirect : undefined,
+          defaultLandingPath: permissionStore.getDefaultLandingPath
+        })
+        if (to.fullPath === redirect) return true
+        return { ...parseRouteLocation(redirect), replace: true }
       }
     } else {
-      if (whiteList.indexOf(to.path) !== -1) {
+      if (
+        whiteList.includes(to.path) ||
+        whiteListPrefixes.some((path) => to.path === path || to.path.startsWith(`${path}/`))
+      ) {
         return true
       } else {
         return `/login?redirect=${encodeURIComponent(to.fullPath)}` // 否则全部重定向到登录页

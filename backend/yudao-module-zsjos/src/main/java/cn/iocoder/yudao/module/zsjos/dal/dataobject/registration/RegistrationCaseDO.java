@@ -18,6 +18,7 @@ public class RegistrationCaseDO extends TenantBaseDO {
     private Long orderId;
     private String status;
     private Long checklistVersionId;
+    private String assignmentMode;
     private Long studyPlannerUserId;
     private LocalDateTime registrationApprovedAt;
     private Long completedByUserId;

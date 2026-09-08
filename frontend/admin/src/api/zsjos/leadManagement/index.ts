@@ -3,6 +3,7 @@ import type { Timestamp } from '../types'
 import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface LeadProductVO {
+  specs?: import('@/utils/productSpecs').ProductSpec[]
   id: number
   spuRef?: string
   spuName?: string

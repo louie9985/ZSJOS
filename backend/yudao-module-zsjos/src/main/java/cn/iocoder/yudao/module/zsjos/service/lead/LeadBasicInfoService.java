@@ -63,6 +63,8 @@ public class LeadBasicInfoService {
         LeadCategorySnapshotService.Selection categorySelection = Objects.equals(lead.getLeadCategory(), category)
                 ? null : categorySnapshotService.requireEnabled(category);
         List<LeadProductSnapshot> snapshots = validateProducts(req.getIntendedProducts());
+        var existingProducts = productMapper.selectListByLeadId(leadId);
+        snapshots = snapshots.stream().map(s -> s.retainSelection(existingProducts)).toList();
 
         PersonDO person = personMapper.selectById(lead.getPersonId());
         List<String> changedFields = new ArrayList<>();
@@ -165,6 +167,7 @@ public class LeadBasicInfoService {
             row.setLeadId(leadId); row.setProductRef(s.productRef()); row.setProductNameSnapshot(s.name());
             row.setSpuRef(s.productRef()); row.setSpuNameSnapshot(s.name()); row.setSkuRef(s.skuRef()); row.setSkuNameSnapshot(s.skuName());
             row.setSelectedAttrValuesJson(s.selectedAttrValuesJson()); row.setPriceSnapshot(s.price()); row.setSpuUnknown(s.spuUnknown()); row.setSkuUnknown(s.skuUnknown());
+            row.setSelectedSpecsJson(JsonUtils.toJsonString(s.specs()));
             row.setCategoryId(s.categoryId()); row.setCategoryNameSnapshot(s.categoryName()); row.setCategoryPathSnapshot(JsonUtils.toJsonString(s.categoryPath()));
             row.setLevel1CategoryId(s.level1CategoryId()); row.setLevel1CategoryNameSnapshot(s.level1CategoryName());
             row.setLevel2CategoryId(s.level2CategoryId()); row.setLevel2CategoryNameSnapshot(s.level2CategoryName());

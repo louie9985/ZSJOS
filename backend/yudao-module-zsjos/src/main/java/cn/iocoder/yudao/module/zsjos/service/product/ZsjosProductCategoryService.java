@@ -10,5 +10,6 @@ public interface ZsjosProductCategoryService {
     void delete(Long id);
     void updateStatus(Long id, Integer status);
     ZsjosProductCategoryRespVO get(Long id);
-    List<ZsjosProductCategoryRespVO> getTree();
+    List<ZsjosProductCategoryRespVO> getTree(Integer status);
+    default List<ZsjosProductCategoryRespVO> getTree() { return getTree(null); }
 }

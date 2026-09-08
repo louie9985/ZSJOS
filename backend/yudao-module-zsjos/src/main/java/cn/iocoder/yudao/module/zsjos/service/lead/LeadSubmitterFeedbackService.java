@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.hutool.core.util.DesensitizedUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.*;
@@ -38,7 +37,7 @@ public class LeadSubmitterFeedbackService {
     @Resource private LeadSubmitterFeedbackMapper leadSubmitterFeedbackMapper;
     @Resource private LeadSubmitterFeedbackAttachmentMapper attachmentMapper;
     @Resource private LeadSubmitterFeedbackPermissionProvider permission;
-    @Resource private LeadObjectPermissionService identityPermission;
+    @Resource private LeadIdentityMaskingService identityMaskingService;
     @Resource private PartnerAccountService partnerAccountService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private FileApi fileApi;
@@ -152,17 +151,16 @@ public class LeadSubmitterFeedbackService {
 
     private PageResult<LeadSubmitterFeedbackRespVO> project(LeadDO lead, PageResult<LeadSubmitterFeedbackDO> page,
                                                           Long viewer, boolean partner) {
-        boolean mask = !partner && !DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
-                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && lead.getSourceUserId() != null
-                && lead.getOwnerUserId() != null && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
-                && !identityPermission.canViewUnmaskedIdentity(viewer, lead);
+        LeadIdentityMaskingService.LeadIdentityViewContext identityContext =
+                partner ? null : identityMaskingService.resolve(viewer, lead);
         return new PageResult<>(page.getList().stream().map(row -> {
             var result = new LeadSubmitterFeedbackRespVO();
             result.setId(row.getId()); result.setFeedback(row.getFeedback()); result.setCreateTime(row.getCreateTime());
-            result.setSalesName(mask && !Objects.equals(viewer, row.getSalesUserId())
-                    ? maskName(row.getSalesNameSnapshot()) : row.getSalesNameSnapshot());
-            result.setSubmitterName(mask && !Objects.equals(viewer, row.getSubmitterUserId())
-                    ? maskName(row.getSubmitterNameSnapshot()) : row.getSubmitterNameSnapshot());
+            result.setSalesName(partner ? row.getSalesNameSnapshot()
+                    : identityMaskingService.snapshotName(identityContext, row.getSalesNameSnapshot(),
+                    row.getSalesUserId(), LeadIdentityRole.OWNER));
+            result.setSubmitterName(partner ? row.getSubmitterNameSnapshot()
+                    : projectSubmitterName(identityContext, row));
             result.setAttachments(attachmentMapper.listByFeedback(row.getId()).stream().map(file ->
                     new LeadSubmitterFeedbackRespVO.Attachment(file.getFileId(), file.getOriginalName(),
                             file.getContentType(), file.getFileSize(), fileApi.getFileInfo(file.getFileId()) == null
@@ -171,7 +169,15 @@ public class LeadSubmitterFeedbackService {
         }).toList(), page.getTotal());
     }
 
-    private String maskName(String name) { return name == null ? null : DesensitizedUtil.chineseName(name); }
+    private String projectSubmitterName(LeadIdentityMaskingService.LeadIdentityViewContext context,
+                                        LeadSubmitterFeedbackDO row) {
+        if (context.sourceIdentityType() == LeadIdentityMaskingService.SourceIdentityType.PARTNER) {
+            return identityMaskingService.partnerName(context, row.getSubmitterNameSnapshot());
+        }
+        return identityMaskingService.snapshotName(context, row.getSubmitterNameSnapshot(),
+                row.getSubmitterUserId(), LeadIdentityRole.SOURCE);
+    }
+
     private LeadDO lockedLead(Long id) {
         LeadDO lead = leadMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);

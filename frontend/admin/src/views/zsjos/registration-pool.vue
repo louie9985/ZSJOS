@@ -101,9 +101,16 @@
           class="mt-16px"
         />
 
-        <div class="section-heading">学员流转</div>
+        <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? '逐商品分班' : '历史学习规划师分配' }}</div>
+        <div v-if="detail.assignmentMode === 'class_per_item'" class="checklist">
+          <div v-for="assignment in detail.classAssignments" :key="assignment.orderItemId" class="checklist-item">
+            <div><strong>{{ assignment.productName || '历史产品信息缺失' }}</strong><ProductSpecs :product="assignment" /><div class="checklist-meta">{{ assignment.categoryName || '产品分类' }}<span v-if="assignment.errorReason"> · {{ assignment.errorReason }}</span></div></div>
+            <el-tree-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" placeholder="选择班级" :disabled="!canUpdate || !isEditable(detail.status) || classSaving" :data="classTree[assignment.orderItemId] || []" @visible-change="(visible) => visible && loadClassOptions(assignment)" />
+          </div>
+          <el-button v-if="canUpdate && isEditable(detail.status)" type="primary" :loading="classSaving" @click="saveClasses">保存分班</el-button>
+        </div>
         <div class="checklist">
-          <div v-for="route in detail.routes" :key="route.id" class="checklist-item">
+          <div v-for="route in detail.assignmentMode === 'class_per_item' ? [] : detail.routes" :key="route.id" class="checklist-item">
             <el-checkbox
               :model-value="route.selected"
               :disabled="!canUpdate || !isEditable(detail.status) || routeSaving"
@@ -210,7 +217,9 @@
 </template>
 
 <script lang="ts" setup>
+import ProductSpecs from './components/ProductSpecs.vue'
 import * as RegistrationApi from '@/api/zsjos/registration'
+import * as DeliveryClassApi from '@/api/zsjos/deliveryClass'
 import { useUserStore } from '@/store/modules/user'
 import { useMessage } from '@/hooks/web/useMessage'
 import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
@@ -231,6 +240,9 @@ const detail = ref<RegistrationApi.RegistrationCase>()
 const detailId = ref<number>()
 const routeCandidates = ref<Record<number, RegistrationApi.StudyPlanner[]>>({})
 const routeSaving = ref(false)
+const classSaving = ref(false)
+const classDraft = reactive<Record<number, number | undefined>>({})
+const classTree = reactive<Record<number, Array<{ label: string; value: string | number; disabled?: boolean; children?: Array<{ label: string; value: number }> }>>>({})
 const savingItemId = ref<number>()
 const completing = ref(false)
 
@@ -283,6 +295,7 @@ const openDetail = async (id: number) => {
   detailError.value = ''
   try {
     detail.value = await RegistrationApi.getRegistrationCase(id)
+    if (detail.value.assignmentMode === 'class_per_item') for (const item of detail.value.classAssignments || []) classDraft[item.orderItemId] = item.classId
   } catch (cause: any) {
     detail.value = undefined
     detailError.value = cause?.msg || cause?.message || '报名履约详情加载失败'
@@ -359,6 +372,22 @@ const saveRoutes = async (
   } finally {
     routeSaving.value = false
   }
+}
+const loadClassOptions = async (assignment: RegistrationApi.RegistrationClassAssignment) => {
+  if (classTree[assignment.orderItemId]) return
+  try {
+    const options = await DeliveryClassApi.getDeliveryClassOptions(assignment.categoryId, true)
+    classTree[assignment.orderItemId] = [{ label: assignment.categoryName || '已购产品', value: `category-${assignment.orderItemId}`, disabled: true, children: options.map((item) => ({ label: item.systemClass ? '待分班' : `${item.className} · ${item.homeroomUserName || '未配置班主任'}`, value: item.id })) }]
+  } catch (cause: any) { message.error(cause?.msg || cause?.message || '可选班级加载失败') }
+}
+const saveClasses = async () => {
+  if (!detail.value?.classAssignments) return
+  const assignments = detail.value.classAssignments.map((item) => ({ orderItemId: item.orderItemId, classId: classDraft[item.orderItemId] }))
+  if (assignments.some((item) => !item.classId)) { message.warning('请为每个订单商品选择班级'); return }
+  classSaving.value = true
+  try { detail.value = await RegistrationApi.updateRegistrationClassAssignments(detail.value.id, assignments as Array<{ orderItemId: number; classId: number }>, detail.value.version); message.success('分班已保存'); await load() }
+  catch (cause: any) { message.error(cause?.msg || cause?.message || '分班保存失败'); await openDetail(detail.value.id) }
+  finally { classSaving.value = false }
 }
 const changeRouteSelection = async (
   route: RegistrationApi.RegistrationRoute,

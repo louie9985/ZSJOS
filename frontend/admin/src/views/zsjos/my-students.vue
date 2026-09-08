@@ -99,11 +99,7 @@
                 <strong>{{ serviceCourseName(row) }}</strong>
                 <span v-if="row.skuName && row.skuName !== row.courseName">{{ row.skuName }}</span>
                 <span>{{ serviceCategoryPath(row) }}</span>
-                <div v-if="row.attributeValues?.length" class="course-rights-tags">
-                  <el-tag v-for="value in row.attributeValues" :key="value" size="small">{{
-                    value
-                  }}</el-tag>
-                </div>
+                <ProductSpecs :product="row" />
               </div>
             </template>
           </el-table-column>
@@ -123,6 +119,8 @@
 </template>
 
 <script lang="ts" setup>
+import ProductSpecs from './components/ProductSpecs.vue'
+import { productSpecText } from '@/utils/productSpecs'
 import * as RegistrationApi from '@/api/zsjos/registration'
 import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
 
@@ -147,7 +145,7 @@ const serviceSummary = (services: RegistrationApi.StudentService[]) => {
     : names.join('、')
 }
 const serviceCourseName = (service: RegistrationApi.StudentService) =>
-  service.courseName || service.skuName || '课程服务'
+  [service.courseName || service.skuName || '课程服务', productSpecText(service)].filter(Boolean).join(' · ')
 const serviceCategoryPath = (service: RegistrationApi.StudentService) =>
   service.categoryPath?.length ? service.categoryPath.join(' / ') : '课程分类暂未记录'
 const serviceStatusLabel = (status: string) =>

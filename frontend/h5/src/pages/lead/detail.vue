@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductSpecs from '../../components/ProductSpecs.vue'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isAxiosError } from 'axios'
@@ -303,7 +304,7 @@ function goAppeal() {
         <div v-if="detailProducts.length > 0" class="card">
           <div class="section-title">意向课程</div>
           <div v-for="product in detailProducts" :key="`${product.spuRef}-${product.skuRef || ''}`" class="product-item">
-            <div><strong>{{ product.spuName || '课程' }}</strong><p v-if="product.categoryName">{{ product.categoryName }}</p><p v-if="product.skuName">规格：{{ product.skuName }}</p><p v-if="product.selectedAttrValues">属性：{{ product.selectedAttrValues }}</p></div>
+            <div><strong>{{ product.spuName || '课程' }}</strong><p v-if="product.categoryName">{{ product.categoryName }}</p><ProductSpecs :product="product" /><p v-if="product.skuName">{{ product.skuName }}</p></div>
             <div><van-tag v-if="product.primary" type="primary" size="medium">主意向</van-tag><span v-if="product.price != null" class="product-price">¥{{ product.price }}</span></div>
           </div>
         </div>

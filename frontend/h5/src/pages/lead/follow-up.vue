@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductSpecs from '../../components/ProductSpecs.vue'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLeadFollowUpSummary, getMyLeadPage, type LeadFollowUpSummary, type LeadListItem } from '@/api/lead'
@@ -109,6 +110,7 @@ void loadSummary()
             <span class="follow-up-card__main">
               <span class="follow-up-card__identity"><strong>{{ item.submittedName || '未命名客户' }}</strong><small>{{ formatLeadNo(item.leadNo) }}</small></span>
               <span class="follow-up-card__course">{{ primaryCourse(item) }}</span>
+              <ProductSpecs :product="item.primaryProduct || item.intendedProducts?.find(p => p.primary) || item.intendedProducts?.[0] || {}" />
               <span class="follow-up-card__meta"><b>{{ stageText(item) }}</b><time>{{ formatDate(cardTime(item)) }}</time></span>
             </span>
             <span class="follow-up-card__status" :class="`follow-up-card__status--${statusClass(item.status)}`">{{ formatLeadStatus(item.status) }}</span>

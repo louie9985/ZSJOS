@@ -74,6 +74,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private CashbackService cashbackService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
@@ -81,7 +82,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         if (!leadObjectPermissionService.canReadDetail(lead, userId) || !canReadAppealRecords(lead, userId)) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
-        return appealMapper.selectListByLeadId(leadId).stream().map(item -> convert(item, lead, null)).toList();
+        List<LeadAppealDO> rows = appealMapper.selectListByLeadId(leadId);
+        LeadIdentityMaskingService.LeadIdentityViewContext context = identityMaskingService.resolve(userId, lead);
+        Map<Long, AdminUserRespDTO> users = identityUsers(rows);
+        return rows.stream().map(item -> convert(item, lead, null, users, context)).toList();
     }
 
     /** Submitters may read the appeal history of their own Lead; other readers need appeal capability. */
@@ -536,6 +540,20 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         return convert(source, lead, taskId, null);
     }
 
+    private LeadAppealRespVO convert(LeadAppealDO source, LeadDO lead, String taskId,
+                                     Map<Long, AdminUserRespDTO> users,
+                                     LeadIdentityMaskingService.LeadIdentityViewContext context) {
+        // Build the non-identity fields without resolving names; identity fields are projected below.
+        LeadAppealRespVO result = convert(source, lead, taskId, Map.of());
+        if (context != null) {
+            result.setApplicantUserName(identityMaskingService.employeeName(context, users,
+                    source.getApplicantUserId(), LeadIdentityRole.SOURCE));
+            result.setReviewerUserName(identityMaskingService.employeeName(context, users,
+                    source.getReviewerUserId(), LeadIdentityRole.OPERATOR));
+        }
+        return result;
+    }
+
     private LeadAppealRespVO convert(LeadAppealDO source, LeadDO lead, String taskId, Map<Long, String> userNames) {
         LeadAppealRespVO result = new LeadAppealRespVO();
         result.setId(source.getId()); result.setLeadId(source.getLeadId()); result.setLeadNo(lead.getLeadNo());
@@ -578,6 +596,15 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     private String userName(Long id) {
         AdminUserRespDTO user = id == null ? null : adminUserApi.getUser(id);
         return user == null ? null : user.getNickname();
+    }
+
+    private Map<Long, AdminUserRespDTO> identityUsers(List<LeadAppealDO> rows) {
+        Set<Long> ids = rows.stream().flatMap(row -> java.util.stream.Stream.of(
+                        row.getApplicantUserId(), row.getReviewerUserId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) return Map.of();
+        return adminUserApi.getUserList(ids).stream()
+                .collect(Collectors.toMap(AdminUserRespDTO::getId, item -> item, (left, right) -> left));
     }
 
     private BusinessEventDO addEvent(String type, LeadDO lead, Long operatorUserId, LeadAppealDO appeal,

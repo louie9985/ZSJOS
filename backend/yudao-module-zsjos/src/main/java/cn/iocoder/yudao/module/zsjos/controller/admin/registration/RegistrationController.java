@@ -77,6 +77,14 @@ public class RegistrationController {
         return success(registrationService.updateRoutes(id, SecurityFrameworkUtils.getLoginUserId(), reqVO));
     }
 
+    @PutMapping("/{id}/class-assignments")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
+    public CommonResult<RegistrationCaseRespVO> updateClassAssignments(@PathVariable Long id,
+            @Valid @RequestBody RegistrationClassAssignmentsSaveReqVO reqVO) {
+        return success(registrationService.updateClassAssignments(id,
+                SecurityFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
     @PostMapping("/{id}/items/{itemId}/attachments")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
     public CommonResult<RegistrationAttachmentUploadRespVO> uploadAttachment(

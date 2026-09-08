@@ -13,7 +13,7 @@ class LeadFlowHistoryPermissionContractTest {
     void endpointAllowsPartnerReadAndServiceRequiresLeadObjectRead() throws Exception {
         PreAuthorize feature = LeadManagementController.class.getMethod("getFlowHistory", Long.class)
                 .getAnnotation(PreAuthorize.class);
-        ZsjosPermission object = LeadFlowHistoryService.class.getMethod("getHistory", Long.class)
+        ZsjosPermission object = LeadFlowHistoryService.class.getMethod("getHistory", Long.class, Long.class)
                 .getAnnotation(ZsjosPermission.class);
 
         assertEquals("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')",

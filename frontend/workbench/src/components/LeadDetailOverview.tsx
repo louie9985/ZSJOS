@@ -1,3 +1,4 @@
+import ProductSpecs from './ProductSpecs'
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Empty, Image, Tag, Typography } from 'antd'
 import {
@@ -140,7 +141,7 @@ function ProductCard({ product }: { product: ManagedLeadProduct }) {
         {product.primary && <Tag color="green" bordered={false}>主意向</Tag>}
         <span className="lead-product-name">{product.spuName || '未明确课程'}</span>
       </div>
-      {product.skuName && <span className="lead-product-sku">{product.skuName}</span>}
+      <ProductSpecs product={product} />{product.skuName && <span className="lead-product-sku">{product.skuName}</span>}
       {product.price != null && (
         <span className="lead-product-price">¥{Number(product.price).toFixed(2)}</span>
       )}
@@ -703,7 +704,8 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     <div className="lead-product-list">
                       <div className="lead-product-card primary">
                         <div className="lead-product-card-header"><Tag color="green" bordered={false}>已成交</Tag><span className="lead-product-name">{service.courseName || service.skuName || '课程服务'}</span></div>
-                        {service.skuName && service.skuName !== service.courseName && <span className="lead-product-sku">{service.skuName}</span>}
+                        <ProductSpecs product={service} />
+                        {service.skuName && <span>{service.skuName}</span>}
                         {service.orderNo && <span className="lead-product-sku">订单号：{service.orderNo}</span>}
                       </div>
                     </div>

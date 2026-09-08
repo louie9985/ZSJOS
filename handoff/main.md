@@ -113,6 +113,58 @@
 
 ## Workstream Registration - 2026-09-07 00:00:00 +08:00
 
+- Workstream ID: `main-delivery-class-management`
+- Goal: 新增产品分类/考期/班主任驱动的班级管理、报名分班、我的班级和调班能力。
+- Non-goals: 不复制 System 用户/权限、产品或 BPM 数据；不删除历史服务关系；不切换分支、提交、推送或清理其他未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos` 班级/报名/服务关系相关文件；`script/sql/mysql` 班级 migration；`frontend/workbench` 班级与报名页面/API/菜单注册；`frontend/admin` 班级管理 API/页面/菜单；直接受影响的 API、架构和菜单覆盖文档；本 handoff 文件。
+- Owner: Codex `/root`。
+- Dependencies: 现有 ZSJOS product、exam calendar、registration、service relation、System user/permission/user-relation API、BPM public API；无新增依赖。
+- Integration order: migration/DO/DAL -> class service/controller/API -> service relation and registration assignment -> Workbench/Admin pages and menu registry -> tests/docs -> focused backend/frontend verification。
+- Verification plan: ZSJOS focused Maven tests/module compile; Workbench tests/typecheck/build; Admin typecheck/build where feasible; SQL guarded migration review; scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-07 22:45:00 +08:00
+
+- Workstream ID: `main-delivery-class-management`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 新增产品分类/考期/班主任驱动的班级管理、待分班承接、我的班级入口和服务关系班级归属。
+- Key decisions: 班级绑定产品分类与已发布考期；新增租户级系统待分班班级；服务关系增加 nullable `class_id`；历史关系迁移到待分班；报名完成的新关系先落待分班兼容现有 planner 流程；班级结课不改变服务关系状态。
+- Execution or analysis result: 新增 ZSJOS 班级 DO/Mapper/Service/Controller/VO、V188 UTF-8 migration、班级菜单权限、服务关系 classId、报名完成待分班挂接；新增 Workbench 班级/我的班级 API、路由注册和查询页面；新增 Admin 班级管理 API/页面；更新菜单覆盖和 migration README。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/{controller/admin/deliveryclass,dal/dataobject/deliveryclass,dal/mysql/deliveryclass,service/deliveryclass}`；服务关系/报名完成/错误码；`script/sql/mysql/migrations/V188__delivery_class_management.sql`; `script/sql/mysql/bootstrap.sql`; Workbench constants/API/route registry/page/menu test; Admin delivery-class API/page; menu coverage/migration docs。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; Workbench `npm run typecheck` passed; Workbench `npm test -- --run` passed 103 files/568 tests after updating the route-count assertion; focused menu test passed 22/22; scoped `git diff --check` reported only existing LF/CRLF conversion warnings. Admin `pnpm ts:check` remains blocked by pre-existing errors in unrelated BPM/EAM/AI/CRM files.
+- Dependency or integration impact: No new dependency, branch, commit, push, or external database execution. Migration source was updated but not run against a database. Existing unrelated worktree changes were preserved.
+- Remaining work: The full per-order-item class selection UI/API contract, formal-class direct assignment, planner BPM transfer request/listener, class-level notification, student detail deep-linking, real database migration verification, browser acceptance, and Admin clean typecheck remain incomplete. Current new registration completion assigns the system pending class while retaining the legacy planner route for compatibility.
+- Status: `partial implementation; backend compile and Workbench verification passed; production business flow not complete`。
+
+## Delivery Entry - 2026-09-07 16:45:00 +08:00
+
+- Workstream ID: `main-lead-identity-masking-unification`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 统一 Lead 详情域的关系型身份脱敏，修复相互脱敏客资在判定有效/无效时间线中显示完整操作人姓名的问题。
+- Key decisions: 新增可注入 `LeadIdentityMaskingService` 与 `LeadIdentityRole`；复用 `LeadObjectPermissionService.canViewUnmaskedIdentity`，不复制授权算法；按当前查看人实时投影历史流转身份；保持指定派单、销售自拓无提供方、系统账号和未知账号既有特殊语义；跟进读取接口增加带 `viewerId` 的入口并由 Controller 传入当前用户。
+- Execution or analysis result: Lead 详情中的提交人、所属销售、判定人、待接销售、回收来源负责人通过统一服务投影；`/flow-history` 改为接收查看人并统一处理操作人、原/新负责人、员工/兼职提交名称；Lead 跟进分页读取同步执行身份重投影；同步流转 API 与数据权限架构文档；未修改历史事件/快照、数据库结构或权限标识。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/{LeadIdentityMaskingService.java,LeadIdentityRole.java,LeadManagementServiceImpl.java,LeadFlowHistoryService.java,LeadFollowUpService.java,LeadFollowUpServiceImpl.java}`；Lead 管理/跟进 Controller；相关 Lead 测试；`docs/api/zsjos-lead-flow-history.md`；`docs/architecture/data-and-permission-flow.md`；本 handoff 文件。
+- Verification evidence: ZSJOS focused Maven tests 61/61 passed (`LeadManagementServiceImplTest`, `LeadFlowHistoryServiceTest`, `LeadIdentityMaskingServiceTest`, `LeadFollowUpServiceImplTest`); Workbench `npm test -- --run` passed 102/102 files and 566/566 tests; `npm run typecheck` passed; `npm run build` passed with existing large-chunk warning; scoped `git diff --check` had no whitespace errors, only LF/CRLF conversion warnings.
+- Dependency or integration impact: No new dependency, database migration, permission identifier, branch, commit, push, or external service change. Existing unrelated worktree changes, including `LOG_FILE_IS_UNDEFINED`, Workbench cache and JRebel artifact, were preserved.
+- Remaining work: Appeal/complaint inboxes are separate Lead work surfaces and were not changed because they are not loaded by the Lead detail overview/flow-history read path; authenticated HTTP and desktop/mobile browser acceptance were not run because no runtime session was started.
+- Status: `implemented; focused backend and full Workbench verification passed; live runtime acceptance pending`。
+
+## Workstream Registration - 2026-09-07 16:00:00 +08:00
+
+- Workstream ID: `main-lead-identity-masking-unification`
+- Goal: 在 Lead 详情域建立统一的关系型身份脱敏投影，覆盖详情、概览时间线、流转记录及直接加载的 Lead 子接口，修复判定人等字段泄露完整姓名的问题。
+- Non-goals: 不修改历史事件/快照数据、数据库结构、权限标识、非 Lead 详情域接口、分支、提交、推送或外部共享状态；保留当前工作树其他未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: 当前 HEAD `0f5734a73506259660e6286c11bae7c016c6a423`（含既有未提交修改）。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/`; Lead 管理/流转 Controller 与 VO；Lead 详情域相关测试与 API 文档；必要的 `frontend/workbench/src` Lead 详情类型/守卫测试；`handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 `LeadObjectPermissionService.canViewUnmaskedIdentity`、System `AdminUserApi`、Lead/Partner DAL、Workbench Lead 详情 API；无新增依赖。
+- Integration order: 统一身份上下文服务 -> Lead 详情投影 -> `/flow-history` 查看人上下文 -> 详情域子接口审查/改造 -> 测试与 API/架构文档 -> 后端与 Workbench 验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦 Maven 测试与模块编译；Workbench `npm test`、`npm run typecheck`、`npm run build`；scoped `git diff --check`；真实登录态浏览器/HTTP 若环境可用再验收。
+
+## Workstream Registration - 2026-09-07 00:00:00 +08:00
+
 - Workstream ID: `main-aging-pool-toolbar-deal-gate`
 - Goal: 将公海池操作统一接入 Lead 详情 OverflowToolbar，并禁止活动公海客资录入或补正成交，保留服务端授权的非成交操作与主管公海管理操作。
 - Non-goals: 不修改数据库结构、BPM 流程、权限标识、历史数据、分支、提交或推送；保留当前工作树其他未提交修改。
@@ -21695,3 +21747,387 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、API 路径、响应结构、SQL、数据库、菜单、前端、分支、提交、推送或外部服务变更；System 基础资料 API 调用方不再继承当前账号的数据范围，但租户、逻辑删除、精确条件与消费方业务校验保持有效。
 - Remaining work: 未执行真实账号 HTTP 验收，当前未确认已有可用服务、测试账号及租户数据；发布前仍需以“新媒体运营 + `zsjos:lead:submit` + 仅本人数据权限”验证提交成功、本人可见、他人不可见和未授权直接调用被拒绝。仓库全量测试基线失败需由对应 Infra/System/ZSJOS 工作流分别修复。
 - Status: `implemented; focused permission and submission regressions passed; server assembly passed; live account acceptance and unrelated baseline failures remain`。
+
+## Delivery Entry - 2026-09-07 17:00:58 +08:00
+
+- Workstream ID: `main-lead-identity-masking-unification`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 统一 Lead 详情域身份脱敏，使详情、时间线、流转及详情子接口按同一查看人/客资关系投影员工、兼职和系统身份。
+- Key decisions: 新增 `LeadIdentityMaskingService` 复用 `LeadObjectPermissionService.canViewUnmaskedIdentity`；相互脱敏仅适用于非指定派单、已归属且提交人与负责人不同的 Lead；历史记录实时按当前权限投影，不改快照；申诉、投诉详情接入统一服务，全局审核/分页接口保持既有规则。
+- Execution or analysis result: 详情字段、流转记录、跟进、申诉、投诉均通过统一上下文生成展示名称；系统账号显示“系统”、无法解析员工显示“未知账号”；保留 `identityMaskMode` 与现有对象权限门禁；前端无需新增脱敏逻辑。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/{LeadIdentityMaskingService.java,LeadIdentityRole.java,LeadManagementServiceImpl.java,LeadFlowHistoryService.java,LeadFollowUpService.java,LeadFollowUpServiceImpl.java,LeadAppealServiceImpl.java,LeadComplaintService.java}`；对应 Lead Controller、测试文件；`docs/api/zsjos-lead-flow-history.md`；`docs/architecture/data-and-permission-flow.md`；`handoff/main.md`。
+- Verification evidence: ZSJOS 聚焦测试 82/82 通过（详情、流转、跟进、申诉、投诉及统一服务）；此前 Workbench `npm test -- --run` 566/566、`npm run typecheck`、`npm run build` 均通过；`git diff --check` 无空白错误（仅 LF/CRLF 转换提示）。未执行真实登录态 HTTP 或桌面/移动浏览器验收。
+- Dependency or integration impact: 无新增依赖、数据库字段/迁移、API 路径或历史数据变更；详情 Controller 继续传入当前登录用户；前端继续消费后端展示值。
+- Remaining work: 真实账号权限、实时历史脱敏变化及浏览器展示仍需在可用运行环境中验收；工作树中的 `LOG_FILE_IS_UNDEFINED`、`.cache`、JRebel 文件等无关用户/生成改动未触碰。
+- Status: `implemented; focused backend and prior Workbench verification passed; live runtime acceptance pending`。
+
+## Delivery Entry - 2026-09-07 17:07:12 +08:00
+
+- Workstream ID: `main-lead-identity-masking-unification`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 补齐 Lead 详情域提交人反馈投影的统一身份脱敏。
+- Key decisions: 新增统一服务的快照投影入口；反馈接口继续展示持久化快照，不重新解析或回写历史数据；合作方反馈路径保持原有展示语义。
+- Execution or analysis result: `LeadSubmitterFeedbackService` 已移除直接 `DesensitizedUtil` 调用，销售/提交人快照均按 Lead 身份上下文投影。
+- Changed files: `LeadIdentityMaskingService.java`、`LeadSubmitterFeedbackService.java`、`LeadSubmitterFeedbackServiceTest.java`、`handoff/main.md`。
+- Verification evidence: `LeadSubmitterFeedbackServiceTest` 9/9 通过；此前 Lead 详情相关聚焦测试 82/82 通过。
+- Dependency or integration impact: 无新增依赖、数据库或 API 变更。
+- Remaining work: 真实登录态 HTTP 与浏览器验收仍待可用运行环境。
+- Status: `implemented; focused verification passed`。
+
+## Workstream Registration - 2026-09-07 17:20:00 +08:00
+
+- Workstream ID: `main-calendar-permission-split`
+- Goal: 将媒体账号维护排期与个人手工日程彻底拆分，账号日历按本人、显式管理范围或全量权限授权，新增严格本人范围的“我的日历”CRUD。
+- Non-goals: 不聚合工作计划/BPM 任务；不开放管理员代看或代管个人日程；不修改账号负责人或历史维护数据；不重写 V146/V161；不执行真实数据库迁移；不切换分支、不提交、不推送；保留当前工作树其他未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（含既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS media-account 日历 Controller/VO/Service/Mapper 与新 personalcalendar 分层、错误码和测试；Workbench 日历页面/服务/路由/样式/测试；Admin 对应 API 与页面；`script/sql/mysql` 的 V186/bootstrap/验证/迁移说明；直接受影响的 API、权限、菜单和前端文档；`handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 System `PermissionApi`/`AdminUserApi`、ZSJOS 租户与对象权限、React Workbench、Vue Admin；无新增依赖。
+- Integration order: 账号日历范围收紧 -> 个人日历后端模型/API -> V186 菜单权限和建表 -> Workbench/Admin 页面与路由 -> 测试和文档 -> 比例验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦测试及模块测试、server package；Workbench `npm test`/typecheck/build；Admin typecheck/lint/build；SQL 静态/bootstrap 校验；scoped `git diff --check`；真实数据库和登录态浏览器仅在另获外部状态确认且环境可用时执行。
+
+## Delivery Entry - 2026-09-07 17:55:41 +08:00
+
+- Workstream ID: `main-calendar-permission-split`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 彻底拆分账号维护排期与个人手工日程，使账号日历按本人、正式管理范围或独立全量权限授权，并提供严格本人所有的个人日程 CRUD。
+- Key decisions: `zsjos:media-calendar:query` 只提供本人账号关系范围，`query-managed` 仅消费有界 System 部门范围，部门 `all=true` 不提升为账号全量，只有 `query-all` 可查看全租户账号；候选人从已授权账号关系中产生；个人日程 v1 固定 `MANUAL`、由后端绑定当前 ADMIN 用户，最终查询/更新/删除均保留 owner 与租户边界；退役 `/calendar/all`，不复用 V161 的共享语义。
+- Execution or analysis result: 已新增账号日历统一范围服务和授权候选人查询；移除共享全量运行时接口；新增 `zsjos_personal_calendar_event` 的 Controller/VO/Service/DO/Mapper 与独立错误码；React Workbench 和 Vue Admin 均拆出账号日历/我的日历页面与 API；V186 创建个人日历表、CHECK/索引、菜单按钮权限、套餐覆盖、V161 授权审计与受控回收，并接入 bootstrap/verify；直接受影响文档已同步。`ruoyi-vue-pro` 技能用于保持 System 公共 API、ZSJOS 数据所有权及双前端工程边界。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/{controller/admin/account/MediaAccountController.java,controller/admin/personalcalendar/**,dal/dataobject/personalcalendar/**,dal/mysql/account/MediaAccountMapper.java,dal/mysql/personalcalendar/**,enums/ZsjosErrorCodeConstants.java,service/account/MediaAccountCalendarScopeService.java,service/account/MediaAccountMaintenanceService.java,service/personalcalendar/**}`；对应账号/个人日历测试；`frontend/workbench/{src/constants.ts,src/layouts/RouteHost.tsx,src/pages/MediaCalendarPage.tsx,src/pages/PersonalCalendarPage.tsx,src/pages/TodayTasksPage.tsx,src/services/api.ts,src/services/menuComponentRegistry.ts,src/styles/pages/media-calendar.css}` 及相关测试/契约文档；`frontend/admin/src/{api/zsjos/calendar/**,views/zsjos/mediaCalendar/**,views/zsjos/personalCalendar/**}`；`script/sql/mysql/{bootstrap.sql,verify-bootstrap.sql,migrations/README.md,migrations/V186__split_media_and_personal_calendar.sql}`；`docs/api/media-account-maintenance-calendar.md`、`docs/frontend/zsjos-menu-coverage.md`、`docs/architecture/{data-and-permission-flow.md,zsjos-role-permission-matrix.md}`、`docs/operations/zsjos-full-chain-test-sop.md`；`handoff/main.md`。
+- Verification evidence: 账号/个人日历后端聚焦测试 20/20 通过；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 的 25 个 reactor 模块全部成功；Workbench `npm test -- --run` 102/102 文件、563/563 测试通过，`npm run typecheck` 与 `npm run build` 通过（仅既有大 chunk 警告），最终日历/菜单/样式聚焦回归 61/61；Admin 新文件定向 ESLint 和 `pnpm build:local` 通过（仅既有 `*zoom` CSS 警告）；V186 UTF-8、V185→V186 顺序、时间 CHECK、版本记录、菜单校验、禁止业务删除和禁止 DROP TABLE 静态检查通过；生产源码不存在 `/calendar/all` 调用；scoped `git diff --check` 无空白错误，仅 LF/CRLF 提示。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，不修改 V146/V161、账号负责人、账号维护历史或个人日程以外的业务数据；V186 必须在 V185 后执行，会停用菜单 73604 并逻辑回收其角色授权，保留 73602 `query-all`；未创建分支、提交、推送或修改真实外部状态。
+- Remaining work: 本机没有 MySQL 客户端，且未获共享数据库执行确认，因此未执行 V186、UTF-8 `HEX()`、迁移前后真实角色/用户差异与账号数据对比；未启动共享后端/前端服务，真实 HTTP 403/跨租户和登录态桌面/移动浏览器验收未执行。Admin 全量 `pnpm ts:check` 仍有 20 项位于既有 BPM、EAM、MES、System、ExportTask 等范围外的基线错误，本次新增日历文件无报错。
+- Status: `implemented; focused backend, full Workbench, Admin build, server assembly and SQL static verification passed; live database/runtime/browser acceptance pending`。
+## Workstream Registration - 2026-09-07 17:30:00 +08:00
+
+- Workstream ID: `main-admin-remove-static-home`
+- Goal: 移除 Vue Admin 静态 `/index` 首页，普通进入改为服务端授权的 ZSJOS 工作台首页，并为无该权限账号选择首个可访问内部页面。
+- Non-goals: 不修改后端菜单、权限、数据库、API、React Workbench、账号授权、分支、提交、推送或外部服务；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`; Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/admin/src/router`, `frontend/admin/src/permission.ts`, `frontend/admin/src/store/modules/permission.ts`, `frontend/admin/src/layout/components/UserInfo/src/UserInfo.vue`, `frontend/admin/src/utils`, `frontend/admin/src/views/Home`, `frontend/admin/tests`, `docs/frontend/zsjos-menu-coverage.md`, `handoff/main.md`。
+- Owner: Codex `/root`; Dependencies: 现有服务端授权菜单、Vue Router、Pinia；无新增依赖。
+- Integration order: 路由目标选择工具与测试 -> Permission Store 默认落点 -> 根路由/旧路径兼容 -> 登录/退出回跳 -> 删除静态首页资源与文档同步 -> Admin 检查。
+- Verification plan: Admin 路由选择聚焦测试、`pnpm ts:check`、`pnpm lint`、`pnpm build:local`、scoped `git diff --check`；真实账号浏览器验收仅在已有环境可用时执行。
+
+## Delivery Entry - 2026-09-07 18:13:48 +08:00
+
+- Workstream ID: `main-admin-remove-static-home`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 移除 Vue Admin 静态 `/index` 首页，普通进入改为服务端授权的 ZSJOS 工作台首页，并为无该权限账号选择首个可访问内部页面。
+- Key decisions: 新增服务端菜单递归落点选择；优先 `/zsjos/tasks/today`，否则首个可见内部叶子页，无目标进入 `/403`；`/index` 保留隐藏兼容重定向；显式业务 redirect 保持原目标；删除 `src/views/Home` 专用文件。
+- Execution or analysis result: 根路径不再渲染静态首页；Permission Store 根据授权菜单保存默认落点；登录守卫和退出回跳已对齐；文档与中英文旧首页文案已清理；未修改后端、数据库、权限或 Workbench。
+- Changed files: `frontend/admin/src/utils/authenticatedLanding.ts`; `frontend/admin/src/store/modules/permission.ts`; `frontend/admin/src/permission.ts`; `frontend/admin/src/router/modules/remaining.ts`; `frontend/admin/src/layout/components/UserInfo/src/UserInfo.vue`; `frontend/admin/src/locales/{zh-CN.ts,en.ts}`; `frontend/admin/src/views/Home/{Index.vue,Index2.vue,echarts-data.ts,types.ts}`; `frontend/admin/tests/authenticatedLanding.test.ts`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`。
+- Verification evidence: 路由选择测试 3/3 通过；定向 ESLint、Prettier 检查通过；`pnpm build:local` 成功（仅既有 `*zoom` CSS 警告）；`git diff --check` 无空白错误。全量 `pnpm ts:check` 仍有仓库既有 20 项非本次文件错误；全量 `pnpm lint` 被既有 `src/components/DocAlert/index.vue` 模板错误阻断。
+- Dependency or integration impact: 无新增依赖、API、数据库、菜单权限、分支、提交、推送或外部服务变更；保留工作树其他未提交修改。
+- Remaining work: 未执行真实账号登录态及桌面/移动浏览器验收；发布前需验证有/无 `zsjos:business-task:query` 账号的默认落点和旧 `/index` 书签兼容。
+- Status: `implemented; focused tests, targeted lint/format and Admin build passed; repository baseline type/lint failures and live browser acceptance remain`。
+
+## Delivery Entry - 2026-09-07 20:27:45 +08:00
+
+- Workstream ID: `main-admin-remove-static-home`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 修复 Admin 静态首页移除后的默认落点审查问题。
+- Key decisions: 将当前路径、显式 redirect 和默认落点统一抽为纯函数；已初始化用户也执行 `/`、`/index` 默认落点；继续保留业务深链；默认菜单外链判定复用 `isUrl()`；为 Node 直测开启 `allowImportingTsExtensions`。
+- Execution or analysis result: 已修复已初始化状态访问根路径停留空 Layout 的高优先级缺陷；已修复 `www.example.com`、账号格式外链被选为默认页面的中优先级缺陷；新增对应回归测试。
+- Changed files: `frontend/admin/src/permission.ts`; `frontend/admin/src/utils/authenticatedLanding.ts`; `frontend/admin/tests/authenticatedLanding.test.ts`; `frontend/admin/tsconfig.json`; `handoff/main.md`。
+- Verification evidence: `node --experimental-strip-types --test tests/authenticatedLanding.test.ts` 通过 5/5；定向 ESLint 通过；定向 Prettier 通过；`pnpm build:local` 成功（仅既有 `*zoom` CSS 警告）；`git diff --check` 无空白错误；`pnpm ts:check` 仍报告仓库既有错误，未报告本次新增文件错误。
+- Dependency or integration impact: 无新增依赖、后端接口、数据库、菜单权限、Workbench、日历、分支、提交、推送或外部服务变更；保留其他未提交修改。
+- Remaining work: 未执行真实账号登录及桌面/移动浏览器验收；全量类型检查的既有错误仍需由对应工作流处理。
+- Status: `implemented; review findings fixed; focused tests, lint/format and Admin build passed; baseline type errors and live browser acceptance remain`。
+
+## Workstream Registration - 2026-09-07 18:30:00 +08:00
+
+- Workstream ID: `main-exam-calendar`。
+- Scope update (2026-09-08): User requires sibling query/manage leaf permissions because parent menus cannot be independently selected. Owner /root resumes V187, verification SQL and directly affected documentation; preserve existing API codes. Verify explicit query leaf, grants, package coverage and controller permission distinction.
+- Scope update (2026-09-07): User corrected the page parent to Calendar menu 73600. Ownership covers V187 parent/package correction, route/menu regression test, affected docs and delivery log; verification covers menu tests, typecheck and scoped diff. API and permission codes remain unchanged.
+- Goal: 在员工 Workbench 新增考期日历，支持全员查看精确考期、抽屉查看粗略考期，并由服务端 `manage` 权限控制考务人员的草稿、编辑、发布与撤销操作。
+- Non-goals: 不实现 Vue Admin 页面、SKU 关联、通知、重复排期限制、定时结束任务或真实数据库同步；不修改现有媒体/个人日历语义；不创建分支、不提交、不推送；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（含既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS examcalendar Controller/VO/Service/DAL/枚举/错误码与测试；Workbench 考期日历页面、服务类型、路由/组件注册、样式与测试；`script/sql/mysql` 新 migration、bootstrap/verify/README；直接相关的 API、权限、菜单与架构文档；本 handoff 文件。共享文件仅追加本功能所需内容。
+- Owner: Codex `/root`。
+- Dependencies: 现有 ZSJOS 产品分类、Infra `ConfigApi`、System 服务端菜单权限、React Workbench/Ant Design 6；无新增依赖。
+- Integration order: 后端模型/API/状态投影 -> SQL 表/参数/菜单权限 -> Workbench 页面与注册 -> 聚焦测试 -> 文档同步 -> 比例验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦及模块 Maven 测试、必要的 server package；Workbench `npm test`、`npm run typecheck`、`npm run build`；桌面/移动浏览器检查；SQL UTF-8/顺序/重复执行/非破坏性静态检查及可用受控环境验证；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-07 19:01:42 +08:00
+
+- Workstream ID: `main-exam-calendar`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 实现员工考期日历，全员查看精确考期和抽屉中的粗略考期，考务主管/专员通过独立管理权限维护草稿、发布和撤销；即将开始天数采用全系统配置。
+- Key decisions: 业务记录归属 ZSJOS；日期使用 `Asia/Shanghai` 自然日；生命周期与精确考期派生状态分离；分类只关联一个当前租户启用的 ZSJOS 产品分类并保存名称/路径快照；普通查询者仅返回已发布记录；菜单运行时只检查 `query/manage` 权限，V187 初始将 query 授给套餐开放该页的所有启用内部角色，将 manage 授给启用的 `exam_manager`/`exam_specialist`；全系统 Infra 参数缺失或非法时回退 3 天；过去精确考期不可编辑或发布。
+- Execution or analysis result: 新增 `zsjos_exam_schedule` 分层模型、精确/粗略分页、分类选项、创建/修改/发布/撤销 API、Controller/Service/对象三层授权和状态投影；React Workbench 新增月历、筛选、详情、粗略考期抽屉、权限化操作及 loading/empty/error/retry/unauthorized 状态；接入服务端菜单组件注册；V187、bootstrap、验证 SQL、API/权限/架构/菜单文档已同步。`ruoyi-vue-pro` 技能用于保持 Yudao 分层、System/Infra 公共边界和 Workbench 服务端菜单约定；浏览器技能用于登录态可用性检查。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/{controller/admin/examcalendar/**,dal/dataobject/examcalendar/**,dal/mysql/examcalendar/**,service/examcalendar/**,enums/ZsjosErrorCodeConstants.java}` 及对应考期测试；`frontend/workbench/src/{constants.ts,layouts/RouteHost.tsx,pages/ExamCalendarPage.tsx,pages/ExamCalendarPage.test.ts,services/api.ts,services/menu.test.ts,services/menuComponentRegistry.ts,styles/index.css,styles/pages/exam-calendar.css}`；`script/sql/mysql/{00-bootstrap-schema.sql,bootstrap.sql,verify-bootstrap.sql,migrations/README.md,migrations/V187__exam_calendar.sql}`；`docs/api/exam-calendar.md`、`docs/frontend/zsjos-menu-coverage.md`、`docs/architecture/{data-and-permission-flow.md,zsjos-role-permission-matrix.md}`；`handoff/main.md`。
+- Verification evidence: 考期后端聚焦测试 11/11 通过；Workbench 聚焦 52/52、全量 103/103 文件与 566/566 测试通过，`npm run typecheck`、`npm run build` 成功（仅既有大 chunk 警告）；V187 UTF-8、V186→V187 顺序、表/索引/CHECK、菜单相对路径、套餐/角色授权、全系统配置、双版本登记和无业务 DELETE/TRUNCATE/DROP TABLE 静态检查通过；本功能 scoped `git diff --check` 通过。聚合 Maven 被既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 失败中止；模块直跑共 865 项，考期测试通过但被当前工作树 11 个 Lead/账号/产品/Partner/审计范围失败拖成失败。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，不关联 SKU、不发送通知、不增加定时任务、不限制同日同分类重复；V187 必须在 V186 后执行并为开放 Workbench 的租户套餐增加页面/按钮菜单。未创建分支、提交、推送或修改真实数据库/共享服务。
+- Remaining work: 未获真实数据库写入确认，因此未执行 V187、bootstrap 重放、真实 schema/data diff 或中文 `HEX()` 校验；内置浏览器停在登录页且 Chrome 未连接，未完成真实 API、403、跨租户及桌面/移动页面验收；仓库全局 `git diff --check` 仍有无关 `LOG_FILE_IS_UNDEFINED` 尾随空格。
+- Status: `implemented; focused backend, full Workbench, build and SQL static verification passed; repository baseline Maven failures and live database/runtime/browser acceptance pending`。
+
+## Delivery Entry - 2026-09-07 20:00:00 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 执行代码审查确认后的完整修复，修正 V186 授权回收边界、个人日历跨日语义和操作失败反馈。
+- Key decisions: V186 仅回收 `creator='migration-V161'` 的 73604 自动授权，保留其他历史授权并在验证脚本中单独检查；个人日历使用半开时间区间，零时长事件按所属日期显示；Workbench/Admin 保存删除失败保留当前编辑或列表状态并给出错误提示。
+- Execution or analysis result: 后端 Mapper 查询支持跨日和零时长事件；Workbench 新增可测试的日期命中函数及保存/删除错误处理；Admin 同步跨日过滤和操作失败兜底；V186/verify-bootstrap/迁移 README 完成授权审计与断言修正。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/personalcalendar/PersonalCalendarEventMapper.java`; `frontend/workbench/src/pages/PersonalCalendarPage.tsx`; `frontend/workbench/src/pages/media-calendar.test.ts`; `frontend/admin/src/views/zsjos/personalCalendar/index.vue`; `script/sql/mysql/migrations/V186__split_media_and_personal_calendar.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/main.md`。
+- Verification evidence: PersonalCalendarEventServiceTest 5/5 通过；Workbench 日历测试 3/3、typecheck、production build 通过；Admin 定向 ESLint 和 `build:local` 通过；后端 ZSJOS 模块编译及聚焦测试通过；SQL UTF-8、来源限定和 scoped 静态检查通过。全量 Admin `pnpm ts:check` 仍被仓库既有非本次文件类型错误阻断；全局 `git diff --check` 仅命中既有无关 `LOG_FILE_IS_UNDEFINED` 尾随空格。
+- Dependency or integration impact: 无新增依赖、分支、提交、推送或共享服务操作；保留所有无关用户修改；未执行真实数据库迁移。
+- Remaining work: 未执行真实数据库/HTTP 权限验收和桌面移动浏览器验收；发布前需在受控数据库执行 V186 并核对自动授权与非自动授权差异。
+- Status: `implemented; focused backend/frontend/SQL verification passed; repository baseline Admin typecheck, unrelated whitespace, live database/API/browser acceptance remain pending`。
+
+## Delivery Entry - 2026-09-07 20:54:48 +08:00
+
+- Workstream ID: `main-lead-identity-masking-unification`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
+- User goal: 实施 Lead 身份脱敏审查后的完整修复，隔离员工与合作方身份，保证相互脱敏只影响提交人与负责人双方，并修复反馈测试装配。
+- Key decisions: `providerOwnerType` 决定提交身份类型，员工提交人、合作方提交人和无身份显式分离；合作方账号 ID 不进入 System 员工匹配；负责人只隐藏提交方，员工提交人只隐藏负责人，第三方视角保持完整；`query-all` 和负责人部门主管的完整身份权限继续由 `LeadObjectPermissionService.canViewUnmaskedIdentity(...)` 唯一决定；历史快照只在响应时投影，不回写。
+- Execution or analysis result: `LeadIdentityMaskingService` 已统一员工、合作方、系统和未知账号名称投影；详情、流转、跟进、申诉、投诉和提交人反馈复用同一 Lead/查看人上下文；合作方反馈不再误走员工 ID 判断；销售自拓历史空记录兼容条件已恢复；反馈 Spring Context 和流转权限契约测试已修复；旧 `isBlindIdentity(...)` 分散判断已删除；架构和流转 API 文档明确第三方视角及 ID 命名空间边界。`ruoyi-vue-pro` 技能用于保持 ZSJOS Service、对象权限和投影边界。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/{controller/admin/lead/LeadFollowUpController.java,controller/admin/lead/LeadManagementController.java,service/lead/LeadIdentityMaskingService.java,service/lead/LeadIdentityRole.java,service/lead/LeadManagementServiceImpl.java,service/lead/LeadFlowHistoryService.java,service/lead/LeadFollowUpService.java,service/lead/LeadFollowUpServiceImpl.java,service/lead/LeadAppealServiceImpl.java,service/lead/LeadComplaintService.java,service/lead/LeadSubmitterFeedbackService.java}`；对应 Lead 聚焦测试；`docs/api/zsjos-lead-flow-history.md`；`docs/architecture/data-and-permission-flow.md`；`handoff/main.md`。
+- Verification evidence: Lead 聚焦测试 98/98 通过；`mvn -f backend/pom.xml -pl yudao-server -am "-DskipTests" package` 的 25 个 reactor 模块全部成功；Workbench 全量测试 103/103 文件、567/567 用例以及 `npm run typecheck`、`npm run build` 通过（仅既有 large chunk warning）；目标详情服务中仅 `LeadIdentityMaskingService` 直接调用 `DesensitizedUtil.chineseName(...)`；scoped `git diff --check` 无空白错误，仅 LF/CRLF 提示。完整 `mvn -f backend/pom.xml -pl yudao-module-zsjos -am test` 在既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 失败处中止；ZSJOS 全量直跑仍受当前工作树无关文件删除及既有 `PersonMapperSqlTest`、`ZsjosAuditCoverageTest`、`MediaAccountServiceTest` 等失败影响。
+- Dependency or integration impact: 无新增 Maven/npm 依赖、数据库字段或迁移、权限标识、API 路径、前端脱敏逻辑和历史数据修改；`flow-history` 模块内服务签名要求显式传入当前查看人，现有对象权限注解保持不变；未创建分支、提交、推送或修改外部状态。
+- Remaining work: 未执行真实登录态 HTTP、权限变化后的历史实时投影及桌面/移动浏览器验收；完整仓库测试中的无关基线失败仍需由对应工作流处理。
+- Status: `implemented; focused backend, Workbench regression and server assembly passed; aggregate baseline failures and live runtime/browser acceptance remain`。
+
+## Delivery Entry - 2026-09-07 21:00:00 +08:00
+
+- Workstream ID: `main-exam-calendar`; Owner: Codex `/root`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`.
+- User goal: 将考期日历放入“日历”菜单。
+- Key decisions: 按用户更正替换原 /zsjos 父菜单方案，父节点为 73600，相对子路径 exam-calendar，页面地址 /calendar/exam-calendar；业务 API、组件标识和权限代码保持原契约。
+- Execution result: 更新 V187 当前开发迁移中的父节点、排序、前置条件、套餐覆盖及验证 SQL；更新路由、菜单解析回归测试、API/菜单/权限/架构和 migration 文档。
+- Changed files: `frontend/workbench/src/{constants.ts,services/menu.test.ts}`; `script/sql/mysql/{migrations/V187__exam_calendar.sql,migrations/README.md,verify-bootstrap.sql}`; `docs/api/exam-calendar.md`; `docs/frontend/zsjos-menu-coverage.md`; `docs/architecture/{data-and-permission-flow.md,zsjos-role-permission-matrix.md}`; `handoff/main.md`.
+- Verification evidence: 菜单/组件注册/路由常量测试 29/29 通过；Workbench typecheck 与 production build 通过（既有大 chunk 警告）；scoped diff check 通过。
+- Dependency or integration impact: 无新增依赖；按已确认未执行的 V187 开发脚本修正，实际数据库菜单需同步后生效。
+- Remaining work: 未执行数据库更新、受控 bootstrap 重放或真实登录态浏览器验证。
+- Status: `menu source and route corrected; verification passed; database synchronization pending`.
+
+## Workstream Registration - 2026-09-07 21:20:00 +08:00
+
+- Workstream ID: `main-delivery-class-closure`.
+- Goal: 在现有班级骨架上完成逐订单商品分班、班主任归属同步、主管直接调班、规划师 BPM 调班，以及 Workbench/Admin 双前端闭环。
+- Non-goals: 不执行真实数据库写入、BPM 流程部署或共享服务启停；不删除旧 planner 兼容读取；不重置学员接收状态或改写历史服务记录；不创建分支、不提交、不推送；不处理本任务外的脏工作区修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（含既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: `yudao-module-zsjos` 的 deliveryclass、registration 分班扩展、class transfer/BPM 接入、服务关系和待办转派所需的精确扩展、错误码及聚焦测试；Workbench 的班级/报名履约页面、API 类型、路由与测试；Admin 的班级/报名履约页面、API 类型及计划列明的全量类型等价修复；V188、bootstrap/baseline/verify/README、直接相关 API/权限/菜单/架构文档与本 handoff 文件。共享文件只追加或修改本功能直接需要的内容。
+- Owner: Codex `/root`.
+- Dependencies: 现有 ZSJOS 产品分类、考期、报名、服务关系、业务待办和通知边界；System 用户/部门/权限公开 API；BPM 公共 API 与状态事件；无新增 Maven/npm 依赖。
+- Integration order: 修正班级域和权限范围 -> 逐商品报名分班 -> 归属迁移核心与班主任变更 -> BPM 调班 -> Workbench -> Admin 与类型清理 -> SQL/文档 -> 聚焦及全量验证 -> 追加交付记录。
+- Verification plan: 后端聚焦测试与模块编译/测试；Workbench `npm test`、`npm run typecheck`、`npm run build`；Admin `pnpm ts:check`、`pnpm lint`、`pnpm build:local`；SQL 语法/依赖/重复执行/约束/UTF-8 静态验证；scoped `git diff --check`。真实数据库、真实登录态 HTTP/浏览器和 BPM 部署保持未执行，除非另获明确确认。
+
+## Delivery Entry - 2026-09-08 00:47:51 +08:00
+
+- Workstream ID: `main-delivery-class-closure`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree).
+- User goal: 完成班级管理剩余闭环，包括逐订单商品分班、班主任归属同步、主管直调、规划师 BPM 调班、Workbench/Admin 双端页面、V188 和全量 Admin 类型清理。
+- Key decisions: 班级与服务关系作为新报名归属真相，旧 planner 仅兼容历史；待分班按租户唯一且新报名 owner 可空；管理范围使用部门 DataPermission 与对象权限叠加；班主任变更和调班复用原子归属/未完成待办迁移；规划师调班只保存业务状态和 BPM 引用，统一审批中心处理任务；BPM 通过时若服务版本、分类、目标班状态或目标班主任资格变化则幂等落为 `invalidated`。
+- Execution or analysis result: 交付班级领域、租户级编号、分页筛选、部门快照、正式/待分班规则、逐商品 assignment 和完成事务已实现；班主任变更、主管直接调班、通知场景和对象权限已闭环；`zsjos_class_transfer` 申请、监听和稳定终态已接入 BPM 公共边界；Workbench/Admin 已提供班级管理、我的班级、学员深链、逐商品选班和调班申请/状态；V188、bootstrap/baseline/验证 SQL、菜单权限及交付文档已同步；Admin 现有 TypeScript 错误已清零。`ruoyi-vue-pro` 技能用于约束 Yudao 分层、System/BPM 公共 API、双前端和服务端菜单权限边界。
+- Changed files: `backend/yudao-module-zsjos` 下 deliveryclass Controller/VO/DO/Mapper/Service/权限/通知/BPM 监听及测试，registration 的逐商品分班、服务关系扩展、对象权限及测试，相关错误码；`frontend/workbench/src/{pages/DeliveryClassPage.tsx,pages/RegistrationPages.tsx,services/api.ts,constants.ts,layouts/RouteHost.tsx,services/menuComponentRegistry.ts}` 及菜单/契约/样式文档；`frontend/admin/src/{api/zsjos/deliveryClass/**,api/zsjos/registration/index.ts,views/zsjos/class-management.vue,views/zsjos/my-classes.vue,views/zsjos/registration-pool.vue}`，以及计划内 TypeScript 等价修复文件；`script/sql/mysql/{migrations/V188__delivery_class_management.sql,00-bootstrap-schema.sql,bootstrap.sql,verify-bootstrap.sql,migrations/README.md}`；`docs/api/{delivery-class-management.md,registration-fulfillment-api.md}`、相关架构/权限/菜单文档；`handoff/main.md`。
+- Verification evidence: 后端 5 个聚焦测试类共 26/26 通过并完成模块编译；Workbench 全量 103/103 测试文件、568/568 用例、`npm run typecheck`、`npm run build` 通过（仅既有 large-chunk 警告）；Admin `pnpm ts:check` 和 `pnpm build:local` 通过（仅既有 `*zoom` CSS 警告）；V188 静态检查确认 V186→V187→V188 顺序、无业务 `DELETE/TRUNCATE/DROP TABLE`、8 个权限、相对菜单路径、唯一守卫、UTF-8 声明、bootstrap 接线及 `待分班` HEX 验证断言齐全；API/权限注解审计与 scoped `git diff --check` 通过，后者仅有 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增 Maven/npm 依赖；新 API、表、字段、菜单和权限须随 V188 部署；运行时必须部署 BPM definition key `zsjos_class_transfer` 并配置班级通知规则。未创建/切换分支，未提交、推送，未修改真实数据库或启停共享服务。
+- Remaining work: 未获外部状态操作确认，因此未执行真实数据库 fresh bootstrap、V187→V188 升级、重复执行、schema/data diff 和实际中文 `HEX()` 查询，也未部署 BPM 定义、启动服务或进行真实登录态 HTTP 与桌面/移动浏览器验收；通知场景 provider 已实现但租户仍需配置 System 通知规则。Admin 全量 `pnpm lint` 的 ESLint 阶段仅剩 5 个既有 warning，但 Stylelint 被本任务外 203 个既有错误阻断，本次班级和报名页面未出现在错误清单中；遵循无关改动保护规则未批量格式化这些页面。
+- Status: `implemented and statically verified; live database/BPM/runtime/browser acceptance requires separate confirmation; repository-wide Admin Stylelint baseline remains failing outside this scope`.
+
+## Delivery Entry - 2026-09-08 09:33:30 +08:00
+
+- Workstream ID: `main-exam-calendar`; Owner: Codex `/root`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`.
+- User goal: 查看与管理必须是可独立勾选的叶子权限，不能仅靠父菜单授权查看。
+- Key decisions: 页面 73610 保留 query 路由契约；增加查看按钮 73612 (query)，与管理按钮 73611 (manage) 同级；普通员工获查看，考务人员获两项。
+- Execution result: V187 增加查看节点的归属校验、套餐覆盖和角色授权；verify-bootstrap 增加对应断言；相关文档同步。
+- Changed files: `script/sql/mysql/migrations/{V187__exam_calendar.sql,README.md}`; `script/sql/mysql/verify-bootstrap.sql`; `docs/api/exam-calendar.md`; `docs/architecture/{data-and-permission-flow.md,zsjos-role-permission-matrix.md}`; `handoff/main.md`.
+- Verification evidence: Selected ExamScheduleControllerPermissionTest and ExamScheduleObjectPermissionProviderTest Maven reactor BUILD SUCCESS; scoped diff check passed; SQL inspection verified sibling parent IDs, separate codes and guarded grants.
+- Dependency or integration impact: No new dependencies or API changes; no real database or account permission writes.
+- Remaining work: Controlled SQL replay, database synchronization and real role-tree browser verification pending.
+- Status: `source corrected; permission tests passed; database synchronization pending`.
+## Workstream Registration - 2026-09-08 10:00:00 +08:00
+
+- Workstream ID: `main-product-category-lifecycle`.
+- Goal: 分类主区域只显示启用分类，新增独立已停用分类树，并实现逐级停用、启用父级约束及停用区查看/编辑/启用/删除闭环。
+- Non-goals: 不级联停用或删除，不修改客资及订单历史快照，不新增数据库迁移或权限标识，不修改真实数据库，不创建分支、提交或推送，不处理工作区无关改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（含既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS 产品分类 Controller/Service/Mapper/错误码及聚焦测试；Admin 产品配置页/API；Workbench 产品配置页/API；直接相关架构或 API 文档；本 handoff 文件。
+- Owner: Codex `/root`.
+- Dependencies: 现有 ZSJOS 产品、分类 API 与 System 菜单按钮权限；无新增 Maven/npm 依赖。
+- Integration order: 后端状态规则与过滤树 -> Admin 停用分类操作 -> Workbench 双树和操作 -> 文档 -> 聚焦验证 -> 追加交付记录。
+- Verification plan: 产品分类 Service 聚焦 Maven 测试；Workbench typecheck、测试和生产构建；Admin 定向 ESLint、类型检查/构建；scoped `git diff --check`。真实数据库和登录态浏览器验证不在本次授权范围。
+- Status: `in-progress`.
+
+## Workstream Registration - 2026-09-08 10:49:27 +08:00
+
+- Workstream ID: `main-pms-admin-sync`.
+- Goal: 将上游 `yudao-ui-admin-vue3` 当前 PMS 管理端 API、页面和必要隐藏路由同步到 `frontend/admin`，适配本地新增 `yudao-module-pms` 后端模块。
+- Non-goals: 不整仓升级 Admin 前端，不覆盖 Zhongshijian 定制，不修改 PMS 后端、菜单/权限数据、SQL、数据库或真实账号权限，不新增依赖，不创建或切换分支，不提交或推送，不处理工作树无关改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（保留全部既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/admin/src/api/pms/**`; `frontend/admin/src/views/pms/**`; `frontend/admin/src/router/modules/remaining.ts` 中 PMS 专属路由增量；`handoff/main.md` 本工作流条目。
+- Owner: Codex `/root`.
+- Dependencies: 现有 Vue 3、TypeScript、Vite、Pinia、Element Plus、请求封装、System 用户/部门 API，以及已安装的 `dhtmlx-gantt`、`markdown-it`、`vuedraggable`；无新增 npm 依赖。
+- Integration order: 导入上游 PMS API/页面 -> 定点合并 PMS 隐藏路由 -> 对照本地 Controller/VO 与现有 Admin 公共组件检查兼容性 -> 修正同步差异 -> 类型、lint、构建和浏览器验证 -> 追加交付记录。
+- Verification plan: `cd frontend/admin && pnpm ts:check`; PMS 文件范围 ESLint/Prettier/Stylelint；`pnpm build:local`；启动本地 Admin 后在可用菜单/认证条件下检查 PMS 桌面与移动页面；PMS API 路径与后端 Controller 静态对照；scoped `git diff --check`。
+- Status: `in-progress`.
+
+## Delivery Entry - 2026-09-08 10:39:35 +08:00
+
+- Workstream ID: `main-product-category-lifecycle`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree).
+- User goal: 主分类树只显示启用分类，新增独立已停用分类树，并支持停用区查看、编辑、启用、删除；父子分类按逐级方式处理，避免断裂树。
+- Key decisions: 分类停用不级联；存在启用直接子分类或启用课程时拒绝停用；启用只更新当前节点，父分类停用时拒绝启用子分类；停用课程不再阻止分类停用，删除仍保留全部子分类/课程引用约束；状态专用接口与编辑保存共用迁移校验；过滤树中缺失父节点的分类提升为当前结果根节点；历史业务继续展示已存产品和分类快照。
+- Execution or analysis result: 后端分类树增加可选状态过滤和三类稳定错误；Admin 与 Workbench 均按启用/停用加载独立树，新课程选择器只消费启用树，停用区提供权限化编辑、启用、删除和明确错误提示；Workbench 补齐分类状态与删除 API；接口文档同步。`ruoyi-vue-pro` 技能用于保持 Yudao Service/DAL、双前端 API 和服务端按钮权限边界；浏览器技能用于本地授权路由检查。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/{controller/admin/product/ZsjosProductCategoryController.java,dal/mysql/product/ZsjosProductMapper.java,enums/ZsjosErrorCodeConstants.java,service/product/ZsjosProductCategoryService.java,service/product/ZsjosProductCategoryServiceImpl.java}`；对应 `ZsjosProductCategoryServiceImplTest.java`；`frontend/admin/src/{api/zsjos/product/index.ts,views/zsjos/product/index.vue}`；`frontend/workbench/src/{services/api.ts,pages/ConfigurationPages.tsx,pages/product-category-lifecycle.guard.test.ts}`；`docs/api/zsjos-product-configuration.md`；`handoff/main.md`。
+- Verification evidence: 产品分类 Service 聚焦测试 10/10 通过，Maven reactor BUILD SUCCESS；Workbench 全量 104/104 测试文件、569/569 用例、typecheck 和 production build 通过（仅既有 large-chunk warning）；Admin 定向 ESLint、`pnpm ts:check`、`pnpm build:local` 通过（仅既有 `*zoom` CSS 警告）；本地 Workbench 可加载，当前登录账号直达 `/zsjos/product` 被服务端菜单权限正确重定向到今日待办；scoped `git diff --check` 通过，仅有 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增 Maven/npm 依赖、数据库迁移、权限标识、分支、提交、推送或真实账号权限变更；保留全部无关工作区修改。后端与两端前端应一并部署以启用状态过滤和操作闭环。
+- Remaining work: 当前登录账号没有产品配置菜单权限，因此未完成真实产品页的桌面/移动视觉和操作验收；未启动或重配共享服务，也未执行真实 HTTP 状态写入。部署后应使用具备产品分类查询/编辑/状态/删除权限的测试账号验证逐级错误提示及停用树操作。
+- Status: `implemented and verified by focused backend tests, full Workbench tests, both frontend builds and permission-route browser check; authorized live product-page acceptance remains`.
+
+## Workstream Registration - 2026-09-08 10:46:40 +08:00
+
+- Workstream ID: `main-delivery-class-review-fixes`.
+- Goal: 修复班主任变更批量通知去重冲突、报名分班班主任资格漂移、报名完成订单商品并发读取、班级学员深链与分页、调班选项残留，以及 V188 与 fresh bootstrap 的字段元数据差异。
+- Non-goals: 不重构班级编号服务，不修改 BPM 流程定义，不新增依赖，不执行真实数据库迁移，不启动或重配服务，不调整真实账号/角色权限，不清理工作树无关改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（保留全部既有未提交修改）；Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS 班级 Service/Mapper 及报名完成相关 Service/Mapper 和聚焦测试；Workbench 班级页及聚焦测试；Admin 班级页/API；`V188__delivery_class_management.sql`、`verify-bootstrap.sql`；班级管理与报名履约 API 文档；本 handoff 文件。
+- Owner: Codex `/root`.
+- Dependencies: 现有 ZSJOS 服务关系、订单商品、BusinessTask、System 权限/通知公开 API、React Workbench、Vue Admin 和现有 V188/bootstrap 契约；无新增依赖。
+- Integration order: 后端通知与资格校验 -> 报名锁顺序 -> Workbench 深链/分页/错误状态 -> Admin 分页/调班状态 -> SQL/文档 -> 聚焦及全量验证 -> 追加交付记录。
+- Verification plan: 班级及报名聚焦 Maven 测试；Workbench 全量测试、typecheck、production build；Admin 全量 `pnpm ts:check`、lint、`build:local`；SQL 静态校验、可用时的隔离 bootstrap/V187→V188 重放、scoped `git diff --check`。真实数据库、服务启动和登录态浏览器验收不在本次授权范围。
+- Status: `in-progress`.
+
+## Workstream Scope Update - 2026-09-08 10:55:00 +08:00
+
+- Workstream ID: `main-pms-admin-sync`.
+- Added ownership scope: `frontend/admin/src/utils/page.ts`; `frontend/admin/src/components/FilePreview/**`.
+- Reason: PMS 构建依赖上游新增的完整分页加载工具与文件预览组件；本地没有等价公共实现，缺失时迭代详情和知识库页面无法打包。
+- Dependency impact: 仅复用现有 Vue、Element Plus 与 UnoCSS 能力，无新增 npm 依赖；其他公共组件和通用框架文件不纳入同步。
+- Non-goal impact: 不改变原定整仓升级、后端、SQL、权限数据和无关工作树改动等非目标。
+
+## Workstream Scope Update - 2026-09-08 11:02:00 +08:00
+
+- Workstream ID: `main-pms-admin-sync`.
+- Added ownership scope: `frontend/admin/src/permission.ts` 中 PMS 公开知识文档分享路由白名单的最小增量。
+- Reason: 浏览器验证确认动态 token 分享地址会被当前精确白名单重定向到登录页；上游 PMS 契约要求该公开页面免登录访问。
+- Preservation decision: 保留现有 `resolveAuthenticatedRouteTarget`、Promise 风格路由守卫和全部其他白名单语义，仅允许 `/pms/kb/document/share` 本身及其子路径通过。
+- Non-goal impact: 不同步上游 `permission.ts` 的其他变化，不放宽其他登录白名单或改变认证、菜单、权限状态生成逻辑。
+
+## Delivery Entry - 2026-09-08 11:04:21 +08:00
+
+- Workstream ID: `main-pms-admin-sync`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree).
+- User goal: 根据 `yudao-ui-admin-vue3` 上游为本地新增 PMS 后端模块同步 `frontend/admin` 前端代码。
+- Key decisions: 以上游提交 `aab14fb0e74720dd09e964ae066f8bbde9f9012e` 的 PMS 专属目录为基线，不做整仓 Admin 升级；保留现有首页、登录落点、ZSJOS、CRM 和其他未提交定制；仅合并 PMS 隐藏路由、公开分享白名单及 PMS 构建必需的分页/文件预览公共设施；不新增依赖或客户端权限真相。
+- Execution or analysis result: 新增 PMS 项目管理、迭代、工作项、工作台、工时、知识库、收藏、最近浏览、回收站、模板与分享等 API/页面；新增 7 个详情/分享隐藏路由；补齐 `getAllPageItems` 和 `FilePreview`；公开知识文档分享 token 路由可在未登录时进入。对上游 4 个 PMS 样式问题做等价 lint 修正。`ruoyi-vue-pro` 技能用于约束 Vue Admin、服务端菜单/权限和 API 边界，浏览器技能用于本地桌面/移动路由检查。
+- Changed files: `frontend/admin/src/api/pms/**`（29 个文件）；`frontend/admin/src/views/pms/**`（83 个文件）；`frontend/admin/src/router/modules/remaining.ts` PMS 路由增量；`frontend/admin/src/permission.ts` PMS 分享白名单增量；`frontend/admin/src/utils/page.ts`; `frontend/admin/src/components/FilePreview/{index.ts,src/FilePreview.vue}`；`handoff/main.md`。
+- Verification evidence: `pnpm ts:check` 通过；PMS/API/新增公共设施/路由增量的 ESLint 通过；PMS 与新增公共设施 Prettier 检查通过；PMS 与 FilePreview Stylelint 通过；最终 `pnpm build:local` 通过，9164 个模块转换并产出 PMS chunks，仅有仓库既有 `*zoom` Lightning CSS 警告；静态对照确认 144 个前端 PMS 请求路径全部存在于本地 Controller，后端额外的 `/pms/pm/work-item/import` 由上传组件动态 URL 使用；scoped `git diff --check` 无空白错误，仅有现有 LF/CRLF 提示。浏览器在 1440x900 与 390x844 下确认本地应用加载、无横向溢出；PMS 分享路由不再重定向登录。
+- Dependency or integration impact: 无新增 npm 依赖、锁文件修改、后端/SQL/菜单/权限数据变更、分支操作、提交或推送。运行时菜单仍由服务端返回，部署时须确保 PMS 菜单 component/path 与新增页面对应。
+- Remaining work: 当前 48080 运行实例对源码标记 `@PermitAll` 的 `/admin-api/pms/kb/document-share/get-by-token` 仍返回业务码 401，表明运行实例尚未加载当前未跟踪 PMS 后端代码；因此真实 PMS 菜单、登录态页面、接口成功/空/错误状态及公开分享内容的桌面/移动验收未完成。需在 PMS 后端与菜单数据部署后复验。
+- Status: `implemented and statically verified; final Admin build passed; live PMS runtime/browser acceptance pending backend deployment`.
+
+## Workstream Scope Update - 2026-09-08 11:10:00 +08:00
+
+- Workstream ID: `main-delivery-class-review-fixes`.
+- Added ownership scope: `script/sql/mysql/schema/core.sql` 的机械基线同步。
+- Reason: 仓库 `zsjos-db check` 要求 core desired schema 与 `00-bootstrap-schema.sql` 逐字一致；V188 字段元数据修正若只保留在 bootstrap 会造成 schema drift，无法完成既定静态校验。
+- Change boundary: 仅将已审核的 `00-bootstrap-schema.sql` 内容同步为 core desired schema，不新增迁移、不改变数据库、不扩展 V188 业务范围。
+
+## Delivery Entry - 2026-09-08 11:16:42 +08:00
+
+- Workstream ID: `main-delivery-class-review-fixes`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree).
+- User goal: 修复班级管理审查确认的批量通知丢失、班主任资格漂移、报名完成并发读取、学员深链/分页、调班陈旧选项及 V188 schema 元数据漂移。
+- Key decisions: 班主任能力统一由 `DeliveryClassService.validateHomeroom` 校验；报名完成复用锁定订单商品，并按 classId 去重升序锁目标班；通知幂等键按班级、服务关系和关系版本区分；管理视图不进入 owner 专属学员操作；两端分别维护学员分页及调班选项加载状态；V188 尚未部署假设下直接修订并同步 core desired schema。
+- Execution or analysis result: 已完成后端一致性与锁顺序修复、两端学员分页/深链/错误重试/调班选项隔离、V188 字段注释和 verify 元数据断言、API/迁移文档同步；多商品测试使用反序 classId 并断言固定升序加锁。`ruoyi-vue-pro` 技能用于保持 Yudao 分层、System 权限能力校验、双前端及 SQL 基线约定。
+- Changed files: `backend/yudao-module-zsjos` 下 deliveryclass Service/实现/调班实现与聚焦测试、`SalesOrderItemMapper.java`、`RegistrationServiceImpl.java`、`RegistrationServiceImplTest.java`; `frontend/workbench/src/pages/{DeliveryClassPage.tsx,delivery-class-review-fixes.guard.test.ts}`; `frontend/admin/src/{api/zsjos/deliveryClass/index.ts,views/zsjos/class-management.vue}`; `script/sql/mysql/{migrations/V188__delivery_class_management.sql,00-bootstrap-schema.sql,schema/core.sql,verify-bootstrap.sql,migrations/README.md}`; `docs/api/{delivery-class-management.md,registration-fulfillment-api.md}`; `handoff/main.md`.
+- Verification evidence: 后端班级/调班/报名聚焦测试 22/22 通过，新增固定锁顺序后报名测试 15/15 再次通过；Workbench 全量 105/105 测试文件、572/572 用例、typecheck、production build 通过；Admin 班级文件定向 ESLint、Stylelint、Prettier 通过，`build:local` 通过（仅既有 `*zoom` Lightning CSS 警告）；bootstrap 与 core schema SHA-256 一致，V188 三个字段元数据文本断言通过；scoped `git diff --check` 无空白错误，仅有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、BPM 定义变更、数据库写入、服务启停、真实权限调整、分支操作、提交或推送。V188 部署时须连同最新 baseline/verify 和双前端发布。
+- Remaining work: Admin 全量 `pnpm ts:check` 被本轮范围外 PMS 页面缺少 10 类 `DICT_TYPE.PMS_*` 常量的 28 个错误阻断；全量 lint 被本轮范围外 203 个 Stylelint 错误阻断，本轮班级文件均通过定向检查。`zsjos-db check` 在 schema drift 消除后被工作树中已删除的 `yudao-module-crm` 与 core manifest 声明不一致阻断。未执行隔离 MySQL fresh/V187→V188/重复执行，未修改真实开发数据库，未启动服务或进行登录态浏览器验收。
+- Status: `requested fixes implemented and focused checks passed; repository-wide Admin and SQL CLI checks remain blocked by unrelated worktree inconsistencies; live database/runtime/browser acceptance pending separate authorization`.
+
+## Workstream Registration - 2026-09-08 Exam Product Scope
+
+- Workstream ID: `main-exam-calendar` (scope extended).
+- Goal: Implement approved partial-spec exam selection and named SKU presentation across Zhongshijian Workbench, Admin and Partner H5.
+- Non-goals: No changes to other business selection, matching, pricing or unknown-product rules; no dependencies, account grants, database synchronization, branch operations or commits.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`; Target branch: local `main`.
+- Ownership scope: ZSJOS examcalendar/product services and VO/DO/mapper/tests; Lead product snapshot producers and projections; order/student product projections; three frontends' Zhongshijian product display/selectors/types/tests/styles; exam/product SQL baseline and directly affected API/architecture/menu documentation; this handoff.
+- Owner: Codex `/root`, serialized local work. Prior product lifecycle and class review deliveries are preserved.
+- Dependencies: Existing product service, System permissions and established frontend libraries only.
+- Integration order: Product display contract -> exam scope validation and persistence -> three frontend presentations -> SQL/docs -> tests/build/browser checks.
+- Verification plan: Focused Java tests and compile; Workbench tests/typecheck/build; Admin types/targeted lint/build; H5 types/build; desktop/mobile browser checks when accessible; static SQL checks with controlled execution and live synchronization reported separately.
+- Status: `in-progress`; outstanding clarification: preserve existing explicit unknown-product branches versus removing them (no change pending answer).
+
+## Delivery Entry - 2026-09-08 12:20:24 +08:00
+
+- Workstream ID: `main-exam-calendar`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (existing dirty worktree preserved).
+- User goal: Implement optional partial exam specifications and field/value SKU presentation across all three Zhongshijian frontends without changing other business selection rules.
+- Key decisions: Exam accepts category-only or one product with optional single-valued AND conditions, validates live enabled SKU matches on save/publication, and freezes labels and matching SKU membership on publication. Published edits are rejected; transitions lock the schedule. Existing Lead unknown-product branches and full-SKU matching/price/command logic remain unchanged. New spec labels are snapshotted; unchanged Lead selections retain stored labels; legacy missing labels are explicitly marked, never inferred from today's catalog.
+- Execution result: Added product-owned price-free exam options VO/service and dedicated manage-authorized endpoint; explicit exam JSON response mapping fixes a real query conversion failure; exact/rough and product/category changes explicitly clear nullable fields. Added named specification projections to SKU/catalog/Lead/order/student/registration APIs, frontend-local pure formatting utilities and framework-owned presentation components. Updated exam editor/calendar/details/rough list/day overflow; product configuration tables; Lead creation/modification/summary/detail; deal selection/order/approval; student and registration displays; H5 product picker/submission/supplement/detail/home/list/follow-up. Inventory is `docs/frontend/product-spec-presentation.md`. The ruoyi-vue-pro skill guided service/VO/frontend/permission boundaries; browser skill was used to inspect actual runtime access.
+- Changed files: Backend examcalendar Controller/VO/DO/Mapper/Service; product SKU interface/implementation, ProductSpecVO and ExamProductScopeRespVO; LeadProductSnapshot, LeadIntendedProductDO, LeadManagementRespVO and four Lead services; SalesOrderRespVO/Service, MyStudentRespVO/Service, RegistrationCaseRespVO/Service; exam permission/service tests, ExamProductScopeTest, ProductSpecSnapshotTest, MyStudentServiceImplTest. Workbench API, productSpecs utility/tests, ProductSpecs component/CSS, ExamCalendarPage/test/CSS, ConfigurationPages, LeadSubmissionPage, LeadManagementPage, RegistrationPages, MediaStudentsPage, LeadIntendedProductEditor, LeadDetailOverview, SalesOrderCoursePicker, SalesOrderDetailCards. Admin productSpecs utility, ProductSpecs/OrderProductSummary components, product/lead/student/registration/order/approval/confirmation views, creation/repurchase dialogs and relevant API types. H5 productSpecs utility, ProductSpecs/ProductPicker, Lead API and home/lead list/follow-up/submit/supplement/detail. SQL current bootstrap/core schema, bootstrap entry, verify and additive exam-calendar-product-scope.sql; migration README; exam/product API, data flow, role matrix, menu coverage and presentation inventory docs; this handoff.
+- Verification evidence: Final focused Java test run succeeded with 56 tests, zero failures/errors (exam service/Controller/object authorization, product scope/spec snapshots, SKU, Lead update/submitter, student and registration). Workbench 106 test files/579 tests passed; explicit typecheck and latest production build passed. Three frontend pure formatting contracts tested together. H5 final vue-tsc/build passed. Admin final production build passed (existing upstream *zoom warning); scoped ESLint passed and new component Stylelint passed after targeted formatting. Admin full typecheck has 28 pre-existing PMS DICT_TYPE errors and no errors in task files. Scoped git diff --check passed; bootstrap/core SHA-256 identical. Read-only MySQL check confirms development database has V186/V187/V188 and exam table, but lacks this task's new columns. No database writes performed.
+- Dependency or integration impact: No added dependencies, account grants, branch operations, commits, service restarts or notifications. Deploy nullable-column correction before backend, then frontends. V187/V188 were not rewritten. Current fresh bootstrap includes a repeatable six-column patch after V188; whether delivered environments need an independently numbered wrapper remains pending deployment-scope confirmation.
+- Remaining work: User confirmation of deployed environment scope; separately authorized development schema synchronization; controlled fresh bootstrap/prerequisite replay/repeatability and schema comparison, UTF-8/HEX verification; true desktop/mobile browser acceptance with authenticated test accounts and deployed backend schema. Browser discovery found only unauthenticated in-app browser, and localhost:5174/calendar/exam-calendar displayed login. No bypass or static production data was used. Existing localhost:5174 server retained. No full backend suite, HTTP success-flow test or controlled SQL execution claimed. Existing catalog matching checks only required specs and explicit unknown branches remain as pre-existing behavior, not expanded by exam rules.
+- Status: `source implementation and focused checks delivered; database/deployment compatibility and authenticated UI acceptance pending`.
+
+## Workstream Registration - 2026-09-08 Exam Review Fixes
+
+- Workstream ID: `main-exam-calendar` (review repair scope).
+- Goal: Implement the approved 11 exam scope, catalog concurrency, snapshot, API compatibility and three-runtime presentation fixes.
+- Non-goals: No change to non-exam SKU matching/unknown branches/pricing rules, dependencies, SQL execution, shared services, real permissions, branches or commits.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`; Target branch: local `main`.
+- Ownership scope: Existing exam/product Service/Mapper/VO and tests; LeadProductSnapshot and registration/student projections/tests; three Zhongshijian frontend product displays, exam editor/loaders, related types/tests/styles; directly affected API/data-flow/presentation documentation; this handoff. Unrelated class/PMS changes are preserved.
+- Owner: Codex `/root`, serialized in the existing worktree.
+- Dependencies: Existing Yudao transactions/row locks, product APIs, frontend frameworks and test tools; no new packages.
+- Integration order: Regression tests -> exam and catalog consistency -> snapshots/contracts -> frontend presentation/request state -> documentation -> verification.
+- Verification plan: Focused Java tests/compile; Workbench full tests/types/build; Admin scoped checks/types/build; H5 tests/types/build; desktop/mobile browser checks where authentication permits. MySQL concurrency and existing migration replay require an explicitly controlled target and are not substituted by mocks.
+- Status: `in-progress`; implementation request supersedes the prior plan-only sentence; database synchronization remains excluded.
+
+## Delivery Entry - 2026-09-08 13:57:00 +08:00
+
+- Workstream ID: `main-exam-calendar`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (existing unrelated changes preserved).
+- User goal: Implement the approved 11 exam product selection and three-runtime SKU presentation review repairs.
+- Key decisions: Only exams accept partial conditions. Keep conditions outside dynamic Form registration; require explicit invalid-condition removal and confirm scope clearing. Preserve unchanged product-scope labels regardless of catalog category moves. Retain historical display snapshots, not old pricing behavior. Keep legacy attributeValues raw and expose named specs separately. Coordinate exam and catalog writes with existing product/category row locks in READ_COMMITTED transactions; no distributed locks or added dependencies.
+- Execution result: Added clearedInvalidAttrs request validation and actionable error codes; sorted category path/subtree locks with post-lock topology checks and MyBatis cache invalidation; product/SKU mutation lock participation and post-lock rereads; batched exam option metadata and one metadata read per SKU list. Fixed stale exact/rough/options responses and post-mutation refresh using current filters. Restored auxiliary SKU names, unknown-field display, student legacy compatibility, historical registration-name fallback and H5 home copy-column layout. Preserved non-exam matching, required/unknown branches, prices, lifecycle, menu and permission semantics. ruoyi-vue-pro guided layering/transactions/runtime boundaries; browser skill used for actual read-only runtime checks.
+- Changed files: Backend ProductCategoryLocks (new), product/category/SKU services and product/category/attribute mappers; ExamScheduleSaveReqVO, ExamScheduleService, ZsjosErrorCodeConstants; LeadProductSnapshot, MyStudentServiceImpl, RegistrationServiceImpl; focused exam/product/category/registration tests including ProductCategoryLocksTest (new). Workbench ExamCalendarPage/API, ExamCalendarRequests.test.ts (new), productSpecs utility/tests, ConfigurationPages, MediaStudentsPage, LeadSubmissionPage, LeadIntendedProductEditor, LeadDetailOverview, SalesOrderCoursePicker, SalesOrderDetailCards/test. Admin productSpecs utility, product/my-students views, LeadCreateDialog, ExternalRepurchaseDialog, OrderProductSummary. H5 Lead API SKU type, productSpecs utility, ProductPicker, home and submission views. docs/api/{exam-calendar,zsjos-product-configuration}.md, docs/frontend/product-spec-presentation.md, docs/architecture/data-and-permission-flow.md, this handoff. Existing compiler/build artifacts were refreshed by verification; no SQL source changes.
+- Verification evidence: Final focused Java reactor compiled and passed 80 tests across 13 test classes, zero failures/errors; covers permissions, scope clearing, snapshot preservation, price retention boundary, malformed registration snapshots, category lock order/topology conflict and SKU metadata query count/reread. Workbench full suite passed 107 files/587 tests; final current-filter refresh refinement passed 22 targeted tests; explicit typecheck and final production build passed. H5 final vue-tsc/build passed. Admin final build:local, scoped ESLint and OrderProductSummary Stylelint passed; two changed utility/component files formatted with scoped Prettier. Admin full ts:check remains blocked solely by 28 existing PMS DICT_TYPE errors after fixing this task's type omissions. Scoped git diff --check passed (only existing LF/CRLF warnings).
+- Browser evidence: Started a new local-only Workbench Vite process (PID 36924) on the confirmed-free 127.0.0.1:5174; existing shared services untouched. Existing authenticated browser reached /calendar/exam-calendar under the server-owned calendar menu, showed no manage buttons for its current permission response, displayed exact-query system-error/retry UI and rough-drawer empty state. No credentials, browser storage or real permissions were read/changed. Exact-query failure means success/data/manager workflows and three-runtime desktop/mobile layout acceptance are NOT complete.
+- Dependency or integration impact: No new npm/Maven dependency, persistent field, migration execution, real account grant, shared backend/database restart, branch operation, stage, commit or push. Additive request property is compatible for requests that do not silently remove invalid conditions. Pre-existing exam scope database columns remain a deployment prerequisite; database target and deployed migration scope require separate confirmation.
+- Remaining work: Controlled MySQL two-transaction races (both commit orders), fresh/prerequisite/repeated SQL replay, schema comparison and UTF-8/HEX checks were not executed; mocks do not prove database concurrency. Runtime exact-query failure requires separately scoped environment diagnosis/deployment. Full three-frontend desktop/mobile screenshots and manager/full-product success flows remain unverified; Admin full types await unrelated PMS corrections. No full backend suite or live management-command success test claimed.
+- Status: `approved source repairs and focused verification complete; database concurrency/deployment and full browser acceptance remain unverified`.
+## Workstream Registration - 2026-09-08 15:20:00 +08:00
+
+- Workstream ID: `main-pms-menu-dictionary-seed`
+- Goal: 从用户提供的 RuoYi-Vue-Pro SQL 提取 PMS 的 `system_menu`、`system_dict_type`、`system_dict_data`，补充到 ZSJOS MySQL 初始化与迁移链。
+- Non-goals: 不写入开发数据库；不纳入 PMS Job、项目/知识库业务实例或其他模块数据；不提交、推送、切换分支或清理既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/V189__pms_menu_and_dictionary.sql`; `script/sql/mysql/bootstrap.sql`; 本文件。
+- Owner: Codex `/root`
+- Dependencies: 现有 System 表结构、V188 迁移与 UTF-8 MySQL 初始化约定；无新增依赖。
+- Integration order: 新增 V189 PMS 元数据种子 -> 接入 bootstrap -> 校验源行数、父子关系、编码和 SQL 差异 -> 追加交付记录。
+- Verification plan: 源脚本与迁移行数/标识差集检查；`git diff --check`；不执行数据库写入。
+
+## Delivery Entry - 2026-09-08 15:32:23 +08:00
+
+- Workstream ID: `main-pms-menu-dictionary-seed`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (no commit created)
+- User goal: 提取附件 SQL 中 PMS 的 `system_menu`、`system_dict_type`、`system_dict_data` 并补充仓库初始化脚本。
+- Key decisions: 按 PMS 根菜单 `8000` 递归提取 48 条菜单；提取 19 条字典类型和 65 条字典数据；新增可重复执行的 V189，使用 `SET NAMES utf8mb4` 与 `INSERT IGNORE`；在 bootstrap 中按 V188 后顺序引入。发现既有 System 字典占用源数据 ID 1346、1347、1348、1385，分别映射为 21346、21347、21348、21385，避免静默跳过 PMS 数据。
+- Execution or analysis result: 已从 `C:\Users\EDY\Desktop\ruoyi-vue-pro.sql` 生成 PMS 元数据迁移；未纳入 Job 或业务实例数据；未操作数据库。
+- Changed files: `script/sql/mysql/migrations/V189__pms_menu_and_dictionary.sql`; `script/sql/mysql/bootstrap.sql`; 本 handoff 文件。
+- Verification evidence: 迁移包含 48/19/65 三类源行；V189 已接入 bootstrap；`git diff --check` 无空白错误（仅现有换行提示）。
+- Dependency or integration impact: 无新增依赖；仅影响 System 菜单/字典元数据初始化顺序；需在受控 UTF-8 数据库中按仓库 SQL 流程执行后再做 HEX/结构校验。
+- Remaining work: 未执行数据库导入、MySQL 语法执行或 schema/data 对照检查，需在具备受控数据库环境时完成。
+## Workstream Registration - 2026-09-08 +08:00
+
+- Workstream ID: `main-delivery-class-product-period-planner`
+- Goal: 调整交付主管创建/编辑班级，沿用考务产品规格范围并冻结适用 SKU，只允许未结束已发布考期，班主任限定为主管同部门且持有启用 `study_planner` 角色的启用用户。
+- Non-goals: 不修改调班、学员服务、考期发布状态机、菜单权限、真实数据库或真实角色分配；不新增依赖；不清理或覆盖当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-module-zsjos` 的 delivery-class 契约、服务、数据对象及聚焦测试；`frontend/admin` 与 `frontend/workbench` 的班级页面和 API 类型；班级相关 bootstrap/migration/验证 SQL；`docs/api/delivery-class-management.md`；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 ZSJOS 产品规格解析、考期发布快照、System `RoleApi`/`PermissionApi`/用户与部门 API、Vue Admin 与 React Workbench；无新增依赖。
+- Integration order: 扩展班级持久化与 HTTP 契约 -> 实现产品/SKU、未结束考期和同部门规划师角色校验 -> 更新两个前端选择器 -> 同步 SQL 与文档 -> 补充测试 -> 运行后端及双前端验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦测试与模块编译；`frontend/admin` typecheck/build；`frontend/workbench` test/typecheck/build；SQL 静态、重复执行结构与 scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-08 16:37:00 +08:00
+
+- Workstream ID: `main-delivery-class-product-period-planner`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)
+- User goal: 调整交付主管创建/编辑班级，使用考务同源产品规格范围，SKU 可选择部分，只允许未结束已发布考期，班主任必须是主管同部门的启用学习规划师角色用户。
+- Key decisions: 班级复用现有产品规格解析并保存产品、规格条件、规格标签和所选 SKU 快照；至少一个有效 SKU，默认前端全选但允许删减；精确考期当天可选、次日结束，粗略考期结束日可选、次日结束；候选和写命令均通过 `study_planner` 启用角色及当前主管直接部门校验。
+- Execution or analysis result: 后端新增班级产品范围接口、请求/响应快照契约、产品/SKU与考期覆盖校验、规划师角色候选过滤和 V190 additive migration；Vue Admin 与 React Workbench 创建/编辑表单均接入产品、规格、SKU、考期和班主任数据；文档与 fresh schema 同步。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/deliveryclass/`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/deliveryclass/`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/deliveryclass/`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/deliveryclass/`; `frontend/admin/src/api/zsjos/deliveryClass/index.ts`; `frontend/admin/src/views/zsjos/class-management.vue`; `frontend/workbench/src/pages/DeliveryClassPage.tsx`; `frontend/workbench/src/services/api.ts`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/V190__delivery_class_product_scope.sql`; `docs/api/delivery-class-management.md`; `handoff/main.md`。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed; `mvn -pl yudao-module-zsjos -Dtest=DeliveryClassServiceImplTest test` passed, 3/3; `frontend/admin` `pnpm exec vue-tsc --noEmit`, targeted ESLint and `pnpm build:local` passed; `frontend/workbench` `npm test -- src/pages/delivery-class-review-fixes.guard.test.ts` passed, 3/3, `npm run typecheck` and `npm run build` passed; `git diff --check` reported only existing line-ending warnings. Builds emitted existing large-chunk/CSS minify warnings.
+- Dependency or integration impact: No new Maven/npm dependency, no branch/worktree operation, no commit/push, no real database DDL/DML execution, and no real account/role/permission changes. Existing unrelated worktree changes were preserved.
+- Remaining work: Controlled database migration execution, real API contract verification, and browser checks remain unverified because no running application/database session was used.

@@ -16,7 +16,7 @@ export interface ExportTaskVO {
 }
 
 export const getExportTaskPage = (params: PageParam & { exportType?: string }) =>
-  request.get<PageResult<ExportTaskVO>>({ url: '/zsjos/export-task/page', params })
+  request.get<PageResult<ExportTaskVO[]>>({ url: '/zsjos/export-task/page', params })
 
 export const createExportTask = (exportType: string, filterJson = '{}') =>
   request.post<number>({ url: '/zsjos/export-task', data: { exportType, filterJson } })

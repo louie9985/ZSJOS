@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
@@ -38,6 +39,8 @@ import static org.mockito.Mockito.when;
 class LeadFlowHistoryServiceTest {
 
     @InjectMocks private LeadFlowHistoryService service;
+    @Spy @InjectMocks private LeadIdentityMaskingService leadIdentityMaskingService;
+    @Mock private LeadObjectPermissionService leadObjectPermissionService;
     @Mock private LeadMapper leadMapper;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private LeadAssignmentHistoryMapper assignmentMapper;
@@ -51,6 +54,8 @@ class LeadFlowHistoryServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "leadIdentityMaskingService",
+                new LeadIdentityMaskingService(leadObjectPermissionService));
         LeadDO lead = new LeadDO();
         lead.setId(7L); lead.setLeadNo("L202608190001"); lead.setSubmittedAt(submittedAt);
         lead.setSourceUserId(10L); lead.setStatus("submitted"); lead.setAssignmentStatus("unassigned");
@@ -76,7 +81,7 @@ class LeadFlowHistoryServiceTest {
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(duplicate, transfer));
         when(agingEventMapper.selectByLeadId(7L)).thenReturn(List.of(aging));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals(List.of("aging:11", "assignment:10", "event:9", "lead:7"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
@@ -94,7 +99,7 @@ class LeadFlowHistoryServiceTest {
         added.setRelatedObjectRefs(JsonUtils.toJsonString(new LeadSupplementSnapshot(Map.of(), LeadSupplementSnapshot.MODE,
                 "new-note", "partner", 70L, "partner-name", "digest")));
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(old, added));
-        var history = service.getHistory(7L);
+        var history = service.getHistory(7L, 99L);
         assertNull(history.stream().filter(r -> r.getId().equals("lead:7")).findFirst().orElseThrow().getRemark());
         assertNull(history.stream().filter(r -> r.getId().equals("event:1")).findFirst().orElseThrow().getRemark());
         var note = history.stream().filter(r -> r.getId().equals("event:2")).findFirst().orElseThrow();
@@ -113,7 +118,7 @@ class LeadFlowHistoryServiceTest {
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(transfer));
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(20L, from, 30L, to));
 
-        LeadFlowHistoryRespVO result = service.getHistory(7L).stream()
+        LeadFlowHistoryRespVO result = service.getHistory(7L, 99L).stream()
                 .filter(item -> "event:1".equals(item.getId())).findFirst().orElseThrow();
 
         assertEquals("主管转派", result.getFlowNode());
@@ -133,7 +138,7 @@ class LeadFlowHistoryServiceTest {
         specified.setOperatorUserId(10L); specified.setAssignmentRuleId(null);
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(automatic, specified));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals("自动分配", result.get(0).getSource());
         assertEquals("指定派单", result.get(1).getSource());
@@ -146,7 +151,7 @@ class LeadFlowHistoryServiceTest {
         LeadAssignmentHistoryDO earlier = assignment(1L, "transfer", submittedAt.minusMinutes(1));
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(sameTime, earlier));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals(List.of("lead:7", "assignment:2", "assignment:1"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
@@ -158,7 +163,7 @@ class LeadFlowHistoryServiceTest {
         LeadAssignmentHistoryDO sameTime = assignment(2L, "dispatch", submittedAt);
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(later, sameTime));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals(List.of("assignment:3", "lead:7", "assignment:2"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
@@ -179,7 +184,7 @@ class LeadFlowHistoryServiceTest {
                 20L, user(20L, "原销售"),
                 30L, user(30L, "新销售")));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals(List.of("event:4", "lead:7"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
@@ -202,7 +207,7 @@ class LeadFlowHistoryServiceTest {
         when(fileApi.presignGetUrl(41L, 600)).thenReturn("https://files.test/proof");
         when(fileApi.presignGetUrl(42L, 600)).thenThrow(new IllegalStateException("missing"));
 
-        List<LeadFlowHistoryRespVO.AttachmentVO> result = service.getHistory(7L).getFirst().getAttachments();
+        List<LeadFlowHistoryRespVO.AttachmentVO> result = service.getHistory(7L, 99L).getFirst().getAttachments();
 
         assertEquals("证明.pdf", result.get(0).getOriginalName());
         assertTrue(result.get(0).getPreviewable()); assertTrue(result.get(0).getAvailable());
@@ -220,7 +225,7 @@ class LeadFlowHistoryServiceTest {
                 "invalid", "sales_manager_reviewing");
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(overturned, submitted));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals("无效", result.get(0).getLeadStatusBefore());
         assertEquals("有效", result.get(0).getLeadStatusAfter());
@@ -243,7 +248,7 @@ class LeadFlowHistoryServiceTest {
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(invalid, followUp));
         when(followUpMapper.selectListByLeadId(7L)).thenReturn(List.of(record));
 
-        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
         assertEquals("信息不实", result.get(0).getReason());
         assertEquals("补充说明", result.get(0).getRemark());

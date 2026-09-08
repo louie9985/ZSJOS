@@ -1,3 +1,5 @@
+import ProductSpecs from '../components/ProductSpecs'
+import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
@@ -18,6 +20,7 @@ import {
   Switch,
   Tag,
   Tabs,
+  TreeSelect,
   Typography,
   Upload,
   message,
@@ -39,6 +42,7 @@ import {
   type RegistrationCase,
   type RegistrationChecklistConfig,
   type RegistrationRoute,
+  type DeliveryClassOption,
   type SimpleDept,
   type StudyPlanner,
 } from "../services/api";
@@ -86,6 +90,7 @@ function LoadState({
 }
 
 function withCompletionState(value: RegistrationCase): RegistrationCase {
+  if (value.assignmentMode === "class_per_item") return value;
   if (value.orderStatus !== "effective") return value;
   const allChecked =
     Boolean(value.items?.length) &&
@@ -133,6 +138,9 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeForm] = Form.useForm<{ reason: string }>();
   const [routeSaving, setRouteSaving] = useState(false);
+  const [classSaving, setClassSaving] = useState(false);
+  const [classDraft, setClassDraft] = useState<Record<number, number>>({});
+  const [classOptions, setClassOptions] = useState<Record<number, DeliveryClassOption[]>>({});
   const [attachmentSavingIds, setAttachmentSavingIds] = useState<Set<number>>(new Set());
   const [savingItemIds, setSavingItemIds] = useState<Set<number>>(new Set());
   const [routeCandidates, setRouteCandidates] = useState<Record<number, Array<{ id: number; nickname: string }>>>({});
@@ -211,6 +219,10 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     return () =>
       window.removeEventListener("zsjos-registration-task-created", refresh);
   }, [load]);
+  useEffect(() => {
+    if (selected?.assignmentMode !== "class_per_item") return;
+    setClassDraft(Object.fromEntries((selected.classAssignments || []).filter(row => row.classId).map(row => [row.orderItemId, row.classId!])))
+  }, [selected?.id, selected?.version, selected?.assignmentMode]);
 
   const updateItem = async (
     item: NonNullable<RegistrationCase["items"]>[number],
@@ -292,6 +304,23 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     await saveRoutes(selected.routes.map((item) => item.id === route.id
       ? { ...item, selected: true, assigneeUserId, assigneeUserName: candidate?.nickname }
       : item), selected);
+  };
+  const loadClassOptions = async (orderItemId: number, categoryId: number) => {
+    if (classOptions[orderItemId]) return;
+    try {
+      const options = await api.deliveryClasses.options(categoryId, true);
+      setClassOptions(current => ({ ...current, [orderItemId]: options }));
+    }
+    catch (requestError) { message.error(errorMessage(requestError)); }
+  };
+  const saveClasses = async () => {
+    if (!selected?.classAssignments) return;
+    const assignments = selected.classAssignments.map(row => ({ orderItemId: row.orderItemId, classId: classDraft[row.orderItemId] }));
+    if (assignments.some(row => !row.classId)) { message.warning("请为每个订单商品选择班级"); return; }
+    setClassSaving(true);
+    try { applyCase(await api.updateRegistrationClassAssignments(selected.id, { version: selected.version, idempotencyKey: key(), assignments })); message.success("分班已保存"); }
+    catch (requestError) { message.error(errorMessage(requestError)); await loadCase(selected.id); }
+    finally { setClassSaving(false); }
   };
   const uploadAttachment = async (item: NonNullable<RegistrationCase["items"]>[number], file: File) => {
     if (!selected) return;
@@ -410,9 +439,15 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         />
       )}
       <section className="registration-checklist-card">
-        <Typography.Title level={5}>学员流转</Typography.Title>
+        <Space style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? "逐商品分班" : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && !["completed", "cancelled"].includes(selected.status) && <Button type="primary" loading={classSaving} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
         <div className="registration-checklist">
-          {selected.routes?.map((route) => (
+          {selected.assignmentMode === "class_per_item" ? selected.classAssignments?.map(assignment => {
+            const options = classOptions[assignment.orderItemId] || [];
+            return <div className="registration-checklist-row registration-route-row" key={assignment.orderItemId}>
+              <div className="registration-checklist-copy"><strong>{assignment.productName || '历史产品信息缺失'}</strong><ProductSpecs product={assignment} /><span>{assignment.categoryName || "产品分类"}{assignment.errorReason ? ` · ${assignment.errorReason}` : ""}</span></div>
+              <TreeSelect style={{ minWidth: 280 }} value={classDraft[assignment.orderItemId]} placeholder="选择班级" disabled={classSaving || ["completed", "cancelled"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions(assignment.orderItemId, assignment.categoryId)} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} treeData={[{ title: assignment.categoryName || "已购产品", value: `category-${assignment.orderItemId}`, selectable: false, children: options.map(row => ({ title: row.systemClass ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}`, value: row.id })) }]} />
+            </div>;
+          }) : selected.routes?.map((route) => (
             <div className="registration-checklist-row registration-route-row" key={route.id}>
               <Checkbox
                 checked={route.selected}
@@ -444,9 +479,9 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               <div className="registration-checklist-row" key={item.id}>
                 <div className="registration-checklist-copy">
                   <strong>{item.title}</strong>
-                  <span>由“学员流转”中的学生服务部门负责人自动满足</span>
+                  <span>{selected.assignmentMode === "class_per_item" ? "新流程由逐商品班级的班主任决定" : "历史报名保留原学习规划师分配"}</span>
                 </div>
-                <Tag>{selected.studyPlannerUserName || "未选择学生服务部门"}</Tag>
+                <Tag>{selected.assignmentMode === "class_per_item" ? "按班级归属" : selected.studyPlannerUserName || "历史规划师未分配"}</Tag>
               </div>
             ) : item.itemType === "attachment" ? (
               <div className="registration-checklist-row registration-attachment-row" key={item.id}>
@@ -822,11 +857,11 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       contactContext={studentContactContext}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
-      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div>}
+      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${productSpecText(service)} · ${service.orderNo || service.orderId}` }))}/></div>}
       overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
-        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} /></section> },
+        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: <ProductSpecs product={selectedService} /> }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} /></section> },
         ...(leadDetail ? [{ key: 'lead-history', label: '客资历史', children: <LeadDetail lead={leadDetail} categories={categories} categoryLabel={(value) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value) => dictionaryDisplayLabel(channels, value, channelError)} mode="student-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void refreshCurrentStudent()} /> }] : [])
       ]}
     />}
@@ -861,23 +896,12 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
                 <strong>
                   {service.courseName || service.skuName || "课程服务"}
                 </strong>
-                {service.skuName && service.skuName !== service.courseName && (
-                  <span>{service.skuName}</span>
-                )}
                 <span>
                   {service.categoryPath?.length
                     ? service.categoryPath.join(" / ")
                     : "课程分类暂未记录"}
                 </span>
-                {Boolean(service.attributeValues?.length) && (
-                  <Space size={[4, 4]} wrap>
-                    {service.attributeValues!.map((value) => (
-                      <Tag key={value} variant="filled">
-                        {value}
-                      </Tag>
-                    ))}
-                  </Space>
-                )}
+                <ProductSpecs product={service} />
                 <span>{service.orderNo || `订单 ${service.orderId}`}</span>
               </div>
               <Tag color={service.status === "active" ? "success" : undefined}>

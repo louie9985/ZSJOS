@@ -25,11 +25,14 @@ class ZsjosProductServiceImplTest {
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private ZsjosProductCategoryMapper categoryMapper;
     @Mock private ZsjosProductSkuMapper skuMapper;
+    @Mock private ProductCategoryLocks categoryLocks;
+    @org.junit.jupiter.api.BeforeEach void setup() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L); }
+    @org.junit.jupiter.api.AfterEach void cleanup() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
 
     @Test
     void deleteRejectsProductReferencedByLeadWithActionableError() {
         ZsjosProductDO product = product(1L, "course-1");
-        when(productMapper.selectById(1L)).thenReturn(product);
+        when(productMapper.selectByIdForUpdate(1L, 1L)).thenReturn(product);
         when(intendedProductMapper.selectCountByProductRef("course-1")).thenReturn(1L);
 
         ServiceException error = assertThrows(ServiceException.class, () -> service.deleteProduct(1L));
@@ -42,7 +45,7 @@ class ZsjosProductServiceImplTest {
     @Test
     void deleteRejectsProductWithSkusWithSkuSpecificError() {
         ZsjosProductDO product = product(1L, "course-1");
-        when(productMapper.selectById(1L)).thenReturn(product);
+        when(productMapper.selectByIdForUpdate(1L, 1L)).thenReturn(product);
         when(intendedProductMapper.selectCountByProductRef("course-1")).thenReturn(0L);
         when(skuMapper.selectCountBySpuId(1L)).thenReturn(1L);
 

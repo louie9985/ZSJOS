@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
-import { canOpenAllCalendar, canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
+import { canOpenPersonalCalendar, canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
 import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const source = readFileSync(new URL('../pages/TodayTasksPage.tsx', import.meta.url), 'utf8')
@@ -27,8 +27,8 @@ describe('today task permissions', () => {
   it('loads optional home panels only when their backend permissions are granted', () => {
     expect(canReadAnnouncements(['system:notice:read'])).toBe(true)
     expect(canReadAnnouncements(['zsjos:business-task:query'])).toBe(false)
-    expect(canOpenAllCalendar(['zsjos:media-calendar:all-query'])).toBe(true)
-    expect(canOpenAllCalendar(['zsjos:media-calendar:query'])).toBe(false)
+    expect(canOpenPersonalCalendar(['zsjos:personal-calendar:query'])).toBe(true)
+    expect(canOpenPersonalCalendar(['zsjos:media-calendar:query'])).toBe(false)
   })
 
   it('keeps the four dashboard regions and server-owned destinations', () => {
@@ -36,7 +36,7 @@ describe('today task permissions', () => {
     expect(source).toContain('home-calendar-panel')
     expect(source).toContain('home-business-panel')
     expect(source).toContain('home-announcement-panel')
-    expect(source).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
+    expect(source).toContain('APP_ROUTES.PERSONAL_CALENDAR')
     expect(source).toContain('APP_ROUTES.ANNOUNCEMENTS')
     expect(source).toContain('const bucketOrder: BusinessTaskBucket[]')
     expect(source).toContain("'overdue'")
@@ -62,7 +62,7 @@ describe('today task permissions', () => {
   it('uses the home calendar only as a current-month preview', () => {
     const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
     expect(calendarPanel).toContain('headerRender={() => null}')
-    expect(calendarPanel).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
+    expect(calendarPanel).toContain('APP_ROUTES.PERSONAL_CALENDAR')
     expectSourceToContainTokens(calendarPanel, "if (info.source === 'date') openCalendar()")
     expect(calendarPanel).not.toContain('onPanelChange')
   })

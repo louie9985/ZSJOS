@@ -60,6 +60,7 @@
         <el-descriptions-item label="审批轮次">{{ detail.approvalRoundNo || '-' }}</el-descriptions-item>
         <el-descriptions-item v-if="current?.decisionReason" label="主管意见">{{ current.decisionReason }}</el-descriptions-item>
       </el-descriptions>
+      <OrderProductSummary v-if="detail" :items="detail.items" />
       <div v-if="current?.status === 'pending' && detail" class="detail-actions">
         <el-button type="primary" @click="openDecision('confirm')">确认</el-button>
         <el-button type="danger" @click="openDecision('reject')">不确认</el-button>
@@ -74,6 +75,7 @@
 </template>
 
 <script lang="ts" setup>
+import OrderProductSummary from '../components/OrderProductSummary.vue'
 import type { TabsPaneContext } from 'element-plus'
 import * as Api from '@/api/zsjos/salesOrderSupervisorConfirmation'
 import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'

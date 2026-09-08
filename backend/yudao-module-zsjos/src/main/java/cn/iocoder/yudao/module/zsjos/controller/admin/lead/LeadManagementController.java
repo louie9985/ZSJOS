@@ -170,7 +170,7 @@ public class LeadManagementController {
     @Operation(summary = "获得客资流转记录")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
     public CommonResult<List<LeadFlowHistoryRespVO>> getFlowHistory(@PathVariable("id") Long id) {
-        return success(leadFlowHistoryService.getHistory(id));
+        return success(leadFlowHistoryService.getHistory(id, getLoginUserId()));
     }
 
     @PutMapping("/{id}/basic-info")

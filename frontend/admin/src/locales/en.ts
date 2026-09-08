@@ -163,7 +163,6 @@ export default {
   },
   router: {
     login: 'Login',
-    home: 'Home',
     analysis: 'Analysis',
     workplace: 'Workplace'
   },

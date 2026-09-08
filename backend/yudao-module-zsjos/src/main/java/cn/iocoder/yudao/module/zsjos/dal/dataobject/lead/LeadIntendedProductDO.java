@@ -21,6 +21,7 @@ public class LeadIntendedProductDO extends TenantBaseDO {
     private String skuRef;
     private String skuNameSnapshot;
     private String selectedAttrValuesJson;
+    private String selectedSpecsJson;
     private java.math.BigDecimal priceSnapshot;
     private Boolean spuUnknown;
     private Boolean skuUnknown;

@@ -120,6 +120,7 @@ public class LeadManagementRespVO {
         private String skuRef;
         private String skuName;
         private String selectedAttrValues;
+        private java.util.List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
         private BigDecimal price;
         private String categoryName;
         private Boolean primary;

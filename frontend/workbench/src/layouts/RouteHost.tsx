@@ -43,10 +43,13 @@ import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, 
 import { ProductionTicketsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
 import MediaCalendarPage from '../pages/MediaCalendarPage'
+import PersonalCalendarPage from '../pages/PersonalCalendarPage'
+import ExamCalendarPage from '../pages/ExamCalendarPage'
 import EamAssetPage from '../pages/EamAssetPage'
 import FeedbackPage from '../pages/FeedbackPage'
 import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
 import AnnouncementCenterPage from '../pages/AnnouncementCenterPage'
+import DeliveryClassPage from '../pages/DeliveryClassPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -64,8 +67,11 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
-  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_ALL_CALENDAR) return <MediaCalendarPage scope="all"/>
-  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage scope="account"/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} manage />
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced/>
@@ -109,9 +115,12 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} manage />
+  if (menu?.path === APP_ROUTES.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage scope="account"/>
-  if (menu?.path === APP_ROUTES.MEDIA_ALL_CALENDAR) return <MediaCalendarPage scope="all"/>
+  if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
+  if (menu?.path === APP_ROUTES.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
   if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
   if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage permissions={permissions}/>

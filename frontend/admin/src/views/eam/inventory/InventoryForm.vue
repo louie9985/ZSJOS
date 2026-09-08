@@ -24,7 +24,7 @@
         <el-tree-select
           v-model="scopeDeptId"
           :data="deptTree"
-          :props="{ label: 'name', children: 'children', value: 'id' }"
+          :props="{ label: 'name', children: 'children' }"
           check-strictly
           node-key="id"
           class="!w-full"
@@ -40,7 +40,7 @@
         <el-tree-select
           v-model="scopeCategoryId"
           :data="categoryTree"
-          :props="{ label: 'name', children: 'children', value: 'id' }"
+          :props="{ label: 'name', children: 'children' }"
           check-strictly
           node-key="id"
           class="!w-full"

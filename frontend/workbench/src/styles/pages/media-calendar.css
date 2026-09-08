@@ -376,3 +376,37 @@
   .media-schedule-main-head { align-items: stretch; flex-direction: column; }
   .media-schedule-month-grid { grid-auto-rows: minmax(96px, auto); }
 }
+.personal-calendar-events {
+  min-height: 72px;
+  overflow: hidden;
+}
+
+.personal-calendar-event {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-2);
+  min-width: 0;
+  margin-top: var(--crm-sp-1);
+  padding: 1px var(--crm-sp-2);
+  border-left: 3px solid var(--crm-color-primary);
+  background: var(--crm-color-primary-bg);
+}
+
+.personal-calendar-event .ant-badge-status-text {
+  display: block;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .personal-calendar-page .ant-picker-calendar-date-content {
+    height: 56px;
+  }
+
+  .personal-calendar-event .ant-space {
+    display: none;
+  }
+}

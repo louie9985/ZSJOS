@@ -57,6 +57,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Resource private LeadCollaborationService collaborationService;
+    @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -178,6 +179,14 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
 
     @Override
     public PageResult<LeadFollowUpRespVO> getPage(Long leadId, int pageNo, int pageSize) {
+        return getPage(leadId, pageNo, pageSize, null);
+    }
+
+    @Override
+    public PageResult<LeadFollowUpRespVO> getPage(Long leadId, int pageNo, int pageSize, Long viewerId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        LeadIdentityMaskingService.LeadIdentityViewContext identityContext = viewerId == null || lead == null
+                ? null : identityMaskingService.resolve(viewerId, lead);
         List<LeadFollowUpRecordDO> leadRecords = recordMapper.selectListByLeadId(leadId);
         List<OpportunityFollowUpRecordDO> opportunityRecords = opportunityRecordMapper.selectListByLeadId(leadId);
         List<LeadFollowUpImageDO> leadImages = imageMapper.selectListByRecordIds(
@@ -199,14 +208,32 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 .collect(Collectors.groupingBy(OpportunityFollowUpImageDO::getFollowUpRecordId));
         List<LeadFollowUpRespVO> merged = new ArrayList<>();
         leadRecords.forEach(record -> merged.add(convert(record,
-                leadImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls)));
+                leadImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
         opportunityRecords.forEach(record -> merged.add(convertOpportunity(record,
-                opportunityImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls)));
+                opportunityImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
         merged.sort(Comparator.comparing(LeadFollowUpRespVO::getOccurredAt).reversed()
                 .thenComparing(LeadFollowUpRespVO::getId, Comparator.reverseOrder()));
         int from = Math.min((pageNo - 1) * pageSize, merged.size());
         int to = Math.min(from + pageSize, merged.size());
         return new PageResult<>(merged.subList(from, to), (long) merged.size());
+    }
+
+    private LeadFollowUpRespVO convert(LeadFollowUpRecordDO record, List<LeadFollowUpImageDO> images,
+                                       Map<Long, AdminUserRespDTO> users, Map<Long, String> urls,
+                                       LeadIdentityMaskingService.LeadIdentityViewContext context) {
+        LeadFollowUpRespVO result = convert(record, images, users, urls);
+        if (context != null) result.setOperatorName(identityMaskingService.employeeName(
+                context, users, record.getOperatorUserId(), LeadIdentityRole.OPERATOR));
+        return result;
+    }
+
+    private LeadFollowUpRespVO convertOpportunity(OpportunityFollowUpRecordDO record,
+            List<OpportunityFollowUpImageDO> images, Map<Long, AdminUserRespDTO> users, Map<Long, String> urls,
+            LeadIdentityMaskingService.LeadIdentityViewContext context) {
+        LeadFollowUpRespVO result = convertOpportunity(record, images, users, urls);
+        if (context != null) result.setOperatorName(identityMaskingService.employeeName(
+                context, users, record.getOperatorUserId(), LeadIdentityRole.OPERATOR));
+        return result;
     }
 
     private boolean canFollow(LeadDO lead) {

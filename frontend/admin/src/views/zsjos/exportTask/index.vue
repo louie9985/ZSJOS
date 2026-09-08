@@ -102,8 +102,12 @@ const statusName = (value: string) =>
     cancelled: '已取消',
     expired: '已过期'
   })[value] || value
-const statusType = (value: string) =>
-  ({ ready: 'success', failed: 'danger', cancelled: 'info', expired: 'info' })[value] || 'warning'
+const statusType = (value: string): 'success' | 'danger' | 'info' | 'warning' => {
+  if (value === 'ready') return 'success'
+  if (value === 'failed') return 'danger'
+  if (value === 'cancelled' || value === 'expired') return 'info'
+  return 'warning'
+}
 
 const load = async () => {
   loading.value = true

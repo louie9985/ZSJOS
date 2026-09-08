@@ -42,5 +42,5 @@ public class ZsjosProductCategoryController {
 
     @GetMapping("/tree") @Operation(summary = "获得产品分类树")
     @PreAuthorize("@ss.hasPermission('zsjos:product-category:query')")
-    public CommonResult<List<ZsjosProductCategoryRespVO>> tree() { return success(categoryService.getTree()); }
+    public CommonResult<List<ZsjosProductCategoryRespVO>> tree(@RequestParam(required = false) Integer status) { return success(categoryService.getTree(status)); }
 }

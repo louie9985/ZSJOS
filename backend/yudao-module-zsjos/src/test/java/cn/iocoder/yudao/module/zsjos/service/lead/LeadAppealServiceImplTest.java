@@ -68,11 +68,16 @@ class LeadAppealServiceImplTest {
     @Mock private CashbackService cashbackService;
     @Mock private LeadObjectPermissionService leadObjectPermissionService;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private LeadIdentityMaskingService identityMaskingService;
 
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
         lenient().when(advancedFilterService.matchAppealIds(isNull(), isNull())).thenReturn(null);
+        lenient().when(identityMaskingService.resolve(anyLong(), any()))
+                .thenReturn(new LeadIdentityMaskingService.LeadIdentityViewContext(40L,
+                        LeadIdentityMaskingService.SourceIdentityType.EMPLOYEE, 40L, null, 20L,
+                        false, false, true, false));
     }
 
     @Test

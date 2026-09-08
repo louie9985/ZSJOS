@@ -10,7 +10,7 @@ All endpoints are tenant-scoped Admin APIs and use the standard `CommonResult` w
 - `POST /zsjos/registration-checklist-config/publish`
 
 Writes carry the template version and idempotency key. A version contains ordered checklist items and
-ordered route options. Administrators can add, remove, reorder and enable/disable ordinary items,
+ordered legacy route options. Administrators can add, remove, reorder and enable/disable ordinary items,
 choose manual-checkbox or attachment type, mark attachment items required, and map routes to System
 department IDs plus the stable assignee type. The fixed `study_planner` item cannot be removed,
 disabled, or renamed. New cases snapshot the published version and never follow later edits.
@@ -25,6 +25,7 @@ disabled, or renamed. New cases snapshot the published version and never follow 
 - `PUT /zsjos/registration/{id}/items/{itemId}`
 - `PUT /zsjos/registration/{id}/study-planner`
 - `PUT /zsjos/registration/{id}/routes`
+- `PUT /zsjos/registration/{id}/class-assignments`
 - `POST /zsjos/registration/{id}/items/{itemId}/attachments`
 - `DELETE /zsjos/registration/{id}/items/{itemId}/attachments/{attachmentId}`
 - `POST /zsjos/registration/{id}/complete`
@@ -44,12 +45,21 @@ requires a close reason and marks the registration case `cancelled` with `cancel
 does not create service relations, does not change the order status, and does not affect already
 completed cases.
 
-At least one snapshotted route must be selected. Study-planner candidates are enabled users holding
+Existing `legacy_planner` cases still require one snapshotted planner route. Study-planner candidates are enabled users holding
 role code `study_planner` inside the selected department subtree; content-director candidates are
 enabled users holding post code `content_director` inside that subtree. Completion revalidates every
 selected assignee. Attachment items allow at most nine files, 20 MB each, in JPG/PNG/WebP/PDF/Word/
 Excel formats; required attachment items must contain at least one file. Department and assignee names
 are stored as completion-time snapshots on the case routes.
+
+New cases use `assignmentMode=class_per_item`. The detail response returns one `classAssignments` projection
+for every order item, including product/category facts, the saved class and homeroom snapshots, and a stable
+per-item error when the current selection is no longer usable. `PUT .../class-assignments` replaces the complete
+set in one versioned, idempotent command: every order item must occur exactly once and select either a same-category
+`SERVING` formal class or the explicit tenant pending class. Save and completion both revalidate the order item,
+product category, tenant class, class state and homeroom eligibility; a formal homeroom must remain enabled and hold
+both `zsjos:delivery-class:query-my` and `zsjos:student:query-my`. The pending selection snapshots the real order
+product category name/path even though the system class itself has no category or homeroom.
 
 Attachment validation requires the detected MIME type to exactly match the file extension; unknown
 `application/octet-stream` values and raw `application/zip` are not accepted as Office documents.
@@ -68,11 +78,16 @@ users who hold `zsjos:registration:query-pool` and enabled users in the configur
 approval department subtree (including the configured root department). System persists the message and emits the existing post-commit
 WebSocket hint.
 
-When registration completion has created the student's service relations,
+When registration completion has created the student's service relations, each order item produces one service
+relation with the selected `classId`. A formal class derives `ownerUserId` from its current homeroom; an explicitly
+pending assignment leaves owner null. Completion locks the registration, order, ordered order-item rows, assignment
+rows and target classes, then reuses that locked item set to create relations. A concurrent order-item change, class
+completion or homeroom change therefore cannot produce a partially validated ownership result.
+For every distinct formal-class homeroom,
 `zsjos.registration.planner_assigned` sends the assigned planner the message
 `学员{{student.name}}（{{student.no}}）已分配给你。` and emits the same post-commit WebSocket refresh hint. Selecting or
-changing the planner on an incomplete case does not notify. One completion publishes one event keyed
-by registration case and planner even when the order contains multiple service items. The durable
+changing the planner on an incomplete legacy case does not notify. Pending assignments do not notify. One completion
+publishes one event keyed by registration case and planner even when multiple items select the same homeroom. The durable
 message uses `bizType=student` and internal `personId` as its click target, so Workbench opens the
 corresponding My Students detail independently of the current list page.
 

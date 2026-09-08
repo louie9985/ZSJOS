@@ -191,7 +191,7 @@ const formRules = reactive<FormRules>({
 })
 const formRef = ref() // 表单 Ref
 const deptList = ref<Tree[]>([]) // 树形结构
-const postList = ref([] as PostApi.PostVO[]) // 岗位列表
+const postList = ref([] as PostApi.PostSimpleVO[]) // 岗位列表
 
 /** 打开弹窗 */
 const open = async (type: string, id?: number) => {

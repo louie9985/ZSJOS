@@ -30,6 +30,7 @@ public class MyStudentRespVO {
         private String skuName;
         private List<String> categoryPath;
         private List<String> attributeValues;
+        private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
         private String productSnapshot;
         private String status;
         private LocalDateTime activatedAt;

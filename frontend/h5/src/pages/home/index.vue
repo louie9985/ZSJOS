@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductSpecs from '../../components/ProductSpecs.vue'
 import { computed, ref, onActivated, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showToast } from 'vant'
@@ -618,8 +619,11 @@ function statusClass(status: string) {
             @click="goLeadDetail(lead.id)"
           >
             <span class="recent-lead__avatar" :class="recentLeadTone(lead.id)">{{ recentLeadInitial(lead.submittedName) }}</span>
+            <div class="recent-lead__copy">
             <span class="recent-lead__name">{{ lead.submittedName || '未命名客户' }}</span>
             <span class="recent-lead__product">{{ recentLeadCourse(lead) }}</span>
+            <ProductSpecs :product="lead.primaryProduct || lead.intendedProducts?.find(p => p.primary) || lead.intendedProducts?.[0] || {}" />
+            </div>
             <span class="recent-lead__status" :class="`recent-lead__status--${statusClass(lead.status)}`">
               {{ formatLeadStatus(lead.status) }}
             </span>
@@ -1486,6 +1490,16 @@ function statusClass(status: string) {
 .recent-lead__name,
 .recent-lead__product {
   min-width: 0;
+}
+
+.recent-lead__copy {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
 }
 
 .recent-lead__name {

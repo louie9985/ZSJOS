@@ -1,5 +1,15 @@
 # Versioned migrations
 
+## Current development exam product scope correction
+
+The current fresh bootstrap sources `../exam-calendar-product-scope.sql` after V188.
+This repeatable additive patch changes only five nullable exam-schedule columns and one
+Lead intended-product label-snapshot column. It changes no business rows or permissions;
+existing category schedules and historical labels remain untouched. Apply schema before
+the corresponding backend. Existing V187/V188 files are not rewritten. Deployed upgrade
+versioning remains subject to deployment-scope confirmation; this is not evidence that a
+live database has been synchronized or that fresh/repeated execution has been verified.
+
 `V045__dual_frontend_workbench_menu_components.sql` assigns Vue-loadable component metadata to the eight Workbench routes that previously used the React-only `zsjos-workbench` marker. React continues to resolve the same server-owned paths locally. The migration changes no menu identity, permission, role grant, ordering, visibility, or business data and is repeatable through stable targeted updates.
 
 V043 is the forward repair for already-applied V041/V042 environments. It independently restores missing concurrency objects, blocks on ambiguous Person contact data, installs cross-field contact ownership and the order command ledger, and path-normalizes only legacy Lead status conditions. Run `../audit-v043-person-contacts.sql` first; V043 never merges, truncates, deletes, or auto-corrects conflicting Person rows. Its backfill scope is active, non-deleted Person phone/WeChat values only. Reruns are supported; rollback is limited to the application because dropping the additive audit tables would lose command and contact-ownership evidence.
@@ -909,6 +919,16 @@ existing query identity to button `79996`, creates strict self-only read permiss
 tenant-wide management; no role receives the new self-only permission automatically. Tenant packages that
 contain the page receive all three configurable permission buttons.
 
+V186 follows V185 and separates media-account maintenance schedules from personal manual events. It creates
+the empty tenant-scoped `zsjos_personal_calendar_event` table, retires shared-account calendar menu `73604`,
+and registers `我的日历` plus independent create/update/delete permissions and the account-calendar
+`query-managed` permission. It revokes only active role grants for retired menu `73604` whose creator is
+the V161 migration; manually configured historical grants are preserved for audit and cannot open a runtime
+route because the menu is hidden and the old endpoint is removed. Account-calendar
+`query-all` grants on `73602` and all media-account business data remain unchanged. New permissions are added
+to eligible tenant packages but are not automatically granted to roles. Rollback is forward-only: retain
+personal events and restore reviewed menu grants in a later migration.
+
 The migration changes only menu metadata, role-menu grants, tenant-package menu IDs and version records. It
 does not modify Partner, ownership, employee, Lead or user-relation rows. Reruns do not copy later page grants
 into query grants. Recovery is forward-only through a reviewed permission migration.
@@ -971,6 +991,25 @@ The migration is additive and guarded for reruns. Rollback is forward-only: reta
 the permission or notification rules in a later migration. Attachments remain Infra file references with stored
 name/type/size snapshots; runtime ownership validation is still required.
 
+### V187 Exam calendar
+
+The page has sibling selectable query (73612) and manage (73611) button nodes. Eligible query roles receive
+both the page and query leaf; only exam management roles receive the manage leaf. Packages containing the
+page also receive the query leaf. This corrects the development V187 seed without changing API permission codes.
+
+V187 follows V186 and creates the empty tenant-scoped `zsjos_exam_schedule` table. Exact schedules store one
+natural date; rough schedules store an inclusive natural-date range. Both snapshot one enabled ZSJOS product
+category name and path, and never reference a SKU. The migration adds `exam-calendar` under Calendar menu
+73600, resolving to `/calendar/exam-calendar`,
+separate query/manage permissions, and the global Infra parameter `zsjos.exam-calendar.upcoming-days=3`.
+Query is initially granted to all enabled internal roles in tenant packages that expose the page; manage is
+initially granted only to enabled `exam_manager` and `exam_specialist` roles. Runtime checks use permission IDs.
+
+Enabled internal roles in eligible Calendar tenant packages receive the query page. Enabled `exam_manager` and
+`exam_specialist` roles initially receive the independently configurable manage button. Runtime authorization is
+permission-based and does not inspect role names. The migration seeds no exam schedules or product data and is
+repeatable; rollback is forward-only and should preserve schedule history while disabling permissions later.
+
 ### V174 Complete ZSJOS business audit
 
 V174 follows V173 and extends the existing tenant-scoped `zsjos_business_audit_log` instead of introducing a
@@ -981,3 +1020,30 @@ identifier must not be presented when no safe public business number is availabl
 
 The migration changes metadata only, seeds no business rows, and guards additive columns and indexes for reruns.
 Rollback is forward-only: retain audit history and allow older application versions to ignore the added columns.
+
+### V188 Delivery class management
+
+V188 follows V187 and creates the tenant-scoped `zsjos_delivery_class` table, including one guarded
+system `PENDING`/`待分班` row per enabled tenant. It adds nullable `class_id` to service relations so
+historical rows can be associated with the real tenant pending class without inventing a formal class;
+their existing planner owner is preserved. New pending assignments may have no planner owner. Formal
+classes snapshot the product category, published exam schedule, homeroom user and owning department.
+The migration also creates one per-order-item registration assignment row and the ZSJOS business
+snapshot/reference table for BPM class-transfer requests. BPM tasks and history remain BPM-owned under
+process key `zsjos_class_transfer`.
+
+The migration adds relative `class-management` and `my-classes` menu paths plus independent managed/my
+query, create, update, complete, direct-transfer and transfer-request permissions. Package IDs are appended
+one at a time only when missing, so partially applied package state and reruns remain deterministic. The
+script is UTF-8, additive and repeatable; it updates only null historical `class_id` values and preserves
+their owners. Added or relaxed registration/service-relation columns retain the same type, nullability,
+default and comments as the fresh bootstrap schema; `verify-bootstrap.sql` checks this metadata explicitly.
+Rollback is forward-only: retain class, assignment and transfer history while disabling the
+menus or permissions in a later migration.
+
+### V190 Delivery class product scope
+
+V190 follows V188 and adds nullable product, selected specification, and selected SKU JSON snapshots
+to `zsjos_delivery_class`. It changes no existing business rows and is repeatable. New class writes
+must select at least one valid SKU from the enabled product scope; historical classes retain NULL snapshots.
+Rollback is forward-only because removing the columns would discard new business snapshots.

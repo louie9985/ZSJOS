@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OrderProductSummary from '../components/OrderProductSummary.vue'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
 const message = useMessage()
@@ -58,8 +59,9 @@ const submit = async () => {
       ></template
     ></WorkbenchListPage
   ><el-dialog v-model="open" title="成交审批" width="560px"
-    ><div v-loading="detailLoading"
-      ><el-form label-width="90px"
+    ><div v-loading="detailLoading">
+      <OrderProductSummary v-if="detail && !detailLoading" :items="detail.items" />
+      <el-form label-width="90px"
         ><el-form-item label="订单"
           ><span>{{ detail?.orderNo || `#${current?.id}` }}</span></el-form-item
         ><el-form-item label="结论" required

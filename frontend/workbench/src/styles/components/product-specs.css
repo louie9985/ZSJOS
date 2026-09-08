@@ -1,0 +1,3 @@
+.product-specs { display: flex; flex-wrap: wrap; gap: var(--crm-sp-1) var(--crm-sp-3); min-width: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); white-space: normal; overflow-wrap: anywhere; }
+.product-specs > span { min-width: 0; }
+@media (max-width: 600px) { .product-specs { flex-direction: column; } }

@@ -23,6 +23,8 @@ export interface SalesOrderSupervisorInboxVO {
 }
 
 export interface SalesOrderDetailVO {
+  items?: Array<{ id?: number; productName?: string; skuName?: string; categoryPath?: string[];
+    specs?: import('@/utils/productSpecs').ProductSpec[]; attrValues?: Record<string, string>; actualAmount?: number }>
   id: number
   orderNo: string
   studentName: string

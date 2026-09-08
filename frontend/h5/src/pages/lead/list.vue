@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductSpecs from '../../components/ProductSpecs.vue'
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
@@ -256,6 +257,7 @@ function avatarText(item: LeadListItem) {
               <div class="lead-card__course">
                 <span>意向课程</span><strong>{{ primaryCourse(item) }}</strong>
               </div>
+              <ProductSpecs :product="item.primaryProduct || item.intendedProducts?.find(p => p.primary) || item.intendedProducts?.[0] || {}" />
               <div class="lead-card__foot">
                 <div class="lead-card__stage"><span>当前环节</span><strong>{{ stageText(item) }}</strong></div>
                 <time>{{ cardDate(item).label }} {{ formatDate(cardDate(item).value) }}</time>

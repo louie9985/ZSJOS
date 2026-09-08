@@ -1,6 +1,8 @@
 import { Cascader, Col, Row, Select, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import type { LeadCatalog, LeadCategoryNode } from '../services/api'
+import ProductSpecs from './ProductSpecs'
+import { catalogSpecs } from '../services/productSpecs'
 
 export function selectedSkuAttrValues(catalog: LeadCatalog, value?: string): Record<string, string> {
   const [spuRef, skuRef] = value?.split('::') || []
@@ -52,6 +54,6 @@ export default function SalesOrderCoursePicker({ catalog, value, onChange, disab
       {selectedSpu?.attrs.map(attr => <Col xs={24} md={8} key={attr.attrKey}><Typography.Text type="secondary">{attr.attrName}</Typography.Text><Select className="w-full" value={attrValues[attr.attrKey]} options={attr.values.map(item => ({ label: item.label, value: item.value }))} disabled={disabled} placeholder={`请选择${attr.attrName}`} onChange={next => chooseAttr(attr.attrKey, next)}/></Col>)}
       {selectedSpu && !selectedSpu.attrs.length && <Col xs={24} md={8}><Typography.Text type="secondary">具体班次/方案</Typography.Text><Select className="w-full" value={skuRef} options={selectedSkus.map(item => ({ label: `${item.skuName}（¥${item.price}）`, value: item.skuRef }))} disabled={disabled} placeholder="请选择具体班次/方案" onChange={chooseSku}/></Col>}
     </Row>
-    {selectedSku && <Typography.Text type="secondary">已选：{selectedSku.skuName} · 参考价 ¥{Number(selectedSku.price).toFixed(2)}</Typography.Text>}
+    {selectedSku && <div><ProductSpecs product={{ specs: selectedSku.specs ?? catalogSpecs(selectedSku.attrValues, selectedSpu?.attrs) }} /><Typography.Text type="secondary">{selectedSku.skuName} · 参考价 ¥{Number(selectedSku.price).toFixed(2)}</Typography.Text></div>}
   </div>
 }

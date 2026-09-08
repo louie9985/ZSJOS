@@ -13,7 +13,7 @@ type TaskView = 'pending' | 'done'
 
 export const canQueryBpmTasks = (permissions: readonly string[]) => permissions.includes('bpm:task:query')
 export const canReadAnnouncements = (permissions: readonly string[]) => permissions.includes('system:notice:read')
-export const canOpenAllCalendar = (permissions: readonly string[]) => permissions.includes('zsjos:media-calendar:all-query')
+export const canOpenPersonalCalendar = (permissions: readonly string[]) => permissions.includes('zsjos:personal-calendar:query')
 
 const errorText = (error: unknown, fallback: string) =>
   error instanceof ApiError && error.code === 403 ? '暂无权限，请联系管理员配置对应功能权限' : error instanceof Error ? error.message : fallback
@@ -298,7 +298,7 @@ function BusinessTaskPanel({
 function HomeCalendarPanel({ enabled }: { enabled: boolean }) {
   const navigate = useNavigate()
   const openCalendar = () => {
-    if (enabled) navigate(APP_ROUTES.MEDIA_ALL_CALENDAR)
+    if (enabled) navigate(APP_ROUTES.PERSONAL_CALENDAR)
   }
 
   return (
@@ -449,7 +449,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment }: { perm
           bpmError={bpmError}
           onRefresh={loadSummary}
         />
-        <HomeCalendarPanel enabled={canOpenAllCalendar(permissions)} />
+        <HomeCalendarPanel enabled={canOpenPersonalCalendar(permissions)} />
         <BusinessTaskPanel summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <AnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>

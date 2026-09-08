@@ -1622,6 +1622,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setProductName(snapshot.name()); result.setSkuName(snapshot.skuName());
             result.setCategoryPath(snapshot.categoryPath().stream().map(node -> node.name()).toList());
             result.setAttrValues(snapshot.selectedAttrValuesJson() == null ? Map.of() : JsonUtils.parseObject(snapshot.selectedAttrValuesJson(), Map.class));
+            result.setSpecs(snapshot.displaySpecs());
         }
         return result;
     }

@@ -2,7 +2,10 @@ package cn.iocoder.yudao.module.zsjos.service.registration;
 
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +21,8 @@ class StudentServiceObjectPermissionProviderTest {
 
     @InjectMocks private StudentServiceObjectPermissionProvider provider;
     @Mock private ServiceRelationMapper relationMapper;
+    @Mock private DeliveryClassMapper deliveryClassMapper;
+    @Mock private DeliveryClassScopeService deliveryClassScopeService;
     @Mock private PermissionApi permissionApi;
 
     @Test
@@ -50,5 +55,32 @@ class StudentServiceObjectPermissionProviderTest {
         assertFalse(provider.hasPermission(10L, "read", 9L));
         relation.setAcceptanceStatus("accepted"); relation.setOperatorUserId(10L);
         assertFalse(provider.hasPermission(10L, "read", 9L));
+    }
+
+    @Test
+    void plannerCanRequestTransferForOwnedReadableService() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(7L); relation.setStatus("completed");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+
+        assertTrue(provider.hasPermission(10L, "class-transfer", 7L));
+        assertFalse(provider.hasPermission(10L, "class-transfer", 8L));
+    }
+
+    @Test
+    void managerDirectTransferRequiresSourceClassScopeUnlessPending() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setClassId(100L); relation.setStatus("active");
+        DeliveryClassDO source = new DeliveryClassDO();
+        source.setId(100L); source.setSystemClass(false); source.setDeptId(80L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(deliveryClassMapper.selectById(100L)).thenReturn(source);
+        when(deliveryClassScopeService.contains(9L, 80L)).thenReturn(true);
+
+        assertTrue(provider.hasPermission(10L, "direct-transfer", 9L));
+        assertFalse(provider.hasPermission(10L, "direct-transfer", 8L));
+
+        source.setSystemClass(true);
+        assertTrue(provider.hasPermission(10L, "direct-transfer", 8L));
     }
 }

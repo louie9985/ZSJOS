@@ -249,7 +249,7 @@ const bpmnInstances = () => (window as any)?.bpmnInstances
 
 const roleOptions = ref<RoleApi.RoleVO[]>([]) // 角色列表
 const deptTreeOptions = ref() // 部门树
-const postOptions = ref<PostApi.PostVO[]>([]) // 岗位列表
+const postOptions = ref<PostApi.PostSimpleVO[]>([]) // 岗位列表
 const userOptions = ref<UserApi.UserVO[]>([]) // 用户列表
 const userGroupOptions = ref<UserGroupApi.UserGroupVO[]>([]) // 用户组列表
 

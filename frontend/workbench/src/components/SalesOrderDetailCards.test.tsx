@@ -37,6 +37,15 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('keeps the SKU custom name alongside named specifications', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({ items: [{
+      id: 1, productName: '考试课程', skuName: '周末强化方案', actualAmount: 100,
+      specs: [{ attrKey: 'level', attrName: '考试等级', value: '2', label: '二级' }]
+    } as SalesOrder['items'][number]] })} />)
+    expect(html).toContain('考试课程')
+    expect(html).toContain('周末强化方案')
+    expect(html).toContain('考试等级：二级')
+  })
   it('renders approval centers as workflow nodes with nested supervisor sign-off', () => {
     const html = renderToStaticMarkup(<SalesOrderDetailCards mode="approval-done" order={order({
       taskDefinitionKey: 'financeReview',

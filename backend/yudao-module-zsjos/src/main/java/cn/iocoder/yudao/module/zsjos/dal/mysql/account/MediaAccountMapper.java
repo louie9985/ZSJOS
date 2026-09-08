@@ -55,6 +55,17 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
         return selectCount(query);
     }
 
+    default List<MediaAccountDO> selectCalendarCandidateAccounts(Collection<Long> visibleUserIds, boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();
+        query.select(MediaAccountDO::getDirectorUserId, MediaAccountDO::getOwnerOperatorUserId);
+        if (!all) {
+            if (visibleUserIds == null || visibleUserIds.isEmpty()) return List.of();
+            query.and(row -> row.in(MediaAccountDO::getDirectorUserId, visibleUserIds)
+                    .or().in(MediaAccountDO::getOwnerOperatorUserId, visibleUserIds));
+        }
+        return selectList(query);
+    }
+
     private LambdaQueryWrapperX<MediaAccountDO> calendarQuery(MediaAccountCalendarPageReqVO req,
                                                                Collection<Long> visibleUserIds, boolean all) {
         LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();

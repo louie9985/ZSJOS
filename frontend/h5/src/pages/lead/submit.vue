@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductSpecs from '../../components/ProductSpecs.vue'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
@@ -396,7 +397,8 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             <div v-for="p in form.products" :key="p.spuRef" class="confirm-row">
               <span class="confirm-value">
                 <van-tag v-if="p.primary" type="primary" size="medium" style="margin-right: 4px;">主</van-tag>
-                {{ p.spuName }}<template v-if="p.skuName"> · {{ p.skuName }}</template>
+                {{ p.spuName }}<ProductSpecs :product="p" />
+                <span v-if="p.skuName">{{ p.skuName }}</span>
               </span>
             </div>
           </div>

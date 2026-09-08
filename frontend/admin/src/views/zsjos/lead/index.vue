@@ -206,11 +206,7 @@
               scope.row.spuName || '未明确'
             }}</template></el-table-column
           >
-          <el-table-column label="具体方案" min-width="150"
-            ><template #default="scope">{{
-              scope.row.skuName || '未明确'
-            }}</template></el-table-column
-          >
+          <el-table-column label="具体方案" min-width="220"><template #default="scope"><ProductSpecs :product="scope.row" /><span>{{ scope.row.skuName || '未明确' }}</span></template></el-table-column>
           <el-table-column label="分类" prop="categoryName" min-width="120" />
           <el-table-column label="价格" width="110"
             ><template #default="scope">{{
@@ -323,6 +319,8 @@
 </template>
 
 <script setup lang="ts">
+import ProductSpecs from '../components/ProductSpecs.vue'
+import { productSpecText } from '@/utils/productSpecs'
 import type { FormInstance } from 'element-plus'
 import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as LeadFollowUpApi from '@/api/zsjos/leadFollowUp'
@@ -423,7 +421,7 @@ const userText = (id?: number, name?: string) => name || (id ? `用户 #${id}` :
 const areaText = (row: LeadApi.LeadManagementVO) =>
   [row.provinceName, row.cityName].filter(Boolean).join(' / ') || '-'
 const productText = (product?: LeadApi.LeadProductVO) =>
-  product ? [product.spuName || '未明确课程', product.skuName].filter(Boolean).join(' / ') : '-'
+  product ? [product.spuName || '未明确课程', productSpecText(product) || product.skuName].filter(Boolean).join(' / ') : '-'
 const snapshotLabel = (label?: string, value?: string) =>
   !label || /^[a-z][a-z0-9_.-]*$/i.test(label) || label === value ? '标签未配置' : label
 

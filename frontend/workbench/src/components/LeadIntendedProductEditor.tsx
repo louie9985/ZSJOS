@@ -2,10 +2,13 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { App, Button, Card, Cascader, Empty, Radio, Segmented, Select, Tag, Typography } from 'antd'
 import { useMemo, useState } from 'react'
 import type { LeadCatalog, LeadCategoryNode, ManagedLeadProduct } from '../services/api'
+import ProductSpecs from './ProductSpecs'
+import { catalogSpecs, productSpecs, type ProductSpec } from '../services/productSpecs'
 
 export type IntendedProductSelection = {
   key: string; spuRef?: string; skuRef?: string; spuUnknown: boolean; skuUnknown: boolean
   spuName: string; skuName: string; path: string; price?: number
+  specs?: ProductSpec[]
 }
 
 export function selectionFromManagedProduct(product: ManagedLeadProduct): IntendedProductSelection {
@@ -14,7 +17,7 @@ export function selectionFromManagedProduct(product: ManagedLeadProduct): Intend
     key, spuRef: product.spuRef, skuRef: product.skuRef, spuUnknown: !product.spuRef,
     skuUnknown: !product.skuRef, spuName: product.spuName || '未明确课程',
     skuName: product.skuName || '未明确规格', path: product.categoryName || '未明确课程',
-    price: product.price
+    price: product.price, specs: productSpecs(product)
   }
 }
 
@@ -52,6 +55,7 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
       : { key, spuRef: selectedSpu!.spuRef, skuRef: skuUnknown ? undefined : selectedSku!.skuRef,
           spuUnknown: false, skuUnknown, spuName: selectedSpu!.spuName,
           skuName: skuUnknown ? '未明确规格' : selectedSku!.skuName,
+          specs: skuUnknown ? [] : selectedSku!.specs ?? catalogSpecs(selectedSku!.attrValues, selectedSpu!.attrs),
           path: selectedSpu!.categoryPath.map(node => node.name).join(' / '), price: skuUnknown ? undefined : selectedSku!.price }
     onChange([...value, next]); if (!primaryKey) onPrimaryChange(key); resetDraft()
   }
@@ -104,7 +108,9 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
       <Radio.Group value={primaryKey} onChange={event => onPrimaryChange(event.target.value)} className="w-full">
         <div className="lead-product-list">{value.map(item => <Card className="lead-product-card" key={item.key} size="small">
           <div className="lead-product-row"><div className="lead-product-copy"><div className="lead-product-title"><Radio value={item.key}>主意向</Radio><strong title={item.spuName}>{item.spuName}</strong></div>
-            <Typography.Text className="lead-product-path" type="secondary" title={`${item.path} · ${item.skuName}`}>{item.path} · {item.skuName}</Typography.Text>
+            <Typography.Text className="lead-product-path" type="secondary">{item.path}</Typography.Text>
+            <ProductSpecs product={item} />
+            {item.skuName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}
             <div>{item.price == null ? <Tag>价格待确认</Tag> : <Tag color="green">¥{item.price.toFixed(2)}</Tag>}</div></div>
             <Button danger type="text" icon={<DeleteOutlined/>} aria-label="删除意向课程" onClick={() => remove(item.key)}/></div>
         </Card>)}</div>

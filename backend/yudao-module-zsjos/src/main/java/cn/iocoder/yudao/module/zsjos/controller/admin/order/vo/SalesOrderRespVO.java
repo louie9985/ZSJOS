@@ -139,6 +139,7 @@ public class SalesOrderRespVO {
         private String skuName;
         private List<String> categoryPath;
         private Map<String, String> attrValues;
+        private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
         private BigDecimal actualAmount;
     }
 

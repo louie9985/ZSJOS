@@ -14,6 +14,7 @@ import java.util.List;
 
 @Mapper
 public interface ZsjosProductMapper extends BaseMapperX<ZsjosProductDO> {
+    @org.apache.ibatis.annotations.Options(useCache = false, flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
     @Select("SELECT * FROM zsjos_product WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     ZsjosProductDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
@@ -51,5 +52,11 @@ public interface ZsjosProductMapper extends BaseMapperX<ZsjosProductDO> {
 
     default Long selectCountByCategoryId(Long categoryId) {
         return selectCount(ZsjosProductDO::getCategoryId, categoryId);
+    }
+
+    default Long selectCountByCategoryIdAndStatus(Long categoryId, Integer status) {
+        return selectCount(new LambdaQueryWrapperX<ZsjosProductDO>()
+                .eq(ZsjosProductDO::getCategoryId, categoryId)
+                .eq(ZsjosProductDO::getStatus, status));
     }
 }

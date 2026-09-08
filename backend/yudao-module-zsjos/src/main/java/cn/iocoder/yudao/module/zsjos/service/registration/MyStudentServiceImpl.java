@@ -211,6 +211,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setSkuName(snapshot.skuName());
             row.setCategoryPath(snapshot.categoryPath() == null ? List.of() : snapshot.categoryPath().stream()
                     .map(node -> node.name()).filter(StrUtil::isNotBlank).toList());
+            row.setSpecs(snapshot.displaySpecs());
             if (StrUtil.isNotBlank(snapshot.selectedAttrValuesJson())) {
                 Map<?, ?> values = JsonUtils.parseObject(snapshot.selectedAttrValuesJson(), Map.class);
                 if (values != null) {

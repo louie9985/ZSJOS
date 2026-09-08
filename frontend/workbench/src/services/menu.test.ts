@@ -23,6 +23,18 @@ const menu = (values: Partial<RawMenu> & Pick<RawMenu, 'id' | 'name'>): RawMenu 
 })
 
 describe('workbench menu conversion', () => {
+  it('resolves the exam calendar beneath the server-owned Calendar directory', () => {
+    const routes = buildMenuTree([menu({
+      id: 73600, name: '日历', path: '/calendar', children: [menu({
+        id: 73610, parentId: 73600, name: '考期日历', path: 'exam-calendar',
+        component: 'zsjos/examCalendar/index'
+      })]
+    })])
+    expect(routes[0].children[0].path).toBe(APP_ROUTES.EXAM_CALENDAR)
+    expect(findMenuByPath(routes, '/calendar/exam-calendar')?.id).toBe(73610)
+    expect(buildTwoLevelNavigation(routes)[0].pages[0].key).toBe('/calendar/exam-calendar')
+  })
+
   it('rejects backend business errors instead of treating them as data', () => {
     expect(() => unwrap({ data: { code: 400, msg: 'tenant required', data: null } }))
       .toThrow('tenant required')
@@ -227,11 +239,12 @@ describe('workbench menu conversion', () => {
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(55)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(58)
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
-    expect(RENDERABLE_APP_ROUTES.has('/calendar/all')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/calendar/personal')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/calendar/exam-calendar')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/my-assets')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/asset-demands')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/feedback')).toBe(true)
