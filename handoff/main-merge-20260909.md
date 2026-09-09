@@ -36,3 +36,15 @@
 - Dependency or integration impact: 远程仓库已更新；未执行数据库或共享服务操作；合并前 stash 仍保留。
 - Remaining work: `LOG_FILE_IS_UNDEFINED`、`frontend/workbench/.cache/`、`jrebel-classpath-44060.jar` 仍为本地未跟踪/未提交产物。
 - Status: `pushed`
+
+## Delivery Entry - 2026-09-09 16:10:00 +08:00
+
+- Workstream ID: `main-merge-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `9543adb9d6`。
+- User goal: 提交并推送当前新增改动。
+- Key decisions: 提交素材库迁移从 `V191` 调整为 `V194` 的源码、文档和校验更新；保留迁移文件重命名及相关 SQL 变更；不纳入日志、缓存和临时 JAR。
+- Execution or analysis result: 已创建提交 `9543adb9d6`，准备推送至 `origin/main`。
+- Changed files: 素材库迁移 SQL、数据库校验脚本、核心 schema、迁移 README、运维文档、菜单覆盖文档及本交接记录。
+- Verification evidence: `git diff --cached --check` 通过；提交成功。
+- Dependency or integration impact: 未执行数据库迁移或共享服务操作。
+- Remaining work: 推送提交并核对远程同步状态。
+- Status: `commit-created`
