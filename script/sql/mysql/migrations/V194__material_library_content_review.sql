@@ -1,4 +1,4 @@
--- UTF-8. V191: material library, content review batches, and student-scoped partner invitations.
+-- UTF-8. V194: material library, content review batches, and student-scoped partner invitations.
 -- Migration-Owner: ai
 -- Dependencies/order: apply after V185. This migration owns the material-library schema and metadata.
 -- Data scope: additive ZSJOS schema, four confirmed material type rows per enabled tenant, two
@@ -12,9 +12,9 @@
 
 SET NAMES utf8mb4;
 
-DROP PROCEDURE IF EXISTS `zsjos_v191_add_column`;
+DROP PROCEDURE IF EXISTS `zsjos_V194_add_column`;
 DELIMITER $$
-CREATE PROCEDURE `zsjos_v191_add_column`(
+CREATE PROCEDURE `zsjos_V194_add_column`(
   IN p_table varchar(64), IN p_column varchar(64), IN p_definition text
 )
 BEGIN
@@ -22,17 +22,17 @@ BEGIN
     SELECT 1 FROM information_schema.columns
     WHERE table_schema=DATABASE() AND table_name=p_table AND column_name=p_column
   ) THEN
-    SET @zsjos_v191_ddl=CONCAT('ALTER TABLE `',p_table,'` ADD COLUMN `',p_column,'` ',p_definition);
-    PREPARE zsjos_v191_stmt FROM @zsjos_v191_ddl;
-    EXECUTE zsjos_v191_stmt;
-    DEALLOCATE PREPARE zsjos_v191_stmt;
+    SET @zsjos_V194_ddl=CONCAT('ALTER TABLE `',p_table,'` ADD COLUMN `',p_column,'` ',p_definition);
+    PREPARE zsjos_V194_stmt FROM @zsjos_V194_ddl;
+    EXECUTE zsjos_V194_stmt;
+    DEALLOCATE PREPARE zsjos_V194_stmt;
   END IF;
 END$$
 DELIMITER ;
 
-DROP PROCEDURE IF EXISTS `zsjos_v191_add_index`;
+DROP PROCEDURE IF EXISTS `zsjos_V194_add_index`;
 DELIMITER $$
-CREATE PROCEDURE `zsjos_v191_add_index`(
+CREATE PROCEDURE `zsjos_V194_add_index`(
   IN p_table varchar(64), IN p_index varchar(64), IN p_definition text
 )
 BEGIN
@@ -40,17 +40,17 @@ BEGIN
     SELECT 1 FROM information_schema.statistics
     WHERE table_schema=DATABASE() AND table_name=p_table AND index_name=p_index
   ) THEN
-    SET @zsjos_v191_ddl=CONCAT('ALTER TABLE `',p_table,'` ADD ',p_definition);
-    PREPARE zsjos_v191_stmt FROM @zsjos_v191_ddl;
-    EXECUTE zsjos_v191_stmt;
-    DEALLOCATE PREPARE zsjos_v191_stmt;
+    SET @zsjos_V194_ddl=CONCAT('ALTER TABLE `',p_table,'` ADD ',p_definition);
+    PREPARE zsjos_V194_stmt FROM @zsjos_V194_ddl;
+    EXECUTE zsjos_V194_stmt;
+    DEALLOCATE PREPARE zsjos_V194_stmt;
   END IF;
 END$$
 DELIMITER ;
 
-DROP PROCEDURE IF EXISTS `zsjos_v191_apply`;
+DROP PROCEDURE IF EXISTS `zsjos_V194_apply`;
 DELIMITER $$
-CREATE PROCEDURE `zsjos_v191_apply`()
+CREATE PROCEDURE `zsjos_V194_apply`()
 BEGIN
   DECLARE v_menu_id int DEFAULT 80010;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -62,13 +62,13 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V185')
      OR NOT EXISTS (SELECT 1 FROM `zsjos_module_schema_version`
                     WHERE `module_code`='core' AND `version`='V185') THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 requires V185 in both schema-version registries';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 requires V185 in both schema-version registries';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=6735 AND `deleted`=b'0') THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 requires ZSJOS menu root 6735';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 requires ZSJOS menu root 6735';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=7022 AND `deleted`=b'0') THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 requires media student page 7022';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 requires media student page 7022';
   END IF;
   IF EXISTS (
     SELECT 1 FROM `system_menu` menu_row WHERE menu_row.`id` BETWEEN 80010 AND 80040
@@ -113,7 +113,7 @@ BEGIN
              WHEN 80013 THEN 'types' WHEN 80014 THEN 'imports' WHEN 80015 THEN 'content-review'
              WHEN 80040 THEN 'content-production' ELSE '' END)
   ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 menu ID range is occupied';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 menu ID range is occupied';
   END IF;
   IF EXISTS (
     SELECT 1 FROM `system_menu` WHERE `id` NOT BETWEEN 80010 AND 80040 AND `deleted`=b'0'
@@ -128,7 +128,7 @@ BEGIN
         'zsjos:content-review:publish-register','zsjos:partner-invitation:create-student',
         'zsjos:content-review:query-all','zsjos:material-import:error-download','zsjos:content:query')
   ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 permission is already owned by another menu';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 permission is already owned by another menu';
   END IF;
 
   CREATE TABLE IF NOT EXISTS `zsjos_material_type` (
@@ -513,45 +513,45 @@ BEGIN
     KEY `idx_content_version_file_order` (`tenant_id`,`content_version_id`,`field_key`,`sort_no`,`id`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='生产内容版本文件绑定';
 
-  CALL `zsjos_v191_add_column`('zsjos_content_version','title_snapshot',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','title_snapshot',
     'varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT ''标题快照'' AFTER `stage`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','topic_snapshot',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','topic_snapshot',
     'varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT ''选题快照'' AFTER `title_snapshot`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','cover_snapshot_json',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','cover_snapshot_json',
     'json DEFAULT NULL COMMENT ''封面文件快照'' AFTER `topic_snapshot`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','deliverable_snapshot_json',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','deliverable_snapshot_json',
     'json DEFAULT NULL COMMENT ''成品视频或图文快照'' AFTER `deliverable_url`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','lead_resource_url',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','lead_resource_url',
     'varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT ''引流资料 HTTPS 链接'' AFTER `script_text`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','planned_publish_at',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','planned_publish_at',
     'datetime DEFAULT NULL COMMENT ''预计发布时间'' AFTER `lead_resource_url`');
-  CALL `zsjos_v191_add_column`('zsjos_content_version','frozen_at',
+  CALL `zsjos_V194_add_column`('zsjos_content_version','frozen_at',
     'datetime DEFAULT NULL COMMENT ''进入批审后的冻结时间'' AFTER `planned_publish_at`');
   ALTER TABLE `zsjos_content` MODIFY COLUMN `current_version_no` int NOT NULL DEFAULT 0;
 
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','invitation_scene',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','invitation_scene',
     'varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT ''GENERAL'' COMMENT ''GENERAL/STUDENT_PARTNER'' AFTER `invite_code`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','student_person_id',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','student_person_id',
     'bigint DEFAULT NULL COMMENT ''学员 Person 编号'' AFTER `invitation_scene`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','student_name_snapshot',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','student_name_snapshot',
     'varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT ''邀请时学员原姓名快照'' AFTER `student_person_id`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','student_mobile_snapshot',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','student_mobile_snapshot',
     'varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT ''邀请时学员原手机号快照'' AFTER `student_name_snapshot`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','initiated_by_director_user_id',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','initiated_by_director_user_id',
     'bigint DEFAULT NULL COMMENT ''发起邀请的责任编导'' AFTER `student_mobile_snapshot`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','assignment_context_json',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','assignment_context_json',
     'json DEFAULT NULL COMMENT ''邀请时分配上下文快照'' AFTER `initiated_by_director_user_id`');
-  CALL `zsjos_v191_add_column`('zsjos_partner_invitation','active_student_person_id',
+  CALL `zsjos_V194_add_column`('zsjos_partner_invitation','active_student_person_id',
     'bigint GENERATED ALWAYS AS (CASE WHEN `invitation_scene`=''STUDENT_PARTNER'' AND `status`=''active'' AND `deleted`=b''0'' THEN `student_person_id` ELSE NULL END) STORED AFTER `assignment_context_json`');
 
   ALTER TABLE `zsjos_partner_invitation`
     MODIFY COLUMN `assigned_operator_user_id` bigint DEFAULT NULL COMMENT '普通邀请的归属运营；学员邀请为空',
     MODIFY COLUMN `assigned_operator_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '普通邀请归属运营姓名快照';
-  CALL `zsjos_v191_add_index`('zsjos_partner_invitation','idx_tenant_student_scene_status',
+  CALL `zsjos_V194_add_index`('zsjos_partner_invitation','idx_tenant_student_scene_status',
     'KEY `idx_tenant_student_scene_status` (`tenant_id`,`student_person_id`,`invitation_scene`,`status`,`id`)');
-  CALL `zsjos_v191_add_index`('zsjos_partner_invitation','uk_tenant_active_student_invitation',
+  CALL `zsjos_V194_add_index`('zsjos_partner_invitation','uk_tenant_active_student_invitation',
     'UNIQUE KEY `uk_tenant_active_student_invitation` (`tenant_id`,`active_student_person_id`)');
-  CALL `zsjos_v191_add_index`('zsjos_content_review_batch_item','idx_content_review_item_version',
+  CALL `zsjos_V194_add_index`('zsjos_content_review_batch_item','idx_content_review_item_version',
     'KEY `idx_content_review_item_version` (`tenant_id`,`content_version_id`,`batch_id`,`deleted`)');
   IF (SELECT COUNT(*) FROM information_schema.tables
       WHERE table_schema=DATABASE() AND table_name IN (
@@ -561,7 +561,7 @@ BEGIN
         'zsjos_material_reference','zsjos_material_import_batch','zsjos_material_import_error',
         'zsjos_content_review_config','zsjos_content_review_batch','zsjos_content_review_batch_item',
         'zsjos_content_version_file')) <> 17 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 material/content-review tables are incomplete';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 material/content-review tables are incomplete';
   END IF;
   IF EXISTS (
     SELECT 1
@@ -582,7 +582,7 @@ BEGIN
      AND actual_column.column_name=expected_column.column_name
     WHERE actual_column.column_name IS NULL
   ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 material/content-review table columns are incomplete';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 material/content-review table columns are incomplete';
   END IF;
   IF EXISTS (
     SELECT 1
@@ -608,7 +608,7 @@ BEGIN
        OR actual_index.non_unique<>expected_index.non_unique
        OR actual_index.column_names<>expected_index.column_names
   ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 material/content-review indexes are incompatible';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 material/content-review indexes are incompatible';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.columns
       WHERE table_schema=DATABASE() AND table_name='zsjos_content_version'
@@ -633,14 +633,14 @@ BEGIN
              OR (column_name='assigned_operator_user_id' AND data_type='bigint' AND is_nullable='YES')
              OR (column_name='assigned_operator_name_snapshot' AND data_type='varchar'
                  AND character_maximum_length=100 AND is_nullable='YES'))) <> 9 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V191 base-table extensions are incomplete';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V194 base-table extensions are incomplete';
   END IF;
 
   START TRANSACTION;
 
   INSERT INTO `system_dict_type`
     (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-  SELECT seed.name,seed.type,0,'管理员维护；V191 不预置业务选项','V191',NOW(),'V191',NOW(),b'0'
+  SELECT seed.name,seed.type,0,'管理员维护；V194 不预置业务选项','V194',NOW(),'V194',NOW(),b'0'
   FROM (
     SELECT '素材适配账号类型' name,'zsjos_material_account_type' type
     UNION ALL SELECT '素材适配专业方向','zsjos_material_profession'
@@ -650,7 +650,7 @@ BEGIN
 
   INSERT INTO `system_dict_data`
     (`sort`,`label`,`value`,`dict_type`,`status`,`color_type`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-  SELECT seed.sort,seed.label,seed.value,'zsjos_material_profession',0,'default','V191',NOW(),'V191',NOW(),b'0'
+  SELECT seed.sort,seed.label,seed.value,'zsjos_material_profession',0,'default','V194',NOW(),'V194',NOW(),b'0'
   FROM (
     SELECT 10 sort,'T1 职业营养' label,'t1_occupational_nutrition' value
     UNION ALL SELECT 20,'T2 健康管理','t2_health_management'
@@ -672,7 +672,7 @@ BEGIN
   SELECT seed.code,seed.name,seed.description,0,seed.manual_create,seed.allow_import,seed.auto_collect,
          seed.recommendation_enabled,JSON_OBJECT('dimensions',JSON_ARRAY('account_type','profession','account_stage'),
          'maxResults',20),
-         0,'V191',NOW(),'V191',NOW(),b'0',tenant.id
+         0,'V194',NOW(),'V194',NOW(),b'0',tenant.id
   FROM `system_tenant` tenant
   CROSS JOIN (
     SELECT 'viral_account' code,'爆款账号' name,'爆款账号拆解内容包' description,b'1' manual_create,b'1' allow_import,b'0' auto_collect,b'1' recommendation_enabled
@@ -686,7 +686,7 @@ BEGIN
 
   INSERT INTO `zsjos_content_review_config`
     (`production_material_type_code`,`version`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT 'production_content',0,'V191',NOW(),'V191',NOW(),b'0',tenant.id
+  SELECT 'production_content',0,'V194',NOW(),'V194',NOW(),b'0',tenant.id
   FROM `system_tenant` tenant
   WHERE tenant.deleted=b'0' AND tenant.status=0
     AND NOT EXISTS (SELECT 1 FROM `zsjos_content_review_config` existing
@@ -696,7 +696,7 @@ BEGIN
     (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,
      `workbench_render_mode`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
   SELECT seed.id,seed.name,seed.permission,seed.type,seed.sort,seed.parent_id,seed.path,seed.icon,
-         seed.component,seed.component_name,seed.render_mode,0,b'1',b'1',b'1','V191',NOW(),'V191',NOW(),b'0'
+         seed.component,seed.component_name,seed.render_mode,0,b'1',b'1',b'1','V194',NOW(),'V194',NOW(),b'0'
   FROM (
     SELECT 80010 id,'素材库' name,'' permission,1 type,60 sort,6735 parent_id,'material-library' path,'ep:collection' icon,'' component,NULL component_name,'native' render_mode
     UNION ALL SELECT 80011,'素材浏览','zsjos:material:query',2,1,80010,'browse','ep:search','zsjos-workbench','MaterialLibraryPage','native'
@@ -736,37 +736,37 @@ BEGIN
     `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),
     `workbench_render_mode`=VALUES(`workbench_render_mode`),`status`=0,`visible`=b'1',
     `keep_alive`=VALUES(`keep_alive`),`always_show`=VALUES(`always_show`),
-    `updater`='V191',`update_time`=NOW(),`deleted`=b'0';
+    `updater`='V194',`update_time`=NOW(),`deleted`=b'0';
 
   SET v_menu_id=80010;
   WHILE v_menu_id <= 80036 DO
     UPDATE `system_tenant_package`
-    SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',v_menu_id),`updater`='V191',`update_time`=NOW()
+    SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',v_menu_id),`updater`='V194',`update_time`=NOW()
     WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$')
       AND NOT JSON_CONTAINS(`menu_ids`,CAST(v_menu_id AS CHAR),'$');
     SET v_menu_id=v_menu_id+1;
   END WHILE;
   UPDATE `system_tenant_package`
-  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80037),`updater`='V191',`update_time`=NOW()
+  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80037),`updater`='V194',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'7022','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'80037','$');
   UPDATE `system_tenant_package`
-  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80038),`updater`='V191',`update_time`=NOW()
+  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80038),`updater`='V194',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'80038','$');
   UPDATE `system_tenant_package`
-  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80039),`updater`='V191',`update_time`=NOW()
+  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80039),`updater`='V194',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'80039','$');
   UPDATE `system_tenant_package`
-  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80040),`updater`='V191',`update_time`=NOW()
+  SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80040),`updater`='V194',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'80040','$');
 
   -- Preserve access held through the retired standalone content page without inferring role names.
   INSERT INTO `system_role_menu`
     (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT role_row.id,target_menu.id,'V191',NOW(),'V191',NOW(),b'0',role_row.tenant_id
+  SELECT DISTINCT role_row.id,target_menu.id,'V194',NOW(),'V194',NOW(),b'0',role_row.tenant_id
   FROM `system_role_menu` source_grant
   JOIN `system_role` role_row ON role_row.id=source_grant.role_id
     AND role_row.tenant_id=source_grant.tenant_id AND role_row.status=0 AND role_row.deleted=b'0'
@@ -779,20 +779,20 @@ BEGIN
         AND existing_grant.tenant_id=role_row.tenant_id AND existing_grant.deleted=b'0');
 
   INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
-  VALUES ('V191','Material library, content review, and student partner invitation',
-          SHA2('V191__material_library_content_review.sql',256),NOW())
+  VALUES ('V194','Material library, content review, and student partner invitation',
+          SHA2('V194__material_library_content_review.sql',256),NOW())
   ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
   INSERT INTO `zsjos_module_schema_version`
     (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-  VALUES ('core','V191','Material library, content review, and student partner invitation',
-          SHA2('V191__material_library_content_review.sql',256),'baseline',NOW())
+  VALUES ('core','V194','Material library, content review, and student partner invitation',
+          SHA2('V194__material_library_content_review.sql',256),'baseline',NOW())
   ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
 
   COMMIT;
 END$$
 DELIMITER ;
 
-CALL `zsjos_v191_apply`();
-DROP PROCEDURE IF EXISTS `zsjos_v191_apply`;
-DROP PROCEDURE IF EXISTS `zsjos_v191_add_index`;
-DROP PROCEDURE IF EXISTS `zsjos_v191_add_column`;
+CALL `zsjos_V194_apply`();
+DROP PROCEDURE IF EXISTS `zsjos_V194_apply`;
+DROP PROCEDURE IF EXISTS `zsjos_V194_add_index`;
+DROP PROCEDURE IF EXISTS `zsjos_V194_add_column`;

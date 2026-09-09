@@ -22331,3 +22331,27 @@ equestAttachments。
 - Verification evidence: 推送前全部验证证据见上一条；本地分支相对 `origin/main` ahead 1，工作树在本条提交后保持干净。
 - Dependency or integration impact: 远程仓库未发生变化；本机 `known_hosts` 新增 Gitee ED25519 主机记录。
 - Remaining work: 在当前终端配置可用的 Gitee HTTPS 凭据或 SSH 公钥后，执行 `git push -u origin main`。
+
+## Workstream Registration - main-migration-v191-renumber-20260909
+
+- Workstream ID: `main-migration-v191-renumber-20260909`; Goal: 消除 Core SQL 迁移素材库脚本与课程日历脚本的重复 `V191` 编号，并同步所有直接引用；Non-goals: 不修改业务表结构、菜单权限逻辑或数据库实例，不处理既有 `V192` 命名冲突。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`; Target branch: `main`; Owner: `/root`。
+- Ownership scope: `script/sql/mysql/migrations/V191__material_library_content_review.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/verify-bootstrap.sql`, `script/sql/mysql/migrations/README.md`, `handoff/main.md`。
+- Dependencies: 课程日历 `V191`、客资资格 `V192`、销售订单 `V193` 的现有执行顺序；Integration order: 先重命名并同步素材库引用，再运行静态唯一性与差异检查。
+- Verification plan: 检查迁移文件名编号唯一、素材库 SQL 内部版本/过程/校验引用一致、bootstrap 顺序与 verify-bootstrap 标签一致、`git diff --check` 通过。
+
+## Delivery Entry - 2026-09-09 00:00:00 +08:00
+
+- Workstream ID: `main-migration-v191-renumber-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`（未创建提交）。
+- User goal: 调整重复的 `V191` 迁移编号及相关引用。
+- Key decisions: 保留课程日历 `V191`；将素材库/内容批审迁移顺延为 `V194`，同步文件名、过程名、版本登记、bootstrap、校验 SQL、baseline 注释和直接受影响文档；不处理既有 `V192` 重复。
+- Execution or analysis result: 素材库迁移已从 `V191__material_library_content_review.sql` 重命名为 `V194__material_library_content_review.sql`，内部所有 `V191` 版本标识改为 `V194`；旧素材库路径引用已清零。
+- Changed files: `script/sql/mysql/migrations/V194__material_library_content_review.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `docs/operations/database-migrations.md`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`。
+- Verification evidence: 素材库旧/新引用审计通过；`V191` 文件仅剩课程日历；`V194` 文件内过程名、版本登记和 checksum 字符串一致；bootstrap/verify 引用一致；`git diff --check`（本次文件）通过。未执行数据库写入或迁移实例化。
+- Dependency or integration impact: 无依赖变化；fresh bootstrap 将按 `V191` 课程日历、`V192`/`V193` 既有脚本、`V194` 素材库顺序执行。仓库仍存在两个 `V192` 文件，需另行编号治理。
+- Remaining work: 需在部署前按 UTF-8 流程执行 fresh/upgrade SQL 验证；未创建提交或推送。
+
+## Delivery Correction - 2026-09-09 13:35:12 +08:00
+
+- Workstream ID: `main-migration-v191-renumber-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`（未创建提交）。
+- Correction: 上一条交付记录的时间字段误写为 `00:00:00`；本条以当前北京时间 `2026-09-09 13:35:12 +08:00` 作为准确交付时间，其余内容不变。

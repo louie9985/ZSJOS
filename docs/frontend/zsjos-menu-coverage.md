@@ -118,7 +118,7 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 - 学员信息收集表配置由 Admin 原生页面 `zsjos/studentInfoFormConfig/index` 承载，菜单使用 `config:query` 权限。Workbench 不实现配置编辑页面，只消费客资操作、快照及服务上下文的权限投影；公开填写由 H5 `/student-info-form` 承载。完整接口与配置约束见 [收集表契约](../api/student-information-collection.md)。
 
 - `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.
-- `/zsjos/material-library/content-production` 使用服务端页面权限 `zsjos:content:query`。V186 仅将仍持有退役内容页 `6974` 的有效角色授权映射到素材库父菜单和本页面，不根据角色名称扩权；创建、编辑和状态推进继续消费各自的 `zsjos:content:*` 按钮权限。
+- `/zsjos/material-library/content-production` 使用服务端页面权限 `zsjos:content:query`。V194 仅将仍持有退役内容页 `6974` 的有效角色授权映射到素材库父菜单和本页面，不根据角色名称扩权；创建、编辑和状态推进继续消费各自的 `zsjos:content:*` 按钮权限。
 - The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its base tabs are overview, third-party platform accounts (including positioning cards and account-scoped status maintenance), and content production history. The new `student-info` collection-snapshot tab is added only when the server projects its independent read permission and Lead visibility. It does not restore the retired talk-record tab: old `tab=student` links fall back to overview, while retired `tab=maintenance` and `tab=positioning` links resolve to the account tab.
 - Directors see their service-relation or account responsibility scope. Operators see only students related to accounts, content, positioning, or tasks they currently own. Each detail and command is re-authorized independently by the backend.
 - 账号状态维护使用服务端按钮权限 `zsjos:media-account:maintenance`，按钮节点挂在当前媒体学员页面菜单 `7022` 下；Workbench 在每个账号行展示该账号的状态摘要和服务端投影的维护/查看入口，完整快照与历史位于选中账号区域，不建立学员级“状态维护”页签。已退役的第三方账号页面 `6970` 不再承载该按钮或任何前端权限来源。

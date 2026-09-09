@@ -19,7 +19,7 @@ structure is `script/sql/mysql/schema/core.sql`; reviewed, forward-only changes 
 stored under `script/sql/mysql/migrations/`. MyBatis data objects are mapping
 evidence, not a complete DDL source.
 
-素材库与内容批审迁移使用 `V186`。AI 工作流只生成偶数版本，奇数版本保留给同事；迁移文件包含 `Migration-Owner: ai` 元数据，必须在 `V185` 两套版本登记和既有素材菜单存在时执行。V186 只增加租户表、菜单/权限元数据和空的业务字典类型，不写入素材实例、模板选项、内容批次或邀请记录。回滚采用后续迁移隐藏入口并保留历史数据，不能删除已被业务版本引用的记录。
+素材库与内容批审迁移使用 `V194`。AI 工作流只生成偶数版本，奇数版本保留给同事；迁移文件包含 `Migration-Owner: ai` 元数据，必须在 `V185` 两套版本登记和既有素材菜单存在时执行。V194 只增加租户表、菜单/权限元数据和空的业务字典类型，不写入素材实例、模板选项、内容批次或邀请记录。回滚采用后续迁移隐藏入口并保留历史数据，不能删除已被业务版本引用的记录。
 
 Do not run generated differences directly against production. `make` generates a
 candidate migration for review. Production runs only migrations packaged in the

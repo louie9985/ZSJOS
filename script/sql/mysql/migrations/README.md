@@ -1048,9 +1048,9 @@ V190 follows V188 and adds nullable product, selected specification, and selecte
 to `zsjos_delivery_class`. It changes no existing business rows and is repeatable. New class writes
 must select at least one valid SKU from the enabled product scope; historical classes retain NULL snapshots.
 Rollback is forward-only because removing the columns would discard new business snapshots.
-### V191 Material library, content review, and student Partner invitations
+### V194 Material library, content review, and student Partner invitations
 
-V191 follows V185 and starts the material-library workstream. It creates the
+V194 follows V193 and continues the material-library workstream. It creates the
 tenant-scoped material type, immutable schema and content version, search/index projection, file snapshot, approval
 round, like, favorite, reference, Excel import, and content-review batch tables. It extends content versions with
 the complete pre-publication package snapshot and extends Partner invitations with a separate student-bound scene.

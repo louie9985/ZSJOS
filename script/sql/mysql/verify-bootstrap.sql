@@ -2029,10 +2029,10 @@ SELECT 'V185 Partner permission scope split' AS check_name,
           'PASS','FAIL') AS result;
 
 
-SELECT 'V191 material library schema and versions' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V191')
+SELECT 'V194 material library schema and versions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V194')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-            WHERE module_code='core' AND version='V191')
+            WHERE module_code='core' AND version='V194')
           AND (SELECT COUNT(*) FROM information_schema.tables
                WHERE table_schema=DATABASE() AND table_name IN (
                  'zsjos_material_type','zsjos_material_schema_version','zsjos_material','zsjos_material_version',
@@ -2043,7 +2043,7 @@ SELECT 'V191 material library schema and versions' AS check_name,
                  'zsjos_content_version_file'))=17,
           'PASS','FAIL') AS result;
 
-SELECT 'V191 material library required columns' AS check_name,
+SELECT 'V194 material library required columns' AS check_name,
        IF(NOT EXISTS (
             SELECT 1
             FROM JSON_TABLE(
@@ -2084,7 +2084,7 @@ SELECT 'V191 material library required columns' AS check_name,
                  AND is_nullable='YES')=2,
           'PASS','FAIL') AS result;
 
-SELECT 'V191 material library indexes' AS check_name,
+SELECT 'V194 material library indexes' AS check_name,
        IF(NOT EXISTS (
             SELECT 1
             FROM JSON_TABLE(
@@ -2111,7 +2111,7 @@ SELECT 'V191 material library indexes' AS check_name,
           ),
           'PASS','FAIL') AS result;
 
-SELECT 'V191 material library menus and package coverage' AS check_name,
+SELECT 'V194 material library menus and package coverage' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu
            WHERE id BETWEEN 80010 AND 80040 AND deleted=b'0')=31
           AND (SELECT COUNT(DISTINCT permission) FROM system_menu

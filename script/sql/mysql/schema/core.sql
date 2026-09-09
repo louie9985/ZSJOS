@@ -6939,7 +6939,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_config_lock (
  tenant_id bigint NOT NULL, PRIMARY KEY(tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收集表配置租户锁';
 
--- V191 material library, content review batches, and content-version file bindings.
+-- V194 material library, content review batches, and content-version file bindings.
 CREATE TABLE IF NOT EXISTS `zsjos_material_type` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '素材类型编号',
   `code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '稳定类型编码',

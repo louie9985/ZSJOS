@@ -176,7 +176,7 @@ SOURCE script/sql/mysql/migrations/V192__lead_qualification_from_ownership.sql;
 SOURCE script/sql/mysql/migrations/V193__unify_sales_order_management.sql;
 -- Current development baseline correction; no business/permission data writes.
 SOURCE script/sql/mysql/exam-calendar-product-scope.sql;
-SOURCE script/sql/mysql/migrations/V191__material_library_content_review.sql;
+SOURCE script/sql/mysql/migrations/V194__material_library_content_review.sql;
 
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
