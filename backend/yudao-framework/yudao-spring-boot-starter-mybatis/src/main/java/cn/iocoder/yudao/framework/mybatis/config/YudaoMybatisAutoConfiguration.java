@@ -33,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @AutoConfiguration(before = MybatisPlusAutoConfiguration.class) // 目的：先于 MyBatis Plus 自动配置，避免 @MapperScan 可能扫描不到 Mapper 打印 warn 日志
 @MapperScan(value = "${yudao.info.base-package}", annotationClass = Mapper.class,
+        nameGenerator = MapperBeanNameGenerator.class, // 生成全局唯一的 Bean 名（模块名 + 接口名），避免跨模块 by-name 碰撞
         lazyInitialization = "${mybatis.lazy-initialization:false}") // Mapper 懒加载，目前仅用于单元测试
 public class YudaoMybatisAutoConfiguration {
 

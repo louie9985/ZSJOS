@@ -9,6 +9,11 @@ public class PartnerInvitationRespVO {
 
     private Long id;
     private String inviteCode;
+    private String invitationScene;
+    private Long studentPersonId;
+    private String studentNameSnapshot;
+    private String studentMobileSnapshot;
+    private Long initiatedByDirectorUserId;
     private String name;
     private String mobile;
     private Long assignedOperatorUserId;

@@ -763,6 +763,11 @@ def make_migration(module_code: str, name: str) -> None:
         fail(f"No desired schema changes found for {module_code}")
     existing = migrations_for(module_code, manifest)
     next_number = (existing[-1].number + 1) if existing else 1
+    if next_number % 2 != 0:
+        fail(
+            f"Next migration for {module_code} would be V{next_number:03d}, an odd version reserved "
+            "for the colleague; wait until that migration is present before generating the next even version"
+        )
     version = f"V{next_number:03d}"
     output_path = resolve_sql_path(manifest["migrations"]) / f"{version}__{name}.sql"
     ddl = atlas_diff(baseline, desired)

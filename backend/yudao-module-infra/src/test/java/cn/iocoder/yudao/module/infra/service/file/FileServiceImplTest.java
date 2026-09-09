@@ -340,6 +340,16 @@ public class FileServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testCreateFileByPresignedPath_directUploadBusinessPathRejected() {
+        FileCreateReqVO reqVO = randomPojo(FileCreateReqVO.class, o -> {
+            o.setPath("zsjos/material/42/file.mp4");
+            o.setName("file.mp4");
+        });
+
+        assertServiceException(() -> fileService.createFile(reqVO), FILE_DIRECT_UPLOAD_REQUIRED);
+    }
+
+    @Test
     public void testGenerateUploadPath_AllEnabled() {
         // 准备参数
         String name = "test.jpg";

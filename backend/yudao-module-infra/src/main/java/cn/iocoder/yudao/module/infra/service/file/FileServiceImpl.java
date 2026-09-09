@@ -44,6 +44,8 @@ public class FileServiceImpl implements FileService {
     static final Set<String> AVATAR_DIRECTORIES = Set.of("system/user/avatar", "employee/avatar");
     static final Set<String> AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     static final long AVATAR_MAX_SIZE = 5L * 1024 * 1024;
+    private static final List<String> DIRECT_UPLOAD_ONLY_DIRECTORIES = List.of(
+            "zsjos/content", "zsjos/material");
 
     /**
      * 上传文件的前缀，是否包含日期（yyyyMMdd）
@@ -198,6 +200,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory) {
+        validateLegacyDirectUploadPath(directory);
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
 
@@ -245,6 +248,7 @@ public class FileServiceImpl implements FileService {
     public Long createFile(FileCreateReqVO createReqVO) {
         // 1.1 校验参数的合法性
         FilePathUtils.validatePath(createReqVO.getPath());
+        validateLegacyDirectUploadPath(createReqVO.getPath());
         createReqVO.setName(FilePathUtils.validateFileName(createReqVO.getName()));
         // 1.2 处理 URL 的合法性，移除 URL 中的查询参数（例如签名参数），保证 URL 的唯一性
         createReqVO.setUrl(HttpUtils.removeUrlQuery(createReqVO.getUrl())); // 目的：移除私有桶情况下，URL 的签名参数
@@ -330,6 +334,13 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDO getFileByConfigIdAndPath(Long configId, String path) {
         return fileMapper.selectLatestByConfigIdAndPath(configId, path);
+    }
+
+    private void validateLegacyDirectUploadPath(String path) {
+        if (path != null && DIRECT_UPLOAD_ONLY_DIRECTORIES.stream()
+                .anyMatch(directory -> path.equals(directory) || path.startsWith(directory + "/"))) {
+            throw exception(FILE_DIRECT_UPLOAD_REQUIRED);
+        }
     }
 
 }

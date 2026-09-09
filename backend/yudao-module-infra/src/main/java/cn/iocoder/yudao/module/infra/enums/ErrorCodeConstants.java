@@ -39,6 +39,15 @@ public interface ErrorCodeConstants {
     ErrorCode FILE_AVATAR_TYPE_INVALID = new ErrorCode(1_001_003_005, "头像仅支持 JPG、PNG、WebP 图片");
     ErrorCode FILE_AVATAR_SIZE_EXCEEDED = new ErrorCode(1_001_003_006, "头像不能超过 5MB");
     ErrorCode FILE_AVATAR_NOT_EXISTS = new ErrorCode(1_001_003_007, "头像文件不存在");
+    ErrorCode FILE_DIRECT_UPLOAD_INVALID = new ErrorCode(1_001_003_008, "直传文件参数不正确");
+    ErrorCode FILE_DIRECT_UPLOAD_UNSUPPORTED = new ErrorCode(1_001_003_009, "当前文件存储不支持安全直传");
+    ErrorCode FILE_DIRECT_UPLOAD_TOKEN_INVALID = new ErrorCode(1_001_003_010, "上传令牌无效或已失效");
+    ErrorCode FILE_DIRECT_UPLOAD_OWNER_MISMATCH = new ErrorCode(1_001_003_011, "上传令牌不属于当前操作主体");
+    ErrorCode FILE_DIRECT_UPLOAD_EXPIRED = new ErrorCode(1_001_003_012, "上传令牌已过期，请重新上传");
+    ErrorCode FILE_DIRECT_UPLOAD_OBJECT_MISSING = new ErrorCode(1_001_003_013, "未找到已上传的文件对象");
+    ErrorCode FILE_DIRECT_UPLOAD_METADATA_MISMATCH = new ErrorCode(1_001_003_014, "上传文件的大小或类型与申请不一致");
+    ErrorCode FILE_DIRECT_UPLOAD_STATE_INVALID = new ErrorCode(1_001_003_015, "上传文件登记状态不一致");
+    ErrorCode FILE_DIRECT_UPLOAD_REQUIRED = new ErrorCode(1_001_003_016, "该业务目录必须使用安全直传接口");
 
     // ========== 代码生成器 1-001-004-000 ==========
     ErrorCode CODEGEN_TABLE_EXISTS = new ErrorCode(1_001_004_002, "表定义已经存在");

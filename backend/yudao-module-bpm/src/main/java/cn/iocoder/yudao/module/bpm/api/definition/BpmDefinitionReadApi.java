@@ -15,4 +15,6 @@ public interface BpmDefinitionReadApi {
     BpmProcessDefinitionMetadataRespDTO getPublishedProcessDefinition(String key);
 
     List<BpmProcessDefinitionMetadataRespDTO> getPublishedProcessDefinitions();
+
+    List<BpmProcessDefinitionMetadataRespDTO> getPublishedProcessDefinitions(String category);
 }

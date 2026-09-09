@@ -111,6 +111,19 @@
 
 # Main Workstream
 
+## Workstream Registration - 2026-09-09 00:00:00 +08:00
+
+- Workstream ID: `main-viral-account-material-template`
+- Goal: 按确认的四列布局和动态模板规则落地爆款账号拆解，支持不完整草稿、严格提交校验、字典快照、重复矩阵字段和可配置 BPM 绑定。
+- Non-goals: 不实现爆款作品拆解；不创建或硬编码 BPM 节点/审批人；不修改无关素材类型、生产内容批审或当前工作树其他用户改动；不切换分支、提交、推送或执行真实数据库写入。
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; Base commit: `cf391285ecf06874cfdaff3611e7071623a4f381`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos` 素材模板/素材服务/字典与 BPM 绑定相关文件及测试；`frontend/workbench` 素材库表单/API/样式与测试；`script/sql/mysql` 素材字典初始化与校验；直接受影响的素材 API/架构文档；本 handoff 文件。
+- Owner: Codex `/root`。
+- Dependencies: System 字典 API（`zsjos_account_platform`、`zsjos_persona_type`、`zsjos_media_account_stage`、`zsjos_material_profession`）、Infra 文件 API、BPM 公共 API、React Workbench、现有素材库数据模型；无新增依赖。
+- Integration order: 扩展字段布局元数据与重复组 -> 草稿/提交校验和标题策略 -> 爆款账号模板及字典初始化 -> Workbench 四列新增/编辑/查看表单 -> 定向测试、类型检查、构建和 SQL 静态校验 -> 追加交付记录。
+- Verification plan: ZSJOS focused Maven tests/module compile；Workbench `npm test`、`npm run typecheck`、`npm run build`；SQL UTF-8/重复执行/校验脚本审查；scoped `git diff --check`；不启动或写入共享数据库。
+
 ## Workstream Registration - 2026-09-07 00:00:00 +08:00
 
 - Workstream ID: `main-delivery-class-management`
@@ -21748,6 +21761,44 @@ equestAttachments。
 - Remaining work: 未执行真实账号 HTTP 验收，当前未确认已有可用服务、测试账号及租户数据；发布前仍需以“新媒体运营 + `zsjos:lead:submit` + 仅本人数据权限”验证提交成功、本人可见、他人不可见和未授权直接调用被拒绝。仓库全量测试基线失败需由对应 Infra/System/ZSJOS 工作流分别修复。
 - Status: `implemented; focused permission and submission regressions passed; server assembly passed; live account acceptance and unrelated baseline failures remain`。
 
+## Delivery Entry - 2026-09-08 17:12:28 +08:00
+
+- Workstream ID: `main-remove-migration-parity-rule-20260908`
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`（未创建提交）。
+- User goal: 删除奇数/偶数迁移编号规则。
+- Key decisions: 仅删除 `AGENTS.md` 中的奇偶迁移编号规则，保留其他数据库迁移约束和用户现有工作区改动。
+- Execution or analysis result: 已删除该规则；`AGENTS.md` 与 `HEAD` 版本一致。
+- Changed files: `AGENTS.md`；`handoff/main.md`。
+- Verification evidence: `rg` 未再找到该规则文本；`git diff --check` 通过；无未合并路径。
+- Dependency or integration impact: 无新增依赖、无数据库操作、无分支/提交/推送。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-08 17:40:59 +08:00
+
+- Workstream ID: `main-sync-and-renumber-v186-to-v191-20260908`
+- Goal: 拉取 `origin/main` 最新代码合并到本地，并将本地素材库迁移脚本从 `V186` 调整为 `V191`。
+- Non-goals: 不覆盖或清理其他本地改动，不提交、推送、切换分支或执行数据库迁移。
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`; Target branch: `main`。
+- Ownership scope: 本地素材库迁移脚本及其 bootstrap/README/verify 引用；Git 同步冲突处理；本 handoff 记录。
+- Owner: Codex；Dependencies: `origin/main`；无新增依赖。
+- Integration order: 重编号本地 V186 -> 暂存现有本地改动 -> 快进拉取远程 -> 恢复并处理冲突 -> 校验版本引用与 Git 状态。
+- Verification plan: 检查迁移脚本内部/外部引用、`HEAD == origin/main`、未合并路径为空，并运行 `git diff --check`。
+
+## Delivery Entry - 2026-09-08 17:40:59 +08:00
+
+- Workstream ID: `main-sync-and-renumber-v186-to-v191-20260908`
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`（未创建提交）。
+- User goal: 拉取最新代码合并到本地，并将本地 SQL 脚本 V186 调整为 V191。
+- Key decisions: 远程 `V186`–`V190` 已存在，因此本地素材库迁移重命名为 `V191`；内部过程名、版本标记和 bootstrap/README/verify 引用同步改为 V191；合并保留远程日历/班级迁移及本地素材库实现。`DocAlert` 冲突保留本地原有可配置提示行为；其他冲突按远程与本地新增内容合并。
+- Execution or analysis result: 本地从 `21a4f9b7` 快进至 `cf391285`；8 个文件冲突已处理，无未合并路径。远程与本地业务改动均保留。
+- Changed files: 远程提交涉及的仓库文件；`script/sql/mysql/migrations/V191__material_library_content_review.sql`；相关 SQL 引用；冲突合并文件；本 handoff 记录。
+- Verification evidence: `HEAD` 与 `origin/main` 均为 `cf391285ecf06874cfdaff3611e7071623a4f381`；`git diff --name-only --diff-filter=U` 无输出；SQL 关键引用搜索通过；待执行 `git diff --check`。
+- Dependency or integration impact: 无新增依赖、无数据库执行、无分支切换、无提交或推送；本地工作区其他改动保留。
+- Remaining work: 需在最终状态下执行 SQL 静态检查和前后端聚焦验证；未执行数据库迁移。
+
 ## Delivery Entry - 2026-09-07 17:00:58 +08:00
 
 - Workstream ID: `main-lead-identity-masking-unification`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `21a4f9b71555426f09d78dac7d891fce4aea4866` (uncommitted worktree)。
@@ -22131,3 +22182,152 @@ equestAttachments。
 - Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed; `mvn -pl yudao-module-zsjos -Dtest=DeliveryClassServiceImplTest test` passed, 3/3; `frontend/admin` `pnpm exec vue-tsc --noEmit`, targeted ESLint and `pnpm build:local` passed; `frontend/workbench` `npm test -- src/pages/delivery-class-review-fixes.guard.test.ts` passed, 3/3, `npm run typecheck` and `npm run build` passed; `git diff --check` reported only existing line-ending warnings. Builds emitted existing large-chunk/CSS minify warnings.
 - Dependency or integration impact: No new Maven/npm dependency, no branch/worktree operation, no commit/push, no real database DDL/DML execution, and no real account/role/permission changes. Existing unrelated worktree changes were preserved.
 - Remaining work: Controlled database migration execution, real API contract verification, and browser checks remain unverified because no running application/database session was used.
+
+## Workstream Registration - 2026-09-08 23:30:00 +08:00
+
+- Workstream ID: `main-admin-bootstrap-white-screen`
+- Goal: 修复 Vue Admin 在认证/权限初始化请求失败时因 `router.isReady()` 拒绝而保持空白页的问题。
+- Non-goals: 不修改后端认证、菜单、权限或数据库；不改变正常登录和动态路由行为；不新增依赖；不切换分支、提交、推送或清理其他未提交改动。
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; Base commit: `21a4f9b71555426f09d78dac7d891fce4aea4866`。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/admin/src/main.ts`; `frontend/admin/src/permission.ts`; `frontend/admin/src/store/modules/permission.ts`; `frontend/admin/src/components/DocAlert/index.vue`; `frontend/admin/src/utils/authenticatedLanding.ts`; `frontend/admin/src/utils/adminBootstrap.ts`; `frontend/admin/src/utils/adminRouteFilter.ts`; `frontend/admin/tests/adminBootstrap.test.ts`; `frontend/admin/tests/adminRouteFilter.test.ts`; `frontend/admin/tests/authenticatedLanding.test.ts`; `memory/2026-09-09-admin-white-screen.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 Vue Router、Admin auth utility、Node test runner；无新增依赖。
+- Integration order: 提取认证失败回退逻辑 -> 过滤 Vue Admin 不支持的 Workbench 原生菜单 -> 接入 Admin 启动入口 -> 添加失败回归测试 -> 运行 Admin 类型检查/构建/测试 -> 追加交付记录。
+- Verification plan: `pnpm ts:check`; `pnpm build:local`; `node --test tests/adminBootstrap.test.ts tests/adminRouteFilter.test.ts`; 浏览器检查不支持的 Workbench 原生菜单不再生成 Vue 路由，正常登录页仍可渲染；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-09 00:06:07 +08:00
+
+- Workstream ID: `main-admin-bootstrap-white-screen`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381` (未创建提交，保留其他未提交改动)。
+- User goal: 优先确认 Admin 白屏/点击报错是否由数据库导致，并修复可确认的根因。
+- Key decisions: 数据库只读验证，不修改菜单、权限或业务数据；保留 `native` 菜单语义，由 Vue Admin 过滤 `component=zsjos-workbench` 的原生 Workbench 菜单；恢复当前用户改动中 `DocAlert` 被模板调用但缺失的 `props`、`getEnable` 和 `goToUrl`；认证/菜单初始化失败时清理失效 token 并回登录页，避免 `#app` 永久白屏。
+- Execution or analysis result: MySQL 关键表 `CHECK TABLE` 全部 `OK`；菜单父引用和角色菜单引用均为 0 个悬挂引用；schema/module 版本均为 `V191`；V191 素材/内容审核表均存在；数据库有 8 条 Workbench native 菜单，其中 `super_admin` 拥有 4 条，说明是跨前端渲染边界而非数据库连接或迁移损坏。已完成 Admin 路由过滤、初始化失败兜底和 DocAlert 缺失逻辑修复。
+- Changed files: `frontend/admin/src/main.ts`; `frontend/admin/src/store/modules/permission.ts`; `frontend/admin/src/components/DocAlert/index.vue`; `frontend/admin/src/utils/adminBootstrap.ts`; `frontend/admin/src/utils/adminRouteFilter.ts`; `frontend/admin/tests/adminBootstrap.test.ts`; `frontend/admin/tests/adminRouteFilter.test.ts`; `memory/2026-09-09-admin-white-screen.md`; `handoff/main.md`。
+- Verification evidence: `node --test tests/adminBootstrap.test.ts tests/adminRouteFilter.test.ts` 通过 5/5；`pnpm exec eslint src/store/modules/permission.ts src/utils/adminBootstrap.ts src/utils/adminRouteFilter.ts` 通过；`pnpm build:local` 成功；`pnpm ts:check` 仍仅报告 26 个既有 PMS `DICT_TYPE` 常量缺失，未再报告 `DocAlert` 或本次新增代码错误；登录页 Vite HTML 可通过本地 80/81 端口访问；后端租户接口返回 JSON。数据库查询全程只读，未写入、未重启服务、未改变账号权限。
+- Dependency or integration impact: 无新增依赖；Vue Admin 现在不会把 React Workbench 原生菜单注册为 Vue 路由，Workbench 仍消费同一服务端菜单；启动失败回退会改变失效认证请求的用户体验为回登录页。
+- Remaining work: 未使用用户凭据执行真实登录后的菜单点击回归；需在可用测试账号和完整部署环境中确认真实菜单响应、后端接口成功流和桌面/移动端页面。PMS 既有类型错误仍待单独处理。
+- Status: `DONE_WITH_CONCERNS`
+
+## Delivery Entry - 2026-09-09 12:05:00 +08:00
+
+- Workstream ID: `main-push-20260909`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`（提交前）。
+- User goal: 推送当前代码。
+- Key decisions: 推送当前工作区全部有效改动；素材库迁移使用已调整的 `V191`，现有 `V186` 保留为日历拆分迁移；补齐 PMS 字典类型、班级表单/API 的 `selectedAttrs` 类型及两条陈旧 Workbench 路由断言；不执行数据库或服务操作。
+- Execution or analysis result: 推送前编译、测试、类型检查和三端构建通过；预落地审查未发现本次差异新增的敏感信息、破坏性 SQL 或未解决冲突。
+- Changed files: 当前工作区全部已修改和未跟踪的后端、三端前端、SQL、文档、测试、memory 与 handoff 文件。
+- Verification evidence: 后端 21 模块编译通过；素材/内容审核/直传聚焦测试 42/42 通过；Workbench 109 个测试文件、593/593 用例、typecheck、production build 通过；Admin 启动/路由测试 10/10、typecheck、build:local 通过；H5 `pnpm install --frozen-lockfile` 后 production build 通过；bootstrap/core schema 一致；V191 含 `SET NAMES utf8mb4` 及版本登记；`git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖版本；H5 仅安装锁文件中已有的 `gsap@3.15.0`；将创建普通提交并推送 `origin/main`，不强制推送。
+- Remaining work: 数据库迁移执行、真实 API、登录态浏览器和共享服务验收仍按各工作流 handoff 记录另行完成。
+
+## Workstream Registration - 2026-09-09 11:55:00 +08:00
+
+- Workstream ID: `main-push-20260909`
+- Goal: 验证、提交并推送当前本地 `main` 的全部有效代码改动。
+- Non-goals: 不修改数据库、真实权限或共享服务；不切换分支、不改写提交历史、不强制推送。
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; Base commit: `cf391285ecf06874cfdaff3611e7071623a4f381`; Target branch: `origin/main`。
+- Ownership scope: 当前工作区全部已修改及未跟踪文件；仅修复推送验证发现的陈旧测试断言和缺失 PMS 字典类型声明。
+- Owner: Codex `/root`。
+- Dependencies: 现有 Maven/npm/pnpm 工具链、`origin/main`；无新增依赖。
+- Integration order: 检查远程与迁移编号 -> 新鲜验证 -> 修复验证阻断 -> 复验 -> 审查差异 -> 提交 -> 普通推送。
+- Verification plan: 后端编译及聚焦测试；Workbench 全量测试、类型检查、生产构建；Admin 测试、类型检查、生产构建；H5 类型检查/构建；SQL 静态检查；`git diff --check`；推送后核对本地与远程提交。
+
+## Workstream Registration - 2026-09-09 00:53:30 +08:00
+
+- Workstream ID: `main-disable-doc-alert`
+- Goal: 关闭当前暂不需要的 Admin `DocAlert` 文档提示。
+- Non-goals: 不删除 `DocAlert` 组件，不移除页面引用，不修改后端、菜单、权限、数据库或其他前端配置；不覆盖其他未提交改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `cf391285ecf06874cfdaff3611e7071623a4f381`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/.env`；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 `DocAlert` 环境变量开关；无新增依赖。
+- Integration order: 将 `VITE_APP_DOCALERT_ENABLE` 设为 `false` -> 检查配置差异和引用逻辑 -> 追加交付记录。
+- Verification plan: 校验 `.env` 开关值、组件条件判断、scoped `git diff --check`；不启动服务、不执行数据库或账号变更。
+
+## Delivery Correction - 2026-09-09 00:18:00 +08:00
+
+- Workstream ID: `main-admin-bootstrap-white-screen`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`。
+- User goal: 修复截图中 `/zsjos/tasks/today` 在 Admin 端显示 404 的问题。
+- Key decisions: 不新增菜单或权限，不改数据库；动态路由注册后检查当前路径和登录回跳路径是否命中带名称的授权路由，未命中时回退 `defaultLandingPath`。
+- Execution or analysis result: 确认截图来自本地 Admin 端口 80 的静态 404 页面；服务端菜单数据中今日待办存在，但 Admin 原守卫未处理未授权/过期直达 URL。已完成授权路径回退逻辑。
+- Changed files: `frontend/admin/src/permission.ts`; `frontend/admin/src/utils/authenticatedLanding.ts`; `frontend/admin/tests/authenticatedLanding.test.ts`; `memory/2026-09-09-admin-white-screen.md`; `handoff/main.md`。
+- Verification evidence: Admin 路由、启动和授权落点测试共 10/10 通过；定向 ESLint 和 Prettier 通过；`pnpm build:local` 成功；数据库仍为只读检查，未写入权限数据。
+- Dependency or integration impact: 无依赖变化；未授权路径体验从 404 改为首个授权页面；权限边界不变。
+- Remaining work: 需要用户在 Chrome 中刷新并重新登录后验证实际账号菜单；若要打开 React Workbench 开发端，应使用 `http://localhost:5174/zsjos/tasks/today`，端口 80 是 Vue Admin。
+- Status: `DONE_WITH_CONCERNS`
+
+## Delivery Correction - 2026-09-09 00:09:47 +08:00
+
+- Workstream ID: `main-admin-bootstrap-white-screen`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`。
+- User goal: 补充本次 Admin 白屏修复的最终格式和定向静态检查证据。
+- Key decisions: 仅修正本次文件的 Prettier 排版，不改变行为或扩大文件范围。
+- Execution or analysis result: 追加格式修正后，Prettier 检查和包含 `DocAlert`、路由过滤及回归测试的定向 ESLint 均通过；路由/启动测试仍为 5/5。
+- Changed files: `frontend/admin/src/components/DocAlert/index.vue`; `frontend/admin/src/main.ts`; `frontend/admin/tests/adminRouteFilter.test.ts`; `handoff/main.md`。
+- Verification evidence: `pnpm exec prettier --check ...` 通过；`pnpm exec eslint ...` 通过；`node --test tests/adminBootstrap.test.ts tests/adminRouteFilter.test.ts` 通过 5/5；scoped `git diff --check` 无错误。
+- Dependency or integration impact: None；无数据库写入、无依赖变更、无提交或推送。
+- Remaining work: 真实登录后的浏览器菜单点击仍需测试账号和可用环境。
+- Status: `DONE_WITH_CONCERNS`
+
+## Delivery Entry - 2026-09-09 00:53:30 +08:00
+
+- Workstream ID: `main-disable-doc-alert`
+- Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`（未创建提交，保留其他未提交改动）。
+- User goal: 关闭当前暂不需要的 Admin `DocAlert` 文档提示。
+- Key decisions: 仅将 `frontend/admin/.env` 中的 `VITE_APP_DOCALERT_ENABLE` 从 `true` 改为 `false`，保留组件、页面引用和可逆配置开关。
+- Execution or analysis result: 配置已生效于现有 `DocAlert` 的 `getEnable()` 条件判断，运行时不渲染文档提示。
+- Changed files: `frontend/admin/.env`; `handoff/main.md`。
+- Verification evidence: 配置值断言通过；组件条件引用检查通过；`git diff --check -- frontend/admin/.env handoff/main.md` 通过。未启动服务、未执行数据库或账号变更。
+- Dependency or integration impact: 无新增依赖；仅影响 Admin 文档提示显示；其他未提交改动未处理。
+- Remaining work: None。
+- Status: `DONE`
+
+## Delivery Correction - 2026-09-09 01:20:00 +08:00
+
+- Workstream ID: `main-admin-bootstrap-white-screen`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`。
+- User goal: 操作 Chrome 复现并修复直接刷新 `/zsjos/tasks/today` 后出现 404 的问题。
+- Key decisions: 保持数据库、菜单和权限不变；在动态路由首次注册后，如果首屏深链接原本没有有效匹配，强制对当前地址重新导航一次，使 Vue Router 使用新注册的授权路由。
+- Execution or analysis result: Chrome 实际复现直接刷新深链接显示 404，而从根路径进入可正常打开；确认是动态路由注入时序导致的前端路由匹配问题。已在 `permission.ts` 增加首次注入后的重匹配回退。历史检查确认最近提交将默认落点从静态首页改为 `/zsjos/tasks/today`，因此该问题此前未暴露。
+- Changed files: `frontend/admin/src/permission.ts`; `memory/2026-09-09-admin-white-screen.md`; `handoff/main.md`。
+- Verification evidence: Admin 路由/启动/落点测试 10/10 通过；`pnpm exec prettier --write src/permission.ts` 和 `pnpm exec eslint src/permission.ts` 通过；`pnpm build:local` 已执行；Chrome 根路径可进入“今日待办”，`5174` 员工工作台显示独立登录页。数据库仍仅做只读检查。
+- Dependency or integration impact: 无新增依赖；无数据库写入、账号权限变更、分支操作或提交推送。
+- Remaining work: 真实账号重新登录后逐项点击所有业务菜单仍需用户侧回归；若浏览器仍缓存旧 bundle，需强制刷新一次。
+- Status: `DONE_WITH_CONCERNS`
+
+## Delivery Entry - 2026-09-09 03:34:00 +08:00
+
+- Workstream ID: `main-viral-account-material-template`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`（未创建提交，保留其他未提交改动）。
+- User goal: 按确认方案首期落地素材库“爆款账号拆解”，使用动态四列模板、可增删重复矩阵、草稿宽松保存与提交严格校验，并避免硬编码编导/总监审核流程。
+- Key decisions: `viral_account` 模板固定账号主页截图、账号详情、编导拆解、搭建建议三类字段分区；账号名称自动生成素材标题；主页截图按 9:16 容器裁切；字典值保存选择时 label 快照；提交仅调用通用 BPM 接口，流程 Key 由后台后续配置。
+- Execution or analysis result: 完成字段布局元数据、默认模板初始化、T1-T9 专业方向字典迁移、草稿/提交校验分层、Workbench 新增/编辑/查看抽屉、字典加载重试、重复组动态增删和移动端纵向布局；账号类型/作品拆解未绑定不存在的审批节点。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/material/`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/material/vo/MaterialSaveReqVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/MaterialConstants.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/material/MaterialSchemaServiceTest.java`; `frontend/workbench/src/components/ViralAccountMaterialForm.tsx`; `frontend/workbench/src/pages/MaterialLibraryPage.tsx`; `frontend/workbench/src/services/materialApi.ts`; `frontend/workbench/src/styles/pages/material-library.css`; `script/sql/mysql/migrations/V191__material_library_content_review.sql`; `script/sql/mysql/verify-bootstrap.sql`; `docs/api/material-library.md`; `handoff/main.md`。
+- Verification evidence: ZSJOS `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` 成功；`MaterialSchemaServiceTest` 8/8 通过；Workbench `npm test -- --run` 107 个文件中 105 个通过，剩余 2 个为既有媒体日历/菜单断言失败；`npm run typecheck` 与 `npm run build` 均被既有 `DeliveryClassPage.tsx` 三条类型错误阻断，本次新增文件未出现额外错误；`git diff --check` 通过。
+- Dependency or integration impact: 无新增 npm/Maven 依赖；未执行真实数据库 DDL/DML、未启动或重配共享服务、未修改账号权限、未创建分支或提交推送。SQL 仅更新源文件，需部署前按 UTF-8 迁移流程执行并核对开发库。
+- Remaining work: 后台发布 `viral_account` 对应 BPM 流程后再配置流程 Key；爆款作品拆解字段和页面待后续确认；真实 API、数据库迁移和桌面/移动浏览器验收尚未执行。
+- Status: `DONE_WITH_CONCERNS`
+
+## Delivery Correction - 2026-09-09 12:05:00 +08:00
+
+- Workstream ID: `main-push-20260909`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381`（提交前）。
+- User goal: 推送当前代码。
+- Key decisions: 本次推送工作流的登记与交付条目因重复补丁上下文被追加到文件中部；遵守 append-only 约束不改写原记录，本条在文件末尾确认其内容有效。推送全部当前有效改动，素材库迁移使用 `V191`，补齐 PMS 字典和班级选择属性类型，更新陈旧路由测试。
+- Execution or analysis result: 推送前新鲜验证全部通过，预落地审查未发现阻断问题；下一步创建普通提交并推送 `origin/main`。
+- Changed files: 当前工作区全部已修改和未跟踪文件，包含后端、三端前端、SQL、文档、测试、memory 与 handoff。
+- Verification evidence: 后端 21 模块编译、素材/审核/直传 42/42 测试；Workbench 109 文件 593/593 测试、typecheck、build；Admin 10/10 测试、typecheck、build；H5 build；SQL baseline/core、V191 UTF-8/版本记录和 `git diff --check` 均通过。
+- Dependency or integration impact: 无新增依赖版本；普通提交及普通推送，不改写历史，不执行数据库或共享服务操作。
+- Remaining work: 数据库迁移、真实 API、登录态浏览器及共享服务验收按既有工作流记录另行完成。
+
+## Delivery Correction - 2026-09-09 12:10:00 +08:00
+
+- Workstream ID: `main-push-20260909`; Branch: `main`; Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`。
+- User goal: 推送当前代码。
+- Key decisions: 已创建本地聚合提交；HTTPS 凭据不可用后尝试现有 SSH 授权，未修改远程配置，也未关闭 SSH 主机校验。
+- Execution or analysis result: 普通推送未完成。HTTPS 返回 `could not read Username`；SSH 首次主机密钥已通过 `accept-new` 写入 `known_hosts`，随后返回 `Permission denied (publickey)`。
+- Changed files: 本 handoff 追加推送结果；其余交付文件已包含在本地提交中。
+- Verification evidence: 推送前全部验证证据见上一条；本地分支相对 `origin/main` ahead 1，工作树在本条提交后保持干净。
+- Dependency or integration impact: 远程仓库未发生变化；本机 `known_hosts` 新增 Gitee ED25519 主机记录。
+- Remaining work: 在当前终端配置可用的 Gitee HTTPS 凭据或 SSH 公钥后，执行 `git push -u origin main`。

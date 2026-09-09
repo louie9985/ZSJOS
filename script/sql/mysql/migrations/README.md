@@ -1047,3 +1047,20 @@ V190 follows V188 and adds nullable product, selected specification, and selecte
 to `zsjos_delivery_class`. It changes no existing business rows and is repeatable. New class writes
 must select at least one valid SKU from the enabled product scope; historical classes retain NULL snapshots.
 Rollback is forward-only because removing the columns would discard new business snapshots.
+### V191 Material library, content review, and student Partner invitations
+
+V191 follows V185 and starts the material-library workstream. It creates the
+tenant-scoped material type, immutable schema and content version, search/index projection, file snapshot, approval
+round, like, favorite, reference, Excel import, and content-review batch tables. It extends content versions with
+the complete pre-publication package snapshot and extends Partner invitations with a separate student-bound scene.
+
+The migration registers four confirmed material types, two empty administrator-maintained dictionary types,
+configurable menu/button permissions, and tenant-package coverage. Existing active grants to the retired
+standalone content page `6974` are copied to the material-library parent and content-production page by
+role-menu identity, without granting any named role broader access. The application initializer creates the
+`zsjos_material` and `zsjos_content_review` BPM categories through `BpmCategoryApi` for every tenant, including
+tenants created after the migration; ZSJOS never queries or writes BPM tables directly. It does not publish a material
+schema, invent account-type or profession options, infer role access by name, create material/content/invitation instances, or
+run a BPM process. Student invitations keep the editable registration name/mobile separate from the original
+student snapshots and enforce one active student invitation per tenant. Recovery is forward-only after business
+versions exist: retain data and hide the relevant menus in a later reviewed migration.

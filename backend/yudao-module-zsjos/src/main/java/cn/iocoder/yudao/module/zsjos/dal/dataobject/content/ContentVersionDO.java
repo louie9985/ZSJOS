@@ -18,9 +18,16 @@ public class ContentVersionDO extends TenantBaseDO {
     private Long contentId;
     private Integer versionNo;
     private String stage;
+    private String titleSnapshot;
+    private String topicSnapshot;
+    private String coverSnapshotJson;
     private String materialRefsJson;
     private String deliverableUrl;
+    private String deliverableSnapshotJson;
     private String scriptText;
+    private String leadResourceUrl;
+    private LocalDateTime plannedPublishAt;
+    private LocalDateTime frozenAt;
     private Long submittedByUserId;
     private LocalDateTime submittedAt;
     private String reviewDecision;

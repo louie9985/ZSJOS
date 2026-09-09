@@ -38,6 +38,9 @@ router.beforeEach(async (to, from) => {
         const dictStore = useDictStoreWithOut()
         const userStore = useUserStoreWithOut()
         const permissionStore = usePermissionStoreWithOut()
+        const needsRouteRematch =
+          to.matched.length === 0 ||
+          to.matched.every((route) => route.name === 'NoFound' || !route.name)
         // 异步加载字典
         // 另外，间接 issue：https://gitee.com/yudaocode/yudao-ui-admin-vue3/issues/ID9FLI
         if (!dictStore.getIsSetDict) {
@@ -52,12 +55,26 @@ router.beforeEach(async (to, from) => {
           permissionStore.getAddRouters.forEach((route) => {
             router.addRoute(route as unknown as RouteRecordRaw) // 动态添加可访问路由表
           })
+          if (needsRouteRematch) {
+            return { path: to.fullPath, replace: true }
+          }
         }
+        const currentPathAuthorized = router
+          .resolve(to.fullPath)
+          .matched.some((route) => Boolean(route.name) && route.name !== 'NoFound')
+        const explicitRedirect =
+          typeof from.query.redirect === 'string' ? from.query.redirect : undefined
+        const explicitRedirectAuthorized = explicitRedirect
+          ? router
+              .resolve(explicitRedirect)
+              .matched.some((route) => Boolean(route.name) && route.name !== 'NoFound')
+          : true
         const redirect = resolveAuthenticatedRouteTarget({
           currentPath: to.path,
-          explicitRedirect:
-            typeof from.query.redirect === 'string' ? from.query.redirect : undefined,
-          defaultLandingPath: permissionStore.getDefaultLandingPath
+          explicitRedirect,
+          defaultLandingPath: permissionStore.getDefaultLandingPath,
+          currentPathAuthorized,
+          explicitRedirectAuthorized
         })
         if (to.fullPath === redirect) return true
         return { ...parseRouteLocation(redirect), replace: true }

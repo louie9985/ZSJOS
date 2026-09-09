@@ -30,3 +30,6 @@ WHERE r.code='system_administrator' AND r.deleted=b'0' AND m.deleted=b'0';
 
 INSERT IGNORE INTO zsjos_schema_version (version, description, checksum)
 VALUES ('V179','Notification channel administration','notify-channel-admin-v1');
+INSERT INTO zsjos_module_schema_version (module_code, version, description, checksum, release_version, installed_at)
+VALUES ('core','V179','Notification channel administration',SHA2('V179__notify_channel_config_admin.sql',256),'baseline',NOW())
+ON DUPLICATE KEY UPDATE description=VALUES(description),checksum=VALUES(checksum);

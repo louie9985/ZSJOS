@@ -5,12 +5,16 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAss
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerActivateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 
 public interface PartnerInvitationService {
 
     PartnerInvitationRespVO create(PartnerInvitationCreateReqVO reqVO, Long operatorUserId);
+
+    PartnerInvitationRespVO createStudentInvitation(PartnerStudentInvitationCreateReqVO reqVO,
+                                                     Long directorUserId);
 
     PageResult<PartnerInvitationRespVO> getPage(PartnerInvitationPageReqVO reqVO);
 

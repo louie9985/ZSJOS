@@ -86,7 +86,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Resource private ServiceRelationMapper serviceRelationMapper;
     @Resource private DeliveryClassMapper deliveryClassMapper;
     @Resource private DeliveryClassService deliveryClassService;
-    @Resource private ZsjosProductCategoryMapper productCategoryMapper;
+    @Resource private ZsjosProductCategoryMapper zsjosProductCategoryMapper;
     @Resource private ZsjosProductMapper productMapper;
     @Resource private RegistrationClassAssignmentMapper classAssignmentMapper;
     @Resource private RegistrationCommandMapper commandMapper;
@@ -698,7 +698,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     private CategorySnapshot categorySnapshot(Long categoryId) {
-        ZsjosProductCategoryDO category = productCategoryMapper.selectById(categoryId);
+        ZsjosProductCategoryDO category = zsjosProductCategoryMapper.selectById(categoryId);
         if (category == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         List<String> path = new ArrayList<>();
         Set<Long> visited = new HashSet<>();
@@ -706,7 +706,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         while (cursor != null && visited.add(cursor.getId())) {
             path.add(cursor.getName());
             if (cursor.getParentId() == null || cursor.getParentId() == 0) break;
-            cursor = productCategoryMapper.selectById(cursor.getParentId());
+            cursor = zsjosProductCategoryMapper.selectById(cursor.getParentId());
         }
         Collections.reverse(path);
         return new CategorySnapshot(category.getName(), JsonUtils.toJsonString(path));

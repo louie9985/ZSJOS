@@ -88,6 +88,23 @@ test('resolves default landing for root paths while preserving explicit deep lin
     options.defaultLandingPath
   )
   assert.equal(
+    resolveAuthenticatedRouteTarget({
+      currentPath: '/zsjos/tasks/today',
+      currentPathAuthorized: false,
+      ...options
+    }),
+    options.defaultLandingPath
+  )
+  assert.equal(
+    resolveAuthenticatedRouteTarget({
+      currentPath: '/',
+      explicitRedirect: '/zsjos/tasks/today',
+      explicitRedirectAuthorized: false,
+      ...options
+    }),
+    options.defaultLandingPath
+  )
+  assert.equal(
     resolveAuthenticatedRouteTarget({ currentPath: '/', defaultLandingPath: '/403' }),
     '/403'
   )

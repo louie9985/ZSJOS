@@ -133,9 +133,14 @@ public interface BpmProcessInstanceConvert {
     void copyTo(BpmProcessDefinitionInfoDO from, @MappingTarget BpmProcessDefinitionRespVO to);
 
     default BpmProcessInstanceStatusEvent buildProcessInstanceStatusEvent(Object source, ProcessInstance instance,
+                                                                          Integer processDefinitionVersion,
                                                                           Integer status, String reason) {
         return new BpmProcessInstanceStatusEvent(source).setId(instance.getId()).setStatus(status).setReason(reason)
-                .setProcessDefinitionKey(instance.getProcessDefinitionKey()).setBusinessKey(instance.getBusinessKey());
+                .setProcessDefinitionId(instance.getProcessDefinitionId())
+                .setProcessDefinitionKey(instance.getProcessDefinitionKey())
+                .setProcessDefinitionVersion(processDefinitionVersion)
+                .setBusinessKey(instance.getBusinessKey())
+                .setEventKey("process-instance-status:" + instance.getId() + ":" + status);
     }
 
     default BpmMessageSendWhenProcessInstanceApproveReqDTO buildProcessInstanceApproveMessage(ProcessInstance instance) {

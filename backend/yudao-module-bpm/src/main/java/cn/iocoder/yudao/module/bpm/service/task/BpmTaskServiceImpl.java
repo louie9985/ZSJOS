@@ -17,6 +17,8 @@ import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelMetaInfoVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.*;
+import cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskActionContext;
 import cn.iocoder.yudao.module.bpm.convert.task.BpmTaskConvert;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmFormDO;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO;
@@ -49,6 +51,7 @@ import org.flowable.engine.history.HistoricActivityInstance;
 import org.flowable.engine.runtime.ActivityInstance;
 import org.flowable.engine.runtime.Execution;
 import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.engine.task.Attachment;
 import org.flowable.task.api.DelegationState;
 import org.flowable.task.api.Task;
@@ -59,6 +62,7 @@ import org.flowable.task.api.history.HistoricTaskInstanceQuery;
 import org.flowable.task.service.impl.persistence.entity.TaskEntity;
 import org.flowable.task.service.impl.persistence.entity.TaskEntityImpl;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -107,6 +111,8 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     private BpmMessageService messageService;
     @Resource
     private BpmFormService formService;
+    @Resource
+    private ObjectProvider<BpmTaskActionValidator> taskActionValidatorProvider;
 
     @Resource
     private AdminUserApi adminUserApi;
@@ -682,6 +688,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (reasonRequire && StrUtil.isEmpty(reqVO.getReason())) {
             throw exception(TASK_REASON_REQUIRE);
         }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_APPROVE, task, instance);
 
         // 情况一：被委派的任务，不调用 complete 去完成任务
         if (DelegationState.PENDING.equals(task.getDelegationState())) {
@@ -954,6 +961,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (instance == null) {
             throw exception(PROCESS_INSTANCE_NOT_EXISTS);
         }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_REJECT, task, instance);
 
         // 并行加签的主任务先驳回时，流程将按主任务决定结束，不再保留主管子任务。
         cancelParallelSignChildren(task, "主审批任务已驳回");
@@ -1008,6 +1016,22 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         taskService.setVariableLocal(id, BpmnVariableConstants.TASK_VARIABLE_STATUS, status);
     }
 
+    private void validateTaskAction(Long userId, String action, Task task, ProcessInstance instance) {
+        ProcessDefinition definition = bpmProcessDefinitionService.getProcessDefinition(task.getProcessDefinitionId());
+        BpmTaskActionContext context = new BpmTaskActionContext()
+                .setUserId(userId)
+                .setAction(action)
+                .setTaskId(task.getId())
+                .setTaskDefinitionKey(task.getTaskDefinitionKey())
+                .setProcessInstanceId(task.getProcessInstanceId())
+                .setProcessDefinitionId(task.getProcessDefinitionId())
+                .setProcessDefinitionKey(instance.getProcessDefinitionKey())
+                .setProcessDefinitionVersion(definition == null ? null : definition.getVersion())
+                .setBusinessKey(instance.getBusinessKey())
+                .setTenantId(task.getTenantId());
+        taskActionValidatorProvider.orderedStream().forEach(validator -> validator.validate(context));
+    }
+
     /**
      * 更新流程任务的 status 状态、reason 理由
      *
@@ -1029,6 +1053,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (task.isSuspended()) {
             throw exception(TASK_IS_PENDING);
         }
+        ProcessInstance instance = processInstanceService.getProcessInstance(task.getProcessInstanceId());
+        if (instance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_RETURN, task, instance);
         // 1.2 获取流程模型信息
         BpmnModel bpmnModel = modelService.getBpmnModelByDefinitionId(task.getProcessDefinitionId());
         // 1.3 校验源头和目标节点的关系，并返回目标元素
@@ -1158,6 +1187,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         String taskId = reqVO.getId();
         // 1.1 校验任务
         Task task = validateTask(userId, reqVO.getId());
+        ProcessInstance instance = processInstanceService.getProcessInstance(task.getProcessInstanceId());
+        if (instance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_DELEGATE, task, instance);
         if (task.getAssignee().equals(reqVO.getDelegateUserId().toString())) { // 校验当前审批人和被委派人不是同一人
             throw exception(TASK_DELEGATE_FAIL_USER_REPEAT);
         }
@@ -1189,6 +1223,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         String taskId = reqVO.getId();
         // 1.1 校验任务
         Task task = validateTask(userId, reqVO.getId());
+        ProcessInstance instance = processInstanceService.getProcessInstance(task.getProcessInstanceId());
+        if (instance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_TRANSFER, task, instance);
         if (task.getAssignee().equals(reqVO.getAssigneeUserId().toString())) { // 校验当前审批人和被转派人不是同一人
             throw exception(TASK_TRANSFER_FAIL_USER_REPEAT);
         }
@@ -1258,6 +1297,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     public List<String> createSignTask(Long userId, BpmTaskSignCreateReqVO reqVO) {
         // 1. 获取和校验任务
         TaskEntityImpl taskEntity = validateTaskCanCreateSign(userId, reqVO);
+        ProcessInstance instance = processInstanceService.getProcessInstance(taskEntity.getProcessInstanceId());
+        if (instance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_ADD_SIGN, taskEntity, instance);
         List<AdminUserRespDTO> userList = adminUserApi.getUserList(reqVO.getUserIds());
         if (CollUtil.isEmpty(userList)) {
             throw exception(TASK_SIGN_CREATE_USER_NOT_EXIST);
@@ -1396,6 +1440,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     public void deleteSignTask(Long userId, BpmTaskSignDeleteReqVO reqVO) {
         // 1.1 校验 task 可以被减签
         Task task = validateTaskCanSignDelete(reqVO.getId());
+        ProcessInstance instance = processInstanceService.getProcessInstance(task.getProcessInstanceId());
+        if (instance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_DELETE_SIGN, task, instance);
         // 1.2 校验取消人存在
         AdminUserRespDTO cancelUser = null;
         if (StrUtil.isNotBlank(task.getAssignee())) {
@@ -1444,6 +1493,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (ObjUtil.isNull(processInstance)) {
             throw exception(TASK_WITHDRAW_FAIL_PROCESS_NOT_RUNNING);
         }
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_WITHDRAW, taskInstance, processInstance);
         // 1.3 判断此流程是否允许撤回
         BpmProcessDefinitionInfoDO processDefinitionInfo = bpmProcessDefinitionService.getProcessDefinitionInfo(
                 processInstance.getProcessDefinitionId());
@@ -1485,6 +1535,23 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                 .processInstanceId(processInstance.getProcessInstanceId())
                 .moveExecutionsToSingleActivityId(withdrawExecutionIds, taskInstance.getTaskDefinitionKey())
                 .changeState();
+    }
+
+    private void validateTaskAction(Long userId, String action, HistoricTaskInstance task,
+                                    ProcessInstance instance) {
+        ProcessDefinition definition = bpmProcessDefinitionService.getProcessDefinition(task.getProcessDefinitionId());
+        BpmTaskActionContext context = new BpmTaskActionContext()
+                .setUserId(userId)
+                .setAction(action)
+                .setTaskId(task.getId())
+                .setTaskDefinitionKey(task.getTaskDefinitionKey())
+                .setProcessInstanceId(task.getProcessInstanceId())
+                .setProcessDefinitionId(task.getProcessDefinitionId())
+                .setProcessDefinitionKey(instance.getProcessDefinitionKey())
+                .setProcessDefinitionVersion(definition == null ? null : definition.getVersion())
+                .setBusinessKey(instance.getBusinessKey())
+                .setTenantId(task.getTenantId());
+        taskActionValidatorProvider.orderedStream().forEach(validator -> validator.validate(context));
     }
 
     /**

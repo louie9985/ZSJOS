@@ -19,6 +19,14 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM `zsjos_module_schema_version` WHERE `module_code`='core' AND `version`='V157') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V158 requires V157 in both schema-version registries';
   END IF;
+  UPDATE `system_menu`
+  SET `name`='公告阅读',`permission`='system:notice:read',`type`=3,`sort`=7,`parent_id`=107,
+      `path`='',`icon`='',`component`='',`component_name`=NULL,`workbench_render_mode`='admin_only',
+      `status`=0,`visible`=b'1',`keep_alive`=b'1',`always_show`=b'1',
+      `deleted`=b'0',`creator`='V158',`create_time`=COALESCE(`create_time`, NOW()),
+      `updater`='V158',`update_time`=NOW()
+  WHERE `id`=79913 AND `deleted`=b'1' AND `creator`='migration-V068'
+    AND `path`='partner-portal' AND `component_name`='ZsjosPartnerPortal';
   IF EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=79913 AND `permission`<>'system:notice:read') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Menu ID 79913 is owned by another permission';
   END IF;

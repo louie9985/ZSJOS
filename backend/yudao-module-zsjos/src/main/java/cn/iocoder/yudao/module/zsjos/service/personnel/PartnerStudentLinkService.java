@@ -21,6 +21,10 @@ public class PartnerStudentLinkService {
     @Resource private PartnerMapper partnerMapper;
     @Resource private PersonMapper personMapper;
 
+    public boolean hasActiveStudentLink(Long studentId) {
+        return mapper.selectActiveByStudent(studentId) != null;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void bind(Long partnerId, Long studentId, String reason, Long userId) {
         if (partnerMapper.selectById(partnerId) == null || personMapper.selectById(studentId) == null) {

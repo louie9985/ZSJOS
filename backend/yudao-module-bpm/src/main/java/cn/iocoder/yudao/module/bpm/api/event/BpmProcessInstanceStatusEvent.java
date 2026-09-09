@@ -24,6 +24,15 @@ public class BpmProcessInstanceStatusEvent extends ApplicationEvent {
     @NotNull(message = "流程实例的 key 不能为空")
     private String processDefinitionKey;
     /**
+     * 流程定义的编号
+     */
+    @NotNull(message = "流程定义的编号不能为空")
+    private String processDefinitionId;
+    /**
+     * 流程定义的版本
+     */
+    private Integer processDefinitionVersion;
+    /**
      * 流程实例的结果
      */
     @NotNull(message = "流程实例的状态不能为空")
@@ -38,6 +47,11 @@ public class BpmProcessInstanceStatusEvent extends ApplicationEvent {
      * 例如说，请假
      */
     private String businessKey;
+    /**
+     * 稳定事件编号。相同实例与结果的重复投递具有相同编号。
+     */
+    @NotNull(message = "流程状态事件编号不能为空")
+    private String eventKey;
 
     public BpmProcessInstanceStatusEvent(Object source) {
         super(source);

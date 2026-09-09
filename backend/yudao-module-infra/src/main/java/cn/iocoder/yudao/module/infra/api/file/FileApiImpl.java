@@ -2,6 +2,10 @@ package cn.iocoder.yudao.module.infra.api.file;
 
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadCompleteReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadInitReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadInitRespDTO;
+import cn.iocoder.yudao.module.infra.service.file.FileDirectUploadService;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -21,6 +25,18 @@ public class FileApiImpl implements FileApi {
 
     @Resource
     private FileService fileService;
+    @Resource
+    private FileDirectUploadService fileDirectUploadService;
+
+    @Override
+    public FileDirectUploadInitRespDTO initDirectUpload(FileDirectUploadInitReqDTO request) {
+        return fileDirectUploadService.init(request);
+    }
+
+    @Override
+    public FileInfoRespDTO completeDirectUpload(FileDirectUploadCompleteReqDTO request) {
+        return fileDirectUploadService.complete(request);
+    }
 
     @Override
     public String createFile(byte[] content, String name, String directory, String type) {

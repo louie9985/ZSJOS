@@ -20,7 +20,7 @@ describe('calendar separation', () => {
     const personal = readFileSync('src/pages/PersonalCalendarPage.tsx', 'utf8')
     const api = readFileSync('src/services/api.ts', 'utf8')
     expect(constants).toContain("PERSONAL_CALENDAR: '/calendar/personal'")
-    expect(constants).not.toContain('/calendar/all')
+    expect(constants).toContain("MEDIA_ALL_CALENDAR: '/calendar/all'")
     expect(account).toContain('api.mediaAccount.calendar(')
     expect(account).not.toContain('calendarAll')
     expect(personal).toContain('api.personalCalendar.list')

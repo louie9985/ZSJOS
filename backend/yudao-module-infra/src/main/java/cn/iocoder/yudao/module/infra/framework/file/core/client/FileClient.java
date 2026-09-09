@@ -53,6 +53,28 @@ public interface FileClient {
     }
 
     /**
+     * 生成绑定文件类型、大小和有效期的浏览器直传地址。
+     */
+    default FileUploadPresignResult presignPutUrl(String path, String contentType,
+                                                  long contentLength, int expirationSeconds) {
+        throw new UnsupportedOperationException("不支持的操作");
+    }
+
+    /**
+     * 读取对象存储中的真实文件元数据。
+     */
+    default FileObjectMetadata getObjectMetadata(String path) {
+        throw new UnsupportedOperationException("不支持的操作");
+    }
+
+    /**
+     * 将已校验的临时对象复制为正式对象。sourceEtag 用于阻止校验后对象被替换。
+     */
+    default void copyObject(String sourcePath, String targetPath, String sourceEtag) {
+        throw new UnsupportedOperationException("不支持的操作");
+    }
+
+    /**
      * 生成文件预签名地址，用于读取
      *
      * @param url 完整的文件访问地址

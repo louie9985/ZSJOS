@@ -30,6 +30,50 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode EXAM_SCHEDULE_SCOPE_INVALID = new ErrorCode(1_900_018_009, "考期必须选择一个分类或一个产品范围");
     ErrorCode EXAM_SCHEDULE_SCOPE_CLEAR_REQUIRED = new ErrorCode(1_900_018_010, "原规格条件已失效，请明确清除或替换后保存");
     ErrorCode PRODUCT_CATALOG_CHANGED = new ErrorCode(1_900_018_011, "产品目录已发生变化，请刷新后重试");
+    ErrorCode MATERIAL_TYPE_NOT_EXISTS = new ErrorCode(1_900_020_001, "素材类型不存在");
+    ErrorCode MATERIAL_TYPE_CODE_DUPLICATE = new ErrorCode(1_900_020_002, "素材类型编码已存在");
+    ErrorCode MATERIAL_TYPE_DISABLED = new ErrorCode(1_900_020_003, "素材类型已停用");
+    ErrorCode MATERIAL_SCHEMA_INVALID = new ErrorCode(1_900_020_004, "素材表单配置无效：{}");
+    ErrorCode MATERIAL_SCHEMA_NOT_PUBLISHED = new ErrorCode(1_900_020_005, "素材表单尚未发布");
+    ErrorCode MATERIAL_NOT_EXISTS = new ErrorCode(1_900_020_006, "素材不存在");
+    ErrorCode MATERIAL_VERSION_NOT_EXISTS = new ErrorCode(1_900_020_007, "素材版本不存在");
+    ErrorCode MATERIAL_STATE_INVALID = new ErrorCode(1_900_020_008, "当前素材状态不允许该操作");
+    ErrorCode MATERIAL_FIELD_INVALID = new ErrorCode(1_900_020_009, "素材字段内容无效：{}");
+    ErrorCode MATERIAL_VERSION_CONFLICT = new ErrorCode(1_900_020_010, "素材已被其他人修改，请刷新后重试");
+    ErrorCode MATERIAL_LIKE_CONFLICT = new ErrorCode(1_900_020_011, "素材点赞状态已变化，请刷新后重试");
+    ErrorCode MATERIAL_REFERENCE_CONFLICT = new ErrorCode(1_900_020_012, "该素材已引用到当前内容版本");
+    ErrorCode MATERIAL_REFERENCE_TARGET_INVALID = new ErrorCode(1_900_020_013, "引用目标内容不存在或无权编辑");
+    ErrorCode MATERIAL_BPM_UNAVAILABLE = new ErrorCode(1_900_020_014, "素材审批流程尚未配置或不可用");
+    ErrorCode MATERIAL_PERMISSION_DENIED = new ErrorCode(1_900_020_015, "无权访问或操作该素材");
+    ErrorCode MATERIAL_IMPORT_INVALID = new ErrorCode(1_900_020_016, "素材导入数据无效：{}");
+    ErrorCode MATERIAL_FILE_INVALID = new ErrorCode(1_900_020_017, "素材文件无效：{}");
+    ErrorCode MATERIAL_SCHEMA_NOT_EXISTS = new ErrorCode(1_900_020_018, "素材表单版本不存在");
+    ErrorCode MATERIAL_SCHEMA_VERSION_CONFLICT = new ErrorCode(1_900_020_019, "素材表单已被其他人修改，请刷新后重试");
+    ErrorCode CONTENT_REVIEW_CONFIG_INVALID = new ErrorCode(1_900_020_020, "生产内容审核配置尚未完成或已失效");
+    ErrorCode CONTENT_REVIEW_BATCH_NOT_EXISTS = new ErrorCode(1_900_020_021, "生产内容审核批次不存在");
+    ErrorCode CONTENT_REVIEW_BATCH_ITEMS_INVALID = new ErrorCode(1_900_020_022, "审核批次必须包含同一账号的 1 至 20 条当前内容版本");
+    ErrorCode CONTENT_REVIEW_BATCH_STATE_INVALID = new ErrorCode(1_900_020_023, "当前审核批次状态不允许该操作");
+    ErrorCode CONTENT_REVIEW_VERSION_CONFLICT = new ErrorCode(1_900_020_024, "审核批次或条目已变化，请刷新后重试");
+    ErrorCode CONTENT_REVIEW_DIRECTOR_INVALID = new ErrorCode(1_900_020_025, "当前运营必须且只能关联一名启用的责任编导");
+    ErrorCode CONTENT_REVIEW_PACKAGE_INCOMPLETE = new ErrorCode(1_900_020_026, "内容成品包不完整：{}");
+    ErrorCode CONTENT_REVIEW_DECISION_INCOMPLETE = new ErrorCode(1_900_020_027, "请先保存本级所有待审条目的结论");
+    ErrorCode CONTENT_REVIEW_TASK_INVALID = new ErrorCode(1_900_020_028, "当前 BPM 任务与审核批次、阶段或流程版本不匹配");
+    ErrorCode CONTENT_REVIEW_COLLECTION_INVALID = new ErrorCode(1_900_020_029, "所选内容无法按当前映射收录素材库：{}");
+    ErrorCode CONTENT_REVIEW_PERMISSION_DENIED = new ErrorCode(1_900_020_030, "无权查看或处理该审核批次");
+    ErrorCode CONTENT_REVIEW_PUBLISH_INVALID = new ErrorCode(1_900_020_031, "内容尚未通过审核，或发布链接和时间无效");
+    ErrorCode CONTENT_REVIEW_PROCESS_UNAVAILABLE = new ErrorCode(1_900_020_032, "生产内容审核流程尚未发布或当前不可用");
+    ErrorCode CONTENT_REVIEW_LEGACY_ENTRY_DISABLED = new ErrorCode(1_900_020_033,
+            "生产内容验收已统一使用审核批次，请从内容审核批次发起或处理");
+    ErrorCode MATERIAL_RECOMMENDATION_ACCOUNT_REQUIRED = new ErrorCode(1_900_020_034,
+            "推荐素材时必须选择有权查看的新媒体账号");
+    ErrorCode CONTENT_VERSION_FILE_INVALID = new ErrorCode(1_900_020_035,
+            "内容版本文件不存在、类型不符或不属于当前上传人");
+    ErrorCode MATERIAL_IMPORT_BATCH_NOT_EXISTS = new ErrorCode(1_900_020_036, "素材导入批次不存在或无权访问");
+    ErrorCode MATERIAL_IMPORT_STATE_INVALID = new ErrorCode(1_900_020_037, "当前素材导入批次状态不允许该操作");
+    ErrorCode MATERIAL_IMPORT_VERSION_CONFLICT = new ErrorCode(1_900_020_038,
+            "素材导入批次已被其他人处理，请刷新后重试");
+    ErrorCode MATERIAL_IMPORT_FILE_TOO_LARGE = new ErrorCode(1_900_020_039, "素材导入文件不能超过 20 MB");
+    ErrorCode MATERIAL_FAVORITE_CONFLICT = new ErrorCode(1_900_020_040, "素材收藏状态已变化，请刷新后重试");
     ErrorCode LEAD_FEEDBACK_STATE_INVALID = new ErrorCode(1_900_003_120, "当前客资状态不允许回复提交人");
     ErrorCode LEAD_FEEDBACK_VERSION_CONFLICT = new ErrorCode(1_900_003_121, "客资已发生变化，请刷新后重试");
     ErrorCode LEAD_FEEDBACK_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_122, "本次发送标识已用于其他反馈内容");
@@ -91,6 +135,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_INVITATION_VERSION_CONFLICT = new ErrorCode(1_900_000_027, "邀请码状态已变化，请刷新后重试");
     ErrorCode PARTNER_INVITATION_CODE_CONFLICT = new ErrorCode(1_900_000_028, "邀请码生成冲突，请重试");
     ErrorCode PARTNER_INVITATION_PASSWORD_CONFIRM_MISMATCH = new ErrorCode(1_900_000_029, "两次输入的密码不一致");
+    ErrorCode PARTNER_STUDENT_INVITATION_FORBIDDEN = new ErrorCode(1_900_000_030,
+            "学员不存在、尚未被当前编导接收或已不在服务中");
 
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
     ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");
@@ -370,6 +416,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CONTENT_VERSION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_012_008, "内容版本提交幂等键已被使用");
     ErrorCode CONTENT_REJECT_REASON_REQUIRED = new ErrorCode(1_900_012_009, "内容验收退回原因不能为空且不能超过 500 个字符");
     ErrorCode CONTENT_CLASS_INVALID = new ErrorCode(1_900_012_010, "内容分类不存在或已停用");
+    ErrorCode CONTENT_VERSION_IDEMPOTENCY_INVALID = new ErrorCode(1_900_012_011, "内容版本提交幂等键不能超过 128 个字符");
 
     ErrorCode PRODUCTION_TICKET_NOT_EXISTS = new ErrorCode(1_900_013_001, "拍剪工单不存在");
     ErrorCode PRODUCTION_TICKET_STATE_INVALID = new ErrorCode(1_900_013_002, "当前拍剪工单状态不允许该操作");

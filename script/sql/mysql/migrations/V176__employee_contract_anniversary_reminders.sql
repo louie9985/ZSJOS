@@ -30,3 +30,6 @@ SELECT '员工入职周年提醒','hrm.employee.entry_anniversary','in_app',t.id
 FROM system_tenant tenant JOIN system_notify_template t ON t.code='ZSJOS_HRM_ENTRY_ANNIVERSARY' AND t.deleted=b'0'
 WHERE tenant.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_notify_rule r WHERE r.tenant_id=tenant.id AND r.scene_code='hrm.employee.entry_anniversary' AND r.deleted=b'0');
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`) VALUES ('V176','Employee contract and anniversary reminders','employee-reminder-v1') ON DUPLICATE KEY UPDATE description=VALUES(description),checksum=VALUES(checksum);
+INSERT INTO `zsjos_module_schema_version` (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V176','Employee contract and anniversary reminders',SHA2('V176__employee_contract_anniversary_reminders.sql',256),'baseline',NOW())
+ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);

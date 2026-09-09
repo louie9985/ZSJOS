@@ -9,3 +9,6 @@ WHERE tenant_id=1 AND channel_code='wecom' AND deleted=b'0';
 
 INSERT IGNORE INTO zsjos_schema_version (version, description, checksum)
 VALUES ('V180','Repair WeCom channel display encoding','wecom-channel-encoding-v1');
+INSERT INTO zsjos_module_schema_version (module_code, version, description, checksum, release_version, installed_at)
+VALUES ('core','V180','Repair WeCom channel display encoding',SHA2('V180__repair_wecom_channel_config_encoding.sql',256),'baseline',NOW())
+ON DUPLICATE KEY UPDATE description=VALUES(description),checksum=VALUES(checksum);

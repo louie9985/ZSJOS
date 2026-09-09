@@ -43,7 +43,7 @@ import {
   getPrimaryTarget,
   type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
+import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, MOBILE_RENDERABLE_APP_ROUTES, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
 import { initializeAuthPlatform, redirectToMobileEntryForPlatformReload, resolveAdminEmbedPresentation, shouldReloadForMobileEntry } from './services/authSession'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
@@ -157,11 +157,12 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
     [info.menus]
   )
   const navigationMenus = useMemo(() => {
+    const renderableRoutes = authPlatform === 'MOBILE' ? MOBILE_RENDERABLE_APP_ROUTES : RENDERABLE_APP_ROUTES
     if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) {
-      return filterRenderableMenus(authorizedMenus, RENDERABLE_APP_ROUTES)
+      return filterRenderableMenus(authorizedMenus, renderableRoutes)
     }
-    return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), RENDERABLE_APP_ROUTES)
-  }, [authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
+    return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), renderableRoutes)
+  }, [authPlatform, authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
   const navigation = useMemo(() => buildTwoLevelNavigation(navigationMenus), [navigationMenus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
@@ -478,13 +479,13 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
-              ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
+              ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
               : leadDetailDeepLink
                 ? <LeadManagementPage permissions={info.permissions || []} detailOnly/>
                 : <Result status="403" title="无权查看客资详情"/>}/>
             <Route path={APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS} element={<Navigate to={APP_ROUTES.SALES_ORDER_APPROVALS} replace/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
-            <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
+            <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
           </Routes>}
         </Content>
         {aiOpen && <Sider width={LAYOUT_SIZES.AI_SIDER_W} className="ai-sider"><Typography.Title level={5}><RobotOutlined/> AI 助手</Typography.Title><Result status="info" title="AI 助手暂未接入"/></Sider>}

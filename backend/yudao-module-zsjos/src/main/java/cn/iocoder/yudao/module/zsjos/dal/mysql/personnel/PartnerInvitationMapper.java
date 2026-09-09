@@ -62,4 +62,16 @@ public interface PartnerInvitationMapper extends BaseMapperX<PartnerInvitationDO
                 .set(PartnerInvitationDO::getVoidedAt, voidedAt)
                 .setSql("version = version + 1"));
     }
+
+    default int voidActiveByStudent(Long studentPersonId, LocalDateTime voidedAt) {
+        return update(null, new LambdaUpdateWrapper<PartnerInvitationDO>()
+                .eq(PartnerInvitationDO::getStudentPersonId, studentPersonId)
+                .eq(PartnerInvitationDO::getInvitationScene,
+                        cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_INVITATION_SCENE_STUDENT)
+                .eq(PartnerInvitationDO::getStatus, PARTNER_INVITATION_STATUS_ACTIVE)
+                .set(PartnerInvitationDO::getStatus,
+                        cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_INVITATION_STATUS_VOIDED)
+                .set(PartnerInvitationDO::getVoidedAt, voidedAt)
+                .setSql("version = version + 1"));
+    }
 }

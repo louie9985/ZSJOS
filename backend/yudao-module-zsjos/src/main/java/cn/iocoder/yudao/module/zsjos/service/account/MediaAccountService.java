@@ -40,6 +40,8 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_TYPE;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PROFESSION;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -85,6 +87,8 @@ public class MediaAccountService {
                 .setLeadDirection(req.getLeadDirection()).setSStage(null)
                 .setSStageEnteredAt(null).setIsSilent(false).setRunStatus(RUN_STATUS_ACTIVE)
                 .setRescueStatus("none").setWhitelistStatus("none").setVersion(0);
+        setRecommendationProfile(account, req.getAccountTypePrimaryValue(), req.getAccountTypeSecondaryValue(),
+                req.getTrackPrimaryValue(), req.getTrackSecondaryValue());
         mapper.insert(account);
         return account.getId();
     }
@@ -182,7 +186,61 @@ public class MediaAccountService {
         requireSnapshotValueUnchanged(account.getRiskLevelValue(), req.getRiskLevelValue());
         account.setLeadDirection(req.getLeadDirection()).setDirectorUserId(directorUserId)
                 .setHealthJson(req.getHealthJson());
+        patchRecommendationProfile(account, req);
         if (mapper.updateProfile(account, req.getVersion()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+    }
+
+    private void patchRecommendationProfile(MediaAccountDO account, MediaAccountUpdateReqVO request) {
+        if (request.getAccountTypePrimaryValue() != null) {
+            DictSelection selection = resolveDictSelection(DICT_ACCOUNT_TYPE, request.getAccountTypePrimaryValue());
+            account.setAccountTypePrimaryValue(selection.value())
+                    .setAccountTypePrimaryLabelSnapshot(selection.label());
+        }
+        if (request.getAccountTypeSecondaryValue() != null) {
+            DictSelection selection = resolveDictSelection(DICT_ACCOUNT_TYPE, request.getAccountTypeSecondaryValue());
+            account.setAccountTypeSecondaryValue(selection.value())
+                    .setAccountTypeSecondaryLabelSnapshot(selection.label());
+        }
+        if (request.getTrackPrimaryValue() != null) {
+            DictSelection selection = resolveDictSelection(DICT_PROFESSION, request.getTrackPrimaryValue());
+            account.setTrackPrimaryValue(selection.value()).setTrackPrimaryLabelSnapshot(selection.label());
+        }
+        if (request.getTrackSecondaryValue() != null) {
+            DictSelection selection = resolveDictSelection(DICT_PROFESSION, request.getTrackSecondaryValue());
+            account.setTrackSecondaryValue(selection.value()).setTrackSecondaryLabelSnapshot(selection.label());
+        }
+    }
+
+    private void setRecommendationProfile(MediaAccountDO account, String accountTypePrimary,
+                                          String accountTypeSecondary, String trackPrimary,
+                                          String trackSecondary) {
+        DictSelection primaryType = resolveDictSelection(DICT_ACCOUNT_TYPE, accountTypePrimary);
+        DictSelection secondaryType = resolveDictSelection(DICT_ACCOUNT_TYPE, accountTypeSecondary);
+        DictSelection primaryTrack = resolveDictSelection(DICT_PROFESSION, trackPrimary);
+        DictSelection secondaryTrack = resolveDictSelection(DICT_PROFESSION, trackSecondary);
+        account.setAccountTypePrimaryValue(primaryType.value())
+                .setAccountTypePrimaryLabelSnapshot(primaryType.label())
+                .setAccountTypeSecondaryValue(secondaryType.value())
+                .setAccountTypeSecondaryLabelSnapshot(secondaryType.label())
+                .setTrackPrimaryValue(primaryTrack.value())
+                .setTrackPrimaryLabelSnapshot(primaryTrack.label())
+                .setTrackSecondaryValue(secondaryTrack.value())
+                .setTrackSecondaryLabelSnapshot(secondaryTrack.label());
+    }
+
+    private DictSelection resolveDictSelection(String dictType, String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) return new DictSelection(null, null);
+        String value = rawValue.trim();
+        dictDataApi.validateDictDataList(dictType, List.of(value));
+        String label = dictDataApi.getDictDataList(dictType).stream()
+                .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
+                .filter(item -> java.util.Objects.equals(item.getValue(), value))
+                .map(DictDataRespDTO::getLabel).findFirst()
+                .orElseThrow(() -> exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
+        return new DictSelection(value, label);
+    }
+
+    private record DictSelection(String value, String label) {
     }
 
     private String requirePlatformLabel(String value) {

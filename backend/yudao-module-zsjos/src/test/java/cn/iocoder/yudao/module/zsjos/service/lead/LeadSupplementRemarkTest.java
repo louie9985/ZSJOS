@@ -47,7 +47,11 @@ class LeadSupplementRemarkTest {
         AreaRespDTO province = new AreaRespDTO(); province.setId(1); province.setType(2); province.setStatus(0);
         AreaRespDTO city = new AreaRespDTO(); city.setId(2); city.setParentId(1); city.setType(3); city.setStatus(0);
         lenient().when(areaApi.getArea(1)).thenReturn(province); lenient().when(areaApi.getArea(2)).thenReturn(city);
-        lenient().when(productSkuService.validateLeadProduct(any(), anyBoolean(), any(), anyBoolean())).thenReturn(mock(LeadProductSnapshot.class));
+        // 返回真实快照而非裸 mock：管线在 supplement 中会调用 retainSelection/insertProducts，
+        // 裸 mock 的这些方法默认返回 null，导致 insertProducts 对 s.productRef() 抛 NPE
+        lenient().when(productSkuService.validateLeadProduct(any(), anyBoolean(), any(), anyBoolean()))
+                .thenReturn(new LeadProductSnapshot("spu", "课程 A", null, null, List.of(), null, null, null, null,
+                        null, null, null, null, false, false, List.of()));
     }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }
 

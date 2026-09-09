@@ -45,20 +45,24 @@ export interface AuthenticatedRouteTargetOptions {
   currentPath: string
   explicitRedirect?: string
   defaultLandingPath: string
+  currentPathAuthorized?: boolean
+  explicitRedirectAuthorized?: boolean
 }
 
 export const resolveAuthenticatedRouteTarget = ({
   currentPath,
   explicitRedirect,
-  defaultLandingPath
+  defaultLandingPath,
+  currentPathAuthorized = true,
+  explicitRedirectAuthorized = true
 }: AuthenticatedRouteTargetOptions): string => {
   if (explicitRedirect && !['/', '/index'].includes(explicitRedirect)) {
-    return explicitRedirect
+    return explicitRedirectAuthorized ? explicitRedirect : defaultLandingPath
   }
   if (currentPath === '/' || currentPath === '/index') {
     return defaultLandingPath
   }
-  return currentPath
+  return currentPathAuthorized ? currentPath : defaultLandingPath
 }
 
 export { DEFAULT_LANDING_PATH }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
+import { APP_ROUTES, MOBILE_RENDERABLE_APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 import { AuthenticationError, buildMenuTree, type RawMenu, unwrap } from './api'
 import {
   buildTwoLevelNavigation,
@@ -164,6 +164,23 @@ describe('workbench menu conversion', () => {
     expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
   })
 
+  it('keeps material browsing on Mobile and removes PC-only production routes', () => {
+    const routes = filterRenderableMenus(buildMenuTree([
+      menu({
+        id: 20,
+        name: '素材库',
+        path: '/zsjos/material-library',
+        children: [
+          menu({ id: 21, parentId: 20, name: '素材浏览', path: 'browse' }),
+          menu({ id: 22, parentId: 20, name: '内容生产', path: 'content-production' }),
+          menu({ id: 23, parentId: 20, name: '内容审核', path: 'content-review' })
+        ]
+      })
+    ]), MOBILE_RENDERABLE_APP_ROUTES)
+
+    expect(routes[0]?.children.map(child => child.path)).toEqual([APP_ROUTES.MATERIAL_LIBRARY])
+  })
+
   it('keeps admin embeds, excludes admin-only menus, and preserves their server hierarchy', () => {
     const routes = filterRenderableMenus(buildMenuTree([
       menu({
@@ -239,7 +256,7 @@ describe('workbench menu conversion', () => {
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(58)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(62)
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
@@ -247,6 +264,9 @@ describe('workbench menu conversion', () => {
     expect(RENDERABLE_APP_ROUTES.has('/calendar/exam-calendar')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/my-assets')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/asset-demands')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/material-library/browse')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/material-library/content-production')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/material-library/content-review')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/feedback')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/work-orders/create')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/work-orders/available')).toBe(true)

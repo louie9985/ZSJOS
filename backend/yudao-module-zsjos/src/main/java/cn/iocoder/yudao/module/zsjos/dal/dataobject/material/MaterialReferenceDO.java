@@ -1,0 +1,24 @@
+package cn.iocoder.yudao.module.zsjos.dal.dataobject.material;
+
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
+import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.time.LocalDateTime;
+
+@TableName("zsjos_material_reference")
+@KeySequence("zsjos_material_reference_seq")
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class MaterialReferenceDO extends TenantBaseDO {
+    @TableId private Long id;
+    private Long materialVersionId;
+    private Long targetContentVersionId;
+    private Long referencedByUserId;
+    private LocalDateTime referencedAt;
+    private String copiedFieldsJson;
+    private String idempotencyKey;
+}

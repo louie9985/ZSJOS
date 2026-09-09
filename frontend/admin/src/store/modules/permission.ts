@@ -5,6 +5,7 @@ import remainingRouter from '@/router/modules/remaining'
 import { flatMultiLevelRoutes, generateRoute } from '@/utils/routerHelper'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
 import { getAuthenticatedLandingPath } from '@/utils/authenticatedLanding'
+import { filterAdminRoutes } from '@/utils/adminRouteFilter'
 
 const { wsCache } = useCache()
 
@@ -48,7 +49,7 @@ export const usePermissionStore = defineStore('permission', {
         let res: AppCustomRouteRecordRaw[] = []
         const roleRouters = wsCache.get(CACHE_KEY.ROLE_ROUTERS)
         if (roleRouters) {
-          res = roleRouters as AppCustomRouteRecordRaw[]
+          res = filterAdminRoutes(roleRouters as AppCustomRouteRecordRaw[])
         }
         const routerMap: AppRouteRecordRaw[] = generateRoute(res)
         this.defaultLandingPath = getAuthenticatedLandingPath(res)

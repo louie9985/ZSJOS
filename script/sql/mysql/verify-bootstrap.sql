@@ -2023,6 +2023,190 @@ SELECT 'V185 Partner permission scope split' AS check_name,
                 OR NOT JSON_CONTAINS(package_row.menu_ids,'79920','$'))),
           'PASS','FAIL') AS result;
 
+
+SELECT 'V191 material library schema and versions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V191')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V191')
+          AND (SELECT COUNT(*) FROM information_schema.tables
+               WHERE table_schema=DATABASE() AND table_name IN (
+                 'zsjos_material_type','zsjos_material_schema_version','zsjos_material','zsjos_material_version',
+                 'zsjos_material_dimension','zsjos_material_field_index','zsjos_material_file',
+                 'zsjos_material_approval_round','zsjos_material_like','zsjos_material_favorite',
+                 'zsjos_material_reference','zsjos_material_import_batch','zsjos_material_import_error',
+                 'zsjos_content_review_config','zsjos_content_review_batch','zsjos_content_review_batch_item',
+                 'zsjos_content_version_file'))=17,
+          'PASS','FAIL') AS result;
+
+SELECT 'V191 material library required columns' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1
+            FROM JSON_TABLE(
+              '[{"table":"zsjos_material_type","columns":["id","code","name","description","status","current_schema_version_id","bpm_process_definition_key","allow_manual_create","allow_import","allow_auto_collect","recommendation_enabled","recommendation_config_json","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_schema_version","columns":["id","material_type_id","version_no","status","fields_json","schema_hash","published_by_user_id","published_at","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material","columns":["id","material_no","material_type_id","title","cover_snapshot_json","summary","source","source_business_id","source_business_version_id","status","current_draft_version_id","current_effective_version_id","owner_user_id","like_count","favorite_count","reference_count","pinned","priority","disabled_reason","disabled_at","disabled_by_user_id","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_version","columns":["id","material_id","version_no","schema_version_id","status","title","cover_snapshot_json","summary","values_json","field_snapshot_json","dict_snapshot_json","file_snapshot_json","search_text","content_hash","process_definition_id","process_definition_key","process_definition_version","process_instance_id","business_key","submitted_by_user_id","submitted_at","effective_at","rejected_at","rejection_reason","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_dimension","columns":["id","material_version_id","dimension_key","dimension_value","label_snapshot","unlimited","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_field_index","columns":["id","material_version_id","field_key","group_index","value_code","label_snapshot","text_value","number_value","date_value","datetime_value","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_file","columns":["id","material_version_id","field_key","group_index","infra_file_id","file_url_snapshot","original_name","content_type","file_size","uploaded_by_user_id","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_approval_round","columns":["id","material_version_id","round_no","status","process_definition_id","process_definition_key","process_definition_version","process_instance_id","business_key","last_event_key","submitted_by_user_id","submitted_at","concluded_at","result_reason","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_like","columns":["id","material_id","user_id","active","liked_at","unliked_at","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_favorite","columns":["id","material_id","user_id","active","favorited_at","unfavorited_at","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_reference","columns":["id","material_version_id","target_content_version_id","referenced_by_user_id","copied_fields_json","idempotency_key","referenced_at","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_import_batch","columns":["id","batch_no","material_type_id","schema_version_id","source_file_name","source_file_hash","status","total_count","success_count","failure_count","preview_rows_json","idempotency_key","created_by_user_id","confirmed_by_user_id","confirmed_at","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_material_import_error","columns":["id","batch_id","sheet_name","row_no","field_key","error_code","error_message","row_snapshot_json","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_content_review_config","columns":["id","process_definition_key","director_task_key","final_task_key","production_material_type_code","material_field_mapping_json","material_default_values_json","version","creator","create_time","updater","update_time","deleted","tenant_id","active_tenant_id"]},{"table":"zsjos_content_review_batch","columns":["id","batch_no","account_id","operator_user_id","director_user_id","relation_snapshot_json","context_snapshot_json","status","current_stage","process_definition_id","process_definition_key","process_definition_version","process_instance_id","business_key","last_event_key","submitted_at","director_completed_at","final_completed_at","finalized_at","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_content_review_batch_item","columns":["id","batch_id","content_id","content_version_id","sort_no","content_snapshot_json","director_decision","director_comment","director_reviewed_by_user_id","director_reviewed_at","final_decision","final_comment","collect_material","collection_snapshot_json","final_reviewed_by_user_id","final_reviewed_at","collected_material_id","collected_material_version_id","result_status","published_platform_url","published_at","published_by_user_id","version","creator","create_time","updater","update_time","deleted","tenant_id"]},{"table":"zsjos_content_version_file","columns":["id","content_version_id","field_key","sort_no","infra_file_id","file_url_snapshot","original_name","content_type","file_size","uploaded_by_user_id","creator","create_time","updater","update_time","deleted","tenant_id"]}]',
+              '$[*]' COLUMNS (
+                table_name varchar(64) PATH '$.table',
+                columns_json json PATH '$.columns'
+              )
+            ) expected_table
+            CROSS JOIN JSON_TABLE(
+              expected_table.columns_json,
+              '$[*]' COLUMNS (column_name varchar(64) PATH '$')
+            ) expected_column
+            LEFT JOIN information_schema.columns actual_column
+              ON actual_column.table_schema=DATABASE()
+             AND actual_column.table_name=expected_table.table_name
+             AND actual_column.column_name=expected_column.column_name
+            WHERE actual_column.column_name IS NULL
+          )
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_content_version'
+                 AND column_name IN ('title_snapshot','topic_snapshot','cover_snapshot_json',
+                   'deliverable_snapshot_json','lead_resource_url','planned_publish_at','frozen_at'))=7
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_content'
+                 AND column_name='current_version_no' AND column_default='0')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_partner_invitation'
+                 AND column_name IN ('invitation_scene','student_person_id','student_name_snapshot',
+                   'student_mobile_snapshot','initiated_by_director_user_id','assignment_context_json',
+                   'active_student_person_id'))=7
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_partner_invitation'
+                 AND column_name='active_student_person_id' AND extra LIKE '%STORED GENERATED%')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_partner_invitation'
+                 AND column_name IN ('assigned_operator_user_id','assigned_operator_name_snapshot')
+                 AND is_nullable='YES')=2,
+          'PASS','FAIL') AS result;
+
+SELECT 'V191 material library indexes' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1
+            FROM JSON_TABLE(
+              '[{"table":"zsjos_material_type","index":"uk_material_type_code","columns":"tenant_id,code,deleted","nonUnique":0},{"table":"zsjos_material_type","index":"idx_material_type_status","columns":"tenant_id,status,id","nonUnique":1},{"table":"zsjos_material_schema_version","index":"uk_material_schema_version","columns":"tenant_id,material_type_id,version_no,deleted","nonUnique":0},{"table":"zsjos_material_schema_version","index":"idx_material_schema_status","columns":"tenant_id,material_type_id,status,id","nonUnique":1},{"table":"zsjos_material","index":"uk_material_no","columns":"tenant_id,material_no,deleted","nonUnique":0},{"table":"zsjos_material","index":"uk_material_source","columns":"tenant_id,material_type_id,source,source_business_id,source_business_version_id,deleted","nonUnique":0},{"table":"zsjos_material","index":"idx_material_list","columns":"tenant_id,material_type_id,status,pinned,priority,id","nonUnique":1},{"table":"zsjos_material","index":"idx_material_owner","columns":"tenant_id,owner_user_id,status,id","nonUnique":1},{"table":"zsjos_material_version","index":"uk_material_content_version","columns":"tenant_id,material_id,version_no,deleted","nonUnique":0},{"table":"zsjos_material_version","index":"uk_material_process_instance","columns":"tenant_id,process_instance_id","nonUnique":0},{"table":"zsjos_material_version","index":"uk_material_business_key","columns":"tenant_id,business_key","nonUnique":0},{"table":"zsjos_material_version","index":"idx_material_version_state","columns":"tenant_id,material_id,status,id","nonUnique":1},{"table":"zsjos_material_dimension","index":"uk_material_dimension","columns":"tenant_id,material_version_id,dimension_key,dimension_value,deleted","nonUnique":0},{"table":"zsjos_material_dimension","index":"idx_material_dimension_match","columns":"tenant_id,dimension_key,dimension_value,material_version_id","nonUnique":1},{"table":"zsjos_material_field_index","index":"idx_material_field_lookup","columns":"tenant_id,field_key,value_code,material_version_id","nonUnique":1},{"table":"zsjos_material_field_index","index":"idx_material_field_number","columns":"tenant_id,field_key,number_value,material_version_id","nonUnique":1},{"table":"zsjos_material_field_index","index":"idx_material_field_date","columns":"tenant_id,field_key,date_value,material_version_id","nonUnique":1},{"table":"zsjos_material_field_index","index":"idx_material_field_datetime","columns":"tenant_id,field_key,datetime_value,material_version_id","nonUnique":1},{"table":"zsjos_material_field_index","index":"idx_material_field_version","columns":"tenant_id,material_version_id,field_key,group_index,id","nonUnique":1},{"table":"zsjos_material_file","index":"uk_material_file_ref","columns":"tenant_id,material_version_id,field_key,group_index,infra_file_id,deleted","nonUnique":0},{"table":"zsjos_material_file","index":"idx_material_file_version","columns":"tenant_id,material_version_id,field_key,group_index,id","nonUnique":1},{"table":"zsjos_material_approval_round","index":"uk_material_approval_round","columns":"tenant_id,material_version_id,round_no,deleted","nonUnique":0},{"table":"zsjos_material_approval_round","index":"uk_material_approval_process","columns":"tenant_id,process_instance_id","nonUnique":0},{"table":"zsjos_material_approval_round","index":"idx_material_approval_state","columns":"tenant_id,status,id","nonUnique":1},{"table":"zsjos_material_like","index":"uk_material_like_user","columns":"tenant_id,material_id,user_id","nonUnique":0},{"table":"zsjos_material_like","index":"idx_material_like_active","columns":"tenant_id,user_id,active,material_id","nonUnique":1},{"table":"zsjos_material_favorite","index":"uk_material_favorite_user","columns":"tenant_id,material_id,user_id","nonUnique":0},{"table":"zsjos_material_favorite","index":"idx_material_favorite_active","columns":"tenant_id,user_id,active,material_id","nonUnique":1},{"table":"zsjos_material_reference","index":"uk_material_reference_target","columns":"tenant_id,material_version_id,target_content_version_id","nonUnique":0},{"table":"zsjos_material_reference","index":"uk_material_reference_idempotency","columns":"tenant_id,idempotency_key","nonUnique":0},{"table":"zsjos_material_reference","index":"idx_material_reference_content","columns":"tenant_id,target_content_version_id,id","nonUnique":1},{"table":"zsjos_material_import_batch","index":"uk_material_import_no","columns":"tenant_id,batch_no,deleted","nonUnique":0},{"table":"zsjos_material_import_batch","index":"uk_material_import_idempotency","columns":"tenant_id,idempotency_key,deleted","nonUnique":0},{"table":"zsjos_material_import_batch","index":"idx_material_import_list","columns":"tenant_id,material_type_id,status,id","nonUnique":1},{"table":"zsjos_material_import_error","index":"idx_material_import_error","columns":"tenant_id,batch_id,row_no,id","nonUnique":1},{"table":"zsjos_content_review_config","index":"uk_content_review_config_tenant","columns":"active_tenant_id","nonUnique":0},{"table":"zsjos_content_review_batch","index":"uk_content_review_batch_no","columns":"tenant_id,batch_no,deleted","nonUnique":0},{"table":"zsjos_content_review_batch","index":"uk_content_review_process","columns":"tenant_id,process_instance_id","nonUnique":0},{"table":"zsjos_content_review_batch","index":"uk_content_review_business_key","columns":"tenant_id,business_key","nonUnique":0},{"table":"zsjos_content_review_batch","index":"idx_content_review_list","columns":"tenant_id,status,director_user_id,id","nonUnique":1},{"table":"zsjos_content_review_batch","index":"idx_content_review_operator","columns":"tenant_id,operator_user_id,status,id","nonUnique":1},{"table":"zsjos_content_review_batch_item","index":"uk_content_review_item","columns":"tenant_id,batch_id,content_version_id,deleted","nonUnique":0},{"table":"zsjos_content_review_batch_item","index":"idx_content_review_item_batch","columns":"tenant_id,batch_id,sort_no,id","nonUnique":1},{"table":"zsjos_content_review_batch_item","index":"idx_content_review_item_content","columns":"tenant_id,content_id,content_version_id","nonUnique":1},{"table":"zsjos_content_review_batch_item","index":"idx_content_review_item_version","columns":"tenant_id,content_version_id,batch_id,deleted","nonUnique":1},{"table":"zsjos_content_version_file","index":"uk_content_version_file","columns":"tenant_id,content_version_id,field_key,infra_file_id,deleted","nonUnique":0},{"table":"zsjos_content_version_file","index":"idx_content_version_file_order","columns":"tenant_id,content_version_id,field_key,sort_no,id","nonUnique":1},{"table":"zsjos_partner_invitation","index":"idx_tenant_student_scene_status","columns":"tenant_id,student_person_id,invitation_scene,status,id","nonUnique":1},{"table":"zsjos_partner_invitation","index":"uk_tenant_active_student_invitation","columns":"tenant_id,active_student_person_id","nonUnique":0}]',
+              '$[*]' COLUMNS (
+                table_name varchar(64) PATH '$.table',
+                index_name varchar(64) PATH '$.index',
+                column_names varchar(1000) PATH '$.columns',
+                non_unique int PATH '$.nonUnique'
+              )
+            ) expected_index
+            LEFT JOIN (
+              SELECT table_name,index_name,MIN(non_unique) non_unique,
+                     GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') column_names
+              FROM information_schema.statistics
+              WHERE table_schema=DATABASE()
+              GROUP BY table_name,index_name
+            ) actual_index
+              ON actual_index.table_name=expected_index.table_name
+             AND actual_index.index_name=expected_index.index_name
+            WHERE actual_index.index_name IS NULL
+               OR actual_index.non_unique<>expected_index.non_unique
+               OR actual_index.column_names<>expected_index.column_names
+          ),
+          'PASS','FAIL') AS result;
+
+SELECT 'V191 material library menus and package coverage' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu
+           WHERE id BETWEEN 80010 AND 80040 AND deleted=b'0')=31
+          AND (SELECT COUNT(DISTINCT permission) FROM system_menu
+               WHERE id BETWEEN 80010 AND 80040 AND permission<>'' AND deleted=b'0')=30
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80010 AND parent_id=6735
+               AND path='material-library' AND type=1 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80011 AND parent_id=80010
+               AND path='browse' AND component='zsjos-workbench'
+               AND workbench_render_mode='native' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80012 AND parent_id=80010
+               AND path='manage' AND component='zsjos/material/index'
+               AND workbench_render_mode='admin_embed' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80013 AND parent_id=80010
+               AND path='types' AND component='zsjos/materialType/index'
+               AND workbench_render_mode='admin_embed' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80014 AND parent_id=80010
+               AND path='imports' AND component='zsjos/materialImport/index'
+               AND workbench_render_mode='admin_embed' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80015 AND parent_id=80010
+               AND path='content-review' AND component='zsjos-workbench'
+               AND workbench_render_mode='native' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=80040 AND parent_id=80010
+               AND path='content-production' AND component='zsjos-workbench'
+               AND component_name='ContentProductionPage' AND permission='zsjos:content:query'
+               AND workbench_render_mode='native' AND deleted=b'0')
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant_package package_row
+            CROSS JOIN JSON_TABLE(
+              '[80010,80011,80012,80013,80014,80015,80016,80017,80018,80019,80020,80021,80022,80023,80024,80025,80026,80027,80028,80029,80030,80031,80032,80033,80034,80035,80036,80038,80039,80040]',
+              '$[*]' COLUMNS (menu_id int PATH '$')
+            ) expected_menu
+            WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'6735','$')
+              AND NOT JSON_CONTAINS(package_row.menu_ids,CAST(expected_menu.menu_id AS CHAR),'$')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant_package package_row
+            WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'7022','$')
+              AND NOT JSON_CONTAINS(package_row.menu_ids,'80037','$')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM system_role_menu source_grant
+            JOIN system_role role_row ON role_row.id=source_grant.role_id
+              AND role_row.tenant_id=source_grant.tenant_id
+              AND role_row.status=0 AND role_row.deleted=b'0'
+            CROSS JOIN (SELECT 80010 menu_id UNION ALL SELECT 80040) expected_grant
+            WHERE source_grant.menu_id=6974 AND source_grant.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM system_role_menu migrated_grant
+                WHERE migrated_grant.role_id=role_row.id
+                  AND migrated_grant.tenant_id=role_row.tenant_id
+                  AND migrated_grant.menu_id=expected_grant.menu_id
+                  AND migrated_grant.deleted=b'0')
+          ),
+          'PASS','FAIL') AS result;
+
+SELECT 'V191 dictionaries, default material types, and content-review config' AS check_name,
+       IF((SELECT COUNT(*) FROM system_dict_type
+           WHERE type IN ('zsjos_material_account_type','zsjos_material_profession')
+             AND status=0 AND deleted=b'0')=2
+          AND (SELECT COUNT(*) FROM system_dict_data
+               WHERE dict_type='zsjos_material_profession' AND deleted=b'0')=9
+          AND NOT EXISTS (SELECT 1 FROM system_dict_data
+               WHERE dict_type='zsjos_material_profession' AND deleted=b'0'
+                 AND label NOT IN ('T1 职业营养','T2 健康管理','T3 心理与社工','T4 药学',
+                   'T5 中药学','T6 中医适宜技术','T7 中医师承专长','T8 健康医疗学历提升',
+                   'T9 健康职业商业变现'))
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant_row
+            CROSS JOIN JSON_TABLE(
+              '["viral_account","viral_content","sop","production_content"]',
+              '$[*]' COLUMNS (type_code varchar(64) PATH '$')
+            ) expected_type
+            WHERE tenant_row.status=0 AND tenant_row.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM zsjos_material_type material_type
+                   WHERE material_type.tenant_id=tenant_row.id
+                     AND material_type.code=(CONVERT(expected_type.type_code USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     AND material_type.deleted=b'0')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant_row
+            WHERE tenant_row.status=0 AND tenant_row.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM zsjos_content_review_config review_config
+                   WHERE review_config.tenant_id=tenant_row.id AND review_config.deleted=b'0')
+          )
+          AND NOT EXISTS (SELECT 1 FROM zsjos_material_type
+               WHERE code='viral_account' AND deleted=b'0'
+                 AND HEX(name)<>'E78886E6ACBEE8B4A6E58FB7')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_material_type
+               WHERE code='viral_content' AND deleted=b'0'
+                 AND HEX(name)<>'E78886E6ACBEE8A786E9A2912FE59BBEE69687')
+          AND EXISTS (SELECT 1 FROM system_dict_type
+               WHERE type='zsjos_material_account_type'
+                 AND HEX(name)='E7B4A0E69D90E98082E9858DE8B4A6E58FB7E7B1BBE59E8B' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_dict_type
+               WHERE type='zsjos_material_profession'
+                 AND HEX(name)='E7B4A0E69D90E98082E9858DE4B893E4B89AE696B9E59091' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+
+-- BPM category rows are provisioned by the application through BpmCategoryApi.
+-- This SQL verifier intentionally does not read or write BPM-owned data tables.
+
 SELECT 'V160 registration close-service button' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V160')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V160')

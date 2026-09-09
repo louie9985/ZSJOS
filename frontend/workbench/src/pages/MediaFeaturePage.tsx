@@ -34,6 +34,7 @@ import {
 import { hasPermission } from "../services/managementAccess";
 import { formatTimestamp, type Timestamp } from "../services/time";
 import ProductionTicketPositioningCard from "../components/ProductionTicketPositioningCard";
+import { DICT_TYPE } from "../constants";
 
 export type MediaFeature =
   | "accounts"
@@ -111,6 +112,8 @@ const actionLabels: Record<string, string> = {
 const actionText = (action: string) => actionLabels[action] || action;
 const statusText = (status?: string) =>
   status ? labels[status] || status : "未记录";
+const profileText = (primary?: string, secondary?: string) =>
+  [primary, secondary].filter(Boolean).join(" / ") || "未配置";
 const errorText = (error: unknown) =>
   error instanceof ApiError && error.code === 403
     ? "无权访问该页面"
@@ -248,6 +251,8 @@ export default function MediaFeaturePage({
   >([]);
   const [platforms, setPlatforms] = useState<DictData[]>([]);
   const [contentClasses, setContentClasses] = useState<DictData[]>([]);
+  const [accountTypes, setAccountTypes] = useState<DictData[]>([]);
+  const [professions, setProfessions] = useState<DictData[]>([]);
   const [createForm] = Form.useForm<Record<string, unknown>>();
   const [accountAction, setAccountAction] = useState<string>();
   const [accountActionLoading, setAccountActionLoading] = useState(false);
@@ -318,8 +323,10 @@ export default function MediaFeaturePage({
       api.mediaStudents.page({ pageNo: 1, pageSize: 100 }),
       api.dictDataByType("zsjos_account_platform"),
       api.dictDataByType("zsjos_content_class"),
+      api.dictDataByType(DICT_TYPE.MATERIAL_ACCOUNT_TYPE),
+      api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
     ]);
-    const [a, u, s, p, c] = results;
+    const [a, u, s, p, c, accountTypeResult, professionResult] = results;
     if (a.status === "fulfilled") setAccounts(a.value.list);
     if (u.status === "fulfilled") setUsers(u.value);
     if (s.status === "fulfilled")
@@ -328,6 +335,10 @@ export default function MediaFeaturePage({
       );
     if (p.status === "fulfilled") setPlatforms(p.value);
     if (c.status === "fulfilled") setContentClasses(c.value);
+    if (accountTypeResult.status === "fulfilled")
+      setAccountTypes(accountTypeResult.value);
+    if (professionResult.status === "fulfilled")
+      setProfessions(professionResult.value);
     if (
       results.some(
         (x) =>
@@ -387,6 +398,10 @@ export default function MediaFeaturePage({
         platformAccountId: account.platformAccountId,
         leadDirection: account.leadDirection,
         directorUserId: account.directorUserId,
+        accountTypePrimaryValue: account.accountTypePrimaryValue,
+        accountTypeSecondaryValue: account.accountTypeSecondaryValue,
+        trackPrimaryValue: account.trackPrimaryValue,
+        trackSecondaryValue: account.trackSecondaryValue,
       });
     if (action === "RESCUE_ACCOUNT")
       accountActionForm.setFieldValue(
@@ -402,6 +417,19 @@ export default function MediaFeaturePage({
       if (results[0].status === "fulfilled")
         setStudents(results[0].value);
       if (results[1].status === "fulfilled") setUsers(results[1].value);
+    }
+    if (
+      action === "EDIT_ACCOUNT" &&
+      (!accountTypes.length || !professions.length)
+    ) {
+      const results = await Promise.allSettled([
+        api.dictDataByType(DICT_TYPE.MATERIAL_ACCOUNT_TYPE),
+        api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
+      ]);
+      if (results[0].status === "fulfilled") setAccountTypes(results[0].value);
+      if (results[1].status === "fulfilled") setProfessions(results[1].value);
+      if (results.some((result) => result.status === "rejected"))
+        message.error("账号画像字典加载失败，请重试");
     }
   };
   const submitAccountAction = async () => {
@@ -435,6 +463,7 @@ export default function MediaFeaturePage({
           riskLevelValue: account.riskLevelValue,
           riskLevelLabelSnapshot: account.riskLevelLabelSnapshot,
           healthJson: account.healthJson,
+          ...recommendationProfilePatch(account, values),
         });
       else if (accountAction === "RESCUE_ACCOUNT")
         await api.mediaAccount.rescue(
@@ -514,6 +543,26 @@ export default function MediaFeaturePage({
             {
               label: "阶段",
               value: (r: Row) => (r as MediaAccount).sStageLabelSnapshot || (r as MediaAccount).sStage || "未记录",
+            },
+            {
+              label: "账号类型",
+              value: (r: Row) => {
+                const account = r as MediaAccount;
+                return profileText(
+                  account.accountTypePrimaryLabelSnapshot,
+                  account.accountTypeSecondaryLabelSnapshot,
+                );
+              },
+            },
+            {
+              label: "专业方向",
+              value: (r: Row) => {
+                const account = r as MediaAccount;
+                return profileText(
+                  account.trackPrimaryLabelSnapshot,
+                  account.trackSecondaryLabelSnapshot,
+                );
+              },
             },
           ]
         : feature === "content"
@@ -714,6 +763,8 @@ export default function MediaFeaturePage({
         students={students}
         platforms={platforms}
         contentClasses={contentClasses}
+        accountTypes={accountTypes}
+        professions={professions}
         onDeadlineChange={setCreateDeadlineAt}
         onCancel={() => setCreateOpen(false)}
         onSubmit={() => void submitCreate()}
@@ -726,6 +777,8 @@ export default function MediaFeaturePage({
           form={accountActionForm}
           users={users}
           students={students}
+          accountTypes={accountTypes}
+          professions={professions}
           onCancel={() => setAccountAction(undefined)}
           onSubmit={() => void submitAccountAction()}
         />
@@ -741,6 +794,8 @@ function AccountActionModal({
   form,
   users,
   students,
+  accountTypes,
+  professions,
   onCancel,
   onSubmit,
 }: {
@@ -750,6 +805,8 @@ function AccountActionModal({
   form: FormInstance<Record<string, unknown>>;
   users: SimpleUser[];
   students: Array<{ personId: number; name?: string }>;
+  accountTypes: DictData[];
+  professions: DictData[];
   onCancel: () => void;
   onSubmit: () => void;
 }) {
@@ -816,6 +873,10 @@ function AccountActionModal({
             <Form.Item name="leadDirection" label="内容方向">
               <Input />
             </Form.Item>
+            <RecommendationProfileFields
+              accountTypes={accountTypes}
+              professions={professions}
+            />
             <Form.Item name="directorUserId" label="编导">
               <Select
                 allowClear
@@ -900,6 +961,8 @@ function CreateMediaModal({
   students,
   platforms,
   contentClasses,
+  accountTypes,
+  professions,
   onDeadlineChange,
   onCancel,
   onSubmit,
@@ -913,6 +976,8 @@ function CreateMediaModal({
   students: Array<{ personId: number; name?: string }>;
   platforms: DictData[];
   contentClasses: DictData[];
+  accountTypes: DictData[];
+  professions: DictData[];
   onDeadlineChange: (value?: Timestamp) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -964,12 +1029,20 @@ function CreateMediaModal({
             <Form.Item name="platformAccountId" label="平台账号标识">
               <Input />
             </Form.Item>
-            <Form.Item name="studentPersonId" label="绑定学员（可选）">
+            <Form.Item
+              name="studentPersonId"
+              label="绑定学员"
+              rules={[{ required: true, message: "请选择学员" }]}
+            >
               <Select allowClear options={studentOptions} />
             </Form.Item>
             <Form.Item name="directorUserId" label="编导（可选）">
               <Select allowClear options={userOptions} />
             </Form.Item>
+            <RecommendationProfileFields
+              accountTypes={accountTypes}
+              professions={professions}
+            />
           </>
         )}
         {feature === "content" && (
@@ -1076,6 +1149,80 @@ function CreateMediaModal({
       </Form>
     </Modal>
   );
+}
+
+function RecommendationProfileFields({
+  accountTypes,
+  professions,
+}: {
+  accountTypes: DictData[];
+  professions: DictData[];
+}) {
+  const options = (items: DictData[]) =>
+    items.map((item) => ({ value: item.value, label: item.label }));
+  return (
+    <>
+      <Form.Item name="accountTypePrimaryValue" label="账号类型（主）">
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          options={options(accountTypes)}
+          disabled={!accountTypes.length}
+          placeholder={accountTypes.length ? "选择主账号类型" : "暂无可用账号类型"}
+        />
+      </Form.Item>
+      <Form.Item name="accountTypeSecondaryValue" label="账号类型（次）">
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          options={options(accountTypes)}
+          disabled={!accountTypes.length}
+          placeholder={accountTypes.length ? "选择次账号类型" : "暂无可用账号类型"}
+        />
+      </Form.Item>
+      <Form.Item name="trackPrimaryValue" label="专业方向（主）">
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          options={options(professions)}
+          disabled={!professions.length}
+          placeholder={professions.length ? "选择主专业方向" : "暂无可用专业方向"}
+        />
+      </Form.Item>
+      <Form.Item name="trackSecondaryValue" label="专业方向（次）">
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          options={options(professions)}
+          disabled={!professions.length}
+          placeholder={professions.length ? "选择次专业方向" : "暂无可用专业方向"}
+        />
+      </Form.Item>
+    </>
+  );
+}
+
+function recommendationProfilePatch(
+  account: MediaAccount,
+  values: Record<string, unknown>,
+) {
+  const patch: Partial<MediaAccount> = {};
+  const keys = [
+    "accountTypePrimaryValue",
+    "accountTypeSecondaryValue",
+    "trackPrimaryValue",
+    "trackSecondaryValue",
+  ] as const;
+  for (const key of keys) {
+    const current = account[key] || undefined;
+    const next = typeof values[key] === "string" ? values[key] : undefined;
+    if (next !== current) patch[key] = next || "";
+  }
+  return patch;
 }
 
 export function AccountsPage({ permissions = [] }: { permissions?: string[] }) {

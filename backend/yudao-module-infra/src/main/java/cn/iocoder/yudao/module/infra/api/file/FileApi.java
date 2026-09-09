@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.module.infra.api.file;
 
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadCompleteReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadInitReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileDirectUploadInitRespDTO;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -13,6 +17,12 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface FileApi {
+
+    /** 初始化由服务端绑定主体和存储坐标的浏览器直传。 */
+    FileDirectUploadInitRespDTO initDirectUpload(@Valid @NotNull FileDirectUploadInitReqDTO request);
+
+    /** 完成直传，校验对象存储中的真实元数据后登记文件。 */
+    FileInfoRespDTO completeDirectUpload(@Valid @NotNull FileDirectUploadCompleteReqDTO request);
 
     /**
      * 保存文件，并返回文件的访问路径

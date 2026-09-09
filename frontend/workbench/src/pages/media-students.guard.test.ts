@@ -6,6 +6,7 @@ describe('director and operator My Students', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
   const configPage = readFileSync('src/pages/DirectorConfigPages.tsx', 'utf8')
   const api = readFileSync('src/services/api.ts', 'utf8')
+  const materialApi = readFileSync('src/services/materialApi.ts', 'utf8')
   const autoSave = readFileSync('src/services/directorAutoSave.ts', 'utf8')
   const style = readFileSync('src/styles/pages/media-students.css', 'utf8')
 
@@ -121,6 +122,20 @@ describe('director and operator My Students', () => {
     expect(page).not.toContain('`${window.location.origin}${result.sharePath}`')
   })
 
+  it('creates a student-bound partner invitation behind the configured permission', () => {
+    expectSourceToContainTokens(page, "hasPermission(permissions, 'zsjos:partner-invitation:create-student')")
+    expect(page).toContain("form.setFieldsValue({ studentName: detail.student.name || '', studentMobile: detail.student.mobile || '' })")
+    expect(page).toContain('partnerStudentInvitationApi.create({')
+    expectSourceToContainTokens(page, 'studentPersonId: detail.student.personId')
+    expect(materialApi).toContain("await http.post('/zsjos/partner-invitation/student/create', data)")
+    expect(page).toContain('setStudentInvitation(invitation)')
+    expect(page).toContain('navigator.clipboard.writeText(studentInvitation.inviteCode)')
+    expect(page).toContain('formatTimestamp(studentInvitation?.expiresAt)')
+    expect(page).toContain('姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。')
+    expect(page).toContain("label: '注册姓名', value: studentInvitation?.name")
+    expect(page).toContain("label: '注册手机号', value: studentInvitation?.mobile")
+  })
+
   it('separates the effective positioning from the latest review round', () => {
     expect(api).toMatch(/\blatestRound\s*:\s*boolean\s*;/)
     expect(api).toMatch(/\beffective\s*:\s*boolean\s*;/)
@@ -171,4 +186,5 @@ describe('director and operator My Students', () => {
     expectSourceToContainTokens(page, "hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />}")
     expect(page).toContain("await autoSaveCoordinator.current!.saveNow(draftSaveTask())")
   })
+
 })

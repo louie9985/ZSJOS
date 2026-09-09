@@ -48,7 +48,6 @@ class PartnerAccountServiceImplTest {
         when(accountMapper.selectById(20L)).thenReturn(account);
         when(passwordEncoder.matches("pass1234", "encoded")).thenReturn(true);
         when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L).setStatus(PARTNER_STATUS_ENABLED));
-        when(accountMapper.updateById(any(PartnerAccountDO.class))).thenReturn(1);
 
         PartnerAccountDO result = service.authenticate(" 13800138000 ", "pass1234", "127.0.0.1");
 

@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAss
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerInvitationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -36,6 +37,13 @@ public class PartnerInvitationController {
     @PreAuthorize("@ss.hasPermission('zsjos:partner-invitation:create')")
     public CommonResult<PartnerInvitationRespVO> create(@Valid @RequestBody PartnerInvitationCreateReqVO reqVO) {
         return success(invitationService.create(reqVO, getLoginUserId()));
+    }
+
+    @PostMapping("/student/create")
+    @PreAuthorize("@ss.hasPermission('zsjos:partner-invitation:create-student')")
+    public CommonResult<PartnerInvitationRespVO> createStudentInvitation(
+            @Valid @RequestBody PartnerStudentInvitationCreateReqVO reqVO) {
+        return success(invitationService.createStudentInvitation(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/page")

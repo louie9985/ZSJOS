@@ -3,10 +3,12 @@ package cn.iocoder.yudao.module.bpm.service.task;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskSignCreateReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO;
+import cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants;
 import cn.iocoder.yudao.module.bpm.service.comment.BpmCommentService;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmModelService;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.flowable.bpmn.model.BpmnModel;
@@ -20,14 +22,17 @@ import org.flowable.task.api.TaskQuery;
 import org.flowable.task.service.impl.persistence.entity.TaskEntity;
 import org.flowable.task.service.impl.persistence.entity.TaskEntityImpl;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +67,15 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
     private ManagementService managementService;
     @Mock
     private NativeTaskQuery nativeTaskQuery;
+    @Mock
+    private BpmProcessDefinitionService bpmProcessDefinitionService;
+    @Mock
+    private ObjectProvider<BpmTaskActionValidator> taskActionValidatorProvider;
+
+    @BeforeEach
+    void setUpTaskActionValidators() {
+        lenient().when(taskActionValidatorProvider.orderedStream()).thenReturn(Stream.empty());
+    }
 
     @Test
     void createParallelSignKeepsParentAssignedAndCreatesActiveChild() {
@@ -72,11 +87,14 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
         AdminUserRespDTO reviewer = new AdminUserRespDTO(); reviewer.setId(233L); reviewer.setNickname("财务审批人");
         when(taskService.createTaskQuery()).thenReturn(taskQuery);
         when(taskQuery.taskId("parent-task")).thenReturn(taskQuery);
+        when(taskQuery.taskTenantId(org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(taskQuery);
         when(taskQuery.includeTaskLocalVariables()).thenReturn(taskQuery);
         when(taskQuery.singleResult()).thenReturn(parent);
         when(taskQuery.processInstanceId("process-1")).thenReturn(taskQuery);
         when(taskQuery.taskDefinitionKey("financeReview")).thenReturn(taskQuery);
         when(taskQuery.list()).thenReturn(List.of(parent));
+        when(processInstanceService.getProcessInstance("process-1"))
+                .thenReturn(org.mockito.Mockito.mock(ProcessInstance.class));
         when(taskService.newTask(anyString())).thenReturn(child);
         when(adminUserApi.getUserList(Set.of(300L))).thenReturn(List.of(supervisor));
         when(adminUserApi.getUser(233L)).thenReturn(reviewer);
@@ -101,6 +119,7 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
         ProcessInstance instance = org.mockito.Mockito.mock(ProcessInstance.class);
         when(taskService.createTaskQuery()).thenReturn(taskQuery);
         when(taskQuery.taskId("parent-task")).thenReturn(taskQuery);
+        when(taskQuery.taskTenantId(org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(taskQuery);
         when(taskQuery.includeTaskLocalVariables()).thenReturn(taskQuery);
         when(taskQuery.singleResult()).thenReturn(parent);
         when(processInstanceService.getProcessInstance("process-1")).thenReturn(instance);
@@ -172,6 +191,7 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
         when(nativeTaskQuery.count()).thenReturn(0L);
         when(taskService.createTaskQuery()).thenReturn(taskQuery);
         when(taskQuery.taskId("parent-task")).thenReturn(taskQuery);
+        when(taskQuery.taskTenantId(org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(taskQuery);
         when(taskQuery.includeTaskLocalVariables()).thenReturn(taskQuery);
         when(taskQuery.singleResult()).thenReturn(parent);
     }

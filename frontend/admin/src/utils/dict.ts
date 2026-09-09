@@ -141,6 +141,18 @@ export enum DICT_TYPE {
   // ========== EAM 模块 ==========
   EAM_ASSET_STATUS = 'eam_asset_status',
 
+  // ========== PMS 模块 ==========
+  PMS_KNOWLEDGE_CONTENT_LEVEL = 'pms_knowledge_content_level',
+  PMS_KNOWLEDGE_OBJECT_TYPE = 'pms_knowledge_object_type',
+  PMS_KNOWLEDGE_DOCUMENT_TYPE = 'pms_knowledge_document_type',
+  PMS_WORK_ITEM_TYPE = 'pms_work_item_type',
+  PMS_WORK_ITEM_STATUS_TYPE = 'pms_work_item_status_type',
+  PMS_WORK_ITEM_PRIORITY = 'pms_work_item_priority',
+  PMS_WORK_ITEM_DEFECT_TYPE = 'pms_work_item_defect_type',
+  PMS_ITERATION_STATUS = 'pms_iteration_status',
+  PMS_PROJECT_TYPE = 'pms_project_type',
+  PMS_PROJECT_MEMBER_LEVEL = 'pms_project_member_level',
+
   // ========== INFRA 模块 ==========
   INFRA_BOOLEAN_STRING = 'infra_boolean_string',
   INFRA_JOB_STATUS = 'infra_job_status',

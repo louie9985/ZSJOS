@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentVersionMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
@@ -28,6 +29,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class ContentService {
     @Resource private ContentMapper mapper;
+    @Resource private ContentVersionMapper contentVersionMapper;
     @Resource private PermissionApi permissionApi;
     @Resource private ContentObjectPermissionProvider objectPermissionProvider;
     @Resource private MediaDataScopeService dataScopeService;
@@ -52,7 +54,8 @@ public class ContentService {
         content.setContentClassValue(req.getContentClassValue());
         content.setContentClassLabelSnapshot(requireContentClassLabel(req.getContentClassValue()));
         content.setStatus(CONTENT_TOPIC);
-        content.setCurrentVersionNo(1);
+        // The first immutable content version is created explicitly by the content editor.
+        content.setCurrentVersionNo(0);
         content.setOwnerOperatorUserId(userId);
         content.setRejectCount(0);
         content.setVersion(0);
@@ -83,20 +86,20 @@ public class ContentService {
 
     @ZsjosPermission(bizType = BIZ_TYPE_CONTENT, bizId = "#id", action = "submit-acceptance")
     @Transactional(rollbackFor = Exception.class)
-    public void submitAcceptance(Long id, Integer version) { transition(id, version, CONTENT_IN_PRODUCTION, CONTENT_ACCEPTANCE); }
+    public void submitAcceptance(Long id, Integer version) {
+        transition(id, version, CONTENT_IN_PRODUCTION, CONTENT_ACCEPTANCE);
+    }
 
     @ZsjosPermission(bizType = BIZ_TYPE_CONTENT, bizId = "#id", action = "acceptance-review")
     @Transactional(rollbackFor = Exception.class)
-    public void approveAcceptance(Long id, Integer version) { transition(id, version, CONTENT_ACCEPTANCE, CONTENT_PUBLISHED); }
+    public void approveAcceptance(Long id, Integer version) {
+        throw exception(CONTENT_REVIEW_LEGACY_ENTRY_DISABLED);
+    }
 
     @ZsjosPermission(bizType = BIZ_TYPE_CONTENT, bizId = "#id", action = "acceptance-review")
     @Transactional(rollbackFor = Exception.class)
     public void rejectAcceptance(Long id, Integer version, String reason) {
-        String normalizedReason = reason == null ? null : reason.trim();
-        if (normalizedReason == null || normalizedReason.isEmpty() || normalizedReason.length() > 500) {
-            throw exception(CONTENT_REJECT_REASON_REQUIRED);
-        }
-        transition(id, version, CONTENT_ACCEPTANCE, CONTENT_REJECTED, normalizedReason);
+        throw exception(CONTENT_REVIEW_LEGACY_ENTRY_DISABLED);
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_CONTENT, bizId = "#id", action = "revise")
@@ -124,11 +127,52 @@ public class ContentService {
     private void transition(Long id, Integer version, String expected, String target, String reason) {
         ContentDO content = require(id);
         if (!expected.equals(content.getStatus())) throw exception(CONTENT_STATE_INVALID);
+        if (content.getCurrentVersionNo() == null || content.getCurrentVersionNo() <= 0) {
+            throw exception(CONTENT_VERSION_STAGE_INVALID);
+        }
+        var currentVersion = contentVersionMapper.selectByContentAndVersionNo(id, content.getCurrentVersionNo());
+        if (currentVersion == null) {
+            throw exception(CONTENT_VERSION_STAGE_INVALID);
+        }
+        boolean startsRejectedRevision = CONTENT_REJECTED.equals(expected) && CONTENT_REVISING.equals(target)
+                && currentVersion.getFrozenAt() != null
+                && "rejected".equals(currentVersion.getReviewDecision());
+        if (currentVersion.getFrozenAt() != null && !startsRejectedRevision) {
+            throw exception(CONTENT_STATE_INVALID);
+        }
+        if (CONTENT_ACCEPTANCE.equals(target)) {
+            ContentPackageValidator.validate(content, currentVersion);
+        }
         int updated = CONTENT_REJECTED.equals(target)
                 ? mapper.rejectTransition(id, version, expected, target)
                 : mapper.transition(id, version, expected, target);
         if (updated == 0) throw exception(CONTENT_VERSION_CONFLICT);
         Long operator = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        publishTransitionEvents(content, expected, target, reason, operator, version);
+    }
+
+    public void applyBatchReview(ContentDO content, Integer expectedVersion, boolean approved,
+                                 String reason, Long reviewerUserId) {
+        String target = approved ? CONTENT_READY_TO_PUBLISH : CONTENT_REJECTED;
+        if (!CONTENT_ACCEPTANCE.equals(content.getStatus())
+                || mapper.applyBatchReview(content.getId(), expectedVersion, approved) != 1) {
+            throw exception(CONTENT_VERSION_CONFLICT);
+        }
+        publishTransitionEvents(content, CONTENT_ACCEPTANCE, target, reason, reviewerUserId, expectedVersion);
+    }
+
+    public void registerPublished(ContentDO content, Integer expectedVersion, String url,
+                                  java.time.LocalDateTime publishedAt, Long operatorUserId) {
+        if (content == null || mapper.registerPublished(content.getId(), expectedVersion, url, publishedAt) != 1) {
+            throw exception(CONTENT_REVIEW_PUBLISH_INVALID);
+        }
+        publishTransitionEvents(content, CONTENT_READY_TO_PUBLISH, CONTENT_PUBLISHED,
+                null, operatorUserId, expectedVersion);
+    }
+
+    private void publishTransitionEvents(ContentDO content, String expected, String target, String reason,
+                                         Long operator, Integer version) {
+        Long id = content.getId();
         workflowEventService.transition(BIZ_TYPE_CONTENT,id,operator,expected,target,reason,"content:"+id+":"+version+":"+target);
         java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("bizNo", content.getContentNo());
@@ -137,15 +181,9 @@ public class ContentService {
             payload.put("deepLink", "/zsjos/media-students?personId=" + linkedAccount.getStudentPersonId()
                     + "&tab=content&contentId=" + id);
         }
-        if (CONTENT_ACCEPTANCE.equals(target)) {
-            workflowEventService.createTaskAndNotify("media.content.pending_acceptance", "MEDIA_CONTENT_ACCEPTANCE",
-                    BIZ_TYPE_CONTENT, id, content.getOwnerOperatorUserId(), "内容待验收", ACTION_APPROVE_CONTENT,
-                    operator, "content-acceptance:" + id + ":" + version, payload);
-        }
-        if (CONTENT_PUBLISHED.equals(target) || CONTENT_REJECTED.equals(target)) {
-            workflowEventService.completeTask("MEDIA_CONTENT_ACCEPTANCE", id, content.getOwnerOperatorUserId());
+        if (CONTENT_READY_TO_PUBLISH.equals(target) || CONTENT_REJECTED.equals(target)) {
             Long recipient = resolveExecutionRecipient(content);
-            String scene = CONTENT_PUBLISHED.equals(target) ? "media.content.approved" : "media.content.rejected";
+            String scene = CONTENT_READY_TO_PUBLISH.equals(target) ? "media.content.approved" : "media.content.rejected";
             workflowEventService.notify(scene, BIZ_TYPE_CONTENT, id, recipient, operator,
                     "content-result:" + id + ":" + version + ":" + target, payload);
         }
@@ -169,11 +207,12 @@ public class ContentService {
 
     public List<String> availableActionsForVisible(ContentDO content, Long userId, boolean objectAuthorized) {
         if (!objectAuthorized) return List.of();
+        if (content.getCurrentVersionNo() == null || content.getCurrentVersionNo() <= 0) return List.of();
         String permission = switch (content.getStatus()) {
             case CONTENT_TOPIC -> "zsjos:content:complete-topic";
             case CONTENT_SCRIPT -> "zsjos:content:submit-production";
             case CONTENT_IN_PRODUCTION -> "zsjos:content:submit-acceptance";
-            case CONTENT_ACCEPTANCE -> "zsjos:content:acceptance-review";
+            case CONTENT_ACCEPTANCE -> null;
             case CONTENT_REJECTED -> "zsjos:content:revise";
             case CONTENT_REVISING -> "zsjos:content:resubmit-production";
             default -> null;
@@ -185,7 +224,6 @@ public class ContentService {
             case CONTENT_TOPIC -> List.of(ACTION_COMPLETE_TOPIC);
             case CONTENT_SCRIPT -> List.of(ACTION_SUBMIT_PRODUCTION);
             case CONTENT_IN_PRODUCTION -> List.of(ACTION_SUBMIT_ACCEPTANCE);
-            case CONTENT_ACCEPTANCE -> List.of(ACTION_APPROVE_CONTENT, ACTION_REJECT_CONTENT);
             case CONTENT_REJECTED -> List.of(ACTION_START_CONTENT_REVISION);
             case CONTENT_REVISING -> List.of(ACTION_RESUBMIT_PRODUCTION);
             default -> List.of();

@@ -75,9 +75,17 @@ class PersonMapperSqlTest {
         String sql = boundSql.getSql().replaceAll("\\s+", " ").trim();
 
         assertTrue(sql.contains("CAST(mobile AS BINARY)=CAST(? AS BINARY)"));
-        assertTrue(sql.contains("CAST(wechat_id AS BINARY)=CAST(? AS BINARY)"));
+        assertTrue(sql.contains("LOWER(wechat_id)=LOWER(?)"));
         assertFalse(sql.contains("BINARY mobile"));
         assertEquals(parameterCount, boundSql.getParameterMappings().size());
         assertDoesNotThrow(() -> CCJSqlParserUtil.parse(sql));
+    }
+
+    /**
+     * WeChat 去重是不区分大小写的（LOWER 相等即视为同一联系人），手机号仍严格区分大小写（BINARY）。
+     */
+    @Test
+    void wechatMatchIsCaseInsensitiveWhileMobileRemainsBinary() throws Exception {
+        assertDuplicateCandidateSql(Map.of("wechatId", "CaseSensitiveWechat"), 2);
     }
 }

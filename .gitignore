@@ -50,6 +50,9 @@ rebel.xml
 
 application-my.yaml
 
+# Local remote database connection override (contains credentials)
+/backend/yudao-server/application-local-private.yaml
+
 # Production deployment secrets and local database backups
 /deploy/production/.env
 /deploy/production/.env.*

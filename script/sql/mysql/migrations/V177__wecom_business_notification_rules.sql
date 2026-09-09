@@ -66,3 +66,6 @@ WHERE source_rule.`deleted`=b'0'
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V177','Mirror business notification rules to WeCom','wecom-business-notification-rules-v1');
+INSERT INTO `zsjos_module_schema_version` (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V177','Mirror business notification rules to WeCom',SHA2('V177__wecom_business_notification_rules.sql',256),'baseline',NOW())
+ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);

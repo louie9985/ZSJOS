@@ -1,4 +1,4 @@
-import axios, { type AxiosRequestConfig } from "axios";
+import axios, { type AxiosProgressEvent, type AxiosRequestConfig } from "axios";
 import type { AxiosHeaderValue } from "axios";
 import {
   APP_CONFIG,
@@ -247,6 +247,14 @@ export type MediaAccount = {
   platformLabelSnapshot: string;
   platformAccountId?: string;
   leadDirection?: string;
+  accountTypePrimaryValue?: string;
+  accountTypePrimaryLabelSnapshot?: string;
+  accountTypeSecondaryValue?: string;
+  accountTypeSecondaryLabelSnapshot?: string;
+  trackPrimaryValue?: string;
+  trackPrimaryLabelSnapshot?: string;
+  trackSecondaryValue?: string;
+  trackSecondaryLabelSnapshot?: string;
   studentPersonId?: number;
   directorUserId?: number;
   detailConfigVersionId?: number;
@@ -325,9 +333,51 @@ export type MediaContent = {
   contentNo: string;
   accountId: number;
   title: string;
+  topic?: string;
+  contentClassValue?: string;
+  contentClassLabelSnapshot?: string;
   status: string;
+  currentVersionNo: number;
+  ownerOperatorUserId?: number;
+  publishedUrl?: string;
+  publishedAt?: Timestamp;
   version: number;
   availableActions: string[];
+};
+export type MediaContentVersionFile = {
+  id: number;
+  fieldKey: string;
+  sortNo: number;
+  infraFileId: number;
+  fileUrlSnapshot?: string;
+  originalName: string;
+  contentType: string;
+  fileSize: number;
+  uploadedByUserId: number;
+  previewUrl?: string;
+};
+export type MediaContentVersion = {
+  id: number;
+  contentId: number;
+  versionNo: number;
+  stage: string;
+  titleSnapshot?: string;
+  topicSnapshot?: string;
+  coverSnapshotJson?: string;
+  materialRefsJson?: string;
+  deliverableUrl?: string;
+  deliverableSnapshotJson?: string;
+  scriptText?: string;
+  leadResourceUrl?: string;
+  plannedPublishAt?: Timestamp;
+  frozenAt?: Timestamp;
+  submittedByUserId?: number;
+  submittedAt?: Timestamp;
+  reviewDecision?: string;
+  reviewComment?: string;
+  reviewedByUserId?: number;
+  reviewedAt?: Timestamp;
+  files: MediaContentVersionFile[];
 };
 export type MediaReview = {
   id: number;
@@ -2892,6 +2942,37 @@ export const unwrap = <T>(response: { data: any }): T => {
   return payload as T;
 };
 
+export type DirectUploadInit = {
+  uploadToken: string;
+  uploadUrl: string;
+  uploadHeaders: Record<string, string>;
+  expiresAt: Timestamp;
+};
+
+export const uploadDirectFile = async <T>(
+  initUrl: string,
+  completeUrl: string,
+  file: File,
+  onUploadProgress?: (event: AxiosProgressEvent) => void,
+): Promise<T> => {
+  const init = unwrap<DirectUploadInit>(
+    await http.post(initUrl, {
+      name: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
+    }),
+  );
+  await axios.put(init.uploadUrl, file, {
+    headers: init.uploadHeaders,
+    timeout: 0,
+    withCredentials: false,
+    onUploadProgress,
+  });
+  return unwrap<T>(
+    await http.post(completeUrl, { uploadToken: init.uploadToken }),
+  );
+};
+
 async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
   const keys = getAuthStorageKeys(platform);
   const refresh = localStorage.getItem(keys.refreshToken);
@@ -2999,8 +3080,8 @@ export const api = {
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
     exams: async (categoryId: number, productId?: number) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId } })),
-    create: async (data: { className?: string; productId: number; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
-    update: async (id: number, data: { className?: string; productId: number; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
+    create: async (data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
+    update: async (id: number, data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
     directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
     requestTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<number>(await http.post(`/zsjos/class-transfer/service/${relationId}`, data)),
@@ -3212,9 +3293,17 @@ export const api = {
   mediaAccount: {
     create: async (data: {
       studentPersonId: number;
+      directorUserId?: number;
       platformValue: string;
       platformLabelSnapshot: string;
-      detailValues: Record<string, unknown>;
+      platformAccountId?: string;
+      nickname?: string;
+      leadDirection?: string;
+      accountTypePrimaryValue?: string;
+      accountTypeSecondaryValue?: string;
+      trackPrimaryValue?: string;
+      trackSecondaryValue?: string;
+      detailValues?: Record<string, unknown>;
     }) => unwrap<number>(await http.post("/zsjos/media-account/create", data)),
     publishedFieldConfig: async () =>
       unwrap<MediaAccountFieldConfig>(
@@ -3403,11 +3492,40 @@ export const api = {
         }),
       ),
     versions: async (contentId: number) =>
-      unwrap<unknown[]>(
+      unwrap<MediaContentVersion[]>(
         await http.get("/zsjos/content/version/list", {
           params: { contentId },
         }),
       ),
+    createVersion: async (data: {
+      contentId: number;
+      titleSnapshot?: string;
+      topicSnapshot?: string;
+      coverSnapshotJson?: string;
+      materialRefsJson?: string;
+      deliverableUrl?: string;
+      deliverableSnapshotJson?: string;
+      scriptText?: string;
+      leadResourceUrl?: string;
+      plannedPublishAt?: string;
+    }) =>
+      unwrap<number>(await http.post("/zsjos/content/version/create", {
+        ...data,
+        idempotencyKey: createIdempotencyKey(),
+      })),
+    uploadVersionFile: async (file: File) => {
+      return uploadDirectFile<{
+        fileId: number;
+        name: string;
+        contentType: string;
+        size: number;
+        previewUrl?: string;
+      }>(
+        "/zsjos/content/version/file/upload/init",
+        "/zsjos/content/version/file/upload/complete",
+        file,
+      );
+    },
   },
   productionTicket: {
     createContext: async (accountId: number, sceneCode: string) =>

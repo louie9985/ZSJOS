@@ -1,0 +1,298 @@
+.content-review-page {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.content-review-filter-shell,
+.content-review-heading,
+.content-review-item-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+}
+
+.content-review-filter-shell h4,
+.content-review-heading h4 {
+  margin: 0;
+}
+
+.content-review-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+}
+
+.content-review-toolbar .ant-input-search {
+  width: min(280px, 100%);
+}
+
+.content-review-toolbar .ant-select {
+  min-width: 140px;
+}
+
+.content-review-layout {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0, 1fr);
+  gap: var(--crm-gap);
+}
+
+.content-review-list-pane,
+.content-review-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.content-review-list-pane {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+.content-review-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  flex-direction: column;
+}
+
+.content-review-list-pane > .ant-pagination {
+  padding: var(--crm-sp-3);
+  border-top: 1px solid var(--crm-border);
+}
+
+.content-review-list-item {
+  display: flex;
+  width: 100%;
+  padding: var(--crm-sp-3);
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  color: var(--crm-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.content-review-list-item:hover,
+.content-review-list-item.active {
+  background: var(--crm-bg-sunken);
+}
+
+.content-review-list-item.active {
+  box-shadow: inset 3px 0 0 var(--crm-color-primary);
+}
+
+.content-review-list-item > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-2);
+}
+
+.content-review-list-item > span:not(:first-child) {
+  overflow: hidden;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-review-detail-pane {
+  padding: var(--crm-pane-pad);
+  overflow-y: auto;
+}
+
+.content-review-heading > div:first-child {
+  min-width: 0;
+}
+
+.content-review-heading h4 {
+  margin-top: var(--crm-sp-2);
+}
+
+.content-review-meta {
+  display: flex;
+  margin: var(--crm-sp-4) 0;
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3) var(--crm-sp-5);
+  border-radius: var(--crm-radius-sm);
+  color: var(--crm-text-secondary);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.content-review-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.content-review-item {
+  display: flex;
+  padding: var(--crm-card-pad);
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+}
+
+.content-review-item-heading > div:first-child,
+.content-review-picker-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.content-review-item-heading span,
+.content-review-picker-copy span {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.content-review-snapshot {
+  display: grid;
+  padding: var(--crm-sp-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--crm-sp-2) var(--crm-sp-4);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.content-review-snapshot p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.content-review-decision {
+  display: grid;
+  align-items: start;
+  grid-template-columns: auto auto minmax(220px, 1fr) auto;
+  gap: var(--crm-sp-2);
+}
+
+.content-review-collect {
+  display: inline-flex;
+  min-height: var(--crm-control-h);
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.content-review-picker {
+  max-height: 56vh;
+  overflow-y: auto;
+}
+
+.content-review-picker-toolbar {
+  display: flex;
+  margin: var(--crm-sp-3) 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.content-review-picker-toolbar .ant-input-search {
+  width: min(420px, 100%);
+}
+
+.content-review-picker .ant-checkbox-wrapper {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.content-review-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--crm-sp-3);
+}
+
+.content-review-media-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.content-review-media-item .ant-image,
+.content-review-media-item video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--crm-radius-sm);
+  object-fit: cover;
+  background: var(--crm-bg-sunken);
+}
+
+@media (max-width: 900px) {
+  .content-review-filter-shell,
+  .content-review-heading {
+    flex-direction: column;
+  }
+
+  .content-review-toolbar {
+    justify-content: flex-start;
+  }
+
+  .content-review-decision {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content-review-decision .ant-input-textarea {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-review-page {
+    height: auto;
+  }
+
+  .content-review-layout {
+    display: flex;
+    overflow: visible;
+    flex-direction: column;
+  }
+
+  .content-review-list-pane,
+  .content-review-detail-pane {
+    overflow: visible;
+  }
+
+  .content-review-scroll {
+    max-height: 38vh;
+  }
+
+  .content-review-snapshot,
+  .content-review-decision {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-review-decision .ant-input-textarea {
+    grid-column: auto;
+  }
+
+  .content-review-item-heading {
+    flex-direction: column;
+  }
+}

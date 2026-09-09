@@ -6,6 +6,8 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.AbstractFileClient;
+import cn.iocoder.yudao.module.infra.framework.file.core.client.FileObjectMetadata;
+import cn.iocoder.yudao.module.infra.framework.file.core.client.FileUploadPresignResult;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -13,16 +15,25 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 基于 S3 协议的文件客户端，实现 MinIO、阿里云、腾讯云、七牛云、华为云等云服务
@@ -111,6 +122,58 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
                 .signatureDuration(EXPIRATION_DEFAULT)
                 .putObjectRequest(b -> b.bucket(config.getBucket()).key(path)).build())
                 .url().toString();
+    }
+
+    @Override
+    public FileUploadPresignResult presignPutUrl(String path, String contentType,
+                                                 long contentLength, int expirationSeconds) {
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(path)
+                .contentType(contentType)
+                .contentLength(contentLength)
+                .build();
+        PresignedPutObjectRequest presigned = presigner.presignPutObject(PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofSeconds(expirationSeconds))
+                .putObjectRequest(request)
+                .build());
+        Map<String, String> headers = new LinkedHashMap<>();
+        presigned.signedHeaders().forEach((name, values) -> {
+            if (!"host".equalsIgnoreCase(name) && !"content-length".equalsIgnoreCase(name)) {
+                headers.put(name, String.join(",", values));
+            }
+        });
+        if (headers.keySet().stream().noneMatch(name -> "content-type".equalsIgnoreCase(name))) {
+            headers.put("Content-Type", contentType);
+        }
+        return new FileUploadPresignResult(presigned.url().toString(), headers);
+    }
+
+    @Override
+    public FileObjectMetadata getObjectMetadata(String path) {
+        HeadObjectResponse response = client.headObject(HeadObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(path)
+                .build());
+        return new FileObjectMetadata(response.contentLength(), response.contentType(), response.eTag());
+    }
+
+    @Override
+    public void copyObject(String sourcePath, String targetPath, String sourceEtag) {
+        CopyObjectRequest.Builder request = CopyObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(targetPath)
+                .copySource(encodeCopySource(sourcePath));
+        if (StrUtil.isNotBlank(sourceEtag)) {
+            request.copySourceIfMatch(sourceEtag);
+        }
+        client.copyObject(request.build());
+    }
+
+    private String encodeCopySource(String sourcePath) {
+        return java.util.Arrays.stream((config.getBucket() + "/" + sourcePath).split("/", -1))
+                .map(segment -> URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20"))
+                .collect(Collectors.joining("/"));
     }
 
     @Override

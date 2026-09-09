@@ -18,6 +18,7 @@ import { formatTimestamp } from '../services/time'
 import { DirectorAutoSaveCoordinator, type DirectorAutoSaveState } from '../services/directorAutoSave'
 import { mergePositioningJsonValues, parsePositioningJson, serializePositioningFormValues, type PositioningJsonImportPreview } from '../services/positioningJsonImport'
 import { workOrderApi, type WorkOrderDepartment, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
+import { partnerStudentInvitationApi, type PartnerStudentInvitation } from '../services/materialApi'
 
 const PAGE_SIZE = 20
 const AUTO_SAVE_DELAY_MS = 1500
@@ -92,7 +93,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [selectedId, setSelectedId] = useState<number>()
   const [keyword, setKeyword] = useState(''), [search, setSearch] = useState(''), [pageNo, setPageNo] = useState(1), [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
-  const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'interview' | 'operator'>(), [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'interview' | 'operator' | 'student-partner'>(), [saving, setSaving] = useState(false)
   const [directorContext, setDirectorContext] = useState<StudentContactContext>(), [operatorCandidates, setOperatorCandidates] = useState<StudyPlanner[]>([])
   const [platforms, setPlatforms] = useState<DictData[]>([]), [contentClasses, setContentClasses] = useState<DictData[]>([])
   const [accountFieldConfig, setAccountFieldConfig] = useState<MediaAccountFieldConfig>(), [fieldDicts, setFieldDicts] = useState<Record<string, DictData[]>>({})
@@ -113,6 +114,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [positioningDetail, setPositioningDetail] = useState<PositioningCard>()
   const [ticketContext, setTicketContext] = useState<ProductionTicketCreateContext>(), [ticketContextLoading, setTicketContextLoading] = useState(false), [ticketContextError, setTicketContextError] = useState(''), [ticketOpen, setTicketOpen] = useState(false), [ticketSaving, setTicketSaving] = useState(false), [ticketTemplates, setTicketTemplates] = useState<WorkOrderTemplate[]>([]), [ticketDepartments, setTicketDepartments] = useState<WorkOrderDepartment[]>([]), [ticketTargetDepartments, setTicketTargetDepartments] = useState<WorkOrderDepartment[]>([]), [ticketUsers, setTicketUsers] = useState<Array<{ id: number; nickname: string }>>([]), [ticketDictionaries, setTicketDictionaries] = useState<Array<{ dictType: string; value: string; label: string }>>([]), [ticketFiles, setTicketFiles] = useState<WorkOrderFile[]>([]), [ticketAccountId, setTicketAccountId] = useState<number>()
   const [shareLink, setShareLink] = useState<string>()
+  const [studentInvitation, setStudentInvitation] = useState<PartnerStudentInvitation>()
   const [autoSave, setAutoSave] = useState<DirectorAutoSaveState>({ status: 'idle' })
   const [rejectingContent, setRejectingContent] = useState<MediaStudentDetail['contents'][number]>()
   const [rejectingPositioning, setRejectingPositioning] = useState<MediaStudentDetail['positioningCards'][number]>()
@@ -403,6 +405,18 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       const values = await form.validateFields(); setSaving(true)
       if (dialog === 'account') await api.mediaAccount.create({ studentPersonId: detail.student.personId, platformValue: String(values.platformValue), platformLabelSnapshot: platforms.find(x => x.value === values.platformValue)?.label || '', detailValues: (values.detailValues || {}) as Record<string, unknown> })
       if (dialog === 'content') await api.mediaContent.create({ ...values, contentClassLabelSnapshot: contentClasses.find(x => x.value === values.contentClassValue)?.label || '' } as never)
+      if (dialog === 'student-partner') {
+        const invitation = await partnerStudentInvitationApi.create({
+          studentPersonId: detail.student.personId,
+          name: String(values.studentName || '').trim(),
+          mobile: String(values.studentMobile || '').trim(),
+        })
+        setStudentInvitation(invitation)
+        setDialog(undefined)
+        message.success('兼职账号邀请码已生成')
+        await loadDetail(detail.student.personId, selectedServiceId, selectedAccountId)
+        return
+      }
       if ((dialog === 'precheck' || dialog === 'interview') && selectedService && directorContext) {
         const stage = dialog
         const shouldSubmit = values.submit !== false
@@ -459,6 +473,21 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     } else return
     if (selectedId) await loadDetail(selectedId, selectedServiceId, selectedAccountId) } catch (cause) { message.error(errorText(cause)) } }
   const viewPositioning = async (id: number) => { try { setPositioningDetail(await api.positioningCard.get(id)) } catch (cause) { message.error(errorText(cause)) } }
+  const openStudentPartnerInvitation = () => {
+    if (!detail) return
+    form.resetFields()
+    form.setFieldsValue({ studentName: detail.student.name || '', studentMobile: detail.student.mobile || '' })
+    setDialog('student-partner')
+  }
+  const copyStudentInvitationCode = async () => {
+    if (!studentInvitation) return
+    try {
+      await navigator.clipboard.writeText(studentInvitation.inviteCode)
+      message.success('邀请码已复制')
+    } catch {
+      message.error('复制失败，请手动选择邀请码')
+    }
+  }
   const actions = (items: string[] | undefined, click: (action: string) => void) => items?.map(action => <Button size="small" key={action} onClick={() => click(action)}>{actionLabels[action] || action}</Button>)
   const accountField = (field: MediaAccountField) => {
     const name = ['detailValues', field.key]
@@ -555,12 +584,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     channelLabel={() => '-'}
     showFollowUp={false}
     studentService={selectedService}
-    toolbar={<OverflowToolbar actions={directorContext?.availableActions.filter(action => ['DIRECTOR_PRECHECK', 'DIRECTOR_INTERVIEW', 'ASSIGN_OPERATOR'].includes(action)).map<ToolbarAction>(action => ({
+    toolbar={<Space wrap><OverflowToolbar actions={directorContext?.availableActions.filter(action => ['DIRECTOR_PRECHECK', 'DIRECTOR_INTERVIEW', 'ASSIGN_OPERATOR'].includes(action)).map<ToolbarAction>(action => ({
       key: action,
       icon: action === 'DIRECTOR_PRECHECK' ? <FileSearchOutlined /> : action === 'DIRECTOR_INTERVIEW' ? <MessageOutlined /> : <UserSwitchOutlined />,
       label: action === 'DIRECTOR_PRECHECK' ? '资料预审' : action === 'DIRECTOR_INTERVIEW' ? '学员采访' : '指派运营',
       onClick: () => openDirectorAction(action)
-    })) || []} />}
+    })) || []} />{hasPermission(permissions, 'zsjos:partner-invitation:create-student') && <Button icon={<PlusOutlined />} onClick={openStudentPartnerInvitation}>开通兼职账号</Button>}</Space>}
     slots={{
       latestActivity: <div className="lead-latest-followup"><div className="lead-section-header"><Typography.Text strong>最新内容</Typography.Text>{latestContent?.lastActivityAt && <Typography.Text type="secondary">{formatTimestamp(latestContent.lastActivityAt)}</Typography.Text>}</div>{latestContent ? <div className="lead-latest-followup-body"><div className="lead-latest-followup-tags"><Tag>{statusLabel(latestContent.status)}</Tag><Tag color="blue">{accountName(latestContent.accountId)}</Tag></div><Typography.Paragraph className="lead-latest-followup-remark">{latestContent.title || latestContent.contentNo}</Typography.Paragraph></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容" />}</div>,
       timeline: <div className="lead-flow-timeline"><div className="lead-section-header"><Typography.Text strong>操作时间线</Typography.Text></div>{mediaTimeline.length ? <Timeline items={mediaTimeline.slice(0, 8).map(item => ({ children: <div className="media-students-timeline-item"><strong>{item.title}</strong><span>{item.detail}</span><Typography.Text type="secondary">{item.operatorName || '系统记录'} · {formatTimestamp(item.occurredAt)}</Typography.Text></div> }))} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无操作记录" />}</div>,
@@ -656,7 +685,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   /> : <Empty description="当前学员暂无课程服务" />
 
   return <section className="workspace-page media-students-page"><header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)} /></Tooltip></header><div className="media-students-inbox-layout"><aside className="media-students-list-pane"><div className="media-students-toolbar"><Input.Search allowClear value={search} onChange={e => setSearch(e.target.value)} onSearch={value => setKeyword(value.trim())} placeholder="搜索姓名或手机号" /></div>{error && <Alert type="error" showIcon message={error} />}<div className="media-students-scroll">{loading && !rows.length ? <Skeleton active /> : rows.map(x => <button type="button" className={`media-students-item${selectedId === x.personId ? ' active' : ''}`} key={x.personId} onClick={() => void loadDetail(x.personId)}><NameAvatar name={x.name || '学员'} size={36} /><span className="media-students-item-copy"><strong>{x.name || '未填写姓名'}</strong><span>{x.personNo || '暂无学员编号'}</span><span>{x.mobile || '无手机号'} · {x.services.length} 项服务</span></span></button>)}</div>{total > PAGE_SIZE && <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} onChange={value => void loadPage(value)} />}</aside><main className="media-students-detail-pane">{body}</main></div>
-    <Modal width={dialog === 'interview' || dialog === 'positioning' ? 'min(1180px, calc(100vw - 32px))' : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '创建内容' : dialog === 'positioning' ? '填写账号定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'interview' ? '学员采访' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
+    <Modal width={dialog === 'interview' || dialog === 'positioning' ? 'min(1180px, calc(100vw - 32px))' : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '创建内容' : dialog === 'positioning' ? '填写账号定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'interview' ? '学员采访' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" onValuesChange={scheduleAutoSave}>
         {autoSaveNotice}
         {dialog === 'account' && <><Form.Item name="platformValue" label="平台" rules={[{ required: true }]}><Select options={platforms.map(x => ({ value: x.value, label: x.label }))} /></Form.Item>{accountFieldConfig?.fields.filter(field => field.enabled).map(accountField)}</>}
@@ -665,6 +694,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         {dialog === 'precheck' && <><Alert type="info" showIcon message="请核对学员、课程、订单及服务归属信息。资料预审不填写业务表单。"/><Form.Item name="confirmed" valuePropName="checked" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请确认资料无误'))}]}><Checkbox>已确认资料无误</Checkbox></Form.Item><Form.Item name="interviewAt" label="访谈预约时间" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请选择访谈预约时间'))}]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>确认完成资料预审</Checkbox></Form.Item></>}
         {dialog === 'interview' && <><Alert type="info" showIcon message="带“必填”的项目提交时必须填写；单选请选择一项，多选可选择多项。"/>{interviewGroups.map(group => <section className="director-interview-group" key={group}><Typography.Title level={5}>{group === '自媒体能力' ? '自媒体运营基础能力' : group}</Typography.Title>{interviewFields.filter(field => (field.group || '基本信息') === group).map(directorField)}</section>)}<Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>提交并完成学员采访</Checkbox></Form.Item></>}
         {dialog === 'operator' && <><Form.Item name="userId" label="运营负责人" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={operatorCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>{directorContext?.operatorAssignmentConflict && <Form.Item name="correctionReason" label="统一归属说明" rules={[{ required: true, max: 500 }]}><Input.TextArea rows={3} /></Form.Item>}</>}
+        {dialog === 'student-partner' && <><Alert type="info" showIcon message="姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。" /><Form.Item name="studentName" label="注册姓名" rules={[{ required: true, whitespace: true, max: 100, message: '请输入注册姓名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="studentMobile" label="注册手机号" rules={[{ required: true, whitespace: true, message: '请输入注册手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的 11 位手机号' }]}><Input maxLength={11} /></Form.Item></>}
         {(dialog === 'reject-content' || dialog === 'reject-positioning') && <Form.Item name="reason" label="退回原因" rules={[{ required: true, max: 500 }]}><Input.TextArea rows={4} /></Form.Item>}
       </Form>
     </Modal>
@@ -694,5 +724,18 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} action={<Button size="small" onClick={() => ticketAccountId && void openTicket(ticketAccountId)}>重试</Button>} /> : ticketContext ? <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" label="工单模板" rules={[{ required: true }]}><Select options={ticketTemplates.map(item => ({ value: item.code, label: item.name }))} onChange={code => ticketAccountId && void loadTicketContext(ticketAccountId, code)} /></Form.Item><DetailFieldGrid columns={2} items={[{ key: 'student', label: '学员姓名', value: ticketContext.studentName || '未记录' }, { key: 'account', label: '第三方账号', value: `${ticketContext.platformLabel || '平台未记录'} · ${ticketContext.accountName || ticketContext.accountNo || '账号未记录'}` }, ...(ticketContext.accountFields || []).map(field => ({ key: field.key, label: field.label, value: field.displayValue || String(field.value ?? '未记录') }))]} />{ticketContext.canCreate ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true, message: '请选择接收部门' }]}><Select showSearch optionFilterProp="label" options={ticketTargetDepartments.map(dept => ({ value: dept.id, label: dept.name }))} /></Form.Item> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true, message: '请选择剪拍专员' }]}><Select showSearch optionFilterProp="label" options={ticketContext.assigneeCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : undefined}>{field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'user' ? <Select showSearch optionFilterProp="label" options={ticketUsers.map(item => ({ value: item.id, label: item.nickname }))} /> : field.type === 'department' ? <Select showSearch optionFilterProp="label" options={ticketDepartments.map(item => ({ value: item.id, label: item.name }))} /> : field.type === 'dictionary' ? <Select options={ticketDictionaries.filter(item => item.dictType === field.dictionaryType).map(item => ({ value: item.value, label: item.label }))} /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true, message: '请填写运营备注' }, { max: 500, message: '运营备注不能超过 500 字' }]}><Input.TextArea rows={4} maxLength={500} showCount placeholder="补充拍摄重点、剪辑要求或其他交接事项" /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="warning" showIcon message={ticketContext.unavailableReason || '当前账号不可发起拍剪工单'} />}</Form> : null}
     </Modal>
     <Modal title="定位卡内容" open={Boolean(positioningDetail)} footer={null} onCancel={() => setPositioningDetail(undefined)}><DetailFieldGrid columns={1} items={(positioningDetail?.fieldsSnapshot || []).filter(field => field.enabled).map(field => ({ key: field.key, label: field.title, value: positioningDisplayValue(positioningDetail, field.key) }))} /></Modal>
-    <Modal title="学员确认链接" open={Boolean(shareLink)} onCancel={() => setShareLink(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => shareLink && void navigator.clipboard.writeText(shareLink)}>复制链接</Button>}><Alert type="success" showIcon icon={<LinkOutlined />} message="链接已生成" description={shareLink} /></Modal></section>
+    <Modal title="兼职账号邀请码" open={Boolean(studentInvitation)} onCancel={() => setStudentInvitation(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => void copyStudentInvitationCode()}>复制邀请码</Button>}>
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Alert type="success" showIcon message="邀请码已生成" description="请将邀请码和注册手机号一并提供给学员。" />
+        <DetailFieldGrid columns={1} items={[
+          { key: 'student', label: '学员', value: studentInvitation?.studentNameSnapshot || studentInvitation?.name },
+          { key: 'name', label: '注册姓名', value: studentInvitation?.name },
+          { key: 'mobile', label: '注册手机号', value: studentInvitation?.mobile },
+          { key: 'inviteCode', label: '邀请码', value: <Typography.Text code>{studentInvitation?.inviteCode}</Typography.Text> },
+          { key: 'expiresAt', label: '有效期至', value: formatTimestamp(studentInvitation?.expiresAt) },
+        ]} />
+      </Space>
+    </Modal>
+    <Modal title="学员确认链接" open={Boolean(shareLink)} onCancel={() => setShareLink(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => shareLink && void navigator.clipboard.writeText(shareLink)}>复制链接</Button>}><Alert type="success" showIcon icon={<LinkOutlined />} message="链接已生成" description={shareLink} /></Modal>
+  </section>
 }

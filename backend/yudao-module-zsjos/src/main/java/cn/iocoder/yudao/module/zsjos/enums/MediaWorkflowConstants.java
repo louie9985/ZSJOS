@@ -21,6 +21,7 @@ public final class MediaWorkflowConstants {
     public static final String CONTENT_SCRIPT = "script";
     public static final String CONTENT_IN_PRODUCTION = "in_production";
     public static final String CONTENT_ACCEPTANCE = "acceptance";
+    public static final String CONTENT_READY_TO_PUBLISH = "ready_to_publish";
     public static final String CONTENT_PUBLISHED = "published";
     public static final String CONTENT_REJECTED = "rejected";
     public static final String CONTENT_REVISING = "revising";
@@ -28,7 +29,8 @@ public final class MediaWorkflowConstants {
             CONTENT_TOPIC, Set.of(CONTENT_SCRIPT),
             CONTENT_SCRIPT, Set.of(CONTENT_IN_PRODUCTION),
             CONTENT_IN_PRODUCTION, Set.of(CONTENT_ACCEPTANCE),
-            CONTENT_ACCEPTANCE, Set.of(CONTENT_PUBLISHED, CONTENT_REJECTED),
+            CONTENT_ACCEPTANCE, Set.of(CONTENT_READY_TO_PUBLISH, CONTENT_REJECTED),
+            CONTENT_READY_TO_PUBLISH, Set.of(CONTENT_PUBLISHED),
             CONTENT_REJECTED, Set.of(CONTENT_REVISING),
             CONTENT_REVISING, Set.of(CONTENT_IN_PRODUCTION));
 

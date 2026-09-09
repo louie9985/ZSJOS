@@ -1,5 +1,5 @@
 import { Card, Result, Typography } from 'antd'
-import { APP_ROUTES } from '../constants'
+import { APP_ROUTES, PC_ONLY_NATIVE_ROUTES, type AuthPlatform } from '../constants'
 import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from '../services/menuComponentRegistry'
 import type { WorkbenchMenu } from '../services/api'
 import { Navigate, useLocation } from 'react-router-dom'
@@ -50,11 +50,15 @@ import FeedbackPage from '../pages/FeedbackPage'
 import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
 import AnnouncementCenterPage from '../pages/AnnouncementCenterPage'
 import DeliveryClassPage from '../pages/DeliveryClassPage'
+import MaterialLibraryPage from '../pages/MaterialLibraryPage'
+import ContentProductionPage from '../pages/ContentProductionPage'
+import ContentReviewBatchPage from '../pages/ContentReviewBatchPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
   permissions: string[]
   roles: string[]
+  authPlatform: AuthPlatform
   onOpenAssignment: () => void
 }
 
@@ -62,8 +66,11 @@ interface RouteHostProps {
  * 根据当前菜单路径/组件名渲染对应业务页面。
  * 未迁移的菜单显示占位提示。
  */
-export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
+export default function RouteHost({ menu, permissions, roles, authPlatform, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
+  if (authPlatform === 'MOBILE' && PC_ONLY_NATIVE_ROUTES.has(menu?.path || location.pathname)) {
+    return <Result status="info" title="请使用电脑端访问" subTitle="内容生产和内容审核仅支持电脑端操作。" />
+  }
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
@@ -131,6 +138,9 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MATERIAL_LIBRARY) return <MaterialLibraryPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.CONTENT_PRODUCTION) return <ContentProductionPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.CONTENT_REVIEW) return <ContentReviewBatchPage permissions={permissions}/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
     <Result status="info" title="页面尚未迁移" subTitle="该菜单已由统一权限系统下发，前端页面尚未迁移。"/>
     <Typography.Paragraph type="secondary">路径：{menu?.path || location.pathname}　组件：{menu?.component || '未配置'}</Typography.Paragraph>

@@ -120,7 +120,11 @@ export const APP_ROUTES = {
   MEDIA_STUDENTS: '/zsjos/media-students',
   MEDIA_CALENDAR: '/calendar/overview',
   PERSONAL_CALENDAR: '/calendar/personal',
-  EXAM_CALENDAR: '/calendar/exam-calendar'
+  EXAM_CALENDAR: '/calendar/exam-calendar',
+  MEDIA_ALL_CALENDAR: '/calendar/all',
+  MATERIAL_LIBRARY: '/zsjos/material-library/browse',
+  CONTENT_PRODUCTION: '/zsjos/material-library/content-production',
+  CONTENT_REVIEW: '/zsjos/material-library/content-review'
 } as const
 
 export type AuthPlatform = 'PC' | 'MOBILE'
@@ -205,8 +209,21 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MEDIA_STUDENTS,
   APP_ROUTES.MEDIA_CALENDAR,
   APP_ROUTES.PERSONAL_CALENDAR,
-  APP_ROUTES.EXAM_CALENDAR
+  APP_ROUTES.EXAM_CALENDAR,
+  APP_ROUTES.MEDIA_ALL_CALENDAR,
+  APP_ROUTES.MATERIAL_LIBRARY,
+  APP_ROUTES.CONTENT_PRODUCTION,
+  APP_ROUTES.CONTENT_REVIEW
 ])
+
+export const PC_ONLY_NATIVE_ROUTES: ReadonlySet<string> = new Set([
+  APP_ROUTES.CONTENT_PRODUCTION,
+  APP_ROUTES.CONTENT_REVIEW
+])
+
+export const MOBILE_RENDERABLE_APP_ROUTES: ReadonlySet<string> = new Set(
+  [...RENDERABLE_APP_ROUTES].filter(path => !PC_ONLY_NATIVE_ROUTES.has(path))
+)
 
 // ========== Dictionaries ==========
 
@@ -231,6 +248,8 @@ export const DICT_TYPE = {
   ,MEDIA_ACCOUNT_STAGE: 'zsjos_media_account_stage'
   ,MEDIA_ACCOUNT_PRIMARY_PROBLEM: 'zsjos_media_account_primary_problem'
   ,MEDIA_ACCOUNT_EXECUTION_MEASURE: 'zsjos_media_account_execution_measure'
+  ,MATERIAL_ACCOUNT_TYPE: 'zsjos_material_account_type'
+  ,MATERIAL_PROFESSION: 'zsjos_material_profession'
   ,EAM_ASSET_STATUS: 'eam_asset_status'
 } as const
 

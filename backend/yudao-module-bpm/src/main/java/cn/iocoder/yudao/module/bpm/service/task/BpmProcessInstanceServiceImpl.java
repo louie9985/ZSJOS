@@ -773,7 +773,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
                 .getProcessDefinition(createReqVO.getProcessDefinitionId());
         // 发起流程
         return createProcessInstance0(userId, definition, createReqVO.getVariables(), null,
-                createReqVO.getStartUserSelectAssignees());
+                createReqVO.getStartUserSelectAssignees(), null);
     }
 
     @Override
@@ -782,12 +782,16 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     public String createProcessInstance(Long userId, @Valid BpmProcessInstanceCreateReqDTO createReqDTO) {
         return FlowableUtils.executeAuthenticatedUserId(userId, () -> {
             // 获得流程定义
-            ProcessDefinition definition = processDefinitionService
-                    .getActiveProcessDefinition(createReqDTO.getProcessDefinitionKey());
+            ProcessDefinition definition = StrUtil.isBlank(createReqDTO.getProcessDefinitionId())
+                    ? processDefinitionService.getActiveProcessDefinition(createReqDTO.getProcessDefinitionKey())
+                    : processDefinitionService.getProcessDefinition(createReqDTO.getProcessDefinitionId());
+            if (definition == null || !Objects.equals(definition.getKey(), createReqDTO.getProcessDefinitionKey())) {
+                throw exception(PROCESS_DEFINITION_NOT_EXISTS);
+            }
             // 发起流程
             return createProcessInstance0(userId, definition, createReqDTO.getVariables(),
                     createReqDTO.getBusinessKey(),
-                    createReqDTO.getStartUserSelectAssignees());
+                    createReqDTO.getStartUserSelectAssignees(), createReqDTO.getPredefinedProcessInstanceId());
         });
     }
 
@@ -797,8 +801,12 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     public String createProcessInstance(BpmStartSubjectDTO subject, BpmProcessInstanceCreateReqDTO createReqDTO) {
         String displayName = requireExternalSubject(subject);
         return FlowableUtils.executeAuthenticatedUserId(subject.toFlowableId(), () -> {
-            ProcessDefinition definition = processDefinitionService
-                    .getActiveProcessDefinition(createReqDTO.getProcessDefinitionKey());
+            ProcessDefinition definition = StrUtil.isBlank(createReqDTO.getProcessDefinitionId())
+                    ? processDefinitionService.getActiveProcessDefinition(createReqDTO.getProcessDefinitionKey())
+                    : processDefinitionService.getProcessDefinition(createReqDTO.getProcessDefinitionId());
+            if (definition == null || !Objects.equals(definition.getKey(), createReqDTO.getProcessDefinitionKey())) {
+                throw exception(PROCESS_DEFINITION_NOT_EXISTS);
+            }
             return createExternalProcessInstance0(subject, displayName, definition, createReqDTO);
         });
     }
@@ -826,7 +834,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
                 .processDefinitionId(definition.getId()).businessKey(reqDTO.getBusinessKey())
                 .variables(variables).name(definition.getName());
         BpmModelMetaInfoVO.ProcessIdRule idRule = definitionInfo.getProcessIdRule();
-        if (idRule != null && Boolean.TRUE.equals(idRule.getEnable())) {
+        if (StrUtil.isNotBlank(reqDTO.getPredefinedProcessInstanceId())) {
+            builder.predefineProcessInstanceId(reqDTO.getPredefinedProcessInstanceId());
+        } else if (idRule != null && Boolean.TRUE.equals(idRule.getEnable())) {
             builder.predefineProcessInstanceId(processIdRedisDAO.generate(idRule));
         }
         return builder.start().getId();
@@ -884,7 +894,8 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
 
     private String createProcessInstance0(Long userId, ProcessDefinition definition,
                                           Map<String, Object> variables, String businessKey,
-                                          Map<String, List<Long>> startUserSelectAssignees) {
+                                          Map<String, List<Long>> startUserSelectAssignees,
+                                          String predefinedProcessInstanceId) {
         // 1.1 校验流程定义
         if (definition == null) {
             throw exception(PROCESS_DEFINITION_NOT_EXISTS);
@@ -929,7 +940,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
                 .variables(variables);
         // 3.1 创建流程 ID
         BpmModelMetaInfoVO.ProcessIdRule processIdRule = processDefinitionInfo.getProcessIdRule();
-        if (processIdRule != null && Boolean.TRUE.equals(processIdRule.getEnable())) {
+        if (StrUtil.isNotBlank(predefinedProcessInstanceId)) {
+            processInstanceBuilder.predefineProcessInstanceId(predefinedProcessInstanceId);
+        } else if (processIdRule != null && Boolean.TRUE.equals(processIdRule.getEnable())) {
             processInstanceBuilder.predefineProcessInstanceId(processIdRedisDAO.generate(processIdRule));
         }
         // 3.2 流程名称
@@ -1148,8 +1161,11 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         }
 
         // 3. 发送流程实例的状态事件
+        ProcessDefinition eventProcessDefinition = processDefinitionService.getProcessDefinition(
+                instance.getProcessDefinitionId());
         processInstanceEventPublisher.sendProcessInstanceResultEvent(
-                BpmProcessInstanceConvert.INSTANCE.buildProcessInstanceStatusEvent(this, instance, status, reason));
+                BpmProcessInstanceConvert.INSTANCE.buildProcessInstanceStatusEvent(this, instance,
+                        eventProcessDefinition == null ? null : eventProcessDefinition.getVersion(), status, reason));
 
         // 4. 流程后置通知
         if (Objects.equals(status, BpmProcessInstanceStatusEnum.APPROVE.getStatus())) {

@@ -35,6 +35,27 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
         return selectList(query).stream().map(MediaAccountDO::getId).toList();
     }
 
+    default List<MediaAccountDO> selectMaterialRecommendationCandidates(String keyword, Long userId,
+                                                                         Long tenantId, boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();
+        if (keyword != null && !keyword.isBlank()) {
+            query.and(row -> row.like(MediaAccountDO::getAccountNo, keyword.trim())
+                    .or().like(MediaAccountDO::getNickname, keyword.trim()));
+        }
+        if (!all) {
+            query.and(row -> row.eq(MediaAccountDO::getOwnerOperatorUserId, userId)
+                    .or().eq(MediaAccountDO::getDirectorUserId, userId)
+                    .or().apply("student_person_id IS NOT NULL AND EXISTS (SELECT 1 FROM zsjos_service_relation sr "
+                                    + "WHERE sr.person_id=zsjos_media_account.student_person_id "
+                                    + "AND sr.tenant_id={0} AND sr.deleted=b'0' AND sr.status='active' "
+                                    + "AND sr.acceptance_status='accepted' "
+                                    + "AND (sr.content_director_user_id={1} OR sr.operator_user_id={1}))",
+                            tenantId, userId));
+        }
+        return selectList(query.orderByDesc(MediaAccountDO::getUpdateTime)
+                .orderByDesc(MediaAccountDO::getId).last("LIMIT 100"));
+    }
+
     default PageResult<MediaAccountDO> selectCalendarPage(MediaAccountCalendarPageReqVO req,
                                                            Collection<Long> visibleUserIds, boolean all) {
         LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, visibleUserIds, all);
@@ -169,7 +190,20 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
 
     default int updateProfile(MediaAccountDO account, Integer version) {
         account.setVersion(version + 1);
-        return update(account, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId, account.getId()).eq(MediaAccountDO::getVersion, version));
+        return update(account, new LambdaUpdateWrapper<MediaAccountDO>()
+                .eq(MediaAccountDO::getId, account.getId())
+                .eq(MediaAccountDO::getVersion, version)
+                // Empty selections must clear both the dictionary value and its historical label snapshot.
+                .set(MediaAccountDO::getAccountTypePrimaryValue, account.getAccountTypePrimaryValue())
+                .set(MediaAccountDO::getAccountTypePrimaryLabelSnapshot,
+                        account.getAccountTypePrimaryLabelSnapshot())
+                .set(MediaAccountDO::getAccountTypeSecondaryValue, account.getAccountTypeSecondaryValue())
+                .set(MediaAccountDO::getAccountTypeSecondaryLabelSnapshot,
+                        account.getAccountTypeSecondaryLabelSnapshot())
+                .set(MediaAccountDO::getTrackPrimaryValue, account.getTrackPrimaryValue())
+                .set(MediaAccountDO::getTrackPrimaryLabelSnapshot, account.getTrackPrimaryLabelSnapshot())
+                .set(MediaAccountDO::getTrackSecondaryValue, account.getTrackSecondaryValue())
+                .set(MediaAccountDO::getTrackSecondaryLabelSnapshot, account.getTrackSecondaryLabelSnapshot()));
     }
 
     default int updateMaintenance(MediaAccountDO account, Integer version) {

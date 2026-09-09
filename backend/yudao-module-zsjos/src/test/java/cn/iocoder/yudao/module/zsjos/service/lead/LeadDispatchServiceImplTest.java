@@ -1,10 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
-import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.LeadClaimPoolPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.LeadPendingRespVO;
@@ -33,8 +31,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_CATEGORY;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_SOURCE_CHANNEL;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_QUALIFICATION_DISPOSITION_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_CLAIM_DAILY_LIMIT_REACHED;
@@ -67,8 +63,6 @@ class LeadDispatchServiceImplTest {
     private LeadAttachmentMapper attachmentMapper;
     @Mock
     private LeadAssignmentService assignmentService;
-    @Mock
-    private DictDataApi dictDataApi;
     @Mock
     private SecurityFrameworkService securityFrameworkService;
     @Mock
@@ -122,8 +116,6 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(product()));
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(attachment()));
-        when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL)).thenReturn(List.of(dict("douyin", "抖音")));
-        when(dictDataApi.getDictDataList(DICT_CATEGORY)).thenReturn(List.of(dict("adult", "成人学历")));
 
         PageResult<LeadPendingRespVO> result = service.getClaimPoolPage(reqVO, 99L);
 
@@ -148,12 +140,10 @@ class LeadDispatchServiceImplTest {
     @Test
     void claimPoolPreservesKeysAndLeavesMissingLabelsEmpty() {
         LeadClaimPoolPageReqVO reqVO = request();
-        LeadDO lead = lead();
+        LeadDO lead = leadWithoutLabels();
         when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
-        when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL)).thenReturn(List.of());
-        when(dictDataApi.getDictDataList(DICT_CATEGORY)).thenReturn(List.of());
 
         LeadPendingRespVO item = service.getClaimPoolPage(reqVO, 99L).getList().getFirst();
 
@@ -348,6 +338,9 @@ class LeadDispatchServiceImplTest {
         lead.setSourceChannelId("douyin");
         lead.setLeadCategory("adult");
         lead.setRemark("完整备注");
+        // 标签在提交/审批时固化到快照字段，claim pool 从快照读取而非实时查字典
+        lead.setSourceChannelLabelSnapshot("抖音");
+        lead.setLeadCategoryLabelSnapshot("成人学历");
         return lead;
     }
 
@@ -356,6 +349,13 @@ class LeadDispatchServiceImplTest {
         lead.setDispatchMode("auto");
         lead.setAssignmentStatus("unassigned");
         lead.setAssignmentRuleSnapshot("{\"acceptTimeoutSeconds\":120,\"maxAttempts\":5}");
+        return lead;
+    }
+
+    private static LeadDO leadWithoutLabels() {
+        LeadDO lead = lead();
+        lead.setSourceChannelLabelSnapshot(null);
+        lead.setLeadCategoryLabelSnapshot(null);
         return lead;
     }
 
@@ -384,13 +384,6 @@ class LeadDispatchServiceImplTest {
         attachment.setFileUrl("https://example.test/a.jpg");
         attachment.setSort(1);
         return attachment;
-    }
-
-    private static DictDataRespDTO dict(String value, String label) {
-        DictDataRespDTO item = new DictDataRespDTO();
-        item.setValue(value);
-        item.setLabel(label);
-        return item;
     }
 
     private static LeadAssignmentUserRespVO salesUser(Long id) {

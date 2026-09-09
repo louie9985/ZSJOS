@@ -23,6 +23,14 @@ public class MediaAccountRespVO {
     private Map<String, Object> detailValues;
     private List<MediaAccountDetailSnapshotVO> detailSnapshots;
     private String leadDirection;
+    private String accountTypePrimaryValue;
+    private String accountTypePrimaryLabelSnapshot;
+    private String accountTypeSecondaryValue;
+    private String accountTypeSecondaryLabelSnapshot;
+    private String trackPrimaryValue;
+    private String trackPrimaryLabelSnapshot;
+    private String trackSecondaryValue;
+    private String trackSecondaryLabelSnapshot;
     private String sStage;
     private String currentStatusValue;
     private String currentStatusLabelSnapshot;
