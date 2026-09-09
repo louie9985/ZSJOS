@@ -10,6 +10,12 @@ describe('ExamCalendarPage contracts', () => {
       productId: 8, categoryId: undefined, selectedAttrs: { level: '2' }
     })
   })
+  it('derives the product id from the registered cascader field', () => {
+    expect(scheduleInput({ scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'),
+      productSelection: [2, 8], selectedAttrs: { level: '2', place: '' } })).toMatchObject({
+      productId: 8, categoryId: undefined, selectedAttrs: { level: '2' }
+    })
+  })
   it('serializes exact schedules without rough dates', () => {
     expect(scheduleInput({
       scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), categoryId: 2, remark: ' 上午场 '
@@ -38,11 +44,12 @@ describe('ExamCalendarPage contracts', () => {
     expect(source).not.toContain("if (canManage && info.source === 'date') openCreate(date)")
   })
 
-  it('renders one product cascader instead of separate category and product fields', () => {
+  it('renders a complete product cascader', () => {
     const source = readFileSync(new URL('./ExamCalendarPage.tsx', import.meta.url), 'utf8')
     expect(source).toContain('name="productSelection" label="产品"')
     expect(source).toContain('<Cascader')
-    expect(source).not.toContain('name="categoryId" label="产品分类"')
     expect(source).not.toContain('name="productId" label="产品"')
+    expect(source).toContain('保存并发布')
+    expect(source).toContain('api.examCalendar.publish(savedId)')
   })
 })

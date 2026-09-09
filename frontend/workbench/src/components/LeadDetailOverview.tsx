@@ -17,38 +17,19 @@ import {
 } from '../constants'
 import { protocolDisplayLabel } from '../services/leadManagement'
 import LeadFollowUpCharts from './LeadFollowUpCharts'
+import SubjectAvatar from './SubjectAvatar'
 
-/* ========== 确定性彩色首字头像 ========== */
+/* ========== 客资/学员确定性头像 ========== */
 
-const AVATAR_PALETTE = [
-  { bg: '#e6f4ff', color: '#1677ff' },
-  { bg: '#f6ffed', color: '#52c41a' },
-  { bg: '#fff7e6', color: '#fa8c16' },
-  { bg: '#fff1f0', color: '#f5222d' },
-  { bg: '#f9f0ff', color: '#722ed1' },
-  { bg: '#e6fffb', color: '#13c2c2' },
-  { bg: '#fff0f6', color: '#eb2f96' },
-  { bg: '#fcffe6', color: '#a0d911' },
-] as const
-
-function hashName(name: string): number {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash)
-}
-
-function NameAvatar({ name, size = 44 }: { name: string; size?: number }) {
-  const palette = AVATAR_PALETTE[hashName(name) % AVATAR_PALETTE.length]
-  return (
-    <div
-      className="lead-name-avatar"
-      style={{ width: size, height: size, background: palette.bg, color: palette.color }}
-    >
-      {name.slice(0, 1)}
-    </div>
-  )
+function NameAvatar({
+  name,
+  seed,
+  src,
+  size = 44,
+  label = '',
+  subjectType = 'lead',
+}: { name: string; seed?: string | number; src?: string; size?: number; label?: string; subjectType?: 'lead' | 'student' | 'subject' }) {
+  return <SubjectAvatar seed={seed} src={src} size={size} label={label} subjectType={subjectType} className="lead-name-avatar" />
 }
 
 /* ========== 行内复制按钮 ========== */

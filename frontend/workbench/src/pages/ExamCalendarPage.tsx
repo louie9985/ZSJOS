@@ -41,20 +41,25 @@ const hasPermission = (permissions: string[], value: string) =>
 
 export const scheduleStatusLabel = (status: string) => STATUS_META[status]?.label || status
 
-export const scheduleInput = (values: EditorValues): ExamScheduleInput => values.scheduleType === 'EXACT'
+export const scheduleInput = (values: EditorValues): ExamScheduleInput => {
+  const productId = values.productId ?? values.productSelection?.at(-1)
+  const categoryId = productId ? undefined : values.categoryId
+  const selectedAttrs = productId
+    ? Object.fromEntries(Object.entries(values.selectedAttrs || {}).filter(([, value]) => value != null && value !== ''))
+    : undefined
+  return values.scheduleType === 'EXACT'
   ? {
       scheduleType: 'EXACT', exactDate: values.exactDate?.format('YYYY-MM-DD'),
-      categoryId: values.productId ? undefined : values.categoryId, productId: values.productId,
-      selectedAttrs: values.productId ? Object.fromEntries(Object.entries(values.selectedAttrs || {}).filter(([, value]) => value != null && value !== '')) : undefined,
+      categoryId, productId, selectedAttrs,
       remark: values.remark?.trim() || undefined
     }
   : {
       scheduleType: 'ROUGH', roughStartDate: values.roughRange?.[0].format('YYYY-MM-DD'),
       roughEndDate: values.roughRange?.[1].format('YYYY-MM-DD'),
-      categoryId: values.productId ? undefined : values.categoryId, productId: values.productId,
-      selectedAttrs: values.productId ? Object.fromEntries(Object.entries(values.selectedAttrs || {}).filter(([, value]) => value != null && value !== '')) : undefined,
+      categoryId, productId, selectedAttrs,
       remark: values.remark?.trim() || undefined
     }
+}
 
 function ScheduleStatus({ value }: { value: string }) {
   const meta = STATUS_META[value] || { label: value, color: 'default' }
@@ -93,13 +98,14 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const [roughError, setRoughError] = useState('')
   const [editorOpen, setEditorOpen] = useState(false), [editing, setEditing] = useState<ExamSchedule>()
   const [detail, setDetail] = useState<ExamSchedule>(), [saving, setSaving] = useState(false)
+  const [savingAction, setSavingAction] = useState<'DRAFT' | 'PUBLISH'>('DRAFT')
   const [form] = Form.useForm<EditorValues>()
   const requests = useRef({ exact: 0, rough: 0, products: 0, categories: 0 })
   const [selectedAttrs, setSelectedAttrs] = useState<Record<string, string>>({})
   const [clearedInvalidAttrs, setClearedInvalidAttrs] = useState<string[]>([])
   const scheduleType = Form.useWatch('scheduleType', form)
   const editorCategoryId = Form.useWatch('categoryId', form)
-  const editorProductId = Form.useWatch('productId', form)
+  const editorProductId = Form.useWatch('productId', form) || (Form.useWatch('productSelection', form) as number[] | undefined)?.at(-1)
   const selectedProduct = products.find(p => p.productId === editorProductId)
   const invalidAttrs = Object.entries(selectedAttrs).filter(([key, value]) =>
     !selectedProduct?.attrs.some(attr => attr.attrKey === key && attr.values.some(option => option.value === value)))
@@ -228,26 +234,33 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     setEditorOpen(true)
   }
 
-  const save = async () => {
+  const save = async (publishAfterSave = false) => {
     const values = await form.validateFields()
-    if (values.productId && invalidAttrs.length) {
+    const input = scheduleInput({ ...values, selectedAttrs })
+    const productId = input.productId
+    if (!productId) {
+      message.error('请选择完整产品'); return
+    }
+    if (invalidAttrs.length) {
       message.error('原规格条件已失效，请明确清除或替换后保存'); return
     }
-    if (values.productId && (productLoading || productError || !matchingSkus.length)) {
+    if (productLoading || productError || !matchingSkus.length) {
       message.error(productError || '所选规格未匹配到有效 SKU，请重新选择'); return
     }
-    setSaving(true)
+    setSaving(true); setSavingAction(publishAfterSave ? 'PUBLISH' : 'DRAFT')
     try {
-      const input = { ...scheduleInput({ ...values, selectedAttrs }), clearedInvalidAttrs }
-      if (editing) await api.examCalendar.update(editing.id, input)
-      else await api.examCalendar.create(input)
-      message.success(editing ? '考期已更新' : '考期草稿已创建')
+      const request = { ...input, clearedInvalidAttrs }
+      const savedId = editing ? (await api.examCalendar.update(editing.id, request), editing.id) : await api.examCalendar.create(request)
+      if (publishAfterSave) {
+        await api.examCalendar.publish(savedId)
+        message.success('考期已保存并发布')
+      } else message.success(editing ? '考期已更新' : '考期草稿已创建')
       setEditorOpen(false)
       const current = latestReload.current
       await Promise.all([current.load(), current.roughOpen ? current.loadRough() : Promise.resolve()])
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message : '考期保存失败')
-    } finally { setSaving(false) }
+    } finally { setSaving(false); setSavingAction('DRAFT') }
   }
 
   const changeProduct = (value: number | undefined) => {
@@ -333,14 +346,14 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     <Modal title={`${dayDetail?.format('YYYY年M月D日')} 考期安排`} open={Boolean(dayDetail)} onCancel={() => setDayDetail(undefined)} footer={null} width="min(720px, calc(100vw - 32px))" destroyOnHidden>
       {dayDetail && (() => { const rows = schedules.filter(row => row.exactDate === dayDetail.format('YYYY-MM-DD')); return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}><List.Item.Meta title={<Space wrap><strong>{row.scheduleName || row.categoryNameSnapshot}</strong><ScheduleStatus value={row.displayStatus} /></Space>} description={<><div>{row.productNameSnapshot || row.categoryNameSnapshot}<ProductSpecs product={{ specs: row.selectedSpecs }} /></div>{row.remark && <div>{row.remark}</div>}</>} /></List.Item>} /> : <Empty description="当天暂无考期安排" /> })()}
     </Modal>
-    <Modal title={editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={() => setEditorOpen(false)} onOk={() => void save()} okText="保存草稿" destroyOnHidden>
+    <Modal title={editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={() => setEditorOpen(false)} footer={<Space><Button onClick={() => setEditorOpen(false)} disabled={saving}>取消</Button><Button loading={saving && savingAction === 'DRAFT'} disabled={saving} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving && savingAction === 'PUBLISH'} disabled={saving} onClick={() => void save(true)}>保存并发布</Button></Space>} destroyOnHidden>
       <Form form={form} layout="vertical" initialValues={{ scheduleType: 'EXACT' }}>
         {productError && <Alert type="error" showIcon message={productError} action={<Button onClick={() => void loadProducts()}>重试</Button>} />}
-        <Form.Item name="productSelection" label="产品" rules={[{ required: true, message: '请选择产品' }]}><Cascader showSearch loading={productLoading} disabled={productLoading || !!productError} options={productCascaderOptions} placeholder="请选择产品" onChange={path => {
-          const value = Array.from(path).at(-1) as number | undefined
-          form.setFieldValue('productSelection', path)
-          void changeProduct(value)
-        }} /></Form.Item>
+        <Form.Item name="productSelection" label="产品" rules={[{ required: true, message: '请选择完整产品' }]}><Cascader showSearch loading={productLoading} disabled={productLoading || !!productError} options={productCascaderOptions} placeholder="请选择完整产品" onChange={path => {
+            const value = Array.from(path).at(-1) as number | undefined
+            form.setFieldValue('productSelection', path)
+            void changeProduct(value)
+          }} /></Form.Item>
         {editorProductId && !selectedProduct && !productLoading && !productError && <Alert type="warning" message={`${editing?.productNameSnapshot || '原产品'}已不可用，请重新选择产品`} />}
         {selectedProduct?.attrs.map(attr => <Form.Item key={attr.attrKey} label={attr.attrName}><Select allowClear value={selectedAttrs[attr.attrKey!]} onChange={value => changeAttr(attr.attrKey!, value)} options={attr.values.map(v => ({ value: v.value, label: v.label }))} /></Form.Item>)}
         {!productLoading && invalidAttrs.map(([key, value]) => {

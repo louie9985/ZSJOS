@@ -22,7 +22,7 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
     @Select("SELECT * FROM zsjos_delivery_class WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     DeliveryClassDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    default PageResult<DeliveryClassDO> selectPage(DeliveryClassPageReqVO req, Set<Long> deptIds,
+    default PageResult<DeliveryClassDO> selectDeliveryClassPage(DeliveryClassPageReqVO req, Set<Long> deptIds,
                                                     Long homeroomUserId, boolean allDepartments,
                                                     boolean includeSystem) {
         LambdaQueryWrapperX<DeliveryClassDO> query = new LambdaQueryWrapperX<>();
@@ -46,7 +46,7 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
             }
         }
         if (!includeSystem) query.eq(DeliveryClassDO::getSystemClass, false);
-        return selectPage(req, query.orderByAsc(DeliveryClassDO::getSystemClass)
+        return selectPage(req, query.orderByDesc(DeliveryClassDO::getSystemClass)
                 .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId));
     }
     @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0' AND status IN ('active','paused','completed')")
@@ -64,7 +64,7 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
         LambdaQueryWrapperX<DeliveryClassDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(DeliveryClassDO::getStatus, status);
         if (!includeSystem) query.eq(DeliveryClassDO::getHomeroomUserId, homeroomUserId);
-        return selectList(query.orderByAsc(DeliveryClassDO::getSystemClass)
+        return selectList(query.orderByDesc(DeliveryClassDO::getSystemClass)
                 .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId));
     }
 }

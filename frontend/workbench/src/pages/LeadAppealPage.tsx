@@ -18,6 +18,7 @@ import {
 } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { api, type AdvancedFilterGroup, type LeadAppeal, type LeadAppealEvidence } from '../services/api'
+import SubjectAvatar from '../components/SubjectAvatar'
 import { formatTimestamp } from '../services/time'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -52,7 +53,7 @@ function Detail({ item, onDecision }: { item: LeadAppeal; onDecision: (type: 'ov
     : null
   return <article className="message-inbox-detail">
     <div className="message-detail-hero">
-      <Avatar>{item.leadName.slice(0, 1)}</Avatar>
+      <SubjectAvatar seed={item.leadNo} label="" />
       <div className="message-detail-heading">
         <Typography.Title level={4}>{item.leadNo} · {item.leadName}</Typography.Title>
         <Space wrap>
@@ -334,7 +335,7 @@ export default function LeadAppealPage() {
                 }}
               >
                 <div className="business-inbox-item-main">
-                  <Avatar>{item.leadName.slice(0, 1)}</Avatar>
+                  <SubjectAvatar seed={item.leadNo} label="" />
                   <div className="business-inbox-item-copy">
                     <div className="business-inbox-item-title">
                       <strong>{item.leadName}</strong>

@@ -30,6 +30,12 @@
   white-space: nowrap;
 }
 
+.lead-detail-hero-avatar {
+  position: absolute;
+  inset-inline-start: var(--crm-sp-5);
+  flex: none;
+}
+
 /* 下次应跟进：绝对定位在右侧，不影响姓名居中 */
 .lead-hero-next-followup {
   position: absolute;
@@ -64,6 +70,10 @@
   .lead-detail-hero {
     flex-direction: column;
     gap: var(--crm-sp-3);
+  }
+
+  .lead-detail-hero-avatar {
+    position: static;
   }
 
   .lead-hero-next-followup {

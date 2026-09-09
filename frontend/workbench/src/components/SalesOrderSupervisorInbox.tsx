@@ -40,6 +40,7 @@ import { AdvancedFilterToolbar } from "./AdvancedFilter";
 import { ProTable } from "@ant-design/pro-components";
 import { useInboxTableLayout } from "../services/inboxLayout";
 import ResizableDetailDrawer from "./ResizableDetailDrawer";
+import SubjectAvatar from "./SubjectAvatar";
 
 const STATUS_LABELS = {
   pending: "待审批",
@@ -423,7 +424,7 @@ export default function SalesOrderSupervisorInbox({
                   }}
                 >
                   <div className="business-inbox-item-main">
-                    <Avatar>{item.studentName.slice(0, 1)}</Avatar>
+                    <SubjectAvatar label="" />
                     <div className="business-inbox-item-copy">
                       <div className="business-inbox-item-title">
                         <strong>{item.studentName}</strong>

@@ -24,6 +24,7 @@ import EmployeeSelect from './EmployeeSelect'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import LeadSubmitterFeedbackPanel from './LeadSubmitterFeedbackPanel'
 import StudentInfoPanel from './StudentInfoPanel'
+import SubjectAvatar from './SubjectAvatar'
 import StudentInfoLinkModal from './StudentInfoLinkModal'
 
 type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
@@ -311,6 +312,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   return <div className="lead-inbox-detail">
     {studentInfoLinkMode && <StudentInfoLinkModal key={lead.id} leadId={lead.id} mode={studentInfoLinkMode} onClose={() => setStudentInfoLinkMode(undefined)}/>}
     <div className="lead-detail-hero">
+      <SubjectAvatar className="lead-detail-hero-avatar" seed={lead.leadNo} subjectType="lead" size={44} label={lead.submittedName || '客资'} />
       <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
       {!studentContext && visibleTabs.includes('follow-ups') && lead.nextFollowUpAt && <div className="lead-hero-next-followup">
         <ClockCircleOutlined />

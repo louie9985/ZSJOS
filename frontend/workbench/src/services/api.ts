@@ -3058,6 +3058,7 @@ export type DeliveryClass = {
   status: string; studentCount: number; version: number;
   productId?: number; productNameSnapshot?: string; selectedAttrs?: Record<string, string>;
   selectedSpecs?: import('./productSpecs').ProductSpec[]; selectedSkus?: ExamProductOption['skus'];
+  scheduleType?: string; exactDate?: string; createTime?: Timestamp;
 }
 export type DeliveryClassStudent = {
   serviceRelationId: number; personId: number; personNo?: string; studentName?: string;

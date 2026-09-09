@@ -1,0 +1,13 @@
+{
+  "name": "@local/avatar-kit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Four deterministic SVG avatar styles with an optional native Web Component.",
+  "exports": {
+    ".": { "types": "./index.d.mts", "default": "./index.mjs" },
+    "./config": { "types": "./config.d.mts", "default": "./config.mjs" },
+    "./element": "./smart-avatar.mjs"
+  },
+  "scripts": { "test": "node --test tests/*.test.mjs" }
+}

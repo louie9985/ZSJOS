@@ -6,6 +6,7 @@ import { formatTimestamp } from '../services/time'
 import LeadDetailOverview, { type LeadOverviewSlots, type StudentOverviewContext } from './LeadDetailOverview'
 import type { LeadDetailExtraTab } from './LeadDetail'
 import StudentInfoPanel from './StudentInfoPanel'
+import SubjectAvatar from './SubjectAvatar'
 
 export default function StudentDetail({ student, service, contactContext, contactRecords = [], toolbar, overviewSlots, overviewContent, contextHeader, extraTabs = [], activeTab: controlledActiveTab, onTabChange }: {
   student: MyStudent
@@ -34,6 +35,7 @@ export default function StudentDetail({ student, service, contactContext, contac
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
+      <SubjectAvatar className="lead-detail-hero-avatar" seed={student.personNo} subjectType="student" size={44} label={student.name || '学员'} />
       <Typography.Title level={4}>{student.name || '未填写姓名'}</Typography.Title>
       {contactContext?.currentTask?.dueAt && <div className="lead-hero-next-followup">
         <ClockCircleOutlined />

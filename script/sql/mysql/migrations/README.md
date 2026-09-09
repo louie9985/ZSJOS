@@ -1048,9 +1048,10 @@ V190 follows V188 and adds nullable product, selected specification, and selecte
 to `zsjos_delivery_class`. It changes no existing business rows and is repeatable. New class writes
 must select at least one valid SKU from the enabled product scope; historical classes retain NULL snapshots.
 Rollback is forward-only because removing the columns would discard new business snapshots.
+
 ### V194 Material library, content review, and student Partner invitations
 
-V194 follows V193 and continues the material-library workstream. It creates the
+V194 follows the existing V193 sales-order migration and continues the material-library workstream. It creates the
 tenant-scoped material type, immutable schema and content version, search/index projection, file snapshot, approval
 round, like, favorite, reference, Excel import, and content-review batch tables. It extends content versions with
 the complete pre-publication package snapshot and extends Partner invitations with a separate student-bound scene.
@@ -1065,3 +1066,10 @@ schema, invent account-type or profession options, infer role access by name, cr
 run a BPM process. Student invitations keep the editable registration name/mobile separate from the original
 student snapshots and enforce one active student invitation per tenant. Recovery is forward-only after business
 versions exist: retain data and hide the relevant menus in a later reviewed migration.
+
+### V195 Delivery class access repair
+
+V195 follows V194 and makes the existing student route visible as `学员管理`, grants it to roles with an active
+delivery-class entry, and removes the accidental managed-scope grant from roles that retain the legacy personal-class
+capability. It changes only System menu, role-menu, tenant-package, and schema-version metadata; no class, student,
+service, or account rows are changed. The script is UTF-8, repeatable, and forward-only.

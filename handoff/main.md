@@ -111,6 +111,90 @@
 
 # Main Workstream
 
+## Workstream Registration - 2026-09-09 15:00:00 +08:00
+
+- Workstream ID: `main-workbench-subject-avatar-kit`
+- Goal: 接入 Avatar Kit v1，统一 Workbench 客资与学员业务主体的确定性默认头像，保留真实头像优先与异步失败回退。
+- Non-goals: 不修改 Admin 员工/IM/群组头像；不修改数据库、头像字段、权限、后端 API、分支、提交或推送；不清理当前工作树既有未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `134ef6917911b2b92bf352598e0476226bf1ee14`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/shared/avatar-kit/`; `frontend/workbench/package.json`; `frontend/workbench/package-lock.json`; `frontend/workbench/src/components/SubjectAvatar.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; 客资/学员订单报名申诉审批相关 Workbench 调用点；相关测试、文档和本 handoff 记录。
+- Dependencies: 附件 Avatar Kit v1；现有 React/Vite/TypeScript/Ant Design 6、Workbench 主题上下文与租户存储；无第三方运行时依赖。
+- Integration order: 导入共享生成器与测试 -> 接通本地 file 依赖 -> 实现 SubjectAvatar 与竞态回退 -> 替换客资/学员业务调用 -> 更新测试/文档 -> 运行生成器与 Workbench 验证 -> 追加交付记录。
+- Verification plan: Avatar Kit Node tests; `npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`; 可用时浏览器桌面/移动主题与回退检查。
+- Status: `in-progress`。
+
+## Delivery Entry - 2026-09-09 15:08:00 +08:00
+
+- Workstream ID: `main-workbench-subject-avatar-kit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 接入附件 Avatar Kit v1，统一 Workbench 客资与学员业务主体的确定性默认头像，保留真实头像优先和异步失败回退。
+- Key decisions: 新增框架无关 `frontend/shared/avatar-kit`，Workbench 通过本地 file 依赖消费；默认 variant 为 `geometric`；客资 seed 使用 `leadId`、学员 seed 使用 `personId`，缺失时统一匿名；不修改 Admin、数据库或后端 API；真实头像失败后回退 data URI，并保护 URL 变化竞态。
+- Execution or analysis result: 导入附件生成器和 v1 测试；新增 `SubjectAvatar` 与稳定身份归一化；替换客资管理、老化池、派单、学员、报名、申诉、订单/审批等业务主体头像；保留员工/IM/群组/品牌/文件头像逻辑；新增 Workbench 调用文档和组件测试。
+- Changed files: `frontend/shared/avatar-kit/`; `frontend/workbench/package.json`; `frontend/workbench/package-lock.json`; `frontend/workbench/src/components/SubjectAvatar.tsx`; `frontend/workbench/src/components/SubjectAvatar.test.ts`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/components/LeadAssignmentHost.tsx`; `frontend/workbench/src/components/SalesOrderSupervisorInbox.tsx`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/workbench/src/pages/LeadAgingPoolPage.tsx`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/LeadAppealPage.tsx`; `frontend/workbench/src/pages/MySalesOrderPage.tsx`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; `frontend/workbench/docs/subject-avatar.md`; `handoff/main.md`。
+- Verification evidence: `node --test frontend/shared/avatar-kit/tests/*.test.mjs` passed 7/7; focused Workbench tests passed 37/37; `npm run typecheck` passed; `npm run build` passed with existing Vite large-chunk warning; scoped `git diff --check` reported no whitespace errors, only LF-to-CRLF notices. Full `npm test` reached 105 passed files and retained 5 pre-existing failures in delivery-class guard/menu baseline plus transient package import failures before `npm install` (resolved afterward).
+- Dependency or integration impact: Added only local workspace package `@zsjos/avatar-kit`; no third-party dependency, backend/API/database/permission change, branch/worktree operation, commit, push, or external service mutation.
+- Remaining work: No authenticated browser session was available for live desktop/mobile and screen-reader verification; Admin adapter/page replacement remains intentionally out of scope. Full-suite baseline failures require their owning workstreams.
+- Status: `implemented; targeted verification complete; browser acceptance unverified`。
+
+## Delivery Correction - 2026-09-09 15:12:00 +08:00
+
+- Workstream ID: `main-workbench-subject-avatar-kit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- Correction: 本次实际使用已有认证态打开 Workbench `/zsjos/leads/manage`，页面成功加载但当前接口返回暂无客资数据，因此未能在真实数据行上验证生成头像、真实头像失败回退或移动端布局。
+- Verification evidence: 本地 Vite `http://127.0.0.1:5174/` 启动成功；客资管理页面可访问、显示空状态；未执行任何写入/提交操作。
+- Remaining work: 有真实客资/学员数据和移动设备视口时，仍需补充头像图案、主题、尺寸、失败回退和读屏的浏览器验收。
+
+## Delivery Entry - 2026-09-09 15:20:00 +08:00
+
+- Workstream ID: `main-workbench-subject-avatar-kit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 在固定 namespace 下为客资/学员头像增加四种风格的稳定随机分配。
+- Key decisions: 移除租户 ID；namespace 固定为 `zsjos:subject`；新增 `selectAvatarVariant`，对 `avatar-style-v1`、主体类型和稳定 ID 做 FNV-1a 哈希后对四种 variant 取模；显式 `variant` 仍优先。
+- Execution result: `SubjectAvatar` 未显式传风格时按主体稳定 ID 选择 geometric/abstract/character/collection，刷新、改名、排序和尺寸变化不改变风格；补充共享配置类型和 Workbench 单测/文档。
+- Changed files: `frontend/shared/avatar-kit/config.mjs`; `frontend/shared/avatar-kit/config.d.mts`; `frontend/workbench/src/components/SubjectAvatar.tsx`; `frontend/workbench/src/components/SubjectAvatar.test.ts`; `frontend/workbench/docs/subject-avatar.md`; `handoff/main.md`。
+- Verification evidence: 本轮执行 Avatar Kit Node 测试、Workbench 定向测试、类型检查和构建。
+- Dependency or integration impact: 无新增依赖、数据库/API/权限变更；固定 namespace 意味着不同租户相同主体 ID 会得到相同头像。
+- Remaining work: 浏览器真实业务数据验证仍受当前空数据限制。
+
+## Delivery Correction - 2026-09-09 15:27:00 +08:00
+
+- Workstream ID: `main-workbench-subject-avatar-kit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- Verification result: 稳定随机风格改动后的 Avatar Kit 测试 7/7、Workbench 定向测试 10/10、`npm run typecheck` 和 `npm run build` 均通过；构建仅有既有大包体积警告，`git diff --check` 无空白错误。
+- Remaining work: 浏览器真实业务数据验证仍受当前空数据限制。
+
+## Delivery Entry - 2026-09-09 15:05:53 +08:00
+
+- Workstream ID: `main-migration-v193-duplicate-renumber`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 处理两个 `V193` 编号及其相关引用。
+- Key decisions: 保留销售订单统一迁移为 `V193`；将交付班级访问修复迁移重命名为 `V195`；同步 SQL 内部版本、schema-version/checksum、bootstrap 执行入口、验证脚本和迁移/运维文档；不执行数据库写入。
+- Execution or analysis result: `V195__delivery_class_access_repair.sql` 已替代原重复的交付班级 `V193` 文件；fresh bootstrap 顺序为 `V193` 销售订单、`V194` 素材库、`V195` 交付班级修复；新增 `verify-bootstrap.sql` 的 V195 版本、菜单可见性和误授权检查。历史 handoff 条目未改写。
+- Changed files: `script/sql/mysql/migrations/V195__delivery_class_access_repair.sql`（由原 `V193__delivery_class_access_repair.sql` 重命名）；`script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; `handoff/main.md`。
+- Verification evidence: 迁移文件名审计显示不再存在重复 `V193`；发现仓库原有两个 `V192` 文件，未纳入本次确认范围；V195 脚本内部未残留 V193/V194 标识；bootstrap、verify、README、运维文档引用一致；scoped `git diff --check` 无空白错误（仅现有换行转换提示）。未执行 MySQL 迁移或真实数据库验证。
+- Dependency or integration impact: 无新增依赖；无业务数据、权限数据、分支、提交、推送或外部服务变更。已执行过旧 V193 的开发库需要按部署策略评估版本标记兼容性，本次未直接修复数据库状态。
+- Remaining work: 若要治理现存两个 `V192`，需另行确认编号归属和已部署兼容策略；V195 需在受控 UTF-8 数据库按 bootstrap 或迁移流程执行并运行对应 verify 检查。
+- Status: `implemented; static verification complete; database execution unverified`。
+
+## Workstream Registration - 2026-09-09 15:30:38 +08:00
+
+- Workstream ID: `main-workbench-lead-detail-hero-avatar`
+- Goal: 在学员客资 `lead-detail-hero` 最左侧复用现有 `SubjectAvatar`，让客资详情与学员详情显示稳定的业务主体头像。
+- Non-goals: 不新增头像接口或字段，不修改后端、权限、菜单、数据库、依赖、分支、提交或推送；保留当前工作树其他未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `134ef6917911b2b92bf352598e0476226bf1ee14`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/components/StudentDetail.tsx`; `frontend/workbench/src/styles/components/lead-detail.css`; `docs/superpowers/specs/2026-09-09-lead-detail-hero-avatar-design.md`; `handoff/main.md`。
+- Dependencies: 现有 React/Vite/TypeScript/Ant Design 6 与 `SubjectAvatar`；无新增依赖。
+- Integration order: 写设计说明 -> 两个 Hero 接入 `SubjectAvatar` -> 调整 Hero 对齐样式 -> Workbench 定向验证与浏览器检查 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test`; `npm run typecheck`; `npm run build`; 桌面/移动宽度浏览器检查；scoped `git diff --check`。
+- Status: `in-progress`。
+
+## Delivery Entry - 2026-09-09 15:37:30 +08:00
+
+- Workstream ID: `main-workbench-lead-detail-hero-avatar`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 在学员客资的 `lead-detail-hero` 最左侧新增头像并复用现有头像组件。
+- Key decisions: 客资 Hero 使用 `lead.id`，学员 Hero 优先使用 `service.leadId`、否则使用 `student.personId` 作为稳定 seed；复用现有 44px 圆形 `SubjectAvatar`；桌面端头像固定在 Hero 左侧且不改变标题居中，移动端回到正常纵向布局。
+- Execution or analysis result: 客资详情与学员详情 Hero 均已显示确定性业务主体头像；未新增头像接口、字段、权限或依赖。
+- Changed files: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/components/StudentDetail.tsx`; `frontend/workbench/src/styles/components/lead-detail.css`; `docs/superpowers/specs/2026-09-09-lead-detail-hero-avatar-design.md`; `handoff/main.md`。
+- Verification evidence: `npm run typecheck` passed; `npm run build` passed（仅既有大 chunk 警告）；聚焦 Vitest 42/42 passed，覆盖 `SubjectAvatar`、客资详情、学员详情复用和样式守卫；全量 Vitest 601/605 passed，4 个失败来自当前工作区已有的 delivery-class 源码守卫和菜单路由数量基线；scoped `git diff --check` passed（仅换行转换提示）。浏览器打开 `/zsjos/leads/manage` 成功，但本地页面处于离线且无列表数据，未能进入具体 Hero 做桌面/移动像素级检查。
+- Dependency or integration impact: 无新增依赖；无后端、API、数据库、菜单、权限、分支、提交、推送或外部状态变更；保留工作区全部其他未提交改动。
+- Remaining work: 后端数据可用时，在真实客资/学员详情分别补做桌面和移动宽度视觉验收。
+- Status: `implemented; automated verification complete; live hero visual acceptance pending data availability`。
+
 ## Workstream Registration - 2026-09-09 00:00:00 +08:00
 
 - Workstream ID: `main-viral-account-material-template`
@@ -22355,3 +22439,204 @@ equestAttachments。
 
 - Workstream ID: `main-migration-v191-renumber-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`（未创建提交）。
 - Correction: 上一条交付记录的时间字段误写为 `00:00:00`；本条以当前北京时间 `2026-09-09 13:35:12 +08:00` 作为准确交付时间，其余内容不变。
+
+## Workstream Registration - 2026-09-09 10:00:00 +08:00
+
+- Workstream ID: `main-course-calendar-day-detail-expansion`
+- Goal: 将课程日历日期点击调整为当天详情弹窗，并按分钟展示课程时间轴。
+- Non-goals: 不修改课程日历后端接口、数据库、权限、附件能力或其他日历行为；不新增依赖；不清理既有工作树改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`。
+- Target branch: 当前本地 `main`；Owner: Codex `/root`。
+- Ownership scope: `frontend/workbench/src/pages/CourseCalendarPage.tsx`; `frontend/workbench/src/styles/pages/course-calendar.css`; focused course calendar tests; this handoff。
+- Dependencies: 现有课程日历月度 API、Workbench React + Ant Design、CRM CSS tokens；无新增依赖。
+- Integration order: 修改课程日期选择和详情展示 -> 增加时间轴样式 -> 补充测试 -> 运行 Workbench 验证。
+- Verification plan: focused Vitest、`npm run typecheck`、`npm run build`、`git diff --check`；浏览器验收在无运行环境时记录为未验证。
+- Status: `in-progress`。
+
+## Delivery Entry - 2026-09-09 13:55:00 +08:00
+
+- Workstream ID: `main-course-calendar-day-detail-expansion`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `b22332ae6b4c1f61c1b8dadb426aec3ef66e18e6`（未创建提交）。
+- User goal: 课程日历按已确认日历方案改为日期详情弹窗和分钟级当天课程时间轴。
+- Key decisions: 复用课程月度 API；日期点击只查看不新建；跨日课程按当天区间裁剪；保留顶部新增、编辑、删除和现有课程字典/附件表单；无后端或依赖变更。
+- Execution result: 重写课程页面日期详情交互；新增课程 24 小时时间轴、分钟定位、跨日筛选和重叠并列；新增专属样式文件并注册；增加 2 条纯逻辑测试。
+- Changed files: `frontend/workbench/src/pages/CourseCalendarPage.tsx`; `frontend/workbench/src/pages/course-calendar.test.ts`; `frontend/workbench/src/styles/pages/course-calendar.css`; `frontend/workbench/src/styles/index.css`; this handoff。
+- Verification evidence: 课程聚焦测试 2/2 通过；`npm run typecheck` 通过；`npm run build` 通过，仅有既有 bundle 体积警告；`git diff --check` 无空白错误（仅换行转换提示）。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、分支或提交；其他既有未提交改动保持不变；未执行真实 API、数据库或浏览器验收。
+- Remaining work: 需要在可用登录态下验证课程日期弹窗的桌面/移动布局、跨日课程展示和管理操作。
+- Status: `implemented; automated verification complete; browser/runtime acceptance unverified`。
+## Workstream Registration - 2026-09-09 13:50:00 +08:00
+
+- Workstream ID: `main-exam-calendar-scope-submit-fix`
+- Goal: 修复 Workbench 考期安排选择产品后提交载荷丢失 `productId` 的问题，并支持分类范围与产品范围两种互斥选择。
+- Non-goals: 不修改后端 `ExamScheduleService`、数据库、API 字段、权限、依赖、分支或其他前端项目；保留当前工作树已有改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `134ef6917911b2b92bf352598e0476226bf1ee14`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/workbench/src/pages/ExamCalendarPage.tsx`; `frontend/workbench/src/pages/ExamCalendarPage.test.ts`; `frontend/workbench/src/pages/ExamCalendarRequests.test.ts`; `handoff/main.md`。
+- Dependencies: 现有 Workbench React、Ant Design、考期 API 与产品/分类 API；无新增依赖。
+- Integration order: 增加范围字段与归一化 -> 调整创建/编辑/切换交互 -> 补充请求与回归测试 -> 运行 Workbench 测试、类型检查、构建 -> 追加交付记录。
+- Verification plan: `npm test -- --run src/pages/ExamCalendarPage.test.ts src/pages/ExamCalendarRequests.test.ts`; `npm run typecheck`; `npm run build`; `git diff --check`；浏览器真实接口验收按环境可用性报告。
+- Status: `in-progress`。
+- Delivery Entry - 2026-09-09 14:02:30 +08:00
+
+- Workstream ID: `main-exam-calendar-scope-submit-fix`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 修复考期安排选择产品后提交仍提示必须选择分类或产品范围的问题，并完整支持分类范围与产品范围。
+- Key decisions: 保持后端 API、`applyScope`、数据库和权限契约不变；在 Workbench 表单增加仅前端的 `scopeType`；从已注册的 `productSelection` 末级值归一化 `productId`；分类与产品范围互斥；补充序列化回归测试。
+- Execution or analysis result: 产品选择不再因 `validateFields()` 未返回未注册的 `productId` 而丢失；保存前统一校验归一化范围、失效规格和 SKU；编辑回填分类/产品范围；切换范围清理另一侧字段及规格。
+- Changed files: `frontend/workbench/src/pages/ExamCalendarPage.tsx`; `frontend/workbench/src/pages/ExamCalendarPage.test.ts`; `handoff/main.md`。
+- Verification evidence: 考期定向测试 12/12 通过；`npm run typecheck` 通过；`npm run build` 通过（仅既有大包体积警告）；全量 `npm test` 为 108 文件中 106 通过，失败的 2 个既有守护测试共 4 个断言与本次文件无关；`git diff --check` 无空白错误（仅换行转换提示）。
+- Dependency or integration impact: 无新增依赖；无后端、数据库、权限、分支、提交或外部服务变更；未执行真实 API/浏览器验收。
+- Remaining work: 使用可用登录态在桌面和移动宽度实际创建一次产品范围及分类范围考期；全量测试中的既有菜单/班级守护失败需由对应工作流处理。
+- Status: `implemented; targeted verification complete; browser acceptance unverified`。
+- Delivery Correction - 2026-09-09 14:10:00 +08:00
+
+- Workstream ID: `main-exam-calendar-scope-submit-fix`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User correction: 考期必须选择完整产品，不新增分类/产品范围切换按钮；原先的范围切换实现已撤回。
+- Key decisions: 保持产品级联器为唯一范围入口；在请求归一化时从 `productSelection` 末级值恢复 `productId`；后端 `applyScope()` 不修改，因为其对缺少 `productId` 的拒绝符合契约。
+- Execution or analysis result: 修复了 `validateFields()` 只返回已注册 `productSelection` 导致产品 ID 丢失的问题；保存校验统一使用归一化后的产品 ID，并要求完整产品、有效规格和有效 SKU。
+- Changed files: `frontend/workbench/src/pages/ExamCalendarPage.tsx`; `frontend/workbench/src/pages/ExamCalendarPage.test.ts`; `handoff/main.md`。
+- Verification evidence: 考期定向测试 11/11 通过；`npm run typecheck` 通过；之前的 Workbench build 通过；未执行真实 API/浏览器验收。
+- Dependency or integration impact: 无新增依赖；无后端、数据库、权限或外部服务变更；保留其他工作流已有未提交改动。
+- Remaining work: 使用真实登录态确认产品级联选择后请求包含 `productId`，并验证后端成功创建考期。
+- Status: `implemented; corrected scope; targeted verification complete; browser acceptance unverified`。
+- Workstream Registration - 2026-09-09 14:20:00 +08:00
+
+- Workstream ID: `main-exam-calendar-save-publish`
+- Goal: 在考期设置弹窗中提供保存草稿与保存并发布功能。
+- Non-goals: 不修改后端接口、状态机、数据库、权限、依赖、分支或其他前端项目；保留当前工作树已有改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `134ef6917911b2b92bf352598e0476226bf1ee14`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/workbench/src/pages/ExamCalendarPage.tsx`; `frontend/workbench/src/pages/ExamCalendarPage.test.ts`; `handoff/main.md`。
+- Dependencies: 现有 `examCalendar.create/update/publish` API；无新增依赖。
+- Integration order: 扩展保存函数支持发布模式 -> 增加弹窗操作按钮与加载状态 -> 补充调用顺序/失败保留草稿测试 -> 运行 Workbench 验证 -> 追加交付记录。
+- Verification plan: 考期定向测试、`npm run typecheck`、`npm run build`、`git diff --check`；真实 API/浏览器验收按环境可用性报告。
+- Status: `in-progress`。
+- Delivery Entry - 2026-09-09 14:20:00 +08:00
+
+- Workstream ID: `main-exam-calendar-save-publish`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 在考期设置中提供保存草稿与发布功能。
+- Key decisions: 复用现有 `create/update/publish` API；保存并发布严格按保存成功、取得业务 ID、再发布的顺序执行；发布失败保留草稿并提示错误；不修改后端契约或数据库。
+- Execution or analysis result: 弹窗新增“保存草稿”和“保存并发布”操作；创建和编辑均支持发布；保存期间按钮互斥禁用并分别显示加载状态。
+- Changed files: `frontend/workbench/src/pages/ExamCalendarPage.tsx`; `frontend/workbench/src/pages/ExamCalendarPage.test.ts`; `handoff/main.md`。
+- Verification evidence: 考期定向测试 11/11 通过；`npm run typecheck` 通过；`npm run build` 通过（仅既有 bundle 体积警告）；`git diff --check` 无空白错误（仅换行转换提示）。
+- Dependency or integration impact: 无新增依赖；无后端、数据库、权限、分支、提交或外部服务变更；保留其他工作流已有未提交改动。
+- Remaining work: 未执行真实登录态下的浏览器/API验收，需确认后端发布权限和发布成功后的日历刷新。
+- Status: `implemented; automated verification complete; browser/API acceptance unverified`。
+
+## Delivery Entry - 2026-09-09 14:45:00 +08:00
+
+- Workstream ID: `main-class-management-review-fixes`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381` (uncommitted worktree).
+- User goal: 修复交付主管看不到待分班、没有学员管理菜单及班级卡片跳转失败，并同步开发库授权。
+- Key decisions: 待分班系统班在班级分页中置顶；学员管理作为可见菜单授权给拥有班级入口的角色；统一页面权限与 query-managed/query-my 数据范围权限分离；前向迁移 V193 修复 V192 的规划师管理范围误授权。
+- Execution result: 班级列表排序改为系统班优先；班级页标题固定为“班级管理”；班级详情接口接受统一页面权限；新增 V193 修复菜单、角色菜单、租户套餐和 schema version；已在开发库执行 V193。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/deliveryclass/DeliveryClassMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/deliveryclass/DeliveryClassController.java`; `frontend/workbench/src/pages/DeliveryClassPage.tsx`; `script/sql/mysql/migrations/V193__delivery_class_access_repair.sql`; `script/sql/mysql/migrations/README.md`; `docs/api/delivery-class-management.md`; `handoff/main.md`。
+- Verification evidence: Development DB V193 executed successfully with UTF-8 client; menu 73020 is visible and named 学员管理; role 3014 has 73020/73620/73628; role 3012 has 73020/73620/73629 and no active 73628; pending class PENDING/待分班/SERVING exists; ZSJOS compile passed; Workbench typecheck passed; scoped diff check passed.
+- Dependency or integration impact: No business rows, class rows, student rows, service relations, accounts, or role definitions were deleted or changed. Only menu metadata, role-menu grants, tenant package menu coverage, and schema version markers were updated in the development database.
+- Remaining work: Authenticated browser/API verification using the actual delivery-manager account remains recommended; application restart or permission-cache refresh may be required before existing sessions see the new menu tree.
+- Status: `fixed; development database synchronized; runtime session refresh recommended`。
+
+## Delivery Entry - 2026-09-09 14:53:00 +08:00
+
+- Workstream ID: `main-class-management-review-fixes`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381` (uncommitted worktree).
+- User goal: 修复班级列表接口日志中的 `StackOverflowError`。
+- Execution result: 确认 `DeliveryClassMapper` 自定义 `selectPage` 与 BaseMapperX 分页默认方法在 MyBatis/JRebel 代理下递归；改名为 `selectDeliveryClassPage` 并同步 Service 调用，避免重载递归。无数据库变更。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/deliveryclass/DeliveryClassMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/deliveryclass/DeliveryClassServiceImpl.java`; `handoff/main.md`。
+- Verification evidence: ZSJOS compile passed; `DeliveryClassServiceImplTest` passed 5/5; scoped `git diff --check` passed.
+- Dependency or integration impact: No API/database/permission change. Running application must reload/restart the changed class so JRebel does not retain the old mapper proxy shape.
+- Remaining work: Retry `/admin-api/zsjos/delivery-class/page?pageNo=1&pageSize=10&status=SERVING` after backend reload with the same authenticated account.
+- Status: `fixed; compile and focused test passed; endpoint retry pending`。
+
+## Delivery Entry - 2026-09-09 15:50:00 +08:00
+
+- Workstream ID: `main-class-management-review-fixes`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `cf391285ecf06874cfdaff3611e7071623a4f381` (uncommitted worktree).
+- User goal: 根据创建班级接口日志修复 `categoryId` 缺失。
+- Execution result: 创建班级表单注册隐藏 `categoryId` 字段；保存前从当前产品分类兜底并在缺失时阻止请求，避免后端收到 null 分类。
+- Changed files: `frontend/workbench/src/pages/DeliveryClassPage.tsx`; `handoff/main.md`。
+- Verification evidence: scoped `git diff --check` passed. Workbench typecheck is blocked by an unrelated existing `LeadDetailOverview.tsx:30` `subjectType` type error.
+- Dependency or integration impact: No backend/database/permission change. The next create request should include `categoryId` alongside productId and examScheduleId.
+- Remaining work: Retry class creation after Workbench reload; verify request payload includes the selected product category ID.
+- Status: `fixed; focused static check complete; full typecheck blocked by unrelated existing error`。
+
+## Workstream Registration - 2026-09-09 15:00:00 +08:00
+
+- Workstream ID: `main-migration-v193-duplicate-renumber`
+- Goal: 处理两个 `V193` 数据库迁移编号冲突，保留销售订单迁移为 `V193`，将交付班级访问修复迁移顺延为 `V195`，同步所有执行入口、校验和文档引用。
+- Non-goals: 不修改业务数据、不执行数据库写入、不重写已部署迁移历史、不改分支/提交/推送、不清理工作树其他既有改动、不引入依赖。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `134ef6917911b2b92bf352598e0476226bf1ee14`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `script/sql/mysql/migrations/V195__delivery_class_access_repair.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; `handoff/main.md`。
+- Dependencies: 现有 `V193` 销售订单统一迁移与 `V194` 素材库迁移；无新增依赖。
+- Integration order: 重命名交付班级迁移 -> 同步 SQL 内版本/过程/校验标识 -> 更新 bootstrap 与 verify -> 更新迁移/运维文档 -> 静态唯一性和差异检查 -> 追加交付记录。
+- Verification plan: `rg` 审计 `V193`/`V195` 唯一性与引用；检查 bootstrap 顺序、checksum 和 schema-version 标记；`git diff --check`；不执行真实数据库迁移。
+- Status: `in-progress`。
+
+## Delivery Entry - 2026-09-09 15:05:53 +08:00
+
+- Workstream ID: `main-migration-v193-duplicate-renumber`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 处理两个 `V193` 编号及其相关引用。
+- Key decisions: 保留销售订单统一迁移为 `V193`；将交付班级访问修复迁移重命名为 `V195`；同步 SQL 内部版本、schema-version/checksum、bootstrap 执行入口、验证脚本和迁移/运维文档；不执行数据库写入。
+- Execution or analysis result: `V195__delivery_class_access_repair.sql` 已替代原重复的交付班级 `V193` 文件；fresh bootstrap 顺序为 `V193` 销售订单、`V194` 素材库、`V195` 交付班级修复；新增 `verify-bootstrap.sql` 的 V195 版本、菜单可见性和误授权检查。历史 handoff 条目未改写。
+- Changed files: `script/sql/mysql/migrations/V195__delivery_class_access_repair.sql`（由原 `V193__delivery_class_access_repair.sql` 重命名）；`script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; `handoff/main.md`。
+- Verification evidence: 迁移文件名审计显示不再存在重复 `V193`；发现仓库原有两个 `V192` 文件，未纳入本次确认范围；V195 脚本内部未残留 V193/V194 标识；bootstrap、verify、README、运维文档引用一致；scoped `git diff --check` 无空白错误（仅现有换行转换提示）。未执行 MySQL 迁移或真实数据库验证。
+- Dependency or integration impact: 无新增依赖；无业务数据、权限数据、分支、提交、推送或外部服务变更。已执行过旧 V193 的开发库需要按部署策略评估版本标记兼容性，本次未直接修复数据库状态。
+- Remaining work: 若要治理现存两个 `V192`，需另行确认编号归属和已部署兼容策略；V195 需在受控 UTF-8 数据库按 bootstrap 或迁移流程执行并运行对应 verify 检查。
+- Status: `implemented; static verification complete; database execution unverified`。
+
+## Workstream Registration - main-subject-avatar-consistency-2026-09-09 15:52:56 +08:00
+
+- Workstream ID: main-subject-avatar-consistency
+- Goal: 修复客资/学员默认头像内容不一致，统一使用业务编号、固定 namespace 与稳定风格哈希。
+- Non-goals: 不修改数据库、后端头像契约、员工/IM/品牌头像逻辑，不切换分支、不提交。
+- Branch: main; Worktree: $path; Base commit: $head; Target branch: main; Owner: Codex /root。
+- Ownership scope: rontend/shared/avatar-kit/config.mjs; rontend/shared/avatar-kit/config.d.mts; rontend/workbench/src/components/SubjectAvatar.tsx; rontend/workbench/src/components/SubjectAvatar.test.ts; 业务头像调用页面；rontend/workbench/docs/subject-avatar.md; handoff/main.md。
+- Dependencies: 现有 Avatar Kit v1/v2、本地 file 依赖、Workbench ThemeContext。
+- Integration order: 固定配置哈希 -> 替换业务编号 seed -> 补充一致性测试与文档 -> 运行生成器/Workbench 检查。
+- Verification plan: Avatar Kit Node tests、SubjectAvatar 定向测试、Workbench typecheck/build、diff check；浏览器真实数据检查按环境可用性报告。
+- Status: in-progress.
+
+## Delivery Entry - 2026-09-09 16:01:20 +08:00
+
+- Workstream ID: `main-delivery-class-page-restore`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 恢复此前被 reset/pull 覆盖的班级管理与学员管理页面重构改动。
+- Key decisions: 保留现有班级编辑、结课和权限推导逻辑；恢复班级服务端分页卡片栅格、IntersectionObserver 滚动加载、待分班系统班独立入口、模糊考期持续警告，并通过路由 state 以 `classId` 进入学员管理；不恢复班内学员表格或调班申请展示，不改变后端调班业务和授权边界。
+- Execution or analysis result: `DeliveryClassPage.tsx` 已从旧表格/班内学员展示恢复为卡片页；`DeliveryClass` 前端契约补充 `scheduleType`、`exactDate`、`createTime`；既有 `RegistrationPages.tsx`、后端 `classId` 查询过滤逻辑保持不变。
+- Changed files: `frontend/workbench/src/pages/DeliveryClassPage.tsx`; `frontend/workbench/src/services/api.ts`; `handoff/main.md`。
+- Verification evidence: 定向守卫测试 4/4 通过；`npm run typecheck` 通过；`npm run build` 通过（仅已有 bundle 大小警告）；`mvn -pl yudao-module-zsjos -am -DskipTests compile` 通过；完整 Workbench 测试 604/607 通过，剩余 3 个失败为既有 `SubjectAvatar` 尺寸断言、菜单路由数量基线及本次守卫启动时的旧进程结果，重新执行定向守卫已通过；未执行真实浏览器/API 验收。
+- Dependency or integration impact: 无新增依赖、数据库、权限、分支、提交、推送或外部服务变更；班级卡片跳转依赖现有 `/zsjos/my-students` 与 `classId` 查询契约。
+- Remaining work: 需要在可用运行环境中进行真实浏览器和接口验收；完整测试中的头像与菜单基线失败需由对应任务单独处理。
+- Status: `implemented; focused verification complete; browser/API verification unverified`。
+
+## Delivery Correction - 2026-09-09 16:02:10 +08:00
+
+- Workstream ID: `main-delivery-class-page-restore`。
+- Correction: 后续重新执行定向守卫后确认本次班级页面守卫为 4/4；完整 Workbench 测试当前剩余 2 个与本恢复无关的失败，分别为 `SubjectAvatar` 尺寸断言和菜单路由数量基线。此前交付条目中的“剩余 3 个失败”包含了修复前旧进程输出，现予以更正。
+
+## Delivery Entry - 2026-09-09 16:04:00 +08:00
+
+- Workstream ID: `main-subject-avatar-consistency`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 修复客资/学员头像内容不一致。
+- Key decisions: 业务 seed 统一为客资 `leadNo`、学员 `personNo`；默认 namespace 固定为 `zsjos:subject`；风格哈希忽略 `subjectType`，保证同编号跨页面同图案；缺少业务编号统一匿名；订单/主管审批无编号时不使用订单号或内部 ID；Avatar Kit v1 仍为默认，v2 保持显式 opt-in。
+- Execution result: 替换 Workbench 残留内部 ID seed；修复 `selectAvatarVariant` 的跨类型一致性；补充 SubjectAvatar 一致性与固定 namespace 测试；更新头像调用文档。未修改数据库、后端头像契约或员工/IM/品牌头像。
+- Changed files: `frontend/shared/avatar-kit/config.mjs`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/components/SubjectAvatar.test.ts`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/MySalesOrderPage.tsx`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; `frontend/workbench/docs/subject-avatar.md`; `handoff/main.md`。
+- Verification evidence: Avatar Kit Node tests 12/12；SubjectAvatar 定向测试 5/5；`npm run typecheck` 通过；`npm run build` 通过（仅既有 bundle 体积警告）；静态 seed 审计未发现客资/学员头像使用内部 `id/leadId/personId`；`git diff --check` 未发现本次改动空白错误。真实业务数据浏览器验收未完成，当前环境接口无可用客资行。
+- Dependency or integration impact: 继续使用现有本地 `file:` avatar-kit 依赖，无新增运行时第三方依赖；不涉及数据库、权限、分支、提交、推送或外部服务。
+- Remaining work: 可用后端数据和登录态下补做客资、学员、订单/审批真实头像成功/失败回退及移动端视觉验收；当前业务响应未声明真实头像 URL，组件回退能力已保留但页面暂无法验证真实头像字段。
+- Status: `fixed; automated verification complete; browser/API acceptance unverified`。
+
+## Delivery Correction - 2026-09-09 16:08:00 +08:00
+
+- Workstream ID: `main-subject-avatar-consistency`。
+- Correction: 完整 Workbench `npm test` 实际为 606/607 通过，唯一失败是既有 `src/services/menu.test.ts` 路由数量基线（期望 62、当前 64），与头像改动无关；SubjectAvatar 定向测试仍为 5/5。
+
+## Delivery Correction - 2026-09-09 16:11:00 +08:00
+
+- Workstream ID: `main-subject-avatar-consistency`。
+- Correction: `SubjectAvatar` 现已暴露可选 `version` 参数，默认 `v1`，显式 `version="v2"` 可使用扩展图案；定向测试更新为 6/6，typecheck 通过。完整测试结论仍为 606/607，唯一失败为既有菜单路由数量基线。
+
+## Delivery Entry - 2026-09-09 16:12:00 +08:00
+
+- Workstream ID: `main-delivery-class-product-cascader`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `134ef6917911b2b92bf352598e0476226bf1ee14` (uncommitted worktree).
+- User goal: 恢复班级创建/编辑页面的“分类 → 产品”级联选择，避免产品退回直接选择。
+- Key decisions: 使用后端产品选项返回的 `categoryPath` 动态构造 Ant Design Cascader；编辑时回填分类路径和产品节点；产品切换继续复用现有 SKU、规格和考期联动；API payload 仍只提交原有 `productId`、`categoryId` 等字段，不持久化 UI 路径字段。
+- Execution result: `DeliveryClassPage.tsx` 已将直接产品 Select 替换为分类到产品的级联控件，并保留隐藏业务字段和现有保存契约。
+- Changed files: `frontend/workbench/src/pages/DeliveryClassPage.tsx`; `handoff/main.md`。
+- Verification evidence: `npm run typecheck` 通过；`npm test -- --run src/pages/delivery-class-review-fixes.guard.test.ts` 4/4 通过；`git diff --check` 未发现空白错误。真实浏览器交互验收未执行。
+- Dependency or integration impact: 无新增依赖、数据库、权限或后端接口变更；依赖现有 `DeliveryClassProductOption.categoryPath` 数据。
+- Remaining work: 在可用登录态下补做创建和编辑班级的桌面、移动端浏览器验收，确认分类树展示和路径回填符合实际数据。
+- Status: `implemented; focused verification complete; browser acceptance unverified`。

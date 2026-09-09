@@ -1,0 +1,20 @@
+.course-calendar-page { display: flex; min-height: 0; height: 100%; flex-direction: column; gap: var(--crm-gap); }
+.course-calendar-page .page-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-gap); }
+.course-calendar-page .page-heading h4 { margin: 0; }
+.course-calendar-page .ant-spin-nested-loading, .course-calendar-page .ant-spin-container { min-height: 0; height: 100%; }
+.course-calendar-page .ant-picker-calendar { height: 100%; overflow: auto; }
+.course-calendar-cell { min-height: 72px; overflow: hidden; }
+.course-calendar-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-1); margin-top: var(--crm-sp-1); padding: 1px var(--crm-sp-2); border-left: 3px solid var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.course-calendar-summary .ant-badge-status-text { display: block; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.course-calendar-timeline-wrap { max-height: min(70vh, 720px); overflow: auto; }
+.course-calendar-timeline { display: grid; height: 1152px; grid-template-columns: 56px minmax(0, 1fr); }
+.course-calendar-hours { display: grid; grid-template-rows: repeat(24, 1fr); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.course-calendar-hours > div { padding-top: 2px; border-top: 1px solid var(--crm-border); }
+.course-calendar-track { position: relative; min-width: 0; border-left: 1px solid var(--crm-border); }
+.course-calendar-hour-line { position: absolute; right: 0; left: 0; border-top: 1px solid var(--crm-border); pointer-events: none; }
+.course-calendar-timeline-event { position: absolute; min-width: 0; padding: 0 2px; }
+.course-calendar-timeline-card { display: flex; height: 100%; min-width: 0; flex-direction: column; overflow: hidden; padding: var(--crm-sp-1) var(--crm-sp-2); border-left: 3px solid var(--crm-color-primary); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); }
+.course-calendar-timeline-card strong, .course-calendar-timeline-card span, .course-calendar-timeline-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.course-calendar-timeline-card span, .course-calendar-timeline-card small { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.course-calendar-timeline-card .ant-space { margin-top: auto; }
+@media (max-width: 768px) { .course-calendar-page { height: auto; min-height: 100%; } .course-calendar-page .page-heading { align-items: flex-start; flex-direction: column; } .course-calendar-timeline { height: 960px; } }

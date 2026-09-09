@@ -261,6 +261,21 @@ SELECT 'sales_order_management_unification' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management'
                      AND path='sales-orders' AND type=2 AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:sales-order:query-own','zsjos:sales-order:query-team') AND deleted=b'0'),
+           'PASS','FAIL') AS result;
+SELECT 'delivery_class_access_repair' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V195'
+                    AND checksum='V195__delivery_class_access_repair.sql')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V195'
+                        AND checksum=SHA2('V195__delivery_class_access_repair.sql',256))
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
+                     AND name='学员管理' AND visible=b'1' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu managed
+                          JOIN system_role_menu personal ON personal.role_id=managed.role_id
+                            AND personal.tenant_id=managed.tenant_id AND personal.menu_id=73624
+                            AND personal.deleted=b'0'
+                          WHERE managed.menu_id=73628 AND managed.deleted=b'0'),
           'PASS','FAIL') AS result;
 SELECT 'new_media_business_notifications' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V102')

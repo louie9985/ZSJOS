@@ -226,7 +226,7 @@ export function LeadDetails({ lead }: { lead: PendingLead }) {
   const region = [lead.provinceName, lead.cityName].filter(Boolean).join(' / ')
   return <div className="assignment-sheet">
     <div className="assignment-sheet-identity">
-      <NameAvatar name={lead.maskedName || '客'} size={44} />
+      <NameAvatar name={lead.maskedName || '客'} seed={lead.leadNo} size={44} />
       <div className="assignment-sheet-identity-info">
         <Typography.Text strong className="assignment-sheet-name">{lead.maskedName || '未填写姓名'}</Typography.Text>
         <Space size={4} wrap>

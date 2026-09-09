@@ -743,7 +743,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
               className={['lead-inbox-item', active && 'active', unseen && 'unseen'].filter(Boolean).join(' ')}
               onClick={() => selectLead(item.id)}>
               <div className="lead-inbox-item-main">
-                <NameAvatar name={item.submittedName} size={36} />
+                <NameAvatar name={item.submittedName} seed={item.leadNo} size={36} />
                 <div className="lead-inbox-item-copy">
                   <div className="lead-inbox-item-title">
                     {/* 标签与姓名同级：塞进 strong 会被姓名的 ellipsis 一起裁掉 */}

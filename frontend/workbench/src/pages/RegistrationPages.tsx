@@ -603,7 +603,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   onClick={() => void loadCase(row.id)}
                 >
                   <div className="lead-inbox-item-main">
-                    <NameAvatar name={row.studentName || "学员"} size={36} />
+                    <NameAvatar name={row.studentName || "学员"} seed={row.leadNo} size={36} />
                     <div className="lead-inbox-item-copy">
                       <div className="lead-inbox-item-title">
                         <strong>{row.studentName || "未填写姓名"}</strong>
@@ -1000,7 +1000,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
                   onClick={() => void loadStudent(row.personId)}
                 >
                   <div className="lead-inbox-item-main">
-                    <NameAvatar name={row.name || "学员"} size={36} />
+                    <NameAvatar name={row.name || "学员"} seed={row.personNo} size={36} subjectType="student" />
                     <div className="lead-inbox-item-copy">
                       <div className="lead-inbox-item-title">
                         <strong>{row.name || "未填写姓名"}</strong>

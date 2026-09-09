@@ -12,6 +12,7 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
 import { resolveSalesOrderApprovalAccess, type SalesOrderApprovalWorkType } from '../services/salesOrderApprovalAccess'
+import SubjectAvatar from '../components/SubjectAvatar'
 import { useInboxTableLayout } from '../services/inboxLayout'
 import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
@@ -223,7 +224,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(undefined, true)}>重试</Button>}/>}
       <div className="business-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'business-inbox-item active' : 'business-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
-          <div className="business-inbox-item-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交审批'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
+          <div className="business-inbox-item-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交审批'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
           <div className="business-inbox-item-meta"><Badge status="processing"/><span>{formatTimestamp(groupKey === 'done' ? item.taskEndTime : item.taskCreateTime || item.submittedAt)}</span></div>
         </button>)}
         {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}

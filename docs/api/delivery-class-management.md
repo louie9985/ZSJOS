@@ -11,7 +11,7 @@
 - `GET /zsjos/delivery-class/{id}`、`GET /zsjos/delivery-class/{id}/students`：读取班级及课程
   服务分页；调用方必须传递并消费 `pageNo`、`pageSize` 和响应 `total`，不得截断为固定前 50 条。
   学员行以 `serviceRelationId` 为操作边界，并返回订单商品所属 `categoryId`，使待分班服务也能
-  加载同分类目标班。Workbench 从“我的班级”进入学员详情时通过路由 state 传递该 ID；主管管理
+  加载同分类目标班。Workbench 从“班级管理”进入学员管理时通过路由 state 传递该 ID；主管管理
   视图不因此获得 owner 专属的学员服务操作权。
 - `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回同分类、服务中的正式班；
   只有显式 `includePending=true` 时附加租户待分班班级。

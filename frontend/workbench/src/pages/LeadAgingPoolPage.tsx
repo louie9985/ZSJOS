@@ -269,7 +269,7 @@ export default function LeadAgingPoolPage() {
               : items.map(item => <button type="button" key={item.cycleId}
                   className={`lead-inbox-item${selected?.cycleId === item.cycleId ? " active" : ""}`}
                   onClick={() => void selectItem(item)}>
-                  <div className="lead-inbox-item-main"><NameAvatar name={item.submittedName} size={36}/>
+                  <div className="lead-inbox-item-main"><NameAvatar name={item.submittedName} seed={item.leadNo} size={36}/>
                     <div className="lead-inbox-item-copy"><div className="lead-inbox-item-title"><strong>{item.submittedName}</strong><Tag>{statusLabel[item.status]}</Tag></div>
                       <span>{item.leadNo}</span><span>{item.submittedMobile || "无手机号"} · {item.submittedWechatId || "无微信号"}</span>
                       <span>A：{item.originalOwnerUserName || `#${item.originalOwnerUserId}`} · B：{item.collaboratorUserName || "待指派"}</span>

@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@zsjos/avatar-kit": "file:../shared/avatar-kit",
     "@ant-design/icons": "^6.3.2",
     "@ant-design/pro-components": "^3.1.14-2",
     "@iconify/react": "^6.0.2",

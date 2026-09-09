@@ -71,14 +71,14 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     public PageResult<DeliveryClassRespVO> getManagedPage(Long userId, DeliveryClassPageReqVO req) {
         DeliveryClassScopeService.Scope scope = scopeService.resolve(userId);
-        PageResult<DeliveryClassDO> page = mapper.selectPage(req, scope.deptIds(), null,
+        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.deptIds(), null,
                 scope.allDepartments(), true);
         return toPageResult(page);
     }
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
-        PageResult<DeliveryClassDO> page = mapper.selectPage(req, Set.of(), userId, false, false);
+        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, Set.of(), userId, false, false);
         return toPageResult(page);
     }
 
