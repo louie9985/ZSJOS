@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTeamPag
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.FinanceOrderExportReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterQuery;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderManagementScope;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -86,7 +87,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         return selectMyPage(userId, reqVO, null);
     }
-    default PageResult<SalesOrderDO> selectTeamPage(Collection<Long> userIds, SalesOrderTeamPageReqVO reqVO,
+    default PageResult<SalesOrderDO> selectTeamPage(Collection<Long> userIds, SalesOrderMyPageReqVO reqVO,
                                                      List<Long> matchedOrderIds) {
         if (userIds == null || userIds.isEmpty()) return PageResult.empty();
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
@@ -104,6 +105,50 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         }
         query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
         return selectPage(reqVO, query);
+    }
+
+    default PageResult<SalesOrderDO> selectManagementPage(SalesOrderManagementScope scope, SalesOrderMyPageReqVO reqVO,
+                                                           List<Long> matchedOrderIds) {
+        if (scope.isEmpty()) return PageResult.empty();
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
+                .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
+        if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        if (isNotBlank(reqVO.getKeyword())) {
+            String keyword = reqVO.getKeyword().trim();
+            query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
+                    .or().like(SalesOrderDO::getStudentName, keyword).or().like(SalesOrderDO::getStudentMobile, keyword));
+        }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
+        query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
+        return selectPage(reqVO, query);
+    }
+
+    default List<SalesOrderDO> selectManagementCursor(SalesOrderManagementScope scope, String status, String keyword,
+                                                       List<Long> matchedOrderIds, LocalDateTime cursorTime,
+                                                       Long cursorId, int limit) {
+        if (scope.isEmpty()) return List.of();
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>().eqIfPresent(SalesOrderDO::getStatus, status);
+        if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        if (isNotBlank(keyword)) {
+            String value = keyword.trim();
+            query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
+                    .or().like(SalesOrderDO::getStudentName, value).or().like(SalesOrderDO::getStudentMobile, value));
+        }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
+        if (cursorTime != null && cursorId != null) query.and(wrapper -> wrapper.lt(SalesOrderDO::getUpdateTime, cursorTime)
+                .or(nested -> nested.eq(SalesOrderDO::getUpdateTime, cursorTime).lt(SalesOrderDO::getId, cursorId)));
+        return selectList(query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId).last("LIMIT " + limit));
+    }
+
+    default long selectManagementCount(SalesOrderManagementScope scope, String status) {
+        if (scope.isEmpty()) return 0;
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>().eqIfPresent(SalesOrderDO::getStatus, status);
+        if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        return selectCount(query);
     }
     default List<SalesOrderDO> selectTeamCursor(Collection<Long> userIds, String status, String keyword,
                                                  List<Long> matchedOrderIds, LocalDateTime cursorTime,

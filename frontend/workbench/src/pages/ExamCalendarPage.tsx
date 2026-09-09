@@ -3,7 +3,7 @@ import {
   ReloadOutlined, RightOutlined, SendOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
-  Alert, Button, Calendar, DatePicker, Drawer, Empty, Form, Input, List, Modal,
+  Alert, Button, Calendar, Cascader, DatePicker, Drawer, Empty, Form, Input, List, Modal,
   Popconfirm, Radio, Select, Space, Spin, Tag, Typography, message
 } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -22,6 +22,7 @@ type EditorValues = {
   roughRange?: [Dayjs, Dayjs]
   categoryId?: number
   productId?: number
+  productSelection?: number[]
   selectedAttrs?: Record<string, string>
   remark?: string
 }
@@ -111,6 +112,25 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const categoryOptions = useMemo(() => categories.map(item => ({
     value: item.id, label: item.path.map(node => node.name).join(' / ')
   })), [categories])
+  const productCascaderOptions = useMemo(() => {
+    type Node = { value: number; label: string; children?: Node[]; isLeaf?: boolean }
+    const roots: Node[] = []
+    for (const product of products) {
+      let level = roots
+      product.categoryPath.forEach((category, index) => {
+        let node = level.find(item => item.value === category.id)
+        if (!node) {
+          node = { value: category.id, label: category.name, children: [] }
+          level.push(node)
+        }
+        level = node.children!
+        if (index === product.categoryPath.length - 1) {
+          level.push({ value: product.productId, label: product.productName, isLeaf: true })
+        }
+      })
+    }
+    return roots
+  }, [products])
 
   const loadCategories = useCallback(async () => {
     const request = ++requests.current.categories
@@ -198,7 +218,12 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       exactDate: schedule.exactDate ? dayjs(schedule.exactDate) : undefined,
       roughRange: schedule.roughStartDate && schedule.roughEndDate
         ? [dayjs(schedule.roughStartDate), dayjs(schedule.roughEndDate)] : undefined,
-      categoryId: schedule.categoryId, productId: schedule.productId, selectedAttrs: schedule.selectedAttrs || {}, remark: schedule.remark
+      categoryId: schedule.categoryId, productId: schedule.productId,
+      productSelection: schedule.productId
+        ? [...(products.find(product => product.productId === schedule.productId)?.categoryPath
+          || schedule.categoryPathSnapshot || []).map(node => node.id), schedule.productId]
+        : undefined,
+      selectedAttrs: schedule.selectedAttrs || {}, remark: schedule.remark
     })
     setEditorOpen(true)
   }
@@ -225,17 +250,17 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     } finally { setSaving(false) }
   }
 
-  const changeScope = (field: 'categoryId' | 'productId', value: number | undefined) => {
-    const previous = field === 'categoryId' ? editorCategoryId : editorProductId
-    form.setFieldValue(field, previous)
+  const changeProduct = (value: number | undefined) => {
+    const previous = editorProductId
+    form.setFieldValue('productId', previous)
     const apply = () => {
-      form.setFieldValue(field, value)
-      if (field === 'categoryId') form.setFieldValue('productId', undefined)
+      form.setFieldValue('productId', value)
+      form.setFieldValue('categoryId', value == null ? undefined : products.find(product => product.productId === value)?.categoryId)
       setSelectedAttrs({}); setClearedInvalidAttrs([])
     }
     if (Object.keys(selectedAttrs).length) {
-      Modal.confirm({ title: '切换范围将清除原规格条件，确认继续？', onOk: apply,
-        onCancel: () => form.setFieldValue(field, previous) })
+      Modal.confirm({ title: '切换产品将清除原规格条件，确认继续？', onOk: apply,
+        onCancel: () => form.setFieldValue('productId', previous) })
     } else apply()
   }
 
@@ -293,7 +318,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     </div>
     {referenceError && <Alert type="warning" showIcon message="产品分类加载失败" description={referenceError} action={<Button onClick={() => void loadCategories()}>重试</Button>} />}
     {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} />
-      : <Spin spinning={loading}><Calendar value={anchor} onPanelChange={setAnchor} onSelect={(date, info) => { if (canManage && info.source === 'date') openCreate(date) }} cellRender={(date, info) => {
+      : <Spin spinning={loading}><Calendar value={anchor} onPanelChange={setAnchor} onSelect={(date, info) => { if (info.source === 'date') setDayDetail(date) }} cellRender={(date, info) => {
         if (info.type !== 'date') return info.originNode
         const dayRows = schedules.filter(item => item.exactDate && dayjs(item.exactDate).isSame(date, 'day'))
         return <div className="exam-calendar-events">{dayRows.slice(0, 3).map(item => <button type="button" key={item.id} className={`exam-calendar-event tone-${item.displayStatus.toLowerCase()}`} onClick={event => { event.stopPropagation(); setDetail(item) }}><span>{item.productNameSnapshot || item.categoryNameSnapshot}<ProductSpecs product={{ specs: item.selectedSpecs }} /></span><ScheduleStatus value={item.displayStatus} /></button>)}{dayRows.length > 3 && <Button type="link" size="small" className="exam-calendar-overflow" onClick={event => { event.stopPropagation(); setDayDetail(date) }}>另有 {dayRows.length - 3} 条</Button>}</div>
@@ -305,14 +330,17 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     </Drawer>
 
     <Modal title="考期详情" open={Boolean(detail)} onCancel={() => setDetail(undefined)} footer={detail ? actions(detail) : null} destroyOnHidden>{detail && <ScheduleDetail schedule={detail} />}</Modal>
-    <Drawer title={dayDetail?.format('YYYY-MM-DD')} open={Boolean(dayDetail)} onClose={() => setDayDetail(undefined)} width={520}>
-      <List dataSource={schedules.filter(row => row.exactDate === dayDetail?.format('YYYY-MM-DD'))} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}><List.Item.Meta title={row.scheduleName || row.categoryNameSnapshot} description={<ScheduleStatus value={row.displayStatus} />} /></List.Item>} />
-    </Drawer>
+    <Modal title={`${dayDetail?.format('YYYY年M月D日')} 考期安排`} open={Boolean(dayDetail)} onCancel={() => setDayDetail(undefined)} footer={null} width="min(720px, calc(100vw - 32px))" destroyOnHidden>
+      {dayDetail && (() => { const rows = schedules.filter(row => row.exactDate === dayDetail.format('YYYY-MM-DD')); return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}><List.Item.Meta title={<Space wrap><strong>{row.scheduleName || row.categoryNameSnapshot}</strong><ScheduleStatus value={row.displayStatus} /></Space>} description={<><div>{row.productNameSnapshot || row.categoryNameSnapshot}<ProductSpecs product={{ specs: row.selectedSpecs }} /></div>{row.remark && <div>{row.remark}</div>}</>} /></List.Item>} /> : <Empty description="当天暂无考期安排" /> })()}
+    </Modal>
     <Modal title={editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={() => setEditorOpen(false)} onOk={() => void save()} okText="保存草稿" destroyOnHidden>
       <Form form={form} layout="vertical" initialValues={{ scheduleType: 'EXACT' }}>
-        <Form.Item name="categoryId" label="产品分类" rules={[{ required: !editorProductId, message: '请选择已启用产品分类' }]}><Select showSearch optionFilterProp="label" placeholder="请选择分类" options={categoryOptions} onChange={value => changeScope('categoryId', value)} /></Form.Item>
         {productError && <Alert type="error" showIcon message={productError} action={<Button onClick={() => void loadProducts()}>重试</Button>} />}
-        <Form.Item name="productId" label="产品"><Select allowClear showSearch optionFilterProp="label" loading={productLoading} disabled={!editorCategoryId || productLoading || !!productError} options={products.filter(p => p.categoryId === editorCategoryId || p.productId === editorProductId).map(p => ({ value: p.productId, label: p.productName }))} onChange={value => changeScope('productId', value)} /></Form.Item>
+        <Form.Item name="productSelection" label="产品" rules={[{ required: true, message: '请选择产品' }]}><Cascader showSearch loading={productLoading} disabled={productLoading || !!productError} options={productCascaderOptions} placeholder="请选择产品" onChange={path => {
+          const value = Array.from(path).at(-1) as number | undefined
+          form.setFieldValue('productSelection', path)
+          void changeProduct(value)
+        }} /></Form.Item>
         {editorProductId && !selectedProduct && !productLoading && !productError && <Alert type="warning" message={`${editing?.productNameSnapshot || '原产品'}已不可用，请重新选择产品`} />}
         {selectedProduct?.attrs.map(attr => <Form.Item key={attr.attrKey} label={attr.attrName}><Select allowClear value={selectedAttrs[attr.attrKey!]} onChange={value => changeAttr(attr.attrKey!, value)} options={attr.values.map(v => ({ value: v.value, label: v.label }))} /></Form.Item>)}
         {!productLoading && invalidAttrs.map(([key, value]) => {

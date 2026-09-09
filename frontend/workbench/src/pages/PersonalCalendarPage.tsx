@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type PersonalCalendarEvent, type PersonalCalendarEventInput } from '../services/api'
 
 type EditorValues = { title: string; description?: string; range: [Dayjs, Dayjs]; allDay: boolean }
+type TimelineEvent = PersonalCalendarEvent & { visibleStart: Dayjs; visibleEnd: Dayjs; column: number; columns: number }
 const hasPermission = (permissions: string[], value: string) => permissions.includes('*:*:*') || permissions.includes(value)
 export const personalCalendarEventTouchesDay = (event: Pick<PersonalCalendarEvent, 'startTime' | 'endTime'>, day: Dayjs) => {
   const dayStart = day.startOf('day')
@@ -13,11 +14,42 @@ export const personalCalendarEventTouchesDay = (event: Pick<PersonalCalendarEven
   const end = dayjs(event.endTime)
   return start.isSame(end) ? !start.isBefore(dayStart) && start.isBefore(dayEnd) : start.isBefore(dayEnd) && end.isAfter(dayStart)
 }
+export const personalCalendarEventPosition = (event: Pick<PersonalCalendarEvent, 'startTime' | 'endTime'>, day: Dayjs) => {
+  const dayStart = day.startOf('day'); const dayEnd = dayStart.add(1, 'day')
+  const start = dayjs(event.startTime); const end = dayjs(event.endTime)
+  const visibleStart = start.isAfter(dayStart) ? start : dayStart
+  const visibleEnd = end.isAfter(visibleStart) ? (end.isBefore(dayEnd) ? end : dayEnd) : visibleStart.add(1, 'minute')
+  return { top: visibleStart.diff(dayStart, 'minute') / 1440 * 100, height: Math.max(visibleEnd.diff(visibleStart, 'minute'), 1) / 1440 * 100,
+    start: visibleStart, end: visibleEnd }
+}
+
+const buildTimelineEvents = (events: PersonalCalendarEvent[], day: Dayjs): TimelineEvent[] => {
+  const positioned = events.filter(event => personalCalendarEventTouchesDay(event, day)).map(event => ({ event, position: personalCalendarEventPosition(event, day) }))
+    .sort((a, b) => a.position.start.valueOf() - b.position.start.valueOf() || a.position.end.valueOf() - b.position.end.valueOf())
+  const columns: TimelineEvent[][] = []
+  return positioned.map(({ event, position }) => {
+    let column = columns.findIndex(items => !items.some(item => item.visibleEnd.isAfter(position.start)))
+    if (column < 0) { column = columns.length; columns.push([]) }
+    const item = { ...event, visibleStart: position.start, visibleEnd: position.end, column, columns: 1 } as TimelineEvent
+    columns[column].push(item)
+    const overlapping = columns.flat().filter(other => other.visibleStart.isBefore(position.end) && other.visibleEnd.isAfter(position.start))
+    const count = Math.max(...overlapping.map(other => other.column + 1), column + 1)
+    overlapping.forEach(other => { other.columns = Math.max(other.columns, count) })
+    item.columns = count
+    return item
+  })
+}
+
+function DayTimeline({ events, day, permissions, onEdit, onDelete }: { events: PersonalCalendarEvent[]; day: Dayjs; permissions: string[]; onEdit: (event: PersonalCalendarEvent) => void; onDelete: (id: number) => void }) {
+  const rows = buildTimelineEvents(events, day)
+  return <div className="personal-calendar-timeline-wrap">{!rows.length ? <Empty description="当天暂无日程" /> : <div className="personal-calendar-timeline"><div className="personal-calendar-hours">{Array.from({ length: 24 }, (_, hour) => <div key={hour}>{`${String(hour).padStart(2, '0')}:00`}</div>)}</div><div className="personal-calendar-track">{Array.from({ length: 24 }, (_, hour) => <div className="personal-calendar-hour-line" key={hour} style={{ top: `${hour / 24 * 100}%` }} />)}{rows.map(event => <div className="personal-calendar-timeline-event" key={event.id} style={{ top: `${personalCalendarEventPosition(event, day).top}%`, height: `${personalCalendarEventPosition(event, day).height}%`, left: `${event.column / event.columns * 100}%`, width: `${100 / event.columns}%` }}><div className="personal-calendar-timeline-card"><strong>{event.title}</strong><span>{event.allDay ? '全天' : `${event.visibleStart.format('HH:mm')} - ${event.visibleEnd.format('HH:mm')}`}</span>{event.description && <small>{event.description}</small>}<Space size={0}>{hasPermission(permissions, 'zsjos:personal-calendar:update') && <Button type="text" size="small" icon={<EditOutlined />} aria-label="编辑日程" onClick={() => onEdit(event)} />}{hasPermission(permissions, 'zsjos:personal-calendar:delete') && <Popconfirm title="删除这条日程？" onConfirm={() => onDelete(event.id)}><Button danger type="text" size="small" icon={<DeleteOutlined />} aria-label="删除日程" /></Popconfirm>}</Space></div></div>)}</div></div>}</div>
+}
 
 export default function PersonalCalendarPage({ permissions }: { permissions: string[] }) {
   const [anchor, setAnchor] = useState(dayjs()), [events, setEvents] = useState<PersonalCalendarEvent[]>([])
   const [loading, setLoading] = useState(false), [error, setError] = useState(''), [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<PersonalCalendarEvent>(), [saving, setSaving] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<Dayjs>()
   const [form] = Form.useForm<EditorValues>()
   const range = useMemo(() => ({ start: anchor.startOf('month').startOf('week'), end: anchor.endOf('month').endOf('week') }), [anchor])
   const load = useCallback(async () => { setLoading(true); setError(''); try { setEvents(await api.personalCalendar.list({ rangeStart: range.start.format('YYYY-MM-DDTHH:mm:ss'), rangeEnd: range.end.add(1, 'second').format('YYYY-MM-DDTHH:mm:ss') })) } catch (cause) { setEvents([]); setError(cause instanceof ApiError && cause.code === 403 ? '无权查看我的日历' : cause instanceof Error ? cause.message : '个人日程加载失败') } finally { setLoading(false) } }, [range])
@@ -30,7 +62,8 @@ export default function PersonalCalendarPage({ permissions }: { permissions: str
 
   return <section className="workspace-page personal-calendar-page">
     <div className="page-heading"><div><Typography.Title level={4}>我的日历</Typography.Title><Typography.Text type="secondary">{anchor.format('YYYY年M月')}</Typography.Text></div><Space><Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void load()} />{hasPermission(permissions, 'zsjos:personal-calendar:create') && <Button type="primary" icon={<PlusOutlined />} onClick={() => startCreate()}>新建日程</Button>}</Space></div>
-    {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} /> : <Spin spinning={loading}><Calendar value={anchor} onChange={setAnchor} cellRender={(date, info) => info.type === 'date' ? <div className="personal-calendar-events">{events.filter(event => personalCalendarEventTouchesDay(event, date)).slice(0, 3).map(event => <div className="personal-calendar-event" key={event.id}><Badge status="processing" text={event.title} /><Space size={0}>{hasPermission(permissions, 'zsjos:personal-calendar:update') && <Button type="text" size="small" icon={<EditOutlined />} aria-label="编辑日程" onClick={e => { e.stopPropagation(); startEdit(event) }} />}{hasPermission(permissions, 'zsjos:personal-calendar:delete') && <Popconfirm title="删除这条日程？" onConfirm={() => void remove(event.id)}><Button danger type="text" size="small" icon={<DeleteOutlined />} aria-label="删除日程" onClick={e => e.stopPropagation()} /></Popconfirm>}</Space></div>)}{!events.length && date.isSame(anchor, 'day') ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={false} /> : null}</div> : info.originNode} /></Spin>}
+    {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} /> : <Spin spinning={loading}><Calendar value={anchor} onChange={setAnchor} onSelect={(date, info) => { if (info.source === 'date') setSelectedDay(date) }} cellRender={(date, info) => info.type === 'date' ? <div className="personal-calendar-events">{events.filter(event => personalCalendarEventTouchesDay(event, date)).slice(0, 3).map(event => <div className="personal-calendar-event" key={event.id}><Badge status="processing" text={event.title} /><Space size={0}>{hasPermission(permissions, 'zsjos:personal-calendar:update') && <Button type="text" size="small" icon={<EditOutlined />} aria-label="编辑日程" onClick={e => { e.stopPropagation(); startEdit(event) }} />}{hasPermission(permissions, 'zsjos:personal-calendar:delete') && <Popconfirm title="删除这条日程？" onConfirm={() => void remove(event.id)}><Button danger type="text" size="small" icon={<DeleteOutlined />} aria-label="删除日程" onClick={e => e.stopPropagation()} /></Popconfirm>}</Space></div>)}{events.filter(event => personalCalendarEventTouchesDay(event, date)).length > 3 && <Typography.Text type="secondary">另有 {events.filter(event => personalCalendarEventTouchesDay(event, date)).length - 3} 条</Typography.Text>}</div> : info.originNode} /></Spin>}
+    <Modal title={`${selectedDay?.format('YYYY年M月D日')} 日程`} open={Boolean(selectedDay)} onCancel={() => setSelectedDay(undefined)} footer={null} width="min(900px, calc(100vw - 32px))" destroyOnHidden>{selectedDay && <DayTimeline events={events} day={selectedDay} permissions={permissions} onEdit={startEdit} onDelete={id => void remove(id)} />}</Modal>
     <Modal title={editing ? '编辑日程' : '新建日程'} open={open} confirmLoading={saving} onCancel={() => setOpen(false)} onOk={() => void save()} destroyOnHidden><Form form={form} layout="vertical"><Form.Item name="title" label="标题" rules={[{ required: true, whitespace: true, max: 100 }]}><Input /></Form.Item><Form.Item name="range" label="时间" rules={[{ required: true }]}><DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} /></Form.Item><Form.Item name="allDay" label="全天" valuePropName="checked"><Switch /></Form.Item><Form.Item name="description" label="说明" rules={[{ max: 2000 }]}><Input.TextArea rows={4} /></Form.Item></Form></Modal>
   </section>
 }

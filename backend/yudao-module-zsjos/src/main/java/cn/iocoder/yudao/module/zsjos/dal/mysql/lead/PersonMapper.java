@@ -49,19 +49,22 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     default PageResult<PersonDO> selectMyStudentPage(MyStudentPageReqVO reqVO, Long userId,
                                                       java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
+        String classPredicate = " AND ({1} IS NULL OR sr.class_id={1})";
         if (reqVO.getServiceStatus() == null) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                             + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                            + classPredicate
                             + "AND ((sr.owner_user_id={0} AND sr.status IN ('active','paused','completed')) "
                             + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
-                            + "AND sr.status='active' AND sr.acceptance_status='accepted')))", userId);
+                            + "AND sr.status='active' AND sr.acceptance_status='accepted')))", userId, reqVO.getClassId());
         } else {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                             + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
-                            + "AND ((sr.owner_user_id={0} AND sr.status={1}) "
+                            + classPredicate
+                            + "AND ((sr.owner_user_id={0} AND sr.status={2}) "
                             + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
-                            + "AND sr.status={1} AND sr.acceptance_status='accepted')))",
-                    userId, reqVO.getServiceStatus());
+                            + "AND sr.status={2} AND sr.acceptance_status='accepted')))",
+                    userId, reqVO.getClassId(), reqVO.getServiceStatus());
         }
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }

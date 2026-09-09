@@ -4379,7 +4379,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_rule` (
   `code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则编码',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则名称',
   `first_follow_up_timeout_minutes` int NOT NULL COMMENT '接单后首次跟进时限（分钟）',
-  `qualification_timeout_minutes` int NOT NULL DEFAULT '4320' COMMENT '首次跟进后有效性判定时限（分钟）',
+  `qualification_timeout_minutes` int NOT NULL DEFAULT '4320' COMMENT '归属成立后有效性判定时限（分钟）',
   `aging_pool_timeout_days` int NOT NULL DEFAULT '90' COMMENT '公海期限（自然日）',
   `notification_popup_duration_minutes` int NOT NULL DEFAULT '5' COMMENT '消息通知浮窗时长（分钟）',
   `duplicate_auto_resolution_enabled` bit(1) NOT NULL DEFAULT b'0' COMMENT '重复客资自动判重开关',

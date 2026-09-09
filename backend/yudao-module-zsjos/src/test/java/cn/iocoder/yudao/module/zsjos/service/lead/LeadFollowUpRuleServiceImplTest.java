@@ -32,8 +32,6 @@ class LeadFollowUpRuleServiceImplTest {
         request.setFirstFollowUpTimeoutMinutes(720);
         request.setQualificationTimeoutMinutes(4320);
         request.setAgingPoolTimeoutDays(120);
-        request.setNoProgressWarningDays(7);
-        request.setNoProgressGraceDays(2);
         request.setNotificationPopupDurationMinutes(6);
         request.setDuplicateAutoResolutionEnabled(true);
 
@@ -115,7 +113,6 @@ class LeadFollowUpRuleServiceImplTest {
         LeadFollowUpRuleUpdateReqVO request = new LeadFollowUpRuleUpdateReqVO();
         request.setVersion(version); request.setFirstFollowUpTimeoutMinutes(720);
         request.setQualificationTimeoutMinutes(4320); request.setAgingPoolTimeoutDays(120);
-        request.setNoProgressWarningDays(7); request.setNoProgressGraceDays(2);
         request.setNotificationPopupDurationMinutes(6); request.setDuplicateAutoResolutionEnabled(true);
         return request;
     }

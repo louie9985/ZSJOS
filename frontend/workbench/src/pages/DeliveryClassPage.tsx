@@ -40,6 +40,12 @@ export default function DeliveryClassPage({ permissions = [], manage = false }: 
   const [form] = Form.useForm<ClassForm>()
   const [transferForm] = Form.useForm<TransferForm>()
   const canQueryTransfers = !manage && has(permissions, 'zsjos:class-transfer:query')
+  const selectedProductId = Form.useWatch('productId', form)
+  const selectedProduct = products.find(row => row.productId === selectedProductId)
+  const normalizeAttrs = (attrs?: Record<string, string>) => Object.fromEntries(Object.entries(attrs || {}).filter(([, value]) => value != null && value !== ''))
+  const loadExams = async (categoryId: number, productId?: number, attrs?: Record<string, string>) => {
+    setExams(await api.deliveryClasses.exams(categoryId, productId, normalizeAttrs(attrs)))
+  }
 
   const load = useCallback(async (targetPage = pageNo) => {
     setLoading(true); setError('')
@@ -78,8 +84,9 @@ export default function DeliveryClassPage({ permissions = [], manage = false }: 
     try {
       const [categoryRows, productRows, candidateRows] = await Promise.all([api.deliveryClasses.categories(), api.deliveryClasses.products(), api.deliveryClasses.candidates()])
       setCategories(categoryRows); setProducts(productRows); setCandidates(candidateRows)
-      if (row?.categoryId) setExams(await api.deliveryClasses.exams(row.categoryId, row.productId))
-      form.setFieldsValue(row ? { className: row.className, productId: row.productId!, selectedSkuIds: row.selectedSkus?.map(sku => sku.id), categoryId: row.categoryId!, examScheduleId: row.examScheduleId!, homeroomUserId: row.homeroomUserId! } : {})
+      const attrs = normalizeAttrs(row?.selectedAttrs)
+      form.setFieldsValue(row ? { className: row.className, productId: row.productId!, selectedAttrs: attrs, selectedSkuIds: row.selectedSkus?.map(sku => sku.id), categoryId: row.categoryId!, examScheduleId: row.examScheduleId!, homeroomUserId: row.homeroomUserId! } : {})
+      if (row?.categoryId) await loadExams(row.categoryId, row.productId, attrs)
     } catch (e) { message.error(e instanceof Error ? e.message : '创建班级所需数据加载失败'); setEditOpen(false) }
     finally { setSaving(false) }
   }
@@ -87,7 +94,15 @@ export default function DeliveryClassPage({ permissions = [], manage = false }: 
     const product = products.find(item => item.productId === productId)
     if (!product) return
     form.setFieldsValue({ categoryId: product.categoryId, selectedSkuIds: product.skus.map(sku => sku.id), selectedAttrs: {}, examScheduleId: undefined })
-    setExams(await api.deliveryClasses.exams(product.categoryId, product.productId))
+    await loadExams(product.categoryId, product.productId, {})
+  }
+  const attrsChanged = async (attrKey: string, value?: string) => {
+    const attrs = normalizeAttrs({ ...form.getFieldValue('selectedAttrs'), [attrKey]: value || '' })
+    const product = selectedProduct
+    if (!product) return
+    const validSkuIds = new Set(product.skus.filter(sku => Object.entries(attrs).every(([key, selected]) => sku.attrValues?.[key] === selected)).map(sku => sku.id))
+    form.setFieldsValue({ selectedAttrs: attrs, selectedSkuIds: (form.getFieldValue('selectedSkuIds') || []).filter((id: number) => validSkuIds.has(id)), examScheduleId: undefined })
+    await loadExams(product.categoryId, product.productId, attrs)
   }
   const categoryChanged = async (categoryId: number) => {
     form.setFieldValue('examScheduleId', undefined); setExams([])
@@ -96,6 +111,7 @@ export default function DeliveryClassPage({ permissions = [], manage = false }: 
   const save = async () => {
     const value = await form.validateFields(); setSaving(true)
     try {
+      value.selectedAttrs = normalizeAttrs(value.selectedAttrs)
       if (editing) await api.deliveryClasses.update(editing.id, { ...value, version: editing.version })
       else await api.deliveryClasses.create(value)
       message.success(editing ? '班级已更新' : '班级已创建'); setEditOpen(false); form.resetFields(); await load(1)
@@ -168,7 +184,7 @@ export default function DeliveryClassPage({ permissions = [], manage = false }: 
       </section>}
     </Space>
     <Modal open={editOpen} title={editing ? '编辑班级' : '创建班级'} confirmLoading={saving} onOk={() => void save()} onCancel={() => setEditOpen(false)} destroyOnHidden>
-      <Form form={form} layout="vertical"><Form.Item name="className" label="班级名称"><Input maxLength={100} placeholder="留空时按分类、考期和序号生成" /></Form.Item><Form.Item name="productId" label="产品" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={products.map(row => ({ label: row.productName, value: row.productId }))} onChange={value => void productChanged(value)} /></Form.Item>{(products.find(row => row.productId === form.getFieldValue('productId'))?.attrs || []).flatMap(attr => attr.attrKey ? [<Form.Item key={attr.attrKey} name={['selectedAttrs', attr.attrKey]} label={attr.attrName}><Select allowClear options={attr.values.map(value => ({ label: value.label, value: value.value }))} /></Form.Item>] : [])}<Form.Item name="selectedSkuIds" label="SKU"><Select mode="multiple" showSearch optionFilterProp="label" options={(products.find(row => row.productId === form.getFieldValue('productId'))?.skus || []).map(row => ({ label: row.skuName, value: row.id }))} /></Form.Item><Form.Item name="examScheduleId" label="考期" rules={[{ required: true }]}><Select options={exams.map(row => ({ label: row.displayName, value: row.id }))} /></Form.Item><Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} /></Form.Item></Form>
+      <Form form={form} layout="vertical"><Form.Item name="className" label="班级名称"><Input maxLength={100} placeholder="留空时按分类、考期和序号生成" /></Form.Item><Form.Item name="productId" label="产品" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={products.map(row => ({ label: row.productName, value: row.productId }))} onChange={value => void productChanged(Number(value))} /></Form.Item>{(selectedProduct?.attrs || []).map(attr => <Form.Item key={attr.attrKey} name={['selectedAttrs', attr.attrKey!] as [string, string]} label={attr.attrName}><Select allowClear options={attr.values.map(value => ({ label: value.label, value: value.value }))} onChange={value => void attrsChanged(attr.attrKey!, value as string | undefined)} /></Form.Item>)}<Form.Item name="selectedSkuIds" label="SKU"><Select mode="multiple" showSearch optionFilterProp="label" options={(selectedProduct?.skus || []).map(row => ({ label: row.skuName, value: row.id }))} /></Form.Item><Form.Item name="examScheduleId" label="考期" rules={[{ required: true }]}><Select options={exams.map(row => ({ label: row.displayName, value: row.id }))} /></Form.Item><Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} /></Form.Item></Form>
     </Modal>
     <Modal open={Boolean(transfer)} title={manage ? '主管直接调班' : '申请调班'} confirmLoading={saving} okButtonProps={{ disabled: transferLoading || Boolean(transferError) }} onOk={() => void submitTransfer()} onCancel={() => setTransfer(undefined)} destroyOnHidden>
       {transferError && <Alert type="error" showIcon message={transferError} action={<Button size="small" onClick={() => transfer && void loadTransferOptions(transfer)}>重试</Button>} />}

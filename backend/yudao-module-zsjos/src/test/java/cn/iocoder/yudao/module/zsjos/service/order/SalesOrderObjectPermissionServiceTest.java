@@ -23,6 +23,8 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.DISABLE;
 import static cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.ENABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +76,34 @@ class SalesOrderObjectPermissionServiceTest {
         org.junit.jupiter.api.Assertions.assertTrue(service.canRead(order, 30L));
         org.junit.jupiter.api.Assertions.assertFalse(service.canRead(
                 new SalesOrderDO().setId(2L).setSubmitterUserId(999L), 30L));
+    }
+
+    @Test
+    void managementScopeAllDoesNotLoadEveryUser() {
+        when(permissionApi.getDeptDataPermission(30L)).thenReturn(scope(true, false, Set.of()));
+
+        SalesOrderManagementScope result = service.resolveManagementScope(30L);
+
+        org.junit.jupiter.api.Assertions.assertTrue(result.isAll());
+        verify(adminUserApi, never()).getUserListByStatus(ENABLE.getStatus());
+    }
+
+    @Test
+    void nullManagementScopeFailsClosed() {
+        when(permissionApi.getDeptDataPermission(30L)).thenReturn(null);
+
+        SalesOrderManagementScope result = service.resolveManagementScope(30L);
+
+        org.junit.jupiter.api.Assertions.assertTrue(result.isEmpty());
+        org.junit.jupiter.api.Assertions.assertFalse(service.canReadManagement(
+                new SalesOrderDO().setSubmitterUserId(30L), 30L));
+    }
+
+    private cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO scope(
+            boolean all, boolean self, Set<Long> deptIds) {
+        var result = new cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO();
+        result.setAll(all); result.setSelf(self); result.setDeptIds(deptIds);
+        return result;
     }
 
     private DeptRespDTO dept(Long id, Long leaderId) {

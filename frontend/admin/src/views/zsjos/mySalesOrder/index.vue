@@ -1,11 +1,11 @@
 <template>
   <WorkbenchListPage
-    :title="isTeam ? '团队订单' : '我的订单'"
-    :endpoint="isTeam ? '/zsjos/sales-order/team-page' : '/zsjos/sales-order/my-page'"
-    :description="isTeam ? '当前部门及下属部门的成交订单' : '当前用户成交订单'"
+    title="订单管理"
+    endpoint="/zsjos/sales-order/management-page"
+    description="按当前用户数据权限可见的成交订单"
     :query="queryParams"
     advanced-scene="order"
-    :advanced-search-endpoint="isTeam ? '/zsjos/sales-order/team-search-page' : '/zsjos/sales-order/my-search-page'"
+    advanced-search-endpoint="/zsjos/sales-order/management-search-page"
     advanced-placeholder="订单号 / 学员姓名 / 手机号"
   >
     <template #actions="{ reload }">
@@ -49,14 +49,14 @@
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
       <el-button
-        v-if="!isTeam && detail?.canRevise"
+        v-if="detail?.canRevise"
         v-hasPermi="['zsjos:sales-order:create']"
         type="primary"
         @click="openRevision"
         >补正并重新提交</el-button
       >
       <el-button
-        v-if="!isTeam && detail?.canTerminate"
+        v-if="detail?.canTerminate"
         v-hasPermi="['zsjos:sales-order:create']"
         type="danger"
         @click="terminateOpen = true"
@@ -128,7 +128,6 @@ import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 
 const message = useMessage()
-const isTeam = window.location.pathname.includes('/sales-orders/team')
 const queryParams = reactive({ keyword: '', status: '' })
 const resetQuery = (reload: () => void) => {
   queryParams.keyword = ''
@@ -152,7 +151,7 @@ const loadDetail = async () => {
   detailLoading.value = true
   detailError.value = ''
   try {
-    detail.value = await (isTeam ? Api.getTeamSalesOrder(selectedId.value) : Api.getMySalesOrder(selectedId.value))
+    detail.value = await Api.getManagementSalesOrder(selectedId.value)
   } catch (error: any) {
     detail.value = undefined
     detailError.value = error?.msg || error?.message || '订单详情加载失败'

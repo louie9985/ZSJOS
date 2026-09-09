@@ -37,8 +37,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 17 | 首页 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
-| 21 | 我的订单 | `/zsjos/sales-orders/my` | `MySalesOrderPage` | `zsjos/mySalesOrder/index` |
-| 21.1 | 团队订单 | `/zsjos/sales-orders/team` | `MySalesOrderPage(team)` | `zsjos/mySalesOrder/index` |
+| 21 | 订单管理 | `/zsjos/sales-orders` | `MySalesOrderPage` | `zsjos/mySalesOrder/index` |
 | 22 | 成交订单审批 | `/zsjos/sales-order-approvals` | `SalesOrderApprovalPage` | `zsjos/salesOrderApproval/index` |
 | 23 | 历史客户复购 | `/zsjos/orders/external-repurchase` | `ExternalRepurchasePage` | `zsjos/externalRepurchase/index` |
 | 24 | 导出任务 | `/zsjos/export-task` | `ExportTaskPage` | `zsjos/exportTask/index` |
@@ -55,9 +54,9 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 35 | 未读消息 | `/messages/unread` | `MessageInboxPage(view=unread)` | `system/notify/my/unread/index` |
 | 36 | 报名履约公共池 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
-| 38 | 我的学员（隐藏深链） | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
-| 38.1 | 班级管理 | `/zsjos/class-management` | `DeliveryClassPage(manage)` | `zsjos/class-management` |
-| 38.2 | 我的班级 | `/zsjos/my-classes` | `DeliveryClassPage` | `zsjos/my-classes` |
+| 38 | 学员管理（隐藏深链） | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
+| 38.1 | 班级管理 | `/zsjos/class-management` | `DeliveryClassPage`（按服务端权限选择数据范围） | `zsjos/class-management` |
+| 38.2 | 班级管理（兼容旧路径） | `/zsjos/my-classes` | `DeliveryClassPage`（按服务端权限选择数据范围） | `zsjos/my-classes` |
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
 | 40 | 采访表单配置 | `/zsjos/director-config/interview-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
 | 40.1 | 定位卡模板配置 | `/zsjos/director-config/positioning-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
@@ -93,7 +92,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 
 - 申诉正式路径仅为 `/zsjos/appeals`，不提供 `/zsjos/leads/appeals` 兼容跳转。
 - 公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
-- 团队订单正式路径为 `/zsjos/sales-orders/team`，只消费服务端 `zsjos:sales-order:query-team`
+- 订单管理正式路径为 `/zsjos/sales-orders`，消费服务端 `zsjos:sales-order:query-management` 并按 System 数据权限过滤订单。
   页面授权；详情使用只读 `team` 模式，不投影修改、终止或审批操作。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。
 - `/zsjos/feedback` 由服务端相对子路径 `feedback` 解析，要求页面权限 `zsjos:feedback:query`；创建、查看、回复和满意度入口分别消费独立按钮权限。通知深链使用 `feedbackId`，详情仍由服务端校验本人数据范围。

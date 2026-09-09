@@ -20,4 +20,15 @@ class SalesOrderControllerTeamPermissionTest {
             assertTrue(authorization.value().contains("zsjos:sales-order:query-team"), name);
         }
     }
+
+    @Test
+    void managementEndpointsUseManagementPermission() {
+        for (String name : new String[]{"getManagementPage", "searchManagementPage", "getManagementCursor",
+                "searchManagementCursor", "getManagementStatusCounts", "getManagementOrder"}) {
+            Method method = Arrays.stream(SalesOrderController.class.getDeclaredMethods())
+                    .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+            PreAuthorize authorization = method.getAnnotation(PreAuthorize.class);
+            assertTrue(authorization.value().contains("zsjos:sales-order:query-management"), name);
+        }
+    }
 }

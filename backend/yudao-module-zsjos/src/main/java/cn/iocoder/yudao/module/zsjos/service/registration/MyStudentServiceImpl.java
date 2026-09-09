@@ -51,6 +51,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         Map<Long, List<ServiceRelationDO>> groups = relationMapper
                 .selectAssignedByUserAndPersonIds(userId, personIds, reqVO.getServiceStatus()).stream()
+                .filter(relation -> reqVO.getClassId() == null || Objects.equals(relation.getClassId(), reqVO.getClassId()))
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         return new PageResult<>(people.getList().stream().map(person -> convert(userId, person.getId(), groups.get(person.getId())))
                 .toList(), people.getTotal());

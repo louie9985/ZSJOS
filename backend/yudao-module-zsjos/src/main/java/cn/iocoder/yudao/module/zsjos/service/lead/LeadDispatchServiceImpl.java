@@ -73,6 +73,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             lead.setCurrentAssignmentHistoryId(history.getId());
             lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                     lead.getId(), submitterUserId, history.getId(), now, EVENT_LEAD_ACCEPTED, ASSIGNMENT_UNASSIGNED));
+            if (STATUS_SUBMITTED.equals(lead.getStatus())) {
+                lifecycleTaskService.createQualificationTask(lead, submitterUserId, now);
+            }
             leadMapper.updateById(lead); return;
         }
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
@@ -215,6 +218,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.completeAssignmentTask(leadId, userId, acceptedAt);
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, userId, history.getId(), acceptedAt, EVENT_LEAD_ACCEPTED, ASSIGNMENT_PENDING));
+        lifecycleTaskService.createQualificationTask(lead, userId, acceptedAt);
         leadMapper.updateById(lead);
         notifySales(userId, leadId, "accepted");
         releaseReservation(leadId, userId);
@@ -272,6 +276,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         leadMapper.updateById(lead);
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, userId, history.getId(), claimedAt, EVENT_LEAD_CLAIMED, ASSIGNMENT_PUBLIC_POOL));
+        lifecycleTaskService.createQualificationTask(lead, userId, claimedAt);
         leadMapper.updateById(lead);
     }
 
@@ -394,6 +399,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         }
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, salesUserId, history.getId(), transferredAt, EVENT_LEAD_TRANSFERRED, fromAssignmentStatus));
+        if (STATUS_SUBMITTED.equals(lead.getStatus())) {
+            lifecycleTaskService.createQualificationTask(lead, salesUserId, transferredAt);
+        }
         leadMapper.updateById(lead);
         releaseReservation(leadId, pendingAssigneeUserId);
         if (pendingAssigneeUserId != null) {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   getAuthenticatedLandingPath,
+  resolveAuthenticatedRouteNavigation,
   resolveAuthenticatedRouteTarget
 } from '../src/utils/authenticatedLanding.ts'
 
@@ -62,18 +63,26 @@ test('skips external URLs supported by the shared router URL matcher', () => {
 })
 
 test('resolves default landing for root paths while preserving explicit deep links', () => {
-  const options = { defaultLandingPath: '/zsjos/tasks/today' }
+  const options = { currentFullPath: '/', defaultLandingPath: '/zsjos/tasks/today' }
   assert.equal(
     resolveAuthenticatedRouteTarget({ currentPath: '/', ...options }),
     options.defaultLandingPath
   )
   assert.equal(
-    resolveAuthenticatedRouteTarget({ currentPath: '/index', ...options }),
+    resolveAuthenticatedRouteTarget({
+      currentPath: '/index',
+      ...options,
+      currentFullPath: '/index'
+    }),
     options.defaultLandingPath
   )
   assert.equal(
-    resolveAuthenticatedRouteTarget({ currentPath: '/system/user', ...options }),
-    '/system/user'
+    resolveAuthenticatedRouteTarget({
+      currentPath: '/system/user',
+      ...options,
+      currentFullPath: '/system/user?page=2#profile'
+    }),
+    '/system/user?page=2#profile'
   )
   assert.equal(
     resolveAuthenticatedRouteTarget({
@@ -89,23 +98,35 @@ test('resolves default landing for root paths while preserving explicit deep lin
   )
   assert.equal(
     resolveAuthenticatedRouteTarget({
-      currentPath: '/zsjos/tasks/today',
-      currentPathAuthorized: false,
-      ...options
-    }),
-    options.defaultLandingPath
-  )
-  assert.equal(
-    resolveAuthenticatedRouteTarget({
       currentPath: '/',
-      explicitRedirect: '/zsjos/tasks/today',
-      explicitRedirectAuthorized: false,
-      ...options
+      currentFullPath: '/',
+      defaultLandingPath: '/403'
     }),
-    options.defaultLandingPath
+    '/403'
+  )
+})
+
+test('requests navigation after route registration or when the target changes', () => {
+  const options = {
+    currentPath: '/system/user',
+    currentFullPath: '/system/user?page=2#profile',
+    defaultLandingPath: '/zsjos/tasks/today'
+  }
+  assert.equal(
+    resolveAuthenticatedRouteNavigation({ ...options, routesJustAdded: true }),
+    options.currentFullPath
   )
   assert.equal(
-    resolveAuthenticatedRouteTarget({ currentPath: '/', defaultLandingPath: '/403' }),
-    '/403'
+    resolveAuthenticatedRouteNavigation({ ...options, routesJustAdded: false }),
+    undefined
+  )
+  assert.equal(
+    resolveAuthenticatedRouteNavigation({
+      ...options,
+      currentPath: '/',
+      currentFullPath: '/',
+      routesJustAdded: false
+    }),
+    options.defaultLandingPath
   )
 })

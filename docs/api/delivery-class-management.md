@@ -7,7 +7,7 @@
 
 - `GET /zsjos/delivery-class/page`：按当前用户部门 DataPermission 分页查询管理范围；租户级
   `PENDING` 系统班级作为待分班入口一并返回。
-- `GET /zsjos/delivery-class/my-page`：只返回当前用户担任班主任的正式班。
+- `GET /zsjos/delivery-class/my-page`：只返回当前用户担任班主任的正式班。Workbench 班级管理将该响应按服务端分页加载为卡片；卡片只展示班级摘要和人数，不展示班内学员。
 - `GET /zsjos/delivery-class/{id}`、`GET /zsjos/delivery-class/{id}/students`：读取班级及课程
   服务分页；调用方必须传递并消费 `pageNo`、`pageSize` 和响应 `total`，不得截断为固定前 50 条。
   学员行以 `serviceRelationId` 为操作边界，并返回订单商品所属 `categoryId`，使待分班服务也能
@@ -23,6 +23,8 @@
   `roughEndDate`，结束日期次日起不可选。
 - `POST /zsjos/delivery-class/create`、`PUT /zsjos/delivery-class/{id}`、
   `POST /zsjos/delivery-class/{id}/complete`：创建、编辑和手动结课。
+
+班级响应同时返回考期 `scheduleType` 与 `exactDate` 展示字段。`ROUGH` 班级由前端持续显示“未设置精确考期”警示；精确考期仍只能通过已有班级编辑权限选择考期管理中匹配的已发布精确考期。
 
 正式班编号为 `BJyyyyMMddHHmmss####`，由服务生成并依赖租户级唯一约束及冲突重试。
 班级保存产品、规格条件、所选 SKU、产品分类完整路径、考期、班主任和创建时部门名称快照。

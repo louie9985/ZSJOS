@@ -43,6 +43,7 @@ import {
   type RegistrationChecklistConfig,
   type RegistrationRoute,
   type DeliveryClassOption,
+  type DeliveryClass,
   type SimpleDept,
   type StudyPlanner,
 } from "../services/api";
@@ -52,6 +53,7 @@ import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import type { AdvancedFilterGroup } from "../services/api";
 import { DICT_TYPE } from "../constants";
 import { dictionaryDisplayLabel } from "../services/leadManagement";
+import { applyFollowUpTimeShortcut, FOLLOW_UP_TIME_SHORTCUTS } from "../services/leadFollowUp";
 import RegistrationAttachmentPreview from "../components/RegistrationAttachmentPreview";
 
 const PAGE_SIZE = 20;
@@ -667,9 +669,10 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 
 export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
   const location = useLocation();
-  const taskTarget = location.state as { personId?: number; serviceRelationId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
+  const taskTarget = location.state as { personId?: number; serviceRelationId?: number; classId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedPersonId = Number(taskTarget?.personId) || undefined;
   const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
+  const requestedClassId = Number(taskTarget?.classId) || undefined;
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
@@ -683,6 +686,11 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   const [channelError, setChannelError] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [serviceStatus, setServiceStatus] = useState<'active' | 'paused' | 'completed'>();
+  const [classId, setClassId] = useState<number | undefined>(requestedClassId);
+  const [classOptions, setClassOptions] = useState<DeliveryClass[]>([]);
+  const [classOptionsLoading, setClassOptionsLoading] = useState(false);
+  const [classOptionsError, setClassOptionsError] = useState('');
+  const classOptionsGeneration = useRef(0);
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [pageNo, setPageNo] = useState(1),
     [total, setTotal] = useState(0);
@@ -733,6 +741,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   }, [selectedServiceId]);
   const targetNavigationKey = location.key;
   useEffect(() => {
+    setClassId(requestedClassId);
     const targetKey = requestedPersonId ? `person:${requestedPersonId}`
       : requestedServiceId ? `service:${requestedServiceId}` : "";
     if (!targetKey) return;
@@ -744,7 +753,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       setSelectedServiceId(requestedServiceId);
       return loadStudent(student.personId, requestedServiceId);
     }).catch(requestError => setDetailError(errorMessage(requestError)));
-  }, [loadStudent, requestedPersonId, requestedServiceId, targetNavigationKey]);
+  }, [loadStudent, requestedClassId, requestedPersonId, requestedServiceId, targetNavigationKey]);
   const loadDictionaries = useCallback(async () => {
     const generation = ++dictionaryGeneration.current;
     const [categoryResult, channelResult] = await Promise.allSettled([
@@ -758,9 +767,24 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
     else setChannelError(true);
   }, []);
   useEffect(() => { void loadDictionaries(); }, [loadDictionaries]);
+  const loadClassOptions = useCallback(async (search?: string) => {
+    const generation = ++classOptionsGeneration.current;
+    setClassOptionsLoading(true); setClassOptionsError('');
+    const manage = hasPermission(permissions, 'zsjos:delivery-class:query-managed');
+    try {
+      const [serving, completed] = await Promise.all([
+        api.deliveryClasses.page({ pageNo: 1, pageSize: 50, status: 'SERVING', keyword: search || undefined }, manage),
+        api.deliveryClasses.page({ pageNo: 1, pageSize: 50, status: 'COMPLETED', keyword: search || undefined }, manage),
+      ]);
+      if (generation === classOptionsGeneration.current) setClassOptions([...serving.list, ...completed.list]);
+    } catch (requestError) {
+      if (generation === classOptionsGeneration.current) { setClassOptions([]); setClassOptionsError(errorMessage(requestError)); }
+    } finally { if (generation === classOptionsGeneration.current) setClassOptionsLoading(false); }
+  }, [permissions]);
+  useEffect(() => { void loadClassOptions(); }, [loadClassOptions]);
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
-      const baseRequestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${JSON.stringify(advancedFilter)}`;
+      const baseRequestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
       const requestKey = options.force
         ? `${baseRequestKey}:force:${++forcedListSequence.current}`
@@ -775,6 +799,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
           pageSize: PAGE_SIZE,
           keyword: keyword || undefined,
           serviceStatus,
+          classId,
           advancedFilter,
         });
         if (generation !== listGeneration.current) return;
@@ -795,11 +820,11 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, keyword, serviceStatus]);
+  }, [advancedFilter, classId, keyword, serviceStatus]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
   const refreshCurrentStudent = useCallback(async () => {
     if (!selected) {
@@ -847,6 +872,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       student={selected}
       service={selectedService}
       context={studentContactContext}
+      permissions={permissions}
       openTaskId={taskTarget?.openContactTask ? taskTarget.taskId : undefined}
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
@@ -919,16 +945,21 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
     <section className="workspace-page registration-page">
       <header className="registration-filter-shell">
         <div>
-          <Typography.Title level={4}>我的学员</Typography.Title>
+          <Typography.Title level={4}>学员管理</Typography.Title>
           <Typography.Text type="secondary">
             查看当前负责的学员及课程权益
           </Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
+      {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
+            <Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} optionFilterProp="label" value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: '100%', marginBottom: 8 }}
+              onChange={value => { resetSelection(); setPageNo(1); setClassId(value); }}
+              options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}
+              notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />
             <Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: '100%', marginBottom: 8 }}
               onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value); }}
               options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
@@ -1079,17 +1110,18 @@ function StudentContactForm({
     {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => { const current = String(form.getFieldValue("remark") || "").trimEnd(); form.setFieldValue("remark", current ? `${current}\n${note}` : note); }}>{note}</Button>)}</Space></Form.Item>}
     <Form.Item name="remark" label="备注" rules={[{ required: true }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item>
     <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
-    <Space wrap className="student-contact-time-shortcuts">{[1, 2, 3, 5, 7, 14, 30].map(days => <Button key={days} size="small" onClick={() => form.setFieldValue("nextContactAt", dayjs().add(days, "day"))}>+{days} 天</Button>)}</Space>
+    <Space wrap className="student-contact-time-shortcuts">{FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => <Button key={shortcut.key} size="small" onClick={() => form.setFieldValue("nextContactAt", applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>)}</Space>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const successful = getFieldValue("successful") === true; const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact"; const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0; const extended = Boolean(value && timeout && new Date(String(value)).getTime() > Date.now() + timeout * 60000); return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
     <Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>添加附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space>
     <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首联" : taskType === "student_study_plan" ? "学习计划" : "普通跟进"}</Button></Space>
   </Form>;
 }
 
-function StudentPlannerOperations({ student, service, context, openTaskId, openTaskType, onRefresh, children }: {
+function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, children }: {
   student: MyStudent;
   service: MyStudent["services"][number];
   context: import("../services/api").StudentContactContext;
+  permissions: string[];
   openTaskId?: number;
   openTaskType?: string;
   onRefresh: () => Promise<void>;
@@ -1112,6 +1144,11 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
   const [examDateForm] = Form.useForm();
   const [examDateOpen, setExamDateOpen] = useState(false);
   const [examDateSaving, setExamDateSaving] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferTargets, setTransferTargets] = useState<DeliveryClass[]>([]);
+  const [transferTargetId, setTransferTargetId] = useState<number>();
+  const [transferReason, setTransferReason] = useState("");
   const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
   const available = context.availableActions || [];
   const stageAction = available.find(action => ["FIRST_CONTACT", "STUDY_PLAN", "FOLLOW_UP"].includes(action));
@@ -1207,6 +1244,26 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     } catch (error) { message.error(errorMessage(error)); }
     finally { setExamDateSaving(false); }
   };
+  const openTransfer = async () => {
+    setTransferOpen(true); setTransferReason(""); setTransferTargetId(undefined);
+    try {
+      const manage = hasPermission(permissions, "zsjos:delivery-class:query-managed");
+      const page = await api.deliveryClasses.page({ pageNo: 1, pageSize: 100, status: "SERVING" }, manage);
+      setTransferTargets(page.list.filter(row => !row.systemClass));
+    } catch (error) { message.error(errorMessage(error)); setTransferTargets([]); }
+  };
+  const submitTransfer = async () => {
+    if (!transferTargetId || !transferReason.trim()) { message.warning("请选择目标班级并填写调班原因"); return; }
+    setTransferSaving(true);
+    try {
+      const payload = { targetClassId: transferTargetId, version: service.version || context.version, reason: transferReason.trim() };
+      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer")) await api.deliveryClasses.directTransfer(service.serviceRelationId, payload);
+      else await api.deliveryClasses.requestTransfer(service.serviceRelationId, payload);
+      message.success(hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "已完成调班" : "调班申请已提交");
+      setTransferOpen(false); await onRefresh();
+    } catch (error) { message.error(errorMessage(error)); }
+    finally { setTransferSaving(false); }
+  };
   const submitDeliveryStage = async (values: { remark: string; data: string }) => {
     if (!currentDeliveryStage) return;
     let parsed: Record<string, unknown> = {};
@@ -1245,6 +1302,8 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
     available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
     available.includes("UPDATE_EXAM_DATE") && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? dayjs(context.examDate) : undefined }); setExamDateOpen(true); } },
+    (hasPermission(permissions, "zsjos:delivery-class:direct-transfer") || hasPermission(permissions, "zsjos:class-transfer:create"))
+      && { key: "student-class-transfer", icon: <EditOutlined />, label: "调班", onClick: () => void openTransfer() },
     available.includes("EXAM_NOTICE_DONE") && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
     available.includes("POST_EXAM_DONE") && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
     (available.includes("COMPLETE_STAGE") || available.includes("END_SERVICE")) && currentDeliveryStage
@@ -1279,6 +1338,9 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
       <Form form={examDateForm} layout="vertical" onFinish={saveExamDate}>
         <Form.Item name="examDate" label="考试时间" rules={[{ required: true, message: "请选择考试日期" }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
       </Form>
+    </Modal>
+    <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okText={hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
+      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
     </Modal>
     <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>

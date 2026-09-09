@@ -582,6 +582,7 @@ otherwise
 - V078 将 V007 的两个固定入口收拢为单一“客资管理”页面，原权限节点保留为隐藏范围能力；不根据角色名、岗位名或前端标签推断数据范围。
 - V121 退役独立“异常客资”页面菜单；挂起与回收待处理客资仍通过统一“客资管理”读取，恢复、转派、回收、释放动作由详情 `availableActions` 返回并在 `lead-action-toolbar` 中展示。后端异常处置 API 与权限标识保留。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
+- V193 将“我的订单”和“团队订单”合并为“订单管理”。统一查询使用 `zsjos:sales-order:query-management`，订单提交人集合由 System 数据权限（本人、部门、部门及下属、指定部门或全部）动态解析，多角色范围取并集；旧菜单、角色授权和订单筛选模板迁移后逻辑删除，订单业务记录不改写。
 
 ### Qualification exception authorization
 
@@ -589,7 +590,7 @@ otherwise
 - 异常队列查询、异常处置和全租户处置分别使用 `zsjos:lead:qualification:query`、`zsjos:lead:qualification:manage`、`zsjos:lead:qualification:manage-all`，不得从角色、岗位或显示名称推断。
 - 无效判定附件上传使用 `zsjos:lead:qualify` 专用接口；上传只产生当前用户的临时文件引用，最终仍由判无效命令校验文件归属并在客资行锁事务中固化证据快照。申诉附件接口继续使用申诉权限，不与判定权限互相替代。
 - 普通主管的对象范围来自系统部门负责人关系：必须负责原销售所在部门或其上级部门；转派候选仅包含本人管理部门及子部门内的启用销售专员。
-- 回收清除 `owner_user_id` 后，以 `recycle_source_owner_user_id` 继续执行主管对象范围校验。全租户处置权限只放宽当前租户内部门范围，不绕过租户隔离。
+- 回收清除 `owner_user_id` 后，仅在 `assignment_status=recycle_pending` 时以 `recycle_source_owner_user_id` 继续执行主管对象范围校验。进入 `public_pool` 后 `owner_user_id` 与 `recycle_source_owner_user_id` 均必须为空，原归属只保留在分配历史和业务事件中，客资不得再通过历史负责人进入原销售的客资管理列表。全租户处置权限只放宽当前租户内部门范围，不绕过租户隔离。
 - 判定、超时扫描和主管处置都在租户条件下锁定客资。超时扫描实际提交前允许人工判定；任一事务先提交后，后续事务按新的持久化状态拒绝冲突操作。
 
 ### Claim-pool visibility and actions
@@ -753,7 +754,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - V188 后新报名固定使用 `class_per_item`，按每个订单商品保存班级选择；正式班班主任成为该课程
   服务的 owner，明确选择租户待分班时 owner 为空。旧 `legacy_planner` 路线只为历史报名兼容，
   不再成为新报名完成条件。存量服务关系只补充真实租户待分班 `classId`，原 owner 保留。
-- 班级管理列表累积校验 `query-managed` 与部门 DataPermission；本人班级列表只按当前班主任关系。
+- 班级管理统一页面按权限调用管理范围或本人班级列表：`query-managed` 累积部门 DataPermission，本人范围只按当前班主任关系。页面卡片点击进入学员管理时，`classId` 仅作为原有学员可见范围内的查询条件，不扩大对象权限。
   单班读取、更新、结课继续经过 `delivery-class` 对象权限。待分班是主管可读的租户系统对象，
   不可编辑或结课；主管直调另需 `direct-transfer`，不能由查询权限隐式获得。
 - 班主任变化、主管直调和 BPM 调班共用服务归属迁移边界：原子更新课程服务 owner 与未完成业务

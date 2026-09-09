@@ -96,12 +96,12 @@ in-app message and the standard post-commit WebSocket hint for that director.
 
 ## My Students
 
-- `GET /zsjos/student/my-page`
+- `GET /zsjos/student/my-page`（可选 `classId`）
 - `POST /zsjos/student/my/search-page`
 - `GET /zsjos/student/my/{personId}`
 - `GET /zsjos/student/my/by-service/{relationId}`
 
-“我的学员”响应按 Person 聚合，Person 与当前 `serviceRelationId` 共同构成详情主体。`services` 中每一项仅在该服务真实订单关联 Lead 时返回 `leadId`（内部技术链接）和 `leadNo`（用户可见业务编号）；复购等合法服务可以没有 Lead。Workbench 的统一学员详情在无 Lead 时仍展示 Person 档案、成交课程、联系上下文和获准标签/动作，并用 `personNo` 标识学员；不得伪造 Lead、借用同 Person 下其他服务的 Lead，或降级为缺少业务操作的简化详情。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。真实 Lead 存在时，订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。接收、首联、学习计划、普通跟进、交付阶段、基础信息修改、协作者分配和复购录入成功后，Workbench 必须强制刷新列表投影并独立重载当前 Person 的当前 `serviceRelationId`；详情刷新不得依赖列表请求去重或当前分页命中，且刷新后必须保持当前课程服务选中。
+“我的学员”响应按 Person 聚合，支持可选 `classId` 在原有用户可见范围内叠加班级服务关系筛选；筛选后 `services` 仅返回当前班级的可见服务关系。Person 与当前 `serviceRelationId` 共同构成详情主体。`services` 中每一项仅在该服务真实订单关联 Lead 时返回 `leadId`（内部技术链接）和 `leadNo`（用户可见业务编号）；复购等合法服务可以没有 Lead。Workbench 的统一学员详情在无 Lead 时仍展示 Person 档案、成交课程、联系上下文和获准标签/动作，并用 `personNo` 标识学员；不得伪造 Lead、借用同 Person 下其他服务的 Lead，或降级为缺少业务操作的简化详情。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。真实 Lead 存在时，订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。接收、首联、学习计划、普通跟进、交付阶段、基础信息修改、协作者分配和复购录入成功后，Workbench 必须强制刷新列表投影并独立重载当前 Person 的当前 `serviceRelationId`；详情刷新不得依赖列表请求去重或当前分页命中，且刷新后必须保持当前课程服务选中。
 
 Results are read-only, grouped by Person, scoped to active service relationships directly owned by or
 routed to the current user, and aggregate order/course services without exposing sales actions. Both

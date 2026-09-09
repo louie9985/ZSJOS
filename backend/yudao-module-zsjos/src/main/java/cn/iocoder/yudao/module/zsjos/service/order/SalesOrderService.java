@@ -16,6 +16,10 @@ public interface SalesOrderService {
     Long reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
     SalesOrderRespVO get(Long orderId, Long userId);
     SalesOrderRespVO getOwn(Long orderId, Long userId);
+    SalesOrderRespVO getManagement(Long orderId, Long userId);
+    PageResult<SalesOrderListItemRespVO> getManagementPage(SalesOrderMyPageReqVO reqVO, Long userId);
+    CursorPageResult<SalesOrderListItemRespVO> getManagementCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId);
+    SalesOrderStatusCountsRespVO getManagementStatusCounts(Long userId);
     PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId);
     CursorPageResult<SalesOrderListItemRespVO> getMyCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId);
     PageResult<SalesOrderListItemRespVO> getTeamPage(SalesOrderTeamPageReqVO reqVO, Long userId);

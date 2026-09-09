@@ -520,6 +520,8 @@ export type AssignmentLog = {
   createTime: Timestamp;
 };
 export type PageResult<T> = { list: T[]; total: number };
+export type CourseCalendarEvent = { id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
+export type CourseCalendarInput = { courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] };
 export type ExamScheduleType = 'EXACT' | 'ROUGH';
 export type ExamScheduleRecordStatus = 'DRAFT' | 'PUBLISHED' | 'REVOKED';
 export type ExamScheduleDisplayStatus = ExamScheduleRecordStatus | 'UPCOMING' | 'IN_PROGRESS' | 'ENDED';
@@ -3079,7 +3081,7 @@ export const api = {
     candidates: async () => unwrap<HomeroomCandidate[]>(await http.get('/zsjos/delivery-class/homeroom-candidates')),
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
-    exams: async (categoryId: number, productId?: number) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId } })),
+      exams: async (categoryId: number, productId?: number, selectedAttrs?: Record<string, string>) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}) } })),
     create: async (data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
     update: async (id: number, data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
@@ -3228,6 +3230,13 @@ export const api = {
       unwrap<number>(await http.post("/eam/workbench/repair", data)),
   },
   areaTree: async () => unwrap<AreaNode[]>(await http.get("/system/area/tree")),
+  courseCalendar: {
+    page: async (params: { rangeStart: string; rangeEnd: string }) => unwrap<CourseCalendarEvent[]>(await http.get('/zsjos/course-calendar/page', { params })),
+    get: async (id: number) => unwrap<CourseCalendarEvent>(await http.get(`/zsjos/course-calendar/${id}`)),
+    create: async (data: CourseCalendarInput) => unwrap<number>(await http.post('/zsjos/course-calendar', data)),
+    update: async (id: number, data: CourseCalendarInput) => unwrap<boolean>(await http.put(`/zsjos/course-calendar/${id}`, data)),
+    delete: async (id: number) => unwrap<boolean>(await http.delete(`/zsjos/course-calendar/${id}`)),
+  },
   leadCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/lead/product/catalog")),
   uploadLeadAttachment: async (file: File) => {
@@ -4329,6 +4338,8 @@ export const api = {
     ),
   salesOrder: async (orderId: number) =>
     unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
+  managementSalesOrder: async (orderId: number) =>
+    unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/management/${orderId}`)),
   mySalesOrder: async (orderId: number) =>
     unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
   mySalesOrderPage: async (params: {
@@ -4363,6 +4374,13 @@ export const api = {
     unwrap<SalesOrderStatusCounts>(
       await http.get("/zsjos/sales-order/my-status-counts"),
     ),
+  managementSalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+    ? unwrap<PageResult<SalesOrderListItem>>(await http.post("/zsjos/sales-order/management-search-page", params))
+    : unwrap<PageResult<SalesOrderListItem>>(await http.get("/zsjos/sales-order/management-page", { params })),
+  managementSalesOrderCursor: async (params: { cursor?: string; limit?: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+    ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post("/zsjos/sales-order/management-search-cursor", params))
+    : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get("/zsjos/sales-order/management-cursor", { params })),
+  managementSalesOrderStatusCounts: async () => unwrap<SalesOrderStatusCounts>(await http.get("/zsjos/sales-order/management-status-counts")),
   teamSalesOrderPage: async (params: {
     pageNo: number;
     pageSize: number;
@@ -5325,6 +5343,7 @@ export const api = {
     pageSize: number;
     keyword?: string;
     serviceStatus?: "active" | "paused" | "completed";
+    classId?: number;
     advancedFilter?: AdvancedFilterGroup;
   }) =>
     params.advancedFilter

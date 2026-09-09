@@ -181,6 +181,10 @@ class LeadQualificationServiceImplTest {
         timeoutOrder.verify(taskReminderService).emitDueForTask(eq(88L), any(LocalDateTime.class));
         timeoutOrder.verify(lifecycleTaskService).cancelQualificationTask(eq(1L), eq(2),
                 any(LocalDateTime.class), anyString());
+        timeoutOrder.verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(1L), any(LocalDateTime.class),
+                eq("有效性判定超时自动挂起"));
+        timeoutOrder.verify(lifecycleTaskService).cancelFollowUpReminders(eq(1L), any(LocalDateTime.class),
+                eq("有效性判定超时自动挂起"));
         verifyNoInteractions(notifyEventPublisher);
     }
 
@@ -260,7 +264,22 @@ class LeadQualificationServiceImplTest {
                 () -> assertNotNull(suspended.getLastActivityAt()),
                 () -> assertNotNull(recycled.getLastActivityAt()),
                 () -> assertNotNull(ownedForRecycle.getLastActivityAt()),
-                () -> assertNotNull(ownedForRelease.getLastActivityAt()));
+                () -> assertNotNull(ownedForRelease.getLastActivityAt()),
+                () -> assertNull(suspended.getOwnerUserId()),
+                () -> assertNull(recycled.getOwnerUserId()),
+                () -> assertNull(ownedForRecycle.getOwnerUserId()),
+                () -> assertNull(ownedForRelease.getOwnerUserId()),
+                () -> assertEquals("public_pool", recycled.getAssignmentStatus()),
+                () -> assertEquals("public_pool", ownedForRelease.getAssignmentStatus()),
+                () -> assertNull(recycled.getRecycleSourceOwnerUserId()),
+                () -> assertNull(ownedForRelease.getRecycleSourceOwnerUserId()),
+                () -> assertEquals(20L, ownedForRecycle.getRecycleSourceOwnerUserId()),
+                () -> assertNull(ownedForRelease.getQualificationDeadlineAt()));
+        verify(leadMapper).updateAfterOwnershipCleared(suspended);
+        verify(leadMapper).updateAfterOwnershipCleared(recycled);
+        verify(leadMapper).updateAfterOwnershipCleared(ownedForRecycle);
+        verify(leadMapper).updateAfterOwnershipCleared(ownedForRelease);
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
     }
 
     @Test

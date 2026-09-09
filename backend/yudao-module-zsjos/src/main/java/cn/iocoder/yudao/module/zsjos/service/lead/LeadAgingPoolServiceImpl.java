@@ -361,65 +361,6 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         return emitted;
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int processPreQualificationNoProgress(LocalDateTime now) {
-        LeadFollowUpRuleDO rule = ruleService.requireEnabledRule();
-        LocalDateTime warningCutoff = now.minusDays(rule.getNoProgressWarningDays());
-        int changed = 0;
-        for (LeadDO snapshot : leadMapper.selectPreQualificationNoProgressCandidates(warningCutoff)) {
-            LeadDO lead = leadMapper.selectByIdForUpdate(snapshot.getId(), TenantContextHolder.getRequiredTenantId());
-            if (lead == null || !STATUS_SUBMITTED.equals(lead.getStatus())
-                    || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) continue;
-            LocalDateTime progressAt = lead.getLastFollowUpAt() == null
-                    ? lead.getOwnershipStartedAt() : lead.getLastFollowUpAt();
-            if (progressAt == null || progressAt.plusDays(rule.getNoProgressWarningDays()).isAfter(now)) continue;
-            if (lead.getNoProgressWarnedAt() == null || lead.getNoProgressWarnedAt().isBefore(progressAt)) {
-                lead.setNoProgressWarnedAt(now);
-                leadMapper.updateById(lead);
-                publishNoProgress(lead, "warning", now);
-                changed++;
-                continue;
-            }
-            if (lead.getNoProgressWarnedAt().plusDays(rule.getNoProgressGraceDays()).isAfter(now)) continue;
-            Long previousOwner = lead.getOwnerUserId();
-            lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
-            lead.setOwnerUserId(null);
-            lead.setPublicPoolAt(now);
-            lead.setOwnershipStartedAt(null);
-            lead.setNoProgressWarnedAt(null);
-            LeadMapper.advanceActivity(lead, now);
-            leadMapper.updateById(lead);
-            lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), now, "无进展宽限期结束释放抢单池");
-            lifecycleTaskService.cancelFollowUpReminders(lead.getId(), now, "无进展宽限期结束释放抢单池");
-            addNoProgressHistory(lead, previousOwner, now);
-            publishNoProgress(lead, previousOwner, "released", now);
-            changed++;
-        }
-        return changed;
-    }
-
-    private void addNoProgressHistory(LeadDO lead, Long previousOwner, LocalDateTime now) {
-        LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
-        history.setLeadId(lead.getId()); history.setActionType(ACTION_PUBLIC_POOL);
-        history.setFromOwnerUserId(previousOwner); history.setOperatorUserId(0L);
-        history.setReason("无进展预警宽限期结束"); history.setOccurredAt(now);
-        assignmentHistoryMapper.insert(history);
-    }
-
-    private void publishNoProgress(LeadDO lead, String stage, LocalDateTime now) {
-        publishNoProgress(lead, lead.getOwnerUserId(), stage, now);
-    }
-    private void publishNoProgress(LeadDO lead, Long ownerUserId, String stage, LocalDateTime now) {
-        Map<String, Object> context = new LinkedHashMap<>();
-        context.put("ownerUserId", ownerUserId);
-        context.put("reminder.stage", "warning".equals(stage) ? "无进展预警" : stage);
-        context.put("assignment.reason", "released".equals(stage) ? "无进展宽限期结束" : "长期无有效进展");
-        notifyPublisher.publish("released".equals(stage) ? PUBLIC_POOL : NEXT_FOLLOW_UP_REMINDER,
-                lead.getId(), "lead-no-progress:" + stage + ":" + lead.getId() + ":" + now,
-                0L, now, context);
-    }
-
     @Override public boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
         if (Objects.equals(formalOwnerUserId, operatorUserId)) return true;
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);

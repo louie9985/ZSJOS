@@ -3,13 +3,11 @@ import { App, Button, DatePicker, Empty, Form, Input, Modal, Select, Space, Spin
 import dayjs from 'dayjs'
 import { api, type DictData, type LeadAttachment, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
-import { appendQuickNote } from '../services/leadFollowUp'
+import { applyFollowUpTimeShortcut, appendQuickNote, FOLLOW_UP_TIME_SHORTCUTS } from '../services/leadFollowUp'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
-
-const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 
 type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
@@ -133,8 +131,8 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
             <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} disabledDate={date => date.endOf('day').isBefore(dayjs())}/>
           </Form.Item>
           <Space wrap className="follow-up-day-shortcuts" style={{ marginBottom: 16 }}>
-            {QUICK_DAYS.map(days => (
-              <Button size="small" key={days} onClick={() => form.setFieldValue('nextFollowUpAt', dayjs().add(days, 'day'))}>+{days} 天</Button>
+            {FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => (
+              <Button size="small" key={shortcut.key} onClick={() => form.setFieldValue('nextFollowUpAt', applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>
             ))}
           </Space>
           <Form.Item label={`跟进图片${images.some(image => image.status === 'uploading') ? '（上传中）' : ''}`}>

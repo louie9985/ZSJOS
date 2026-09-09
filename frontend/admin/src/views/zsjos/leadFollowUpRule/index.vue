@@ -45,14 +45,6 @@
         <el-input-number v-model="formData.agingPoolTimeoutDays" :min="1" :max="3650" :step="1" />
         <span class="unit">自然日</span>
       </el-form-item>
-      <el-form-item label="判定前无进展预警" prop="noProgressWarningDays">
-        <el-input-number v-model="formData.noProgressWarningDays" :min="1" :max="365" :step="1" />
-        <span class="unit">自然日</span>
-      </el-form-item>
-      <el-form-item label="预警宽限期" prop="noProgressGraceDays">
-        <el-input-number v-model="formData.noProgressGraceDays" :min="1" :max="30" :step="1" />
-        <span class="unit">自然日</span>
-      </el-form-item>
       <el-form-item label="消息浮窗时长" prop="notificationPopupDurationMinutes">
         <el-input-number
           v-model="formData.notificationPopupDurationMinutes"
@@ -103,8 +95,6 @@ const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({
   firstFollowUpTimeoutMinutes: 1440,
   qualificationTimeoutMinutes: 4320,
   agingPoolTimeoutDays: 90,
-  noProgressWarningDays: 7,
-  noProgressGraceDays: 2,
   notificationPopupDurationMinutes: 5,
   duplicateAutoResolutionEnabled: false
 })
@@ -121,14 +111,6 @@ const rules: FormRules = {
     { required: true, message: '请输入公海期限', trigger: 'blur' },
     { type: 'number', min: 1, max: 3650, message: '范围为 1–3650 个自然日', trigger: 'change' }
   ],
-  noProgressWarningDays: [
-    { required: true, message: '请输入无进展预警天数', trigger: 'blur' },
-    { type: 'number', min: 1, max: 365, message: '范围为 1–365 个自然日', trigger: 'change' }
-  ],
-  noProgressGraceDays: [
-    { required: true, message: '请输入预警宽限期', trigger: 'blur' },
-    { type: 'number', min: 1, max: 30, message: '范围为 1–30 个自然日', trigger: 'change' }
-  ],
   notificationPopupDurationMinutes: [
     { required: true, message: '请输入消息浮窗时长', trigger: 'blur' },
     { type: 'number', min: 1, max: 30, message: '范围为 1–30 分钟', trigger: 'change' }
@@ -144,8 +126,6 @@ const loadRule = async () => {
     formData.firstFollowUpTimeoutMinutes = rule.firstFollowUpTimeoutMinutes
     formData.qualificationTimeoutMinutes = rule.qualificationTimeoutMinutes
     formData.agingPoolTimeoutDays = rule.agingPoolTimeoutDays
-    formData.noProgressWarningDays = rule.noProgressWarningDays
-    formData.noProgressGraceDays = rule.noProgressGraceDays
     formData.notificationPopupDurationMinutes = rule.notificationPopupDurationMinutes
     formData.duplicateAutoResolutionEnabled = rule.duplicateAutoResolutionEnabled
   } catch (loadError: any) {

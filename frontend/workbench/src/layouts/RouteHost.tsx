@@ -45,6 +45,7 @@ import MediaStudentsPage from '../pages/MediaStudentsPage'
 import MediaCalendarPage from '../pages/MediaCalendarPage'
 import PersonalCalendarPage from '../pages/PersonalCalendarPage'
 import ExamCalendarPage from '../pages/ExamCalendarPage'
+import CourseCalendarPage from '../pages/CourseCalendarPage'
 import EamAssetPage from '../pages/EamAssetPage'
 import FeedbackPage from '../pages/FeedbackPage'
 import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
@@ -76,7 +77,8 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
-  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} manage />
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
@@ -100,8 +102,7 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.BPM_DONE) return <BpmApprovalCenterPage permissions={permissions} initialView="done"/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
-  if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
-  if (menu?.path === APP_ROUTES.TEAM_SALES_ORDERS) return <MySalesOrderPage team/>
+  if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
   if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>
@@ -122,12 +123,13 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} manage />
+  if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
   if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
   if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage permissions={permissions}/>

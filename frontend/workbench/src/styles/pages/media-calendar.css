@@ -401,6 +401,21 @@
   white-space: nowrap;
 }
 
+.personal-calendar-timeline-wrap { max-height: min(70vh, 720px); overflow: auto; }
+.personal-calendar-timeline { display: grid; min-width: 0; grid-template-columns: 56px minmax(0, 1fr); height: 1152px; }
+.personal-calendar-hours { display: grid; grid-template-rows: repeat(24, 1fr); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.personal-calendar-hours > div { padding-top: 2px; border-top: 1px solid var(--crm-border); }
+.personal-calendar-track { position: relative; min-width: 0; border-left: 1px solid var(--crm-border); background: var(--crm-bg-container); }
+.personal-calendar-hour-line { position: absolute; right: 0; left: 0; border-top: 1px solid var(--crm-border); pointer-events: none; }
+.personal-calendar-timeline-event { position: absolute; min-width: 0; padding: 0 2px; }
+.personal-calendar-timeline-card { display: flex; height: 100%; min-width: 0; flex-direction: column; overflow: hidden; padding: var(--crm-sp-1) var(--crm-sp-2); border-left: 3px solid var(--crm-color-primary); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); }
+.personal-calendar-timeline-card strong,
+.personal-calendar-timeline-card span,
+.personal-calendar-timeline-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.personal-calendar-timeline-card span,
+.personal-calendar-timeline-card small { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.personal-calendar-timeline-card .ant-space { margin-top: auto; }
+
 @media (max-width: 768px) {
   .personal-calendar-page .ant-picker-calendar-date-content {
     height: 56px;
@@ -409,4 +424,5 @@
   .personal-calendar-event .ant-space {
     display: none;
   }
+  .personal-calendar-timeline { height: 960px; }
 }

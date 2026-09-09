@@ -279,7 +279,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setOwnerUserId(null);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateById(lead);
+        leadMapper.updateAfterOwnershipCleared(lead);
         addEvent(EVENT_LEAD_RECYCLED, lead, userId, STATUS_SUSPENDED, ASSIGNMENT_RECYCLE_PENDING,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
                         "assignmentHistoryId", history.getId()));
@@ -306,11 +306,11 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
         lead.setOwnerUserId(null);
-        lead.setRecycleSourceOwnerUserId(fromOwner);
+        lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateById(lead);
+        leadMapper.updateAfterOwnershipCleared(lead);
         addEvent(EVENT_LEAD_RELEASED, lead, userId,
                 suspended ? STATUS_SUSPENDED : ASSIGNMENT_RECYCLE_PENDING, ASSIGNMENT_PUBLIC_POOL,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
@@ -342,7 +342,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setOwnerUserId(null);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateById(lead);
+        leadMapper.updateAfterOwnershipCleared(lead);
         addEvent(EVENT_LEAD_RECYCLED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
                         "assignmentHistoryId", history.getId()));
@@ -369,11 +369,11 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 userId, reqVO.getReason(), now);
         lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
         lead.setOwnerUserId(null);
-        lead.setRecycleSourceOwnerUserId(fromOwner);
+        lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateById(lead);
+        leadMapper.updateAfterOwnershipCleared(lead);
         addEvent(EVENT_LEAD_RELEASED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_PUBLIC_POOL,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
                         "assignmentHistoryId", history.getId()));
@@ -401,6 +401,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
             leadMapper.updateById(lead);
             lifecycleTaskService.cancelQualificationTask(lead.getId(), lead.getQualificationRoundNo(), now,
                     "有效性判定超时自动挂起");
+            lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), now, "有效性判定超时自动挂起");
+            lifecycleTaskService.cancelFollowUpReminders(lead.getId(), now, "有效性判定超时自动挂起");
             addEvent(EVENT_LEAD_SUSPENDED, lead, null, STATUS_SUBMITTED, STATUS_SUSPENDED,
                     "有效性判定超时", "lead-suspended:" + lead.getId() + ":" + lead.getQualificationRoundNo(),
                     Map.of("roundNo", lead.getQualificationRoundNo(),
@@ -413,6 +415,12 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     private void requireQualificationPending(LeadDO lead, Long userId) {
         if (!STATUS_SUBMITTED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || lead.getQualificationDeadlineAt() == null || !Objects.equals(userId, lead.getOwnerUserId())) {
+            throw exception(LEAD_QUALIFICATION_STATE_INVALID);
+        }
+        // Fresh ownership requires the first follow-up before qualification; supervisor
+        // restore/transfer rounds intentionally enter qualification directly.
+        if (lead.getCurrentAssignmentFirstFollowUpDeadlineAt() != null
+                && lead.getCurrentAssignmentFirstFollowUpAt() == null) {
             throw exception(LEAD_QUALIFICATION_STATE_INVALID);
         }
     }

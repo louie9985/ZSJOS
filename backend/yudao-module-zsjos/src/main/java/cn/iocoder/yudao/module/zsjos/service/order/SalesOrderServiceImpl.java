@@ -364,6 +364,78 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "read-management")
+    public SalesOrderRespVO getManagement(Long orderId, Long userId) {
+        SalesOrderDO order = orderMapper.selectById(orderId);
+        if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
+        if (!permissionService.canReadManagement(order, userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
+    }
+
+    @Override
+    public PageResult<SalesOrderListItemRespVO> getManagementPage(SalesOrderMyPageReqVO reqVO, Long userId) {
+        SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
+        if (scope.isEmpty()) return PageResult.empty();
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        if (matchedOrderIds != null) reqVO.setStatus(null);
+        PageResult<SalesOrderDO> page = orderMapper.selectManagementPage(scope, reqVO, matchedOrderIds);
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
+        List<SalesOrderListItemRespVO> result = page.getList().stream().map(order -> convertListItem(order,
+                rounds.get(order.getCurrentApprovalRoundId()), null, items.getOrDefault(order.getId(), List.of()))).toList();
+        enrichManagementRows(result, page.getList(), userId);
+        return new PageResult<>(result, page.getTotal());
+    }
+
+    @Override
+    public CursorPageResult<SalesOrderListItemRespVO> getManagementCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId) {
+        SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
+        if (scope.isEmpty()) return new CursorPageResult<>(List.of(), null, false);
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        String keyword = StrUtil.blankToDefault(reqVO.getKeyword(), null);
+        SalesOrderCursorCodec.Cursor cursor = SalesOrderCursorCodec.decode(reqVO.getCursor(), userId, reqVO.getStatus(), keyword);
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<SalesOrderDO> rows = orderMapper.selectManagementCursor(scope, reqVO.getStatus(), keyword, matchedOrderIds,
+                cursor == null ? null : cursor.time(), cursor == null ? null : cursor.id(), limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<SalesOrderDO> list = hasMore ? rows.subList(0, limit) : rows;
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(list);
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(list);
+        List<SalesOrderListItemRespVO> result = list.stream().map(order -> convertListItem(order,
+                rounds.get(order.getCurrentApprovalRoundId()), null, items.getOrDefault(order.getId(), List.of()))).toList();
+        enrichManagementRows(result, list, userId);
+        String next = hasMore && !list.isEmpty() ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getUpdateTime(),
+                list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
+        return new CursorPageResult<>(result, next, hasMore);
+    }
+
+    private void enrichManagementRows(List<SalesOrderListItemRespVO> rows, List<SalesOrderDO> orders, Long userId) {
+        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(orders.stream()
+                .map(SalesOrderDO::getSubmitterUserId).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
+        for (int i = 0; i < rows.size() && i < orders.size(); i++) {
+            SalesOrderDO order = orders.get(i);
+            SalesOrderListItemRespVO row = rows.get(i);
+            row.setSubmitterUserId(order.getSubmitterUserId());
+            AdminUserRespDTO submitter = users.get(order.getSubmitterUserId());
+            row.setSubmitterUserName(submitter == null ? null : submitter.getNickname());
+            row.setCanRevise((STATUS_REVISION_REQUIRED.equals(order.getStatus()) || STATUS_TERMINATED.equals(order.getStatus()))
+                    && permissionService.canRevise(order, userId));
+            row.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus())
+                    && (Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId)));
+        }
+    }
+
+    @Override
+    public SalesOrderStatusCountsRespVO getManagementStatusCounts(Long userId) {
+        SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
+        return new SalesOrderStatusCountsRespVO(orderMapper.selectManagementCount(scope, null),
+                orderMapper.selectManagementCount(scope, STATUS_PENDING_APPROVAL),
+                orderMapper.selectManagementCount(scope, STATUS_REVISION_REQUIRED),
+                orderMapper.selectManagementCount(scope, STATUS_EFFECTIVE),
+                orderMapper.selectManagementCount(scope, STATUS_SUPERSEDED));
+    }
+
+    @Override
     public PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId) {
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
         if (matchedOrderIds != null) reqVO.setStatus(null);
@@ -1457,6 +1529,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType()); result.setPersonId(order.getPersonId());
+        result.setSubmitterUserId(order.getSubmitterUserId());
         result.setBuyerName(order.getBuyerName()); result.setStudentName(order.getStudentName());
         result.setStudentMobile(order.getStudentMobile()); result.setStudentWechatId(order.getStudentWechatId());
         result.setProvinceName(order.getProvinceName()); result.setCityName(order.getCityName());

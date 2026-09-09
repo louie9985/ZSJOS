@@ -171,26 +171,14 @@
       <el-form-item label="产品" prop="productId"><el-select v-model="editor.productId" filterable @change="productChanged"><el-option v-for="item in products" :key="item.productId" :label="item.productName" :value="item.productId" /></el-select></el-form-item>
       <el-form-item v-for="attr in selectedProduct?.attrs || []" :key="attr.attrKey" :label="attr.attrName"><el-select v-model="editor.selectedAttrs[attr.attrKey]" clearable @change="productScopeChanged"><el-option v-for="item in attr.values" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
       <el-form-item label="SKU" prop="selectedSkuIds"><el-select v-model="editor.selectedSkuIds" multiple collapse-tags filterable :disabled="!selectedProduct"><el-option v-for="item in selectedProduct?.skus || []" :key="item.id" :label="item.skuName" :value="item.id" /></el-select></el-form-item>
-      <el-form-item label="产品分类" prop="categoryId"
-        ><el-select
-          v-model="editor.categoryId"
-          filterable
-          :disabled="Boolean(editing?.studentCount)"
-          @change="categoryChanged"
-          ><el-option
-            v-for="item in categories"
-            :key="item.id"
-            :label="item.name"
-            :value="item.id" /></el-select
-      ></el-form-item>
       <el-form-item label="考期" prop="examScheduleId"
-        ><el-select v-model="editor.examScheduleId"
+        ><el-alert v-if="examError" :title="examError" type="error" show-icon :closable="false"><template #default><el-button link type="primary" @click="reloadExams()">重试</el-button></template></el-alert><el-select v-model="editor.examScheduleId" :loading="examLoading" :disabled="examLoading || Boolean(examError)"
           ><el-option
             v-for="item in exams"
             :key="item.id"
             :label="item.displayName"
             :value="item.id" /></el-select
-      ></el-form-item>
+        ><el-empty v-if="!examLoading && !examError && !exams.length" description="暂无可用考期" :image-size="60" /></el-form-item>
       <el-form-item label="班主任" prop="homeroomUserId"
         ><el-select v-model="editor.homeroomUserId" filterable
           ><el-option
@@ -281,11 +269,13 @@ const editing = ref<Api.DeliveryClass>()
 const editorRef = ref<FormInstance>()
 const referenceLoading = ref(false)
 const saving = ref(false)
-const categories = ref<Api.CategoryOption[]>([])
 const exams = ref<Api.ExamOption[]>([])
+const examLoading = ref(false)
+const examError = ref('')
 const candidates = ref<Api.HomeroomCandidate[]>([])
 const products = ref<Api.ProductOption[]>([])
 const selectedProduct = computed(() => products.value.find(item => item.productId === editor.productId))
+const normalizeAttrs = (attrs?: Record<string, string>) => Object.fromEntries(Object.entries(attrs || {}).filter(([, value]) => value != null && value !== ''))
 const editor = reactive({
   className: '',
   categoryId: undefined as number | undefined,
@@ -369,6 +359,8 @@ const openEditor = async (row?: Api.DeliveryClass) => {
   editing.value = row
   editorOpen.value = true
   referenceLoading.value = true
+  exams.value = []
+  examError.value = ''
   Object.assign(editor, {
     className: row?.className || '',
     categoryId: row?.categoryId,
@@ -377,12 +369,13 @@ const openEditor = async (row?: Api.DeliveryClass) => {
     , productId: row?.productId, selectedSkuIds: row?.selectedSkus?.map(sku => sku.id) || [], selectedAttrs: { ...(row?.selectedAttrs || {}) }
   })
   try {
-    const [categoryRows, productRows, candidateRows] = await Promise.all([
-      Api.getCategoryOptions(), Api.getProductOptions(),
+    const [productRows, candidateRows] = await Promise.all([
+      Api.getProductOptions(),
       Api.getHomeroomCandidates()
     ])
-    categories.value = categoryRows; products.value = productRows; candidates.value = candidateRows
-    exams.value = row?.categoryId ? await Api.getExamOptions(row.categoryId, row.productId) : []
+    products.value = productRows; candidates.value = candidateRows
+    editor.selectedAttrs = normalizeAttrs(row?.selectedAttrs)
+    if (row?.categoryId) await reloadExams(row.categoryId, row.productId, editor.selectedAttrs)
   } catch (cause: any) {
     ElMessage.error(cause?.msg || cause?.message || '基础选项加载失败')
     editorOpen.value = false
@@ -390,9 +383,12 @@ const openEditor = async (row?: Api.DeliveryClass) => {
     referenceLoading.value = false
   }
 }
-const categoryChanged = async (categoryId: number) => {
-  editor.examScheduleId = undefined
-  exams.value = await Api.getExamOptions(categoryId)
+const reloadExams = async (categoryId = selectedProduct.value?.categoryId, productId = selectedProduct.value?.productId, attrs = editor.selectedAttrs) => {
+  if (!categoryId) { exams.value = []; return }
+  examLoading.value = true; examError.value = ''
+  try { exams.value = await Api.getExamOptions(categoryId, productId, JSON.stringify(normalizeAttrs(attrs))) }
+  catch (cause: any) { exams.value = []; examError.value = cause?.msg || cause?.message || '考期加载失败' }
+  finally { examLoading.value = false }
 }
 const productChanged = (productId: number) => {
   const product = products.value.find(item => item.productId === productId)
@@ -400,11 +396,17 @@ const productChanged = (productId: number) => {
   editor.selectedSkuIds = product?.skus.map(sku => sku.id) || []
   editor.selectedAttrs = {}
   editor.examScheduleId = undefined
-  if (product) void Api.getExamOptions(product.categoryId, product.productId, JSON.stringify(editor.selectedAttrs || {})).then(rows => { exams.value = rows })
+  void reloadExams(product?.categoryId, product?.productId, {})
 }
 const productScopeChanged = () => {
   const product = selectedProduct.value
-  if (product) void Api.getExamOptions(product.categoryId, product.productId, JSON.stringify(editor.selectedAttrs)).then(rows => { exams.value = rows })
+  if (!product) return
+  const attrs = normalizeAttrs(editor.selectedAttrs)
+  editor.selectedAttrs = attrs
+  const validSkuIds = new Set(product.skus.filter(sku => Object.entries(attrs).every(([key, value]) => sku.attrValues[key] === value)).map(sku => sku.id))
+  editor.selectedSkuIds = editor.selectedSkuIds.filter(id => validSkuIds.has(id))
+  editor.examScheduleId = undefined
+  void reloadExams(product.categoryId, product.productId, editor.selectedAttrs)
 }
 const save = async () => {
   if (!(await editorRef.value?.validate())) return

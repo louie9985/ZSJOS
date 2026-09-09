@@ -19,7 +19,7 @@ const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
 const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0, superseded: 0 }
 
-export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
+export default function MySalesOrderPage() {
   const navigate = useNavigate()
   const requestedOrderId = useRef(Number(new URLSearchParams(location.search).get('orderId')) || undefined)
   const [status, setStatus] = useState<StatusTab>('all')
@@ -51,9 +51,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
 
   const loadCounts = useCallback(async () => {
     setCountsError('')
-    try { setCounts(await (team ? api.teamSalesOrderStatusCounts() : api.mySalesOrderStatusCounts())) }
+      try { setCounts(await api.managementSalesOrderStatusCounts()) }
     catch (loadError) { setCountsError(loadError instanceof Error ? loadError.message : '订单数量加载失败') }
-  }, [team])
+  }, [])
 
   const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean, version: number) => {
     const key = `${version}:${targetCursor || 'first'}`
@@ -61,13 +61,13 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
     activePages.current.add(key); setLoading(true); setError('')
     try {
       const result = useTableLayout
-        ? await (team ? api.teamSalesOrderPage({ pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderPage({ pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
-        : await (team ? api.teamSalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
+        ? await api.managementSalesOrderPage({ pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+        : await api.managementSalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
       if (version !== listVersion.current) return
       let nextItems = result.list
       const requestedId = replace ? requestedOrderId.current : undefined
       if (requestedId && !result.list.some(item => item.id === requestedId)) {
-        const requestedOrder = await (team ? api.salesOrder(requestedId) : api.mySalesOrder(requestedId))
+        const requestedOrder = await api.managementSalesOrder(requestedId)
         if (version !== listVersion.current) return
         nextItems = [salesOrderDetailToListItem(requestedOrder), ...result.list]
       }
@@ -84,7 +84,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
     } catch (loadError) {
       if (version === listVersion.current) setError(loadError instanceof Error ? loadError.message : '我的订单加载失败')
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
-  }, [advancedFilter, keyword, status, tablePage, tablePageSize, team, useTableLayout])
+  }, [advancedFilter, keyword, status, tablePage, tablePageSize, useTableLayout])
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
@@ -100,19 +100,19 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current
     setDetailLoading(true); setDetailError('')
-    try { const result = await (team ? api.salesOrder(id) : api.mySalesOrder(id)); if (version === detailVersion.current) setDetail(result) }
+    try { const result = await api.managementSalesOrder(id); if (version === detailVersion.current) setDetail(result) }
     catch (loadError) { if (version === detailVersion.current) { setDetail(undefined); setDetailError(loadError instanceof Error ? loadError.message : '订单详情加载失败') } }
     finally { if (version === detailVersion.current) setDetailLoading(false) }
-  }, [team])
+  }, [])
   useEffect(() => { if (selectedId) void loadDetail(selectedId); else setDetail(undefined) }, [loadDetail, selectedId])
 
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail ? <><div className="sales-order-detail-actions">{detail.supersedesOrderId && <Button onClick={() => setSelectedId(detail.supersedesOrderId)}>查看原订单</Button>}{detail.supersededByOrderId && <Button type="primary" onClick={() => setSelectedId(detail.supersededByOrderId)}>查看重提订单</Button>}{detail.leadId && <Button onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${detail.leadId}`)}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={team ? "team" : "mine"}
-          onRevise={team ? undefined : () => setRevisionOpen(true)}
-          onTerminate={team ? undefined : () => { resetTerminationIntent(); setTerminateOpen(true) }}/></>
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine"
+          onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
+          onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
         : <Empty description="从左侧选择一条订单"/>
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
     id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
@@ -131,12 +131,12 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {useTableLayout ? <div className="sales-order-table-area"><div className="sales-order-table-toolbar"><AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderListItem>
+    {useTableLayout ? <div className="sales-order-table-area"><div className="sales-order-table-toolbar"><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderListItem>
       className="sales-order-inbox-table"
       rowKey="id"
       search={false}
       options={{ density: true, fullScreen: true, setting: true }}
-      columnsState={{ persistenceKey: `crm-sales-order-${team ? 'team' : 'my'}-table-columns`, persistenceType: 'localStorage' }}
+      columnsState={{ persistenceKey: 'crm-sales-order-management-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
       pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size); } }}
@@ -145,7 +145,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       columns={buildSalesOrderTableColumns(item => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })}
     /></div> : <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
-        <AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+        <AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
         {error && <Alert
           className="sales-order-inbox-error" type="error" showIcon message={error}
           action={<Button size="small" onClick={reload}>重试</Button>}/>

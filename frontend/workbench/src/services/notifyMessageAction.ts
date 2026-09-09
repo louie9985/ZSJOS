@@ -167,8 +167,8 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
         await api.salesOrder(detail.bizId)
         deps.navigate(`${APP_ROUTES.SALES_ORDER_APPROVALS}?workType=approval&orderId=${detail.bizId}`)
       } else {
-        await api.mySalesOrder(detail.bizId)
-        deps.navigate(APP_ROUTES.MY_SALES_ORDERS, { state: { orderId: detail.bizId } })
+        await api.salesOrder(detail.bizId)
+        deps.navigate(APP_ROUTES.SALES_ORDERS, { state: { orderId: detail.bizId } })
       }
       return
     } catch (error) {

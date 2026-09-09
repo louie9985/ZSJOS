@@ -90,7 +90,7 @@ public class SalesOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "获得成交订单详情")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
     public CommonResult<SalesOrderRespVO> get(@PathVariable Long id) {
         return success(orderService.get(id, WebFrameworkUtils.getLoginUserId()));
     }
@@ -171,6 +171,46 @@ public class SalesOrderController {
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
     public CommonResult<SalesOrderRespVO> getMyOrder(@PathVariable Long id) {
         return success(orderService.getOwn(id, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/management/{id}")
+    @Operation(summary = "获得订单管理详情")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<SalesOrderRespVO> getManagementOrder(@PathVariable Long id) {
+        return success(orderService.getManagement(id, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/management-page")
+    @Operation(summary = "获得订单管理分页")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> getManagementPage(@Valid SalesOrderMyPageReqVO reqVO) {
+        return success(orderService.getManagementPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/management-search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> searchManagementPage(@Valid @RequestBody SalesOrderMyPageReqVO reqVO) {
+        return success(orderService.getManagementPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/management-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> getManagementCursor(@Valid SalesOrderMyCursorReqVO reqVO) {
+        return success(orderService.getManagementCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/management-search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchManagementCursor(@Valid @RequestBody SalesOrderMyCursorReqVO reqVO) {
+        return success(orderService.getManagementCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/management-status-counts")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-management')")
+    public CommonResult<SalesOrderStatusCountsRespVO> getManagementStatusCounts() {
+        return success(orderService.getManagementStatusCounts(WebFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/approval/inbox-page")

@@ -240,8 +240,7 @@ SELECT 'study_planner_repurchase_schema_gate' AS check_name,
                      AND checksum=SHA2('study-planner-repurchase-permission-v5',256))
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6813
-                     AND permission='zsjos:sales-order:query-own' AND path='sales-orders/my'
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management' AND path='sales-orders'
                      AND type=2 AND status=0 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                      AND permission='zsjos:student:query-my' AND path='my-students'
@@ -249,14 +248,20 @@ SELECT 'study_planner_repurchase_schema_gate' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73440
                      AND permission='zsjos:sales-order:student-repurchase' AND parent_id=73020
                      AND type=3 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
-SELECT 'sales_order_team_management' AS check_name,
+SELECT 'sales_order_team_management_legacy' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V136'
                   AND checksum='V136__sales_order_team_management.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136'
                      AND checksum=SHA2('V136__sales_order_team_management.sql',256))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73510
                      AND permission='zsjos:sales-order:query-team' AND parent_id=6735
-                     AND path='sales-orders/team' AND type=2 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
+                     AND path='sales-orders/team' AND deleted=b'1'), 'PASS','FAIL') AS result;
+SELECT 'sales_order_management_unification' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V193')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management'
+                     AND path='sales-orders' AND type=2 AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:sales-order:query-own','zsjos:sales-order:query-team') AND deleted=b'0'),
+          'PASS','FAIL') AS result;
 SELECT 'new_media_business_notifications' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V102')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V102')
@@ -765,7 +770,7 @@ SELECT 'sales_order_v025_reason_and_index' AS check_name,
             AND table_name='zsjos_order' AND index_name='idx_tenant_submitter_status_submitted'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_order_v025_menu' AS check_name,
        IF(EXISTS(SELECT 1 FROM system_menu WHERE id=6813 AND permission='zsjos:sales-order:query-own'
-            AND path='sales-orders/my' AND sort=17 AND deleted=b'0')
+            AND path='sales-orders' AND sort=17 AND deleted=b'0')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6810 AND sort=18 AND deleted=b'0')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6804 AND sort=19 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'zsjos_bpm_readonly_forms' AS check_name,
@@ -1409,7 +1414,7 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6813
-            AND permission='zsjos:sales-order:query-own' AND path='sales-orders/my'
+            AND permission='zsjos:sales-order:query-management' AND path='sales-orders'
             AND type=2 AND status=0 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
             AND permission='zsjos:student:query-my' AND path='my-students'
@@ -2435,11 +2440,12 @@ SELECT 'V188 pending class and UTF-8 snapshot' AS check_name,
 SELECT 'V188 delivery class menus and package coverage' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
                    WHERE path='/zsjos' AND parent_id=0 AND deleted=b'0' ORDER BY id LIMIT 1)
-                   AND path='class-management' AND permission='zsjos:delivery-class:query-managed'
+                   AND path='class-management' AND permission='zsjos:delivery-class:query'
                    AND component='zsjos/class-management' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73624 AND path='my-classes'
-                      AND permission='zsjos:delivery-class:query-my'
-                      AND component='zsjos/my-classes' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73624 AND visible=b'0' AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73628,73629)
+               AND permission IN ('zsjos:delivery-class:query-managed','zsjos:delivery-class:query-my')
+               AND visible=b'0' AND deleted=b'0')=2
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                       AND permission='zsjos:student:query-my' AND status=0 AND visible=b'0' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73621,73622,73623,73625,73626,73627)
@@ -2460,3 +2466,17 @@ SELECT 'V188 delivery class menus and package coverage' AS check_name,
 
 SELECT tenant_id,class_no,class_name,HEX(class_name) AS class_name_hex
 FROM zsjos_delivery_class WHERE system_class=b'1' AND deleted=b'0' ORDER BY tenant_id;
+
+SELECT 'V191 course calendar' AS check_name,
+       IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_course_calendar_event')
+          AND EXISTS (SELECT 1 FROM system_dict_type WHERE type='zsjos_course_form' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_course_form' AND value='LIVE' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73630 AND path='course-calendar' AND permission='zsjos:course-calendar:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73632 AND permission='zsjos:course-calendar:manage' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+
+SELECT 'V192 lead qualification ownership timing' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V192')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_lead
+                          WHERE status='submitted' AND assignment_status='owned'
+                            AND ownership_started_at IS NOT NULL
+                            AND qualification_deadline_at IS NULL AND deleted=b'0'), 'PASS', 'FAIL') AS result;

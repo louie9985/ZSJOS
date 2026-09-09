@@ -126,6 +126,8 @@ V056 must be preceded by its built-in read-only account conflict audit. The migr
 
 V057 additively extends the tenant-scoped lead follow-up rule with `notification_popup_duration_minutes` (default 5) and `duplicate_auto_resolution_enabled` (default disabled). It depends on V039's `no_progress_grace_days` column and V056's migration position, deletes or rewrites no business rows, and uses metadata guards plus version upserts for repeatability. Afterward, confirm the V057 version row and both column defaults through `verify-bootstrap.sql`; application rollback leaves the additive columns intact.
 
+V192 changes Lead qualification timing to start at the current ownership timestamp. It backfills only `submitted + owned` Leads with `ownership_started_at` and no qualification deadline, creating the next qualification round, business task, and start event from the tenant's enabled rule. Public-pool and other historical states are not restored or rewritten. The migration is repeatable through scoped predicates and tenant idempotency keys; apply it before accepting traffic with the new service code, then run `verify-bootstrap.sql`. No-progress warning/grace settings remain as historical columns but are no longer consumed by the scheduler; no automatic release to the claim pool remains. Rollback is application-only because qualification rounds, tasks, and events are durable audit facts.
+
 V067 establishes the user-visible Lead-number contract after V066. It replaces `lead.id` with `lead.no` only in untouched system-owned Lead notification templates and changes only untouched ZSJOS appeal and order read-only BPM forms to display `leadNo`; internal `leadId` variables and relationships remain unchanged. Administrator customizations, historical messages, and started workflow instances are preserved. Afterward, use `verify-bootstrap.sql` to confirm the V067 version row, default template variables, and BPM form fields. Rollback is forward-only and must retain durable Lead business numbers.
 
 ## V071 H5 and role-permission repair
@@ -632,3 +634,6 @@ Before deployment, confirm menu IDs `79960-79978` and the dictionary type are no
 After deployment run the V157 section of `verify-bootstrap.sql`, including version markers, tables, columns,
 unique extension identity, relative Workbench paths, empty category values, and tenant-package inheritance.
 Rollback is forward-only because published versions and work-order snapshots may reference the new schema.
+### V193 订单管理统一
+
+V193 将“我的订单”和“团队订单”菜单授权合并到“订单管理”，逻辑删除旧菜单及角色关系，并把订单高级筛选模板迁移到 `sales_order_management`。迁移前通过临时表保存原始 pageKey 和名称，在同一批次处理同名模板来源后缀；每个作用域/所有者按更新时间、ID 选择唯一默认模板。迁移不修改订单业务数据，需在 UTF-8 连接的受控数据库执行并保留菜单、角色关系和模板备份以支持恢复。

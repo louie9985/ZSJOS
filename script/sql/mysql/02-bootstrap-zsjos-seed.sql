@@ -298,7 +298,7 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V024', 'Add read-only BPM forms for ZSJOS workflows', 'zsjos-bpm-readonly-forms-v1');
 
 INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6813,'我的订单','zsjos:sales-order:query-own',2,17,6735,'sales-orders/my','ep:tickets','zsjos/mySalesOrder/index','ZsjosMySalesOrder',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+(6813,'订单管理','zsjos:sales-order:query-management',2,17,6735,'sales-orders','ep:tickets','zsjos/mySalesOrder/index','ZsjosSalesOrderManagement',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
 UPDATE `system_menu` SET `sort`=18 WHERE `id`=6810 AND `deleted`=b'0';
 UPDATE `system_menu` SET `sort`=19 WHERE `id`=6804 AND `deleted`=b'0';
 

@@ -1032,8 +1032,9 @@ The migration also creates one per-order-item registration assignment row and th
 snapshot/reference table for BPM class-transfer requests. BPM tasks and history remain BPM-owned under
 process key `zsjos_class_transfer`.
 
-The migration adds relative `class-management` and `my-classes` menu paths plus independent managed/my
-query, create, update, complete, direct-transfer and transfer-request permissions. Package IDs are appended
+V192 consolidates the visible class entry into `class-management` with the `zsjos:delivery-class:query`
+page permission. Managed and本人 data-scope permissions remain as hidden capability buttons, while the
+legacy `my-classes` menu is hidden and retained only for route compatibility. Package IDs are appended
 one at a time only when missing, so partially applied package state and reruns remain deterministic. The
 script is UTF-8, additive and repeatable; it updates only null historical `class_id` values and preserves
 their owners. Added or relaxed registration/service-relation columns retain the same type, nullability,

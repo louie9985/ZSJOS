@@ -7,8 +7,6 @@ export interface LeadFollowUpRuleVO {
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
   agingPoolTimeoutDays: number
-  noProgressWarningDays: number
-  noProgressGraceDays: number
   notificationPopupDurationMinutes: number
   duplicateAutoResolutionEnabled: boolean
   status: number
@@ -20,8 +18,6 @@ export interface LeadFollowUpRuleUpdateReqVO {
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
   agingPoolTimeoutDays: number
-  noProgressWarningDays: number
-  noProgressGraceDays: number
   notificationPopupDurationMinutes: number
   duplicateAutoResolutionEnabled: boolean
 }

@@ -54,6 +54,7 @@
 .exam-calendar-event .product-specs { max-height: 3em; overflow: hidden; }
 .exam-calendar-detail strong { overflow-wrap: anywhere; }
 .exam-calendar-overflow { padding-inline: var(--crm-sp-2); }
+.exam-calendar-page .ant-modal-body { max-height: min(70vh, 640px); overflow-y: auto; }
 .exam-calendar-event.tone-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
 .exam-calendar-event.tone-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
 .exam-calendar-event.tone-published { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }

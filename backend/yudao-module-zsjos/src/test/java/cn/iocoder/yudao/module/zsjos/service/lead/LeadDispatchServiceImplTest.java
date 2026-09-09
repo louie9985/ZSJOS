@@ -105,6 +105,7 @@ class LeadDispatchServiceImplTest {
         verify(lifecycleTaskService).completeAssignmentTask(eq(1L), eq(10L), any());
         verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(10L), eq(88L), any(),
                 eq("lead_assignment_accepted"), eq("pending_acceptance"));
+        verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(10L), any());
         verify(applicationEventPublisher).publishEvent(any(LeadAssignmentRealtimeEvent.class));
         verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
     }
@@ -198,6 +199,7 @@ class LeadDispatchServiceImplTest {
 
         verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(10L), eq(88L), any(),
                 eq("lead_claimed"), eq("public_pool"));
+        verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(10L), any());
         verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
     }
 
@@ -284,6 +286,7 @@ class LeadDispatchServiceImplTest {
         assertEquals(20L, lead.getOwnerUserId());
         assertEquals(20L, opportunity.getOwnerUserId());
         verify(opportunityMapper).updateById(opportunity);
+        verify(lifecycleTaskService, never()).createQualificationTask(any(LeadDO.class), eq(20L), any());
     }
 
     @Test

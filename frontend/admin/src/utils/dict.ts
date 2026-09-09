@@ -112,6 +112,7 @@ export const getDictLabel = (dictType: string, value: any): string => {
 }
 
 export enum DICT_TYPE {
+  ZSJOS_COURSE_FORM = 'zsjos_course_form',
   USER_TYPE = 'user_type',
   COMMON_STATUS = 'common_status',
   TERMINAL = 'terminal', // 终端

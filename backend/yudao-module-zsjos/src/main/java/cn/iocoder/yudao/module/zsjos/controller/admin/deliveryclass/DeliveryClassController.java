@@ -18,9 +18,9 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Tag(name="员工工作台 - 班级管理") @RestController @RequestMapping("/zsjos/delivery-class") @Validated
 public class DeliveryClassController {
     @Resource private DeliveryClassService service;
-    @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:query-managed')")
+    @GetMapping("/page") @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:query','zsjos:delivery-class:query-managed')")
     public CommonResult<PageResult<DeliveryClassRespVO>> page(@Valid DeliveryClassPageReqVO req){ return success(service.getManagedPage(getLoginUserId(),req)); }
-    @GetMapping("/my-page") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:query-my')")
+    @GetMapping("/my-page") @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:query','zsjos:delivery-class:query-my')")
     public CommonResult<PageResult<DeliveryClassRespVO>> myPage(@Valid DeliveryClassPageReqVO req){ return success(service.getMyPage(getLoginUserId(),req)); }
     @GetMapping("/options")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:registration:update','zsjos:delivery-class:direct-transfer','zsjos:class-transfer:create')")

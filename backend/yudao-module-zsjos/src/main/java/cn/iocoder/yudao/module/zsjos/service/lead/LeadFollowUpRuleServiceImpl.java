@@ -32,8 +32,6 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         result.setFirstFollowUpTimeoutMinutes(rule.getFirstFollowUpTimeoutMinutes());
         result.setQualificationTimeoutMinutes(rule.getQualificationTimeoutMinutes());
         result.setAgingPoolTimeoutDays(rule.getAgingPoolTimeoutDays());
-        result.setNoProgressWarningDays(rule.getNoProgressWarningDays());
-        result.setNoProgressGraceDays(rule.getNoProgressGraceDays());
         result.setNotificationPopupDurationMinutes(rule.getNotificationPopupDurationMinutes());
         result.setDuplicateAutoResolutionEnabled(rule.getDuplicateAutoResolutionEnabled());
         result.setStatus(rule.getStatus());
@@ -57,8 +55,6 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         rule.setFirstFollowUpTimeoutMinutes(reqVO.getFirstFollowUpTimeoutMinutes());
         rule.setQualificationTimeoutMinutes(reqVO.getQualificationTimeoutMinutes());
         rule.setAgingPoolTimeoutDays(reqVO.getAgingPoolTimeoutDays());
-        rule.setNoProgressWarningDays(reqVO.getNoProgressWarningDays());
-        rule.setNoProgressGraceDays(reqVO.getNoProgressGraceDays());
         rule.setNotificationPopupDurationMinutes(reqVO.getNotificationPopupDurationMinutes());
         rule.setDuplicateAutoResolutionEnabled(reqVO.getDuplicateAutoResolutionEnabled());
         rule.setVersion(reqVO.getVersion() + 1);
@@ -74,15 +70,11 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         Integer timeout = rule.getFirstFollowUpTimeoutMinutes();
         Integer qualificationTimeout = rule.getQualificationTimeoutMinutes();
         Integer agingPoolTimeoutDays = rule.getAgingPoolTimeoutDays();
-        Integer warningDays = rule.getNoProgressWarningDays();
-        Integer graceDays = rule.getNoProgressGraceDays();
         Integer popupDuration = rule.getNotificationPopupDurationMinutes();
         if (!CommonStatusEnum.ENABLE.getStatus().equals(rule.getStatus())
                 || timeout == null || timeout < 5 || timeout > 10080
                 || qualificationTimeout == null || qualificationTimeout < 5 || qualificationTimeout > 43200
                 || agingPoolTimeoutDays == null || agingPoolTimeoutDays < 1 || agingPoolTimeoutDays > 3650
-                || warningDays == null || warningDays < 1 || warningDays > 365
-                || graceDays == null || graceDays < 1 || graceDays > 30
                 || popupDuration == null || popupDuration < 1 || popupDuration > 30
                 || rule.getDuplicateAutoResolutionEnabled() == null) {
             throw exception(LEAD_FOLLOW_UP_RULE_INVALID);

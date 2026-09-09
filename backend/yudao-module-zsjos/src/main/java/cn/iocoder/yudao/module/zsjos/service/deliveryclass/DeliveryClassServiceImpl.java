@@ -41,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
@@ -72,18 +73,34 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         DeliveryClassScopeService.Scope scope = scopeService.resolve(userId);
         PageResult<DeliveryClassDO> page = mapper.selectPage(req, scope.deptIds(), null,
                 scope.allDepartments(), true);
-        return new PageResult<>(page.getList().stream().map(this::toVO).toList(), page.getTotal());
+        return toPageResult(page);
     }
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
         PageResult<DeliveryClassDO> page = mapper.selectPage(req, Set.of(), userId, false, false);
-        return new PageResult<>(page.getList().stream().map(this::toVO).toList(), page.getTotal());
+        return toPageResult(page);
     }
 
     @Override
     @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "read")
     public DeliveryClassRespVO get(Long id, Long userId) { return toVO(require(id)); }
+
+    private PageResult<DeliveryClassRespVO> toPageResult(PageResult<DeliveryClassDO> page) {
+        List<DeliveryClassDO> rows = page.getList();
+        Map<Long, ExamScheduleDO> schedules = new HashMap<>();
+        Set<Long> scheduleIds = rows.stream().map(DeliveryClassDO::getExamScheduleId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (!scheduleIds.isEmpty()) scheduleMapper.selectBatchIds(scheduleIds)
+                .forEach(schedule -> schedules.put(schedule.getId(), schedule));
+        Map<Long, Integer> studentCounts = new HashMap<>();
+        Map<Long, List<Long>> idsByTenant = rows.stream().collect(Collectors.groupingBy(
+                DeliveryClassDO::getTenantId, Collectors.mapping(DeliveryClassDO::getId, Collectors.toList())));
+        idsByTenant.forEach((tenantId, classIds) -> mapper.countStudentsByClassIds(tenantId, classIds).forEach(item ->
+                studentCounts.put(((Number) item.get("classId")).longValue(), ((Number) item.get("studentCount")).intValue())));
+        return new PageResult<>(rows.stream().map(row -> toVO(row, schedules.get(row.getExamScheduleId()),
+                studentCounts.getOrDefault(row.getId(), 0))).toList(), page.getTotal());
+    }
 
     @Override
     @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "read")
@@ -149,6 +166,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         Map<String, String> selectedAttrs = selectedAttrsJson == null || selectedAttrsJson.isBlank()
                 ? Map.of() : JsonUtils.parseObject(selectedAttrsJson, Map.class);
         ExamProductScopeRespVO requested = productId == null ? null : productSkuService.resolveExamScope(productId, selectedAttrs);
+        if (requested != null && !Objects.equals(categoryId, requested.categoryId())) {
+            throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
+        }
         return scheduleMapper.selectList(new LambdaQueryWrapperX<ExamScheduleDO>()
                 .eq(ExamScheduleDO::getCategoryId, categoryId)
                 .eq(ExamScheduleDO::getRecordStatus, "PUBLISHED")
@@ -198,9 +218,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             throw exception(DELIVERY_CLASS_STATE_INVALID);
         }
         if (!Objects.equals(req.getVersion(), current.getVersion())) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
-        if (!Objects.equals(req.getCategoryId(), current.getCategoryId())
-                && mapper.countAllRelations(current.getTenantId(), id) > 0) throw exception(DELIVERY_CLASS_CATEGORY_LOCKED);
         ScopeSnapshot snapshot = validate(req);
+        if (!Objects.equals(snapshot.scope().categoryId(), current.getCategoryId())
+                && mapper.countAllRelations(current.getTenantId(), id) > 0) throw exception(DELIVERY_CLASS_CATEGORY_LOCKED);
         AdminUserRespDTO homeroom = requireHomeroom(req.getHomeroomUserId());
         requireSameDepartment(userId, homeroom);
         if (!Objects.equals(homeroom.getDeptId(), current.getDeptId())) throw exception(DELIVERY_CLASS_USER_INVALID);
@@ -361,6 +381,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     private ScopeSnapshot validate(DeliveryClassSaveReqVO req) {
         ExamProductScopeRespVO resolved = productSkuService.resolveExamScope(req.getProductId(), req.getSelectedAttrs());
+        if (!Objects.equals(req.getCategoryId(), resolved.categoryId())) {
+            throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
+        }
         Set<Long> selectedIds = req.getSelectedSkuIds() == null || req.getSelectedSkuIds().isEmpty()
                 ? resolved.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet())
                 : req.getSelectedSkuIds();
@@ -391,11 +414,20 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private DeliveryClassRespVO toVO(DeliveryClassDO row) {
+        ExamScheduleDO schedule = row.getExamScheduleId() == null ? null : scheduleMapper.selectById(row.getExamScheduleId());
+        return toVO(row, schedule, mapper.countStudents(row.getTenantId(), row.getId()));
+    }
+
+    private DeliveryClassRespVO toVO(DeliveryClassDO row, ExamScheduleDO schedule, int studentCount) {
         DeliveryClassRespVO vo = BeanUtils.toBean(row, DeliveryClassRespVO.class);
+        if (schedule != null) {
+            vo.setScheduleType(schedule.getScheduleType());
+            vo.setExactDate(schedule.getExactDate());
+        }
         vo.setSelectedAttrs(row.getSelectedAttrsJson() == null ? Map.of() : JsonUtils.parseObject(row.getSelectedAttrsJson(), Map.class));
         vo.setSelectedSpecs(row.getSelectedSpecsJson() == null ? List.of() : JsonUtils.parseArray(row.getSelectedSpecsJson(), cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO.class));
         vo.setSelectedSkus(parseSkus(row.getSelectedSkusJson()));
-        vo.setStudentCount(mapper.countStudents(row.getTenantId(), row.getId()));
+        vo.setStudentCount(studentCount);
         return vo;
     }
 

@@ -4,20 +4,26 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync('src/pages/DeliveryClassPage.tsx', 'utf8')
 
 describe('delivery class review fixes', () => {
-  it('uses the established service-relation route state for student deep links', () => {
-    expect(source).toContain("navigate(APP_ROUTES.MY_STUDENTS, { state: { serviceRelationId: row.serviceRelationId } })")
-    expect(source).not.toContain('?serviceRelationId=')
+  it('enters student management with the selected class filter', () => {
+    expect(source).toContain("navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })")
+    expect(source).toContain('delivery-class-grid')
   })
 
-  it('paginates class students and retries the current detail request', () => {
-    expect(source).toContain('studentTotal')
-    expect(source).toContain('onChange: page => void loadStudents(selected, page)')
-    expect(source).toContain('loadStudents(selected, studentPageNo)')
+  it('loads classes incrementally and separates the pending class', () => {
+    expect(source).toContain('IntersectionObserver')
+    expect(source).toContain('const pendingClass = rows.find(row => row.systemClass)')
+    expect(source).toContain('setHasMore(targetPage * CLASS_PAGE_SIZE < page.total)')
   })
 
-  it('clears transfer options and blocks submit after an option-loading failure', () => {
-    expect(source).toContain("setTransferLoading(true); setTransferError(''); setTransferOptions([])")
-    expect(source).toContain('disabled: transferLoading || Boolean(transferError)')
-    expect(source).toContain('disabled={transferLoading || Boolean(transferError)}')
+  it('warns on rough schedules without exposing student rows', () => {
+    expect(source).toContain('row.scheduleType === \'ROUGH\'')
+    expect(source).toContain('未设置精确考期')
+    expect(source).not.toContain('loadStudents')
+  })
+
+  it('reloads exam options with current attributes and restores edit snapshots', () => {
+    expect(source).toContain('selectedAttrs: attrs')
+    expect(source).toContain('loadExams(row.categoryId, row.productId, attrs)')
+    expect(source).toContain('onChange={value => void attrsChanged(attr.attrKey!, value as string | undefined)}')
   })
 })

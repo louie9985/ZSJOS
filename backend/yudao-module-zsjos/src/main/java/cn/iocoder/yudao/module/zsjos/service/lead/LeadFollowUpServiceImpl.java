@@ -153,7 +153,6 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             record.setFirstInAssignment(true);
             recordMapper.updateById(record);
             lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
-            lifecycleTaskService.createQualificationTask(lead, operatorUserId, occurredAt);
         }
         lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),

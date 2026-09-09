@@ -26,6 +26,8 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadHandlingStage;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PUBLIC_POOL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_RECYCLE_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_UNASSIGNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
@@ -230,10 +232,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
                 if (inboxHandlingStages.size() == 1
                         && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
-                    query.isNull(LeadDO::getQualificationDeadlineAt);
+                    query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
                 } else if (inboxHandlingStages.size() == 1
                         && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
-                    query.isNotNull(LeadDO::getQualificationDeadlineAt);
+                    query.isNotNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
                 }
             }
         }
@@ -297,10 +299,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
                 if (inboxHandlingStages.size() == 1
                         && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
-                    query.isNull(LeadDO::getQualificationDeadlineAt);
+                    query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
                 } else if (inboxHandlingStages.size() == 1
                         && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
-                    query.isNotNull(LeadDO::getQualificationDeadlineAt);
+                    query.isNotNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
                 }
             }
         }
@@ -311,21 +313,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
         if (!queryAll) {
-            boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
-            boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
-            if (!hasSourceScope && !hasOwnerScope) {
-                query.eq(LeadDO::getId, -1L);
-            } else {
-                query.and(wrapper -> {
-                    if (hasSourceScope) wrapper.eq(LeadDO::getProviderOwnerType, "system_user")
-                            .in(LeadDO::getProviderOwnerId, visibleSourceUserIds);
-                    if (hasOwnerScope) {
-                        if (hasSourceScope) wrapper.or();
-                        wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds)
-                                .or().in(LeadDO::getRecycleSourceOwnerUserId, visibleOwnerUserIds);
-                    }
-                });
-            }
+            applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds);
         }
         if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
             query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
@@ -334,6 +322,27 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         applyManagementOrder(query, reqVO);
         return selectPage(reqVO, query);
+    }
+
+    private static void applyManagementScope(LambdaQueryWrapperX<LeadDO> query,
+                                             List<Long> visibleSourceUserIds,
+                                             List<Long> visibleOwnerUserIds) {
+        boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
+        boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
+        if (!hasSourceScope && !hasOwnerScope) {
+            query.eq(LeadDO::getId, -1L);
+            return;
+        }
+        query.and(wrapper -> {
+            if (hasSourceScope) wrapper.eq(LeadDO::getProviderOwnerType, "system_user")
+                    .in(LeadDO::getProviderOwnerId, visibleSourceUserIds);
+            if (hasOwnerScope) {
+                if (hasSourceScope) wrapper.or();
+                wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds)
+                        .or(recycled -> recycled.eq(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING)
+                                .in(LeadDO::getRecycleSourceOwnerUserId, visibleOwnerUserIds));
+            }
+        });
     }
 
     private static void applyManagementOrder(LambdaQueryWrapperX<LeadDO> query,
@@ -630,7 +639,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         QueryWrapper<LeadDO> query = new QueryWrapper<LeadDO>()
                 .select("status", "assignment_status",
                         "CASE WHEN status='submitted' AND assignment_status='owned' "
-                                + "THEN CASE WHEN qualification_deadline_at IS NULL "
+                                + "THEN CASE WHEN current_assignment_first_follow_up_at IS NULL "
                                 + "THEN 'first_follow_pending' ELSE 'qualification_pending' END ELSE NULL END AS handling_stage",
                         "COUNT(*) AS total")
                 .groupBy("status", "assignment_status", "handling_stage");
@@ -688,16 +697,6 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .isNotNull(LeadDO::getAssignmentRuleSnapshot)
                 .orderByAsc(LeadDO::getSubmittedAt).last("LIMIT 100"));
     }
-    default List<LeadDO> selectPreQualificationNoProgressCandidates(LocalDateTime cutoff) {
-        return selectList(new LambdaQueryWrapperX<LeadDO>()
-                .eq(LeadDO::getStatus, "submitted")
-                .eq(LeadDO::getAssignmentStatus, "owned")
-                .isNotNull(LeadDO::getOwnerUserId)
-                .and(query -> query.le(LeadDO::getLastFollowUpAt, cutoff)
-                        .or(nested -> nested.isNull(LeadDO::getLastFollowUpAt)
-                                .le(LeadDO::getOwnershipStartedAt, cutoff)))
-                .orderByAsc(LeadDO::getOwnershipStartedAt).last("LIMIT 200"));
-    }
     default int updateUnassignedToPending(Long id, Long assigneeId, LocalDateTime expiresAt, Integer attempt,
                                           LocalDateTime activityAt) {
         LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
@@ -733,6 +732,27 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt, null)
                 .set(LeadDO::getNextFollowUpAt, null);
         setMonotonicActivity(update, activityAt);
+        return update(null, update);
+    }
+    default int updateAfterOwnershipCleared(LeadDO lead) {
+        LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
+                .eq(LeadDO::getId, lead.getId())
+                .set(LeadDO::getStatus, lead.getStatus())
+                .set(LeadDO::getAssignmentStatus, lead.getAssignmentStatus())
+                .set(LeadDO::getOwnerUserId, null)
+                .set(LeadDO::getRecycleSourceOwnerUserId, lead.getRecycleSourceOwnerUserId())
+                .set(LeadDO::getCurrentAssignmentHistoryId, null)
+                .set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)
+                .set(LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt, null)
+                .set(LeadDO::getNextFollowUpAt, null)
+                .set(LeadDO::getQualificationStartedAt, null)
+                .set(LeadDO::getQualificationDeadlineAt, null)
+                .set(LeadDO::getQualificationRuleSnapshot, null)
+                .set(LeadDO::getSuspendedAt, null)
+                .set(LeadDO::getLastActivityAt, lead.getLastActivityAt());
+        if (ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus())) {
+            update.set(LeadDO::getPublicPoolAt, lead.getPublicPoolAt());
+        }
         return update(null, update);
     }
     default int updatePendingResult(Long id, Long assigneeId, String newStatus, Long ownerId,

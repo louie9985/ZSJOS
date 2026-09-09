@@ -24,7 +24,6 @@ public interface LeadAgingPoolService {
     boolean canEnterManually(Long leadId);
     int clearInvalidCollaborators(LocalDateTime now);
     int emitAdvanceReminders(LocalDateTime now);
-    int processPreQualificationNoProgress(LocalDateTime now);
     boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     LeadAgingPoolCycleDO getActiveCycle(Long leadId);

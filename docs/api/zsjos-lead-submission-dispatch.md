@@ -115,7 +115,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 顶部接单控件与工作台全局状态提示复用同一状态和 30 秒心跳。接口确认具备销售资格但状态加载失败、页面/实时连接离线或接单偏好暂停时，所有工作台路由都会在全局内容区域显示醒目提示，并按该优先级处理；顶部“接单暂停”和“页面离线”状态使用红色标签。不具备销售资格的用户不显示可恢复式接单提示。
 
 拒单立即释放预留并重新派发，不对销售实施冷却。自动派单超时继续由数据库 `pending_expires_at` 扫描处理，不能通过扫描已经过期消失的 Redis 键恢复客资。Redis 暂不可用时客资保持 `unassigned`，租户定时任务恢复后重试；三圈确实无人可接或达到最大实际尝试次数时进入抢单池。指定派单不进入在线轮询。
-首次跟进时限独立配置，范围为 5–10080 分钟，默认 1440 分钟；有效性判定时限范围为 5–43200 分钟，默认 4320 分钟。相同租户规则还维护 `notificationPopupDurationMinutes`（1–30 分钟，默认 5）和 `duplicateAutoResolutionEnabled`（默认 `false`）。运行时接口只暴露浮窗时长，管理读取和更新接口返回全部字段；更新请求必须携带读取时的 `version`，版本冲突返回 `1_900_003_079`。首次跟进截止时间从当前归属开始计算；有效性判定截止时间从当前归属周期首次跟进成功时计算。两者均在对应任务创建时固化规则版本和截止时间，修改不追溯已有任务。首次跟进完成前，客资仍属于待判定大类但处理阶段为待首跟，不返回有效性判定截止时间。
+首次跟进时限独立配置，范围为 5–10080 分钟，默认 1440 分钟；有效性判定时限范围为 5–43200 分钟，默认 4320 分钟。相同租户规则还维护 `notificationPopupDurationMinutes`（1–30 分钟，默认 5）和 `duplicateAutoResolutionEnabled`（默认 `false`）。运行时接口只暴露浮窗时长，管理读取和更新接口返回全部字段；更新请求必须携带读取时的 `version`，版本冲突返回 `1_900_003_079`。首次跟进和有效性判定截止时间均从当前归属成立时间计算，并在对应任务创建时固化规则版本和截止时间；修改不追溯已有任务。首次跟进完成前，客资处理阶段仍为待首跟，但已返回有效性判定截止时间；首次跟进逾期只提醒，判定截止后进入挂起。
 
 提交人、负责人和公海筛选配置接口只返回筛选结构与标签，不返回分组或选项数量，也不执行状态统计 SQL。列表分页总数及独立统计接口保持原契约。
 
@@ -127,7 +127,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按可选的下次跟进时间替换 `lead_follow_up_reminder`。`nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
 
-首次跟进成功后创建 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
+客资归属成立时立即创建 `lead_first_follow_up` 和 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。系统不再因无进展预警或宽限期自动释放客资到抢单池；抢单池进入仅由明确的分配或主管处置动作触发。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
 
 客资详情的生命周期时间字段按业务事实投影：`qualifiedAt` 表示判定有效/无效时间，`salesOrderSubmittedAt` 表示最近一次首购订单录入并提交审批的时间，`convertedAt` 仅在关联 Opportunity 进入 `won` 时返回其 `wonAt`，不再把创建 Opportunity 的历史兼容时间展示为成交转化。
 

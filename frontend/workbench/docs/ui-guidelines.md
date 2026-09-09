@@ -187,7 +187,7 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 }
 ```
 
-`/zsjos/sales-orders/my` 沿用标准主从页面骨架：使用 `.workspace-page` 的
+`/zsjos/sales-orders` 沿用标准主从页面骨架：使用 `.workspace-page` 的
 `--crm-page-pad`，列表与详情区使用统一的 `--crm-list-pane-w`、`--crm-gap` 和
 `--crm-pane-pad`。订单状态标签与刷新操作共用顶部一行；订单字段和业务操作保持订单域
 自己的数据与权限契约，不因视觉对齐而复制客资页面的数据模型。

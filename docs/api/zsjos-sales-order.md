@@ -4,7 +4,7 @@
 
 - `zsjos:sales-order:create`：当前正式归属销售录入成交订单；公海协同销售必须先完成正式转派，不能仅凭协同身份录入。
 - `zsjos:sales-order:query-own`：分页和读取当前用户作为实际提交人的历史订单。详情仍执行 `read-own` 对象校验，不随客资负责人变化。
-- `zsjos:sales-order:query-team`：团队订单只读查询。后端按当前用户所在部门及全部下属部门动态解析成员，并以订单提交人为范围；不按角色名称推断，也不授予修改、审批、终止或导出权限。
+- `zsjos:sales-order:query-management`：订单管理查询。后端按 System 数据权限解析可见提交人，并以订单提交人为范围；不按角色名称推断。
 - `zsjos:sales-order:query`：读取具备对象关系的订单详情。
 - `zsjos:sales-order:review`：工作台成交审批菜单与直接详情查询权限。审批池、通过和驳回接口的业务授权以配置部门成员关系和本人 BPM 任务为准，不按角色名称推断。
 - `zsjos:sales-order:supervisor-confirm`：统一“成交订单审批”入口中的主管待办/已办列表及确认决定权限。V076 为启用的稳定 `sales_manager` 角色补齐该权限；主管命令还要求当前用户是申请时固化的订单销售直属主管、持有本人 BPM 加签任务并通过订单对象校验。
@@ -20,14 +20,18 @@
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：同样累计标签 feature 权限、Lead 对象关系和订单与客资 `personId` 一致性校验。
 - `PUT /zsjos/sales-order/{id}/resubmit`：对允许重提的 `revision_required` 或 `terminated` 订单创建全新订单并返回新订单 ID。旧订单进入 `superseded` 终态，使用 `supersedes_order_id` / `superseded_by_order_id` 双向关联；旧审批轮次、明细、凭证和驳回原因保持不变，新订单从第 1 个审批轮次独立启动。若同一客资已存在另一张活动首购订单，或同一客户已存在另一张活动复购订单，则拒绝重提；复购创建与重提通过客户主档行锁串行化。
 - `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，兼容回退到当前可读投影。首购订单关联的当前客资仍存在时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/姓名及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
+- `GET /zsjos/sales-order/management/{id}`：订单管理详情。仅接受 `zsjos:sales-order:query-management`，并按当前 System 数据权限校验订单提交人范围；不会继承旧 `query-team` 的团队读取范围。
 - `GET /zsjos/sales-order/my-page`：本人提交订单分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。列表响应直接投影订单详情中可用于表格展示的业务字段，包括购买方、学员联系方式与地区、历史字典标签快照、课程摘要、付款与服务信息、备注、关联客资业务编号及来源摘要；课程明细按当前页批量读取，不要求前端逐行请求详情。内部关联 ID 仍只用于路由和命令，不作为用户可见列。
+- `GET /zsjos/sales-order/management-page`、`POST /zsjos/sales-order/management-search-page`：订单管理分页及高级筛选，服务端按 System 数据权限计算订单提交人范围。
+- `GET /zsjos/sales-order/management-cursor`、`POST /zsjos/sales-order/management-search-cursor`：订单管理游标查询，与分页接口使用相同可见范围。
+- `GET /zsjos/sales-order/management-status-counts`：订单管理状态统计，与订单列表使用相同可见范围。
 - `POST /zsjos/sales-order/my-search-page`：在本人订单固定范围内组合关键词与高级条件树；高级条件非空时忽略可选状态分组。
 - `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、已驳回待修改、已通过数量。
 - `GET /zsjos/sales-order/my/{id}`：本人订单完整详情；已驳回订单包含最新轮次 `decisionReason` 和 `canRevise`。
 - `GET /zsjos/sales-order/team-page`、`POST /zsjos/sales-order/team-search-page`：团队订单分页查询，支持状态、关键词和高级条件；团队成员提交范围始终作为固定边界。
 - `GET /zsjos/sales-order/team-cursor`、`POST /zsjos/sales-order/team-search-cursor`：团队订单游标查询，筛选条件与分页接口一致。
 - `GET /zsjos/sales-order/team-status-counts`：团队订单状态统计，范围与团队订单列表一致。
-- Workbench `/zsjos/sales-orders/team` directly consumes the three team cursor/search/count contracts.
+- Workbench `/zsjos/sales-orders` consumes the management cursor/search/count contracts.
   It uses the normal order detail contract in read-only `team` mode and never exposes update, terminate,
   approval, or export commands from the team-query permission.
 - `GET /zsjos/sales-order/approval/filter-profile`：返回当前租户已发布的待处理/已处理方案，以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。

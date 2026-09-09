@@ -15,6 +15,7 @@ import jakarta.validation.Validation;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -178,5 +179,54 @@ class LeadMapperSqlTest {
                 + "OR last_activity_at <"), sql);
         assertTrue(sql.contains("ELSE last_activity_at END"), sql);
         assertTrue(wrapper.getValue().getParamNameValuePairs().containsValue(occurredAt));
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void ownershipClearUpdateExplicitlyPersistsNullAssignmentFields() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+        doReturn(1).when(mapper).update(any(), any());
+        LeadDO lead = new LeadDO();
+        lead.setId(42L);
+        lead.setStatus("submitted");
+        lead.setAssignmentStatus("public_pool");
+        lead.setRecycleSourceOwnerUserId(null);
+        lead.setPublicPoolAt(LocalDateTime.of(2026, 9, 9, 11, 30));
+        lead.setLastActivityAt(LocalDateTime.of(2026, 9, 9, 11, 30));
+
+        assertEquals(1, mapper.updateAfterOwnershipCleared(lead));
+
+        org.mockito.ArgumentCaptor<LambdaUpdateWrapper> wrapper =
+                org.mockito.ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mapper).update(org.mockito.ArgumentMatchers.isNull(), wrapper.capture());
+        String sql = wrapper.getValue().getSqlSet().replaceAll("\\s+", " ");
+        assertTrue(sql.contains("owner_user_id="), sql);
+        assertTrue(sql.contains("recycle_source_owner_user_id="), sql);
+        assertTrue(sql.contains("current_assignment_history_id="), sql);
+        assertTrue(sql.contains("current_assignment_first_follow_up_at="), sql);
+        assertTrue(sql.contains("current_assignment_first_follow_up_deadline_at="), sql);
+        assertTrue(sql.contains("qualification_started_at="), sql);
+        assertTrue(sql.contains("qualification_deadline_at="), sql);
+        assertTrue(sql.contains("qualification_rule_snapshot="), sql);
+        assertTrue(sql.contains("suspended_at="), sql);
+    }
+
+    @Test
+    void managementOwnerScopeUsesRecycleSourceOnlyWhileRecyclePending() throws Exception {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        Method method = LeadMapper.class.getDeclaredMethod("applyManagementScope",
+                LambdaQueryWrapperX.class, List.class, List.class);
+        method.setAccessible(true);
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
+
+        method.invoke(null, query, List.of(), List.of(10L));
+
+        String sql = query.getSqlSegment().replaceAll("\\s+", " ");
+        assertTrue(sql.contains("owner_user_id IN"), sql);
+        assertTrue(sql.contains("assignment_status ="), sql);
+        assertTrue(sql.contains("recycle_source_owner_user_id IN"), sql);
+        assertTrue(query.getParamNameValuePairs().containsValue("recycle_pending"));
+        assertFalse(query.getParamNameValuePairs().containsValue("public_pool"));
     }
 }

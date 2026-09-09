@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO;
@@ -23,6 +24,8 @@ public class DeliveryClassRespVO {
     private String categoryPathSnapshot;
     private Long examScheduleId;
     private String examScheduleSnapshot;
+    private String scheduleType;
+    private LocalDate exactDate;
     private Long homeroomUserId;
     private String homeroomUserNameSnapshot;
     private Long deptId;

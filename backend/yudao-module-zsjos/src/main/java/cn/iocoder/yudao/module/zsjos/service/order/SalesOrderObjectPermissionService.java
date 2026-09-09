@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.order;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -41,6 +42,7 @@ public class SalesOrderObjectPermissionService {
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
             case "read" -> canRead(order, userId);
+            case "read-management" -> canReadManagement(order, userId);
             case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
             case "continue-revise" -> canContinue(order, userId);
@@ -110,6 +112,40 @@ public class SalesOrderObjectPermissionService {
         if (user == null || user.getDeptId() == null
                 || permissionApi == null || !permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_TEAM)) return Set.of();
         return enabledUsers(user.getDeptId());
+    }
+
+    /**
+     * Resolves the submitters visible to the unified order-management list from
+     * System data scope. The result is tenant-scoped by the System APIs.
+     */
+    public SalesOrderManagementScope resolveManagementScope(Long userId) {
+        if (permissionApi == null) return SalesOrderManagementScope.empty();
+        DeptDataPermissionRespDTO scope = permissionApi.getDeptDataPermission(userId);
+        if (scope == null) return SalesOrderManagementScope.empty();
+        Set<Long> result = new LinkedHashSet<>();
+        if (Boolean.TRUE.equals(scope.getSelf())) result.add(userId);
+        if (Boolean.TRUE.equals(scope.getAll())) {
+            return new SalesOrderManagementScope(true, true, scope.getDeptIds(), result);
+        }
+        if (scope.getDeptIds() != null && !scope.getDeptIds().isEmpty()) {
+            adminUserApi.getUserListByDeptIds(scope.getDeptIds()).stream()
+                    .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+                    .map(AdminUserRespDTO::getId).forEach(result::add);
+        }
+        return new SalesOrderManagementScope(false, Boolean.TRUE.equals(scope.getSelf()), scope.getDeptIds(), result);
+    }
+
+    public boolean canReadManagement(SalesOrderDO order, Long userId) {
+        SalesOrderManagementScope scope = resolveManagementScope(userId);
+        if (scope.isAll()) return true;
+        if (scope.isEmpty()) return false;
+        if (scope.getSubmitterUserIds().contains(order.getSubmitterUserId())) return true;
+        if (scope.getDeptIds().isEmpty() || order.getSubmitterUserId() == null) return false;
+        AdminUserRespDTO submitter = adminUserApi.getUser(order.getSubmitterUserId());
+        return submitter != null
+                && CommonStatusEnum.ENABLE.getStatus().equals(submitter.getStatus())
+                && submitter.getDeptId() != null
+                && scope.getDeptIds().contains(submitter.getDeptId());
     }
 
     private boolean isTeamOrderReader(SalesOrderDO order, Long userId) {

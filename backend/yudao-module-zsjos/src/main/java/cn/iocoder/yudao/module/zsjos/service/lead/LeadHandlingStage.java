@@ -19,7 +19,8 @@ public final class LeadHandlingStage {
         if (ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())) return ASSIGNMENT_PENDING;
         if (ASSIGNMENT_UNASSIGNED.equals(lead.getAssignmentStatus())) return ASSIGNMENT_UNASSIGNED;
         if (STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
-            return lead.getQualificationDeadlineAt() == null ? FIRST_FOLLOW_PENDING : QUALIFICATION_PENDING;
+            return lead.getCurrentAssignmentFirstFollowUpAt() == null
+                    ? FIRST_FOLLOW_PENDING : QUALIFICATION_PENDING;
         }
         return lead.getStatus();
     }

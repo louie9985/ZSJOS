@@ -11,6 +11,8 @@ public class SalesOrderListItemRespVO {
     private String orderNo;
     private Long leadId;
     private Long personId;
+    private Long submitterUserId;
+    private String submitterUserName;
     private String orderType;
     private String status;
     private String buyerName;
@@ -54,4 +56,6 @@ public class SalesOrderListItemRespVO {
     private Long supervisorConfirmationId;
     private String supervisorConfirmationStatus;
     private String supervisorRequesterName;
+    private Boolean canRevise;
+    private Boolean canTerminate;
 }

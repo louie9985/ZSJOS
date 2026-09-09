@@ -460,6 +460,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PERSONAL_CALENDAR_EVENT_NOT_EXISTS = new ErrorCode(1_900_017_001, "个人日程不存在");
     ErrorCode PERSONAL_CALENDAR_PERMISSION_DENIED = new ErrorCode(1_900_017_002, "无权查看或操作该个人日程");
     ErrorCode PERSONAL_CALENDAR_TIME_INVALID = new ErrorCode(1_900_017_003, "日程结束时间不得早于开始时间");
+    ErrorCode COURSE_CALENDAR_NOT_EXISTS = new ErrorCode(1_900_020_001, "课程安排不存在");
+    ErrorCode COURSE_CALENDAR_TIME_INVALID = new ErrorCode(1_900_020_002, "课程结束时间不得早于开始时间");
+    ErrorCode COURSE_CALENDAR_FORM_INVALID = new ErrorCode(1_900_020_003, "课程形式无效或已停用");
+    ErrorCode COURSE_CALENDAR_ATTACHMENT_INVALID = new ErrorCode(1_900_020_004, "课程附件不存在或无效");
 
     ErrorCode FEEDBACK_TYPE_INVALID = new ErrorCode(1_900_016_001, "反馈类型无效");
     ErrorCode FEEDBACK_NOT_OPEN = new ErrorCode(1_900_016_002, "该类反馈暂未开放，请联系管理员配置分派负责人");

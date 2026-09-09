@@ -9,6 +9,7 @@ describe('student contact shortcuts', () => {
     expect(page).toContain('draft.quickNotes')
     expect(page).toContain('新增快捷备注')
     expect(page).toContain('student-contact-time-shortcuts')
-    expect(page).toContain('[1, 2, 3, 5, 7, 14, 30]')
+    expect(page).toContain('FOLLOW_UP_TIME_SHORTCUTS.map')
+    expect(page).toContain('applyFollowUpTimeShortcut(shortcut)')
   })
 })

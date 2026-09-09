@@ -5,14 +5,13 @@ import dayjs from 'dayjs'
 import { api, type DictData, type LeadAttachment, type LeadFollowUp, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { useBusinessOverlay } from './OverlayCoordinator'
-import { appendQuickNote, filterFollowUps } from '../services/leadFollowUp'
+import { applyFollowUpTimeShortcut, appendQuickNote, filterFollowUps, FOLLOW_UP_TIME_SHORTCUTS } from '../services/leadFollowUp'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import FollowUpTimeline from './FollowUpTimeline'
 
-const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
 
 type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
@@ -167,7 +166,7 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
                 <Form.Item name="nextFollowUpAt" label="下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
                   <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} disabledDate={date => date.endOf('day').isBefore(dayjs())}/>
                 </Form.Item>
-                <Space wrap className="follow-up-day-shortcuts">{QUICK_DAYS.map(days => <Button size="small" key={days} onClick={() => { form.setFieldValue('nextFollowUpAt', dayjs().add(days, 'day')); setDirty(true) }}>+{days} 天</Button>)}</Space>
+                <Space wrap className="follow-up-day-shortcuts">{FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => <Button size="small" key={shortcut.key} onClick={() => { form.setFieldValue('nextFollowUpAt', applyFollowUpTimeShortcut(shortcut)); setDirty(true) }}>{shortcut.label}</Button>)}</Space>
                 <div className="follow-up-upload-row">
                   <Form.Item label={`跟进图片${images.some(image => image.status === 'uploading') ? '（上传中）' : ''}`}>
                     <DeferredAttachmentPicker value={images} onChange={value => { setImages(value); setDirty(true) }} accept="image/jpeg,image/png,image/webp"/>

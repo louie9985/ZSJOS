@@ -33,6 +33,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.DELIVERY_CLASS_CATEGORY_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.DELIVERY_CLASS_CATEGORY_LOCKED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.DELIVERY_CLASS_TRANSFER_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -142,6 +144,50 @@ class DeliveryClassServiceImplTest {
         verify(notifyPublisher).publishOwnerChanged(
                 "homeroom-change:100:relation:12:v5", 12L, 100L, 11L, 20L, "班主任变更");
         verify(taskCommandService, times(2)).reassignPending(anyCollection(), anyLong(), eq(20L));
+    }
+
+    @Test
+    void updateUsesResolvedProductCategoryForCategoryLock() {
+        DeliveryClassDO current = deliveryClass(100L, false, 8L, 11L);
+        current.setClassName("原班级"); current.setExamScheduleId(70L); current.setVersion(2);
+        ZsjosProductCategoryDO category = new ZsjosProductCategoryDO().setId(9L).setName("新分类")
+                .setParentId(0L).setStatus(CommonStatusEnum.ENABLE.getStatus());
+        ExamScheduleDO schedule = new ExamScheduleDO().setId(70L).setCategoryId(9L)
+                .setRecordStatus("PUBLISHED").setScheduleType("EXACT")
+                .setExactDate(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).plusDays(1));
+        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
+        when(productSkuService.resolveExamScope(eq(500L), any())).thenReturn(scope(500L, 9L, 900L));
+        when(categoryMapper.selectById(9L)).thenReturn(category);
+        when(scheduleMapper.selectById(70L)).thenReturn(schedule);
+        when(classMapper.countAllRelations(1L, 100L)).thenReturn(1);
+
+        DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
+        request.setClassName("修改班级"); request.setProductId(500L); request.setCategoryId(9L);
+        request.setExamScheduleId(70L); request.setSelectedSkuIds(java.util.Set.of(900L)); request.setVersion(2);
+
+        var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.update(100L, request, 9L));
+
+        assertEquals(DELIVERY_CLASS_CATEGORY_LOCKED.getCode(), error.getCode());
+        verify(classMapper, never()).updateById(any(DeliveryClassDO.class));
+    }
+
+    @Test
+    void updateRejectsCategoryDifferentFromResolvedProduct() {
+        DeliveryClassDO current = deliveryClass(100L, false, 8L, 11L);
+        current.setVersion(2);
+        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
+        when(productSkuService.resolveExamScope(eq(500L), any())).thenReturn(scope(500L, 9L, 900L));
+
+        DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
+        request.setProductId(500L); request.setCategoryId(8L); request.setExamScheduleId(70L);
+        request.setSelectedSkuIds(java.util.Set.of(900L)); request.setVersion(2);
+
+        var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.update(100L, request, 9L));
+
+        assertEquals(DELIVERY_CLASS_CATEGORY_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(scheduleMapper, categoryMapper);
     }
 
     private static ServiceRelationDO relation(Long id, Long classId, Integer version) {

@@ -171,6 +171,9 @@ SOURCE script/sql/mysql/migrations/V187__exam_calendar.sql;
 SOURCE script/sql/mysql/migrations/V188__delivery_class_management.sql;
 SOURCE script/sql/mysql/migrations/V189__pms_menu_and_dictionary.sql;
 SOURCE script/sql/mysql/migrations/V190__delivery_class_product_scope.sql;
+SOURCE script/sql/mysql/migrations/V191__course_calendar.sql;
+SOURCE script/sql/mysql/migrations/V192__lead_qualification_from_ownership.sql;
+SOURCE script/sql/mysql/migrations/V193__unify_sales_order_management.sql;
 -- Current development baseline correction; no business/permission data writes.
 SOURCE script/sql/mysql/exam-calendar-product-scope.sql;
 SOURCE script/sql/mysql/migrations/V191__material_library_content_review.sql;

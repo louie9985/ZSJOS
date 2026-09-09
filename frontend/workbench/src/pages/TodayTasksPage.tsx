@@ -178,7 +178,7 @@ function BusinessTaskPanel({
       return
     }
     if (task.actionCode === 'OPEN_SALES_ORDER_REVISION') {
-      navigate(`${APP_ROUTES.MY_SALES_ORDERS}?orderId=${task.bizId}`)
+      navigate(`${APP_ROUTES.SALES_ORDERS}?orderId=${task.bizId}`)
       return
     }
     if (task.actionCode?.startsWith('OPEN_STUDENT_') && task.serviceRelationId) {

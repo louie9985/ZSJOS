@@ -91,6 +91,7 @@ export const APP_ROUTES = {
   BPM_TODO: '/bpm/task/todo',
   BPM_DONE: '/bpm/task/done',
   LEAD_APPEALS: '/zsjos/appeals',
+  SALES_ORDERS: '/zsjos/sales-orders',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   TEAM_SALES_ORDERS: '/zsjos/sales-orders/team',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
@@ -121,6 +122,7 @@ export const APP_ROUTES = {
   MEDIA_CALENDAR: '/calendar/overview',
   PERSONAL_CALENDAR: '/calendar/personal',
   EXAM_CALENDAR: '/calendar/exam-calendar',
+  COURSE_CALENDAR: '/calendar/course-calendar',
   MEDIA_ALL_CALENDAR: '/calendar/all',
   MATERIAL_LIBRARY: '/zsjos/material-library/browse',
   CONTENT_PRODUCTION: '/zsjos/material-library/content-production',
@@ -181,6 +183,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.SUBORDINATE_SALES,
   APP_ROUTES.SUBORDINATE_PARTNERS,
   APP_ROUTES.LEAD_APPEALS,
+  APP_ROUTES.SALES_ORDERS,
   APP_ROUTES.MY_SALES_ORDERS,
   APP_ROUTES.TEAM_SALES_ORDERS,
   APP_ROUTES.SALES_ORDER_APPROVALS,
@@ -210,6 +213,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MEDIA_CALENDAR,
   APP_ROUTES.PERSONAL_CALENDAR,
   APP_ROUTES.EXAM_CALENDAR,
+  APP_ROUTES.COURSE_CALENDAR,
   APP_ROUTES.MEDIA_ALL_CALENDAR,
   APP_ROUTES.MATERIAL_LIBRARY,
   APP_ROUTES.CONTENT_PRODUCTION,
@@ -228,6 +232,7 @@ export const MOBILE_RENDERABLE_APP_ROUTES: ReadonlySet<string> = new Set(
 // ========== Dictionaries ==========
 
 export const DICT_TYPE = {
+  COURSE_FORM: 'zsjos_course_form',
   COMMON_STATUS: 'common_status',
   LEAD_SOURCE_CHANNEL: 'zsjos_lead_source_channel',
   LEAD_CATEGORY: 'zsjos_lead_category',

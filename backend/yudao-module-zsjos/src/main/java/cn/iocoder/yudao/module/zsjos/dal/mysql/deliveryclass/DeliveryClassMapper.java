@@ -9,6 +9,8 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.util.Set;
+import java.util.Collection;
+import java.util.Map;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO;
 
@@ -51,6 +53,13 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
     int countStudents(@Param("tenantId") Long tenantId, @Param("classId") Long classId);
     @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0'")
     int countAllRelations(@Param("tenantId") Long tenantId, @Param("classId") Long classId);
+
+    @Select({"<script>", "SELECT class_id AS classId, COUNT(1) AS studentCount FROM zsjos_service_relation",
+            "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND status IN ('active','paused','completed')",
+            "AND class_id IN", "<foreach collection='classIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+            "GROUP BY class_id", "</script>"})
+    List<Map<String, Object>> countStudentsByClassIds(@Param("tenantId") Long tenantId,
+                                                       @Param("classIds") Collection<Long> classIds);
     default List<DeliveryClassDO> selectVisible(Long homeroomUserId, String status, boolean includeSystem) {
         LambdaQueryWrapperX<DeliveryClassDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(DeliveryClassDO::getStatus, status);

@@ -13,3 +13,9 @@ export const getPersonalCalendar = (params: { rangeStart: string; rangeEnd: stri
 export const createPersonalCalendar = (data: PersonalCalendarInput) => request.post<number>({ url: '/zsjos/personal-calendar', data })
 export const updatePersonalCalendar = (id: number, data: PersonalCalendarInput) => request.put({ url: `/zsjos/personal-calendar/${id}`, data })
 export const deletePersonalCalendar = (id: number) => request.delete({ url: `/zsjos/personal-calendar/${id}` })
+export interface CourseCalendarEvent { id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] }
+export interface CourseCalendarInput { courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] }
+export const getCourseCalendar = (params: { rangeStart: string; rangeEnd: string }) => request.get<CourseCalendarEvent[]>({ url: '/zsjos/course-calendar/page', params })
+export const createCourseCalendar = (data: CourseCalendarInput) => request.post<number>({ url: '/zsjos/course-calendar', data })
+export const updateCourseCalendar = (id: number, data: CourseCalendarInput) => request.put({ url: `/zsjos/course-calendar/${id}`, data })
+export const deleteCourseCalendar = (id: number) => request.delete({ url: `/zsjos/course-calendar/${id}` })

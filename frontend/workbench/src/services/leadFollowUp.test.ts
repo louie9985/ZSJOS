@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import dayjs from 'dayjs'
 import {
-  addFollowUpDays, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab, detailTabsFromProjection, filterFollowUps,
+  addFollowUpDays, applyFollowUpTimeShortcut, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab,
+  detailTabsFromProjection, filterFollowUps, FOLLOW_UP_TIME_SHORTCUTS,
   parseLeadDetailTab, resolveLeadDetailTab,
   shouldBlockLeadSwitch, shouldShowLeadOrderTab, snakeColumnsForWidth, snakeRowReversed
 } from './leadFollowUp'
@@ -24,6 +26,17 @@ describe('lead follow-up form logic', () => {
   it('opens customer details on overview unless a follow-up task requested the form', () => {
     expect(defaultLeadDetailTab(false)).toBe('overview')
     expect(defaultLeadDetailTab(true)).toBe('follow-ups')
+  })
+
+  it('provides shared minute and day shortcuts for all follow-up forms', () => {
+    expect(FOLLOW_UP_TIME_SHORTCUTS.map(item => item.label))
+      .toEqual(['+30 分钟', '+1 天', '+2 天', '+3 天', '+5 天', '+7 天', '+14 天', '+25 天', '+30 天'])
+
+    const now = dayjs('2026-09-09 10:15')
+    expect(applyFollowUpTimeShortcut(FOLLOW_UP_TIME_SHORTCUTS[0], now).format('YYYY-MM-DD HH:mm'))
+      .toBe('2026-09-09 10:45')
+    expect(applyFollowUpTimeShortcut(FOLLOW_UP_TIME_SHORTCUTS[7], now).format('YYYY-MM-DD HH:mm'))
+      .toBe('2026-10-04 10:15')
   })
 
   it('parses and authorizes Lead detail deep-link tabs', () => {

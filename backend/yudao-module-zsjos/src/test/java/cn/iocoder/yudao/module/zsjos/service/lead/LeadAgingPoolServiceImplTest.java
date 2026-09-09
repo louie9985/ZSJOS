@@ -159,28 +159,6 @@ class LeadAgingPoolServiceImplTest {
     }
 
     @Test
-    void preQualificationNoProgressWarnsThenReleasesToClaimPool() {
-        LocalDateTime now = LocalDateTime.of(2026, 8, 13, 12, 0);
-        LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO();
-        rule.setNoProgressWarningDays(7); rule.setNoProgressGraceDays(2);
-        LeadDO lead = new LeadDO();
-        lead.setId(1L); lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-        lead.setOwnerUserId(10L); lead.setOwnershipStartedAt(now.minusDays(10));
-        when(ruleService.requireEnabledRule()).thenReturn(rule);
-        when(leadMapper.selectPreQualificationNoProgressCandidates(now.minusDays(7))).thenReturn(java.util.List.of(lead));
-        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-
-        assertEquals(1, service.processPreQualificationNoProgress(now));
-        assertEquals(now, lead.getNoProgressWarnedAt());
-
-        lead.setNoProgressWarnedAt(now.minusDays(3));
-        assertEquals(1, service.processPreQualificationNoProgress(now));
-        assertEquals(ASSIGNMENT_PUBLIC_POOL, lead.getAssignmentStatus());
-        assertNull(lead.getOwnerUserId());
-        verify(assignmentHistoryMapper).insert(org.mockito.ArgumentMatchers.any(LeadAssignmentHistoryDO.class));
-    }
-
-    @Test
     void dueLeadDoesNotEnterAgingPoolWhileManualPublicSeaIsActive() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 19, 9, 0);
         LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO(); rule.setAgingPoolTimeoutDays(7);

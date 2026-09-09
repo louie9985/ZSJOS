@@ -43,26 +43,35 @@ export const getAuthenticatedLandingPath = (
 
 export interface AuthenticatedRouteTargetOptions {
   currentPath: string
+  currentFullPath: string
   explicitRedirect?: string
   defaultLandingPath: string
-  currentPathAuthorized?: boolean
-  explicitRedirectAuthorized?: boolean
 }
 
 export const resolveAuthenticatedRouteTarget = ({
   currentPath,
+  currentFullPath,
   explicitRedirect,
-  defaultLandingPath,
-  currentPathAuthorized = true,
-  explicitRedirectAuthorized = true
+  defaultLandingPath
 }: AuthenticatedRouteTargetOptions): string => {
   if (explicitRedirect && !['/', '/index'].includes(explicitRedirect)) {
-    return explicitRedirectAuthorized ? explicitRedirect : defaultLandingPath
+    return explicitRedirect
   }
   if (currentPath === '/' || currentPath === '/index') {
     return defaultLandingPath
   }
-  return currentPathAuthorized ? currentPath : defaultLandingPath
+  return currentFullPath
+}
+
+export interface AuthenticatedRouteNavigationOptions extends AuthenticatedRouteTargetOptions {
+  routesJustAdded: boolean
+}
+
+export const resolveAuthenticatedRouteNavigation = (
+  options: AuthenticatedRouteNavigationOptions
+): string | undefined => {
+  const target = resolveAuthenticatedRouteTarget(options)
+  return options.routesJustAdded || options.currentFullPath !== target ? target : undefined
 }
 
 export { DEFAULT_LANDING_PATH }

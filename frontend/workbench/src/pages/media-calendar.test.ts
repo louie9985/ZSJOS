@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
 import { calendarWeekdayLabel, mediaCalendarTone, mediaCalendarWindow, mondayOfWeek, parseCalendarDate } from './MediaCalendarPage'
-import { personalCalendarEventTouchesDay } from './PersonalCalendarPage'
+import { personalCalendarEventPosition, personalCalendarEventTouchesDay } from './PersonalCalendarPage'
 
 describe('calendar separation', () => {
   it('keeps account calendar date calculations stable', () => {
@@ -34,5 +34,17 @@ describe('calendar separation', () => {
     expect(personalCalendarEventTouchesDay(event, dayjs('2026-09-02'))).toBe(true)
     expect(personalCalendarEventTouchesDay(event, dayjs('2026-09-03'))).toBe(false)
     expect(personalCalendarEventTouchesDay({ startTime: '2026-09-04T12:00:00', endTime: '2026-09-04T12:00:00' } as any, dayjs('2026-09-04'))).toBe(true)
+  })
+
+  it('positions personal events by minute within the selected day', () => {
+    const position = personalCalendarEventPosition({ startTime: '2026-09-01T09:30:00', endTime: '2026-09-01T10:45:00' } as any, dayjs('2026-09-01'))
+    expect(position.top).toBeCloseTo(39.5833, 3)
+    expect(position.height).toBeCloseTo(5.2083, 3)
+  })
+
+  it('clips cross-day event positions to the selected day', () => {
+    const position = personalCalendarEventPosition({ startTime: '2026-08-31T23:00:00', endTime: '2026-09-01T01:00:00' } as any, dayjs('2026-09-01'))
+    expect(position.top).toBe(0)
+    expect(position.height).toBeCloseTo(4.1667, 3)
   })
 })
