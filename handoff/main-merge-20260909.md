@@ -48,3 +48,15 @@
 - Dependency or integration impact: 未执行数据库迁移或共享服务操作。
 - Remaining work: 推送提交并核对远程同步状态。
 - Status: `commit-created`
+
+## Delivery Entry - 2026-09-09 16:20:00 +08:00
+
+- Workstream ID: `main-merge-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c635deaffb`。
+- User goal: 提交并推送当前新增改动。
+- Key decisions: 纳入后端班级访问修复、Workbench 头像组件与课程日历更新、共享 avatar-kit、V195 SQL 迁移及相关文档测试；排除日志、缓存和临时 JAR。
+- Execution or analysis result: 已创建提交 `c635deaffb`，等待推送。
+- Changed files: 后端 delivery-class、Workbench 页面/组件/API/CSS/测试、`frontend/shared/avatar-kit`、V195 迁移、文档及本交接文件。
+- Verification evidence: `git diff --cached --check` 通过；提交成功。
+- Dependency or integration impact: 包含现有 package manifest/lockfile 改动；未执行数据库迁移或共享服务操作。
+- Remaining work: 推送提交并核对远程同步状态。
+- Status: `commit-created`
