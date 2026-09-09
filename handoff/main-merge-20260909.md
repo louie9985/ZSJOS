@@ -24,3 +24,15 @@
 - Dependency or integration impact: 无新增依赖、数据库或共享服务操作；未提交、未推送；原始本地恢复 stash `codex-pre-merge-20260909` 仍保留作为回退副本。
 - Remaining work: 等待用户明确授权后再提交或推送；需决定是否清理生成物和保留 stash。
 - Status: `resolved-awaiting-commit`
+
+## Delivery Entry - 2026-09-09 16:05:00 +08:00
+
+- Workstream ID: `main-merge-20260909`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `b22332ae6b`。
+- User goal: 提交并推送已完成的双方内容合并结果。
+- Key decisions: 创建普通合并提交并推送 `origin/main`；不纳入日志占位文件、Workbench 缓存和临时 JAR。
+- Execution or analysis result: 提交 `b22332ae6b` 已成功推送，远程 `main` 从 `a9f7e2a7c0` 更新至该提交。
+- Changed files: `handoff/main-merge-20260909.md`。
+- Verification evidence: 推送命令成功；`git rev-list --left-right --count HEAD...origin/main` 为 `0 0`；无未合并文件。
+- Dependency or integration impact: 远程仓库已更新；未执行数据库或共享服务操作；合并前 stash 仍保留。
+- Remaining work: `LOG_FILE_IS_UNDEFINED`、`frontend/workbench/.cache/`、`jrebel-classpath-44060.jar` 仍为本地未跟踪/未提交产物。
+- Status: `pushed`
