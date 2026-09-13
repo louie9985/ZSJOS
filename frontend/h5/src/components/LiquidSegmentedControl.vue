@@ -25,10 +25,13 @@ const activeIndex = computed(() => {
   return index >= 0 ? index : 0
 })
 
-const indicatorStyle = computed(() => ({
-  width: `${100 / Math.max(props.items.length, 1)}%`,
-  transform: `translateX(${activeIndex.value * 100}%)`
-}))
+const indicatorStyle = computed(() => {
+  const segmentCount = Math.max(props.items.length, 1)
+  return {
+    width: `calc(${100 / segmentCount}% - ${6 / segmentCount}px)`,
+    transform: `translateX(${activeIndex.value * 100}%)`
+  }
+})
 
 function select(key: string) {
   if (key === props.modelValue) return
@@ -70,7 +73,7 @@ function select(key: string) {
   overflow: hidden;
   border: 1px solid var(--h5-border);
   border-radius: 999px;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   isolation: isolate;
 }
 
@@ -91,8 +94,11 @@ function select(key: string) {
 .liquid-segmented__item {
   position: relative;
   z-index: 1;
+  display: flex;
   min-width: 0;
   height: 34px;
+  align-items: center;
+  justify-content: center;
   padding: 0 8px;
   overflow: hidden;
   border: 0;
@@ -100,6 +106,8 @@ function select(key: string) {
   color: var(--h5-text-secondary);
   font: inherit;
   font-size: 13px;
+  line-height: 18px;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: color 0.22s ease, transform 0.3s cubic-bezier(0.22, 1.35, 0.36, 1);

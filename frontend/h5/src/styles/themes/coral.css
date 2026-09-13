@@ -1,12 +1,13 @@
-/* 珊瑚粉主题 — 默认 */
-:root[data-theme="coral"],
-:root:not([data-theme]) {
+/* 珊瑚粉主题 */
+:root[data-theme="coral"] {
   --h5-primary: #F04455;
   --h5-primary-light: #FFF0F1;
   --h5-primary-dark: #D93648;
   --h5-primary-opacity: rgba(240, 68, 85, 0.1);
   --h5-gradient: linear-gradient(135deg, #F04455 0%, #FF7180 100%);
-  --h5-bg: #F7F8FA;
+  --h5-canvas-base: #FFFAFB;
+  --h5-canvas-tint: #FFEFF2;
+  --h5-bg: var(--h5-canvas-base);
   --h5-card-bg: #FFFFFF;
   --h5-text-primary: #1A1A1A;
   --h5-text-secondary: #666666;
@@ -20,8 +21,8 @@
 
   /* Vant 变量覆盖 */
   --van-primary-color: #F04455;
-  --van-background: #F7F8FA;
-  --van-background-2: #FFFFFF;
+  --van-background: var(--h5-canvas-base);
+  --van-background-2: var(--h5-glass-surface-strong);
   --van-text-color: #1A1A1A;
   --van-text-color-2: #666666;
   --van-text-color-3: #BFBFBF;

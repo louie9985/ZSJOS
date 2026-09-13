@@ -18,6 +18,7 @@ const activateMobile = ref('')
 const activatePassword = ref('')
 const activateConfirmPassword = ref('')
 const inviteCode = ref('')
+const agreementAccepted = ref(false)
 
 // 获取登录后跳转地址
 const redirectPath = () => (route.query.redirect as string) || '/home'
@@ -117,25 +118,6 @@ async function handleWecomLogin() {
     </div>
 
     <div class="login-form">
-      <div class="login-mode">
-        <van-button
-          size="small"
-          :type="mode === 'login' ? 'primary' : 'default'"
-          round
-          @click="mode = 'login'"
-        >
-          登录
-        </van-button>
-        <van-button
-          size="small"
-          :type="mode === 'activate' ? 'primary' : 'default'"
-          round
-          @click="mode = 'activate'"
-        >
-          首次登录去激活
-        </van-button>
-      </div>
-
       <van-cell-group v-if="mode === 'login'" inset>
         <van-field
           v-model="mobile"
@@ -196,7 +178,7 @@ async function handleWecomLogin() {
         />
       </van-cell-group>
 
-      <div class="login-actions" v-if="mode === 'login'">
+      <div class="login-actions login-actions--row" v-if="mode === 'login'">
         <van-button
           type="primary"
           block
@@ -227,6 +209,33 @@ async function handleWecomLogin() {
         </van-button>
       </div>
 
+      <div class="login-secondary">
+        <button
+          v-if="mode === 'login'"
+          type="button"
+          class="login-text-button"
+          :disabled="loading"
+          @click="mode = 'activate'"
+        >首次使用？激活账号</button>
+        <button
+          v-else
+          type="button"
+          class="login-text-button"
+          :disabled="loading"
+          @click="mode = 'login'"
+        >已有账号？返回登录</button>
+      </div>
+
+      <div class="login-agreement">
+        <input id="login-agreement" v-model="agreementAccepted" type="checkbox" />
+        <div>
+          <label for="login-agreement">请先阅读并同意</label>
+          <button type="button" class="login-text-button" @click="showToast('用户协议暂未配置')">《用户协议》</button>
+          <span>和</span>
+          <button type="button" class="login-text-button" @click="showToast('隐私政策暂未配置')">《隐私政策》</button>
+        </div>
+      </div>
+
       <div v-if="error" class="login-error">{{ error }}</div>
     </div>
   </div>
@@ -240,7 +249,7 @@ async function handleWecomLogin() {
   align-items: center;
   justify-content: center;
   padding: 0 24px;
-  background: var(--h5-bg);
+  background: transparent;
 }
 
 .login-header {
@@ -265,13 +274,6 @@ async function handleWecomLogin() {
   width: 100%;
 }
 
-.login-mode {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
 .login-form :deep(.van-cell-group--inset) {
   margin: 0;
   border-radius: 12px;
@@ -281,14 +283,53 @@ async function handleWecomLogin() {
 .login-actions {
   margin-top: 24px;
 }
+.login-actions--row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
 .login-actions .van-button {
   height: 46px;
   font-size: 16px;
 }
 .login-wecom-btn {
-  margin-top: 12px;
   color: var(--h5-text-secondary);
   border-color: var(--h5-divider);
+}
+
+.login-secondary {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+}
+.login-text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--h5-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.login-text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.login-agreement {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--h5-text-secondary);
+}
+.login-agreement input {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 3px 0 0;
+  accent-color: var(--h5-primary);
 }
 
 .login-error {

@@ -17,6 +17,7 @@ const businessTarget = computed(() => {
   const item = detail.value
   if (!item?.bizId || item.actionType !== 'business_detail') return undefined
   if (item.bizType === 'lead') return `/lead/${item.bizId}${item.sceneCode === 'zsjos.lead.submitter_feedback_created' ? '#submitter-feedback' : ''}`
+  if (item.bizType === 'sales_order') return '/lead/list'
   if (item.bizType === 'cashback') return '/earnings'
   if (item.bizType === 'withdrawal') return `/withdrawal/${item.bizId}`
   if (item.bizType === 'feedback') return `/feedback/${item.bizId}`
@@ -28,10 +29,15 @@ async function loadDetail() {
   loadError.value = ''
   try {
     const message = await getMessageDetail(id)
+    if (!message?.id) throw new Error('消息不存在或当前账号无权查看')
     detail.value = message
     if (!message.readStatus) {
       markRead([message.id])
-        .then(() => { detail.value = { ...message, readStatus: true } })
+        .then(() => {
+          if (detail.value?.id === message.id) {
+            detail.value = { ...detail.value, readStatus: true, readTime: new Date().toISOString() }
+          }
+        })
         .catch(() => {})
     }
   } catch (cause) {
@@ -63,12 +69,10 @@ onMounted(loadDetail)
           </div>
           <div class="message-detail__chips">
             <span class="message-detail__chip">消息</span>
-            <span class="message-detail__chip message-detail__chip--muted">{{ detail.bizType || '系统' }}</span>
           </div>
         </div>
 
-        <div class="message-detail__status">
-          <span>消息类型：{{ detail.bizType || '系统' }}</span>
+        <div v-if="detail.readTime" class="message-detail__status">
           <span v-if="detail.readTime">已读于 {{ formatDateTime(detail.readTime) }}</span>
         </div>
 
@@ -99,7 +103,7 @@ onMounted(loadDetail)
 .message-detail-page {
   min-height: 100vh;
   padding-bottom: 88px;
-  background: var(--h5-bg);
+  background: transparent;
 }
 
 .message-detail-page__skeleton {
@@ -162,11 +166,6 @@ onMounted(loadDetail)
   font-weight: 600;
 }
 
-.message-detail__chip--muted {
-  background: var(--h5-bg);
-  color: var(--h5-text-secondary);
-}
-
 .message-detail__status {
   display: flex;
   flex-wrap: wrap;
@@ -174,7 +173,7 @@ onMounted(loadDetail)
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--h5-primary) 6%, var(--h5-card-bg));
+  background: color-mix(in srgb, var(--h5-primary) 6%, var(--h5-glass-surface-strong));
   color: var(--h5-text-secondary);
   font-size: 12px;
   line-height: 1.4;
@@ -200,7 +199,7 @@ onMounted(loadDetail)
 .message-detail__section--summary p {
   padding: 12px;
   border-radius: 14px;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   color: var(--h5-text-secondary);
   font-size: 13px;
   line-height: 1.7;

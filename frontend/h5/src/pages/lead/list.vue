@@ -7,6 +7,9 @@ import { usePageList } from '@/composables/usePageList'
 import { getDictByType, getLeadCatalog, getMyLeadPage, getPartnerLeadFilterOptions, type LeadFilterOption, type LeadListItem } from '@/api/lead'
 import type { DictItem } from '@/stores/app'
 import { formatDate, formatLeadNo, formatLeadStatus } from '@/utils/format'
+import SmartAvatar from '@/components/SmartAvatar.vue'
+import LiquidSegmentedControl from '@/components/LiquidSegmentedControl.vue'
+import { leadAvatarSeed } from '@/config/avatar'
 
 defineOptions({ name: 'LeadList' })
 
@@ -15,6 +18,10 @@ const activeTab = ref('all')
 const keywordInput = ref('')
 const keyword = ref('')
 const showFilters = ref(false)
+const showPicker = ref(false)
+const pickerKind = ref<'option' | 'date'>('option')
+const pickerField = ref<FilterKey>()
+const pickerModel = ref<string[]>([])
 const optionLoading = ref(false)
 const optionError = ref('')
 const sourceChannels = ref<DictItem[]>([])
@@ -24,7 +31,11 @@ const appealOptions = ref<LeadFilterOption[]>([])
 const orderOptions = ref<LeadFilterOption[]>([])
 const advancedOptionError = ref('')
 const advancedFiltersAvailable = ref(false)
-const filters = reactive({ simpleStatus: '', assignmentStatus: '', sourceChannel: '', leadCategory: '', startDate: '', endDate: '', mainProductRef: '', appealStatus: '', orderReviewStatus: '' })
+type FilterKey = 'simpleStatus' | 'assignmentStatus' | 'sourceChannel' | 'leadCategory' | 'mainProductRef' | 'appealStatus' | 'orderReviewStatus' | 'startDate' | 'endDate'
+type FilterValues = Record<FilterKey, string>
+const emptyFilters = (): FilterValues => ({ simpleStatus: '', assignmentStatus: '', sourceChannel: '', leadCategory: '', startDate: '', endDate: '', mainProductRef: '', appealStatus: '', orderReviewStatus: '' })
+const filters = reactive<FilterValues>(emptyFilters())
+const draftFilters = reactive<FilterValues>(emptyFilters())
 
 const statusTabs = [
   { key: 'all', label: '全部' },
@@ -47,7 +58,20 @@ const stageOptions = [
   { value: 'suspended', label: '已挂起' }
 ]
 
-const advancedCount = computed(() => Object.values(filters).filter(Boolean).length)
+const advancedCount = computed(() => {
+  const dateCount = filters.startDate || filters.endDate ? 1 : 0
+  return Object.entries(filters).filter(([key, value]) => value && key !== 'startDate' && key !== 'endDate').length + dateCount
+})
+const pickerTitle = computed(() => pickerField.value ? ({
+  simpleStatus: '业务环节', assignmentStatus: '分配状态', sourceChannel: '来源渠道', leadCategory: '客资分类',
+  mainProductRef: '主课程', appealStatus: '申诉状态', orderReviewStatus: '订单状态', startDate: '开始日期', endDate: '结束日期'
+}[pickerField.value]) : '')
+const pickerColumns = computed(() => {
+  if (!pickerField.value || pickerKind.value === 'date') return []
+  return filterOptions(pickerField.value).map(item => ({ text: item.label, value: item.value }))
+})
+const pickerMinDate = new Date(2020, 0, 1)
+const pickerMaxDate = new Date()
 const filterParams = computed(() => ({
   ...(activeTab.value !== 'all' ? { status: activeTab.value } : {}),
   ...(filters.simpleStatus ? { simpleStatus: filters.simpleStatus } : {}),
@@ -92,6 +116,25 @@ function optionText(options: Array<{ label: string; value: string }>, value: str
   return options.find(item => item.value === value)?.label || value
 }
 
+function filterOptions(key: FilterKey) {
+  if (key === 'simpleStatus') return stageOptions
+  if (key === 'assignmentStatus') return assignmentOptions
+  if (key === 'sourceChannel') return [{ value: '', label: '全部' }, ...sourceChannels.value]
+  if (key === 'leadCategory') return [{ value: '', label: '全部' }, ...leadCategories.value]
+  if (key === 'mainProductRef') return [{ value: '', label: advancedFiltersAvailable.value ? '全部' : '暂不可用' }, ...productOptions.value]
+  if (key === 'appealStatus') return [{ value: '', label: advancedFiltersAvailable.value ? '全部' : '暂不可用' }, ...appealOptions.value]
+  if (key === 'orderReviewStatus') return [{ value: '', label: advancedFiltersAvailable.value ? '全部' : '暂不可用' }, ...orderOptions.value]
+  return []
+}
+
+function draftOptionText(key: FilterKey) {
+  return optionText(filterOptions(key), draftFilters[key]) || '全部'
+}
+
+function formatPickerDate(value: string) {
+  return value || '请选择日期'
+}
+
 async function loadOptions() {
   if (optionLoading.value) return
   optionLoading.value = true
@@ -122,27 +165,59 @@ async function loadOptions() {
   }
 }
 
-function openFilters() { showFilters.value = true; void loadOptions() }
+function openFilters() { Object.assign(draftFilters, filters); showFilters.value = true; void loadOptions() }
 function submitSearch() { keyword.value = keywordInput.value.trim(); refresh() }
 function clearSearch() { keywordInput.value = ''; keyword.value = ''; refresh() }
 function selectStatus(status: string) { activeTab.value = status; refresh() }
 function applyFilters() {
-  if (Boolean(filters.startDate) !== Boolean(filters.endDate)) { showToast('请选择完整的提交时间范围'); return }
-  if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) { showToast('开始日期不能晚于结束日期'); return }
+  if (Boolean(draftFilters.startDate) !== Boolean(draftFilters.endDate)) { showToast('请选择完整的提交时间范围'); return }
+  if (draftFilters.startDate && draftFilters.endDate && draftFilters.startDate > draftFilters.endDate) { showToast('开始日期不能晚于结束日期'); return }
+  Object.assign(filters, draftFilters)
   showFilters.value = false
   refresh()
 }
-function resetFilters() {
-  Object.assign(filters, { simpleStatus: '', assignmentStatus: '', sourceChannel: '', leadCategory: '', startDate: '', endDate: '', mainProductRef: '', appealStatus: '', orderReviewStatus: '' })
+function resetDraftFilters() {
+  Object.assign(draftFilters, emptyFilters())
+}
+function clearActiveFilters() {
+  Object.assign(filters, emptyFilters())
+  Object.assign(draftFilters, emptyFilters())
   refresh()
 }
 function clearQuery() {
   activeTab.value = 'all'
   keywordInput.value = ''
   keyword.value = ''
-  Object.assign(filters, { simpleStatus: '', assignmentStatus: '', sourceChannel: '', leadCategory: '', startDate: '', endDate: '', mainProductRef: '', appealStatus: '', orderReviewStatus: '' })
+  Object.assign(filters, emptyFilters())
+  Object.assign(draftFilters, emptyFilters())
   refresh()
 }
+function openOptionPicker(field: FilterKey) {
+  pickerField.value = field
+  pickerKind.value = 'option'
+  pickerModel.value = [draftFilters[field] || filterOptions(field)[0]?.value || '']
+  showPicker.value = true
+}
+function openDatePicker(field: 'startDate' | 'endDate') {
+  pickerField.value = field
+  pickerKind.value = 'date'
+  const value = draftFilters[field] || new Date().toISOString().slice(0, 10)
+  pickerModel.value = value.split('-')
+  showPicker.value = true
+}
+function confirmPicker(values?: { selectedValues?: string[] } | string[]) {
+  if (!pickerField.value) return
+  const field = pickerField.value
+  const selectedValues = Array.isArray(values) ? values : values?.selectedValues
+  if (pickerKind.value === 'date') {
+    const selected = (selectedValues || pickerModel.value).map(value => String(value).padStart(2, '0'))
+    draftFilters[field] = selected.join('-')
+  } else {
+    draftFilters[field] = (selectedValues || pickerModel.value)[0] || ''
+  }
+  showPicker.value = false
+}
+function cancelPicker() { showPicker.value = false }
 function goDetail(id: number) { router.push(`/lead/${id}`) }
 function goSubmit() { router.push('/lead/submit') }
 
@@ -170,56 +245,33 @@ function cardDate(item: LeadListItem) {
   return { label: '提交', value: item.submittedAt }
 }
 
-function avatarText(item: LeadListItem) {
-  return (item.submittedName || '客')[0] || '客'
-}
 </script>
 
 <template>
   <div class="page-container lead-list-page">
-    <van-nav-bar title="我的客资" />
-
-    <section class="card page-hero lead-hero" aria-label="客资概览">
-      <div class="page-hero__head">
-        <div>
-          <div class="page-hero__title">我的客资</div>
-          <div class="page-hero__subtitle">查看已提交客资的状态、跟进进度和历史记录。</div>
-          <div class="page-hero__meta">
-            <span class="page-chip">{{ total }} 条记录</span>
-            <span class="page-chip page-chip--muted">{{ activeTabLabel }}</span>
-          </div>
-        </div>
-        <div class="page-hero__aside">
-          <div class="page-hero__avatar"><van-icon name="friends-o" size="22" /></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card lead-toolbar">
+    <section class="lead-toolbar">
       <div class="lead-search">
-        <van-search v-model="keywordInput" class="lead-search__field" placeholder="搜索姓名、手机号或客资编号" shape="round" @search="submitSearch" @clear="clearSearch" />
+        <van-search v-model="keywordInput" class="lead-search__field" placeholder="搜索姓名、手机号或客资编号" shape="round" @search="submitSearch" @clear="clearSearch" @click-left-icon="submitSearch" />
         <button type="button" class="lead-filter-button" :class="{ active: advancedCount > 0 }" @click="openFilters">
           <van-icon name="filter-o" size="17" />
-          <span>筛选<span v-if="advancedCount"> {{ advancedCount }}</span></span>
+          <span>筛选</span>
+          <em v-if="advancedCount">{{ advancedCount }}</em>
         </button>
       </div>
 
-      <div class="status-segments" role="tablist" aria-label="客资状态">
-        <button
-          v-for="tab in statusTabs"
-          :key="tab.key"
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === tab.key"
-          :class="{ active: activeTab === tab.key }"
-          @click="selectStatus(tab.key)"
-        >{{ tab.label }}</button>
-      </div>
+      <LiquidSegmentedControl
+        class="status-segments"
+        :model-value="activeTab"
+        :items="statusTabs"
+        ariaLabel="客资状态"
+        compact
+        @change="selectStatus"
+      />
 
-      <button type="button" class="lead-filter-summary" @click="openFilters">
+      <button v-if="advancedCount" type="button" class="lead-filter-summary" @click="openFilters">
         <span class="filter-summary__title">筛选条件</span>
         <span class="filter-summary__text">{{ activeFilterSummary || '按课程、来源或业务环节筛选' }}</span>
-        <span v-if="advancedCount" class="filter-summary__clear" @click.stop="resetFilters">清空</span>
+        <span class="filter-summary__clear" @click.stop="clearActiveFilters">清空</span>
         <van-icon name="arrow" size="14" />
       </button>
     </section>
@@ -246,7 +298,7 @@ function avatarText(item: LeadListItem) {
         <div v-else class="lead-list">
           <button v-for="item in list" :key="item.id" type="button" class="page-list-card lead-card" @click="goDetail(item.id)">
             <div class="lead-card__head">
-              <div class="lead-card__avatar">{{ avatarText(item) }}</div>
+              <SmartAvatar class="lead-card__avatar" :seed="leadAvatarSeed(item.id)" :size="36" shape="rounded" label="" />
               <div class="lead-card__identity">
                 <strong>{{ item.submittedName || '未命名客户' }}</strong>
                 <span>{{ formatLeadNo(item.leadNo) }}</span>
@@ -271,25 +323,71 @@ function avatarText(item: LeadListItem) {
 
     <button type="button" class="fab-btn" aria-label="提交客资" @click="goSubmit"><van-icon name="plus" size="25" color="#fff" /></button>
 
-    <van-popup v-model:show="showFilters" position="bottom" round class="filter-popup" safe-area-inset-bottom>
+    <van-popup
+      v-model:show="showFilters"
+      position="bottom"
+      round
+      teleport="body"
+      class="filter-popup norem"
+      overlay-class="h5-glass-overlay"
+      safe-area-inset-bottom
+    >
+      <div class="filter-popup__grip" aria-hidden="true" />
       <div class="filter-header">
         <div><strong>筛选条件</strong><small v-if="advancedCount">已选择 {{ advancedCount }} 项</small></div>
-        <button type="button" @click="resetFilters">重置</button>
+        <div class="filter-header__actions">
+          <button type="button" class="filter-reset" @click="resetDraftFilters">重置</button>
+          <button type="button" class="filter-close" aria-label="关闭筛选" title="关闭" @click="showFilters = false"><van-icon name="cross" size="20" /></button>
+        </div>
       </div>
       <van-loading v-if="optionLoading" class="filter-loading">加载筛选项...</van-loading>
       <van-empty v-else-if="optionError" :description="optionError" image="error" :image-size="56"><van-button size="mini" type="primary" @click="loadOptions">重试</van-button></van-empty>
       <div v-else class="filter-form">
-        <van-notice-bar v-if="advancedOptionError" color="#8a6100" background="#fff7df">申诉和订单筛选暂不可用</van-notice-bar>
-        <label><span>业务环节</span><select v-model="filters.simpleStatus"><option v-for="item in stageOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>分配状态</span><select v-model="filters.assignmentStatus"><option v-for="item in assignmentOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>来源渠道</span><select v-model="filters.sourceChannel"><option value="">全部</option><option v-for="item in sourceChannels" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>客资分类</span><select v-model="filters.leadCategory"><option value="">全部</option><option v-for="item in leadCategories" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>主课程</span><select v-model="filters.mainProductRef" :disabled="!advancedFiltersAvailable"><option value="">{{ advancedFiltersAvailable ? '全部' : '暂不可用' }}</option><option v-for="item in productOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>申诉状态</span><select v-model="filters.appealStatus" :disabled="!advancedFiltersAvailable"><option value="">{{ advancedFiltersAvailable ? '全部' : '暂不可用' }}</option><option v-for="item in appealOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label><span>订单状态</span><select v-model="filters.orderReviewStatus" :disabled="!advancedFiltersAvailable"><option value="">{{ advancedFiltersAvailable ? '全部' : '暂不可用' }}</option><option v-for="item in orderOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <div class="date-range"><span>提交时间</span><div><input v-model="filters.startDate" type="date" aria-label="开始日期" /><em>至</em><input v-model="filters.endDate" type="date" aria-label="结束日期" /></div></div>
+        <van-notice-bar v-if="advancedOptionError" class="filter-notice" wrapable>申诉和订单筛选暂不可用</van-notice-bar>
+        <button type="button" class="filter-row" @click="openOptionPicker('simpleStatus')"><span>业务环节</span><strong>{{ draftOptionText('simpleStatus') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" @click="openOptionPicker('assignmentStatus')"><span>分配状态</span><strong>{{ draftOptionText('assignmentStatus') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" @click="openOptionPicker('sourceChannel')"><span>来源渠道</span><strong>{{ draftOptionText('sourceChannel') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" @click="openOptionPicker('leadCategory')"><span>客资分类</span><strong>{{ draftOptionText('leadCategory') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" :disabled="!advancedFiltersAvailable" @click="openOptionPicker('mainProductRef')"><span>主课程</span><strong>{{ draftOptionText('mainProductRef') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" :disabled="!advancedFiltersAvailable" @click="openOptionPicker('appealStatus')"><span>申诉状态</span><strong>{{ draftOptionText('appealStatus') }}</strong><van-icon name="arrow" /></button>
+        <button type="button" class="filter-row" :disabled="!advancedFiltersAvailable" @click="openOptionPicker('orderReviewStatus')"><span>订单状态</span><strong>{{ draftOptionText('orderReviewStatus') }}</strong><van-icon name="arrow" /></button>
+        <div class="date-range"><span>提交时间</span><div><button type="button" class="date-trigger" @click="openDatePicker('startDate')">{{ formatPickerDate(draftFilters.startDate) }}<van-icon name="arrow" /></button><em>至</em><button type="button" class="date-trigger" @click="openDatePicker('endDate')">{{ formatPickerDate(draftFilters.endDate) }}<van-icon name="arrow" /></button></div></div>
       </div>
-      <div class="filter-actions"><van-button block round type="primary" @click="applyFilters">查看结果</van-button></div>
+      <div class="filter-actions"><van-button block round type="primary" @click="applyFilters">确认</van-button></div>
+    </van-popup>
+
+    <van-popup
+      v-model:show="showPicker"
+      position="bottom"
+      round
+      teleport="body"
+      class="picker-popup norem"
+      overlay-class="h5-glass-overlay"
+      safe-area-inset-bottom
+    >
+      <div class="picker-popup__grip" aria-hidden="true" />
+      <van-picker
+        v-if="pickerKind === 'option'"
+        v-model="pickerModel"
+        :columns="pickerColumns"
+        :title="pickerTitle"
+        cancel-button-text="取消"
+        confirm-button-text="确认"
+        @cancel="cancelPicker"
+        @confirm="confirmPicker"
+      />
+      <van-date-picker
+        v-else
+        v-model="pickerModel"
+        :title="pickerTitle"
+        :min-date="pickerMinDate"
+        :max-date="pickerMaxDate"
+        :columns-type="['year', 'month', 'day']"
+        cancel-button-text="取消"
+        confirm-button-text="确认"
+        @cancel="cancelPicker"
+        @confirm="confirmPicker"
+      />
     </van-popup>
   </div>
 </template>
@@ -298,26 +396,32 @@ function avatarText(item: LeadListItem) {
 .lead-list-page {
   min-height: 100vh;
   padding-bottom: 88px;
-  background: var(--h5-bg);
-}
-
-.lead-hero {
-  margin-top: 12px;
-  padding: 16px;
+  background: transparent;
 }
 
 .lead-toolbar {
-  gap: 12px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 20PX;
+  gap: 10px;
+  background: transparent;
 }
 
 .lead-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 74px;
+  grid-template-columns: minmax(0, 1fr) 68px;
   align-items: center;
-  gap: 8px;
+  min-height: 40px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 12%, var(--h5-glass-border));
+  border-radius: 14px;
+  background: transparent;
 }
 
 .lead-search__field {
+  min-width: 0;
+  height: 40px;
   padding: 0;
   background: transparent;
 }
@@ -325,8 +429,22 @@ function avatarText(item: LeadListItem) {
 .lead-search__field :deep(.van-search__content) {
   height: 40px;
   align-items: center;
-  border-radius: 14px;
-  background: var(--h5-bg);
+  border-radius: 0;
+  background: transparent;
+}
+
+.lead-search__field :deep(.van-field__control) {
+  color: var(--h5-text-primary);
+  font-size: 13px;
+}
+
+.lead-search__field :deep(.van-field__left-icon) {
+  color: var(--h5-primary);
+  cursor: pointer;
+}
+
+.lead-search__field :deep(.van-field__control::placeholder) {
+  color: var(--h5-text-placeholder);
 }
 
 .lead-search__field :deep(.van-field__body) {
@@ -335,47 +453,49 @@ function avatarText(item: LeadListItem) {
 }
 
 .lead-filter-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 3px;
   height: 40px;
-  border: 1px solid var(--h5-border);
-  border-radius: 12px;
-  background: var(--h5-card-bg);
-  color: var(--h5-text-secondary);
-  font-size: 12px;
+  padding: 0 7px;
+  border: 0;
+  border-left: 1px solid var(--h5-glass-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--h5-primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lead-filter-button em {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--h5-primary);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 16px;
 }
 
 .lead-filter-button.active {
-  border-color: color-mix(in srgb, var(--h5-primary) 35%, transparent);
   background: var(--h5-primary-opacity);
-  color: var(--h5-primary);
 }
 
-.status-segments {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
+.lead-filter-button:active {
+  transform: scale(0.98);
 }
 
-.status-segments button {
-  min-width: 0;
-  height: 34px;
-  padding: 0 4px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: var(--h5-bg);
-  color: var(--h5-text-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.status-segments button.active {
-  border-color: color-mix(in srgb, var(--h5-primary) 35%, transparent);
-  background: var(--h5-primary-opacity);
-  color: var(--h5-primary);
-  font-weight: 600;
+.status-segments :deep(.liquid-segmented) {
+  border-color: color-mix(in srgb, var(--h5-primary) 12%, var(--h5-glass-border));
+  background: transparent;
+  box-shadow: none;
 }
 
 .lead-filter-summary {
@@ -384,9 +504,8 @@ function avatarText(item: LeadListItem) {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 7px;
-  padding: 8px 2px 0;
+  padding: 0 2px;
   border: 0;
-  border-top: 1px solid var(--h5-divider);
   background: transparent;
   text-align: left;
 }
@@ -417,8 +536,8 @@ function avatarText(item: LeadListItem) {
 .lead-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 16px 0;
+  gap: 12px;
+  padding: 6px 16px 0;
 }
 
 .lead-list .page-list-card + .page-list-card {
@@ -429,12 +548,14 @@ function avatarText(item: LeadListItem) {
   display: block;
   width: 100%;
   padding: 14px 16px;
-  border: 1px solid var(--h5-border);
+  border: 1px solid var(--h5-glass-border);
   border-radius: 16px;
-  background: var(--h5-card-bg);
-  box-shadow: 0 6px 20px rgba(31, 35, 48, 0.05);
+  background: var(--h5-content-surface);
+  box-shadow: var(--h5-glass-shadow);
   color: var(--h5-text-primary);
   text-align: left;
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
 }
 
 .lead-card:active {
@@ -503,7 +624,7 @@ function avatarText(item: LeadListItem) {
 .lead-status--success { background: rgba(82, 196, 26, 0.1); color: var(--h5-success); }
 .lead-status--danger { background: rgba(255, 77, 79, 0.1); color: var(--h5-danger); }
 .lead-status--warning { background: rgba(250, 173, 20, 0.12); color: #c77d00; }
-.lead-status--muted { background: var(--h5-bg); color: var(--h5-text-secondary); }
+.lead-status--muted { background: var(--h5-glass-sunken); color: var(--h5-text-secondary); }
 
 .lead-card__body {
   margin-top: 10px;
@@ -585,6 +706,18 @@ function avatarText(item: LeadListItem) {
   margin: 12px 16px 0;
 }
 
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lead-card { background: var(--h5-content-surface); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lead-card {
+    background: var(--h5-content-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 .fab-btn {
   position: fixed;
   right: max(20px, calc((100vw - 10rem) / 2 + 20px));
@@ -603,20 +736,128 @@ function avatarText(item: LeadListItem) {
 }
 
 .filter-popup {
-  right: auto;
-  left: 50%;
-  width: 100%;
-  max-width: 10rem;
-  max-height: 84vh;
+  right: 0;
+  left: 0;
+  display: flex;
+  width: min(100%, 10rem);
+  max-height: min(84dvh, 720px);
+  flex-direction: column;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 24px 24px 0 0;
   background: var(--h5-card-bg);
-  transform: translate3d(-50%, 0, 0);
+  box-shadow: var(--h5-glass-shadow-floating);
+}
+
+.picker-popup {
+  --van-picker-background: transparent;
+  --van-picker-option-text-color: var(--h5-text-secondary);
+  --van-picker-mask-color:
+    linear-gradient(180deg, color-mix(in srgb, var(--h5-card-bg) 90%, transparent), transparent),
+    linear-gradient(0deg, color-mix(in srgb, var(--h5-card-bg) 90%, transparent), transparent);
+
+  right: 0;
+  left: 0;
+  width: min(100%, 10rem);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--h5-card-bg);
+  box-shadow: var(--h5-glass-shadow-floating);
+}
+
+.filter-popup.norem,
+.picker-popup.norem {
+  border-radius: 24px 24px 0 0;
+}
+
+.filter-popup__grip,
+.picker-popup__grip {
+  width: 32px;
+  height: 3px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--h5-glass-divider);
+}
+
+.picker-popup__grip {
+  display: none;
+}
+
+.picker-popup :deep(.van-picker) {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.picker-popup :deep(.van-picker__toolbar) {
+  min-height: 54px;
+  background: transparent;
+}
+
+.picker-popup :deep(.van-picker__title) {
+  color: var(--h5-text-primary);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.picker-popup :deep(.van-picker__cancel),
+.picker-popup :deep(.van-picker__confirm) {
+  height: 34px;
+  margin: 0 10px;
+  padding: 0 10px;
+  border: 1px solid var(--h5-glass-border);
+  border-radius: 10px;
+  background: var(--h5-glass-sunken);
+  font-size: 12px;
+}
+
+.picker-popup :deep(.van-picker__cancel) { color: var(--h5-text-secondary); }
+.picker-popup :deep(.van-picker__confirm) { color: var(--h5-primary); font-weight: 600; }
+
+.picker-popup :deep(.van-picker__columns) {
+  margin: 8px 12px 12px;
+  background: transparent;
+}
+
+.picker-popup :deep(.van-picker__frame) {
+  right: 8px;
+  left: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--h5-text-primary) 6%, transparent);
+}
+
+.picker-popup :deep(.van-picker__frame::after) {
+  border: 0;
+}
+
+.picker-popup :deep(.van-picker-column__item) {
+  color: var(--h5-text-secondary);
+}
+
+.picker-popup :deep(.van-picker-column__item--selected) {
+  position: relative;
+  z-index: 3;
+  color: var(--h5-text-primary);
+  font-weight: 650;
 }
 
 .filter-header {
   display: flex;
+  min-height: 58px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 16px 10px;
+  gap: 12px;
+  padding: 10px 14px 8px 20px;
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: transparent;
 }
 
 .filter-header > div {
@@ -626,7 +867,9 @@ function avatarText(item: LeadListItem) {
 }
 
 .filter-header strong {
+  color: var(--h5-text-primary);
   font-size: 17px;
+  font-weight: 600;
 }
 
 .filter-header small {
@@ -634,60 +877,163 @@ function avatarText(item: LeadListItem) {
   font-size: 11px;
 }
 
+.filter-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
 .filter-header button {
-  padding: 4px;
   border: 0;
-  background: transparent;
+  font: inherit;
+}
+
+.filter-header .filter-reset {
+  min-width: 44px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--h5-glass-sunken);
   color: var(--h5-primary);
-  font-size: 12px;
+  font-size: 11px;
+}
+
+.filter-close {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--h5-glass-sunken);
+  color: var(--h5-text-secondary);
+}
+
+.filter-reset:active,
+.filter-close:active {
+  background: var(--h5-primary-opacity);
+  color: var(--h5-primary);
 }
 
 .filter-loading {
   display: flex;
+  min-height: 240px;
   justify-content: center;
+  align-items: center;
   padding: 40px 0;
+  color: var(--h5-primary);
 }
 
 .filter-form {
   display: grid;
-  max-height: 58vh;
-  padding: 0 16px;
+  min-height: 0;
+  flex: 1;
+  padding: 8px 16px 12px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.filter-form label,
+.filter-notice {
+  min-height: 38px;
+  height: auto;
+  margin: 2px 0 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--h5-warning) 28%, var(--h5-glass-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--h5-warning) 10%, transparent);
+  color: color-mix(in srgb, var(--h5-warning) 76%, var(--h5-text-primary));
+  font-size: 11px;
+}
+
+.filter-form .filter-row,
 .date-range {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
   align-items: center;
-  min-height: 54px;
-  border-bottom: 1px solid var(--h5-divider);
+  min-height: 46px;
+  border-bottom: 1px solid var(--h5-glass-divider);
   font-size: 13px;
   color: var(--h5-text-primary);
 }
 
-.filter-form select,
-.date-range input {
+.filter-row {
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.filter-row strong {
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--h5-border);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--h5-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-row :deep(.van-icon) {
+  position: absolute;
+  right: 12px;
+  color: var(--h5-primary);
+  pointer-events: none;
+}
+
+.filter-row:active:not(:disabled) strong {
+  border-color: color-mix(in srgb, var(--h5-primary) 38%, var(--h5-border));
+  background: transparent;
+}
+
+.filter-row:disabled { opacity: 0.48; }
+
+.date-range { grid-template-columns: 82px minmax(0, 1fr); }
+.date-trigger {
   min-width: 0;
   width: 100%;
-  height: 36px;
+  height: 32px;
   padding: 0 10px;
   border: 1px solid var(--h5-border);
-  border-radius: 8px;
+  border-radius: 11px;
   outline: 0;
-  background: var(--h5-bg);
+  background: transparent;
   color: var(--h5-text-primary);
   font-size: 12px;
 }
 
-.filter-form select:focus,
-.date-range input:focus {
-  border-color: var(--h5-primary);
-  background: var(--h5-card-bg);
+.date-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  color: var(--h5-text-primary);
+  text-align: left;
 }
 
-.filter-form select:disabled {
-  color: var(--h5-text-placeholder);
+.date-trigger:empty { color: var(--h5-text-placeholder); }
+.date-trigger :deep(.van-icon) { flex: 0 0 auto; color: var(--h5-primary); }
+
+.date-trigger:active {
+  border-color: color-mix(in srgb, var(--h5-primary) 38%, var(--h5-border));
+  background: transparent;
+}
+
+.date-trigger:focus-visible,
+.filter-row:focus-visible {
+  border-color: var(--h5-primary);
+  background: transparent;
 }
 
 .date-range > div {
@@ -705,11 +1051,39 @@ function avatarText(item: LeadListItem) {
 }
 
 .filter-actions {
-  padding: 14px 16px;
+  flex: 0 0 auto;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--h5-glass-divider);
+  background: transparent;
+}
+
+.filter-actions :deep(.van-button) {
+  height: 44px;
+  border: 0;
+  background: var(--h5-gradient);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--h5-primary) 24%, transparent);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .filter-popup,
+  .picker-popup {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .filter-popup,
+  .picker-popup {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 @media (min-width:700px) {
-  .lead-toolbar, .page-empty-card {
+  .page-empty-card {
     margin-left: auto;
     margin-right: auto;
     width: calc(100% - 32px);

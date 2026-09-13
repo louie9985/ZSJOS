@@ -31,9 +31,9 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="修改密码" left-arrow @click-left="$router.back()" />
-    <div class="card">
+  <div class="page-container my-subpage-page profile-form-page">
+    <van-nav-bar class="my-subpage__nav" title="修改密码" left-arrow @click-left="$router.back()" />
+    <div class="card profile-form-card">
       <van-field v-model="form.oldPassword" type="password" label="当前密码" placeholder="请输入当前密码" required />
       <van-field v-model="form.newPassword" type="password" label="新密码" placeholder="8-20位，包含字母和数字" required />
       <van-field v-model="form.confirmPassword" type="password" label="确认密码" placeholder="再次输入新密码" required />
@@ -43,3 +43,9 @@ async function handleSubmit() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.profile-form-page .profile-form-card {
+  background: var(--h5-content-surface);
+}
+</style>

@@ -8,7 +8,7 @@
       <van-empty v-if="runtime && runtime.status !== 'DRAFT'" :description="statusText" />
       <form v-else-if="runtime" @submit.prevent="submit">
         <div v-for="field in runtime.fields" :key="field.key" class="collection-field">
-          <label :for="field.key">{{ field.label }}<span v-if="field.required" class="required"> *</span></label>
+          <label :for="field.key"><span :class="{ 'h5-required-label': field.required }">{{ field.label }}</span></label>
           <select v-if="field.type === 'dict'" :id="field.key" v-model="answers[field.key]" :required="field.required" :disabled="saving">
             <option value="">请选择</option>
             <option v-for="option in runtime.options[field.key] || []" :key="option.value" :value="option.value">{{ option.label }}</option>
@@ -118,6 +118,5 @@ h1 { margin: 0 0 24px; font-size: 22px; font-weight: 600; letter-spacing: 0; }
 .collection-field input, .collection-field textarea, .collection-field select, .area-control { width: 100%; box-sizing: border-box; border: 1px solid #c9cdd4; border-radius: 4px; padding: 10px; min-height: 44px; font: inherit; color: #202020; background: #fff; }
 .area-control { text-align: left; }
 .collection-field p { margin: 6px 0 0; color: #666; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
-.required { color: #b42318; }
 .collection-loading { padding: 24px; text-align: center; }
 </style>

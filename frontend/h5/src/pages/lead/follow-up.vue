@@ -1,17 +1,28 @@
 <script setup lang="ts">
 import ProductSpecs from '../../components/ProductSpecs.vue'
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getLeadFollowUpSummary, getMyLeadPage, type LeadFollowUpSummary, type LeadListItem } from '@/api/lead'
 import { usePageList } from '@/composables/usePageList'
 import { formatDate, formatLeadNo, formatLeadStatus } from '@/utils/format'
+import SmartAvatar from '@/components/SmartAvatar.vue'
+import LiquidSegmentedControl from '@/components/LiquidSegmentedControl.vue'
+import { leadAvatarSeed } from '@/config/avatar'
 
 defineOptions({ name: 'LeadFollowUp' })
 
 type FollowUpView = 'follow_up_pending' | 'unreachable' | 'invalid'
 
 const router = useRouter()
-const activeView = ref<FollowUpView>('follow_up_pending')
+const route = useRoute()
+
+function normalizeView(value: unknown): FollowUpView {
+  return value === 'unreachable' || value === 'invalid' || value === 'follow_up_pending'
+    ? value
+    : 'follow_up_pending'
+}
+
+const activeView = ref<FollowUpView>(normalizeView(route.query.view))
 const summary = ref<LeadFollowUpSummary>()
 const summaryError = ref('')
 const summaryLoading = ref(true)
@@ -22,6 +33,10 @@ const tabs = computed(() => [
   { key: 'invalid' as const, label: '已判无效', count: summary.value?.invalidCount || 0 }
 ])
 const activeTab = computed(() => tabs.value.find(tab => tab.key === activeView.value) || tabs.value[0])
+const segmentItems = computed(() => tabs.value.map(tab => ({
+  key: tab.key,
+  label: summaryLoading.value ? tab.label : `${tab.label} · ${tab.count}`
+})))
 const params = computed(() => ({ view: activeView.value }))
 const { list, total, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   request => getMyLeadPage(request), params, { immediate: false }
@@ -40,7 +55,12 @@ async function loadSummary() {
   }
 }
 
-function selectView(view: FollowUpView) { if (activeView.value !== view) activeView.value = view }
+function selectView(view: FollowUpView) {
+  if (activeView.value !== view) activeView.value = view
+  if (route.query.view !== view) {
+    void router.replace({ query: { ...route.query, view } })
+  }
+}
 function goDetail(id: number) { router.push(`/lead/${id}`) }
 function primaryCourse(item: LeadListItem) {
   return item.primaryProduct?.spuName
@@ -57,13 +77,19 @@ function stageText(item: LeadListItem) {
   return formatLeadStatus(item.status)
 }
 function cardTime(item: LeadListItem) { return item.lastActivityAt || item.qualifiedAt || item.submittedAt }
-function avatarText(item: LeadListItem) { return (item.submittedName || '客')[0] || '客' }
 function statusClass(status: string) {
   return status === 'invalid' ? 'danger'
     : ['valid', 'won'].includes(status) ? 'success'
       : status === 'suspended' ? 'warning' : 'primary'
 }
 
+watch(() => route.query.view, value => {
+  const view = normalizeView(value)
+  if (activeView.value !== view) activeView.value = view
+  if (value !== view) {
+    void router.replace({ query: { ...route.query, view } })
+  }
+}, { immediate: true })
 watch(activeView, () => { void refresh() }, { immediate: true })
 void loadSummary()
 </script>
@@ -72,12 +98,14 @@ void loadSummary()
   <div class="page-container lead-follow-up-page">
     <van-nav-bar title="客资跟进提醒" left-arrow @click-left="router.back()" />
 
-    <section class="card follow-up-tabs" role="tablist" aria-label="客资跟进分类">
-      <button v-for="tab in tabs" :key="tab.key" type="button" role="tab" :aria-selected="activeView === tab.key" :class="{ active: activeView === tab.key }" @click="selectView(tab.key)">
-        <strong>{{ tab.label }}</strong>
-        <span v-if="summaryLoading">--</span><span v-else>{{ tab.count }}</span>
-      </button>
-    </section>
+    <LiquidSegmentedControl
+      class="follow-up-tabs"
+      :model-value="activeView"
+      :items="segmentItems"
+      ariaLabel="客资跟进分类"
+      compact
+      @change="key => selectView(normalizeView(key))"
+    />
 
     <div v-if="summaryError" class="follow-up-summary-error">
       <span>{{ summaryError }}</span><button type="button" @click="loadSummary">重试</button>
@@ -106,7 +134,7 @@ void loadSummary()
         </div>
         <div v-else class="follow-up-list">
           <button v-for="item in list" :key="item.id" type="button" class="card follow-up-card" @click="goDetail(item.id)">
-            <span class="follow-up-card__avatar">{{ avatarText(item) }}</span>
+            <SmartAvatar class="follow-up-card__avatar" :seed="leadAvatarSeed(item.id)" :size="40" shape="rounded" label="" />
             <span class="follow-up-card__main">
               <span class="follow-up-card__identity"><strong>{{ item.submittedName || '未命名客户' }}</strong><small>{{ formatLeadNo(item.leadNo) }}</small></span>
               <span class="follow-up-card__course">{{ primaryCourse(item) }}</span>
@@ -123,20 +151,16 @@ void loadSummary()
 </template>
 
 <style scoped>
-.lead-follow-up-page { min-height: 100vh; padding-bottom: 28px; background: var(--h5-bg); }
-.follow-up-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 0; padding: 6px; border: 1px solid var(--h5-border); border-radius: 16px; background: var(--h5-card-bg); box-shadow: 0 6px 20px rgba(31, 35, 48, 0.05); }
-.follow-up-tabs button { display: flex; min-width: 0; height: 58px; align-items: center; justify-content: center; gap: 5px; border: 0; border-radius: 12px; background: transparent; color: var(--h5-text-secondary); }
-.follow-up-tabs button.active { background: var(--h5-primary-opacity); color: var(--h5-primary); }
-.follow-up-tabs strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.follow-up-tabs span { min-width: 20px; font-size: 17px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.lead-follow-up-page { min-height: 100vh; padding-bottom: 28px; background: transparent; }
+.follow-up-tabs { margin: 12px 16px 0; }
 .follow-up-summary-error { display: flex; align-items: center; justify-content: space-between; margin: 8px 16px 0; color: var(--h5-danger); font-size: 11px; }
 .follow-up-summary-error button { border: 0; background: transparent; color: var(--h5-primary); }
 .follow-up-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 18px 18px 10px; }
 .follow-up-list-head h1 { margin: 0; color: var(--h5-text-primary); font-size: 18px; line-height: 1.4; }
 .follow-up-list-head p { margin-top: 3px; color: var(--h5-text-secondary); font-size: 11px; line-height: 1.45; }
 .follow-up-list-head > span { flex: 0 0 auto; color: var(--h5-text-placeholder); font-size: 11px; }
-.follow-up-list { display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
-.follow-up-card { display: grid; width: 100%; min-height: 104px; grid-template-columns: 40px minmax(0, 1fr) auto 16px; align-items: start; gap: 10px; padding: 14px; border: 1px solid var(--h5-border); border-radius: 16px; background: var(--h5-card-bg); box-shadow: 0 6px 20px rgba(31, 35, 48, 0.05); color: var(--h5-text-primary); text-align: left; }
+.follow-up-list { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
+.follow-up-card { display: grid; width: 100%; min-height: 104px; margin: 0; grid-template-columns: 40px minmax(0, 1fr) auto 16px; align-items: start; gap: 10px; padding: 14px; border: 1px solid var(--h5-glass-border); border-radius: 16px; background: var(--h5-content-surface); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 6px 20px rgba(31, 35, 48, 0.07); color: var(--h5-text-primary); text-align: left; }
 button.follow-up-card:active { transform: scale(0.99); }
 .follow-up-card--skeleton { display: block; }
 .follow-up-card__avatar { display: flex; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 13px; background: var(--h5-primary-opacity); color: var(--h5-primary); font-size: 15px; font-weight: 700; }
@@ -155,5 +179,5 @@ button.follow-up-card:active { transform: scale(0.99); }
 .follow-up-card__status--warning { background: rgba(250, 173, 20, 0.12); color: #c77d00; }
 .follow-up-card__arrow { align-self: center; color: var(--h5-text-placeholder); }
 .follow-up-state { margin: 0 16px; padding: 14px; border-radius: 16px; }
-@media (max-width: 360px) { .follow-up-tabs { margin-right: 12px; margin-left: 12px; } .follow-up-tabs button { gap: 3px; } .follow-up-tabs strong { font-size: 12px; } .follow-up-list { padding-right: 12px; padding-left: 12px; } }
+@media (max-width: 360px) { .follow-up-tabs { margin-right: 12px; margin-left: 12px; } .follow-up-list { padding-right: 12px; padding-left: 12px; } }
 </style>

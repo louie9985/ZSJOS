@@ -221,7 +221,7 @@ function goAppeal() {
 </script>
 
 <template>
-  <div class="page-container">
+  <div class="page-container lead-detail-page">
     <van-nav-bar title="客资详情" left-arrow @click-left="$router.back()" />
     <van-skeleton :loading="loading" :row="8" style="padding: 16px;">
       <van-empty v-if="loadError" :description="loadError" image="error">
@@ -265,28 +265,24 @@ function goAppeal() {
         </div>
 
         <!-- 客户信息 -->
-        <div class="card">
+        <div class="card detail-card customer-card">
           <div class="section-title">客户信息</div>
-          <van-cell-group :border="false">
-            <van-cell title="姓名" :value="lead.submittedName" />
-            <van-cell v-if="lead.submittedMobile" title="手机号" :value="lead.submittedMobile" />
-            <van-cell v-if="lead.submittedWechatId" title="微信号" :value="lead.submittedWechatId" />
-            <van-cell title="提交时间" :value="formatDateTime(lead.submittedAt)" />
-            <van-cell v-if="lead.sourceUserName" title="来源人" :value="lead.sourceUserName" />
-            <van-cell v-if="lead.providerOwnerNameSnapshot" title="提供方" :value="lead.providerOwnerNameSnapshot" />
-            <van-cell v-if="lead.ownerUserName" title="负责销售" :value="lead.ownerUserName" />
-            <van-cell v-if="lead.pendingAssigneeUserName" title="待接销售" :value="lead.pendingAssigneeUserName" />
-            <van-cell v-if="lead.assignmentStatus === 'pending_acceptance'" title="处理状态" value="等待平台处理" />
-            <van-cell title="来源类型" :value="lead.sourceLabel || '来源未配置'" />
-            <van-cell title="来源渠道">
-              <template #value>
-                <span>{{ sourceChannelLabel }}</span>
-              </template>
-            </van-cell>
-            <van-cell title="客资分类" :value="lead.leadCategoryLabelSnapshot || lead.leadCategory" />
-            <van-cell v-if="lead.closedAt" title="关闭时间" :value="formatDateTime(lead.closedAt)" />
-            <van-cell v-if="lead.closeReason" title="关闭原因" :value="lead.closeReason" />
-          </van-cell-group>
+          <div class="detail-fields">
+            <div class="detail-field"><span>姓名</span><strong>{{ lead.submittedName }}</strong></div>
+            <div v-if="lead.submittedMobile" class="detail-field"><span>手机号</span><strong>{{ lead.submittedMobile }}</strong></div>
+            <div v-if="lead.submittedWechatId" class="detail-field"><span>微信号</span><strong>{{ lead.submittedWechatId }}</strong></div>
+            <div class="detail-field"><span>提交时间</span><strong>{{ formatDateTime(lead.submittedAt) }}</strong></div>
+            <div v-if="lead.sourceUserName" class="detail-field"><span>来源人</span><strong>{{ lead.sourceUserName }}</strong></div>
+            <div v-if="lead.providerOwnerNameSnapshot" class="detail-field"><span>提供方</span><strong>{{ lead.providerOwnerNameSnapshot }}</strong></div>
+            <div v-if="lead.ownerUserName" class="detail-field"><span>负责销售</span><strong>{{ lead.ownerUserName }}</strong></div>
+            <div v-if="lead.pendingAssigneeUserName" class="detail-field"><span>待接销售</span><strong>{{ lead.pendingAssigneeUserName }}</strong></div>
+            <div v-if="lead.assignmentStatus === 'pending_acceptance'" class="detail-field"><span>处理状态</span><strong>等待平台处理</strong></div>
+            <div class="detail-field"><span>来源类型</span><strong>{{ lead.sourceLabel || '来源未配置' }}</strong></div>
+            <div class="detail-field"><span>来源渠道</span><strong>{{ sourceChannelLabel }}</strong></div>
+            <div class="detail-field"><span>客资分类</span><strong>{{ lead.leadCategoryLabelSnapshot || lead.leadCategory }}</strong></div>
+            <div v-if="lead.closedAt" class="detail-field"><span>关闭时间</span><strong>{{ formatDateTime(lead.closedAt) }}</strong></div>
+            <div v-if="lead.closeReason" class="detail-field"><span>关闭原因</span><strong>{{ lead.closeReason }}</strong></div>
+          </div>
         </div>
 
         <div class="card">
@@ -304,21 +300,32 @@ function goAppeal() {
         <div v-if="detailProducts.length > 0" class="card">
           <div class="section-title">意向课程</div>
           <div v-for="product in detailProducts" :key="`${product.spuRef}-${product.skuRef || ''}`" class="product-item">
-            <div><strong>{{ product.spuName || '课程' }}</strong><p v-if="product.categoryName">{{ product.categoryName }}</p><ProductSpecs :product="product" /><p v-if="product.skuName">{{ product.skuName }}</p></div>
-            <div><van-tag v-if="product.primary" type="primary" size="medium">主意向</van-tag><span v-if="product.price != null" class="product-price">¥{{ product.price }}</span></div>
+            <div class="product-item__body">
+              <strong class="product-item__title">{{ product.spuName || '课程' }}</strong>
+              <p v-if="product.categoryName" class="product-item__meta">{{ product.categoryName }}</p>
+              <ProductSpecs :product="product" />
+              <p v-if="product.skuName" class="product-item__meta">{{ product.skuName }}</p>
+            </div>
+            <div class="product-item__aside">
+              <van-tag v-if="product.primary" type="primary" size="medium">主意向</van-tag>
+              <span v-if="product.price != null" class="product-price">¥{{ product.price }}</span>
+            </div>
           </div>
         </div>
 
-        <div v-if="lead.validDescription" class="card"><div class="section-title">有效说明</div><p class="detail-text">{{ lead.validDescription }}</p></div>
+        <div v-if="lead.validDescription" class="card">
+          <div class="section-title">有效说明</div>
+          <p class="detail-text">{{ lead.validDescription }}</p>
+        </div>
 
-        <div v-if="lead.qualificationDeadlineAt || lead.suspendedAt || lead.appealDeadlineAt || lead.currentAssignmentFirstFollowUpDeadlineAt" class="card">
+        <div v-if="lead.qualificationDeadlineAt || lead.suspendedAt || lead.appealDeadlineAt || lead.currentAssignmentFirstFollowUpDeadlineAt" class="card detail-card">
           <div class="section-title">处理时限</div>
-          <van-cell-group :border="false">
-            <van-cell v-if="lead.currentAssignmentFirstFollowUpDeadlineAt" title="首次跟进截止" :value="formatDateTime(lead.currentAssignmentFirstFollowUpDeadlineAt)" />
-            <van-cell v-if="lead.qualificationDeadlineAt" title="有效判定截止" :value="formatDateTime(lead.qualificationDeadlineAt)" />
-            <van-cell v-if="lead.suspendedAt" title="挂起时间" :value="formatDateTime(lead.suspendedAt)" />
-            <van-cell v-if="lead.appealDeadlineAt" title="申诉截止" :value="formatDateTime(lead.appealDeadlineAt)" />
-          </van-cell-group>
+          <div class="detail-fields">
+            <div v-if="lead.currentAssignmentFirstFollowUpDeadlineAt" class="detail-field"><span>首次跟进截止</span><strong>{{ formatDateTime(lead.currentAssignmentFirstFollowUpDeadlineAt) }}</strong></div>
+            <div v-if="lead.qualificationDeadlineAt" class="detail-field"><span>有效判定截止</span><strong>{{ formatDateTime(lead.qualificationDeadlineAt) }}</strong></div>
+            <div v-if="lead.suspendedAt" class="detail-field"><span>挂起时间</span><strong>{{ formatDateTime(lead.suspendedAt) }}</strong></div>
+            <div v-if="lead.appealDeadlineAt" class="detail-field"><span>申诉截止</span><strong>{{ formatDateTime(lead.appealDeadlineAt) }}</strong></div>
+          </div>
         </div>
 
         <div v-if="lead.attachments?.length" class="card">
@@ -340,10 +347,10 @@ function goAppeal() {
 
         <div v-if="lead.invalidReason || lead.invalidDescription || lead.invalidEvidence?.length" class="card">
           <div class="section-title">无效说明</div>
-          <van-cell-group :border="false">
-            <van-cell v-if="lead.invalidReason" title="无效原因" :value="lead.invalidReasonLabelSnapshot || lead.invalidReason" />
-            <van-cell v-if="lead.invalidDescription" title="补充说明" :label="lead.invalidDescription" />
-          </van-cell-group>
+          <div class="detail-fields">
+            <div v-if="lead.invalidReason" class="detail-field"><span>无效原因</span><strong>{{ lead.invalidReasonLabelSnapshot || lead.invalidReason }}</strong></div>
+            <div v-if="lead.invalidDescription" class="detail-field detail-field--stacked"><span>补充说明</span><strong>{{ lead.invalidDescription }}</strong></div>
+          </div>
           <div v-if="lead.invalidEvidence?.length" class="attachment-grid record-images">
             <button v-for="(file, index) in lead.invalidEvidence" :key="file.infraFileId" type="button" class="attachment-item" @click="previewUrls(lead.invalidEvidence!.map(item => item.fileUrl || '').filter(Boolean), index)">
               <img v-if="file.fileUrl" :src="file.fileUrl" :alt="file.originalName" />
@@ -438,6 +445,7 @@ function goAppeal() {
         <!-- 底部操作栏 -->
         <LeadSubmitterFeedback v-if="lead.visibleTabs?.includes('submitter-feedback')" :key="leadId" :lead-id="leadId" />
         <div v-if="actions.size > 0" class="detail-actions safe-area-bottom">
+          <div class="detail-actions__inner">
           <van-button
             v-if="actions.has('SUBMITTER_SUPPLEMENT')"
             size="small"
@@ -445,6 +453,7 @@ function goAppeal() {
             plain
             @click="goSupplement"
           >
+            <van-icon name="edit" />
             补充
           </van-button>
           <van-button
@@ -455,6 +464,7 @@ function goAppeal() {
             :loading="urgeLoading"
             @click="handleUrge"
           >
+            <van-icon name="clock-o" />
             催办
           </van-button>
           <van-button
@@ -464,6 +474,7 @@ function goAppeal() {
             plain
             @click="goComplaint"
           >
+            <van-icon name="warning-o" />
             投诉
           </van-button>
           <van-button
@@ -473,8 +484,10 @@ function goAppeal() {
             type="primary"
             @click="goAppeal"
           >
+            <van-icon name="info-o" />
             申诉
           </van-button>
+          </div>
         </div>
       </template>
     </van-skeleton>
@@ -482,6 +495,34 @@ function goAppeal() {
 </template>
 
 <style scoped>
+.lead-detail-page { padding-bottom: 104px; }
+
+.lead-detail-page :deep(.van-nav-bar) {
+  border-bottom-color: var(--h5-glass-border);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.detail-card { overflow: hidden; }
+
+.detail-fields { margin: 0 -4px; }
+.detail-field {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.34fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-height: 42px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--h5-divider);
+}
+.detail-field:last-child { border-bottom: 0; }
+.detail-field > span { color: var(--h5-text-secondary); font-size: 12px; line-height: 20px; }
+.detail-field > strong { min-width: 0; color: var(--h5-text-primary); font-size: 13px; font-weight: 500; line-height: 20px; text-align: right; overflow-wrap: anywhere; }
+.detail-field--stacked { grid-template-columns: 76px minmax(0, 1fr); }
+.detail-field--stacked > strong { text-align: left; white-space: pre-wrap; }
+
 .status-card {
   border-top: 3px solid var(--h5-primary);
 }
@@ -499,7 +540,7 @@ function goAppeal() {
   padding: 4px 10px;
   border: 1px solid currentColor;
   border-radius: 12px;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   font-size: 12px;
   line-height: 16px;
   text-overflow: ellipsis;
@@ -545,10 +586,14 @@ function goAppeal() {
 }
 
 .section-title {
-  font-size: 15px;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
   color: var(--h5-text-primary);
-  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 22px;
 }
 .progress-card {
   min-height: 154px;
@@ -642,14 +687,51 @@ function goAppeal() {
 
 .product-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
   padding: 8px 0;
-  font-size: 14px;
   border-bottom: 1px solid var(--h5-divider);
 }
 .product-item:last-child {
   border-bottom: none;
+}
+.product-item__body { min-width: 0; flex: 1; }
+.product-item__title {
+  display: block;
+  color: var(--h5-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.product-item__meta {
+  margin-top: 4px;
+  color: var(--h5-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.product-item__aside {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.product-price {
+  color: var(--h5-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+}
+.detail-text {
+  margin: 0;
+  color: var(--h5-text-secondary);
+  font-size: 75%;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .attachment-grid {
   display: grid;
@@ -689,14 +771,20 @@ function goAppeal() {
   bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--h5-card-bg);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--h5-glass-border);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 10;
 }
-.detail-actions .van-button {
-  flex: 1;
+.detail-actions__inner { display: flex; gap: 8px; width: 100%; max-width: 10rem; margin: 0 auto; }
+.detail-actions .van-button { flex: 1; min-width: 0; height: 40px; }
+.detail-actions .van-button :deep(.van-icon) { margin-right: 4px; font-size: 15px; vertical-align: -2px; }
+
+@media (max-width: 340px) {
+  .detail-actions__inner { gap: 5px; }
+  .detail-actions .van-button { padding: 0 6px; font-size: 12px; }
 }
 </style>

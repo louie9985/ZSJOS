@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { showToast } from 'vant'
 import { uploadLeadAttachment, type UploadResult } from '@/api/lead'
 import { createIdempotencyKey } from '@/utils/idempotency'
@@ -7,7 +7,8 @@ export interface UploadFile {
   id: string
   file: File
   url: string
-  status: 'uploading' | 'done' | 'error'
+  status: 'queued' | 'uploading' | 'processing' | 'done' | 'error'
+  progress: number
   result?: UploadResult
   error?: string
 }
@@ -17,9 +18,13 @@ export interface UploadFile {
  */
 export function useUpload(maxCount = 9) {
   const fileList = ref<UploadFile[]>([])
-  const uploading = ref(false)
+  const controllers = new Map<string, AbortController>()
+  const uploading = computed(() => fileList.value.some(file => (
+    file.status === 'queued' || file.status === 'uploading' || file.status === 'processing'
+  )))
+  let queueRunning = false
 
-  async function addFile(file: File) {
+  function addFile(file: File) {
     if (fileList.value.length >= maxCount) {
       showToast(`最多上传 ${maxCount} 张图片`)
       return
@@ -27,33 +32,68 @@ export function useUpload(maxCount = 9) {
 
     const id = createIdempotencyKey()
     const url = URL.createObjectURL(file)
-    const item: UploadFile = { id, file, url, status: 'uploading' }
+    const item: UploadFile = { id, file, url, status: 'queued', progress: 0 }
     fileList.value.push(item)
+    void runQueue()
+  }
 
-    uploading.value = true
+  async function uploadItem(item: UploadFile) {
+    const controller = new AbortController()
+    controllers.set(item.id, controller)
+    item.status = 'uploading'
+    item.progress = 0
     try {
-      const result = await uploadLeadAttachment(file)
+      const result = await uploadLeadAttachment(item.file, {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (!fileList.value.some(file => file.id === item.id)) return
+          item.progress = progress
+          item.status = progress >= 100 ? 'processing' : 'uploading'
+        }
+      })
+      if (!fileList.value.some(file => file.id === item.id)) return
       item.status = 'done'
+      item.progress = 100
       item.result = result
       item.error = undefined
-      URL.revokeObjectURL(url)
+      if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
       item.url = result.fileUrl
     } catch (cause) {
+      if (!fileList.value.some(file => file.id === item.id) || controller.signal.aborted) return
       item.status = 'error'
-      item.error = cause instanceof Error ? cause.message : '图片上传失败'
+      item.progress = 0
+      item.error = uploadErrorMessage(cause)
     } finally {
-      uploading.value = fileList.value.some(f => f.status === 'uploading')
+      controllers.delete(item.id)
     }
+  }
+
+  async function runQueue() {
+    if (queueRunning) return
+    queueRunning = true
+    try {
+      let next = fileList.value.find(file => file.status === 'queued')
+      while (next) {
+        await uploadItem(next)
+        next = fileList.value.find(file => file.status === 'queued')
+      }
+    } finally {
+      queueRunning = false
+      if (fileList.value.some(file => file.status === 'queued')) void runQueue()
+    }
+  }
+
+  function uploadErrorMessage(cause: unknown) {
+    if (!(cause instanceof Error)) return '图片上传失败，请重试'
+    if (/timeout|timed out|ECONNABORTED/i.test(cause.message)) return '上传超时，请重试'
+    return cause.message || '图片上传失败，请重试'
   }
 
   function removeFile(id: string) {
     const idx = fileList.value.findIndex(f => f.id === id)
     if (idx >= 0) {
       const item = fileList.value[idx]
-      if (item.status === 'uploading') {
-        showToast('图片正在上传，请稍候')
-        return
-      }
+      controllers.get(id)?.abort()
       if (item.url.startsWith('blob:')) {
         URL.revokeObjectURL(item.url)
       }
@@ -63,24 +103,13 @@ export function useUpload(maxCount = 9) {
 
   async function retryFile(id: string) {
     const item = fileList.value.find(f => f.id === id)
-    if (!item) return
+    if (!item || item.status !== 'error') return
 
-    item.status = 'uploading'
+    item.status = 'queued'
+    item.progress = 0
     item.result = undefined
     item.error = undefined
-    uploading.value = true
-    try {
-      const result = await uploadLeadAttachment(item.file)
-      item.status = 'done'
-      item.result = result
-      if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
-      item.url = result.fileUrl
-    } catch (cause) {
-      item.status = 'error'
-      item.error = cause instanceof Error ? cause.message : '图片上传失败'
-    } finally {
-      uploading.value = fileList.value.some(f => f.status === 'uploading')
-    }
+    await runQueue()
   }
 
   function getUploadedIds(): number[] {
@@ -94,11 +123,12 @@ export function useUpload(maxCount = 9) {
   }
 
   function reset() {
+    controllers.forEach(controller => controller.abort())
+    controllers.clear()
     fileList.value.forEach(f => {
       if (f.url.startsWith('blob:')) URL.revokeObjectURL(f.url)
     })
     fileList.value = []
-    uploading.value = false
   }
 
   function getUploadedFiles(): UploadResult[] {
@@ -106,6 +136,8 @@ export function useUpload(maxCount = 9) {
       .filter(f => f.status === 'done' && f.result)
       .map(f => f.result!)
   }
+
+  onUnmounted(reset)
 
   return {
     fileList,

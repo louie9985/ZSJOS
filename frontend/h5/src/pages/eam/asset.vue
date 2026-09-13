@@ -177,7 +177,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.asset-page { min-height: 100vh; background: #f7f8fa; padding-bottom: 24px; }
+.asset-page { min-height: 100vh; padding-bottom: 24px; background: transparent; }
 .state { padding: 48px 0; text-align: center; }
 .edit-box { margin-top: 16px; padding-bottom: 12px; }
 .edit-box .van-button { margin: 12px auto 0; width: calc(100% - 32px); }

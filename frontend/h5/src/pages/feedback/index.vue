@@ -76,17 +76,17 @@ function changeFilter() {
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="系统反馈" left-arrow @click-left="$router.back()">
+  <div class="page-container feedback-list-page">
+    <van-nav-bar class="feedback-top-nav" title="系统反馈" left-arrow @click-left="$router.back()">
       <template #right>
         <van-icon name="plus" size="20" @click="router.push('/feedback/create')" />
       </template>
     </van-nav-bar>
-    <van-search v-model="keywordInput" placeholder="搜索反馈编号或标题" shape="round" @search="search" @clear="clearSearch" />
-    <van-tabs v-model:active="activeType" shrink @change="changeFilter">
+    <van-search class="feedback-top-search" v-model="keywordInput" placeholder="搜索反馈编号或标题" shape="round" @search="search" @clear="clearSearch" />
+    <van-tabs class="feedback-top-tabs feedback-type-tabs" v-model:active="activeType" shrink @change="changeFilter">
       <van-tab v-for="tab in typeTabs" :key="tab.key" :name="tab.key" :title="tab.label" />
     </van-tabs>
-    <van-tabs v-model:active="activeStatus" shrink sticky @change="changeFilter">
+    <van-tabs class="feedback-top-tabs feedback-status-tabs" v-model:active="activeStatus" shrink sticky @change="changeFilter">
       <van-tab v-for="tab in statusTabs" :key="tab.key" :name="tab.key" :title="tab.label" />
     </van-tabs>
     <van-pull-refresh v-model="refreshing" @refresh="refresh">
@@ -112,5 +112,80 @@ function changeFilter() {
 </template>
 
 <style scoped>
+.feedback-row {
+  background: var(--h5-content-surface);
+}
+
+.feedback-list-page :deep(.feedback-top-nav),
+.feedback-list-page :deep(.feedback-top-search),
+.feedback-list-page :deep(.feedback-top-tabs) {
+  background: var(--h5-glass-surface);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+}
+
+.feedback-list-page :deep(.feedback-top-nav) {
+  border-bottom: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.feedback-list-page :deep(.feedback-top-nav)::after {
+  display: none;
+}
+
+.feedback-list-page :deep(.feedback-top-search) {
+  padding: 10px 16px;
+}
+
+.feedback-list-page :deep(.feedback-top-search .van-search__content) {
+  background: var(--h5-glass-surface-subtle);
+  backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
+}
+
+.feedback-list-page :deep(.feedback-top-tabs .van-tabs__wrap),
+.feedback-list-page :deep(.feedback-top-tabs .van-tabs__nav) {
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.feedback-list-page :deep(.feedback-status-tabs) {
+  border-bottom: 1px solid var(--h5-glass-divider);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .feedback-list-page :deep(.feedback-top-nav),
+  .feedback-list-page :deep(.feedback-top-search),
+  .feedback-list-page :deep(.feedback-top-tabs) {
+    background: var(--h5-glass-surface-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .feedback-list-page :deep(.feedback-top-search .van-search__content) {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .feedback-list-page :deep(.feedback-top-nav),
+  .feedback-list-page :deep(.feedback-top-search),
+  .feedback-list-page :deep(.feedback-top-tabs) {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .feedback-list-page :deep(.feedback-top-search .van-search__content) {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 .feedback-row{margin:10px 16px;padding:14px;cursor:pointer}.feedback-row__head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.feedback-row__head strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.feedback-row p{margin:8px 0 0;color:var(--h5-text-secondary);font-size:12px;line-height:1.5}.feedback-row__reply{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical}.feedback-row time{display:block;margin-top:8px;color:var(--h5-text-placeholder);font-size:11px}
 </style>

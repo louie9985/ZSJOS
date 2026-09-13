@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
 const { fileList, uploading, addFile, removeFile, retryFile, reset, getUploadedFiles } = useUpload(props.maxCount)
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const maxFileSize = 10 * 1024 * 1024
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -35,6 +36,10 @@ function onFileChange(event: Event) {
   for (const file of selectedFiles.slice(0, availableCount)) {
     if (!allowedTypes.has(file.type)) {
       showToast(`${file.name} 仅支持 JPG、PNG、WebP`)
+      continue
+    }
+    if (file.size > maxFileSize) {
+      showToast(`${file.name} 不能超过 10MB`)
       continue
     }
     addFile(file)
@@ -66,9 +71,26 @@ defineExpose({
       >
         <img :src="item.url" class="image-uploader__img" alt="" />
 
-        <!-- 上传中遮罩 -->
-        <div v-if="item.status === 'uploading'" class="image-uploader__mask">
+        <div v-if="item.status === 'queued'" class="image-uploader__mask" role="status">
+          <span class="image-uploader__status-text">等待上传</span>
+        </div>
+
+        <div v-else-if="item.status === 'uploading'" class="image-uploader__mask" role="status">
+          <van-circle
+            :current-rate="item.progress"
+            :rate="item.progress"
+            :speed="100"
+            size="38px"
+            stroke-width="80"
+            color="#fff"
+            layer-color="rgba(255, 255, 255, 0.28)"
+            :text="`${item.progress}%`"
+          />
+        </div>
+
+        <div v-else-if="item.status === 'processing'" class="image-uploader__mask" role="status">
           <van-loading size="20" color="#fff" />
+          <span class="image-uploader__status-text">处理中</span>
         </div>
 
         <!-- 失败遮罩 -->
@@ -82,13 +104,15 @@ defineExpose({
         </div>
 
         <!-- 删除按钮 -->
-        <van-icon
-          name="clear"
+        <button
+          type="button"
           class="image-uploader__delete"
-          size="18"
-          :class="{ 'image-uploader__delete--disabled': item.status === 'uploading' }"
+          :aria-label="item.status === 'done' || item.status === 'error' ? '删除图片' : '取消上传并删除图片'"
+          title="删除图片"
           @click.stop="removeFile(item.id)"
-        />
+        >
+          <van-icon name="cross" size="14" />
+        </button>
         <div v-if="item.status === 'error' && item.error" class="image-uploader__error-text">
           {{ item.error }}
         </div>
@@ -140,6 +164,15 @@ defineExpose({
   align-items: center;
   justify-content: center;
 }
+.image-uploader__mask :deep(.van-circle__text) {
+  color: #fff;
+  font-size: 10px;
+}
+.image-uploader__status-text {
+  margin-top: 4px;
+  color: #fff;
+  font-size: 10px;
+}
 .image-uploader__mask--error {
   cursor: pointer;
 }
@@ -153,12 +186,17 @@ defineExpose({
   position: absolute;
   top: 2px;
   right: 2px;
-  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: rgba(255, 255, 255, 0.95);
   background: rgba(0, 0, 0, 0.4);
   border-radius: 50%;
-}
-.image-uploader__delete--disabled {
-  opacity: 0.45;
+  z-index: 2;
 }
 .image-uploader__done {
   position: absolute;
@@ -197,7 +235,7 @@ defineExpose({
   justify-content: center;
   gap: 4px;
   cursor: pointer;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
 }
 .image-uploader__add-text {
   font-size: 10px;

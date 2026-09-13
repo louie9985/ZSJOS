@@ -67,8 +67,8 @@ async function handleSetDefault(card: BankCard) {
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="银行卡管理" left-arrow @click-left="$router.back()">
+  <div class="page-container my-subpage-page bank-cards-page">
+    <van-nav-bar class="my-subpage__nav" title="银行卡管理" left-arrow @click-left="$router.back()">
       <template #right>
         <van-icon name="plus" size="20" @click="showAdd = true" />
       </template>
@@ -82,36 +82,54 @@ async function handleSetDefault(card: BankCard) {
         </van-empty>
       </div>
 
-      <div v-for="card in loadError ? [] : cards" :key="card.id" class="card bank-card-item">
-        <div class="bank-card-item__header">
-          <span class="bank-card-item__bank">{{ card.bankName }}</span>
-          <van-tag v-if="card.defaultCard" type="primary" size="medium">默认</van-tag>
+      <div v-for="card in loadError ? [] : cards" :key="card.id" class="card my-subpage-card bank-card-item">
+        <div class="bank-card-item__content">
+          <div class="bank-card-item__header">
+            <span class="bank-card-item__bank">{{ card.bankName }}</span>
+            <van-tag v-if="card.defaultCard" type="primary" size="medium">默认</van-tag>
+          </div>
+          <div class="bank-card-item__number">{{ card.maskedCardNumber }}</div>
+          <div class="bank-card-item__name">{{ card.accountName }}</div>
         </div>
-        <div class="bank-card-item__number">{{ card.maskedCardNumber }}</div>
-        <div class="bank-card-item__name">{{ card.accountName }}</div>
         <div class="bank-card-item__actions">
-          <van-button size="mini" plain icon="edit" @click="$router.push(`/profile/bank-cards/${card.id}/edit`)">编辑</van-button>
-          <van-button v-if="!card.defaultCard" size="mini" plain @click="handleSetDefault(card)">设为默认</van-button>
-          <van-button size="mini" plain type="danger" @click="handleDelete(card)">删除</van-button>
+          <button type="button" class="bank-card-item__action" @click="$router.push(`/profile/bank-cards/${card.id}/edit`)">
+            <van-icon name="edit" />
+            <span>编辑</span>
+          </button>
+          <button v-if="!card.defaultCard" type="button" class="bank-card-item__action" @click="handleSetDefault(card)">
+            <van-icon name="star-o" />
+            <span>设为默认</span>
+          </button>
+          <button type="button" class="bank-card-item__action bank-card-item__action--danger" @click="handleDelete(card)">
+            <van-icon name="delete-o" />
+            <span>删除</span>
+          </button>
         </div>
       </div>
     </van-skeleton>
 
     <!-- 添加银行卡弹窗 -->
-    <van-popup v-model:show="showAdd" position="bottom" round :style="{ padding: '16px' }">
-      <div style="font-size: 16px; font-weight: 500; margin-bottom: 16px;">添加银行卡</div>
-      <van-field v-model="newCard.accountName" label="户名" placeholder="持卡人姓名" required />
-      <van-field v-model="newCard.cardNumber" label="卡号" type="digit" placeholder="银行卡号" required />
-      <van-field v-model="newCard.bankName" label="银行" placeholder="开户银行" required />
-      <van-field v-model="newCard.branchName" label="支行" placeholder="开户支行（选填）" />
-      <van-button type="primary" block round :loading="submitting" style="margin-top: 16px;" @click="handleAdd">确认添加</van-button>
+    <van-popup v-model:show="showAdd" class="bank-card-add-popup" position="bottom" round safe-area-inset-bottom>
+      <div class="bank-card-add-popup__title">添加银行卡</div>
+      <div class="bank-card-add-popup__fields">
+        <van-field v-model="newCard.accountName" label="户名" placeholder="持卡人姓名" required />
+        <van-field v-model="newCard.cardNumber" label="卡号" type="digit" placeholder="银行卡号" required />
+        <van-field v-model="newCard.bankName" label="银行" placeholder="开户银行" required />
+        <van-field v-model="newCard.branchName" label="支行" placeholder="开户支行（选填）" />
+      </div>
+      <van-button class="bank-card-add-popup__submit" type="primary" block round :loading="submitting" @click="handleAdd">确认添加</van-button>
     </van-popup>
   </div>
 </template>
 
 <style scoped>
 .bank-card-item {
+  background: var(--h5-content-surface);
+  overflow: hidden;
   margin: 12px 16px;
+  padding: 0;
+}
+.bank-card-item__content {
   padding: 16px;
 }
 .bank-card-item__header {
@@ -137,10 +155,50 @@ async function handleSetDefault(card: BankCard) {
   color: var(--h5-text-secondary);
 }
 .bank-card-item__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   border-top: 1px solid var(--h5-divider);
+}
+.bank-card-item__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 46px;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--h5-primary);
+  font-size: 13px;
+  line-height: 1;
+}
+.bank-card-item__action + .bank-card-item__action {
+  border-left: 1px solid var(--h5-divider);
+}
+.bank-card-item__action:active {
+  background: var(--h5-primary-opacity);
+}
+.bank-card-item__action--danger {
+  color: var(--h5-danger);
+}
+.bank-card-item__action--danger:active {
+  background: color-mix(in srgb, var(--h5-danger) 10%, transparent);
+}
+.bank-card-add-popup {
+  padding: 16px;
+}
+.bank-card-add-popup__title {
+  margin-bottom: 8px;
+  color: var(--h5-text-primary);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.bank-card-add-popup__fields :deep(.van-cell) {
+  background: transparent;
+}
+.bank-card-add-popup__submit {
+  margin-top: 16px;
 }
 </style>

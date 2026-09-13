@@ -699,13 +699,36 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setSpuName(source.getSpuNameSnapshot());
         result.setSkuRef(source.getSkuRef());
         result.setSkuName(source.getSkuNameSnapshot());
-        result.setSelectedAttrValues(source.getSelectedAttrValuesJson());
+        result.setSelectedAttrValues(formatSelectedAttrValues(source.getSelectedAttrValuesJson()));
         result.setSpecs(source.getSelectedSpecsJson() == null ? null : JsonUtils.parseArray(source.getSelectedSpecsJson(),
                 cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO.class));
         result.setPrice(source.getPriceSnapshot());
         result.setCategoryName(source.getCategoryNameSnapshot());
         result.setPrimary(source.getIsPrimary());
         return result;
+    }
+
+    /**
+     * Product attributes are persisted as an immutable JSON snapshot. Expose only
+     * its values in detail projections so internal attribute keys never leak into
+     * the customer-facing view.
+     */
+    static String formatSelectedAttrValues(String selectedAttrValuesJson) {
+        if (StrUtil.isBlank(selectedAttrValuesJson)) return null;
+        try {
+            Map<?, ?> values = JsonUtils.parseObject(selectedAttrValuesJson, Map.class);
+            if (values == null || values.isEmpty()) return null;
+            String formatted = values.values().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(StrUtil::isNotBlank)
+                    .collect(Collectors.joining(" · "));
+            return StrUtil.blankToDefault(formatted, null);
+        } catch (RuntimeException ignored) {
+            // Do not render malformed historical JSON as an internal payload.
+            return null;
+        }
     }
 
     private LeadManagementRespVO.LeadAttachmentVO convertAttachment(LeadAttachmentDO source,

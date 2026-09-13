@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type ThemeKey = 'coral' | 'lavender' | 'sky'
+export const THEME_KEYS = ['coral', 'lavender', 'sky'] as const
+export type ThemeKey = (typeof THEME_KEYS)[number]
+
+export function resolveThemeKey(value: string | null): ThemeKey {
+  return THEME_KEYS.includes(value as ThemeKey) ? value as ThemeKey : 'coral'
+}
 
 export interface DictItem {
   label: string
@@ -11,7 +16,7 @@ export interface DictItem {
 
 export const useAppStore = defineStore('app', () => {
   // --- 主题 ---
-  const theme = ref<ThemeKey>((localStorage.getItem('h5-theme') as ThemeKey) || 'coral')
+  const theme = ref<ThemeKey>(resolveThemeKey(localStorage.getItem('h5-theme')))
 
   function setTheme(key: ThemeKey) {
     theme.value = key
@@ -22,6 +27,9 @@ export const useAppStore = defineStore('app', () => {
   // 初始化时应用主题
   function initTheme() {
     document.documentElement.setAttribute('data-theme', theme.value)
+    if (localStorage.getItem('h5-theme') !== theme.value) {
+      localStorage.setItem('h5-theme', theme.value)
+    }
   }
 
   // --- 字典缓存 ---

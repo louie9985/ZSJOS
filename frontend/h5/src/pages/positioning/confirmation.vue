@@ -58,12 +58,12 @@ onMounted(load)
 </template>
 
 <style scoped>
-.positioning-share-page{min-height:100vh;background:#f5f6f8;padding-bottom:96px;color:#1f2329}
+.positioning-share-page{min-height:100vh;padding-bottom:96px;background:transparent;color:var(--h5-text-primary)}
 .positioning-share-state{padding-top:96px}
-.positioning-share-heading{padding:24px 20px 16px;background:#fff}
+.positioning-share-heading{padding:24px 20px 16px;border-bottom:1px solid var(--h5-glass-border);background:var(--h5-glass-surface-strong);box-shadow:var(--h5-glass-shadow);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur))}
 .positioning-share-heading h1{margin:0 0 8px;font-size:22px;letter-spacing:0}
 .positioning-share-heading p{margin:0;color:#646a73;font-size:14px;letter-spacing:0}
-.positioning-share-actions{position:sticky;bottom:0;display:grid;gap:10px;padding:16px 20px;background:#fff}
+.positioning-share-actions{position:sticky;bottom:0;display:grid;gap:10px;padding:16px 20px;border-top:1px solid var(--h5-glass-border);background:var(--h5-glass-surface-strong);box-shadow:0 -8px 24px rgba(31,35,48,.08);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur-strong));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur-strong))}
 .positioning-share-revision{padding:20px 20px 28px}
 .positioning-share-revision h2{margin:0 0 16px;font-size:18px;letter-spacing:0}
 .positioning-share-revision .van-button{margin-top:16px}

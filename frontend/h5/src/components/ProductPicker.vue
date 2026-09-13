@@ -39,11 +39,14 @@ const searchText = ref('')
 
 // 已选的 spuRef 集合
 const selectedRefs = computed(() => new Set(props.modelValue.map(p => p.spuRef)))
+const hasUnknownProduct = computed(() => props.modelValue.some(product => product.spuUnknown))
+const hasCatalogProduct = computed(() => props.modelValue.some(product => !product.spuUnknown))
 const categoryPath = ref<CategoryNode[]>([])
 const selectedCategoryLeaf = ref<CategoryNode>()
 const selectedSpu = ref<SpuItem>()
 const selectedSku = ref<SkuItem>()
 const selectedAttrs = ref<Record<string, string>>({})
+const skuUnknown = ref(true)
 
 const currentCategory = computed(() => categoryPath.value[categoryPath.value.length - 1])
 const currentCategoryOptions = computed(() => currentCategory.value?.children || props.categoryTree)
@@ -77,12 +80,13 @@ const selectedSpuCategory = computed(() => selectedSpu.value?.categoryPath.map(i
   || '')
 const canConfirmSpu = computed(() => {
   if (!selectedSpu.value) return false
-  if (selectedSpuAllSkus.value.length === 0) return true
+  if (selectedSpuAllSkus.value.length === 0 || skuUnknown.value) return true
   return requiredAttrsSelected.value && selectedSpuSkus.value.length > 0 && Boolean(selectedSku.value)
 })
 const skuStatusText = computed(() => {
   if (!selectedSpu.value) return ''
   if (selectedSpuAllSkus.value.length === 0) return '该课程未配置具体班型，可直接确认'
+  if (skuUnknown.value) return '已选择课程，具体班次/方案可稍后确认'
   if (missingRequiredAttrs.value.length > 0) {
     return `还需选择：${missingRequiredAttrs.value.map(attr => attr.attrName).join('、')}`
   }
@@ -100,6 +104,10 @@ function attrsFromSku(sku: SkuItem) {
 }
 
 function syncSkuSelection() {
+  if (skuUnknown.value) {
+    selectedSku.value = undefined
+    return
+  }
   if (!requiredAttrsSelected.value) {
     selectedSku.value = undefined
     return
@@ -126,6 +134,7 @@ function selectSpu(spu: SpuItem) {
   selectedSpu.value = spu
   selectedSku.value = undefined
   selectedAttrs.value = {}
+  skuUnknown.value = true
   syncSkuSelection()
 }
 
@@ -146,6 +155,7 @@ function goBackCategory() {
     selectedSpu.value = undefined
     selectedSku.value = undefined
     selectedAttrs.value = {}
+    skuUnknown.value = false
     return
   }
   if (selectedCategoryLeaf.value) {
@@ -162,6 +172,7 @@ function resetNavigation() {
   selectedSpu.value = undefined
   selectedSku.value = undefined
   selectedAttrs.value = {}
+  skuUnknown.value = false
 }
 
 function openPicker() {
@@ -183,6 +194,13 @@ function selectSku(sku: SkuItem) {
   selectedSku.value = sku
 }
 
+function setSkuUnknown(value: boolean) {
+  skuUnknown.value = value
+  selectedSku.value = undefined
+  selectedAttrs.value = {}
+  if (!value) syncSkuSelection()
+}
+
 function skuAttrSummary(sku: SkuItem) {
   return (sku.specs ?? catalogSpecs(sku.attrValues, selectedSpu.value?.attrs)).map(specText).join(' · ')
 }
@@ -196,17 +214,18 @@ function confirmSpu() {
   if (!spu || !canConfirmSpu.value) return
   const sku = selectedSku.value
   const hasCatalogSku = selectedSpuAllSkus.value.length > 0
+  const hasUnknownSku = skuUnknown.value || !hasCatalogSku
 
   const newItem: SelectedProduct = {
     spuRef: spu.spuRef,
     spuName: spu.spuName,
-    skuRef: sku?.skuRef,
-    skuName: sku?.skuName,
-    attrValues: sku?.attrValues,
-    specs: sku ? sku.specs ?? catalogSpecs(sku.attrValues, spu.attrs) : [],
-    price: sku?.price,
+    skuRef: hasUnknownSku ? undefined : sku?.skuRef,
+    skuName: hasUnknownSku ? '未明确具体班次/方案' : sku?.skuName,
+    attrValues: hasUnknownSku ? undefined : sku?.attrValues,
+    specs: hasUnknownSku ? [] : sku ? sku.specs ?? catalogSpecs(sku.attrValues, spu.attrs) : [],
+    price: hasUnknownSku ? undefined : sku?.price,
     spuUnknown: false,
-    skuUnknown: !hasCatalogSku,
+    skuUnknown: hasUnknownSku,
     primary: props.modelValue.length === 0 // 第一个默认为主意向
   }
   emit('update:modelValue', [...props.modelValue, newItem])
@@ -237,6 +256,7 @@ function setPrimary(index: number) {
 }
 
 function addUnknown() {
+  if (hasUnknownProduct.value) return
   const newItem: SelectedProduct = {
     spuRef: `unknown_${Date.now()}`,
     spuName: '未明确课程',
@@ -260,39 +280,65 @@ function addUnknown() {
         class="product-picker__item"
       >
         <div class="product-picker__item-info">
-          <van-tag
-            v-if="item.primary"
-            type="primary"
-            size="medium"
-            style="margin-right: 6px;"
-          >
-            主意向
-          </van-tag>
-          <span class="product-picker__item-name">{{ item.spuName }}</span>
-          <ProductSpecs :product="item" /><span v-if="item.skuName" class="product-picker__item-meta">{{ item.skuName }}<template v-if="item.price != null"> · ¥{{ item.price }}</template></span>
+          <div class="product-picker__item-title">
+            <span v-if="item.primary" class="product-picker__primary-tag">主意向</span>
+            <strong class="product-picker__item-name">{{ item.spuName }}</strong>
+          </div>
+          <ProductSpecs :product="item" />
+          <span class="product-picker__item-meta">
+            {{ item.skuName || (item.spuUnknown ? '课程待确认' : '班次/方案待确认') }}
+            <template v-if="item.price != null"> · {{ formatPrice(item.price) }}</template>
+          </span>
         </div>
         <div class="product-picker__item-actions">
-          <van-button
+          <button
             v-if="!item.primary"
-            size="mini"
-            plain
+            type="button"
+            class="product-picker__set-primary"
             @click="setPrimary(index)"
           >
-            设为主
-          </van-button>
-          <van-icon name="cross" size="16" color="var(--h5-text-placeholder)" @click="removeProduct(index)" />
+            设为主意向
+          </button>
+          <button
+            type="button"
+            class="product-picker__remove"
+            :aria-label="`删除意向课程：${item.spuName}`"
+            title="删除意向课程"
+            @click="removeProduct(index)"
+          >
+            <van-icon name="delete-o" size="18" />
+          </button>
         </div>
       </div>
     </div>
 
     <!-- 添加按钮 -->
     <div class="product-picker__add">
-      <van-button icon="plus" size="small" plain round @click="openPicker">
-        选择课程
-      </van-button>
-      <van-button size="small" plain round @click="addUnknown">
-        未明确课程
-      </van-button>
+      <button
+        type="button"
+        class="product-picker__entry"
+        :class="{ 'is-active': hasCatalogProduct }"
+        @click="openPicker"
+      >
+        <span class="product-picker__entry-icon"><van-icon name="apps-o" size="21" /></span>
+        <span class="product-picker__entry-copy">
+          <strong>选择课程</strong>
+          <small>从课程目录中选择</small>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="product-picker__entry"
+        :class="{ 'is-active': hasUnknownProduct }"
+        :disabled="hasUnknownProduct"
+        @click="addUnknown"
+      >
+        <span class="product-picker__entry-icon"><van-icon name="question-o" size="21" /></span>
+        <span class="product-picker__entry-copy">
+          <strong>未明确课程</strong>
+          <small>{{ hasUnknownProduct ? '已添加' : '稍后再确认课程' }}</small>
+        </span>
+      </button>
     </div>
 
     <!-- 课程选择弹窗 -->
@@ -300,9 +346,10 @@ function addUnknown() {
       v-model:show="show"
       position="bottom"
       round
+      teleport="body"
       safe-area-inset-bottom
-      class="product-picker__sheet"
-      :style="{ height: '82%' }"
+      class="product-picker__sheet norem"
+      overlay-class="submit-picker-overlay"
     >
       <div class="product-picker__popup">
         <div class="product-picker__popup-header">
@@ -328,7 +375,7 @@ function addUnknown() {
 
             <div class="product-picker__course-card">
               <div class="product-picker__course-icon">
-                <van-icon name="description" size="22" />
+                <van-icon name="apps-o" size="22" />
               </div>
               <div class="product-picker__course-info">
                 <span>已选课程</span>
@@ -341,28 +388,40 @@ function addUnknown() {
             <div v-if="selectedSpuAllSkus.length" class="product-picker__specification">
               <div class="product-picker__section-heading">
                 <strong>选择课程规格</strong>
-                <span>带 * 为必选项</span>
+                <span v-if="!skuUnknown">带 * 为必选项</span>
               </div>
-              <div v-for="attr in selectedSpu.attrs" :key="attr.attrKey" class="product-picker__attr">
-                <div class="product-picker__attr-name">
-                  {{ attr.attrName }}<span v-if="attr.required">*</span>
-                </div>
-                <div class="product-picker__attr-values">
-                  <button
-                    v-for="option in attr.values"
-                    :key="option.value"
-                    type="button"
-                    class="product-picker__attr-option"
-                    :class="{ 'is-active': selectedAttrs[attr.attrKey] === option.value }"
-                    :disabled="isAttrOptionDisabled(attr.attrKey, option.value)"
-                    :aria-pressed="selectedAttrs[attr.attrKey] === option.value"
-                    @click="selectAttr(attr.attrKey, option.value)"
-                  >
-                    <span>{{ option.label }}</span>
-                    <van-icon v-if="selectedAttrs[attr.attrKey] === option.value" name="success" size="14" />
-                  </button>
-                </div>
+              <div class="product-picker__unknown-sku norem">
+                <van-checkbox
+                  :model-value="skuUnknown"
+                  shape="square"
+                  icon-size="20"
+                  @update:model-value="setSkuUnknown"
+                >
+                  未明确具体班次/方案
+                </van-checkbox>
               </div>
+              <template v-if="!skuUnknown">
+                <div v-for="attr in selectedSpu.attrs" :key="attr.attrKey" class="product-picker__attr">
+                  <div class="product-picker__attr-name">
+                    <span :class="{ 'h5-required-label': attr.required }">{{ attr.attrName }}</span>
+                  </div>
+                  <div class="product-picker__attr-values">
+                    <button
+                      v-for="option in attr.values"
+                      :key="option.value"
+                      type="button"
+                      class="product-picker__attr-option"
+                      :class="{ 'is-active': selectedAttrs[attr.attrKey] === option.value }"
+                      :disabled="isAttrOptionDisabled(attr.attrKey, option.value)"
+                      :aria-pressed="selectedAttrs[attr.attrKey] === option.value"
+                      @click="selectAttr(attr.attrKey, option.value)"
+                    >
+                      <span>{{ option.label }}</span>
+                      <van-icon v-if="selectedAttrs[attr.attrKey] === option.value" name="success" size="14" />
+                    </button>
+                  </div>
+                </div>
+              </template>
             </div>
 
             <div v-if="selectedSpuAllSkus.length === 0" class="product-picker__notice product-picker__notice--info">
@@ -370,7 +429,7 @@ function addUnknown() {
               <span>该课程未配置具体班型，可直接确认选择</span>
             </div>
 
-            <div v-else-if="requiredAttrsSelected && selectedSpuSkus.length" class="product-picker__sku-section">
+            <div v-else-if="!skuUnknown && requiredAttrsSelected && selectedSpuSkus.length" class="product-picker__sku-section">
               <div class="product-picker__section-heading">
                 <strong>匹配班型</strong>
                 <span>{{ selectedSpuSkus.length }} 个可选</span>
@@ -397,14 +456,14 @@ function addUnknown() {
               </button>
             </div>
 
-            <div v-if="selectedSpuAllSkus.length > 0 && requiredAttrsSelected && selectedSpuSkus.length === 0" class="product-picker__notice product-picker__notice--error">
+            <div v-if="!skuUnknown && selectedSpuAllSkus.length > 0 && requiredAttrsSelected && selectedSpuSkus.length === 0" class="product-picker__notice product-picker__notice--error">
               <van-icon name="warning-o" size="18" />
               <span>当前规格暂无可选班型，请重新选择规格</span>
             </div>
           </div>
 
           <div class="product-picker__actions">
-            <div class="product-picker__status" :class="{ 'is-complete': canConfirmSpu, 'is-error': requiredAttrsSelected && selectedSpuSkus.length === 0 && selectedSpuAllSkus.length > 0 }">
+            <div class="product-picker__status" :class="{ 'is-complete': canConfirmSpu, 'is-error': !skuUnknown && requiredAttrsSelected && selectedSpuSkus.length === 0 && selectedSpuAllSkus.length > 0 }">
               <van-icon :name="canConfirmSpu ? 'passed' : 'info-o'" size="16" />
               <span>{{ skuStatusText }}</span>
             </div>
@@ -457,27 +516,55 @@ function addUnknown() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: var(--h5-primary-opacity);
-  border-radius: 8px;
+  gap: 12px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--h5-glass-border);
+  background: var(--h5-glass-surface);
+  border-radius: 10px;
   margin-bottom: 8px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 46%, transparent);
 }
 .product-picker__item-info {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
   flex: 1;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
+.product-picker__item-title {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 6px;
+}
+.product-picker__primary-tag {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 26%, transparent);
+  border-radius: 7px;
+  background: var(--h5-primary-opacity);
+  color: var(--h5-primary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+}
 .product-picker__item-name {
+  min-width: 0;
   font-size: 14px;
+  font-weight: 600;
   color: var(--h5-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
+  line-height: 20px;
   overflow-wrap: anywhere;
 }
-.product-picker__item-meta{color:var(--h5-text-secondary);font-size:11px;white-space:normal;overflow-wrap:anywhere}
+.product-picker__item-meta {
+  color: var(--h5-text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
 .product-picker__item-actions {
   display: flex;
   align-items: center;
@@ -485,25 +572,137 @@ function addUnknown() {
   flex-shrink: 0;
   margin-left: 8px;
 }
+.product-picker__set-primary,
+.product-picker__remove {
+  border: 1px solid var(--h5-glass-border);
+  border-radius: 8px;
+  background: var(--h5-glass-sunken);
+  color: var(--h5-primary);
+  font: inherit;
+}
+.product-picker__set-primary {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.product-picker__remove {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--h5-text-placeholder);
+}
+.product-picker__remove:active,
+.product-picker__set-primary:active {
+  background: var(--h5-primary-opacity);
+  color: var(--h5-primary-dark);
+}
 
 .product-picker__add {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+.product-picker__entry {
+  display: grid;
+  min-width: 0;
+  min-height: 74px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--h5-glass-border);
+  border-radius: 10px;
+  background: var(--h5-glass-surface);
+  color: var(--h5-text-primary);
+  font: inherit;
+  text-align: left;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 46%, transparent);
+}
+.product-picker__entry.is-active {
+  border-color: color-mix(in srgb, var(--h5-primary) 58%, var(--h5-glass-border));
+  background: var(--h5-primary-opacity);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 60%, transparent), 0 4px 12px color-mix(in srgb, var(--h5-primary) 8%, transparent);
+}
+.product-picker__entry:disabled {
+  opacity: 0.72;
+}
+.product-picker__entry-icon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 20%, var(--h5-glass-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--h5-primary) 10%, var(--h5-glass-sunken));
+  color: var(--h5-primary);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent);
+}
+.product-picker__entry.is-active .product-picker__entry-icon {
+  border-color: color-mix(in srgb, var(--h5-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--h5-primary) 16%, var(--h5-glass-sunken));
+}
+.product-picker__entry-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.product-picker__entry-copy strong,
+.product-picker__entry-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.product-picker__entry-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.product-picker__entry-copy small {
+  color: var(--h5-text-secondary);
+  font-size: 10px;
 }
 
 .product-picker__popup {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--h5-card-bg);
+  background: transparent;
+}
+.product-picker__popup::before {
+  width: 32px;
+  height: 3px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--h5-glass-divider);
+  content: '';
 }
 .product-picker__sheet {
   right: 0;
   left: 0;
   width: min(100%, 10rem);
+  height: min(82dvh, 720px);
+  max-height: calc(100dvh - 48px);
   margin: 0 auto;
   overflow: hidden;
+  border: 1px solid var(--h5-glass-border);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: color-mix(in srgb, var(--h5-card-bg) 74%, transparent);
+  box-shadow: var(--h5-glass-shadow-floating);
+  backdrop-filter: saturate(170%) blur(var(--h5-glass-blur-strong));
+  -webkit-backdrop-filter: saturate(170%) blur(var(--h5-glass-blur-strong));
+}
+.product-picker__sheet.norem {
+  border-radius: 24px 24px 0 0;
 }
 .product-picker__popup-header {
   display: flex;
@@ -512,6 +711,7 @@ function addUnknown() {
   flex: 0 0 auto;
   min-height: 58px;
   padding: 14px 16px 10px 20px;
+  background: transparent;
   color: var(--h5-text-primary);
   font-size: 18px;
   font-weight: 600;
@@ -525,24 +725,35 @@ function addUnknown() {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   color: var(--h5-text-secondary);
 }
 .product-picker__search {
   flex: 0 0 auto;
   padding: 8px 16px 12px;
-  background: var(--h5-card-bg);
+  background: transparent;
 }
 .product-picker__search :deep(.van-search__content) {
   border: 1px solid transparent;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
 }
 .product-picker__popup-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: var(--h5-card-bg);
+  background: transparent;
   overscroll-behavior: contain;
+}
+.product-picker__popup-list :deep(.van-cell) {
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: transparent;
+  color: var(--h5-text-primary);
+}
+.product-picker__popup-list :deep(.van-cell:active) {
+  background: var(--h5-primary-opacity);
+}
+.product-picker__popup-list :deep(.van-cell__label) {
+  color: var(--h5-text-secondary);
 }
 .product-picker__navigation {
   display: flex;
@@ -552,6 +763,7 @@ function addUnknown() {
   gap: 10px;
   padding: 7px 16px;
   border-bottom: 1px solid var(--h5-divider);
+  background: transparent;
 }
 .product-picker__back,
 .product-picker__course-back {
@@ -579,7 +791,7 @@ function addUnknown() {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: var(--h5-bg);
+  background: transparent;
 }
 .product-picker__sku-scroll {
   flex: 1;
@@ -598,7 +810,7 @@ function addUnknown() {
   padding: 14px;
   border: 1px solid var(--h5-primary-opacity);
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--h5-primary-opacity), var(--h5-card-bg));
+  background: color-mix(in srgb, var(--h5-primary) 8%, var(--h5-glass-surface));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 .product-picker__course-icon {
@@ -609,7 +821,7 @@ function addUnknown() {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
   color: var(--h5-primary);
 }
 .product-picker__course-info {
@@ -643,9 +855,10 @@ function addUnknown() {
 .product-picker__sku-section {
   margin-top: 12px;
   padding: 16px;
+  border: 1px solid var(--h5-glass-border);
   border-radius: 12px;
-  background: var(--h5-card-bg);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  background: color-mix(in srgb, var(--h5-card-bg) 62%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 4px 14px rgba(31, 35, 48, 0.06);
 }
 .product-picker__section-heading {
   display: flex;
@@ -664,6 +877,38 @@ function addUnknown() {
   font-size: 10px;
   white-space: nowrap;
 }
+.product-picker__unknown-sku {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--h5-primary-light) 42%, transparent);
+}
+.product-picker__unknown-sku.norem {
+  min-height: 44px;
+  padding: 12px;
+}
+.product-picker__unknown-sku.norem :deep(.van-checkbox) {
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+}
+.product-picker__unknown-sku.norem :deep(.van-checkbox__icon) {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.product-picker__unknown-sku.norem :deep(.van-checkbox__label) {
+  min-width: 0;
+  flex: 1;
+  margin-left: 8px;
+  color: var(--h5-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .product-picker__attr + .product-picker__attr {
   margin-top: 18px;
 }
@@ -672,10 +917,6 @@ function addUnknown() {
   color: var(--h5-text-primary);
   font-size: 13px;
   font-weight: 500;
-}
-.product-picker__attr-name span {
-  margin-left: 2px;
-  color: var(--h5-danger);
 }
 .product-picker__attr-values {
   display: flex;
@@ -692,7 +933,7 @@ function addUnknown() {
   padding: 8px 14px;
   border: 1px solid transparent;
   border-radius: 9px;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   color: var(--h5-text-primary);
   font: inherit;
   font-size: 13px;
@@ -717,7 +958,7 @@ function addUnknown() {
   padding: 11px 12px;
   border: 1px solid var(--h5-border);
   border-radius: 10px;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
   color: var(--h5-text-primary);
   text-align: left;
 }
@@ -800,9 +1041,11 @@ function addUnknown() {
 .product-picker__actions {
   flex: 0 0 auto;
   padding: 10px 16px 14px;
-  border-top: 1px solid var(--h5-divider);
-  background: var(--h5-card-bg);
-  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.05);
+  border-top: 1px solid var(--h5-glass-border);
+  background: color-mix(in srgb, var(--h5-card-bg) 82%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 -8px 24px rgba(31, 35, 48, 0.08);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
 }
 .product-picker__status {
   display: flex;
@@ -824,6 +1067,22 @@ function addUnknown() {
   height: 48px;
   font-size: 15px;
   font-weight: 600;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .product-picker__sheet {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .product-picker__sheet {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 </style>

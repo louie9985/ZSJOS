@@ -157,6 +157,7 @@ async function handleSubmit() {
 
         <van-field
           v-model="reason"
+          label="申诉理由"
           type="textarea"
           placeholder="请详细说明申诉理由"
           required

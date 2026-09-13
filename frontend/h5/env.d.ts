@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __H5_VERSION__: import('./src/utils/version').VersionManifest
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<object, object, unknown>

@@ -45,14 +45,14 @@ const statusMap: Record<string, { text: string; color: string }> = {
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="提现记录" left-arrow @click-left="$router.back()">
+  <div class="page-container my-subpage-page withdrawal-page">
+    <van-nav-bar class="my-subpage__nav" title="提现记录" left-arrow @click-left="$router.back()">
       <template #right>
         <van-icon name="plus" size="20" @click="goApply" />
       </template>
     </van-nav-bar>
 
-    <van-tabs v-model:active="activeTab" @change="onTabChange" shrink sticky>
+    <van-tabs class="my-subpage__tabs" v-model:active="activeTab" @change="onTabChange" shrink sticky>
       <van-tab v-for="tab in tabs" :key="tab.key" :name="tab.key" :title="tab.label" />
     </van-tabs>
 
@@ -83,6 +83,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
 
 <style scoped>
 .withdrawal-item {
+  background: var(--h5-content-surface);
   margin: 8px 16px;
   padding: 14px 16px;
   cursor: pointer;

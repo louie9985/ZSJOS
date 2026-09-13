@@ -31,5 +31,5 @@ onBeforeUnmount(() => timer && window.clearTimeout(timer))
 </template>
 
 <style scoped>
-.result-page{min-height:100vh;background:#f6f7f9;padding-top:72px}.checking{padding-top:96px}.result-state{text-align:center;padding:72px 24px}.result-state h1{font-size:22px;margin:20px 0 8px}.result-state p{color:#646a73;margin:0}
+.result-page{min-height:100vh;background:transparent;padding-top:72px}.checking{padding-top:96px}.result-state{margin:0 16px;padding:72px 24px;border:1px solid var(--h5-glass-border);border-radius:16px;background:var(--h5-glass-surface-strong);box-shadow:var(--h5-glass-shadow);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));text-align:center}.result-state h1{font-size:22px;margin:20px 0 8px}.result-state p{color:var(--h5-text-secondary);margin:0}
 </style>

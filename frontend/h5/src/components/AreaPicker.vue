@@ -9,8 +9,11 @@ import { ref, computed } from 'vue'
 export interface AreaNode {
   code: string
   name: string
+  leafSelectable?: boolean
   children?: AreaNode[]
 }
+
+const OTHER_AREA_CODE = 'OTHER'
 
 const props = defineProps<{
   modelValue?: { provinceCode: string; provinceName: string; cityCode: string; cityName: string }
@@ -24,35 +27,42 @@ const emit = defineEmits<{
 const show = ref(false)
 
 const displayText = computed(() => {
-  if (props.modelValue?.provinceName && props.modelValue?.cityName) {
-    return `${props.modelValue.provinceName} / ${props.modelValue.cityName}`
-  }
-  return ''
+  return [props.modelValue?.provinceName, props.modelValue?.cityName].filter(Boolean).join(' / ')
 })
 
 // 转换为 Vant Cascader 需要的格式
 const cascaderOptions = computed(() => {
-  return props.areaTree.map(province => ({
-    text: province.name,
-    value: province.code,
-    children: (province.children || []).map(city => ({
-      text: city.name,
-      value: city.code
-    }))
-  }))
+  return props.areaTree.map(province => {
+    const children = province.children || []
+    return {
+      text: province.name,
+      value: province.code,
+      disabled: children.length === 0 && !province.leafSelectable,
+      children: children.length
+        ? children.map(city => ({
+            text: city.name,
+            value: city.code
+          }))
+        : undefined
+    }
+  })
 })
 
 const cascaderValue = ref(props.modelValue?.cityCode || '')
 
 function onFinish({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) {
-  if (selectedOptions.length >= 2) {
-    emit('update:modelValue', {
-      provinceCode: selectedOptions[0].value,
-      provinceName: selectedOptions[0].text,
-      cityCode: selectedOptions[1].value,
-      cityName: selectedOptions[1].text
-    })
+  if (!selectedOptions.length) {
+    show.value = false
+    return
   }
+  const province = selectedOptions[0]
+  const city = selectedOptions[1]
+  emit('update:modelValue', {
+    provinceCode: province.value,
+    provinceName: province.text,
+    cityCode: city?.value || OTHER_AREA_CODE,
+    cityName: city?.text || ''
+  })
   show.value = false
 }
 </script>
@@ -68,9 +78,18 @@ function onFinish({ selectedOptions }: { selectedOptions: Array<{ text: string; 
       @click="show = true"
     />
 
-    <van-popup v-model:show="show" position="bottom" round>
+    <van-popup
+      v-model:show="show"
+      position="bottom"
+      round
+      teleport="body"
+      class="area-picker-popup norem"
+      overlay-class="submit-picker-overlay"
+      safe-area-inset-bottom
+    >
       <van-cascader
         v-model="cascaderValue"
+        class="area-picker-cascader"
         title="选择地区"
         :options="cascaderOptions"
         @close="show = false"

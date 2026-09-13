@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showSuccessToast } from 'vant'
-import { getMessageGroups, getMessagePage, getUnreadCount, markAllRead, markRead, type MessageGroup, type MessageItem } from '@/api/message'
+import { getMessageGroups, getMessagePage, getUnreadCount, markAllRead, type MessageGroup, type MessageItem } from '@/api/message'
 import { usePageList } from '@/composables/usePageList'
+import LiquidSegmentedControl from '@/components/LiquidSegmentedControl.vue'
 import { formatDateTime } from '@/utils/format'
 
 defineOptions({ name: 'Messages' })
@@ -16,8 +17,18 @@ const unreadOnly = ref(false)
 const markingAll = ref(false)
 const unreadCount = ref<number>()
 const unreadCountLoading = ref(true)
+let refreshOnActivate = false
 const params = computed(() => ({ ...(activeGroup.value !== 'all' ? { group: activeGroup.value } : {}), ...(unreadOnly.value ? { unreadOnly: true } : {}) }))
 const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList<MessageItem>(page => getMessagePage(page), params)
+const groupTabs = computed(() => groups.value.map(group => ({ key: group.key, label: group.label })))
+const bizTypeLabels = computed(() => {
+  const labels = new Map<string, string>()
+  groups.value.forEach(group => {
+    if (group.key === 'all') return
+    group.bizTypes.forEach(bizType => labels.set(bizType, group.label))
+  })
+  return labels
+})
 
 async function loadGroups() {
   groupLoading.value = true; groupError.value = ''
@@ -35,7 +46,7 @@ async function loadUnreadCount() {
     unreadCountLoading.value = false
   }
 }
-function goDetail(item: MessageItem) { if (!item.readStatus) markRead([item.id]).catch(() => {}); router.push(`/messages/${item.id}`) }
+function goDetail(item: MessageItem) { router.push(`/messages/${item.id}`) }
 async function readAll() {
   try { await showConfirmDialog({ title: '全部已读', message: '将当前账号的全部消息标记为已读？' }) } catch { return }
   markingAll.value = true
@@ -46,6 +57,7 @@ async function readAll() {
   } finally { markingAll.value = false }
 }
 const typeIcon: Record<string, string> = { lead: 'orders-o', cashback: 'gold-coin-o', withdrawal: 'balance-list-o', appeal: 'info-o', complaint: 'warning-o', feedback: 'comment-o' }
+function bizTypeLabel(bizType?: string) { return (bizType && bizTypeLabels.value.get(bizType)) || '系统' }
 function applyGroup(group: string) {
   activeGroup.value = group
   void refresh()
@@ -57,53 +69,76 @@ onMounted(() => {
   void loadGroups()
   void loadUnreadCount()
 })
+onDeactivated(() => { refreshOnActivate = true })
+onActivated(() => {
+  if (!refreshOnActivate) return
+  refreshOnActivate = false
+  void refresh()
+  void loadUnreadCount()
+})
 </script>
 
 <template>
-  <div class="page-container messages-page">
-    <van-nav-bar title="消息中心">
-      <template #right>
-        <van-button size="mini" plain :loading="markingAll" @click="readAll">全部已读</van-button>
-      </template>
-    </van-nav-bar>
+  <div class="page-container my-subpage-page messages-page">
+    <van-nav-bar class="my-subpage__nav" title="消息中心" left-arrow @click-left="$router.back()" />
 
-    <section class="card messages-hero">
+    <section class="card messages-hero hero-surface">
       <div class="messages-hero__head">
         <div>
-          <div class="messages-hero__title">消息中心</div>
-          <div class="messages-hero__subtitle">查看通知、业务提醒和系统反馈。</div>
+          <div class="messages-hero__title-row">
+            <div class="messages-hero__title">消息中心</div>
+            <HelpPopover text="查看通知、业务提醒和系统反馈。" aria-label="消息中心说明" />
+          </div>
         </div>
         <div class="messages-hero__aside">
           <span class="messages-chip" :class="{ 'messages-chip--loading': unreadCountLoading }">
-            {{ unreadCountLoading ? '加载中' : `未读 ${unreadCount ?? 0}` }}
+            {{ unreadCountLoading ? '加载中' : unreadCount === undefined ? '未读 --' : `未读 ${unreadCount}` }}
           </span>
           <span class="messages-chip messages-chip--muted">{{ unreadOnly ? '仅未读' : '全部消息' }}</span>
         </div>
       </div>
     </section>
 
-    <section class="page-section">
-      <div class="page-section__head messages-section__head">
-        <div class="page-section__title">消息分组</div>
+    <section class="messages-filter-section">
+      <div v-if="groupLoading" class="messages-filter-state card"><van-loading size="18" /> 加载分组</div>
+      <div v-else-if="groupError" class="messages-filter-state card">
+        <span>{{ groupError }}</span>
+        <button type="button" @click="loadGroups">重试</button>
       </div>
-      <div class="card messages-filter">
-        <div v-if="groupLoading" class="messages-filter__state"><van-loading size="18" /> 加载分组</div>
-        <div v-else-if="groupError" class="messages-filter__state">
-          <span>{{ groupError }}</span>
-          <button type="button" @click="loadGroups">重试</button>
+      <template v-else>
+        <div class="messages-tabs-wrap">
+          <LiquidSegmentedControl
+            class="messages-tabs"
+            :model-value="activeGroup"
+            :items="groupTabs"
+            ariaLabel="消息分组"
+            @change="applyGroup"
+          />
         </div>
-        <template v-else>
-          <div class="messages-tabs">
-            <button type="button" :class="{ active: activeGroup === 'all' }" @click="applyGroup('all')">全部</button>
-            <button v-for="group in groups" :key="group.key" type="button" :class="{ active: activeGroup === group.key }" @click="applyGroup(group.key)">
-              {{ group.label }}
-            </button>
+        <div class="messages-filter__toggle-row">
+          <div class="toggle-row__left">
+            <span>只看未读</span>
+            <van-switch
+              v-model="unreadOnly"
+              size="20"
+              aria-label="只看未读"
+              @change="toggleUnreadOnly"
+            />
           </div>
-          <van-checkbox v-model="unreadOnly" icon-size="16" class="messages-filter__toggle" @change="toggleUnreadOnly">
-            只看未读
-          </van-checkbox>
-        </template>
-      </div>
+          <button
+            type="button"
+            class="mark-all-btn"
+            :disabled="markingAll"
+            :aria-busy="markingAll"
+            aria-label="全部已读"
+            @click="readAll"
+          >
+            <van-loading v-if="markingAll" size="14" />
+            <van-icon v-else name="success" />
+            <span>全部已读</span>
+          </button>
+        </div>
+      </template>
     </section>
 
     <van-pull-refresh v-model="refreshing" @refresh="refresh">
@@ -120,7 +155,7 @@ onMounted(() => {
             </div>
             <div class="message-card__meta">
               <span>{{ item.templateNickname || '中世健' }}</span>
-              <span>{{ item.bizType || '系统' }}</span>
+              <span>{{ bizTypeLabel(item.bizType) }}</span>
             </div>
             <div class="message-card__preview">
               {{ item.templateSummary || item.templateContent }}
@@ -139,7 +174,7 @@ onMounted(() => {
 .messages-page {
   min-height: 100vh;
   padding-bottom: 88px;
-  background: var(--h5-bg);
+  background: transparent;
 }
 
 .messages-hero {
@@ -154,6 +189,12 @@ onMounted(() => {
   gap: 12px;
 }
 
+.messages-hero__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .messages-hero__title {
   color: var(--h5-text-primary);
   font-size: 18px;
@@ -161,11 +202,8 @@ onMounted(() => {
   line-height: 1.35;
 }
 
-.messages-hero__subtitle {
-  margin-top: 4px;
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
+.messages-hero__title-row :deep(.help-popover__button) {
+  margin: -8px -4px;
 }
 
 .messages-hero__aside {
@@ -190,7 +228,7 @@ onMounted(() => {
 }
 
 .messages-chip--muted {
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   color: var(--h5-text-secondary);
 }
 
@@ -198,60 +236,141 @@ onMounted(() => {
   opacity: 0.75;
 }
 
-.messages-section__head {
-  margin: 0 16px;
+.messages-filter-section {
+  position: sticky;
+  top: 46px;
+  z-index: 9;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: var(--h5-glass-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
 }
 
-.messages-filter {
+.messages-filter-state {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-}
-
-.messages-filter__state {
-  display: flex;
-  align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 14px;
   color: var(--h5-text-secondary);
   font-size: 12px;
 }
 
-.messages-filter__state button {
+.messages-filter-state button {
   border: 0;
   background: transparent;
   color: var(--h5-primary);
 }
 
-.messages-tabs {
+.messages-tabs-wrap {
+  width: 100%;
+}
+
+.messages-tabs :deep(.liquid-segmented) {
+  border-color: var(--h5-glass-border);
+  background: color-mix(in srgb, var(--h5-glass-sunken) 78%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent);
+}
+
+.messages-tabs :deep(.liquid-segmented__indicator) {
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 42%, var(--h5-glass-border));
+  background: color-mix(in srgb, var(--h5-primary) 25%, var(--h5-card-bg));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 62%, transparent), 0 4px 12px color-mix(in srgb, var(--h5-primary) 18%, transparent);
+}
+
+.messages-filter__toggle-row {
   display: flex;
-  min-width: 0;
-  flex: 1;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.messages-tabs button {
-  flex: 0 0 auto;
-  height: 30px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--h5-bg);
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 6px;
+  padding: 0 4px;
   color: var(--h5-text-secondary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.messages-tabs button.active {
-  background: var(--h5-primary);
-  color: #fff;
+.toggle-row__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.messages-filter__toggle {
+.mark-all-btn {
+  position: relative;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 32%, transparent);
+  border-radius: 999px;
+  appearance: none;
+  background: var(--h5-primary-opacity);
+  color: var(--h5-primary);
   font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.mark-all-btn::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+
+.mark-all-btn .van-icon {
+  font-size: 14px;
+}
+
+.mark-all-btn:not(:disabled):active {
+  background: color-mix(in srgb, var(--h5-primary) 26%, transparent);
+}
+
+.mark-all-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .messages-filter-section {
+    background: var(--h5-glass-surface-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .messages-tabs :deep(.liquid-segmented) {
+    background: color-mix(in srgb, var(--h5-primary-light) 52%, var(--h5-card-bg));
+  }
+
+  .messages-tabs :deep(.liquid-segmented__indicator) {
+    background: color-mix(in srgb, var(--h5-primary) 22%, var(--h5-card-bg));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .messages-filter-section {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .messages-tabs :deep(.liquid-segmented) {
+    background: color-mix(in srgb, var(--h5-primary-light) 52%, var(--h5-card-bg));
+  }
+
+  .messages-tabs :deep(.liquid-segmented__indicator) {
+    background: color-mix(in srgb, var(--h5-primary) 22%, var(--h5-card-bg));
+  }
 }
 
 .message-card {
@@ -262,10 +381,11 @@ onMounted(() => {
   width: calc(100% - 32px);
   margin: 0 16px 10px;
   padding: 14px 14px 12px;
-  border: 1px solid var(--h5-border);
+  border: 1px solid var(--h5-glass-border);
   border-radius: 16px;
   appearance: none;
-  background: var(--h5-card-bg);
+  background: var(--h5-content-surface);
+  box-shadow: var(--h5-glass-shadow);
   color: inherit;
   font: inherit;
   text-align: left;

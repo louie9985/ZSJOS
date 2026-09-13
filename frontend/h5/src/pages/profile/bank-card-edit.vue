@@ -46,12 +46,12 @@ onMounted(loadCard)
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="编辑银行卡" left-arrow @click-left="$router.back()" />
+  <div class="page-container my-subpage-page bank-card-edit-page">
+    <van-nav-bar class="my-subpage__nav" title="编辑银行卡" left-arrow @click-left="$router.back()" />
     <van-skeleton :loading="loading" :row="6" style="padding:16px">
       <van-empty v-if="loadError" :description="loadError" image="error"><van-button size="small" type="primary" @click="loadCard">重新加载</van-button></van-empty>
       <van-form v-else-if="card" @submit="submit">
-        <van-cell-group inset>
+        <van-cell-group class="bank-card-edit-form" inset>
           <van-field v-model="form.accountName" label="开户名" required maxlength="64" placeholder="持卡人姓名" />
           <van-field label="当前卡号" :model-value="card.maskedCardNumber" readonly />
           <van-cell title="更换银行卡号"><template #value><van-switch v-model="changeNumber" size="22" @change="form.cardNumber = ''" /></template></van-cell>
@@ -67,5 +67,15 @@ onMounted(loadCard)
 </template>
 
 <style scoped>
+.bank-card-edit-form {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.bank-card-edit-form :deep(.van-cell:not(:last-child)::after) {
+  border-color: var(--h5-glass-divider);
+}
 .bank-tip{display:flex;align-items:center;gap:6px;padding:14px 24px;color:var(--h5-text-secondary);font-size:12px}.submit-wrap{padding:16px}
 </style>

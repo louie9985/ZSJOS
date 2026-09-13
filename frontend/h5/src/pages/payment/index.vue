@@ -58,5 +58,5 @@ const payAlipay = async () => {
 </template>
 
 <style scoped>
-.payment-page{min-height:100vh;background:#f6f7f9;color:#1f2329}.payment-content{padding:48px 20px 24px;text-align:center}.merchant{font-size:18px;font-weight:600}.amount{margin-top:26px;font-size:44px;font-weight:700}.amount span{font-size:22px;margin-right:4px}.description{margin:10px 0 36px;color:#646a73}.payment-actions{display:grid;gap:12px;max-width:420px;margin:0 auto}.hint{margin:2px 0;color:#8f959e;font-size:13px}.center-state{padding-top:120px}
+.payment-page{min-height:100vh;background:transparent;color:var(--h5-text-primary)}.payment-content{margin:24px 16px 0;padding:32px 20px 24px;border:1px solid var(--h5-glass-border);border-radius:16px;background:var(--h5-glass-surface-strong);box-shadow:var(--h5-glass-shadow);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));text-align:center}.merchant{font-size:18px;font-weight:600}.amount{margin-top:26px;font-size:44px;font-weight:700}.amount span{font-size:22px;margin-right:4px}.description{margin:10px 0 36px;color:var(--h5-text-secondary)}.payment-actions{display:grid;gap:12px;max-width:420px;margin:0 auto}.hint{margin:2px 0;color:var(--h5-text-secondary);font-size:13px}.center-state{padding-top:120px}
 </style>

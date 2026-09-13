@@ -11705,6 +11705,53 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、无数据库执行、无服务启停、无分支/工作树切换、无提交、无推送；保留新建 stash `codex-before-pull-2026-08-29-2026-08-29-192433` 和 `codex-generated-after-stash-2026-08-29-2026-08-29-192451` 作为恢复备份。
 - Remaining work: None。
 
+## Delivery Entry - 2026-09-11 14:38:00 +08:00
+
+- Beijing time: 2026-09-11 14:38:00 +08:00
+- Workstream ID: `main-h5-earnings-summary-no-counts`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 删除兼职端 H5 收益中心汇总卡片中的笔数字段，并收紧卡片底部区域。
+- Key decisions: 删除主金额下方“可提现 X 笔”以及待结算、已提现指标下方的笔数；保留累计收益、待结算、提现中、已提现四项金额和标签；后端/API 的 `counts` 字段继续保留兼容，仅停止该页面消费；将汇总卡片底部内边距从 12px 收紧到 8px，网格行距从 8px 收紧到 6px，网格上方外边距和内边距分别从 12px/10px 收紧到 10px/8px。
+- Execution or analysis result: 收益中心汇总区现只显示金额与状态标签，不再渲染任何“笔”字段；汇总网格和卡片底部空间已收紧，返现列表与详情未改动。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Verification evidence: H5 全量 `node --test tests/*.test.mjs` 通过 25/25；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；静态检查确认汇总模板不含“笔”、`summary.counts`、`earnings-hero__main-meta` 或 `earnings-hero__count`；Playwright 使用受控只读 GET 响应检查 360x844、390x844、1280x844，三种宽度下汇总区均无“笔”字段、文档无横向溢出、控制台错误为 0；目标源码 `git diff --check` 无空白错误，仅有既有 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增依赖，不修改统计金额、接口、后端、数据库、权限、返现列表、收益详情、分支、提交、推送或外部业务状态；浏览器验收未写入业务数据，临时截图已删除。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 14:27:26 +08:00
+
+- Workstream ID: `main-h5-earnings-summary-no-counts`
+- Status: `active`
+- Goal: 精简兼职端 H5 `/earnings` 收益中心汇总卡片，移除所有返现笔数文案并收紧汇总区域底部空间。
+- Non-goals: 不修改汇总金额、返现列表卡片、收益详情弹层、后端接口、数据库、权限、提现业务逻辑、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant 收益页汇总卡片；无新增依赖。
+- Integration order: 删除可提现、待结算、已提现的笔数模板 -> 删除对应计数样式并压缩汇总网格与卡片底部间距 -> 运行 H5 测试、类型检查、生产构建和差异检查 -> 在 360px、390px、1280px 检查布局和文本 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; Playwright 使用只读受控响应确认收益中心汇总不出现“笔”、卡片底部收紧且无横向溢出。
+
+## Workstream Registration - 2026-09-11 00:10:00 +08:00
+- Workstream ID: `main-h5-neutral-theme-soften`
+- Status: `active`
+- Goal: 优化兼职端 H5“黑白经典”主题，改为浅灰中性风格，避免大面积近黑色交互背景。
+- Non-goals: 不修改主题键、主题切换流程、后端、接口、数据库、权限、页面布局、业务交互、语义状态色、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 H5 CSS 主题变量、Node 测试和 Playwright；无新增依赖。
+- Integration order: 调浅中性主题色阶 -> 更新测试和视觉规范 -> 运行 H5 测试/构建 -> 检查移动与桌面截图 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npm run build`; scoped `git diff --check`; 在 390×844 与 1280×900 检查首页、主题设置和表单主操作不出现近黑色大面积背景。
+
 ## Workstream Registration - 2026-08-31 13:20:00 +08:00
 
 - Workstream ID: `main-zsjos-complete-business-audit`
@@ -22640,3 +22687,937 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、数据库、权限或后端接口变更；依赖现有 `DeliveryClassProductOption.categoryPath` 数据。
 - Remaining work: 在可用登录态下补做创建和编辑班级的桌面、移动端浏览器验收，确认分类树展示和路径回填符合实际数据。
 - Status: `implemented; focused verification complete; browser acceptance unverified`。
+
+## Delivery Entry - 2026-09-10 12:32:00 +08:00
+
+- Workstream ID: `main-h5-home-card-padding`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 统一 `/home` 页面所有卡片组件的外层 padding，以 `home-follow-card` 为基线。
+- Key decisions: 统一为 `15px 18px 13px`；保留卡片内部指标、按钮和页面容器的独立间距；同步调整响应式覆盖。
+- Execution or analysis result: 首页收益、跟进、统计、最近提交、排行榜卡片及对应响应式覆盖已统一外层 padding。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`。
+- Verification evidence: `git diff --check` 未发现新增空白错误；`npm run typecheck` 未执行，项目未定义该脚本。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限或外部状态变更。
+- Remaining work: None。
+- Status: `implemented; focused static verification complete`。
+
+## Delivery Entry - 2026-09-10 13:00:00 +08:00
+
+- Workstream ID: `main-h5-home-earnings-labels`; Branch: `main`; Worktree: `D:\code\ZSJOS`; HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree).
+- User goal: 首页预计收入卡片标题加粗，仅保留可提现收入和兑现收入。
+- Key decisions: 仅调整 `frontend/h5` 首页展示文案和布局；沿用现有 `availableAmount`、`pendingAmount` 数据字段，不改后端契约。
+- Execution or analysis result: 删除已提现金额统计，将待结算改为兑现收入，将可提现金额改为可提现收入；预计收入标题加粗；统计列调整为两列。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`。
+- Verification evidence: `git diff --check` 待执行。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限或外部状态变更。
+- Remaining work: None。
+- Status: `implemented`。
+
+## Delivery Entry - 2026-09-10 13:05:00 +08:00
+
+- Workstream ID: `main-h5-home-earnings-labels`; Branch: `main`; Worktree: `D:\code\ZSJOS`; HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree).
+- User goal: 交换兑现收入和可提现收入位置，并使两项金额居中。
+- Key decisions: 调整首页模板顺序；复用现有 `.home-earnings-metric` 的居中布局与数据字段。
+- Execution or analysis result: 兑现收入置于左侧，可提现收入置于右侧；两项标签和金额均由现有 `align-items:center`、`text-align:center` 居中。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`。
+- Verification evidence: `git diff --check` 无新增空白错误（仅报告文件既有 EOF 空行提示）。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限或外部状态变更。
+- Remaining work: None。
+- Status: `implemented`。
+
+## Delivery Entry - 2026-09-10 13:04:52 +08:00 +08:00
+
+- Workstream ID: main-h5-earnings-compact; Branch: main; Worktree: D:\code\ZSJOS; HEAD commit: $head (uncommitted worktree).
+- User goal: 将 /earnings 收益中心卡片按第一种方案压缩布局。
+- Key decisions: 仅调整卡片 CSS 间距与主金额字号，不改变模板、接口或业务逻辑。
+- Execution or analysis result: 压缩主区域、统计网格、标签和笔数的垂直间距；主金额 34px 调整为 32px。
+- Changed files: rontend/h5/src/pages/earnings/index.vue; handoff/main.md。
+- Verification evidence: git diff --check、前端类型检查待执行。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限或外部状态变更。
+- Remaining work: None。
+- Status: implemented。
+# Delivery - 2026-09-10 13:04:54 +08:00
+
+- Beijing time: `2026-09-10 13:04:54 +08:00`
+- Branch: `main`
+- Worktree: `D:\\code\\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 在 H5 `lead/submit` 页面手机号和微信号右上角增加问号，点击显示“手机号和微信号至少填一个”。
+- Key decisions: 复用 Vant Popover 和 Icon；仅增加前端提示显示，不调整提交校验、接口或后端。
+- Execution result: 两个字段标签分别增加可点击问号及相同提示内容，使用 teleport 避免被页面布局裁切。
+- Changed files: `frontend/h5/src/pages/lead/submit.vue`; 本记录。
+- Verification evidence: `npm run build` 通过，包含 `vue-tsc -b` 和 Vite 生产构建（618 modules）。
+- Dependency or integration impact: 无新依赖、API、权限、数据库或分支变更；保留既有工作树修改。
+- Remaining work: None
+- Status: `implemented`
+
+## Workstream Registration - main-contact-hint-removal
+- ID / Owner: main-contact-hint-removal / Codex 当前任务
+- Goal: 删除提交页联系方式下方重复常驻提示。
+- Non-goals: 不改变问号提示、校验、后端及其他既有修改。
+- Branch / Target branch: main / main
+- Worktree: D:\code\ZSJOS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Ownership scope: frontend/h5/src/pages/lead/submit.vue 中重复提示行；handoff/main.md 本次追加记录。
+- Dependencies: None
+- Integration order: 删除单行模板 → 精确差异检查 → 交付记录。
+- Verification plan: 确认仅删除目标行且两个问号提示仍在。
+
+## Delivery - 2026-09-10 13:33:42 +08:00
+- Beijing time: 2026-09-10 13:33:42 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 删除联系方式下方 field-hint 内容。
+- Key decisions: 仅删除重复提示节点，保留两处问号弹窗及其他 field-hint。
+- Execution result: 已删除目标单行。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md
+- Verification evidence: 写入前后精确比较仅减少目标一行；两处问号提示仍存在。未重复构建或进行浏览器检查。
+- Dependency or integration impact: None
+- Remaining work: None
+
+## Workstream Registration - main-submit-field-style
+- ID / Owner: main-submit-field-style / Codex 当前任务
+- Goal: 第一阶段表单统一 14px 常规字重，姓名和地区必填星号移至标签右上角。
+- Non-goals: 不修改业务校验、接口、共享地区组件及其他步骤。
+- Branch / Target: main / main
+- Worktree: D:\code\ZSJOS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Ownership scope: frontend/h5/src/pages/lead/submit.vue 第一阶段标签及局部样式；handoff/main.md 本次追加记录。
+- Dependencies: None
+- Integration order: 局部模板和 CSS → 类型检查及构建 → 交付记录。
+- Verification plan: 构建与差异检查；如有可用浏览器会话则检查桌面与移动端。
+
+## Delivery Entry - 2026-09-10 13:12:00 +08:00
+
+- Workstream ID: `main-h5-card-gap`; Branch: `main`; Worktree: `D:\code\ZSJOS`; HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284` (uncommitted worktree).
+- User goal: 统一首页、客资列表、收益列表、跟进列表卡片之间的间距。
+- Key decisions: 统一连续卡片垂直间距为 12px；仅调整列表 gap/相邻卡片 margin。
+- Execution or analysis result: 客资列表与跟进列表 gap 调整为 12px；收益卡片相邻 margin 调整为 12px；首页原有 12px 保持不变。
+- Changed files: `frontend/h5/src/pages/lead/follow-up.vue`; `frontend/h5/src/pages/lead/list.vue`; `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Verification evidence: `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限或外部状态变更。
+- Remaining work: None。
+- Status: `implemented`。
+
+## Delivery - 2026-09-10 13:40:59 +08:00
+- Beijing time: 2026-09-10 13:40:59 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 姓名和地区必填标记移至右上角，第一步表单文字字号统一。
+- Key decisions: 保留姓名 required 属性，局部隐藏默认左侧星号；两标签用右上角星号；第一步标签和输入内容统一 14px/400，不影响其他步骤和共享地区组件。
+- Execution result: 完成页面模板及局部样式修改。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md；构建可能更新已有修改的 frontend/h5/tsconfig.tsbuildinfo。
+- Verification evidence: npm run build（vue-tsc 和 Vite，618 模块）通过；目标页面 git diff --check 通过。Playwright 访问指定 URL 后重定向登录页，当前会话无认证，桌面和移动端表单视觉检查未完成。
+- Dependency or integration impact: None；保留既有未提交修改。
+- Remaining work: 已登录状态下复核实际表单视觉效果。
+
+## Workstream Registration - main-submit-name-marker
+- ID / Owner: main-submit-name-marker / Codex 当前任务
+- Goal: 去掉客户姓名左侧默认必填标记，保留右上角标记。
+- Non-goals: 不改变表单业务校验及其他字段。
+- Branch / Target: main / main
+- Worktree: D:\code\ZSJOS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Ownership scope: frontend/h5/src/pages/lead/submit.vue 姓名字段默认标记及关联样式；handoff/main.md 本次记录。
+- Dependencies: None
+- Integration order: 删除默认标记属性及无用覆盖 → 构建 → 记录。
+- Verification plan: 检查姓名保留自定义右上角星号和既有校验，运行构建。
+
+## Delivery Entry - 2026-09-10 13:15:00 +08:00
+
+- Workstream ID: `main-h5-card-gap`; Branch: `main`; Worktree: `D:\code\ZSJOS`; HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284` (uncommitted worktree).
+- User goal: 修正跟进页卡片间距未实际统一的问题。
+- Key decisions: 清除跟进卡片继承的全局 margin，由列表 gap 单独控制 12px。
+- Execution or analysis result: `.follow-up-card` 增加 `margin: 0`，避免全局 `.card` 的 14px margin 与容器 gap 叠加。
+- Changed files: `frontend/h5/src/pages/lead/follow-up.vue`; `handoff/main.md`。
+- Verification evidence: 已核对跟进列表 DOM 与 CSS 规则。
+- Dependency or integration impact: None。
+- Remaining work: None。
+- Status: `implemented`。
+
+## Delivery - 2026-09-10 13:44:04 +08:00
+- Beijing time: 2026-09-10 13:44:04 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 去掉客户姓名左上角红色标记。
+- Key decisions: 移除触发 Vant 默认标记的 required 属性，保留 aria-required、自定义右上角星号及姓名校验；删除上次新增且已无用的隐藏样式。
+- Execution result: 姓名不再生成默认必填标记。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md；构建可能更新已有修改的 frontend/h5/tsconfig.tsbuildinfo。
+- Verification evidence: npm run build（vue-tsc + Vite）通过；git diff --check 通过；源码确认右上角星号及姓名校验保留。未重复浏览器检查，之前会话缺少登录态。
+- Dependency or integration impact: None
+- Remaining work: 登录后视觉复核。
+
+## Delivery - 2026-09-10 14:00:00 +08:00
+- Beijing time: 2026-09-10 14:00:00 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 将图片一的底色风格应用到图片二提交客资表单。
+- Key decisions: 仅调整 customer-info-section 背景为 #F7F9FD。
+- Execution or analysis result: CSS 修改完成。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md
+- Verification evidence: frontend/h5 npm run build 通过。
+- Dependency or integration impact: None
+- Remaining work: None
+
+
+## Delivery - 2026-09-10 13:56:57 +08:00
+- Beijing time: 2026-09-10 13:56:57 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 客户地区选择内容显示在字段右侧。
+- Key decisions: 仅在提交页包裹 AreaPicker 做横向布局；保留共享组件和选择逻辑。
+- Execution result: 标签、地区文本和箭头同一行，长文本省略。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md
+- Verification evidence: npm run build 通过（618 modules）；git diff --check 通过。
+- Dependency or integration impact: None
+- Remaining work: 登录态视觉复核。
+
+## Workstream Registration - H5 指定卡片底色统一
+- Workstream ID: main-h5-fixed-card-surface
+- Goal: 六个已确认页面的指定卡片使用 #F7F9FD。
+- Non-goals: 不修改全局卡片、弹窗、导航、业务逻辑及其他已有改动。
+- Branch / Target branch: main / main
+- Worktree: D:\code\ZSJOS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Ownership scope: frontend/h5/src/pages/earnings/index.vue; frontend/h5/src/pages/lead/follow-up.vue; frontend/h5/src/pages/lead/list.vue; frontend/h5/src/pages/profile/edit.vue; frontend/h5/src/pages/profile/bank-cards.vue; frontend/h5/src/pages/profile/password.vue; frontend/h5/docs/ui-guidelines.md; frontend/h5/tsconfig.tsbuildinfo（构建产物）; handoff/main.md。
+- Owner: Codex /root（当前串行工作流）
+- Dependencies: 现有 Vue、Vant 和主题样式；无新增依赖。
+- Integration order: 局部样式 -> UI 文档 -> 构建与检查 -> 交付记录。
+- Verification plan: 定向样式检查、vue-tsc 与 Vite 构建、浏览器桌面和移动宽度检查（工具可用时）。
+## Delivery - 2026-09-10 13:59:15 +08:00
+- Beijing time: 2026-09-10 13:59:15 +08:00
+- Workstream ID: main-h5-fixed-card-surface
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 实现已确认的六个页面指定卡片底色统一。
+- Key decisions: 仅在六个页面局部应用 #F7F9FD；保留表单透明内层、银行卡操作反馈；同步收益与客资列表背景降级规则、UI 例外说明。
+- Execution result: 六个页面卡片与同类客资骨架卡片已应用固定底色，保留现有其他工作区修改。
+- Changed files: frontend/h5/src/pages/earnings/index.vue; frontend/h5/src/pages/lead/follow-up.vue; frontend/h5/src/pages/lead/list.vue; frontend/h5/src/pages/profile/edit.vue; frontend/h5/src/pages/profile/bank-cards.vue; frontend/h5/src/pages/profile/password.vue; frontend/h5/docs/ui-guidelines.md; handoff/main.md；构建可能更新已有 tsconfig.tsbuildinfo。
+- Verification evidence: npm run build（vue-tsc + Vite）通过；六个页面定向 diff --check 通过；静态核对局部选择器、字段透明背景及降级规则。包含历史交接记录的整体 diff --check 报已有 CRLF 空白问题，未修改历史记录。
+- Dependency or integration impact: None，无新增依赖、外部状态或业务逻辑变化。
+- Remaining work: 桌面与移动端浏览器视觉检查未验证，浏览器工具返回 Browser use requires a trusted Node REPL browser service，无法连接；实际渲染仍需复核。
+## Workstream Registration - main-area-alignment
+- ID / Owner: main-area-alignment / Codex 当前任务
+- Goal: 地区占位文字与其他输入框对齐，下拉箭头右对齐。
+- Non-goals: 不改变地区数据、弹窗或其他字段。
+- Branch / Target: main / main
+- Worktree: D:\code\ZSJOS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Ownership scope: frontend/h5/src/pages/lead/submit.vue 地区行样式及类名；handoff/main.md 本次记录。
+- Dependencies: 现有 Vant 字段标签间距。
+- Integration order: 修正选择器根元素伸展和标签间距 → 构建及检查 → 交付。
+- Verification plan: 检查 Vant 标签间距一致、地区组件根元素占满剩余宽度，类型检查与构建。
+
+## Delivery - 2026-09-10 14:05:30 +08:00
+- Beijing time: 2026-09-10 14:05:30 +08:00
+- Branch / Worktree: main / D:\code\ZSJOS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 地区占位提示与其他三个字段对齐，下拉箭头右对齐。
+- Key decisions: 地区标签复用 Vant 标签右间距变量；flex:1 移至实际 flex 子项（AreaPicker 根节点），min-width:0 允许收缩。
+- Execution result: 地区输入起点采用同样的标签宽度和间距，选择器占满剩余宽度，使箭头靠右。
+- Changed files: frontend/h5/src/pages/lead/submit.vue; handoff/main.md；构建可能更新已有修改的 frontend/h5/tsconfig.tsbuildinfo。
+- Verification evidence: npm run build（vue-tsc 和 Vite）通过；git diff --check 通过。浏览器视觉复核未执行，之前测试会话无登录态。
+- Dependency or integration impact: None
+- Remaining work: 登录后复核实际对齐效果。
+
+## Workstream Registration - 2026-09-13 02:38:49 +08:00
+- Workstream ID: `main-gitee-origin-pull-20260913`
+- Goal: 保存本地修改代码，拉取远程最新代码并合并到本地。
+- Non-goals: 不提交、不推送、不切换分支、不删除备份 stash、不清理未跟踪文件、不修改业务功能。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- Target branch: 本地 `main` 对齐 `origin/main`
+- Ownership scope: Git 工作树保存/恢复与本次同步记录；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Git 远程 `origin/main`；无新增依赖。
+- Integration order: 保存本地修改到 stash → fetch 远程 → 检查并快进合并 → 恢复本地修改 → Git 状态验证 → 追加交付记录。
+- Verification plan: `git rev-list --left-right --count HEAD...origin/main`；冲突与暂存区检查；冲突标记搜索；`git diff --check`。
+- Status: `complete`
+
+## Delivery - 2026-09-13 02:38:49 +08:00
+- Beijing time: `2026-09-13 02:38:49 +08:00`
+- Workstream ID: `main-gitee-origin-pull-20260913`
+- Branch / Worktree: `main` / `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 保存本地修改代码，拉取远程最新代码并合并到本地。
+- Key decisions: 使用 `codex-before-pull-2026-09-13-023727` 保存本轮已跟踪和未跟踪本地修改；fetch 后确认本地与远程均为同一提交，无需产生合并提交；恢复过程中因 H5 构建生成的 `frontend/h5/components.d.ts` 阻止 stash 直接应用，额外保存 `codex-generated-after-stash-2026-09-13-023809`，再恢复原 stash 内容。
+- Execution or analysis result: 远程 fetch 成功，`HEAD...origin/main` 为 `0 0`；本地修改和未跟踪文件已恢复；无未合并冲突；没有提交、推送、切换分支或删除 stash。
+- Changed files: `handoff/main.md` 本次追加同步记录；其他工作树文件均为本地原有修改或恢复的未跟踪文件。
+- Verification evidence: `git diff --name-only --diff-filter=U` 为空；`git diff --cached --name-only` 为空；冲突标记搜索无匹配；`git rev-list --left-right --count HEAD...origin/main` 返回 `0 0`。
+- Dependency or integration impact: 无新增依赖、数据库或外部服务变更；保留 `codex-before-pull-2026-09-13-023727`（`bd90637a2d2060b0e669b8f54c9b63175896691c`）和 `codex-generated-after-stash-2026-09-13-023809`（`b0653b0dbb19acd8a234a5a3fac84160e9848cbc`）作为备份 stash。
+- Remaining work: None；如需发布当前本地修改，仍需另行确认提交和推送范围。
+
+## Workstream Registration - 2026-09-13 10:15:29 +08:00
+
+- Workstream ID: `main-commit-push-local-changes-20260913`
+- Goal: 将当前本地修改提交到本地 `main` 分支，并推送到远程 `origin/main`。
+- Non-goals: 不切换分支、不删除 stash、不清理其他文件、不修改业务代码内容。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- Target branch: `main` / `origin/main`
+- Ownership scope: 当前工作区所有已修改和未跟踪文件；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Git 远程 `origin`；无新增依赖。
+- Integration order: H5 构建与头像测试 → 追加交付记录 → 暂存全部本地变更 → 创建提交 → 推送 `origin/main` → 校验本地与远程提交一致。
+- Verification plan: `npm --prefix frontend/h5 run build`; `npm --prefix frontend/h5 run test:avatar`; `git status`; `git rev-parse`; `git rev-list --left-right --count main...origin/main`。
+- Status: `in-progress`
+
+## Delivery - 2026-09-13 10:16:24 +08:00
+
+- Workstream ID: `main-commit-push-local-changes-20260913`
+- Beijing time: `2026-09-13 10:16:24 +08:00`
+- Branch / Worktree: `main` / `D:\code\ZSJOS`
+- Commit: `7a66509d999dda478150b22da171a2dec8c22c65`（待推送）
+- User goal: 将当前本地修改提交到本地 `main` 分支，并推送到远程 `origin/main`。
+- Key decisions: 按用户授权将当前 60 个已修改文件和 29 个未跟踪文件全部纳入提交；未纳入已删除的 `output/playwright` 未跟踪产物；保留历史 stash 不做清理。
+- Execution or analysis result: 本地提交已创建，共 89 个文件，新增 7361 行、删除 2019 行；H5 生产构建和头像单元测试通过。
+- Changed files: 当前提交中的全部 89 个文件，涵盖 backend、frontend/h5、frontend/shared、frontend/workbench、docs 和 handoff。
+- Verification evidence: `npm --prefix frontend/h5 run build` 通过（vue-tsc 与 Vite，627 modules）；`npm --prefix frontend/h5 run test:avatar` 通过（8/8）；提交前工作区无暂存遗漏。
+- Dependency or integration impact: 无新增依赖；提交包含本地开发配置地址 `192.168.2.17` 和现有 Workbench/H5 代理配置变更；尚未推送远程。
+- Remaining work: 推送该提交到 `origin/main`，然后校验本地和远程 commit 一致。
+- Status: `in-progress`
+
+## Delivery Correction - 2026-09-13 10:18:19 +08:00
+
+- Workstream ID: `main-commit-push-local-changes-20260913`
+- Beijing time: `2026-09-13 10:18:19 +08:00`
+- Branch / Worktree: `main` / `D:\code\ZSJOS`
+- HEAD commit: `94157aa18a31accc498d822453839746c43e5def`（本地提交，尚未推送）
+- User goal: 将当前本地修改提交到本地 `main` 分支，并推送到远程 `origin/main`。
+- Key decisions: 保留已创建的本地提交；不在仓库中写入凭据，不绕过 Gitee 认证。
+- Execution or analysis result: `git push origin main` 因 Git Credential Manager 未获得可用 Gitee 凭据，认证对话框被取消，远程推送失败；本地工作树干净，当前领先 `origin/main` 1 个提交。
+- Changed files: 仅追加本修正记录至 `handoff/main.md`。
+- Verification evidence: `git status --short --branch` 显示 `main...origin/main [ahead 1]` 且无工作区改动；`git rev-list --left-right --count main...origin/main` 返回 `1 0`。
+- Dependency or integration impact: 无代码、数据库或外部服务变更；推送仍需当前环境配置 Gitee 账号/令牌或 SSH 认证。
+- Remaining work: 配置可用的 Gitee 认证后执行 `git push origin main`，再确认远程 HEAD 与本地 HEAD 一致。
+- Status: `blocked-on-credentials`
+
+## Workstream Registration - 2026-09-10 17:55:44 +08:00
+- Workstream ID: `main-gitee-origin-pull-20260910`
+- Goal: 保存本地修改代码，拉取远程最新代码并合并到本地。
+- Non-goals: 不提交、不推送、不切换分支、不删除备份 stash、不清理未跟踪文件、不修改业务功能。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- Target branch: 本地 `main` 对齐 `origin/main`
+- Ownership scope: Git 工作树保存/恢复与本次同步记录；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Git 远程 `origin/main`；无新增依赖。
+- Integration order: 保存本地修改到 stash → fetch 远程 → 检查并快进合并 → 恢复本地修改 → Git 状态验证 → 追加交付记录。
+- Verification plan: `git rev-list --left-right --count HEAD...origin/main`；冲突与暂存区检查；`git diff --check`。
+- Status: `complete`
+
+## Delivery - 2026-09-10 17:55:44 +08:00
+- Beijing time: 2026-09-10 17:55:44 +08:00
+- Workstream ID: `main-gitee-origin-pull-20260910`
+- Branch / Worktree: `main` / `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 保存本地修改代码，拉取远程最新代码并合并到本地。
+- Key decisions: 使用 `codex-before-pull-2026-09-10-175305` 保存已跟踪和未跟踪本地修改；fetch 后发现本地与远程均为 `f338087e9aaa8b8d881cd0aee80427d8773ab284`，无需产生新的合并提交；恢复过程中因 H5 构建自动生成 `components.d.ts`，额外保存 `codex-generated-after-stash-2026-09-10-175450`，再按原 stash 内容恢复工作树。
+- Execution or analysis result: 远程 fetch 成功，`HEAD...origin/main` 为 `0 0`；本地修改和未跟踪文件已恢复；没有提交、推送、切换分支或删除 stash。
+- Changed files: `handoff/main.md` 本次追加同步记录；其他工作树文件均为本地原有修改或恢复的未跟踪文件。
+- Verification evidence: `git diff --name-only --diff-filter=U` 为空；`git diff --cached --name-only` 为空；冲突标记搜索无匹配；远程同步计数为 `0 0`。`git diff --check` 仅报告恢复前 handoff 历史内容中已有的空白问题及 `frontend/h5/src/pages/home/index.vue` 文件末尾空行，未修改这些既有内容。
+- Dependency or integration impact: 无新增依赖、数据库或外部服务变更；保留 `codex-before-pull-2026-09-10-175305` 与 `codex-generated-after-stash-2026-09-10-175450` 备份 stash。
+- Remaining work: None；如需发布这些本地修改，仍需另行确认提交和推送范围。
+
+## Workstream Registration - 2026-09-10 18:46:50 +08:00
+- Workstream ID: `main-h5-home-leaderboard-theme-first`
+- Status: `active`
+- Goal: 将 H5 首页排行榜简榜第一名的行背景、头像边框/光圈和皇冠改为跟随当前主题色。
+- Non-goals: 不修改详细排行榜 Top3 的金银铜语义配色；不修改收益火焰、榜单数据、排序、接口、权限、主题切换机制、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/components/LeaderboardCrown.vue`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue scoped CSS、主题变量与共享 `LeaderboardCrown`；无新增依赖。
+- Integration order: 为共享皇冠增加默认不变的主题模式 -> 首页第一名启用主题模式并替换固定金色 -> 同步 UI 规范 -> 运行构建与定向检查 -> 在可用浏览器中检查三套主题和详细榜回归 -> 追加交付记录。
+- Verification plan: `npm --prefix frontend/h5 run build`; scoped `git diff --check`; 静态确认首页第一名不再引用固定金色且详细榜默认金银铜不变；浏览器可用时在移动端与桌面宽度检查珊瑚粉、薰衣草、天空蓝主题。
+
+## Workstream Scope Update - 2026-09-10 18:49:00 +08:00
+- Workstream ID: `main-h5-home-leaderboard-theme-first`
+- Added ownership scope: `frontend/h5/tests/leaderboard-theme.test.mjs`。
+- Reason: 为首页第一名主题联动和详细排行榜默认奖牌配色边界增加聚焦回归测试。
+- Non-goal impact: 不修改测试脚本、依赖或其他产品行为。
+
+## Delivery Entry - 2026-09-10 18:52:08 +08:00
+- Beijing time: 2026-09-10 18:52:08 +08:00
+- Workstream ID: `main-h5-home-leaderboard-theme-first`
+- Status: `merged`（直接在当前本地 `main` 工作树完成，未执行 Git 合并或提交）
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 实现 H5 首页排行榜简榜第一名跟随当前主题色变化。
+- Key decisions: 首页第一名显式启用共享皇冠的 `theme` 模式；共享组件默认仍为 `medal`，确保详细排行榜 Top3 保留金银铜；行背景、备用名次块、头像边框与光圈统一改用既有主题变量；所有名次共享的收益火焰保持语义橙色。
+- Execution or analysis result: 首页简榜第一名不再引用固定金色，珊瑚粉、薰衣草和天空蓝均由现有 `--h5-primary` / `--h5-primary-dark` 自动驱动；详细排行榜调用点未启用主题模式；UI 规范已同步，新增聚焦源码回归测试。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/components/LeaderboardCrown.vue`（任务开始时已为未跟踪文件）; `frontend/h5/docs/ui-guidelines.md`（任务开始时已为未跟踪文件）; `frontend/h5/tests/leaderboard-theme.test.mjs`; `handoff/main.md`; 构建刷新了任务开始时已修改的 `frontend/h5/tsconfig.tsbuildinfo`。
+- Verification evidence: `node --test tests/leaderboard-theme.test.mjs` 通过，1/1；`npm --prefix frontend/h5 run build` 通过，`vue-tsc -b` 与 Vite 627 modules 构建成功；生产 CSS 包含主题皇冠、第一名主题背景和主题头像边框规则；源码检查确认首页无 `#f4c95d` / `#694c00`，详细榜 `LeaderboardCrown` 仍使用默认模式。scoped `git diff --check` 仅报告任务前已有的 `home/index.vue` 文件末尾空行和 `handoff/main.md` 历史空白问题，本次新增文件及交接尾部无行尾空白。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、主题配置、分支、提交、推送或外部状态变更；仅新增共享组件的可选展示模式，默认行为兼容现有详细榜调用点。
+- Remaining work: 浏览器视觉检查未验证；浏览器连接返回 `Browser use requires a trusted Node REPL browser service`，仍需在可用会话中抽查三套主题的移动端与桌面宽度，以及详细排行榜 Top3 配色。
+
+## Workstream Registration - 2026-09-10 18:55:18 +08:00
+- Workstream ID: `main-h5-home-recent-lead-summary`
+- Status: `active`
+- Goal: 移除 H5 首页“最近提交”客户条目中的课程名称和课程规格，仅保留头像、客户姓名、状态和详情箭头。
+- Non-goals: 不修改客资接口、数据结构、详情页、列表页、状态映射、状态配色、权限、加载/空态/错误态、跳转、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue、Vant、SmartAvatar 和客资列表接口；无新增依赖。
+- Integration order: 删除首页课程展示及仅由其使用的代码 -> 收敛最近提交条目为单行布局 -> 运行 H5 构建与定向检查 -> 可用时执行桌面和移动宽度浏览器检查 -> 追加交付记录。
+- Verification plan: `npm --prefix frontend/h5 run build`; scoped `git diff --check`; 静态确认“最近提交”条目只渲染头像、姓名、状态和箭头；浏览器可用时检查 360px、390px/430px 与桌面宽度，并验证详情和列表跳转。
+
+## Delivery Entry - 2026-09-10 18:58:24 +08:00
+- Beijing time: 2026-09-10 18:58:24 +08:00
+- Workstream ID: `main-h5-home-recent-lead-summary`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 实现 H5 首页“最近提交”客户条目移除课程相关信息，只保留头像、名字、状态和箭头。
+- Key decisions: 仅删除首页课程名称、课程规格及其专用函数和样式；保留三条数据、状态映射与配色、加载/空态/错误态、客户详情跳转和“查看全部”跳转；条目使用稳定单行四列布局，长姓名继续单行省略。
+- Execution or analysis result: “最近提交”每条记录现在只渲染 `SmartAvatar`、客户姓名、状态和详情箭头，课程名称、时长、级别等规格不再出现在首页；客资接口和其他页面未修改。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`; 构建检查了任务开始时已修改的 `frontend/h5/tsconfig.tsbuildinfo`。
+- Verification evidence: `npm --prefix frontend/h5 run build` 通过，`vue-tsc -b` 与 Vite 627 modules 构建成功；定向静态检查确认保留 `SmartAvatar`、`recent-lead__name`、`recent-lead__status`、`recent-lead__arrow`，且首页源文件不再包含 `ProductSpecs`、`recentLeadCourse`、`recent-lead__product`、`recent-lead__copy`。定向 `git diff --check` 仅报告任务开始前已存在并已在上一交付记录中说明的 `frontend/h5/src/pages/home/index.vue` 文件末尾空行，本次未清理该无关既有改动。
+- Dependency or integration impact: 无新增依赖、接口、数据结构、数据库、权限、分支、提交、推送或外部状态变更；仅影响 H5 首页最近提交摘要的展示。
+- Remaining work: 浏览器视觉与点击回归未验证；浏览器连接返回 `Browser use requires a trusted Node REPL browser service`，需在可用会话中抽查 360px、390px/430px 和桌面宽度，并验证客户详情与“查看全部”跳转。
+
+## Workstream Registration - 2026-09-10 18:59:25 +08:00
+- Workstream ID: `main-h5-earnings-head-alignment`
+- Status: `active`
+- Goal: 让 H5 收益中心标题区域与“立即提现”按钮在 `page-hero__head` 内垂直居中对齐。
+- Non-goals: 不修改公共 `page-hero__head`、标题与按钮尺寸、问号提示、收益数据、接口、权限、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue scoped CSS 与公共页面骨架；无新增依赖。
+- Integration order: 增加收益页局部垂直居中规则 -> 执行定向差异检查 -> 运行 H5 类型检查与生产构建 -> 可用时执行多宽度浏览器检查 -> 追加交付记录。
+- Verification plan: `git diff --check -- frontend/h5/src/pages/earnings/index.vue`; `npm --prefix frontend/h5 run build`; 静态确认公共 `frontend/h5/src/styles/base.css` 未被本任务修改；浏览器可用时检查 360px、390px、430px 宽度的标题与按钮中心线。
+
+## Workstream Registration - 2026-09-10 19:05:00
+- Workstream ID: `main-h5-earnings-withdrawal-fab`
+- Status: `active`
+- Goal: 在 H5 收益中心右下角增加与客资列表一致的提现悬浮入口，点击进入现有提现申请页。
+- Non-goals: 不修改提现接口、路由、提现申请业务、顶部“立即提现”按钮、权限定义、公共样式、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 Vue、Vant、收益页提现权限判断、`/withdrawal/apply` 路由；无新增依赖。
+- Integration order: 新增收益页悬浮按钮 -> 同步视觉规范 -> 运行 H5 构建和差异检查 -> 追加交付记录。
+- Verification plan: `npm --prefix frontend/h5 run build`; `git diff --check -- frontend/h5/src/pages/earnings/index.vue frontend/h5/docs/ui-guidelines.md handoff/main.md`; 静态确认按钮复用 `canWithdraw` 和 `goWithdraw`，且公共样式未修改；浏览器可用时检查移动/桌面宽度和无提现权限状态。
+
+## Delivery Entry - 2026-09-10 19:16:46 +08:00
+- Beijing time: 2026-09-10 19:16:46 +08:00
+- Workstream ID: `main-h5-earnings-withdrawal-fab`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 在 H5 收益中心右下角增加与客资列表类似的悬浮入口，点击进入提现页面。
+- Key decisions: 复用收益页已有 `canWithdraw` 与 `goWithdraw()`，仅向持有 `zsjos:withdrawal:apply` 的账号显示入口；沿用客资列表的 52px 圆形渐变、阴影、底部导航/安全区避让和桌面内容区定位；保留顶部“立即提现”入口和先登记工作流新增的标题垂直居中规则。
+- Execution or analysis result: 收益页新增可访问名称为“申请提现”的右下角加号悬浮按钮，授权用户点击进入现有 `/withdrawal/apply`，无申请权限时不渲染；同步记录视觉规范。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: `npm --prefix frontend/h5 run build` 通过，`vue-tsc -b` 与 Vite 627 modules 构建成功；`git diff --check -- frontend/h5/src/pages/earnings/index.vue frontend/h5/docs/ui-guidelines.md` 无空白错误，仅有现存 LF/CRLF 提示；Playwright 受控数据下在 390x844 与 1280x800 检查布局，授权态快照包含“申请提现”按钮，点击后 URL 为 `/withdrawal/apply`，无 `zsjos:withdrawal:apply` 权限的 390x844 快照不包含该按钮；静态核对 `.earnings-hero > .page-hero__head { align-items: center; }` 保持不变。
+- Dependency or integration impact: 无新增依赖、接口、路由、提现业务、数据库或权限定义变更；未执行分支、提交、推送或外部服务操作。与先登记的 `main-h5-earnings-head-alignment` 共享收益页文件，已按协调要求保留其规则，需由该工作流重新验证后结束。
+- Remaining work: `handoff/main.md` 全文件差异检查仍报告本任务开始前已存在的尾随空白，本次未清理无关历史内容；先登记的标题对齐工作流需完成自己的最终复核。
+
+## Delivery Entry - 2026-09-10 19:20:06 +08:00
+- Beijing time: 2026-09-10 19:20:06 +08:00
+- Workstream ID: `main-h5-earnings-head-alignment`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 实现 H5 收益中心标题区域与“立即提现”按钮在 `page-hero__head` 内垂直居中对齐。
+- Key decisions: 在收益页 scoped CSS 中使用 `.earnings-hero > .page-hero__head` 局部覆盖公共骨架的 `align-items: flex-start`；不修改公共 `base.css`、DOM、标题和按钮尺寸，避免影响提交客资等其他页面。
+- Execution or analysis result: 收益中心标题区域和“立即提现”按钮现由父容器按中心线对齐；后续并行加入的提现悬浮入口已保留本规则，合并状态无覆盖。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。构建检查了任务开始时已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: `git diff --check -- frontend/h5/src/pages/earnings/index.vue` 无空白错误，仅报告现存 LF/CRLF 转换提示；`npm --prefix frontend/h5 run build` 通过，`vue-tsc -b` 与 Vite 627 modules 构建成功；Playwright 使用受控接口数据加载实际 `/earnings` 页面，在 360x844、390x844、430x844 下计算 `page-hero__head` 的 `align-items` 均为 `center`，标题容器与按钮中心线差值均为 `0px`；浏览器会话已关闭。
+- Dependency or integration impact: 无新增依赖、接口、路由、权限、数据库、公共样式、分支、提交、推送或外部服务变更；保留工作树全部既有修改和同期提现悬浮入口改动。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-10 23:36:28 +08:00
+- Workstream ID: `main-h5-neutral-theme`
+- Status: `active`
+- Goal: 为兼职端 H5 新增默认的“黑白经典”中性主题，同时兼容已有三套主题偏好。
+- Non-goals: 不修改后端、接口、数据库、权限、页面布局、业务交互、语义状态色、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/stores/app.ts`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/themes/coral.css`; `frontend/h5/src/main.ts`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue、Pinia、Vant、H5 CSS 主题变量与 Node 测试；无新增依赖。
+- Integration order: 增加中性主题变量与导入 -> 扩展主题键、默认值和本地记录校验 -> 增加主题选项 -> 更新视觉规范 -> 补充聚焦测试 -> 运行全部 H5 Node 测试、生产构建与浏览器验收 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npm run build`; scoped `git diff --check`; 在 390×844 与 1280×900 检查登录页、首页、主题设置页和代表性列表/表单，并验证四主题切换、持久化及语义色保留。
+
+## Delivery Entry - 2026-09-10 23:59:17 +08:00
+- Beijing time: 2026-09-10 23:59:17 +08:00
+- Workstream ID: `main-h5-neutral-theme`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 为兼职端 H5 增加默认的“黑白经典”无彩色主题选项，并保留已有三套主题和存量用户偏好。
+- Key decisions: 使用显式 `neutral` 主题键和石墨黑 `#303133` 强调色；保留现有雾玻璃层次及成功、警告、错误、信息和奖牌语义色；仅缺失或非法的本地主题记录回退中性主题，合法旧记录不迁移；无 `data-theme` 的 CSS 降级由中性主题接管。
+- Execution or analysis result: 主题列表现有四项且“黑白经典”排首位；新增完整中性 H5/Vant 变量，默认画布、交互强调和主题表面均为白灰黑；主题选择可立即切换并持久化，刷新后恢复；个人中心正确显示“黑白经典”；视觉规范已同步。
+- Changed files: `frontend/h5/src/stores/app.ts`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/main.ts`; `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/themes/coral.css`（仅将默认无属性降级移交中性主题，保留任务前已有改动）; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`（任务前已为未跟踪文件，在现有内容上增量更新）; `handoff/main.md`。构建检查了任务开始时已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: `node --test tests/*.test.mjs` 通过 22/22；`npm run build` 通过，包含 `vue-tsc -b` 与 Vite 628 modules 生产构建；聚焦主题测试通过 5/5，覆盖四主题键、默认/非法记录回退、合法旧记录兼容、应用与持久化、中性 CSS 默认降级和语义色；scoped `git diff --check` 无空白错误，仅有既有 LF/CRLF 提示。Playwright 使用受控只读接口响应在 390×844 与 1280×900 实际加载登录、首页、主题设置、客资列表和提交客资表单：四主题均可点击切换且变量/本地记录同步，刷新后中性主题保持；个人中心显示“黑白经典”；中性主色、白灰画布及语义色值正确；页面无横向溢出，桌面内容宽 540px；最终浏览器控制台 0 error。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、路由、布局、分支、提交、推送或外部服务变更；Playwright 检查使用本地开发服务器和浏览器路由模拟，均已关闭。
+- Remaining work: None。
+## Workstream Registration - 2026-09-11 01:06:05 +08:00
+- Workstream ID: `main-h5-lead-filter-surface`
+- Status: `active`
+- Goal: 将 H5 `/lead/list` 筛选弹窗内的选项框和提交时间框底色调整为更浅的主题玻璃表面。
+- Non-goals: 不修改筛选逻辑、接口、布局、全局主题变量、其他页面、依赖、分支、提交、推送或其他既有工作树改动。
+- Branch: `main`; Worktree: `D:\code\ZSJOS`; Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/h5/src/pages/lead/list.vue`; `handoff/main.md`。
+- Dependencies: 现有 Vue scoped CSS、H5 主题变量和 Vant 组件；无新增依赖。
+- Integration order: 局部筛选控件背景调整 -> H5 生产构建与差异检查 -> 追加交付记录。
+- Verification plan: `npm --prefix frontend/h5 run build`; `git diff --check -- frontend/h5/src/pages/lead/list.vue handoff/main.md`; 静态确认仅修改筛选弹窗局部背景规则。
+
+## Workstream Registration - 2026-09-11 01:11:38 +08:00
+- Workstream ID: `main-h5-classic-ios-theme`
+- Status: `active`
+- Goal: 将兼职端 H5 的 `neutral` 主题显示名改为“经典”，并改造成现代 iOS 浅色全站主题，消除灰黑按钮和主题染色内容卡片。
+- Non-goals: 不修改主题键和本地存储协议；不调整页面结构、操作位置或既有圆角；不修改后端、接口、数据库、权限、业务逻辑、依赖、分支、提交、推送及其他既有工作树改动。
+- Branch: `main`; Worktree: `D:\code\ZSJOS`; Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`; Target branch: `main`; Owner: Codex `/root`。
+- Ownership scope: `frontend/h5/src/styles/base.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/pages/profile/theme.vue`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Dependencies: 现有 Vue、Pinia、Vant、H5 主题变量和 Node 源码守卫；无新增依赖。`main-h5-lead-filter-surface` 已确认中断于登记阶段，本工作流不修改其 `lead/list.vue` 所有权范围。
+- Integration order: 分离内容表面与导航玻璃 token -> 完善 iOS 调色板和 Vant 控件状态 -> 更新“经典”名称与蓝色圆点 -> 同步测试及视觉规范 -> 全量测试/构建 -> 双视口浏览器验收 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npm run build`; scoped `git diff --check`; 在新本地开发端口以 390×844、1280×900 检查登录、首页、主题设置、个人中心、客资列表、提交表单及弹窗/选择器，验证四主题切换、持久化、经典主题表面/按钮/语义色与其他三主题回归。
+
+## Workstream Scope Amendment - 2026-09-11 01:57:02 +08:00
+- Workstream ID: `main-h5-classic-ios-theme`
+- Added ownership scope: `output/playwright/h5-classic-ios/`，仅保存本工作流的双视口视觉验收截图。
+- Reason: 保留登录、首页、主题设置、个人中心、客资列表、提交表单及弹窗/选择器的验收证据；不包含账号、令牌或真实业务数据。
+
+## Delivery Entry - 2026-09-11 02:00:23 +08:00
+- Beijing time: 2026-09-11 02:00:23 +08:00
+- Workstream ID: `main-h5-classic-ios-theme`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 将兼职端 H5 的 `neutral` 主题显示名改为“经典”，并完成现代 iOS 17/18 浅色全站主题改造。
+- Key decisions: 保留 `neutral` 键和 `h5-theme` 存储协议；经典主题使用 `#F2F2F7` 页面、纯白内容表面、iOS 蓝操作色与 Apple 语义色；新增独立内容和导航材质变量，彩色主题继续映射原玻璃配方；导航和 Dock 保留半透明模糊，普通卡片、表单和弹窗正文使用纯白；分段控件使用浅灰轨道和白色选中块。
+- Execution or analysis result: 主题名称、蓝色圆点与卡片化预览已更新；经典主题的按钮、文本、状态、内容表面、导航玻璃、弹窗及禁用态完成统一；个人中心移除经典主题下的卡片染色装饰；默认和非法记录仍回退 `neutral`，合法旧记录与三套彩色主题保持兼容；视觉规范和样式守卫同步完成。
+- Changed files: `frontend/h5/src/styles/base.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/pages/profile/theme.vue`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`; `output/playwright/h5-classic-ios/`。构建检查了任务开始前已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: `node --test tests/*.test.mjs` 通过 23/23；`npm run build` 通过，包含 `vue-tsc -b` 与 Vite 628 modules 生产构建；目标源码和文档的 `git diff --check` 无空白错误，仅有既有 LF/CRLF 提示。Playwright 使用当前源码的新端口 `10087`，在 390x844 与 1280x900 检查登录、首页、主题设置、个人中心、客资列表、提交表单及筛选/地区选择弹窗：页面背景为 `rgb(242, 242, 247)`、普通内容卡片与弹窗正文为 `rgb(255, 255, 255)`、主按钮为 `rgb(0, 122, 255)`、分段轨道/选中块分别为 `rgb(233, 233, 235)`/白色、导航与 Dock 保持半透明白色；各页横向溢出为 0，桌面内容宽 540px，控制台 0 error。四套主题均通过页面操作切换，刷新后 `neutral` 恢复正常；珊瑚粉仍保留原 `rgba(..., 0.76)` 玻璃内容表面，未被经典材质覆盖。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、业务流程、路由、页面布局、分支、提交或推送变更；未修改 `frontend/h5/src/pages/lead/list.vue`。本地开发服务器保留在 `http://127.0.0.1:10087/` 供验收。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 09:10:55 +08:00
+- Workstream ID: `main-h5-classic-soft-blue`
+- Status: `active`
+- Goal: 将 H5“经典”主题由高饱和 iOS 蓝调整为低饱和浅雾蓝，只保留轻微色彩感，并与“天空蓝”形成清晰区分。
+- Non-goals: 不修改 `neutral` 主题键、`h5-theme` 存储协议、其他三套主题、页面结构、操作位置、业务逻辑、接口、后端、数据库、权限、依赖、分支、提交或推送；不修改 `frontend/h5/src/pages/lead/list.vue`。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 H5 主题变量、Vant 变量和 Node 源码守卫；无新增依赖。
+- Integration order: 调整经典主题浅雾蓝配色与可读前景 -> 更新主题预览、测试和规范 -> 运行测试/构建/差异检查 -> 双视口浏览器对比经典与天空蓝 -> 追加交付记录。
+- Verification plan: `node --test tests/theme-config.test.mjs`; `node --test tests/*.test.mjs`; `npm run build`; scoped `git diff --check`; 在 390x844 与 1280x900 检查登录、主题设置和代表性登录态页面，确认浅蓝按钮深蓝字、白色卡片、轻微蓝色画布、无横向溢出，并与天空蓝进行计算样式对比。
+
+## Workstream Scope Update - 2026-09-11 09:15:30 +08:00
+- Workstream ID: `main-h5-lead-filter-surface`
+- Added ownership scope: `frontend/h5/docs/ui-guidelines.md`; `output/playwright/lead-filter-transparent-390.png`。
+- Reason: 用户确认客资列表筛选控件取消底色，与现有“选项底板使用内凹表面”的通用规范冲突；需记录该页面局部例外，并保留浏览器验收截图。
+- Non-goal impact: 不改变其他页面选项底板、全局主题变量或公共组件。
+
+## Delivery Entry - 2026-09-11 09:16:14 +08:00
+- Beijing time: 2026-09-11 09:16:14 +08:00
+- Workstream ID: `main-h5-lead-filter-surface`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 去除 H5 客资列表筛选面板内选项框和日期框偏重的填充底色。
+- Key decisions: 仅将七个选项框和两个日期框的常态、按下态与焦点态背景设为透明；保留边框、圆角、文字、箭头、禁用透明度和边框交互反馈；不修改筛选弹窗底板或全局主题变量。同步视觉规范，将该页面记录为通用内凹选项底板规则的局部例外。
+- Execution or analysis result: `/lead/list` 筛选面板中的业务环节、分配状态、来源渠道、客资分类、主课程、申诉状态、订单状态以及起止日期控件均不再绘制填充底色；筛选逻辑和弹出选择器保持不变。
+- Changed files: `frontend/h5/src/pages/lead/list.vue`; `frontend/h5/docs/ui-guidelines.md`（任务开始前已为未跟踪文件，在现有内容上增量更新）; `handoff/main.md`; `output/playwright/lead-filter-transparent-390.png`。构建检查了任务开始前已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: `npm run build` 通过，包含 `vue-tsc -b` 与 Vite 628 modules 生产构建；scoped `git diff --check` 无空白错误，仅有既有 LF/CRLF 提示；Playwright 在 390x844 实际打开 `/lead/list` 并展开筛选面板，计算样式确认四套主题 `neutral`、`coral`、`lavender`、`sky` 的选项框和日期框 `backgroundColor` 均为 `rgba(0, 0, 0, 0)`、横向溢出为 0，控制台 0 error；截图人工检查确认边框、文字、箭头和布局正常。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、筛选逻辑、全局主题变量、分支、提交、推送或外部服务变更；浏览器验收使用只读模拟响应，未写入业务数据。
+- Remaining work: None。
+
+## Delivery Entry - 2026-09-11 09:28:05 +08:00
+- Beijing time: 2026-09-11 09:28:05 +08:00
+- Workstream ID: `main-h5-classic-soft-blue`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 将 H5“经典”主题的高饱和蓝改为只带轻微色彩感的浅蓝，并与“天空蓝”明确区分。
+- Key decisions: 保留 `neutral` 键、`h5-theme` 存储协议和纯白内容卡片；经典主题使用 `#A8CFF3` 主视觉浅蓝、`#8DBDE9` 按压色、`#F1F7FC` 浅状态底和 `#F4F6F9` 白灰画布，链接与小图标使用可读的低饱和蓝 `#5B8DB8`；浅蓝填充统一搭配深蓝文字 `#24577F`，避免低对比白字；不修改天空蓝及其他彩色主题。
+- Execution or analysis result: 经典主题已调整为白灰主体加轻雾蓝点缀；主按钮、提现入口、悬浮按钮、客资筛选确认、排行榜强调和提现概览均使用浅蓝填充与深蓝前景；主题预览圆点及画布同步更新；经典与天空蓝的主色、强调填充和页面画布均不同。未修改 `frontend/h5/src/pages/lead/list.vue`，其浅蓝前景兼容由经典主题全局样式完成。
+- Changed files: `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。构建检查了任务开始前已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: 聚焦主题测试通过 6/6；H5 全部 Node 测试通过 23/23；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 628 modules 生产构建成功。Playwright 使用当前源码端口 `10088` 和受控只读接口响应，在 390x844 与 1280x900 检查登录、首页、主题设置、个人中心、客资列表、提交表单及地区选择器：经典主题主按钮计算样式为 `rgb(168, 207, 243)` 浅蓝底和 `rgb(36, 87, 127)` 深蓝字，普通卡片和弹窗为纯白，所有页面横向溢出为 0，桌面内容宽 540px，控制台 0 error；页面切换到天空蓝后主色仍为 `#4A90D9`、强调仍为原渐变，切回经典并刷新后 `neutral` 持久化正常。目标产品文件的 scoped `git diff --check` 通过，所有本轮目标文件尾随空白扫描通过；`handoff/main.md` 的全文件差异检查仍报告本轮前已有的历史尾随空格，本轮未改写。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、业务流程、路由、页面布局、其他主题、分支、提交、推送或外部业务状态变更；浏览器模拟响应未写入业务数据。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 09:36:03 +08:00
+- Workstream ID: `main-h5-classic-ice-blue`
+- Status: `active`
+- Goal: 将 H5“经典”主题调整为已确认的极浅冰蓝方案，在保持可读性的前提下进一步降低蓝色存在感。
+- Non-goals: 不修改 `neutral` 主题键、`h5-theme` 存储协议、其他三套主题、页面布局、业务逻辑、接口、后端、数据库、权限、依赖、分支、提交或推送；不修改 `frontend/h5/src/pages/lead/list.vue`。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 H5 主题变量、Vant 变量和 Node 源码守卫；无新增依赖。
+- Integration order: 调整极浅冰蓝变量与控件状态 -> 更新主题预览、测试和规范 -> 运行测试、类型检查、构建和差异检查 -> 双视口浏览器验收 -> 追加交付记录。
+- Verification plan: `node --test tests/theme-config.test.mjs`; H5 全部 Node 测试；`npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; 在 390x844 与 1280x900 检查登录、主题页和代表性登录态页面，确认极浅冰蓝按钮仍可识别、深色前景清晰、白色卡片和布局无回归，并与天空蓝进行计算样式对比。
+
+## Delivery Entry - 2026-09-11 09:49:03 +08:00
+- Beijing time: 2026-09-11 09:49:03 +08:00
+- Workstream ID: `main-h5-classic-ice-blue`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 将已确认的“极浅冰蓝”方案实现在 H5 经典主题中。
+- Key decisions: 保留 `neutral` 键、`h5-theme` 存储协议、白色内容卡片和 Apple 语义色；经典主题使用 `#587993` 可读交互色、`#E3EEF7` 极浅冰蓝填充、`#D3E4F1` 按压色、`#F5F9FC` 浅状态底和 `#42647D` 深蓝前景；页面画布由冷白 `#FAFBFC` 过渡至白灰 `#F8F9FA` 和冰蓝灰 `#F4F7F9`；其他三套主题保持不变。
+- Execution or analysis result: 经典主题的主按钮、提现入口、悬浮按钮、客资筛选确认、排行榜强调和提现概览已统一为极浅冰蓝底与深蓝前景；链接、金额、图标和选中边框使用可读的低饱和蓝；内容卡片与弹窗继续保持纯白，边界和分段轨道进一步减淡；主题预览圆点、测试守卫和视觉规范已同步。未修改 `frontend/h5/src/pages/lead/list.vue`，其极浅冰蓝前景兼容继续由经典主题全局样式提供。
+- Changed files: `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。构建检查了任务开始前已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: 聚焦主题测试通过 6/6；H5 全部 Node 测试通过 23/23；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 628 modules 生产构建成功；目标产品文件 scoped `git diff --check` 通过，所有本轮目标文件尾随空白扫描无命中。Playwright 使用当前源码端口 `10088` 和受控只读接口响应，在 390x844 与 1280x900 检查登录、首页、主题设置、客资列表、提交表单及地区选择器：主按钮和悬浮按钮计算样式为 `rgb(227, 238, 247)` 背景与 `rgb(66, 100, 125)` 前景，普通卡片与弹窗为纯白，分段轨道为 `rgb(242, 246, 249)`；各页横向溢出为 0，桌面内容宽 540px，控制台 0 error；切换天空蓝后仍为 `#4A90D9` 主色和原蓝色渐变，切回经典并刷新后 `neutral` 持久化正常。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、业务流程、路由、页面布局、其他主题、分支、提交、推送或外部业务状态变更；浏览器模拟响应未写入业务数据。
+- Remaining work: None。
+
+## Delivery Entry - 2026-09-11 10:08:15 +08:00
+- Beijing time: 2026-09-11 10:08:15 +08:00
+- Workstream ID: `main-h5-home-earnings-font-size`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 降低 H5 `/home` 首个收益卡片 `.home-earnings-amount` 的金额字号，使更多数字能够在卡片内显示。
+- Key decisions: 仅调整 `.home-earnings-amount` 的基础字号及两个移动端断点字号；默认 48px→40px，≤430px 40px→36px，≤360px 38px→34px；同步调整 `norem` 覆盖，未改金额格式、卡片布局、按钮或其他指标字号。
+- Execution or analysis result: 首页预计收入金额字号已在普通、430px 及 360px 以下视口统一降低，现有 `norem` 页面覆盖规则同步生效。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`。
+- Verification evidence: `npm run build`（在 `frontend/h5`）通过，包含 `vue-tsc -b` 与 Vite 628 modules 生产构建；目标金额类静态检查确认 6 处字号为 40px、36px、34px（含 `!important` 覆盖）；`git diff --check -- frontend/h5/src/pages/home/index.vue` 仅报告该文件任务前已有的 EOF 空行提示，无新增空白错误。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、业务逻辑、其他组件样式、分支、提交、推送或外部服务变更；保留工作树其他既有未提交改动。
+- Remaining work: 未执行已登录浏览器下的实时视觉验收；构建与静态规则验证已完成。
+
+## Delivery Entry - 2026-09-11 11:00:06 +08:00
+- Beijing time: 2026-09-11 11:00:06 +08:00
+- Workstream ID: `main-h5-remove-classic-theme`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 移除兼职端 H5 的“经典”主题，保留其他主题并兼容历史主题记录。
+- Key decisions: 删除 `neutral/经典` 主题枚举、预览项、CSS 文件和经典专属 Vant 规则；保留珊瑚粉、薰衣草、天空蓝及 `/profile/theme` 路由；缺失、非法或历史 `h5-theme=neutral` 统一回退并持久化为 `coral`；不修改后端、接口、数据库、权限或业务页面。
+- Execution or analysis result: H5 主题状态和主题设置页现在只提供三套彩色主题；`main.ts` 不再加载经典主题样式；视觉规范已删除经典主题专属描述；主题源码守卫已改为验证三套主题和历史值迁移。
+- Changed files: `frontend/h5/src/stores/app.ts`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/main.ts`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/styles/themes/neutral.css`（删除）；`frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `output/playwright/h5-remove-classic-theme-mobile.png`; `output/playwright/h5-remove-classic-theme-desktop.png`; `handoff/main.md`。
+- Verification evidence: `node --test tests/*.test.mjs` 通过，24/24；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；浏览器在 390x844 与 1280x900 检查主题页，显示主题数为 3、横向溢出为 0、控制台错误为 0；预置 `h5-theme=neutral` 后页面初始化将其持久化为 `coral`；目标源码 `git diff --check` 通过。仓库未定义 `npm test` 脚本，因此未执行该命令；`handoff/main.md` 的差异检查仍有本次之前的历史尾随空格提示。
+- Dependency or integration impact: 无新增依赖、后端、接口、数据库、权限、业务流程、分支、提交、推送或外部服务变更；浏览器验收使用受控权限接口响应，未写入业务数据。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 10:42:37 +08:00
+- Workstream ID: `main-h5-remove-classic-theme`
+- Status: `active`
+- Goal: 移除兼职端 H5 的 `neutral/经典`主题，保留珊瑚粉、薰衣草和天空蓝，并兼容历史本地主题值。
+- Non-goals: 不修改后端、接口、数据库、权限、业务逻辑、页面路由、其他三套主题、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/stores/app.ts`; `frontend/h5/src/composables/useTheme.ts`; `frontend/h5/src/main.ts`; `frontend/h5/src/styles/themes/neutral.css`; `frontend/h5/src/styles/vant-overrides.css`; `frontend/h5/src/pages/profile/index.vue`; `frontend/h5/src/pages/profile/theme.vue`; `frontend/h5/tests/theme-config.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Pinia 主题状态、Vant 主题变量和主题源码守卫；无新增依赖。
+- Integration order: 删除经典主题定义与 CSS -> 增加 `neutral` 历史值到 `coral` 的迁移 -> 清理经典专属 Vant 规则 -> 更新测试与规范 -> 运行 H5 测试、类型检查、构建和移动浏览器检查 -> 追加交付记录。
+- Verification plan: H5 全部 Node 测试；`npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; Playwright 在移动端和桌面端验证主题列表、历史值迁移、登录/主题页及代表性页面无布局或控制台错误。
+
+## Workstream Registration - 2026-09-11 11:04:08 +08:00
+
+- Workstream ID: `main-h5-leaderboard-header-seam`
+- Status: `active`
+- Goal: 消除兼职端 H5 `/leaderboard` 顶部导航栏与指标筛选区之间的白色细线，使二者视觉连续。
+- Non-goals: 不修改全局导航栏样式、排行榜布局和业务逻辑、主题变量、接口、后端、数据库、权限、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/leaderboard/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有排行榜页局部样式、Vant 导航栏和 H5 主题变量；无新增依赖。
+- Integration order: 覆盖排行榜导航栏边框、阴影与独立模糊层 -> 运行 H5 聚焦测试、类型检查、生产构建和差异检查 -> 可用时进行移动端视觉检查 -> 追加交付记录。
+- Verification plan: `node --test tests/leaderboard-theme.test.mjs`; `npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; 在 390px 移动端检查导航栏与指标筛选区背景连续、无白线且交互元素正常。
+
+## Delivery Entry - 2026-09-11 11:11:01 +08:00
+
+- Beijing time: 2026-09-11 11:11:01 +08:00
+- Workstream ID: `main-h5-leaderboard-header-seam`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 消除兼职端 H5 `/leaderboard` 顶部导航栏与指标筛选区之间的白色细线。
+- Key decisions: 仅在排行榜页覆盖 Vant 导航栏的真实底边框、阴影和独立模糊层，继续使用 `.leaderboard-top` 父容器统一绘制背景；保留全局导航栏样式及排行榜布局、内容和交互不变。
+- Execution or analysis result: 排行榜导航栏和指标筛选区已视觉连成同一顶部区域，原有贯穿宽度的浅色分隔线已消失。
+- Changed files: `frontend/h5/src/pages/leaderboard/index.vue`; `output/playwright/leaderboard-header-seam-390.png`; `handoff/main.md`。构建检查了任务开始前已修改的 `frontend/h5/tsconfig.tsbuildinfo`，本任务未手工修改该生成文件。
+- Verification evidence: `node --test tests/leaderboard-theme.test.mjs` 通过 1/1；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；390x844 Playwright 只读模拟响应验收确认导航栏计算样式为 `border-bottom-width: 0px`、`box-shadow: none`、`backdrop-filter: none`、透明背景，横向溢出为 0；截图人工检查确认顶部背景连续且返回、标题、规则按钮、指标和周期切换显示正常；目标页面 scoped `git diff --check` 无空白错误，仅有既有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、全局样式、接口、后端、数据库、权限、业务逻辑、分支、提交、推送或外部服务变更；浏览器验收使用只读模拟响应，未写入业务数据。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 11:20:00 +08:00
+
+- Workstream ID: `main-h5-leaderboard-period-labels`
+- Status: `active`
+- Goal: 调整兼职端 H5 首页排行榜简榜与详情页，使榜单名称按后端类型对应，周期显示为日榜/周榜/月榜/总榜，并从首页进入详情时保留当前类型与周期。
+- Non-goals: 不修改后端接口、数据库、权限、统计口径、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动；不新增“已提交金额榜”等后端未提供类型。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/utils/leaderboard.ts`; `frontend/h5/tests/leaderboard-theme.test.mjs`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有排行榜配置/数据 API、Vue Router 查询参数、H5 主题变量；无新增依赖。
+- Integration order: 增加共享周期标签映射 -> 首页标题与详情跳转接入 -> 详情页读取并校验查询参数 -> 补充聚焦测试 -> 运行测试、类型检查、构建和差异检查 -> 追加交付记录。
+- Verification plan: `node --test tests/leaderboard-theme.test.mjs`; H5 全部 Node 测试；`npx vue-tsc -b --pretty false`; `npm run build`; 目标文件 `git diff --check`；必要时用静态检查确认四种类型和四种周期文案契约。
+
+## Workstream Scope Update - 2026-09-11 11:27:00 +08:00
+
+- Workstream ID: `main-h5-leaderboard-period-labels`
+- Added ownership scope: `frontend/h5/docs/ui-guidelines.md`。
+- Reason: 排行榜标题和周期标签属于直接可见 UI 契约，需要同步视觉规范。
+
+## Delivery Entry - 2026-09-11 11:34:59 +08:00
+
+- Beijing time: 2026-09-11 11:34:59 +08:00
+- Workstream ID: `main-h5-leaderboard-period-labels`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 首页排行榜简榜保留后端实际榜单名称，将周期信息简写为日榜/周榜/月榜/总榜并放在标题右侧；首页进入详情时保持当前榜单类型和周期。
+- Key decisions: 新增共享 `formatLeaderboardTitle` 和 `formatLeaderboardPeriodLabel`；`today` 固定显示“日榜”，不使用“今日榜”；榜单类型名称完全消费后端 `typeLabel/typeOptions`，不新增“已提交金额榜”；首页跳转通过查询参数传递 `type` 与 `period`，详情页只接受后端启用的类型和已支持周期，无效参数回退到后端默认值；周期标签使用主题主色浅底小标签并移除重复的“本月预计收益排行”副标题。
+- Execution or analysis result: 首页标题区域现在显示“预计收益榜 [月榜]”等对应组合，详情页导航标题随当前后端榜单类型同步；首页加载态可从排行榜配置显示默认类型和周期；排行榜视觉规范已同步。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/utils/leaderboard.ts`; `frontend/h5/tests/leaderboard-theme.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: `node --test tests/leaderboard-theme.test.mjs` 通过 2/2；H5 全量 `node --test tests/*.test.mjs` 通过 25/25；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 构建成功；目标文件 `git diff --check` 无新增空白错误（仅报告首页任务前已有 EOF 空行及换行转换提示）；静态契约检查确认四种周期文案、后端类型标题和首页详情查询参数均存在且旧副标题已移除；Playwright 打开 `http://localhost:10086/home` 并调整至 390x844 时因未登录跳转 `/login?redirect=/home`，未能执行登录态排行榜视觉截图，控制台已有 1 条应用错误，登录态视觉验收仍需具备测试账号后复核。
+- Dependency or integration impact: 无新增依赖、后端、数据库、权限、统计口径、分支、提交、推送或外部业务状态变更；详情页继续使用现有排行榜接口和服务端排名数据。
+- Remaining work: 具备可用测试账号后，补做 390px 登录态首页简榜和详情页四种类型/周期的浏览器视觉验收。
+
+## Workstream Registration - 2026-09-11 11:20:00 +08:00
+
+- Workstream ID: `main-h5-profile-identity-card-no-amount`
+- Status: `active`
+- Goal: 仅移除兼职端 H5 `/profile` 身份牌中的金额与提现展示，保留身份信息及页面其他功能不变。
+- Non-goals: 不修改个人中心“账户与账单”列表、收益/提现页面、路由、权限、后端接口、数据库、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/profile/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant 个人中心实现；无新增依赖。
+- Integration order: 删除身份牌金额展示及专属依赖 -> 保持账户列表和其他页面不变 -> 运行 H5 类型检查、构建、相关测试和差异检查 -> 追加交付记录。
+- Verification plan: `npx vue-tsc -b --pretty false`; `npm run build`; `node --test tests/*.test.mjs`; 静态确认 profile 身份牌不再包含金额文案/金额值/提现按钮，账户列表源码未改动；目标文件 `git diff --check`。
+
+## Delivery Entry - 2026-09-11 11:29:23 +08:00
+
+- Beijing time: 2026-09-11 11:29:23 +08:00
+- Workstream ID: `main-h5-profile-identity-card-no-amount`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 仅移除兼职端 H5 `/profile` 身份牌中的金额类型内容，其他地方不改。
+- Key decisions: 身份牌仅保留头像、兼职昵称、脱敏手机号和主题标签；删除可提现金额、总收益、待结算、提现按钮及其加载/错误状态；不新增或移动任何账户入口。
+- Execution or analysis result: `/profile` 身份牌已不再渲染或请求返现汇总，相关专属状态、格式化引用、跳转函数和样式已清理；“账户与账单”列表内容与顺序保持不变。
+- Changed files: `frontend/h5/src/pages/profile/index.vue`; `handoff/main.md`。
+- Verification evidence: `npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；`node --test tests/*.test.mjs` 通过 25/25；静态搜索确认目标页面不再包含可提现金额、总收益、待结算、金额组件类、返现汇总请求和金额格式化引用，账户列表仍为个人信息、提现记录、银行卡管理、修改密码；目标页面 `git diff --check` 无新增空白错误，仅报告既有 LF/CRLF 提示，`handoff/main.md` 仍有本轮前存在的历史尾随空格。
+- Dependency or integration impact: 无新增依赖，不修改账户列表、收益/提现页面、路由、权限、后端接口、数据库、分支、提交、推送或外部状态；保留工作树其他既有未提交改动。
+- Remaining work: 浏览器插件运行环境不可用，未执行已登录浏览器实时视觉验收；类型、构建、测试与静态范围验证已完成。
+
+## Workstream Registration - 2026-09-11 14:10:18 +08:00
+
+- Workstream ID: `main-h5-earnings-card-simplification`
+- Status: `active`
+- Goal: 精简兼职端 H5 `/earnings` 收益列表卡片，移除返现编号、返现基数、返现比例和观察期，保留详情弹层中的完整收益信息。
+- Non-goals: 不修改收益详情弹层、可提现时间、结算时间、取消原因、收益生成时间、返现计算规则、接口、后端、数据库、权限、依赖、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant 收益页实现；无新增依赖。
+- Integration order: 删除列表卡片四项低频返现明细 -> 静态确认详情弹层完整保留 -> 运行 H5 测试、类型检查、生产构建和差异检查 -> 在可用的本地页面执行移动端与桌面端浏览器检查 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; 静态区分列表与详情中的四项文案；Playwright 检查 `/earnings` 在移动端和桌面宽度下的布局、横向溢出及控制台错误。
+
+## Delivery Entry - 2026-09-11 14:18:02 +08:00
+
+- Beijing time: 2026-09-11 14:18:02 +08:00
+- Workstream ID: `main-h5-earnings-card-simplification`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 精简兼职端 H5 `/earnings` 收益列表卡片，去掉返现编号、返现基数、返现比例和观察期，同时保留完整详情。
+- Key decisions: 仅删除列表卡片四项低频返现明细；继续展示课程、返现类型、客资编号、状态、收益金额、可提现时间、结算时间、取消原因、收益生成时间和详情入口；详情弹层中的四项信息及后端/API 契约均保持不变。
+- Execution or analysis result: 收益列表卡片不再渲染返现编号、返现基数、返现比例和观察期；点击列表项打开收益详情后仍可查看这四项完整信息；当前工作树内收益页其他既有视觉改动全部保留。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Verification evidence: H5 全量 `node --test tests/*.test.mjs` 通过 25/25；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；静态检查确认四项文案在列表区域全部缺失、在详情区域全部保留；Playwright 使用受控只读接口响应在 `http://localhost:10086/earnings` 验证 390x844 与 128 saber?  
+
+## Delivery Entry Correction - 2026-09-11 14:19:10 +08:00
+
+- Beijing time: 2026-09-11 14:19:10 +08:00
+- Workstream ID: `main-h5-earnings-card-simplification`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 精简兼职端 H5 `/earnings` 收益列表卡片，去掉返现编号、返现基数、返现比例和观察期，同时保留完整详情。
+- Key decisions: 本条更正并补全上一条交付记录的验证、依赖影响和剩余工作字段；实现决策不变。
+- Execution or analysis result: 收益列表卡片不再渲染四项低频返现明细，详情弹层完整保留；上一条验证字段末尾的无效文本不代表实际命令或结果，以本条为准。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Verification evidence: H5 全量 `node --test tests/*.test.mjs` 通过 25/25；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；静态检查确认四项文案在列表区域全部缺失、在详情区域全部保留；Playwright 使用受控只读接口响应在 `http://localhost:10086/earnings` 验证 390x844 与 1280x900：文档与卡片横向溢出均为 0，列表卡片不含四项被移除文案，点击卡片后详情仍显示全部四项，浏览器控制台错误为 0。
+- Dependency or integration impact: 无新增依赖，不修改详情弹层、接口、后端、数据库、权限、返现规则、分支、提交、推送或外部业务状态；浏览器验收仅拦截 GET 请求并使用内存中的只读响应，未写入业务数据。
+- Remaining work: None。
+
+## Delivery Entry Ordering Correction - 2026-09-11 14:39:00 +08:00
+
+- Beijing time: 2026-09-11 14:39:00 +08:00
+- Workstream ID: `main-h5-earnings-summary-no-counts`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 删除兼职端 H5 收益中心汇总卡片中的笔数字段，并收紧卡片底部区域。
+- Key decisions: 本条在工作流注册之后追加最终状态；14:38 的交付内容与验证证据继续有效，不改写既有记录。
+- Execution or analysis result: 汇总区仅保留可提现主金额以及累计收益、待结算、提现中、已提现四项金额和标签；所有笔数显示及其专属样式已移除，底部空间已收紧。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `handoff/main.md`。
+- Verification evidence: H5 测试 25/25、Vue 类型检查和 Vite 生产构建均通过；静态检查确认汇总不再消费 `summary.counts`；Playwright 在 360x844、390x844、1280x844 下确认无“笔”字段、无横向溢出、控制台错误为 0；目标源码差异检查无空白错误。
+- Dependency or integration impact: 无新增依赖，不修改统计金额、接口、后端、数据库、权限、返现列表、收益详情、分支、提交、推送或外部业务状态。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 14:49:58 +08:00
+
+- Workstream ID: `main-h5-earnings-summary-layout-help`
+- Status: `active`
+- Goal: 调整兼职端 H5 `/earnings` 收益汇总为 2×2 等分且单元内容垂直居中，恢复 8px 行距，收紧汇总、筛选与首张收益卡片之间的空白，并在收益帮助气泡中补充四项金额说明及主题浅色底。
+- Non-goals: 不修改后端统计口径、接口字段、金额计算、返现列表内容、收益详情弹层、后续收益卡片间距、依赖、数据库、权限、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/src/components/HelpPopover.vue`; `frontend/h5/tests/earnings-layout.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant、主题 CSS 变量和 Node 源码测试；无新增依赖。
+- Integration order: 收益汇总布局与区块间距 -> HelpPopover 可选主题底色与四项说明 -> UI 规范与源码守护测试 -> H5 全量测试、类型检查和生产构建 -> 360/390/1280 浏览器及三主题气泡验收 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; Playwright 在 360×844、390×844、1280×844 检查等分、垂直居中、紧凑间距、横向溢出、三套主题气泡文案/底色、开关交互和无障碍名称。
+
+## Delivery Entry - 2026-09-11 15:02:09 +08:00
+
+- Beijing time: 2026-09-11 15:02:09 +08:00
+- Workstream ID: `main-h5-earnings-summary-layout-help`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 调整收益中心四项金额的等分与垂直居中布局，恢复原行距，收紧汇总、筛选和首卡间距，并把四项金额说明放入随主题变化的帮助气泡。
+- Key decisions: 四项字段名继续留在汇总卡片；网格明确使用两列和两条相等 `1fr` 行，单元内部使用纵向 Flex 左对齐并垂直居中；只把筛选容器上下内边距和首卡顶部间距收紧为 4px，后续卡片 12px 不变；`HelpPopover` 新增默认关闭的 `themeTint` 可选属性，仅收益中心启用，底色由 12% 主题主色与强玻璃底色混合，箭头复用同一颜色。
+- Execution or analysis result: 收益汇总现在是稳定的 2×2 等分布局，两行源码间距恢复为 8px；汇总、类型筛选和首张收益卡片的空白按方案缩短；帮助按钮展示累计收益、待结算、提现中和已提现四行口径说明，珊瑚粉、薰衣草和天空蓝主题均有对应浅色背景，其他页面保持默认帮助气泡样式；UI 规范和源码守护测试已同步。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/src/components/HelpPopover.vue`; `frontend/h5/tests/earnings-layout.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: 新增聚焦源码测试通过 3/3；H5 全量 `node --test tests/*.test.mjs` 通过 28/28；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；Playwright 使用受控只读响应在 360×844、390×844、1280×844 检查，四个单元在各档宽度下宽高一致、`justify-content` 为 `center`、页面横向溢出为 0；珊瑚粉、薰衣草和天空蓝三套气泡计算背景均不同，箭头与面板同色，四行说明完整且边界未超出视口，按钮可展开和关闭，`aria-label` 为“查看收益金额说明”，控制台错误为 0；收益页 `git diff --check` 通过，三个未跟踪目标文件尾随空白扫描通过，包含 `handoff/main.md` 的检查仅报告本轮前既有尾随空白。
+- Dependency or integration impact: 无新增依赖，不修改后端统计口径、接口字段、金额计算、返现列表内容、详情弹层、数据库、权限、分支、提交、推送或外部业务状态；浏览器验证只拦截 GET 请求并使用内存只读响应，临时截图目录已删除。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 15:29:53 +08:00
+
+- Workstream ID: `main-h5-earnings-summary-copy-centering-fab-icon`
+- Status: `active`
+- Goal: 精简兼职端 H5 `/earnings` 汇总帮助气泡的四项说明，将四组金额与标签在各自 2×2 等分区域内水平和垂直居中，并把右下角提现悬浮按钮的加号替换为人民币钱币图标。
+- Non-goals: 不修改汇总卡片尺寸、网格间距、金额字号、统计口径、接口、后端、返现列表、详情弹层、提现跳转、按钮尺寸位置、权限、依赖、数据库、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/tests/earnings-layout.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant `gold-coin-o` 图标、收益汇总布局和 Node 源码测试；无新增依赖。
+- Integration order: 替换四行帮助文案 -> 汇总单元双向居中 -> 悬浮按钮替换为人民币钱币图标 -> 更新源码守护与 UI 规范 -> H5 测试、类型检查、生产构建和浏览器验收 -> 追加交付记录。
+- Verification plan: `node --test tests/*.test.mjs`; `npx vue-tsc -b --pretty false`; `npm run build`; scoped `git diff --check`; Playwright 在 360×844、390×844、1280×844 检查四格双向居中、四行气泡文案、人民币图标、按钮无障碍名称、横向溢出和控制台错误。
+
+## Delivery Entry - 2026-09-11 15:37:29 +08:00
+
+- Beijing time: 2026-09-11 15:37:29 +08:00
+- Workstream ID: `main-h5-earnings-summary-copy-centering-fab-icon`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）
+- User goal: 精简收益汇总帮助气泡的四项文案，将四组金额在各自区域内水平和垂直居中，并把右下角悬浮按钮的加号替换为人民币钱币图标。
+- Key decisions: 保持现有 2×2 等分和 8px 行距，只把汇总单元的横向对齐改为居中并增加文本居中；帮助气泡继续使用现有主题浅色模式，只替换用户指定的四行文案；悬浮按钮复用 Vant `gold-coin-o`，保持按钮尺寸、位置、颜色、权限、跳转和“申请提现”无障碍名称不变。
+- Execution or analysis result: 汇总卡片内四组金额与标签已在各自等分区域双向居中；帮助气泡展示新的累计收益、待结算、提现中和已提现说明；右下角提现入口已由加号改为白色人民币钱币图标；源码守护测试和 H5 UI 规范已同步。
+- Changed files: `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/tests/earnings-layout.test.mjs`; `frontend/h5/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: 聚焦 `node --test tests/earnings-layout.test.mjs` 通过 4/4；H5 全量 `node --test tests/*.test.mjs` 通过 29/29；`npx vue-tsc -b --pretty false` 通过；`npm run build` 通过，Vite 627 modules 生产构建成功；Playwright 使用受控只读响应在 360×844、390×844、1280×844 检查，四个单元内容中心与区域中心一致（仅存在不超过 0.008px 的亚像素舍入），三个居中计算样式均为 `center`，横向溢出为 0；悬浮按钮图标类为 `van-icon-gold-coin-o`、不存在 `van-icon-plus`、无障碍名称仍为“申请提现”；四行新气泡文案完整且未超出视口，控制台错误为 0；收益页 `git diff --check` 通过，两个未跟踪目标文件尾随空白扫描通过。
+- Dependency or integration impact: 无新增依赖，不修改汇总卡片尺寸、网格间距、金额字号、统计口径、接口、后端、返现列表、详情弹层、提现跳转、按钮尺寸位置、权限、数据库、分支、提交、推送或外部业务状态；浏览器验证仅拦截 GET 请求并使用内存只读响应，临时截图目录已删除。
+- Remaining work: None。
+
+## Workstream Registration - 2026-09-11 15:50:00 +08:00
+
+- Workstream ID: `main-h5-lead-area-leaf-selection`
+- Status: `active`
+- Goal: 修复兼职端 H5 提交客资地区选择，使后端标记为 `leafSelectable` 的省级地区（包括香港、澳门）可直接选择并按既有协议提交。
+- Non-goals: 不修改后端、System 地区数据、数据库、Admin、Workbench、API 字段、依赖、权限、分支、提交或推送；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（保留当前工作树全部既有未提交改动）。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/h5/src/components/AreaPicker.vue`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 H5 Vue/Vant 组件和 System `/system/area/tree` 协议；无新增依赖。
+- Integration order: 修复地区组件 -> H5 类型检查与生产构建 -> 源码行为核对 -> 追加交付记录。
+- Verification plan: `npx vue-tsc -b --pretty false`; `npm run build`; `git diff --check`; 核对一级叶子地区映射为 `cityCode=OTHER`、普通省市路径保持两级、未配置叶子节点不可选。
+
+## Delivery Entry - 2026-09-11 15:53:01 +08:00
+
+- Beijing time: 2026-09-11 15:53:01 +08:00
+- Workstream ID: `main-h5-lead-area-leaf-selection`
+- Status: `complete`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`（未提交工作树）。
+- User goal: 修复兼职端 H5 提交客资时香港、澳门等省级叶子地区无法选择的问题。
+- Key decisions: 仅修改 H5 共享 `AreaPicker`；消费后端 `leafSelectable`；一级叶子节点提交 `cityCode=OTHER` 且展示省名；无子节点且未配置为可选的地区禁用；不新增香港、澳门静态选项，不改后端或数据库。
+- Execution or analysis result: `AreaPicker` 现在支持一级地区完成选择，保留普通省市两级选择，并可正确显示无 `cityName` 的历史地区。提交客资和补充客资因复用组件一起生效。
+- Changed files: `frontend/h5/src/components/AreaPicker.vue`; `handoff/main.md`。
+- Verification evidence: `npm run build` 通过（`vue-tsc -b` 和 Vite 生产构建，627 modules）；本地 Vite 服务 `http://127.0.0.1:4173/` 返回 HTTP 200；源码断言确认 `leafSelectable`、`cityCode=OTHER`、叶子禁用和无市名展示逻辑；目标文件 `git diff --check` 通过。Playwright CLI 因本机未安装 `chrome-for-testing` 未能执行真实浏览器点击验证。
+- Dependency or integration impact: 无新增依赖，不修改后端、System 地区数据、数据库、Admin、Workbench、API 字段、权限、分支、提交或推送；本地开发服务仅用于验证。
+- Remaining work: 真实浏览器交互验证仍需安装 Playwright 所需 Chromium；构建与源码级行为已验证。
+
+## Delivery Entry - 2026-09-13 10:06:12 +08:00
+
+- Workstream ID: `main-clean-playwright-artifacts-20260913`
+- Beijing time: `2026-09-13 10:06:12 +08:00`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 删除 `output/playwright` 下多处约 90 个截图和测试产物。
+- Key decisions: 仅删除 `output/playwright` 下 Git 未跟踪的 90 个文件及其因此变为空的目录；保留该目录下 20 个已被 Git 跟踪的文件，不触碰其他工作区修改、stash 或源代码。
+- Execution or analysis result: 通过 `git clean -fd -- output/playwright` 删除 90 个未跟踪截图/测试产物；目录下未跟踪文件数已为 0。
+- Changed files: 删除 `output/playwright` 下 90 个未跟踪截图和测试产物；追加本交接记录至 `handoff/main.md`。
+- Verification evidence: 删除前 `git clean -nd -- output/playwright` 精确列出目标文件；删除后 `git ls-files --others --exclude-standard -- output/playwright/**` 返回 0，已跟踪文件仍为 20 个；未执行代码测试（本次仅清理产物）。
+- Dependency or integration impact: 无新增依赖、数据库、服务、分支、提交或推送变更；其他本地修改和未跟踪文件保持不变。
+- Remaining work: None。

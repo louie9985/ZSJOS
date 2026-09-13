@@ -197,6 +197,11 @@ const router = createRouter({
       component: () => import('@/pages/profile/theme.vue')
     },
     {
+      path: '/profile/version-update',
+      name: 'VersionUpdate',
+      component: () => import('@/pages/profile/version-update.vue')
+    },
+    {
       path: '/unauthorized',
       name: 'Unauthorized',
       component: () => import('@/pages/unauthorized/index.vue')

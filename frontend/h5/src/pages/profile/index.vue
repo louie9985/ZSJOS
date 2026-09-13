@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useTheme, THEMES } from '@/composables/useTheme'
-import { bindWecom, getPartnerMe, getProfile, updateNotifyChannel, type UserProfile } from '@/api/profile'
-import { getCashbackSummary, type CashbackSummary } from '@/api/cashback'
+import { bindWecom, getPartnerMe, getProfile, updateNotifyChannel, type PartnerInfo, type UserProfile } from '@/api/profile'
 import { logout, wecomAuthorizeUrl } from '@/api/auth'
-import { formatAmount, maskMobile } from '@/utils/format'
+import { getUnreadCount } from '@/api/message'
+import { maskMobile } from '@/utils/format'
 import { showConfirmDialog, showSuccessToast, showToast } from 'vant'
+import SmartAvatar from '@/components/SmartAvatar.vue'
+import { partnerAvatarSeed } from '@/config/avatar'
+import { checkVersion, currentVersion, useVersion } from '@/services/version'
 
 defineOptions({ name: 'Profile' })
 
 const router = useRouter()
 const route = useRoute()
+const { hasUpdate } = useVersion()
 const userStore = useUserStore()
 const { currentTheme } = useTheme()
 const currentThemeInfo = computed(() => THEMES.find(t => t.key === currentTheme()) || THEMES[0])
@@ -20,12 +24,10 @@ const currentThemeInfo = computed(() => THEMES.find(t => t.key === currentTheme(
 const profileLoading = ref(true)
 const profileError = ref('')
 const profile = ref<UserProfile>()
-const partner = ref<{ name: string; mobile: string }>()
-const summary = ref<CashbackSummary>()
-const summaryLoading = ref(true)
-const summaryError = ref('')
+const partner = ref<PartnerInfo>()
 const wecomBinding = ref(false)
 const wecomSaving = ref(false)
+const unreadCount = ref<number>()
 
 const accountEntries = computed(() => [
   { title: '个人信息', icon: 'contact', to: '/profile/edit' },
@@ -35,14 +37,13 @@ const accountEntries = computed(() => [
 ].filter(item => item.show !== false))
 
 const otherEntries = computed(() => [
-  { title: '消息通知', icon: 'bell', to: '/messages', badge: 37 },
+  { title: '消息通知', icon: 'bell', to: '/messages', badge: unreadCount.value || undefined },
   { title: '主题设置', icon: 'fire-o', to: '/profile/theme', value: currentThemeInfo.value.label },
   { title: '系统反馈', icon: 'comment-o', to: '/feedback' },
   { title: '投诉记录', icon: 'records-o', to: '/complaints', show: userStore.hasPermission('zsjos:lead-complaint:create') },
-  { title: '版本控制与更新', icon: 'info-o', to: '/profile/theme', value: 'v0.1.0' }
+  { title: '版本控制与更新', icon: 'info-o', to: '/profile/version-update', value: hasUpdate.value ? '有更新' : `v${currentVersion.version}` }
 ].filter(item => item.show !== false))
 
-const avatarFallback = computed(() => (profile.value?.nickname || userStore.nickname || '我').trim()[0] || '我')
 const identityName = computed(() => profile.value?.nickname || userStore.nickname || partner.value?.name || '兼职伙伴')
 const identitySubtitle = computed(() => maskMobile(profile.value?.mobile || partner.value?.mobile || ''))
 
@@ -60,15 +61,11 @@ async function loadProfile() {
   }
 }
 
-async function loadSummary() {
-  summaryLoading.value = true
-  summaryError.value = ''
+async function loadUnreadCount() {
   try {
-    summary.value = await getCashbackSummary()
-  } catch (cause) {
-    summaryError.value = cause instanceof Error ? cause.message : '收益加载失败'
-  } finally {
-    summaryLoading.value = false
+    unreadCount.value = await getUnreadCount()
+  } catch {
+    // 保留上次成功结果，避免请求失败时显示虚假的未读数。
   }
 }
 
@@ -132,8 +129,8 @@ async function handleWecomEnabled(enabled: boolean) {
 onMounted(async () => {
   const handledWecom = await handleWecomCallback()
   if (!handledWecom) void loadProfile()
-  void loadSummary()
 })
+onActivated(() => { void loadUnreadCount(); void checkVersion() })
 
 async function handleLogout() {
   try {
@@ -152,31 +149,21 @@ async function handleLogout() {
   }
 }
 
-function goWithdraw() {
-  router.push('/withdrawal/apply')
-}
 </script>
 
 <template>
   <div class="page-container profile-page">
-    <van-nav-bar title="我的" />
-
     <section class="card profile-hero">
       <div class="profile-hero__top">
         <div class="profile-hero__identity">
-          <div class="profile-avatar">
-            <van-image
-              round
-              width="42"
-              height="42"
-              :src="profile?.avatar || userStore.avatar || ''"
-              fit="cover"
-            >
-              <template #error>
-                <div class="profile-avatar__fallback">{{ avatarFallback }}</div>
-              </template>
-            </van-image>
-          </div>
+          <SmartAvatar
+            class="profile-avatar"
+            :seed="partnerAvatarSeed(partner?.id)"
+            :src="profile?.avatar || userStore.avatar"
+            :size="42"
+            loading="eager"
+            label=""
+          />
           <div class="profile-hero__text">
             <div class="profile-hero__name">{{ identityName }}</div>
             <div class="profile-hero__mobile">{{ identitySubtitle }}</div>
@@ -184,40 +171,6 @@ function goWithdraw() {
         </div>
         <span class="profile-theme-chip">{{ currentThemeInfo.label }}</span>
       </div>
-
-      <van-skeleton :loading="summaryLoading" :row="2">
-        <div v-if="summaryError" class="profile-summary__error">
-          <span>{{ summaryError }}</span>
-          <van-button size="small" type="primary" round @click="loadSummary">重试</van-button>
-        </div>
-        <template v-else>
-          <div class="profile-hero__panel">
-            <div class="profile-hero__label">可提现金额</div>
-            <div class="profile-hero__amount">¥{{ formatAmount(summary?.availableAmount) }}</div>
-            <van-button
-              v-if="userStore.hasPermission('zsjos:withdrawal:apply')"
-              type="primary"
-              round
-              size="small"
-              class="profile-hero__withdraw"
-              @click="goWithdraw"
-            >
-              提现
-            </van-button>
-          </div>
-
-          <div class="profile-stats">
-            <div class="profile-stat">
-              <div class="profile-stat__value">¥{{ formatAmount(summary?.totalAmount) }}</div>
-              <div class="profile-stat__label">总收益</div>
-            </div>
-            <div class="profile-stat">
-              <div class="profile-stat__value">¥{{ formatAmount(summary?.pendingAmount) }}</div>
-              <div class="profile-stat__label">待结算</div>
-            </div>
-          </div>
-        </template>
-      </van-skeleton>
     </section>
 
     <section class="page-section">
@@ -285,7 +238,7 @@ function goWithdraw() {
     </section>
 
     <div class="profile-actions">
-      <van-button block round plain type="danger" @click="handleLogout">退出登录</van-button>
+      <van-button block round plain type="default" class="profile-logout-button" @click="handleLogout">退出登录</van-button>
     </div>
   </div>
 </template>
@@ -294,15 +247,15 @@ function goWithdraw() {
 .profile-page {
   min-height: 100vh;
   padding-bottom: 88px;
-  background: var(--h5-bg);
+  background: transparent;
 }
 
 .profile-hero {
-  margin-top: 12px;
+  margin-top: 20PX;
   padding: 14px 16px 16px;
   background:
     radial-gradient(circle at 100% 0, var(--h5-primary-opacity) 0, var(--h5-primary-opacity) 62px, transparent 63px),
-    var(--h5-card-bg);
+    var(--h5-glass-surface);
 }
 
 .profile-hero__top {
@@ -321,19 +274,6 @@ function goWithdraw() {
 
 .profile-avatar {
   flex-shrink: 0;
-}
-
-.profile-avatar__fallback {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--h5-primary-opacity);
-  color: var(--h5-primary);
-  font-size: 16px;
-  font-weight: 700;
 }
 
 .profile-hero__text {
@@ -367,112 +307,23 @@ function goWithdraw() {
   font-weight: 600;
 }
 
-.profile-hero__panel {
-  position: relative;
-  margin-top: 14px;
-  padding: 16px 14px 18px;
-  border: 1px solid color-mix(in srgb, var(--h5-primary) 18%, transparent);
-  border-radius: 16px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--h5-primary) 5%, var(--h5-card-bg)),
-    color-mix(in srgb, var(--h5-primary) 2%, var(--h5-card-bg))
-  );
-  overflow: hidden;
-}
-
-.profile-hero__panel::after {
-  content: '';
-  position: absolute;
-  right: -34px;
-  top: -34px;
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  background: var(--h5-primary-opacity);
-}
-
-.profile-hero__label {
-  position: relative;
-  z-index: 1;
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.profile-hero__amount {
-  position: relative;
-  z-index: 1;
-  margin-top: 6px;
-  color: var(--h5-text-primary);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.15;
-  font-variant-numeric: tabular-nums;
-}
-
-.profile-hero__withdraw {
-  position: absolute;
-  right: 14px;
-  bottom: 16px;
-  z-index: 1;
-  height: 34px;
-  padding: 0 16px;
-  background: linear-gradient(135deg, var(--h5-primary), var(--h5-primary-dark));
-  border: 0;
-}
-
-.profile-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.profile-stat {
-  padding: 12px 12px 10px;
-  border: 1px solid color-mix(in srgb, var(--h5-primary) 14%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--h5-card-bg) 92%, var(--h5-primary) 8%);
-}
-
-.profile-stat__value {
-  overflow: hidden;
-  color: var(--h5-text-primary);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.profile-stat__label {
-  margin-top: 6px;
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.profile-summary__error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--h5-card-bg) 92%, var(--h5-primary) 8%);
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-}
-
 .profile-group {
   overflow: hidden;
+  border: 1px solid var(--h5-glass-border);
+  border-radius: 16px;
+  background: var(--h5-glass-surface);
+  box-shadow: var(--h5-glass-shadow);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
 }
 
 .profile-group :deep(.van-cell) {
   min-height: 50px;
+  background: transparent;
+}
+
+.profile-group :deep(.van-cell:not(:last-child)::after) {
+  border-color: var(--h5-divider);
 }
 
 .profile-group :deep(.van-cell__value) {
@@ -504,5 +355,41 @@ function goWithdraw() {
 
 .profile-actions {
   padding: 24px 16px 0;
+}
+
+.profile-logout-button {
+  --van-button-default-color: var(--h5-primary);
+  --van-button-default-border-color: color-mix(in srgb, var(--h5-primary) 28%, var(--h5-glass-border));
+  --van-button-plain-background: var(--h5-glass-surface);
+  height: 44px;
+  border-color: color-mix(in srgb, var(--h5-primary) 28%, var(--h5-glass-border));
+  background: var(--h5-glass-surface);
+  box-shadow: var(--h5-glass-shadow);
+  color: var(--h5-primary);
+  backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
+}
+
+.profile-logout-button:active {
+  background: var(--h5-primary-opacity);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .profile-group,
+  .profile-logout-button { background: var(--h5-glass-surface-fallback); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .profile-group {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .profile-logout-button {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 </style>

@@ -410,12 +410,22 @@ export function getPartnerLeadFilterOptions() {
   return request.get<never, PartnerLeadFilterOptions>('/zsjos/lead/partner-filter-options')
 }
 
+export interface LeadAttachmentUploadOptions {
+  signal?: AbortSignal
+  onProgress?: (progress: number) => void
+}
+
 /** 上传客资附件 */
-export async function uploadLeadAttachment(file: File) {
+export async function uploadLeadAttachment(file: File, options: LeadAttachmentUploadOptions = {}) {
   const formData = new FormData()
   formData.append('file', file)
   const result = await request.post<never, UploadResult>('/zsjos/lead/attachment/upload', formData, {
-    timeout: 120000
+    timeout: 60000,
+    signal: options.signal,
+    onUploadProgress: (event) => {
+      const ratio = event.progress ?? (event.total ? event.loaded / event.total : 0)
+      options.onProgress?.(Math.min(100, Math.round(ratio * 100)))
+    }
   })
   if (!Number.isSafeInteger(result.infraFileId) || result.infraFileId <= 0) {
     throw new TypeError('图片上传结果缺少有效的文件编号')

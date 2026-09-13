@@ -62,7 +62,7 @@ async function loadDetail() {
   try {
     const result = await getFeedbackDetail(id)
     detail.value = result
-    if (result.unread) void markRead(result)
+    if (result.unread) await markRead(result)
   } catch (cause) {
     loadError.value = cause instanceof Error ? cause.message : '反馈详情加载失败'
   } finally {
@@ -195,11 +195,15 @@ onMounted(loadDetail)
       </van-empty>
       <template v-else-if="detail">
         <div class="card detail-heading">
-          <div>
-            <small>{{ detail.feedbackNo }} · {{ typeLabel[detail.feedbackType] || detail.feedbackType }}</small>
+          <div class="detail-heading__main">
             <h1>{{ detail.title }}</h1>
+            <div class="detail-heading__meta">
+              <span class="detail-heading__no">{{ detail.feedbackNo }}</span>
+              <span aria-hidden="true">·</span>
+              <span>{{ typeLabel[detail.feedbackType] || detail.feedbackType }}</span>
+            </div>
           </div>
-          <van-tag :type="statusType[detail.status]" plain>{{ statusLabel[detail.status] || detail.status }}</van-tag>
+          <van-tag class="detail-heading__status" :type="statusType[detail.status]" plain>{{ statusLabel[detail.status] || detail.status }}</van-tag>
         </div>
 
         <div class="card">
@@ -289,5 +293,5 @@ onMounted(loadDetail)
 </template>
 
 <style scoped>
-.feedback-detail-page{padding-bottom:20px}.detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px}.detail-heading small{color:var(--h5-text-secondary)}.detail-heading h1{margin:5px 0 0;font-size:18px;line-height:1.4;letter-spacing:0}.section-title{margin-bottom:8px;font-size:15px;font-weight:600}.feedback-field{padding:10px 0;border-bottom:1px solid var(--h5-divider)}.feedback-field:last-child{border-bottom:0}.feedback-field__label{color:var(--h5-text-secondary);font-size:12px}.feedback-field p,.reply{margin:6px 0 0;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.feedback-field__empty{color:var(--h5-text-placeholder);font-size:13px}.feedback-attachments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.feedback-attachments--result,.feedback-attachments--reply{margin-top:10px}.feedback-attachment{min-width:0;padding:0;border:0;background:transparent;color:inherit;text-align:left}.feedback-attachment img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px}.feedback-attachment .van-icon{display:flex;width:100%;aspect-ratio:1;align-items:center;justify-content:center;border-radius:6px;background:var(--h5-bg);color:var(--h5-text-secondary)}.feedback-attachment span{display:block;overflow:hidden;margin-top:4px;color:var(--h5-text-secondary);font-size:11px;line-height:16px;text-overflow:ellipsis;white-space:nowrap}.reply-item{padding:10px 0;border-bottom:1px solid var(--h5-divider)}.reply-item:last-child{border-bottom:0}.reply-item__head{display:flex;align-items:center;justify-content:space-between;gap:10px}.reply-item__head strong{font-size:13px}.reply-item__head time{color:var(--h5-text-placeholder);font-size:11px}.reply-item p{margin:6px 0 0;color:var(--h5-text-secondary);font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.reply-button{margin-top:12px}
+.feedback-detail-page{padding-bottom:20px}.detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px}.detail-heading__main{min-width:0;flex:1}.detail-heading h1{margin:0;font-size:18px;line-height:1.4;letter-spacing:0;overflow-wrap:anywhere}.detail-heading__meta{display:flex;min-width:0;flex-wrap:wrap;gap:2px 5px;margin-top:5px;color:var(--h5-text-secondary);font-size:12px;line-height:1.5}.detail-heading__no{overflow-wrap:anywhere}.detail-heading__status{flex:0 0 auto;white-space:nowrap}.section-title{margin-bottom:8px;font-size:15px;font-weight:600}.feedback-field{padding:10px 0;border-bottom:1px solid var(--h5-divider)}.feedback-field:last-child{border-bottom:0}.feedback-field__label{color:var(--h5-text-secondary);font-size:12px}.feedback-field p,.reply{margin:6px 0 0;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.feedback-field__empty{color:var(--h5-text-placeholder);font-size:13px}.feedback-attachments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.feedback-attachments--result,.feedback-attachments--reply{margin-top:10px}.feedback-attachment{min-width:0;padding:0;border:0;background:transparent;color:inherit;text-align:left}.feedback-attachment img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px}.feedback-attachment .van-icon{display:flex;width:100%;aspect-ratio:1;align-items:center;justify-content:center;border-radius:6px;background:var(--h5-glass-sunken);color:var(--h5-text-secondary)}.feedback-attachment span{display:block;overflow:hidden;margin-top:4px;color:var(--h5-text-secondary);font-size:11px;line-height:16px;text-overflow:ellipsis;white-space:nowrap}.reply-item{padding:10px 0;border-bottom:1px solid var(--h5-divider)}.reply-item:last-child{border-bottom:0}.reply-item__head{display:flex;align-items:center;justify-content:space-between;gap:10px}.reply-item__head strong{font-size:13px}.reply-item__head time{color:var(--h5-text-placeholder);font-size:11px}.reply-item p{margin:6px 0 0;color:var(--h5-text-secondary);font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.reply-button{margin-top:12px}
 </style>

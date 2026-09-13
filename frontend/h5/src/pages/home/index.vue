@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import ProductSpecs from '../../components/ProductSpecs.vue'
 import { computed, ref, onActivated, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showToast } from 'vant'
@@ -17,21 +16,25 @@ import {
 } from '@/api/home'
 import { getLeadFollowUpSummary, getMyLeadPage, type LeadFollowUpSummary, type LeadListItem } from '@/api/lead'
 import { getPartnerMe, type PartnerInfo } from '@/api/profile'
-import { getLeaderboard, getLeaderboardConfig, type LeaderboardConfig, type LeaderboardData } from '@/api/leaderboard'
+import { getLeaderboard, getLeaderboardConfig, type LeaderboardConfig, type LeaderboardData, type LeaderboardMember } from '@/api/leaderboard'
 import { getUnreadCount } from '@/api/message'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
-import { formatLeaderboardValue, leaderboardMemberInitial, leaderboardRowGapText } from '@/utils/leaderboard'
+import { formatLeaderboardPeriodLabel, formatLeaderboardTitle, formatLeaderboardValue } from '@/utils/leaderboard'
 import LiquidSegmentedControl from '@/components/LiquidSegmentedControl.vue'
+import SmartAvatar from '@/components/SmartAvatar.vue'
+import LeaderboardCrown from '@/components/LeaderboardCrown.vue'
+import { leadAvatarSeed, partnerAvatarSeed } from '@/config/avatar'
 
 defineOptions({ name: 'Home' })
 
 const router = useRouter()
 const userStore = useUserStore()
+let homeMounted = false
 
 const partner = ref<PartnerInfo>()
 const summary = ref<CashbackSummary>()
 const recentLeads = ref<LeadListItem[]>([])
-const unreadCount = ref(0)
+const unreadCount = ref<number>()
 const partnerError = ref('')
 const summaryLoading = ref(true)
 const summaryError = ref('')
@@ -40,10 +43,6 @@ const recentLeadsError = ref('')
 const leadFollowUpSummary = ref<LeadFollowUpSummary>()
 const leadFollowUpSummaryLoading = ref(true)
 const leadFollowUpSummaryError = ref('')
-const leadFollowUpSummaryEmpty = computed(() => {
-  const value = leadFollowUpSummary.value
-  return !!value && value.followUpPendingCount === 0 && value.unreachableCount === 0 && value.invalidCount === 0
-})
 const leaderboardConfig = ref<LeaderboardConfig>()
 const leaderboard = ref<LeaderboardData>()
 const leaderboardConfigLoading = ref(true)
@@ -51,7 +50,7 @@ const leaderboardLoading = ref(false)
 const leaderboardConfigError = ref('')
 const leaderboardError = ref('')
 const leaderboardConfigStatus = ref<number>()
-const statisticsPeriod = ref<HomeStatisticsPeriod>('month')
+const statisticsPeriod = ref<HomeStatisticsPeriod>('total')
 const statistics = ref<HomeStatistics>()
 const statisticsLoading = ref(true)
 const statisticsError = ref('')
@@ -85,19 +84,17 @@ const statisticsMetrics: Record<HomeStatisticsMetric, { label: string; permissio
   lead_count: { label: '客资数', permission: 'zsjos:lead:query-submitted', unit: 'count' },
   withdrawn_amount: { label: '已提现金额', permission: 'zsjos:withdrawal:my-query', unit: 'money' },
   valid_lead_count: { label: '有效客资', permission: 'zsjos:lead:query-submitted', unit: 'count' },
-  converted_lead_count: { label: '成交客资数', permission: 'zsjos:lead:query-submitted', unit: 'count' }
+  converted_lead_count: { label: '成交客资', permission: 'zsjos:lead:query-submitted', unit: 'count' }
 }
 
 const leaderboardVisible = computed(() => leaderboardConfigLoading.value || leaderboardConfig.value?.enabled !== false || !!leaderboardConfigError.value)
 const canViewLeads = computed(() => userStore.hasPermission('zsjos:lead:query-submitted'))
 const canViewEarnings = computed(() => userStore.hasPermission('zsjos:cashback:my-query'))
-const canWithdraw = computed(() => userStore.hasPermission('zsjos:withdrawal:apply'))
 const earningsSnapshot = computed(() => {
   const value = summary.value
   if (!value) return null
   return {
-    estimatedIncome: (value.pendingAmount || 0) + (value.availableAmount || 0) + (value.withdrawingAmount || 0),
-    withdrawableIncome: value.availableAmount || 0
+    estimatedIncome: (value.pendingAmount || 0) + (value.availableAmount || 0) + (value.withdrawingAmount || 0)
   }
 })
 const statisticsPeriodLabel = computed(() => statisticsPeriods.find(item => item.key === statisticsPeriod.value)?.label || '累计')
@@ -110,24 +107,14 @@ const statisticsDetailSubtitle = computed(() => {
   }
   return `${statisticsPeriodLabel.value} · ${statisticsDetailTotal.value} 条`
 })
-const leaderboardTitle = computed(() => leaderboard.value
-  ? `${leaderboard.value.periodLabel}${leaderboard.value.typeLabel}`
-  : '排行榜')
-const leaderboardChase = computed(() => {
-  const mine = leaderboard.value?.myRank
-  if (!mine) return { primary: '暂未上榜', secondary: '提交有效客资后可参与榜单' }
-  if (mine.rank === 1) return { primary: '当前第 1 名', secondary: '继续保持领先' }
-  if (leaderboard.value?.previousGap?.targetReached) {
-    return { primary: `并列第 ${mine.rank} 名`, secondary: '继续冲击更高名次' }
-  }
-  return {
-    primary: `当前第 ${mine.rank} 名`,
-    secondary: leaderboard.value?.previousGap?.displayValue
-      ? `距上一名 ${leaderboard.value.previousGap.displayValue}`
-      : '继续冲击更高名次'
-  }
+const leaderboardCardTitle = computed(() => {
+  const configuredType = leaderboardConfig.value?.typeOptions.find(option => option.key === leaderboardConfig.value?.defaultType)
+  return formatLeaderboardTitle(leaderboard.value?.typeLabel || configuredType?.label)
 })
-const leaderboardPreviewRows = computed(() => (leaderboard.value?.top3?.length ? leaderboard.value.top3 : leaderboard.value?.list || []).slice(0, 3))
+const leaderboardPeriodLabel = computed(() => formatLeaderboardPeriodLabel(
+  leaderboard.value?.period || leaderboardConfig.value?.defaultPeriod
+))
+const leaderboardTop3 = computed<LeaderboardMember[]>(() => (leaderboard.value?.top3 || []).slice(0, 3))
 const leaderboardConfigUnavailable = computed(() => {
   if ([401, 403, 500].includes(leaderboardConfigStatus.value || 0)) return false
   return [404, 405, 501].includes(leaderboardConfigStatus.value || 0)
@@ -208,7 +195,6 @@ async function loadUnreadCount() {
     unreadCount.value = await getUnreadCount()
   } catch {
     closeToast()
-    unreadCount.value = 0
   }
 }
 
@@ -356,10 +342,6 @@ function openStatisticsItem(item: HomeStatisticsDetailItem) {
   void router.push(item.kind === 'lead' ? `/lead/${item.id}` : `/withdrawal/${item.id}`)
 }
 
-function statisticsDetailInitial(item: HomeStatisticsDetailItem) {
-  return item.kind === 'lead' ? recentLeadInitial(item.submittedName) : '¥'
-}
-
 async function loadLeaderboard() {
   leaderboardConfigLoading.value = true
   leaderboardConfigError.value = ''
@@ -398,62 +380,44 @@ onMounted(() => {
   void loadLeadFollowUpSummary()
   void loadLeaderboard()
   void loadStatistics()
+  homeMounted = true
 })
-onActivated(() => { void loadUnreadCount() })
+onActivated(() => {
+  void loadUnreadCount()
+  if (homeMounted) void loadLeadFollowUpSummary()
+})
 
-function goWithdraw() {
-  router.push('/withdrawal/apply')
+function goEarnings() {
+  router.push('/earnings')
 }
 
 function goLeadList() {
   router.push('/lead/list')
 }
 
-function goLeadFollowUp() {
-  router.push('/lead/follow-up')
+type LeadFollowUpView = 'follow_up_pending' | 'unreachable' | 'invalid'
+
+function goLeadFollowUp(view: LeadFollowUpView) {
+  router.push({ path: '/lead/follow-up', query: { view } })
 }
 
 function goMessages() { router.push('/messages') }
 
-function goLeaderboard() { router.push('/leaderboard') }
-
-function leaderboardPreviewGap(index: number) {
-  const item = leaderboardPreviewRows.value[index]
-  if (!item) return ''
-  return leaderboardRowGapText(item, leaderboardPreviewRows.value[index - 1], leaderboard.value?.valueUnit)
+function goLeaderboard() {
+  const current = leaderboard.value
+  if (!current) {
+    void router.push('/leaderboard')
+    return
+  }
+  void router.push({ path: '/leaderboard', query: { type: current.type, period: current.period } })
 }
 
 function formatMoney(value: number) {
   return `¥${value.toFixed(2)}`
 }
 
-function formatPercent(numerator = 0, denominator = 0) {
-  if (!denominator) return '0%'
-  const value = (numerator / denominator) * 100
-  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)}%`
-}
-
 function goLeadDetail(id: number) {
   router.push(`/lead/${id}`)
-}
-
-function recentLeadInitial(name: string) {
-  return name.trim().charAt(0) || '客'
-}
-
-function recentLeadTone(id: number) {
-  return `tone-${Math.abs(id) % 4}`
-}
-
-function partnerInitial() {
-  return (partner.value?.name || userStore.nickname || '兼').trim().charAt(0) || '兼'
-}
-
-function recentLeadCourse(item: LeadListItem) {
-  return item.primaryProduct?.spuName
-    || item.intendedProducts?.find(product => product.primary)?.spuName
-    || item.intendedProducts?.[0]?.spuName
-    || '未填写意向课程'
 }
 
 function statusClass(status: string) {
@@ -477,8 +441,14 @@ function statusClass(status: string) {
             <van-icon name="bell" size="22" />
           </button>
         </van-badge>
-        <van-image v-if="userStore.avatar" class="home-header__avatar" round :src="userStore.avatar" fit="cover" />
-        <span v-else class="home-header__avatar home-header__avatar--fallback">{{ partnerInitial() }}</span>
+        <SmartAvatar
+          class="home-header__avatar"
+          :seed="partnerAvatarSeed(partner?.id)"
+          :src="userStore.avatar"
+          :size="54"
+          loading="eager"
+          label=""
+        />
       </div>
     </header>
 
@@ -495,55 +465,64 @@ function statusClass(status: string) {
         </div>
         <template v-else>
           <div class="home-earnings-main">
-            <div>
-              <span class="home-earnings-label">可提现</span>
-              <strong class="home-earnings-amount">{{ formatMoney(summary?.availableAmount || 0) }}</strong>
+            <div class="home-earnings-primary">
+              <span class="home-earnings-label">预计收入</span>
+              <strong class="home-earnings-amount">{{ formatMoney(earningsSnapshot?.estimatedIncome || 0) }}</strong>
             </div>
-            <button v-if="canWithdraw" type="button" class="home-withdraw-button" @click="goWithdraw">去提现</button>
+            <button type="button" class="home-withdraw-button" @click="goEarnings">查看收益</button>
           </div>
-          <div v-if="earningsSnapshot" class="home-earnings-row">
+          <div v-if="summary" class="home-earnings-row">
             <div class="home-earnings-metric">
-              <span class="home-earnings-metric__label">预计收入</span>
-              <strong class="home-earnings-metric__value">{{ formatMoney(earningsSnapshot.estimatedIncome) }}</strong>
+              <span class="home-earnings-metric__label">兑现收入</span>
+              <strong class="home-earnings-metric__value">{{ formatMoney(summary.pendingAmount || 0) }}</strong>
             </div>
-            <div class="home-earnings-metric home-earnings-metric--primary">
+            <div class="home-earnings-metric home-earnings-metric--available">
               <span class="home-earnings-metric__label">可提现收入</span>
-              <strong class="home-earnings-metric__value">{{ formatMoney(earningsSnapshot.withdrawableIncome) }}</strong>
+              <strong class="home-earnings-metric__value">{{ formatMoney(summary.availableAmount || 0) }}</strong>
             </div>
           </div>
-          <p class="home-earnings-sub">
-            <span>累计已赚 {{ formatMoney(summary?.totalAmount || 0) }}</span>
-            <span>待结算 {{ formatMoney(summary?.pendingAmount || 0) }}</span>
-          </p>
         </template>
       </van-skeleton>
     </section>
 
     <section v-else class="home-card home-earnings-card home-earnings-card--locked" aria-label="收益概览">
-      <span class="home-earnings-label">可提现</span>
+      <span class="home-earnings-label">预计收入</span>
       <strong class="home-earnings-amount">--</strong>
       <p class="home-earnings-sub"><span>暂无权限查看收益</span></p>
     </section>
 
-    <button type="button" class="home-follow-card" @click="goLeadFollowUp">
-      <span class="home-follow-card__dot" />
-      <span v-if="leadFollowUpSummaryLoading">客资跟进提醒加载中</span>
-      <span v-else-if="leadFollowUpSummaryError">客资跟进提醒加载失败</span>
-      <span v-else-if="leadFollowUpSummaryEmpty">暂无需要处理的客资</span>
-      <span v-else>待跟进客资 {{ leadFollowUpSummary?.followUpPendingCount || 0 }} 条</span>
-      <van-icon name="arrow" size="18" />
-    </button>
+    <section v-if="canViewLeads" class="home-card home-follow-card" aria-label="客资跟进提醒">
+      <div class="home-follow-card__header">
+        <h2>客资跟进提醒</h2>
+        <button v-if="leadFollowUpSummaryError" type="button" class="home-follow-card__retry" @click="loadLeadFollowUpSummary">重试</button>
+      </div>
+      <p v-if="leadFollowUpSummaryError" class="home-follow-card__error">客资提醒加载失败</p>
+      <div v-else class="home-follow-card__metrics">
+        <button type="button" class="home-follow-card__metric home-follow-card__metric--pending" :disabled="leadFollowUpSummaryLoading" @click="goLeadFollowUp('follow_up_pending')">
+          <strong>{{ leadFollowUpSummaryLoading ? '--' : leadFollowUpSummary?.followUpPendingCount ?? 0 }}</strong>
+          <span>待跟进</span>
+        </button>
+        <button type="button" class="home-follow-card__metric home-follow-card__metric--unreachable" :disabled="leadFollowUpSummaryLoading" @click="goLeadFollowUp('unreachable')">
+          <strong>{{ leadFollowUpSummaryLoading ? '--' : leadFollowUpSummary?.unreachableCount ?? 0 }}</strong>
+          <span>未联系上</span>
+        </button>
+        <button type="button" class="home-follow-card__metric home-follow-card__metric--invalid" :disabled="leadFollowUpSummaryLoading" @click="goLeadFollowUp('invalid')">
+          <strong>{{ leadFollowUpSummaryLoading ? '--' : leadFollowUpSummary?.invalidCount ?? 0 }}</strong>
+          <span>已判无效</span>
+        </button>
+      </div>
+    </section>
 
-    <section class="home-card home-statistics" aria-label="我的战绩">
+    <section class="home-card home-statistics" aria-label="客资数">
       <div class="home-section-title statistics-header">
         <div class="statistics-title-wrap">
-          <h2>我的战绩</h2>
+          <h2>客资数</h2>
         </div>
         <LiquidSegmentedControl
           class="period-tabs"
           :model-value="statisticsPeriod"
           :items="statisticsPeriods"
-          ariaLabel="我的战绩周期"
+          ariaLabel="客资周期"
           compact
           @change="selectStatisticsPeriod($event as HomeStatisticsPeriod)"
         />
@@ -565,8 +544,8 @@ function statusClass(status: string) {
               :class="{ 'is-locked': !canOpenStatisticsMetric('lead_count') }"
               @click="openStatisticsDetails('lead_count')"
             >
-              <span>提交</span>
-              <strong>{{ Math.round(statistics.leadCount) }}</strong>
+              <span>提交客资</span>
+              <strong class="statistics-metric__value">{{ Math.round(statistics.leadCount) }}</strong>
               <i><van-icon :name="canOpenStatisticsMetric('lead_count') ? 'arrow' : 'lock'" size="15" /></i>
             </button>
             <button
@@ -575,8 +554,8 @@ function statusClass(status: string) {
               :class="{ 'is-locked': !canOpenStatisticsMetric('valid_lead_count') }"
               @click="openStatisticsDetails('valid_lead_count')"
             >
-              <span>有效</span>
-              <strong>{{ Math.round(statistics.validLeadCount) }}</strong>
+              <span>有效客资</span>
+              <strong class="statistics-metric__value">{{ Math.round(statistics.validLeadCount) }}</strong>
               <i><van-icon :name="canOpenStatisticsMetric('valid_lead_count') ? 'arrow' : 'lock'" size="15" /></i>
             </button>
             <button
@@ -585,15 +564,10 @@ function statusClass(status: string) {
               :class="{ 'is-locked': !canOpenStatisticsMetric('converted_lead_count') }"
               @click="openStatisticsDetails('converted_lead_count')"
             >
-              <span>成交</span>
-              <strong>{{ Math.round(statistics.convertedLeadCount) }}</strong>
+              <span>成交客资</span>
+              <strong class="statistics-metric__value">{{ Math.round(statistics.convertedLeadCount) }}</strong>
               <i><van-icon :name="canOpenStatisticsMetric('converted_lead_count') ? 'arrow' : 'lock'" size="15" /></i>
             </button>
-          </div>
-          <div class="statistics-rates">
-            <span>转化率 {{ formatPercent(statistics.validLeadCount, statistics.leadCount) }}</span>
-            <span aria-hidden="true">·</span>
-            <span>成交率 {{ formatPercent(statistics.convertedLeadCount, statistics.leadCount) }}</span>
           </div>
         </template>
       </div>
@@ -618,12 +592,8 @@ function statusClass(status: string) {
             class="recent-lead"
             @click="goLeadDetail(lead.id)"
           >
-            <span class="recent-lead__avatar" :class="recentLeadTone(lead.id)">{{ recentLeadInitial(lead.submittedName) }}</span>
-            <div class="recent-lead__copy">
+            <SmartAvatar class="recent-lead__avatar" :seed="leadAvatarSeed(lead.id)" :size="34" shape="rounded" label="" />
             <span class="recent-lead__name">{{ lead.submittedName || '未命名客户' }}</span>
-            <span class="recent-lead__product">{{ recentLeadCourse(lead) }}</span>
-            <ProductSpecs :product="lead.primaryProduct || lead.intendedProducts?.find(p => p.primary) || lead.intendedProducts?.[0] || {}" />
-            </div>
             <span class="recent-lead__status" :class="`recent-lead__status--${statusClass(lead.status)}`">
               {{ formatLeadStatus(lead.status) }}
             </span>
@@ -633,51 +603,69 @@ function statusClass(status: string) {
       </van-skeleton>
     </section>
 
-    <section v-if="leaderboardVisible" class="home-card home-leaderboard" aria-label="排行榜">
-      <div class="home-section-title home-section-title--tight">
-        <h2>排行榜</h2>
+    <section v-if="leaderboardVisible" class="home-card home-leaderboard hero-surface" aria-label="排行榜">
+      <header class="leaderboard-card-header">
+        <span class="leaderboard-card-header__icon"><van-icon name="medal-o" size="20" /></span>
+        <span class="leaderboard-card-header__copy">
+          <strong>{{ leaderboardCardTitle }}</strong>
+          <small v-if="leaderboardPeriodLabel" class="leaderboard-card-header__period">{{ leaderboardPeriodLabel }}</small>
+        </span>
         <button type="button" @click="goLeaderboard">
           查看全部 <van-icon name="arrow" size="14" />
         </button>
-      </div>
-      <button type="button" class="leaderboard-summary-card" @click="goLeaderboard">
-        <span class="leaderboard-summary-card__icon"><van-icon name="trophy-o" size="30" /></span>
-        <span class="leaderboard-summary-card__main">
-          <strong>{{ leaderboardTitle }}</strong>
-          <span v-if="leaderboardConfigLoading || leaderboardLoading">榜单加载中</span>
-          <span v-else-if="leaderboardConfigError">{{ leaderboardConfigUnavailable ? '排行榜功能暂不可用' : leaderboardConfigError }}</span>
-          <span v-else-if="leaderboardError">{{ leaderboardError }}</span>
-          <span v-else-if="leaderboard">{{ leaderboardChase.primary }} · {{ leaderboardChase.secondary }}</span>
-          <span v-else>排行榜暂未开启</span>
-        </span>
-        <span v-if="leaderboard?.myRank" class="leaderboard-summary-card__rank">第 {{ leaderboard.myRank.rank }} 名</span>
-        <van-icon class="leaderboard-summary-card__arrow" name="arrow" size="18" />
-      </button>
-      <div v-if="leaderboardPreviewRows.length" class="leaderboard-preview-list">
+      </header>
+
+      <div v-if="leaderboardTop3.length" class="leaderboard-compact-list">
         <button
-          v-for="(item, index) in leaderboardPreviewRows"
+          v-for="item in leaderboardTop3"
           :key="item.partnerId"
           type="button"
-          class="leaderboard-preview-row"
-          :class="{ 'is-me': item.isMe }"
+          class="leaderboard-compact-row"
+          :class="[`rank-${item.rank}`, { 'is-me': item.isMe }]"
           @click="goLeaderboard"
         >
-          <span class="leaderboard-preview-row__avatar" :class="`rank-${item.rank}`">{{ leaderboardMemberInitial(item.displayName) }}</span>
-          <span class="leaderboard-preview-row__main">
-            <strong>{{ item.displayName }}<small v-if="item.isMe">（我）</small></strong>
-            <small>{{ leaderboardPreviewGap(index) }}</small>
+          <LeaderboardCrown v-if="item.rank === 1" :rank="item.rank" tone="theme" class="leaderboard-compact-row__crown" />
+          <span v-else class="leaderboard-compact-row__rank">{{ item.rank }}</span>
+          <SmartAvatar class="leaderboard-compact-row__avatar" :seed="partnerAvatarSeed(item.partnerId)" :size="34" label="" />
+          <span class="leaderboard-compact-row__name">
+            <strong>{{ item.displayName }}</strong>
+            <small v-if="item.isMe">我</small>
           </span>
-          <span class="leaderboard-preview-row__value">{{ formatLeaderboardValue(item.value, leaderboard?.valueUnit) }}</span>
+          <span class="leaderboard-compact-row__value">
+            <van-icon name="fire-o" size="15" />
+            {{ formatLeaderboardValue(item.value, leaderboard?.valueUnit) }}
+          </span>
         </button>
       </div>
-      <div v-else class="leaderboard-preview-empty">
-        <span v-if="leaderboardConfigLoading || leaderboardLoading">排行榜加载中</span>
-        <span v-else-if="leaderboardConfigError">{{ leaderboardConfigUnavailable ? '排行榜功能暂不可用' : leaderboardConfigError }}</span>
-        <span v-else-if="leaderboardError">{{ leaderboardError }}</span>
+      <div v-else class="leaderboard-compact-state">
+        <van-loading v-if="leaderboardConfigLoading || leaderboardLoading" size="20" color="var(--h5-primary)">榜单加载中</van-loading>
+        <template v-else-if="leaderboardConfigError">
+          <span>{{ leaderboardConfigUnavailable ? '排行榜功能暂不可用' : leaderboardConfigError }}</span>
+          <button type="button" @click="loadLeaderboard">重试</button>
+        </template>
+        <template v-else-if="leaderboardError">
+          <span>{{ leaderboardError }}</span>
+          <button type="button" @click="loadLeaderboard">重试</button>
+        </template>
         <span v-else>排行榜暂未开启</span>
       </div>
-      <button type="button" class="leaderboard-footer-link" @click="goLeaderboard">
-        查看完整榜单 <van-icon name="arrow" size="14" />
+
+      <button type="button" class="leaderboard-card-self" @click="goLeaderboard">
+        <SmartAvatar
+          class="leaderboard-card-self__avatar"
+          :seed="partnerAvatarSeed(leaderboard?.myRank?.partnerId ?? partner?.id)"
+          :src="userStore.avatar"
+          :size="32"
+          label=""
+        />
+        <span class="leaderboard-card-self__copy">
+          <span>我的排名 <b>{{ leaderboard?.myRank?.rank ?? '未上榜' }}</b></span>
+          <i />
+          <span v-if="leaderboard?.myRank?.rank === 1">继续保持领先</span>
+          <span v-else-if="leaderboard?.previousGap?.targetReached">已并列上一名</span>
+          <span v-else>距上一名 <b>{{ leaderboard?.previousGap?.displayValue || '--' }}</b></span>
+        </span>
+        <strong>去冲榜 <van-icon name="arrow" size="14" /></strong>
       </button>
     </section>
     <van-popup
@@ -703,7 +691,7 @@ function statusClass(status: string) {
 
         <div v-if="statisticsDetailSelected?.kind === 'lead'" class="statistics-record-detail">
           <div class="statistics-record-hero">
-            <span class="statistics-record-hero__avatar">{{ recentLeadInitial(statisticsDetailSelected.submittedName) }}</span>
+            <SmartAvatar class="statistics-record-hero__avatar" :seed="leadAvatarSeed(statisticsDetailSelected.id)" :size="48" label="" />
             <div>
               <strong>{{ statisticsDetailSelected.submittedName }}</strong>
               <span>{{ formatLeadNo(statisticsDetailSelected.leadNo) }}</span>
@@ -780,9 +768,8 @@ function statusClass(status: string) {
                 class="statistics-detail-row"
                 @click="openStatisticsItem(item)"
               >
-                <span class="statistics-detail-row__avatar" :class="{ 'is-withdrawal': isWithdrawalStatisticsDetail(item) }">
-                  {{ statisticsDetailInitial(item) }}
-                </span>
+                <SmartAvatar v-if="isLeadStatisticsDetail(item)" class="statistics-detail-row__avatar" :seed="leadAvatarSeed(item.id)" :size="40" label="" />
+                <span v-else class="statistics-detail-row__avatar is-withdrawal">¥</span>
                 <span v-if="isLeadStatisticsDetail(item)" class="statistics-detail-row__main">
                   <span class="statistics-detail-row__head">
                     <strong>{{ item.submittedName }}</strong>
@@ -816,7 +803,9 @@ function statusClass(status: string) {
   width: 100%;
   max-width: 10rem;
   overflow: hidden;
-  background: var(--h5-bg);
+  background: var(--h5-glass-surface-strong);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
   transform: translate3d(-50%, 0, 0);
 }
 .statistics-detail-shell {
@@ -833,7 +822,9 @@ function statusClass(status: string) {
   gap: 8px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--h5-divider);
-  background: var(--h5-card-bg);
+  background: color-mix(in srgb, var(--h5-card-bg) 80%, transparent);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
 }
 .statistics-detail-header > button {
   display: flex;
@@ -844,7 +835,7 @@ function statusClass(status: string) {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--h5-bg);
+  background: var(--h5-glass-sunken);
   color: var(--h5-text-secondary);
 }
 .statistics-detail-header > div {
@@ -967,7 +958,7 @@ function statusClass(status: string) {
 .statistics-detail-row__head small.is-success { background: #f0f9eb; color: var(--h5-success); }
 .statistics-detail-row__head small.is-danger { background: #fff1f0; color: var(--h5-danger); }
 .statistics-detail-row__head small.is-warning { background: #fff8e6; color: var(--h5-warning); }
-.statistics-detail-row__head small.is-muted { background: var(--h5-bg); color: var(--h5-text-secondary); }
+.statistics-detail-row__head small.is-muted { background: var(--h5-glass-sunken); color: var(--h5-text-secondary); }
 .statistics-detail-row__arrow { color: var(--h5-text-placeholder); }
 .statistics-record-detail { padding: 16px 0 28px; }
 .statistics-record-hero {
@@ -977,8 +968,9 @@ function statusClass(status: string) {
   gap: 12px;
   margin: 0 16px 14px;
   padding: 16px;
+  border: 1px solid var(--h5-glass-border);
   border-radius: 12px;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
 }
 .statistics-record-hero__avatar {
   display: flex;
@@ -1007,8 +999,9 @@ function statusClass(status: string) {
   gap: 5px;
   margin: 0 16px 14px;
   padding: 22px 16px;
+  border: 1px solid var(--h5-glass-border);
   border-radius: 12px;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
 }
 .statistics-withdrawal-hero > span { color: var(--h5-text-secondary); font-size: 12px; }
 .statistics-withdrawal-hero > strong { color: var(--h5-warning); font-size: 30px; font-variant-numeric: tabular-nums; }
@@ -1016,8 +1009,9 @@ function statusClass(status: string) {
 .statistics-record-timeline {
   margin: 14px 16px 0;
   padding: 16px;
+  border: 1px solid var(--h5-glass-border);
   border-radius: 12px;
-  background: var(--h5-card-bg);
+  background: var(--h5-glass-surface-strong);
 }
 .statistics-record-timeline h3 { margin: 0 0 14px; font-size: 15px; }
 .statistics-record-timeline__item {
@@ -1058,18 +1052,18 @@ function statusClass(status: string) {
 .home-page {
   min-height: 100vh;
   padding: 20px 14px 108px;
-  background:
-    radial-gradient(circle at 50% -80px, rgba(255, 255, 255, 0.98), transparent 260px),
-    var(--h5-bg);
+  background: transparent;
 }
 
 .home-card,
 .home-follow-card {
   margin: 0 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--h5-glass-border);
   border-radius: 16px;
-  background: var(--h5-card-bg);
-  box-shadow: 0 8px 24px rgba(31, 35, 48, 0.07);
+  background: var(--h5-glass-surface);
+  box-shadow: var(--h5-glass-shadow);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
 }
 
 .home-header {
@@ -1117,11 +1111,13 @@ function statusClass(status: string) {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--h5-glass-border);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--h5-glass-surface-subtle);
   color: #68707c;
-  box-shadow: 0 8px 22px rgba(31, 35, 48, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 8px 22px rgba(31, 35, 48, 0.1);
+  backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur));
 }
 
 .home-header__bell:active { transform: scale(0.98); }
@@ -1175,7 +1171,7 @@ function statusClass(status: string) {
 
 .home-earnings-card {
   min-height: 184px;
-  padding: 20px 28px 18px;
+  padding: 15px 18px 13px;
 }
 
 .home-earnings-card--locked { display: flex; flex-direction: column; }
@@ -1193,9 +1189,12 @@ function statusClass(status: string) {
   flex-direction: column;
 }
 
+.home-earnings-primary { min-width: 0; }
+
 .home-earnings-label {
   color: #7e8794;
   font-size: 14px;
+  font-weight: 700;
   line-height: 20px;
 }
 
@@ -1203,7 +1202,7 @@ function statusClass(status: string) {
   display: block;
   margin-top: 8px;
   color: var(--h5-primary);
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 800;
   line-height: 54px;
   font-variant-numeric: tabular-nums;
@@ -1218,7 +1217,7 @@ function statusClass(status: string) {
   border: 0;
   border-radius: 999px;
   background: var(--h5-gradient);
-  box-shadow: 0 8px 18px rgba(240, 68, 85, 0.22);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--h5-primary) 28%, transparent);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -1226,8 +1225,8 @@ function statusClass(status: string) {
 
 .home-earnings-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid rgba(125, 133, 143, 0.14);
@@ -1237,8 +1236,14 @@ function statusClass(status: string) {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
+  padding: 0 8px;
+  text-align: center;
+  border-right: 1px solid rgba(125, 133, 143, 0.12);
 }
+
+.home-earnings-metric:last-child { border-right: 0; }
 
 .home-earnings-metric__label {
   color: #7e8794;
@@ -1257,7 +1262,7 @@ function statusClass(status: string) {
   white-space: nowrap;
 }
 
-.home-earnings-metric--primary .home-earnings-metric__value {
+.home-earnings-metric--available .home-earnings-metric__value {
   color: var(--h5-primary);
 }
 
@@ -1295,31 +1300,93 @@ function statusClass(status: string) {
 .home-empty-row { min-height: 128px; color: var(--h5-text-placeholder); }
 
 .home-follow-card {
-  display: grid;
   width: 100%;
-  height: 46px;
-  grid-template-columns: 18px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px;
-  color: #1f252d;
-  font: inherit;
-  font-size: 15px;
-  text-align: left;
+  min-height: 112px;
+  padding: 15px 18px 13px;
 }
 
-.home-follow-card > span:nth-child(2) {
+.home-follow-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-follow-card__header h2 {
+  margin: 0;
+  color: var(--h5-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 21px;
+}
+
+.home-follow-card__retry {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--h5-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.home-follow-card__error {
+  margin: 16px 0 3px;
+  color: var(--h5-danger);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.home-follow-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 9px;
+}
+
+.home-follow-card__metric {
+  display: flex;
+  min-width: 0;
+  min-height: 53px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--h5-border);
+  background: transparent;
+  color: var(--h5-text-secondary);
+  font: inherit;
+  text-align: center;
+}
+
+.home-follow-card__metric:last-child { border-right: 0; }
+.home-follow-card__metric:active:not(:disabled) { border-radius: 10px; background: var(--h5-primary-opacity); }
+.home-follow-card__metric:disabled { cursor: default; opacity: 1; }
+.home-follow-card__metric strong {
+  color: var(--h5-text-primary);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 27px;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-follow-card__metric span {
   overflow: hidden;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.home-follow-card__dot {
-  width: 7px;
-  height: 7px;
-  justify-self: center;
-  border-radius: 50%;
-  background: var(--h5-primary);
+.home-follow-card__metric--pending strong { color: var(--h5-primary); }
+.home-follow-card__metric--unreachable strong { color: var(--h5-warning); }
+.home-follow-card__metric--invalid strong { color: var(--h5-danger); }
+
+@media (max-width: 360px) {
+  .home-follow-card { padding-right: 12px; padding-left: 12px; }
+  .home-follow-card__metric { padding-right: 4px; padding-left: 4px; }
+  .home-follow-card__metric span { font-size: 11px; }
 }
 
 .home-section-title {
@@ -1353,12 +1420,12 @@ function statusClass(status: string) {
 }
 
 .home-statistics {
-  min-height: 214px;
-  padding: 18px 30px 14px;
+  min-height: 160px;
+  padding: 15px 18px 13px;
 }
 
 .statistics-header {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .statistics-title-wrap {
@@ -1369,11 +1436,49 @@ function statusClass(status: string) {
 }
 
 .period-tabs {
+  width: 236px;
   min-width: 0;
-  flex: 1;
+  flex: 0 1 236px;
+  margin-left: auto;
 }
 
-.statistics-body { min-height: 122px; }
+.period-tabs :deep(.liquid-segmented) {
+  border-color: var(--h5-glass-border);
+  background: color-mix(in srgb, var(--h5-glass-sunken) 78%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent);
+}
+
+.period-tabs :deep(.liquid-segmented__indicator) {
+  border: 1px solid color-mix(in srgb, var(--h5-primary) 42%, var(--h5-glass-border));
+  background: color-mix(in srgb, var(--h5-primary) 25%, var(--h5-card-bg));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 62%, transparent), 0 4px 12px color-mix(in srgb, var(--h5-primary) 18%, transparent);
+}
+
+.period-tabs :deep(.liquid-segmented__item.is-active) {
+  color: var(--h5-primary-dark);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .period-tabs :deep(.liquid-segmented) {
+    background: color-mix(in srgb, var(--h5-primary-light) 52%, var(--h5-card-bg));
+  }
+
+  .period-tabs :deep(.liquid-segmented__indicator) {
+    background: color-mix(in srgb, var(--h5-primary) 22%, var(--h5-card-bg));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .period-tabs :deep(.liquid-segmented) {
+    background: color-mix(in srgb, var(--h5-primary-light) 52%, var(--h5-card-bg));
+  }
+
+  .period-tabs :deep(.liquid-segmented__indicator) {
+    background: color-mix(in srgb, var(--h5-primary) 22%, var(--h5-card-bg));
+  }
+}
+
+.statistics-body { min-height: 72px; }
 
 .statistics-metrics {
   display: grid;
@@ -1384,12 +1489,12 @@ function statusClass(status: string) {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 92px;
+  min-height: 72px;
   grid-template-columns: minmax(0, 1fr) 30px;
   grid-template-rows: auto 1fr;
   align-items: center;
-  row-gap: 5px;
-  padding: 0 15px 0 0;
+  row-gap: 3px;
+  padding: 0 10px 0 0;
   border: 0;
   border-right: 1px solid #edf0f4;
   background: transparent;
@@ -1409,10 +1514,11 @@ function statusClass(status: string) {
 
 .statistics-metric strong {
   min-width: 0;
+  max-width: 100%;
   color: #1c2027;
   font-size: clamp(26px, 3vw, 36px);
   font-weight: 800;
-  line-height: 42px;
+  line-height: 36px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1431,22 +1537,9 @@ function statusClass(status: string) {
 
 .statistics-metric.is-locked { opacity: 0.62; }
 
-.statistics-rates {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 36px;
-  margin-top: 2px;
-  border-top: 1px solid #edf0f4;
-  color: #747c87;
-  font-size: 13px;
-  line-height: 20px;
-}
-
 .home-recent {
   min-height: 216px;
-  padding: 16px 30px 8px;
+  padding: 15px 18px 13px;
 }
 
 .recent-list { margin-top: -2px; }
@@ -1456,7 +1549,6 @@ function statusClass(status: string) {
   width: 100%;
   min-height: 52px;
   grid-template-columns: 38px minmax(0, 1fr) auto 16px;
-  grid-template-rows: auto auto;
   align-items: center;
   gap: 12px;
   padding: 7px 0;
@@ -1483,29 +1575,11 @@ function statusClass(status: string) {
   font-weight: 700;
 }
 
-.recent-lead__avatar.tone-1 { background: #e7f8ee; color: var(--h5-success); }
-.recent-lead__avatar.tone-2 { background: #fff0df; color: #ff8a2a; }
-.recent-lead__avatar.tone-3 { background: #e8f2ff; color: #3c82df; }
-
-.recent-lead__name,
-.recent-lead__product {
-  min-width: 0;
-}
-
-.recent-lead__copy {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 4px;
-  overflow-wrap: anywhere;
-}
-
 .recent-lead__name {
   grid-column: 2;
   grid-row: 1;
   overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #1c2027;
@@ -1513,23 +1587,9 @@ function statusClass(status: string) {
   font-weight: 700;
 }
 
-.recent-lead__product {
-  grid-column: 2;
-  grid-row: 2;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: normal;
-  color: #747c87;
-  font-size: 13px;
-}
-
 .recent-lead__status {
   grid-column: 3;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   display: inline-flex;
   overflow: hidden;
   min-width: 0;
@@ -1551,206 +1611,272 @@ function statusClass(status: string) {
 .recent-lead__status--warning { background: #fff1df; color: #ff8a2a; }
 .recent-lead__status--danger { background: #fff0f1; color: var(--h5-danger); }
 .recent-lead__status--muted { background: #f1f2f4; color: #8b929d; }
-.recent-lead__arrow { grid-column: 4; grid-row: 1 / span 2; color: #9aa1ab; }
+.recent-lead__arrow { grid-column: 4; grid-row: 1; color: #9aa1ab; }
 
 .home-leaderboard {
-  min-height: 88px;
-  padding: 13px 30px 14px;
+  min-height: 250px;
+  padding: 15px 18px 13px;
+  border: 1px solid var(--h5-glass-border);
+  box-shadow: var(--h5-glass-shadow);
+  color: var(--h5-text-primary);
 }
 
-.leaderboard-notice {
-  margin: -4px -18px 8px;
-  border-radius: 10px;
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .home-card,
+  .home-follow-card,
+  .home-header__bell {
+    background: var(--h5-glass-surface-fallback);
+  }
+
 }
 
-.home-section-title--tight {
-  margin-bottom: 10px;
+@media (prefers-reduced-transparency: reduce) {
+  .home-leaderboard {
+    background: var(--h5-glass-surface-strong-fallback);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
-.leaderboard-summary-card {
-  display: grid;
-  width: 100%;
-  min-height: 64px;
-  grid-template-columns: 44px minmax(0, 1fr) auto 18px;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #f04455 0%, #ff7180 100%);
-  color: #fff;
-  text-align: left;
-  box-shadow: 0 10px 22px rgba(240, 68, 85, 0.18);
-}
-
-.leaderboard-summary-card__icon {
+.leaderboard-card-header {
   display: flex;
-  width: 42px;
-  height: 42px;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+}
+
+.leaderboard-card-header__icon {
+  display: flex;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--h5-primary) 16%, transparent);
+  color: var(--h5-primary);
 }
 
-.leaderboard-summary-card__main {
+.leaderboard-card-header__copy {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 4px;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
 }
 
-.leaderboard-summary-card__main strong {
+.leaderboard-card-header__copy strong {
+  min-width: 0;
   overflow: hidden;
   font-size: 18px;
-  font-weight: 800;
-  line-height: 22px;
+  line-height: 23px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.leaderboard-summary-card__main span {
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.leaderboard-summary-card__rank {
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.leaderboard-summary-card__arrow {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.leaderboard-preview-list {
-  overflow: hidden;
-  margin-top: 12px;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 20px rgba(31, 35, 48, 0.06);
-}
-
-.leaderboard-preview-row {
-  display: grid;
-  width: 100%;
-  min-height: 62px;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+.leaderboard-card-header__period {
+  display: inline-flex;
+  min-height: 20px;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--h5-primary) 14%, transparent);
+  color: var(--h5-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.leaderboard-card-header > button,
+.leaderboard-card-self,
+.leaderboard-compact-row {
   border: 0;
-  border-bottom: 1px solid #edf0f4;
-  background: transparent;
-  color: var(--h5-text-primary);
   font: inherit;
   text-align: left;
 }
 
-.leaderboard-preview-row:last-child {
-  border-bottom: 0;
+.leaderboard-card-header > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--h5-primary);
+  font-size: 12px;
 }
 
-.leaderboard-preview-row.is-me {
-  background: linear-gradient(90deg, rgba(240, 68, 85, 0.1) 0%, rgba(240, 68, 85, 0.02) 72%, transparent 100%);
+.leaderboard-compact-list {
+  margin-top: 7px;
 }
 
-.leaderboard-preview-row__avatar {
+.leaderboard-compact-row {
+  display: grid;
+  width: 100%;
+  min-height: 47px;
+  grid-template-columns: 30px 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: transparent;
+  color: var(--h5-text-primary);
+}
+
+.leaderboard-compact-row:last-child { border-bottom: 0; }
+.leaderboard-compact-row.rank-1 { border-radius: 10px; background: color-mix(in srgb, var(--h5-primary) 14%, var(--h5-glass-surface-subtle)); }
+
+.leaderboard-compact-row__rank {
   display: flex;
-  width: 40px;
-  height: 40px;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--h5-glass-sunken);
+  color: var(--h5-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.leaderboard-compact-row.rank-1 .leaderboard-compact-row__rank {
+  background: color-mix(in srgb, var(--h5-primary) 38%, var(--h5-card-bg));
+  color: var(--h5-primary-dark);
+}
+.leaderboard-compact-row.rank-2 .leaderboard-compact-row__rank,
+.leaderboard-compact-row.rank-3 .leaderboard-compact-row__rank {
+  background: color-mix(in srgb, var(--h5-primary-light) 82%, var(--h5-primary));
+  color: var(--h5-primary-dark);
+}
+
+.leaderboard-compact-row__avatar,
+.leaderboard-card-self__avatar {
+  display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f48e99;
-  color: #fff;
-  font-size: 15px;
+  background: var(--h5-glass-surface-subtle);
+  color: var(--h5-primary);
   font-weight: 800;
 }
 
-.leaderboard-preview-row__avatar.rank-1 {
-  background: #e4485b;
+.leaderboard-compact-row__avatar { width: 34px; height: 34px; border: 2px solid var(--h5-glass-border); font-size: 13px; }
+.leaderboard-compact-row.rank-1 .leaderboard-compact-row__avatar {
+  border-color: color-mix(in srgb, var(--h5-primary) 68%, var(--h5-glass-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--h5-primary) 22%, transparent);
 }
+.leaderboard-compact-row.rank-2 .leaderboard-compact-row__avatar,
+.leaderboard-compact-row.rank-3 .leaderboard-compact-row__avatar { border-color: color-mix(in srgb, var(--h5-primary) 42%, var(--h5-glass-border)); }
 
-.leaderboard-preview-row__avatar.rank-2 {
-  background: #e95768;
-}
-
-.leaderboard-preview-row__main {
+.leaderboard-compact-row__name {
   display: flex;
   min-width: 0;
-  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.leaderboard-compact-row__name strong {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-compact-row__name small {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--h5-glass-sunken);
+  color: var(--h5-text-secondary);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.leaderboard-compact-row__value {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-}
-
-.leaderboard-preview-row__main strong {
-  overflow: hidden;
-  color: #1c2027;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.leaderboard-preview-row__main strong small {
-  color: var(--h5-primary);
-}
-
-.leaderboard-preview-row__main > small {
-  overflow: hidden;
-  color: #7c8490;
-  font-size: 12px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.leaderboard-preview-row__value {
-  color: var(--h5-primary);
-  font-size: 14px;
+  color: var(--h5-text-primary);
+  font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.leaderboard-preview-empty {
-  padding: 14px 0 4px;
+.leaderboard-compact-row__value .van-icon { color: #f5a623; }
+
+.leaderboard-compact-state {
+  display: flex;
+  min-height: 145px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: var(--h5-text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
 }
 
-.leaderboard-footer-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-top: 10px;
-  padding: 4px 0;
+.leaderboard-compact-state button {
+  padding: 3px 0;
   border: 0;
   background: transparent;
   color: var(--h5-primary);
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+}
+
+.leaderboard-card-self {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 5px 8px;
+  border-radius: 11px;
+  background: var(--h5-glass-surface-subtle);
+  color: var(--h5-text-primary);
+}
+
+.leaderboard-card-self__avatar { width: 32px; height: 32px; border: 2px solid var(--h5-glass-border); font-size: 12px; }
+.leaderboard-card-self__avatar :deep(img) { width: 100%; height: 100%; border-radius: 50%; }
+
+.leaderboard-card-self__copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--h5-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.leaderboard-card-self__copy span { overflow: hidden; text-overflow: ellipsis; }
+.leaderboard-card-self__copy b { color: var(--h5-text-primary); font-size: 14px; }
+.leaderboard-card-self__copy i { width: 1px; height: 14px; flex: 0 0 auto; background: var(--h5-glass-divider); }
+
+.leaderboard-card-self > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--h5-primary);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 @media (max-width: 430px) {
   .home-page { padding-right: 16px; padding-left: 16px; }
-  .home-earnings-card { padding-right: 30px; padding-left: 30px; }
+  .home-earnings-card { padding-right: 18px; padding-left: 18px; }
   .home-statistics,
   .home-recent,
   .home-leaderboard { padding-right: 20px; padding-left: 20px; }
   .statistics-metric + .statistics-metric { padding-left: 12px; }
   .statistics-metric { padding-right: 8px; }
   .statistics-metric strong { font-size: 30px; }
-  .home-earnings-amount { font-size: 40px; }
+  .home-earnings-amount { font-size: 36px; }
   .home-earnings-row { gap: 10px; margin-top: 10px; padding-top: 10px; }
   .home-earnings-metric__value { font-size: 16px; line-height: 20px; }
   .recent-lead { gap: 8px; }
@@ -1766,11 +1892,12 @@ function statusClass(status: string) {
   .home-statistics,
   .home-recent,
   .home-leaderboard { padding-right: 16px; padding-left: 16px; }
-  .home-earnings-amount { font-size: 38px; }
+  .home-earnings-amount { font-size: 34px; }
   .home-earnings-row { gap: 8px; margin-top: 8px; padding-top: 8px; }
   .home-earnings-metric__value { font-size: 15px; line-height: 20px; }
   .home-withdraw-button { min-width: 82px; padding: 0 14px; }
   .statistics-header { align-items: stretch; flex-direction: column; }
+  .period-tabs { width: 100%; flex: 0 0 auto; margin-left: 0; }
   .statistics-metric { grid-template-columns: minmax(0, 1fr) 22px; padding-right: 6px; text-align: center; }
   .statistics-metric + .statistics-metric { padding-left: 6px; }
   .statistics-metric i { width: 22px; height: 22px; }
@@ -1785,7 +1912,14 @@ function statusClass(status: string) {
 :global(.home-page.norem .home-follow-card) {
   margin-bottom: 12px !important;
   border-radius: 16px !important;
-  box-shadow: 0 8px 24px rgba(31, 35, 48, 0.07) !important;
+}
+
+:global(.home-page.norem .period-tabs.liquid-segmented) {
+  width: 236px !important;
+  max-width: 100%;
+  flex: 0 1 236px !important;
+  margin-left: auto !important;
+  border-radius: 16px !important;
 }
 
 :global(.home-page.norem .home-header) {
@@ -1814,7 +1948,7 @@ function statusClass(status: string) {
 
 :global(.home-page.norem .home-earnings-card) {
   min-height: 170px !important;
-  padding: 17px 28px 16px !important;
+  padding: 15px 18px 13px !important;
 }
 
 :global(.home-page.norem .home-earnings-main) {
@@ -1839,7 +1973,7 @@ function statusClass(status: string) {
 
 :global(.home-page.norem .home-earnings-amount) {
   margin-top: 8px !important;
-  font-size: 45px !important;
+  font-size: 40px !important;
   line-height: 50px !important;
 }
 
@@ -1857,19 +1991,22 @@ function statusClass(status: string) {
 }
 
 :global(.home-page.norem .home-follow-card) {
-  height: 46px !important;
-  gap: 8px !important;
-  padding: 0 18px !important;
+  min-height: 112px !important;
+  padding: 15px 18px 13px !important;
 }
 
 :global(.home-page.norem .home-statistics) {
-  min-height: 198px !important;
-  padding: 16px 30px 12px !important;
+  min-height: 160px !important;
+  padding: 15px 18px 13px !important;
+}
+
+.leaderboard-compact-row__crown {
+  justify-self: center;
 }
 
 :global(.home-page.norem .statistics-header) {
   gap: 10px !important;
-  margin-bottom: 14px !important;
+  margin-bottom: 8px !important;
 }
 
 :global(.home-page.norem .home-section-title h2),
@@ -1879,7 +2016,7 @@ function statusClass(status: string) {
 }
 
 :global(.home-page.norem .statistics-body) {
-  min-height: 116px !important;
+  min-height: 72px !important;
 }
 
 :global(.home-page.norem .statistics-metrics) {
@@ -1887,8 +2024,8 @@ function statusClass(status: string) {
 }
 
 :global(.home-page.norem .statistics-metric) {
-  min-height: 82px !important;
-  row-gap: 4px !important;
+  min-height: 72px !important;
+  row-gap: 3px !important;
   padding-right: 10px !important;
 }
 
@@ -1902,8 +2039,10 @@ function statusClass(status: string) {
 }
 
 :global(.home-page.norem .statistics-metric strong) {
-  font-size: clamp(26px, 3vw, 34px) !important;
-  line-height: 40px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  font-size: 30px !important;
+  line-height: 36px !important;
 }
 
 :global(.home-page.norem .statistics-metric i) {
@@ -1911,17 +2050,9 @@ function statusClass(status: string) {
   height: 30px !important;
 }
 
-:global(.home-page.norem .statistics-rates) {
-  min-height: 32px !important;
-  margin-top: 0 !important;
-  gap: 12px !important;
-  font-size: 13px !important;
-  line-height: 20px !important;
-}
-
 :global(.home-page.norem .home-recent) {
   min-height: 196px !important;
-  padding: 14px 30px 6px !important;
+  padding: 15px 18px 13px !important;
 }
 
 :global(.home-page.norem .home-section-title) {
@@ -1948,12 +2079,6 @@ function statusClass(status: string) {
   font-size: 15px !important;
 }
 
-:global(.home-page.norem .recent-lead__product),
-:global(.home-page.norem .leaderboard-summary-card__main span) {
-  font-size: 13px !important;
-  line-height: 18px !important;
-}
-
 :global(.home-page.norem .recent-lead__status) {
   min-width: 0 !important;
   max-width: 74px !important;
@@ -1962,62 +2087,22 @@ function statusClass(status: string) {
   font-size: 11px !important;
 }
 
-:global(.home-page.norem .recent-lead__product) {
-  display: -webkit-box !important;
-  overflow: hidden !important;
-  -webkit-box-orient: vertical !important;
-  -webkit-line-clamp: 2 !important;
-  white-space: normal !important;
-}
-
 :global(.home-page.norem .home-leaderboard) {
-  min-height: 78px !important;
-  padding: 10px 30px !important;
-}
-
-:global(.home-page.norem .home-section-title--tight) {
-  margin-bottom: 8px !important;
-}
-
-:global(.home-page.norem .leaderboard-summary-card) {
-  min-height: 64px !important;
-  gap: 12px !important;
-  padding: 12px 14px !important;
-}
-
-:global(.home-page.norem .leaderboard-summary-card__main strong) {
-  font-size: 18px !important;
-  line-height: 22px !important;
-}
-
-:global(.home-page.norem .leaderboard-preview-list) {
-  margin-top: 10px !important;
-}
-
-:global(.home-page.norem .leaderboard-preview-row) {
-  min-height: 62px !important;
-  gap: 12px !important;
-}
-
-:global(.home-page.norem .leaderboard-preview-row__main strong) {
-  font-size: 14px !important;
-  line-height: 18px !important;
-}
-
-:global(.home-page.norem .leaderboard-preview-row__value) {
-  font-size: 14px !important;
+  min-height: 250px !important;
+  padding: 15px 18px 13px !important;
 }
 
 @media (max-width: 430px) {
   :global(.home-page.norem) { padding-right: 16px !important; padding-left: 16px !important; }
-  :global(.home-page.norem .home-earnings-card) { padding-right: 30px !important; padding-left: 30px !important; }
+  :global(.home-page.norem .home-earnings-card) { padding-right: 18px !important; padding-left: 18px !important; }
   :global(.home-page.norem .home-statistics),
   :global(.home-page.norem .home-recent),
-  :global(.home-page.norem .home-leaderboard) { padding-right: 20px !important; padding-left: 20px !important; }
-  :global(.home-page.norem .home-earnings-amount) { font-size: 40px !important; }
-  :global(.home-page.norem .statistics-metric + .statistics-metric) { padding-left: 12px !important; }
-  :global(.home-page.norem .statistics-metric) { padding-right: 8px !important; }
-  :global(.home-page.norem .statistics-metric strong) { font-size: 30px !important; }
+  :global(.home-page.norem .home-leaderboard) { padding-right: 18px !important; padding-left: 18px !important; }
+  :global(.home-page.norem .home-earnings-amount) { font-size: 36px !important; }
+  :global(.home-page.norem .statistics-metric + .statistics-metric) { padding-left: 4px !important; }
+  :global(.home-page.norem .statistics-metric) { grid-template-columns: minmax(0, 1fr) 24px; padding-right: 4px !important; }
+  :global(.home-page.norem .statistics-metric strong) { font-size: 22px !important; }
+  :global(.home-page.norem .statistics-metric i) { width: 24px !important; height: 24px !important; }
 }
 
 @media (max-width: 360px) {
@@ -2026,16 +2111,19 @@ function statusClass(status: string) {
   :global(.home-page.norem .home-header__bell) { width: 42px !important; height: 42px !important; }
   :global(.home-page.norem .home-header__avatar) { width: 48px !important; height: 48px !important; }
   :global(.home-page.norem .home-earnings-card),
-  :global(.home-page.norem .home-statistics),
   :global(.home-page.norem .home-recent),
-  :global(.home-page.norem .home-leaderboard) { padding-right: 16px !important; padding-left: 16px !important; }
-  :global(.home-page.norem .home-earnings-amount) { font-size: 38px !important; }
+  :global(.home-page.norem .home-leaderboard) { padding-right: 18px !important; padding-left: 18px !important; }
+  :global(.home-page.norem .home-statistics) { padding-right: 12px !important; padding-left: 12px !important; }
+  :global(.home-page.norem .home-earnings-amount) { font-size: 34px !important; }
   :global(.home-page.norem .home-earnings-row) { gap: 8px !important; margin-top: 8px !important; padding-top: 8px !important; }
   :global(.home-page.norem .home-earnings-metric__value) { font-size: 15px !important; line-height: 20px !important; }
   :global(.home-page.norem .home-withdraw-button) { min-width: 82px !important; padding: 0 14px !important; }
-  :global(.home-page.norem .statistics-metric) { grid-template-columns: minmax(0, 1fr) 22px; padding-right: 6px !important; }
-  :global(.home-page.norem .statistics-metric + .statistics-metric) { padding-left: 6px !important; }
-  :global(.home-page.norem .statistics-metric i) { width: 22px !important; height: 22px !important; }
+  :global(.home-page.norem .period-tabs.liquid-segmented) { width: 100% !important; flex: 0 0 auto !important; margin-left: 0 !important; }
+  :global(.home-page.norem .statistics-metric) { grid-template-columns: minmax(0, 1fr) 20px; padding-right: 2px !important; }
+  :global(.home-page.norem .statistics-metric + .statistics-metric) { padding-left: 2px !important; }
+  :global(.home-page.norem .statistics-metric strong) { font-size: 22px !important; line-height: 34px !important; }
+  :global(.home-page.norem .statistics-metric i) { width: 20px !important; height: 20px !important; }
   :global(.home-page.norem .recent-lead__status) { max-width: 66px !important; font-size: 10px !important; }
 }
 </style>
+

@@ -82,7 +82,6 @@ const steps = [
   { title: '补充信息' },
   { title: '确认提交' }
 ]
-const currentStepTitle = computed(() => currentStep.value < steps.length ? steps[currentStep.value].title : '提交完成')
 const currentStepBadge = computed(() => currentStep.value < steps.length ? `第 ${currentStep.value + 1} / ${steps.length} 步` : '已完成')
 
 // --- Validation ---
@@ -210,23 +209,32 @@ const showCategoryPicker = ref(false)
 
 const sourceLabel = computed(() => sourceChannels.value.find(s => s.value === form.sourceChannel)?.label || '')
 const categoryLabel = computed(() => leadCategories.value.find(c => c.value === form.leadCategory)?.label || '')
+
+function selectSource(value: string) {
+  form.sourceChannel = value
+  showSourcePicker.value = false
+}
+
+function selectCategory(value: string) {
+  form.leadCategory = value
+  showCategoryPicker.value = false
+}
 </script>
 
 <template>
   <div class="page-container submit-page">
-    <van-nav-bar title="提交客资" />
-
-    <section class="card page-hero submit-hero">
+    <section class="card page-hero submit-hero hero-surface">
       <div class="page-hero__head">
         <div>
           <div class="page-hero__title">提交客资</div>
-          <div class="page-hero__subtitle">按步骤完善客户信息，提交后系统自动分配。</div>
-          <div class="page-hero__meta">
-            <span class="page-chip page-chip--muted">{{ currentStepTitle }}</span>
-          </div>
         </div>
         <div class="page-hero__aside">
           <span class="page-chip">{{ currentStepBadge }}</span>
+          <HelpPopover
+            text="按步骤完善客户信息，提交后系统自动分配。"
+            placement="bottom-end"
+            aria-label="查看提交说明"
+          />
         </div>
       </div>
 
@@ -244,54 +252,67 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
     </van-empty>
 
     <template v-else>
-      <section v-show="currentStep === 0" class="card submit-section">
-        <div class="page-section__head">
-          <div>
-            <div class="page-section__title">客户信息</div>
-            <div class="page-section__subtitle">先把客户基础资料补齐，再进入下一步。</div>
-          </div>
-          <span class="page-chip page-chip--muted">基础信息</span>
-        </div>
+      <section v-show="currentStep === 0" class="card submit-section customer-info-section">
         <div class="submit-form">
           <van-field
             v-model="form.name"
             label="客户姓名"
             placeholder="请输入姓名"
-            required
+            aria-required="true"
             maxlength="100"
             clearable
-          />
+          >
+            <template #label>
+              <span class="h5-required-label">客户姓名</span>
+            </template>
+          </van-field>
           <van-field
             v-model="form.mobile"
-            label="手机号"
             type="tel"
             placeholder="请输入手机号"
             maxlength="11"
             clearable
-          />
+          >
+            <template #label>
+              <span class="contact-field-label">
+                <span>手机号</span>
+                <HelpPopover
+                  text="手机号和微信号至少填一个"
+                  placement="top-start"
+                  aria-label="查看手机号填写说明"
+                  nowrap
+                />
+              </span>
+            </template>
+          </van-field>
           <van-field
             v-model="form.wechatId"
-            label="微信号"
             placeholder="请输入微信号"
             maxlength="64"
             clearable
-          />
-          <div class="field-hint">手机号和微信号至少填一个</div>
-          <div class="field-label">客户地区 <span class="required">*</span></div>
-          <AreaPicker v-model="form.area" :area-tree="areaTree" />
+          >
+            <template #label>
+              <span class="contact-field-label">
+                <span>微信号</span>
+                <HelpPopover
+                  text="手机号和微信号至少填一个"
+                  placement="top-start"
+                  aria-label="查看微信号填写说明"
+                  nowrap
+                />
+              </span>
+            </template>
+          </van-field>
+          <div class="customer-area-field">
+            <div class="customer-area-field__label"><span class="h5-required-label">客户地区</span></div>
+            <AreaPicker v-model="form.area" :area-tree="areaTree" class="customer-area-field__picker" />
+          </div>
         </div>
       </section>
 
       <section v-show="currentStep === 1" class="card submit-section">
-        <div class="page-section__head">
-          <div>
-            <div class="page-section__title">意向课程</div>
-            <div class="page-section__subtitle">至少选择一个课程，并标记一个为主意向。</div>
-          </div>
-          <span class="page-chip page-chip--muted">第 2 步</span>
-        </div>
         <div class="submit-form">
-          <div class="field-label">意向课程 <span class="required">*</span></div>
+          <div class="field-label"><span class="h5-required-label">意向课程</span></div>
           <p class="field-desc">至少选择一个课程，标记一个为主意向</p>
           <ProductPicker
             v-model="form.products"
@@ -303,13 +324,6 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
       </section>
 
       <section v-show="currentStep === 2" class="card submit-section">
-        <div class="page-section__head">
-          <div>
-            <div class="page-section__title">补充信息</div>
-            <div class="page-section__subtitle">补足来源、分类和备注，方便后续跟进。</div>
-          </div>
-          <span class="page-chip page-chip--muted">第 3 步</span>
-        </div>
         <div class="submit-form">
           <van-field
             :model-value="sourceLabel"
@@ -318,7 +332,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             required
             readonly
             clickable
-            right-icon="arrow-down"
+            right-icon="arrow"
             @click="showSourcePicker = true"
           />
           <van-field
@@ -328,7 +342,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             required
             readonly
             clickable
-            right-icon="arrow-down"
+            right-icon="arrow"
             @click="showCategoryPicker = true"
           />
           <van-field
@@ -342,35 +356,64 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             autosize
           />
           <div class="field-label">图片附件</div>
-          <p class="field-desc">可选，最多 9 张，JPG/PNG/WebP</p>
+          <p class="field-desc">可选，最多 9 张，JPG/PNG/WebP，单张不超过 10MB</p>
           <ImageUploader ref="uploaderRef" :max-count="9" />
         </div>
 
-        <van-popup v-model:show="showSourcePicker" position="bottom" round class="submit-picker" safe-area-inset-bottom>
-          <van-picker
-            :columns="sourceChannels.map(s => ({ text: s.label, value: s.value }))"
-            @confirm="({ selectedValues }) => { form.sourceChannel = selectedValues[0] as string; showSourcePicker = false }"
-            @cancel="showSourcePicker = false"
-          />
+        <van-popup v-model:show="showSourcePicker" position="bottom" round teleport="body" class="submit-picker norem" overlay-class="submit-picker-overlay" safe-area-inset-bottom>
+          <div class="submit-choice-sheet">
+            <div class="submit-choice-sheet__header">
+              <strong>选择来源渠道</strong>
+              <button type="button" aria-label="关闭来源渠道选择" title="关闭" @click="showSourcePicker = false">
+                <van-icon name="cross" size="20" />
+              </button>
+            </div>
+            <div v-if="sourceChannels.length" class="submit-choice-sheet__list" role="radiogroup" aria-label="来源渠道">
+              <button
+                v-for="item in sourceChannels"
+                :key="item.value"
+                type="button"
+                role="radio"
+                :aria-checked="form.sourceChannel === item.value"
+                :class="{ 'is-active': form.sourceChannel === item.value }"
+                @click="selectSource(item.value)"
+              >
+                <span>{{ item.label }}</span>
+                <van-icon v-if="form.sourceChannel === item.value" name="success" size="18" />
+              </button>
+            </div>
+            <van-empty v-else image="search" description="来源渠道暂未配置" />
+          </div>
         </van-popup>
 
-        <van-popup v-model:show="showCategoryPicker" position="bottom" round class="submit-picker" safe-area-inset-bottom>
-          <van-picker
-            :columns="leadCategories.map(c => ({ text: c.label, value: c.value }))"
-            @confirm="({ selectedValues }) => { form.leadCategory = selectedValues[0] as string; showCategoryPicker = false }"
-            @cancel="showCategoryPicker = false"
-          />
+        <van-popup v-model:show="showCategoryPicker" position="bottom" round teleport="body" class="submit-picker norem" overlay-class="submit-picker-overlay" safe-area-inset-bottom>
+          <div class="submit-choice-sheet">
+            <div class="submit-choice-sheet__header">
+              <strong>选择客资分类</strong>
+              <button type="button" aria-label="关闭客资分类选择" title="关闭" @click="showCategoryPicker = false">
+                <van-icon name="cross" size="20" />
+              </button>
+            </div>
+            <div v-if="leadCategories.length" class="submit-choice-sheet__list" role="radiogroup" aria-label="客资分类">
+              <button
+                v-for="item in leadCategories"
+                :key="item.value"
+                type="button"
+                role="radio"
+                :aria-checked="form.leadCategory === item.value"
+                :class="{ 'is-active': form.leadCategory === item.value }"
+                @click="selectCategory(item.value)"
+              >
+                <span>{{ item.label }}</span>
+                <van-icon v-if="form.leadCategory === item.value" name="success" size="18" />
+              </button>
+            </div>
+            <van-empty v-else image="search" description="客资分类暂未配置" />
+          </div>
         </van-popup>
       </section>
 
       <section v-show="currentStep === 3" class="card submit-section">
-        <div class="page-section__head">
-          <div>
-            <div class="page-section__title">确认提交</div>
-            <div class="page-section__subtitle">确认无误后提交，系统会自动完成派单。</div>
-          </div>
-          <span class="page-chip page-chip--muted">第 4 步</span>
-        </div>
         <div class="submit-form">
           <div class="confirm-section">
             <div class="confirm-title">客户信息</div>
@@ -461,21 +504,45 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 </template>
 
 <style scoped>
+.submit-page {
+  padding-bottom: 152px;
+}
+
 .submit-hero {
-  margin-top: 12px;
-  padding: 16px;
+  margin-top: 20PX;
+  padding: 14px 16px 12px;
+}
+
+.submit-hero .page-hero__aside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .submit-steps {
-  padding: 0;
+  --van-steps-background: transparent;
+  --van-step-line-color: var(--h5-glass-divider);
+
+  margin-top: 0;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--h5-glass-divider);
 }
 
 .submit-steps :deep(.van-step__title) {
-  font-size: 11px;
+  margin-top: 2px;
+  color: var(--h5-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .submit-steps :deep(.van-step__circle-container) {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  background: transparent;
+}
+
+.submit-steps :deep(.van-step--process .van-step__title) {
+  color: var(--h5-primary);
+  font-weight: 600;
 }
 
 .submit-state {
@@ -487,17 +554,49 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 
 .submit-section {
   gap: 0;
+  margin-top: 12px;
+  padding: 16px 16px 18px;
+}
+
+.customer-info-section {
+  background: var(--h5-content-surface);
 }
 
 .submit-form {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding-top: 4px;
+  padding-top: 6px;
+}
+
+.submit-form :deep(.van-cell) {
+  padding: 13px 0;
+  background: transparent;
+}
+
+.submit-form :deep(.van-field__label) {
+  width: 82px;
+  color: var(--h5-text-primary);
+  font-size: 13px;
+}
+
+.submit-form :deep(.van-field__control) {
+  color: var(--h5-text-primary);
+  font-size: 14px;
+}
+
+.contact-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contact-field-label :deep(.help-popover__button) {
+  margin: -8px -4px -8px -6px;
 }
 
 .field-label {
-  padding: 12px 0 6px;
+  padding: 14px 0 6px;
   font-size: 14px;
   font-weight: 500;
   color: var(--h5-text-primary);
@@ -515,38 +614,167 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
   color: var(--h5-text-placeholder);
 }
 
-.required {
-  color: var(--h5-danger);
+.customer-info-section :deep(.van-field__label),
+.customer-info-section :deep(.van-field__control),
+.customer-info-section .field-label {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.customer-area-field {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+}
+
+.customer-area-field__label {
+  flex: 0 0 82px;
+  margin-right: var(--van-field-label-margin-right);
+  color: var(--h5-text-primary);
+  font-size: 14px;
+}
+
+.customer-area-field__picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.customer-area-field :deep(.van-cell) {
+  min-width: 0;
+  padding: 13px 0;
+  border-bottom: 0;
+}
+
+.customer-area-field :deep(.van-field__control) {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .submit-picker {
-  right: auto;
-  left: 50%;
+  right: 0;
+  left: 0;
+  width: min(100%, 10rem);
+  max-height: min(64dvh, 560px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--h5-glass-border);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: color-mix(in srgb, var(--h5-card-bg) 74%, transparent);
+  box-shadow: var(--h5-glass-shadow-floating);
+  backdrop-filter: saturate(170%) blur(var(--h5-glass-blur-strong));
+  -webkit-backdrop-filter: saturate(170%) blur(var(--h5-glass-blur-strong));
+}
+
+.submit-choice-sheet {
+  display: flex;
+  max-height: min(64dvh, 560px);
+  flex-direction: column;
+  background: transparent;
+}
+
+.submit-choice-sheet::before {
+  width: 32px;
+  height: 3px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--h5-glass-divider);
+  content: '';
+}
+
+.submit-choice-sheet__header {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px 20px;
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: transparent;
+}
+
+.submit-choice-sheet__header strong {
+  color: var(--h5-text-primary);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.submit-choice-sheet__header button {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--h5-glass-sunken);
+  color: var(--h5-text-secondary);
+}
+
+.submit-choice-sheet__list {
+  min-height: 0;
+  padding: 6px 16px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: transparent;
+}
+
+.submit-choice-sheet__list button {
+  display: flex;
   width: 100%;
-  max-width: 10rem;
-  transform: translate3d(-50%, 0, 0);
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--h5-glass-divider);
+  background: transparent;
+  color: var(--h5-text-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+}
+
+.submit-choice-sheet__list button.is-active {
+  border-radius: 10px;
+  background: var(--h5-primary-opacity);
+  color: var(--h5-primary);
+  font-weight: 600;
 }
 
 .submit-actions {
   position: fixed;
-  right: 16px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
-  left: 16px;
+  right: 0;
+  bottom: 66px;
+  left: 0;
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--h5-border);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--h5-card-bg) 96%, transparent);
-  box-shadow: 0 10px 28px rgba(31, 35, 48, 0.08);
+  min-height: 64px;
+  padding: 10px 16px;
+  border-top: 0;
+  background: transparent;
+  box-shadow: none;
   z-index: 10;
-  backdrop-filter: blur(14px);
 }
 
 .submit-actions .van-button {
-  flex: 1;
+  width: auto;
   min-width: 0;
+  flex: 1 1 0;
   height: 44px;
+}
+
+.submit-actions .van-button:only-child {
+  flex: 0 1 320px;
+  width: min(100%, 320px);
 }
 
 .confirm-section {
@@ -571,12 +799,14 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 .confirm-row {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  gap: 12px;
+  padding: 6px 0;
   font-size: 13px;
   line-height: 1.45;
 }
 
 .confirm-label {
+  flex: 0 0 52px;
   color: var(--h5-text-secondary);
 }
 
@@ -618,7 +848,8 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 }
 
 .submit-result {
-  padding: 28px 20px;
+  margin-top: 20px;
+  padding: 32px 20px;
   text-align: center;
 }
 
@@ -659,5 +890,17 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 .submit-result__actions .van-button {
   flex: 1;
   min-width: 0;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .submit-actions { background: transparent; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .submit-actions {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 </style>

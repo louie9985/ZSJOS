@@ -1,4 +1,4 @@
-import type { LeaderboardData, LeaderboardMember, LeaderboardValueUnit } from '@/api/leaderboard'
+import type { LeaderboardData, LeaderboardMember, LeaderboardPeriod, LeaderboardValueUnit } from '@/api/leaderboard'
 
 export type LeaderboardTone = 'idle' | 'champion' | 'tie' | 'chase' | 'unranked'
 
@@ -7,11 +7,17 @@ export interface LeaderboardChaseText {
   secondary: string
   tone: LeaderboardTone
 }
-
 export interface LeaderboardGroup {
   rank: number
   members: LeaderboardMember[]
   totalTied: number
+}
+
+const leaderboardPeriodLabels: Record<LeaderboardPeriod, string> = {
+  today: '日榜',
+  week: '周榜',
+  month: '月榜',
+  total: '总榜'
 }
 
 function isZeroGap(displayValue?: string, value?: number | null) {
@@ -26,6 +32,16 @@ function numericDiff(a: number | undefined, b: number | undefined) {
 export function formatLeaderboardValue(value: number | undefined | null, unit: LeaderboardValueUnit = 'money') {
   if (value == null) return '--'
   return unit === 'count' ? `${Math.round(value)} 条` : `¥${value.toFixed(2)}`
+}
+
+export function formatLeaderboardTitle(label?: string | null) {
+  const normalized = label?.trim()
+  if (!normalized) return '排行榜'
+  return normalized.endsWith('榜') ? normalized : `${normalized}榜`
+}
+
+export function formatLeaderboardPeriodLabel(period?: LeaderboardPeriod | null) {
+  return period ? leaderboardPeriodLabels[period] : ''
 }
 
 export function formatLeaderboardChase(data?: LeaderboardData | null): LeaderboardChaseText {
@@ -111,8 +127,4 @@ export function groupTop3ByRank(top3: LeaderboardMember[] | undefined, list: Lea
   })
 
   return groups.sort((a, b) => a.rank - b.rank)
-}
-
-export function leaderboardMemberInitial(name: string | undefined) {
-  return (name || '*').trim().charAt(0) || '*'
 }

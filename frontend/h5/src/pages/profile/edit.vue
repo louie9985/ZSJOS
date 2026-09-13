@@ -36,15 +36,23 @@ async function handleSave() {
 </script>
 
 <template>
-  <div class="page-container">
-    <van-nav-bar title="个人资料" left-arrow @click-left="$router.back()" />
+  <div class="page-container my-subpage-page profile-form-page">
+    <van-nav-bar class="my-subpage__nav" title="个人资料" left-arrow @click-left="$router.back()" />
     <van-skeleton :loading="loading" :row="4" style="padding: 16px;">
-      <div class="card">
+      <div class="card profile-form-card">
         <van-field v-model="form.avatar" label="头像地址" placeholder="可填写图片地址" clearable />
         <van-field v-model="form.nickname" label="昵称" placeholder="请输入昵称" required clearable />
         <van-field v-model="form.mobile" label="手机号" type="tel" readonly />
         <van-field v-model="form.email" label="邮箱" type="email" placeholder="请输入邮箱" clearable />
-        <van-cell title="性别"><template #value><van-radio-group v-model="form.sex" direction="horizontal"><van-radio :name="0">未知</van-radio><van-radio :name="1">男</van-radio><van-radio :name="2">女</van-radio></van-radio-group></template></van-cell>
+        <van-field label="性别">
+          <template #input>
+            <van-radio-group v-model="form.sex" class="profile-sex-group" direction="horizontal">
+              <van-radio :name="0">未知</van-radio>
+              <van-radio :name="1">男</van-radio>
+              <van-radio :name="2">女</van-radio>
+            </van-radio-group>
+          </template>
+        </van-field>
       </div>
       <div style="padding: 24px 16px;">
         <van-button type="primary" block round :loading="submitting" @click="handleSave">保存</van-button>
@@ -52,3 +60,19 @@ async function handleSave() {
     </van-skeleton>
   </div>
 </template>
+
+<style scoped>
+.profile-form-page .profile-form-card {
+  background: var(--h5-content-surface);
+}
+
+.profile-sex-group {
+  width: 100%;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.profile-sex-group :deep(.van-radio--horizontal) {
+  margin-right: 0;
+}
+</style>

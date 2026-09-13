@@ -71,11 +71,11 @@ Token 恢复由 HTTP 客户端内部单航班完成。普通业务请求的 HTTP
 
 来源和分类不使用前端静态值。分别调用 `GET /app-api/system/dict-data/type?type=zsjos_lead_source_channel` 和 `GET /app-api/system/dict-data/type?type=zsjos_lead_category` 获取启用项。
 
-兼职端首页的“客资跟进提醒”进入独立 `/lead/follow-up` 页面；该页面读取 `/lead/inbox/submitted/summary`，返回 `followUpPendingCount`、`unreachableCount` 和 `invalidCount`，并在页面内按三个分类分别分页，不跳转或复用“我的客资”主列表页面状态。分页接口支持服务端视图参数 `view=follow_up_pending|unreachable|invalid`：待跟进覆盖待首跟、待判定和有效后仍在跟进，未联系上取 Lead 与 Opportunity 合并后的最新跟进结果 `unreachable`，已判无效取当前 `lead.status=invalid`。三个统计允许同一客资重叠，均限定当前 Partner 的客资范围；前端不得自行拼接状态条件。
+兼职端首页的“客资跟进提醒”以待跟进、未联系上、已判无效三个分区显示数量，点击分区进入独立 `/lead/follow-up?view=follow_up_pending|unreachable|invalid` 页面并直接选中对应分类；缺失或非法 `view` 时回退到 `follow_up_pending`。该页面读取 `/lead/inbox/submitted/summary`，返回 `followUpPendingCount`、`unreachableCount` 和 `invalidCount`，并在页面内按三个分类分别分页，不跳转或复用“我的客资”主列表页面状态。分页接口支持服务端视图参数 `view=follow_up_pending|unreachable|invalid`：待跟进覆盖待首跟、待判定和有效后仍在跟进，未联系上取 Lead 与 Opportunity 合并后的最新跟进结果 `unreachable`，已判无效取当前 `lead.status=invalid`。三个统计允许同一客资重叠，均限定当前 Partner 的客资范围；前端不得自行拼接状态条件。
 
 `availableActions` 的结构为 `{ code, enabled }[]`。H5 只消费启用的大写编码：`SUBMITTER_SUPPLEMENT`、`URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`。补充资料先读取详情并提交省、市、分类和至少一个产品的完整替换载荷。所有用户可见客资编号只展示 `leadNo`；缺失时显示“客资编号暂未生成”，不得回退到 `id` 或 `leadId`。
 
-H5 在 `/complaints` 提供本人投诉记录分页页，入口仅对具备 `zsjos:lead-complaint:create` 的账号展示，直接访问也由路由守卫校验。列表覆盖加载、空数据、错误重试和下拉刷新状态，并继续以 `leadNo` 展示客资编号。
+H5 在 `/complaints` 提供本人投诉记录分页页，入口仅对具备 `zsjos:lead-complaint:create` 的账号展示，直接访问也由路由守卫校验。列表覆盖加载、空数据、错误重试和下拉刷新状态，并继续以 `leadNo` 展示客资编号。`pending` 展示为“待处理”，`handled` 按 `result` 展示“投诉成立”或“投诉不成立”；投诉证据和处理证据使用接口返回的临时读取 URL 预览，URL 缺失时保留文件名但不允许打开。
 
 `partner-activity` 只返回 Partner 可见的当前状态、时间线、跟进摘要、返现、投诉和订单投影；不得下发销售、主管、审核人、部门、派单规则或内部备注。成交返现订单区只展示与返现 `orderId` 精确匹配的真实订单。
 

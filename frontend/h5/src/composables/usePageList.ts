@@ -27,6 +27,7 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
   const pageNo = ref(1)
   const total = ref(0)
   const error = ref('')
+  let requestVersion = 0
 
   function getParams(): P {
     if (!extraParams) return {} as P
@@ -36,37 +37,46 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
 
   async function loadMore() {
     if (loading.value || finished.value) return
+    const version = requestVersion
+    const currentPageNo = pageNo.value
     loading.value = true
     error.value = ''
     try {
-      const params = { ...getParams(), pageNo: pageNo.value, pageSize } as P & { pageNo: number; pageSize: number }
+      const params = { ...getParams(), pageNo: currentPageNo, pageSize } as P & { pageNo: number; pageSize: number }
       const result = await apiFn(params)
-      if (pageNo.value === 1) {
+      if (version !== requestVersion) return
+      if (currentPageNo === 1) {
         list.value = result.list
       } else {
         list.value.push(...result.list)
       }
       total.value = result.total
       finished.value = list.value.length >= result.total
-      pageNo.value++
+      pageNo.value = currentPageNo + 1
     } catch (cause) {
+      if (version !== requestVersion) return
       error.value = cause instanceof Error ? cause.message : '加载失败'
       finished.value = true
     } finally {
-      loading.value = false
+      if (version === requestVersion) loading.value = false
     }
   }
 
   async function refresh() {
+    const version = ++requestVersion
     refreshing.value = true
+    loading.value = false
     pageNo.value = 1
     finished.value = false
     list.value = []
     await loadMore()
-    refreshing.value = false
+    if (version === requestVersion) refreshing.value = false
   }
 
   function reset() {
+    requestVersion++
+    loading.value = false
+    refreshing.value = false
     pageNo.value = 1
     finished.value = false
     list.value = []

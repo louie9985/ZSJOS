@@ -55,7 +55,7 @@ export function getMyCards() {
 
 /** 新增银行卡 */
 export function addCard(data: { accountName: string; cardNumber: string; bankName: string; branchName: string }) {
-  return request.post<never, void>('/zsjos/withdrawal/my-cards', data)
+  return request.post<never, number>('/zsjos/withdrawal/my-cards', data)
 }
 
 /** 删除银行卡 */

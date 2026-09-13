@@ -103,6 +103,14 @@ class LeadManagementServiceImplTest {
     private BusinessTaskMapper businessTaskMapper;
 
     @Test
+    void formatSelectedAttrValues_shouldExposeOnlySnapshotValues() {
+        assertEquals("普通班 · 2年", LeadManagementServiceImpl.formatSelectedAttrValues(
+                "{\"attr班型\":\"普通班\",\"attr周期\":\"2年\"}"));
+        assertNull(LeadManagementServiceImpl.formatSelectedAttrValues("{not-json"));
+        assertNull(LeadManagementServiceImpl.formatSelectedAttrValues("{}"));
+    }
+
+    @Test
     void resolvePartnerActions_shouldExposeSubmitterActionsForActiveOwnLead() {
         LeadDO lead = new LeadDO().setProviderOwnerType("partner").setProviderOwnerId(10L)
                 .setStatus("valid").setOwnerUserId(20L);

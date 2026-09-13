@@ -61,7 +61,7 @@ onMounted(async () => {
 <style scoped>
 .wecom-click-page {
   min-height: 100vh;
-  background: var(--h5-bg);
+  background: transparent;
 }
 
 .wecom-click-loading {

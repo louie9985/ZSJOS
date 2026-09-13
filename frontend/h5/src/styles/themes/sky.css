@@ -5,7 +5,9 @@
   --h5-primary-dark: #3578C0;
   --h5-primary-opacity: rgba(74, 144, 217, 0.1);
   --h5-gradient: linear-gradient(135deg, #4A90D9 0%, #6BAAEE 100%);
-  --h5-bg: #F5F9FD;
+  --h5-canvas-base: #F8FCFF;
+  --h5-canvas-tint: #EBF6FF;
+  --h5-bg: var(--h5-canvas-base);
   --h5-card-bg: #FFFFFF;
   --h5-text-primary: #1A1A1A;
   --h5-text-secondary: #666666;
@@ -18,8 +20,8 @@
   --h5-info: #1890FF;
 
   --van-primary-color: #4A90D9;
-  --van-background: #F5F9FD;
-  --van-background-2: #FFFFFF;
+  --van-background: var(--h5-canvas-base);
+  --van-background-2: var(--h5-glass-surface-strong);
   --van-text-color: #1A1A1A;
   --van-text-color-2: #666666;
   --van-text-color-3: #BFBFBF;

@@ -413,6 +413,15 @@ file
 }
 ```
 
+前端上传约束：
+
+```
+支持 JPG、PNG、WebP；最多 9 张；单张不超过 10MB。
+选择文件后立即按顺序上传，界面展示排队、上传百分比、服务端处理中、完成或失败状态。
+请求超时（60 秒）、网络/权限/格式/大小错误必须保留可执行的失败提示和重试入口。
+取消或删除上传中的文件不会进入最终提交；只有获得有效 infraFileId 的完成项才能写入创建客资请求。
+```
+
 创建客资时使用返回的 `infraFileId`。
 
 ## 六、提交客资
@@ -480,6 +489,20 @@ spuUnknown: 是否未知 SPU
 skuUnknown: 是否未知 SKU
 primary: 是否主意向课程
 ```
+
+课程已经明确、具体班次或方案尚未明确时，不需要选择 SKU，按以下方式提交：
+
+```json
+{
+  "spuRef": "SPU001",
+  "skuRef": null,
+  "spuUnknown": false,
+  "skuUnknown": true,
+  "primary": true
+}
+```
+
+此场景保留所选课程，规格、属性和价格由后续业务环节确认；它与 `spuUnknown=true` 的“未明确课程”不同。
 
 限制：
 
@@ -566,6 +589,8 @@ GET /part-api/zsjos/lead/get?id={leadId}
 ```
 
 只能查看当前 Partner 所属的客资。详情响应中的 `visibleTabs` 和 `availableActions` 由服务端按 Partner 对象归属与客资状态投影，H5 不按角色名称或本地静态权限推断。Partner 客资详情通常返回 `overview`、`follow-ups`、`complaints`、`appeals`、`orders`、`flow-history` 标签；可用操作使用 `SUBMITTER_SUPPLEMENT`、`SUBMITTER_URGE`、`SUBMITTER_COMPLAINT` 和无效客资的 `CREATE_APPEAL` 编码。
+
+详情中的意向课程属性 `selectedAttrValues` 为服务端根据提交时保存的属性快照生成的可读值文本（多个属性使用“ · ”分隔），前端不得直接展示属性 JSON 或属性内部键；历史快照无法解析时该字段为空。
 
 所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。现有后端的催办/投诉动作编码为 `SUBMITTER_URGE`、`SUBMITTER_COMPLAINT`，H5 兼容这两个编码，同时支持后续统一契约 `URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`；前端不根据状态自行补显示写操作按钮。
 
@@ -679,7 +704,7 @@ pageSize
 status
 ```
 
-返回投诉记录和处理结果。
+返回投诉记录和处理结果。H5 将 `pending` 展示为“待处理”，将 `handled` 按 `result` 展示为“投诉成立”或“投诉不成立”；投诉证据和处理证据使用返回的临时读取 URL 预览，URL 缺失时保留文件名但不允许打开。
 
 ## 九、申诉
 
