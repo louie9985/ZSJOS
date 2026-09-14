@@ -39,6 +39,34 @@ class StudentServiceObjectPermissionProviderTest {
     }
 
     @Test
+    void serviceOwnerWhoIsAlsoDirectorRetainsDirectorActions() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(7L); relation.setContentDirectorUserId(7L);
+        relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        assertTrue(provider.hasPermission(10L,"director-precheck",7L));
+        assertTrue(provider.hasPermission(10L,"director-interview",7L));
+        relation.setContentDirectorUserId(8L);
+        assertFalse(provider.hasPermission(10L,"director-interview",7L));
+    }
+
+    @Test
+    void mediaAccountCreationRequiresCurrentAcceptedDirectorOrOperator() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(6L); relation.setContentDirectorUserId(7L);
+        relation.setOperatorUserId(8L); relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+
+        assertTrue(provider.hasPermission(10L, "create-account", 7L));
+        assertFalse(provider.hasPermission(10L, "create-account", 6L));
+        assertTrue(provider.hasPermission(10L, "create-account", 8L));
+
+        relation.setAcceptanceStatus("pending");
+        assertFalse(provider.hasPermission(10L, "create-account", 7L));
+        assertFalse(provider.hasPermission(10L, "create-account", 8L));
+    }
+
+    @Test
     void assignedOperatorCanOnlyReadAcceptedServiceAcrossReadableStatuses() {
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(10L); relation.setOwnerUserId(7L); relation.setOperatorUserId(9L);

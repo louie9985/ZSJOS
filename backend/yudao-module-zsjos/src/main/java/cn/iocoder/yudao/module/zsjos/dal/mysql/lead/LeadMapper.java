@@ -33,6 +33,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    @Select("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} AND counted_at >= #{from}")
+    long countPartnerLeadsSince(@Param("tenantId") Long tenantId, @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from);
     static void advanceActivity(LeadDO lead, LocalDateTime activityAt) {
         if (lead == null || activityAt == null) return;
         if (lead.getLastActivityAt() == null || activityAt.isAfter(lead.getLastActivityAt())) {

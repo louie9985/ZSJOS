@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.account.vo;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -8,10 +10,14 @@ import java.util.Map;
 
 @Data
 public class MediaAccountSaveReqVO {
-    private Long studentPersonId;
+    @NotNull private Long studentPersonId;
+    @NotNull private Long serviceRelationId;
+    @NotNull @PositiveOrZero private Integer version;
+    @NotBlank @Size(max = 128) private String idempotencyKey;
     private Long directorUserId;
-    @NotBlank private String platformValue;
-    @NotBlank private String platformLabelSnapshot;
+    /** Account creation establishes the relation first; platform/profile fields may be completed later. */
+    private String platformValue;
+    private String platformLabelSnapshot;
     private String platformAccountId;
     private String nickname;
     private String leadDirection;

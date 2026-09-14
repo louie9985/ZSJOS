@@ -1051,12 +1051,12 @@ Rollback is forward-only because removing the columns would discard new business
 
 ### V194 Material library, content review, and student Partner invitations
 
-V194 follows the existing V193 sales-order migration and continues the material-library workstream. It creates the
+V194 follows the existing V193 delivery-class access repair and continues the material-library workstream. It creates the
 tenant-scoped material type, immutable schema and content version, search/index projection, file snapshot, approval
 round, like, favorite, reference, Excel import, and content-review batch tables. It extends content versions with
 the complete pre-publication package snapshot and extends Partner invitations with a separate student-bound scene.
 
-The migration registers four confirmed material types, two empty administrator-maintained dictionary types,
+The migration registers four confirmed material types, one empty administrator-maintained dictionary type,
 configurable menu/button permissions, and tenant-package coverage. Existing active grants to the retired
 standalone content page `6974` are copied to the material-library parent and content-production page by
 role-menu identity, without granting any named role broader access. The application initializer creates the
@@ -1067,9 +1067,88 @@ run a BPM process. Student invitations keep the editable registration name/mobil
 student snapshots and enforce one active student invitation per tenant. Recovery is forward-only after business
 versions exist: retain data and hide the relevant menus in a later reviewed migration.
 
-### V195 Delivery class access repair
+#### V194 replay after V198 (development baseline correction)
 
-V195 follows V194 and makes the existing student route visible as `学员管理`, grants it to roles with an active
-delivery-class entry, and removes the accidental managed-scope grant from roles that retain the legacy personal-class
-capability. It changes only System menu, role-menu, tenant-package, and schema-version metadata; no class, student,
-service, or account rows are changed. The script is UTF-8, repeatable, and forward-only.
+V198 creates Workbench pages `80041` (`viral-account-decompose`) and `80042`
+(`viral-content-decompose`), both intentionally using `zsjos:material:create`.
+The earlier V194 guard treated these legitimate successor pages as foreign permission
+owners and raised `V194 permission is already owned by another menu` on replay.
+The corrected guard permits only those IDs with the V198 permission, parent `6735`,
+page type, path, component, component name, and native render mode. Other collisions
+continue to fail before DDL or data updates. It does not change permissions or grants.
+
+This is an in-place correction for the active development baseline, not an instruction
+to replace an immutable migration in an already deployed release. The existing V185
+registry and menu prerequisites remain mandatory. Run migrations in numeric order
+(`V193 -> V194 -> V195 -> ... -> V206`), not an IDE's arbitrary multi-file selection order.
+After a partial batch failure, inspect actual schema and both registries before retrying;
+later successful version markers do not prove every earlier migration succeeded.
+If V194 is already complete, this guard defect requires no corrective data update.
+Do not replay all historical migrations merely to repair a failed guard: V194's existing
+menu upserts can restore baseline labels and settings. Recovery remains forward-only;
+this correction neither deletes business data nor reconstructs prior administrator edits.
+
+Run `python script/sql/mysql/tools/test_v194_replay.py` for controlled MySQL coverage of
+fresh initialization, V194 before and after V198, repeated replay, UTF-8 label bytes,
+unchanged successor menu definitions, and rejection of genuine ID/permission conflicts.
+The test creates and removes only its own disposable MySQL container.
+
+### V195 Sales-order management unification
+
+V195 unifies personal/team sales-order menus, permissions, and advanced-filter templates. It changes only menu,
+role-menu, and filter-template metadata; no order rows are changed. The script is UTF-8, repeatable, and requires
+the V193 and V194 baseline migrations.
+
+### V196 Lead qualification timing from ownership
+
+V196 follows V195 and starts Lead qualification timing from the current ownership timestamp. It backfills only
+submitted, owned Leads that have an ownership timestamp and no qualification deadline. The migration creates the
+next qualification round, task, and start event with tenant-scoped idempotency keys; it does not restore public-pool
+or closed historical Leads. Generated qualification facts are durable audit history, so rollback is application-only.
+### V197 Lead submitter supplement materials
+
+V197 adds the `zsjos.lead.submitter_supplemented` in-app notification template and a tenant-scoped
+owner recipient rule. The append-only supplement event stores normalized text and immutable image
+metadata; it does not alter submitted Lead attributes or create a new business table. The script sets
+`utf8mb4`, is repeatable through guarded inserts and schema-version upserts, and depends on V196 and the
+existing notification tables. Rollback is forward-only: disable the rule while retaining delivered messages.
+## V198 viral content decompose
+
+`V198__viral_content_decompose.sql` follows V197. It adds the two direct Workbench creation pages,
+renames the stable `viral_content` type display to 爆款内容, and seeds only the confirmed
+`zsjos_viral_content_type` dictionary values. It changes no material record and is repeatable by stable
+menu IDs and dictionary values. Rollback is forward-only: hide the menus and dictionary entries rather
+than deleting values referenced by snapshots.
+
+### V203-V204 Positioning interview and account creation boundary
+
+V203 adds the student-level positioning-interview tables, the published default outline, and configurable
+operation permissions without converting historical interview or positioning-card records. V204 adds nullable
+creation-command metadata and a tenant-scoped idempotency key to `zsjos_media_account`. Existing accounts remain
+unchanged; new account commands can be replayed safely only when the caller still owns the referenced active
+student service and the positioning interview is complete. Both migrations are UTF-8 and repeatable. Rollback is
+forward-only after new interview or account-command records exist; disable the related operations while retaining
+their audit data.
+
+### V208 Viral-account template V3
+
+`V208__viral_account_template_v3.sql` follows V207 in release order, requires the V194 material tables
+and their two registry records, and publishes the corrected immutable
+`viral_account` template from the confirmed V2 content. It keeps 36 top-level fields, assigns 12 fields
+to each of `ACCOUNT_DETAIL`, `DIRECTOR_ANALYSIS`, and `BUILD_SUGGESTION`, places 搭建注意 at the
+end of the director section, and uses stable `s1_stage_plan` through `s6_stage_plan` keys.
+
+The migration upgrades only an empty schema set or either known application-owned V1/V2 hash. An unknown
+current hash is treated as a tenant customization and is left untouched. Existing canonical versions are
+reused, historical schema and material rows are retained, and replay does not create another version.
+Rollback is forward-only after a material references V3; recovery requires relinking the retained archived
+version. Run `python script/sql/mysql/tools/test_v208_replay.py` for disposable MySQL coverage of all
+supported predecessor states, custom-hash preservation, UTF-8 bytes, and repeatability.
+
+### V209 Account profile
+
+`V209__media_account_profile.sql` follows V208. Adds append-only profile entries, nullable empty-account columns, 57 responsibility-configured fields and two empty dictionary types. The development-baseline correction sources `permissions/media-account-profile-query.sql`: adds a query button under media students and grants it only from existing edit/maintenance/query-all capabilities; extends packages containing the parent. No business dictionary entries are assigned. Existing V209 development DBs can run that scoped file alone after grant review. Existing accounts/snapshots/drafts remain intact; stale drafts must be explicitly reconciled before publish. Repeated execution preserves the published version. Rollback requires reverting application/config together while retaining audit rows. Controlled check: `python script/sql/mysql/tools/test_v209_replay.py`; read-only checks: `script/sql/mysql/verify-media-account-profile.sql`. See `docs/api/media-account-profile.md`.
+
+### V211 Media account operation reset
+
+`V211__reset_media_account_operation_data.sql` is an explicitly authorized development reset. It deletes all positioning cards/submissions/versions/confirmation links/execution cards, account profile entries, content/version rows and production tickets/commands/items linked to existing media accounts. It preserves media accounts, students, service relations, partner accounts and partner metrics. Export the affected tables before execution; the operation is irreversible and must be run only after scoped row-count review.

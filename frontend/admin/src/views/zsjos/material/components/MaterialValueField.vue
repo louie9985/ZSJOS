@@ -176,7 +176,7 @@
           </el-button>
         </div>
       </div>
-      <el-upload
+      <ClipboardUploadActions :disabled="readonly || uploading || selectedFiles.length >= (field.maxCount || 20)" :can-paste="!readonly && !uploading && selectedFiles.length < (field.maxCount || 20)" @files="handlePasteFiles"><el-upload
         v-if="!readonly"
         :show-file-list="false"
         :http-request="upload"
@@ -184,9 +184,9 @@
         :disabled="uploading || selectedFiles.length >= (field.maxCount || 20)"
       >
         <el-button :loading="uploading" type="primary" plain>
-          <Icon icon="ep:upload" class="mr-4px" />上传{{ field.label }}
+          <Icon icon="ep:upload" class="mr-4px" />上传附件
         </el-button>
-      </el-upload>
+      </el-upload></ClipboardUploadActions>
     </div>
   </el-form-item>
 </template>
@@ -195,6 +195,7 @@
 import type { UploadRequestOptions } from 'element-plus'
 import { Editor } from '@/components/Editor'
 import { uploadMaterialFile, type MaterialFieldDefinition, type MaterialFile } from '@/api/zsjos/material'
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 
 defineOptions({ name: 'MaterialValueField' })
 
@@ -217,6 +218,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>()
 const message = useMessage()
 const uploading = ref(false)
 const uploadedFiles = ref<MaterialFile[]>([])
+const handlePasteFiles = (files: File[]) => { const file = files[0]; if (file) void upload({ file } as UploadRequestOptions) }
 
 const fieldPath = computed(() => props.fieldPath || props.field.key)
 const rows = computed<Record<string, unknown>[]>(() =>

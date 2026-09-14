@@ -41,7 +41,7 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
 
     private static final Map<String, DefaultType> DEFAULT_TYPES = Map.of(
             "viral_account", new DefaultType("爆款账号", "爆款账号拆解内容包", true, true, false, true),
-            "viral_content", new DefaultType("爆款视频/图文", "爆款视频或图文拆解内容包", true, true, false, true),
+            "viral_content", new DefaultType("爆款内容", "爆款内容拆解内容包", true, true, false, true),
             "sop", new DefaultType("SOP", "可检索、可引用的标准作业参考文档", true, true, false, false),
             "production_content", new DefaultType("生产内容", "审核通过并明确收录的生产内容", false, false, true, true));
 
@@ -251,13 +251,21 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
     }
 
     private void ensureDefaultSchema(MaterialTypeDO type) {
-        if (!"viral_account".equals(type.getCode()) || type.getCurrentSchemaVersionId() != null) {
+        if (!List.of("viral_account", "viral_content").contains(type.getCode())
+                || type.getCurrentSchemaVersionId() != null) {
             return;
         }
-        if (schemaMapper.selectLatestByTypeId(type.getId()) != null) {
+        MaterialSchemaVersionDO existing = schemaMapper.selectLatestByTypeId(type.getId());
+        if (existing != null) {
+            // Re-link a schema whose guarded publish lost the version race on an earlier attempt,
+            // otherwise the type stays unlinked forever and every create fails.
+            if (typeMapper.publishSchema(type.getId(), type.getVersion(), existing.getId()) == 1) {
+                type.setCurrentSchemaVersionId(existing.getId());
+            }
             return;
         }
-        List<MaterialFieldDefinition> fields = ViralAccountMaterialSchema.fields();
+        List<MaterialFieldDefinition> fields = "viral_content".equals(type.getCode())
+                ? ViralContentMaterialSchema.fields() : ViralAccountMaterialSchema.fields();
         String fieldsJson = JsonUtils.toJsonString(fields);
         MaterialSchemaVersionDO schema = new MaterialSchemaVersionDO();
         schema.setMaterialTypeId(type.getId());
@@ -268,8 +276,10 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
         schema.setPublishedAt(LocalDateTime.now());
         schema.setVersion(0);
         schemaMapper.insert(schema);
-        typeMapper.publishSchema(type.getId(), type.getVersion(), schema.getId());
-        type.setCurrentSchemaVersionId(schema.getId());
+        // Only mark the type linked when the guarded update actually matched; a lost race is repaired above.
+        if (typeMapper.publishSchema(type.getId(), type.getVersion(), schema.getId()) == 1) {
+            type.setCurrentSchemaVersionId(schema.getId());
+        }
     }
 
     private void validateProcessDefinition(String processDefinitionKey) {

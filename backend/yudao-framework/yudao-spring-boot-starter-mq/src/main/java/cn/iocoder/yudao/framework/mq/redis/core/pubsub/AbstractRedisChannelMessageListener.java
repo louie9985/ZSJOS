@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.framework.mq.redis.core.pubsub;
 
 import cn.hutool.core.util.TypeUtil;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContextHolder;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditRunner;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.mq.redis.core.RedisMQTemplate;
 import cn.iocoder.yudao.framework.mq.redis.core.interceptor.RedisMessageInterceptor;
@@ -12,6 +16,8 @@ import org.springframework.data.redis.connection.MessageListener;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * Redis Pub/Sub 监听器抽象类，用于实现广播消费
@@ -35,6 +41,9 @@ public abstract class AbstractRedisChannelMessageListener<T extends AbstractRedi
      */
     @Setter
     private RedisMQTemplate redisMQTemplate;
+    /** Optional business integration hooks; empty when no audit implementation is present. */
+    @Setter
+    private List<ExecutionAuditHook> executionAuditHooks = Collections.emptyList();
 
     @SneakyThrows
     protected AbstractRedisChannelMessageListener() {
@@ -55,11 +64,20 @@ public abstract class AbstractRedisChannelMessageListener<T extends AbstractRedi
     public final void onMessage(Message message, byte[] bytes) {
         T messageObj = JsonUtils.parseObject(message.getBody(), messageType);
         try {
-            consumeMessageBefore(messageObj);
-            // 消费消息
-            this.onMessage(messageObj);
-        } finally {
-            consumeMessageAfter(messageObj);
+            ExecutionAuditContext parent = ExecutionAuditContextHolder.get();
+            ExecutionAuditContext context = new ExecutionAuditContext("SYSTEM_REDIS_PUBSUB", channel,
+                    parent == null ? null : parent.traceId(), parent == null ? null : parent.parentAuditId(),
+                    parent == null ? null : parent.initiatorUserId(), parent == null ? null : parent.initiatorName(),
+                    parent == null ? null : parent.tenantId(),
+                    Map.of("messageType", messageType.getName()));
+            ExecutionAuditRunner.run(context, executionAuditHooks, () -> {
+                consumeMessageBefore(messageObj);
+                try { this.onMessage(messageObj); }
+                finally { consumeMessageAfter(messageObj); }
+                return null;
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Redis Pub/Sub message consumption failed", ex);
         }
     }
 

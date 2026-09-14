@@ -8,8 +8,19 @@ export type FieldType =
   | 'select'
   | 'multi_select'
   | 'boolean'
+  | 'image'
+  | 'attachment'
+  | 'materials'
+  | 'record'
+  | 'url'
 
 export interface AccountField {
+  referenceFor?: string
+  materialTypeCode?: string
+  defaultPlatform?: string
+  defaultAccountStage?: string
+  recommendedCount?: string
+  description?: string
   key: string
   label: string
   type: FieldType
@@ -18,6 +29,12 @@ export interface AccountField {
   sort: number
   dictType?: string
   searchable: boolean
+  ownerType: 'AUTO' | 'DIRECTOR' | 'OPERATOR' | 'UNASSIGNED'
+  group: 'PROFILE' | 'POSITIONING' | 'STATUS' | 'METRICS' | 'REVIEW'
+  sourceType: 'MANUAL' | 'ACCOUNT' | 'STUDENT' | 'PENDING'
+  requiredForCreate: false
+  requiredForComplete: boolean
+  snapshotPolicy: 'ON_SELECTION'
 }
 
 export interface ConfigVersion {
@@ -38,7 +55,10 @@ export const getAccountFieldConfig = () =>
   request.get<AccountFieldConfig>({ url: '/zsjos/media-account-field-config' })
 
 export const copyAccountFieldDraft = (id: number, version: number) =>
-  request.post<number>({ url: '/zsjos/media-account-field-config/draft/copy', data: { id, version } })
+  request.post<number>({
+    url: '/zsjos/media-account-field-config/draft/copy',
+    data: { id, version }
+  })
 
 export const saveAccountFieldDraft = (data: {
   id: number
@@ -48,3 +68,9 @@ export const saveAccountFieldDraft = (data: {
 
 export const publishAccountFieldConfig = (id: number, version: number) =>
   request.post<boolean>({ url: '/zsjos/media-account-field-config/publish', data: { id, version } })
+
+export const reconcileAccountFieldDraft = (id: number, version: number) =>
+  request.post<boolean>({
+    url: '/zsjos/media-account-field-config/draft/reconcile',
+    data: { id, version }
+  })

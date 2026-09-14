@@ -2,6 +2,8 @@
 
 课程目录按租户隔离，结构为“任意层级分类（最多 10 层）→ 叶子分类 → 课程 SPU → SKU/属性组合”。`zsjos_product` 作为 SPU 主表，数据库中的 `product_ref` 是稳定 SPU 引用；具体价格只配置在 SKU，并在客资提交时保存价格快照。
 
+SKU 的 `price`/`retailPrice` 表示零售价；最低成交价通过 `minDealPrice`、`minDealType`（`FIXED`、`DISCOUNT_RATE`、`NEGOTIABLE`）和 `minDealRate` 表达，考试费使用 `examFee`，计价单位使用 `priceUnit`（`PACKAGE`、`SUBJECT`、`FULL_COURSE`），补充说明使用 `pricingNote`。订单成交价仍须保存为订单金额快照。
+
 管理端保存按钮和分类、SPU、SKU 的状态切换、删除、缺失组合生成操作在请求完成前必须禁用对应操作。列表操作按业务对象和动作独立锁定，避免快速重复点击发出相同写请求，同时不阻塞其他对象的正常管理操作。
 
 ## 管理端
@@ -55,3 +57,11 @@ SKU／客资目录响应的 `specs` 包含 `attrKey/attrName/value/label/labelMi
 考期保存／发布和产品、规格、SKU、分类写入遵循同一事务锁顺序，详见考期 API。锁内重新校验不改变客资及成交的必填、匹配、金额或提交规则。仅考期允许部分规格条件。
 
 任意层级改造的增量脚本为 `script/sql/zsjos_product_category_tree.sql`，依赖之前的产品、分类及 SPU/SKU 脚本，不自动执行。
+
+## 2026 目录的租户与页面验收
+
+本地 `/zsjos/product` 分类树、课程列表和 SKU 分别通过 `/admin-api/zsjos/product/category/tree`、`/admin-api/zsjos/product/page`、`/admin-api/zsjos/product/sku/list` 读取 `zsjos_product_category`、`zsjos_product`、`zsjos_product_sku`。这些表及销售属性、属性值均受租户隔离；全库计数不能证明当前登录租户可见。
+
+已确认的本地业务目录属于租户 1。六个业务分类直接位于第一层，不增加“2026教育产品”汇总父节点。此前误建的汇总节点已停用保留，不再承载课程。状态约定为 `0=启用`、`1=停用`。
+
+`script/sql/mysql/2026-education-product-catalog.sql` 依赖 V219 价格字段，仅用于已确认的租户 1 业务配置，可重复执行；不纳入无业务数据的生产 bootstrap。执行后使用 `script/sql/mysql/verify-2026-product-catalog.sql` 核对租户、分类层级、数量、关联和中文编码，再在实际页面选择分类、打开 SKU 价格明细。旧目录退役和全新环境初始化仍需独立验收。

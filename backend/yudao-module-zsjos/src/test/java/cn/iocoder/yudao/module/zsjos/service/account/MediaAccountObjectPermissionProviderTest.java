@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.zsjos.service.account;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +20,47 @@ class MediaAccountObjectPermissionProviderTest {
     @InjectMocks private MediaAccountObjectPermissionProvider provider;
     @Mock private MediaAccountMapper mapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private ServiceRelationMapper relationMapper;
+
+    @Test
+    void sourcedAccountUsesOnlyExactActiveAcceptedRelationMembers() {
+        MediaAccountDO account = new MediaAccountDO().setId(1L).setStudentPersonId(40L)
+                .setCreateServiceRelationId(30L).setOwnerOperatorUserId(999L).setDirectorUserId(998L);
+        account.setTenantId(1L);
+        ServiceRelationDO relation = new ServiceRelationDO().setId(30L).setPersonId(40L)
+                .setContentDirectorUserId(248L).setOperatorUserId(230L)
+                .setStatus("active").setAcceptanceStatus("accepted");
+        relation.setTenantId(1L);
+        when(mapper.selectById(1L)).thenReturn(account);
+        when(relationMapper.selectById(30L)).thenReturn(relation);
+        assertTrue(provider.hasPermission(1L, "read", 248L));
+        assertTrue(provider.hasPermission(1L, "update", 230L));
+        assertTrue(provider.hasPermission(1L, "production-ticket-create", 230L));
+        assertFalse(provider.hasPermission(1L, "production-ticket-create", 248L));
+        assertFalse(provider.hasPermission(1L, "read", 999L));
+        assertFalse(provider.hasPermission(1L, "update", 998L));
+        assertFalse(provider.hasPermission(1L, "read", 777L));
+        relation.setPersonId(41L);
+        assertFalse(provider.hasPermission(1L, "read", 248L));
+        relation.setPersonId(40L); relation.setTenantId(2L);
+        assertFalse(provider.hasPermission(1L, "read", 248L));
+        relation.setTenantId(1L); relation.setAcceptanceStatus("pending");
+        assertFalse(provider.hasPermission(1L, "update", 230L));
+        relation.setAcceptanceStatus("accepted"); relation.setStatus("paused");
+        assertFalse(provider.hasPermission(1L, "read", 248L));
+        when(relationMapper.selectById(30L)).thenReturn(null);
+        assertFalse(provider.hasPermission(1L, "read", 998L));
+    }
+
+    @Test
+    void queryAllCannotGrantGenericWritesEvenWhenRelationMissing() {
+        when(mapper.selectById(1L)).thenReturn(new MediaAccountDO().setId(1L).setCreateServiceRelationId(30L));
+        when(permissionApi.hasAnyPermissions(251L, "zsjos:media-account:query-all")).thenReturn(true);
+        assertTrue(provider.hasPermission(1L, "read", 251L));
+        assertTrue(provider.hasPermission(1L, "maintenance", 251L));
+        assertFalse(provider.hasPermission(1L, "update", 251L));
+        assertFalse(provider.hasPermission(1L, "production-ticket-create", 251L));
+    }
 
     @Test
     void responsibleOperatorCanRescueButUnrelatedUserCannot() {

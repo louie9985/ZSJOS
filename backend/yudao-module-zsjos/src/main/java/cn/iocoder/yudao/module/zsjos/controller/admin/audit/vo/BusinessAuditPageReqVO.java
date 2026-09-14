@@ -19,6 +19,11 @@ public class BusinessAuditPageReqVO extends PageParam {
     private String sourceType;
     private String resultStatus;
     private Long operatorUserId;
+    private Long initiatorUserId;
+    private String executorType;
+    private String executorIdentity;
+    private Long parentAuditId;
+    private String executionKey;
 
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] occurredAt;

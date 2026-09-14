@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface BusinessAuditLogMapper extends BaseMapperX<BusinessAuditLogDO> {
+    default BusinessAuditLogDO selectByExecutionKey(String executionKey) {
+        return selectOne(new LambdaQueryWrapperX<BusinessAuditLogDO>().eq(BusinessAuditLogDO::getExecutionKey, executionKey));
+    }
     default PageResult<BusinessAuditLogDO> selectPage(BusinessAuditPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<BusinessAuditLogDO>()
                 .eqIfPresent(BusinessAuditLogDO::getCategoryCode, reqVO.getCategoryCode())
@@ -17,6 +20,11 @@ public interface BusinessAuditLogMapper extends BaseMapperX<BusinessAuditLogDO> 
                 .eqIfPresent(BusinessAuditLogDO::getSourceType, reqVO.getSourceType())
                 .eqIfPresent(BusinessAuditLogDO::getResultStatus, reqVO.getResultStatus())
                 .eqIfPresent(BusinessAuditLogDO::getOperatorUserId, reqVO.getOperatorUserId())
+                .eqIfPresent(BusinessAuditLogDO::getInitiatorUserId, reqVO.getInitiatorUserId())
+                .eqIfPresent(BusinessAuditLogDO::getExecutorType, reqVO.getExecutorType())
+                .eqIfPresent(BusinessAuditLogDO::getExecutorIdentity, reqVO.getExecutorIdentity())
+                .eqIfPresent(BusinessAuditLogDO::getParentAuditId, reqVO.getParentAuditId())
+                .eqIfPresent(BusinessAuditLogDO::getExecutionKey, reqVO.getExecutionKey())
                 .betweenIfPresent(BusinessAuditLogDO::getOccurredAt, reqVO.getOccurredAt())
                 .orderByDesc(BusinessAuditLogDO::getOccurredAt));
     }

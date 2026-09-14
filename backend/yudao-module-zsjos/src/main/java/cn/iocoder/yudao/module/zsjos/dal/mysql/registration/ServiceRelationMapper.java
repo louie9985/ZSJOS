@@ -278,6 +278,38 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .orderByDesc(ServiceRelationDO::getUpdateTime).orderByDesc(ServiceRelationDO::getId));
     }
 
+    /**
+     * Tenant-wide owned read, used only when the reader's data scope covers every department.
+     */
+    default List<ServiceRelationDO> selectOwnedByPersonIds(Collection<Long> personIds, String status) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        LambdaQueryWrapperX<ServiceRelationDO> query = new LambdaQueryWrapperX<>();
+        query.in(ServiceRelationDO::getPersonId, personIds)
+                .eqIfPresent(ServiceRelationDO::getStatus, status)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
+        return selectList(query);
+    }
+
+    /**
+     * Department-scoped read: service relations owned by any of the given owner users.
+     * Only the service owner is consulted; collaborator roles belong to other business lines.
+     */
+    default List<ServiceRelationDO> selectOwnedByOwnerIdsAndPersonIds(Collection<Long> ownerUserIds,
+                                                                       Collection<Long> personIds,
+                                                                       String status) {
+        if (ownerUserIds == null || ownerUserIds.isEmpty() || personIds == null || personIds.isEmpty()) {
+            return List.of();
+        }
+        LambdaQueryWrapperX<ServiceRelationDO> query = new LambdaQueryWrapperX<>();
+        query.in(ServiceRelationDO::getPersonId, personIds)
+                .in(ServiceRelationDO::getOwnerUserId, ownerUserIds)
+                .eqIfPresent(ServiceRelationDO::getStatus, status)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
+        return selectList(query);
+    }
+
     default List<ServiceRelationDO> selectAssignedByUserAndPersonIds(Long userId, Collection<Long> personIds,
                                                                      String status) {
         if (personIds == null || personIds.isEmpty()) return List.of();

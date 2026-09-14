@@ -62,9 +62,9 @@ public class LeadBasicInfoService {
         String category = StrUtil.trimToNull(req.getLeadCategory());
         LeadCategorySnapshotService.Selection categorySelection = Objects.equals(lead.getLeadCategory(), category)
                 ? null : categorySnapshotService.requireEnabled(category);
-        List<LeadProductSnapshot> snapshots = validateProducts(req.getIntendedProducts());
         var existingProducts = productMapper.selectListByLeadId(leadId);
-        snapshots = snapshots.stream().map(s -> s.retainSelection(existingProducts)).toList();
+        List<LeadProductSnapshot> snapshots = validateProducts(req.getIntendedProducts()).stream()
+                .map(s -> s.retainSelection(existingProducts)).toList();
 
         PersonDO person = personMapper.selectById(lead.getPersonId());
         List<String> changedFields = new ArrayList<>();
@@ -154,8 +154,8 @@ public class LeadBasicInfoService {
             String key = Boolean.TRUE.equals(item.getSpuUnknown()) ? "UNKNOWN"
                     : item.effectiveSpuRef() + "|" + (Boolean.TRUE.equals(item.getSkuUnknown()) ? "UNKNOWN" : item.getSkuRef());
             if (!keys.add(key)) throw exception(LEAD_PRODUCT_DUPLICATE);
-            result.add(productSkuService.validateLeadProduct(item.effectiveSpuRef(), Boolean.TRUE.equals(item.getSpuUnknown()),
-                    item.getSkuRef(), Boolean.TRUE.equals(item.getSkuUnknown())));
+            result.add(productSkuService.validateLeadProduct(item.effectiveSpuRef(),
+                    Boolean.TRUE.equals(item.getSpuUnknown()), item.getSkuRef(), Boolean.TRUE.equals(item.getSkuUnknown())));
         }
         return result;
     }

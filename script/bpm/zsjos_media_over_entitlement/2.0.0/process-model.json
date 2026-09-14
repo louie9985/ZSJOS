@@ -1,0 +1,53 @@
+{
+  "key": "zsjos_media_over_entitlement",
+  "name": "新媒体超权益处理",
+  "category": "general-module",
+  "description": "新媒体超权益处理申请由指定审核人员审批",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/zsjos/media-students",
+  "formCustomViewPath": "/zsjos/media-students",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "entitlementReviewer",
+      "type": 11,
+      "name": "超权益审批",
+      "showText": "业务服务提交时指定审批人",
+      "candidateStrategy": 35,
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

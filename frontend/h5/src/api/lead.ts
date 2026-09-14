@@ -102,7 +102,7 @@ export interface LeadListItem {
   sourceChannelLabelSnapshot?: string
   leadCategory: string
   leadCategoryLabelSnapshot?: string
-  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: number; operatorName?: string }>
+  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: ApiDateValue; operatorName?: string; attachments?: LeadRemarkAttachmentItem[] }>
   remarkHistoryIncomplete?: boolean
   status: string
   assignmentStatus: string
@@ -301,13 +301,12 @@ export interface UploadResult {
 }
 
 export interface SupplementParams {
-  provinceCode: string
-  cityCode: string
-  leadCategory: string
-  intendedProducts: IntendedProduct[]
-  remark?: string
+  remark: string
+  attachments?: { infraFileId: number }[]
   idempotencyKey: string
 }
+
+export type LeadRemarkAttachmentItem = Omit<LeadAttachmentItem, 'id'> & { infraFileId: number }
 
 export interface LeadFilterOption {
   value: string

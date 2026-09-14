@@ -1,6 +1,6 @@
 # EAM database module
 
-Execution order is `V001` through `V011`. `V007` adds lightweight office procurement,
+Execution order is `V001` through `V012`. `V007` adds lightweight office procurement,
 company-wide inventory, employee holdings, lifecycle tasks, and their menu permissions.
 `V008` makes HRM `employee_id` the only EAM ownership key. Historical System user IDs
 in ownership columns are discarded rather than reinterpreted as employee IDs; development
@@ -40,6 +40,11 @@ V011 adds `eam:asset:query-self`, `eam:asset:query-dept`,
 `eam:transfer:query-self`, `eam:transfer:query-dept`, and explicit
 `eam:manage-all`. Department visibility includes the current department and all child
 departments; full management is controlled only by the explicit permission.
+
+V012 adds the dictionary-backed custom-field columns
+`eam_category_field.option_source` / `dict_type` and `eam_asset.source_label_snapshot` /
+`ext_field_labels` / `ext_field_dict_types` that `schema/eam.sql` already declares; every
+column is guarded, and existing values are not rewritten.
 
 Rollback is schema-retaining once business rows exist. Disable the added menus and stop
 the EAM jobs if runtime rollback is required; do not drop populated tables.

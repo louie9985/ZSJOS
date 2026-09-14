@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardSubmissionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.production.ProductionTicketMapper;
 import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountService;
+import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountObjectPermissionProvider;
 import cn.iocoder.yudao.module.zsjos.service.content.ContentService;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningCardService;
 import jakarta.annotation.Resource;
@@ -41,6 +42,7 @@ public class MediaStudentService {
     @Resource private ContentMapper contentMapper;
     @Resource private ProductionTicketMapper ticketMapper;
     @Resource private MediaAccountService accountService;
+    @Resource private MediaAccountObjectPermissionProvider accountPermissionProvider;
     @Resource private ContentService contentService;
     @Resource private PositioningCardService positioningService;
     @Resource private MediaStudentTalkRecordMapper talkRecordMapper;
@@ -50,11 +52,9 @@ public class MediaStudentService {
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
         MediaStudentDetailRespVO result = new MediaStudentDetailRespVO();
         result.setStudent(myStudentService.getMediaStudent(userId, personId));
-        boolean serviceParticipant = result.getStudent().getServices().stream().anyMatch(service ->
-                userId.equals(service.getContentDirectorUserId()) || userId.equals(service.getOperatorUserId()));
-        List<MediaAccountDO> accounts = serviceParticipant
-                ? accountMapper.selectByStudent(personId)
-                : accountMapper.selectByParticipantAndStudent(userId, personId);
+        // Student visibility does not authorize all accounts under that person.
+        List<MediaAccountDO> accounts = accountMapper.selectByStudent(personId).stream()
+                .filter(account -> accountPermissionProvider.hasPermission(account.getId(), "read", userId)).toList();
         List<Long> accountIds = accounts.stream().map(MediaAccountDO::getId).toList();
         Map<Long, MediaAccountDO> accountById = accounts.stream()
                 .collect(java.util.stream.Collectors.toMap(MediaAccountDO::getId, row -> row));
@@ -166,7 +166,7 @@ public class MediaStudentService {
         }).toList());
         var talks = talkRecordMapper.selectRecentByStudent(personId);
         result.setOperationTimeline(buildOperationTimeline(
-                accountMapper.selectRecentByParticipantAndStudent(userId, personId),
+                accounts,
                 positioningSubmissions,
                 contentMapper.selectRecentByAccountIds(accountIds), ticketMapper.selectRecentByAccountIds(accountIds),
                 talks));
@@ -232,8 +232,8 @@ public class MediaStudentService {
         String directorStage = service == null || service.getDirectorStage() == null ? "precheck" : service.getDirectorStage();
         boolean interviewStarted = !"precheck".equals(directorStage);
         return List.of(
-                taskStage("precheck", "资料预审", stageStatus(interviewStarted, true), interviewStarted ? "资料预审已提交" : "待编导审核资料并预约访谈"),
-                taskStage("interview", "学员采访", stageStatus("positioning_ready".equals(directorStage), interviewStarted), "采集学员级基础信息")
+                taskStage("precheck", "资料预审", stageStatus(interviewStarted, true), interviewStarted ? "资料预审已提交" : "待编导审核资料并预约定位访谈"),
+                taskStage("positioning_interview", "定位访谈", stageStatus("positioning_interview_completed".equals(directorStage), interviewStarted), "确认定位访谈大纲并保存访谈稿")
         );
     }
 

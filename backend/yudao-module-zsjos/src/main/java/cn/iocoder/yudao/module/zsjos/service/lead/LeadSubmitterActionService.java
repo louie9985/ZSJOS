@@ -3,23 +3,17 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.framework.ip.core.Area;
-import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.system.api.ip.AreaApi;
-import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistRequestReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
-import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO;
@@ -40,12 +34,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadSubmitterActionService {
-    @Resource private LeadMapper leadMapper; @Resource private LeadIntendedProductMapper productMapper;
-    @Resource private AreaApi areaApi;
-    @Resource private ZsjosProductSkuService productSkuService; @Resource private BusinessEventMapper eventMapper;
+    @Resource private LeadMapper leadMapper;
+    @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadUrgeMapper urgeMapper; @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private LeadSubmissionIdentityService identityService;
-    @Resource private LeadCategorySnapshotService categorySnapshotService;
     @Resource private LeadSubmitterAssistRequestMapper assistRequestMapper;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadObjectPermissionService objectPermissionService;
@@ -82,25 +74,20 @@ public class LeadSubmitterActionService {
             return;
         }
         requireActionable(lead);
-        Region region = region(req.getProvinceCode(), req.getCityCode());
-        LeadCategorySnapshotService.Selection category = Objects.equals(lead.getLeadCategory(), req.getLeadCategory())
-                ? null : categorySnapshotService.requireEnabled(req.getLeadCategory());
-        List<LeadProductSnapshot> snapshots = products(req.getIntendedProducts());
-        var existingProducts = productMapper.selectListByLeadId(leadId);
-        snapshots = snapshots.stream().map(s -> s.retainSelection(existingProducts)).toList();
-        Map<String,Object> before = Map.of("provinceCode", Objects.toString(lead.getProvinceCode(), ""),
-                "cityCode", Objects.toString(lead.getCityCode(), ""), "leadCategory", Objects.toString(lead.getLeadCategory(), ""),
-                "remark", Objects.toString(lead.getRemark(), ""));
-        lead.setProvinceCode(region.provinceCode()); lead.setProvinceName(region.provinceName());
-        lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName());
-        if (category != null) {
-            lead.setLeadCategory(category.value());
-            lead.setLeadCategoryLabelSnapshot(category.labelSnapshot());
-        }
+        String remark = StrUtil.trimToNull(req.getRemark());
+        List<LeadAttachmentReqVO> attachments = req.getAttachments() == null ? List.of() : req.getAttachments();
+        Map<Long, FileInfoRespDTO> files = attachments.isEmpty() ? Map.of() : partnerId == null
+                ? attachmentService.validateReferences(attachments, userId)
+                : attachmentService.validatePartnerReferences(attachments, partnerId);
+        List<Map<String, Object>> attachmentSnapshots = files.values().stream().map(file -> {
+            Map<String, Object> snapshot = new LinkedHashMap<>();
+            snapshot.put("infraFileId", file.getId()); snapshot.put("name", file.getName());
+            snapshot.put("type", file.getType()); snapshot.put("size", file.getSize()); snapshot.put("url", file.getUrl());
+            return snapshot;
+        }).toList();
+        Map<String,Object> before = Map.of("remark", Objects.toString(lead.getRemark(), ""));
         LocalDateTime now = LocalDateTime.now();
         LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateById(lead);
-        productMapper.deleteByLeadId(leadId); insertProducts(leadId, req.getIntendedProducts(), snapshots);
         BusinessEventDO event = new BusinessEventDO(); event.setEventType("lead_submitter_supplemented");
         event.setAggregateType(BIZ_TYPE_LEAD); event.setAggregateId(leadId); event.setOperatorUserId(userId);
         String subjectName;
@@ -111,22 +98,27 @@ public class LeadSubmitterActionService {
             var user = adminUserApi.getUser(userId);
             subjectName = user == null ? null : user.getNickname();
         }
+        event.setEvidenceRefs(JsonUtils.toJsonString(attachmentSnapshots));
         event.setRelatedObjectRefs(JsonUtils.toJsonString(new LeadSupplementSnapshot(before,
-                LeadSupplementSnapshot.MODE, Objects.toString(StrUtil.trimToNull(req.getRemark()), ""),
+                LeadSupplementSnapshot.MODE, remark,
                 subjectType, subjectId, subjectName, digest)));
         event.setOccurredAt(now);
         event.setIdempotencyKey(req.getIdempotencyKey());
         try { eventMapper.insert(event); }
         catch (DuplicateKeyException ex) { throw exception(LEAD_SUPPLEMENT_IDEMPOTENCY_CONFLICT); }
+        leadMapper.updateById(lead);
+        if (lead.getOwnerUserId() != null && notifyPublisher != null) {
+            Map<String, Object> context = new LinkedHashMap<>();
+            context.put("lead.no", lead.getLeadNo()); context.put("ownerUserId", lead.getOwnerUserId());
+            context.put("supplement.remark", remark); context.put("supplement.attachmentCount", attachmentSnapshots.size());
+            notifyPublisher.publish(SUBMITTER_SUPPLEMENTED, leadId, "lead-supplement:" + event.getId(), userId, now, context);
+        }
     }
 
     static String supplementDigest(LeadSubmitterSupplementReqVO req) {
-        List<List<Object>> products = req.getIntendedProducts() == null ? List.of() : req.getIntendedProducts().stream()
-                .map(p -> List.<Object>of(Objects.toString(p.effectiveSpuRef(), ""), Objects.toString(p.getSkuRef(), ""),
-                        Boolean.TRUE.equals(p.getSpuUnknown()), Boolean.TRUE.equals(p.getSkuUnknown()), Boolean.TRUE.equals(p.getPrimary())))
-                .toList();
-        return DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(req.getProvinceCode(), req.getCityCode(),
-                req.getLeadCategory(), products, StrUtil.trimToNull(req.getRemark()))));
+        List<Long> attachments = req.getAttachments() == null ? List.of() : req.getAttachments().stream()
+                .map(LeadAttachmentReqVO::getInfraFileId).toList();
+        return DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(StrUtil.trimToNull(req.getRemark()), attachments)));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -270,40 +262,6 @@ public class LeadSubmitterActionService {
             throw exception(LEAD_SUBMITTER_ACTION_STATE_INVALID);
         }
     }
-    private Region region(String provinceCode, String cityCode) {
-        AreaRespDTO province = REGION_OTHER.equals(provinceCode) ? areaApi.getAreaByParentIdAndSelectionCode(Area.ID_CHINA, REGION_OTHER) : parse(provinceCode);
-        if (!enabledArea(province, 2)) throw exception(LEAD_REGION_INVALID);
-        AreaRespDTO city = REGION_OTHER.equals(cityCode) ? areaApi.getAreaByParentIdAndSelectionCode(province.getId(), REGION_OTHER) : parse(cityCode);
-        if (city == null && REGION_OTHER.equals(cityCode) && Boolean.TRUE.equals(province.getLeafSelectable())) {
-            return new Region(provinceCode, province.getName(), cityCode, null);
-        }
-        if (!enabledArea(city, 3) || !Objects.equals(city.getParentId(), province.getId())) {
-            throw exception(LEAD_REGION_INVALID);
-        }
-        return new Region(provinceCode, province.getName(), cityCode, city == null ? null : city.getName());
-    }
-    private boolean enabledArea(AreaRespDTO area, int type) { return area != null && Integer.valueOf(type).equals(area.getType())
-            && CommonStatusEnum.ENABLE.getStatus().equals(area.getStatus()); }
-    private AreaRespDTO parse(String code) { try { return areaApi.getArea(Integer.valueOf(code)); } catch (NumberFormatException ex) { throw exception(LEAD_REGION_INVALID); } }
-    private List<LeadProductSnapshot> products(List<LeadProductReqVO> requested) {
-        if (requested == null || requested.stream().filter(x -> Boolean.TRUE.equals(x.getPrimary())).count() != 1) throw exception(LEAD_PRODUCT_REQUIRED);
-        List<LeadProductSnapshot> result = new ArrayList<>(); Set<String> keys = new HashSet<>();
-        for (LeadProductReqVO item : requested) { String key = item.effectiveSpuRef()+"|"+item.getSkuRef()+"|"+item.getSpuUnknown()+"|"+item.getSkuUnknown();
-            if (!keys.add(key)) throw exception(LEAD_PRODUCT_DUPLICATE); result.add(productSkuService.validateLeadProduct(item.effectiveSpuRef(), Boolean.TRUE.equals(item.getSpuUnknown()), item.getSkuRef(), Boolean.TRUE.equals(item.getSkuUnknown()))); }
-        return result;
-    }
-    private void insertProducts(Long leadId, List<LeadProductReqVO> requested, List<LeadProductSnapshot> snapshots) {
-        for(int i=0;i<requested.size();i++){ LeadProductReqVO item=requested.get(i); LeadProductSnapshot s=snapshots.get(i); LeadIntendedProductDO row=new LeadIntendedProductDO();
-            row.setLeadId(leadId); row.setProductRef(s.productRef()); row.setProductNameSnapshot(s.name()); row.setSpuRef(s.productRef()); row.setSpuNameSnapshot(s.name());
-            row.setSkuRef(s.skuRef()); row.setSkuNameSnapshot(s.skuName()); row.setSelectedAttrValuesJson(s.selectedAttrValuesJson()); row.setPriceSnapshot(s.price());
-            row.setSelectedSpecsJson(JsonUtils.toJsonString(s.specs()));
-            row.setCategoryId(s.categoryId()); row.setCategoryNameSnapshot(s.categoryName());
-            row.setCategoryPathSnapshot(JsonUtils.toJsonString(s.categoryPath()));
-            row.setLevel1CategoryId(s.level1CategoryId()); row.setLevel1CategoryNameSnapshot(s.level1CategoryName());
-            row.setLevel2CategoryId(s.level2CategoryId()); row.setLevel2CategoryNameSnapshot(s.level2CategoryName());
-            row.setSpuUnknown(s.spuUnknown()); row.setSkuUnknown(s.skuUnknown()); row.setIsPrimary(item.getPrimary()); row.setSort(i); productMapper.insert(row); }
-    }
-    private record Region(String provinceCode,String provinceName,String cityCode,String cityName) {}
     private record AssistRecipient(String submitterType, Long submitterId, String submitterName,
                                    Long assigneeUserId, String assigneeName) {}
 }

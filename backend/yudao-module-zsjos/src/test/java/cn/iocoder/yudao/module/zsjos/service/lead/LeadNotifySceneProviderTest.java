@@ -65,8 +65,8 @@ class LeadNotifySceneProviderTest {
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(43, scenes.size());
-        assertEquals(43, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertEquals(44, scenes.size());
+        assertEquals(44, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("lead.name"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));

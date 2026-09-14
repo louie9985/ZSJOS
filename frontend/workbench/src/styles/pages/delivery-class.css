@@ -4,14 +4,13 @@
   gap: var(--crm-gap);
 }
 
-.delivery-class-card,
-.delivery-class-pending {
+.delivery-class-card {
   min-width: 0;
   border-radius: var(--crm-radius-md);
+  cursor: pointer;
 }
 
-.delivery-class-card .ant-card-body,
-.delivery-class-pending .ant-card-body {
+.delivery-class-card .ant-card-body {
   display: flex;
   min-height: 196px;
   flex-direction: column;
@@ -20,8 +19,7 @@
 }
 
 .delivery-class-card-head,
-.delivery-class-card-foot,
-.delivery-class-pending {
+.delivery-class-card-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -63,15 +61,8 @@
 }
 
 .delivery-class-pending {
-  margin-bottom: var(--crm-gap);
-  background: var(--crm-bg-sunken);
-}
-
-.delivery-class-pending > div:first-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--crm-sp-1);
+  border-color: color-mix(in srgb, var(--crm-color-primary) 35%, var(--crm-border));
+  background: color-mix(in srgb, var(--crm-bg-container) 94%, var(--crm-color-primary) 6%);
 }
 
 .delivery-class-sentinel {

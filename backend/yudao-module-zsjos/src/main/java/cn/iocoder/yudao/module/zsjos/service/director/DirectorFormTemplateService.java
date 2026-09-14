@@ -29,6 +29,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class DirectorFormTemplateService {
     public static final String SCENE_INTERVIEW = "director_interview";
+    public static final String SCENE_POSITIONING_INTERVIEW = "director_positioning_interview";
     public static final String SCENE_POSITIONING = "positioning_card";
     private static final Set<String> ENUM_TYPES = Set.of("select", "multi_select", "radio", "checkbox_group");
     private static final Map<String, String> INTERVIEW_SYSTEM_FIELDS = orderedMap(new String[][]{
@@ -83,6 +84,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long copyDraft(Long templateId, Integer templateVersion, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         if (!Objects.equals(template.getVersion(), templateVersion)) throw exception(DIRECTOR_FORM_TEMPLATE_VERSION_CONFLICT);
         DirectorFormTemplateVersionDO existing = versionMapper.selectDraft(templateId);
@@ -100,6 +102,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void updateDraft(Long templateId, DirectorFormTemplateVO.SaveDraftReq request, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         DirectorFormTemplateVersionDO draft = versionMapper.selectById(request.getVersionId());
         if (draft == null || !Objects.equals(draft.getTemplateId(), templateId) || !"draft".equals(draft.getStatus())) {
@@ -120,6 +123,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void publish(Long templateId, DirectorFormTemplateVO.PublishReq request, Long userId, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         DirectorFormTemplateVersionDO draft = versionMapper.selectById(request.getVersionId());
         if (draft == null || !Objects.equals(draft.getTemplateId(), templateId) || !"draft".equals(draft.getStatus())) {
@@ -355,7 +359,9 @@ public class DirectorFormTemplateService {
     private List<DirectorFormTemplateVO.Field> normalize(String scene, List<DirectorFormTemplateVO.Field> source) {
         requireScene(scene);
         if (source == null || source.isEmpty()) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
-        Map<String, String> system = SCENE_INTERVIEW.equals(scene) ? INTERVIEW_SYSTEM_FIELDS : POSITIONING_SYSTEM_FIELDS;
+        Map<String, String> system = SCENE_POSITIONING_INTERVIEW.equals(scene)
+                ? Map.of("studentIdentity", "text", "collectedAt", "date")
+                : SCENE_INTERVIEW.equals(scene) ? INTERVIEW_SYSTEM_FIELDS : POSITIONING_SYSTEM_FIELDS;
         Set<String> keys = new HashSet<>();
         for (DirectorFormTemplateVO.Field field : source) {
             if (field == null || !keys.add(field.getKey()) || field.getSort() == null || field.getEnabled() == null
@@ -363,6 +369,9 @@ public class DirectorFormTemplateService {
                 throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
             }
             String systemType = system.get(field.getKey());
+            if (SCENE_POSITIONING_INTERVIEW.equals(scene) && !Set.of("text", "date").contains(field.getType())) {
+                throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+            }
             if (systemType != null && !systemType.equals(field.getType())) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
             field.setSystemField(systemType != null);
             boolean enumField = ENUM_TYPES.contains(field.getType());
@@ -408,8 +417,14 @@ public class DirectorFormTemplateService {
         if (template == null || !scene.equals(template.getScene())) throw exception(DIRECTOR_FORM_TEMPLATE_NOT_EXISTS);
         return template;
     }
+    private void requireWritableScene(String scene) {
+        // Old template rows remain for historical interpretation, never for new edits or publication.
+        if (SCENE_INTERVIEW.equals(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+        requireScene(scene);
+    }
+
     private void requireScene(String scene) {
-        if (!Set.of(SCENE_INTERVIEW, SCENE_POSITIONING).contains(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+        if (!Set.of(SCENE_INTERVIEW, SCENE_POSITIONING, SCENE_POSITIONING_INTERVIEW).contains(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
     }
     private void clearDefault(String scene, Long except) {
         LambdaUpdateWrapper<DirectorFormTemplateDO> update = new LambdaUpdateWrapper<DirectorFormTemplateDO>()

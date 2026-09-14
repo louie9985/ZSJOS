@@ -44,7 +44,7 @@ $existing = Invoke-RestMethod -Method Get -Uri "$ApiBase/bpm/model/list" -Header
 $existingKeys = @($existing.data | ForEach-Object { $_.key })
 
 Write-Host '[3/3] 通过 BPM 管理 API 导入并发布缺失流程...' -ForegroundColor Cyan
-foreach ($asset in $manifest.assets) {
+foreach ($asset in @($manifest.assets | Where-Object { $_.recommended -eq $true })) {
   if (-not $Force -and $existingKeys -contains $asset.processKey) {
     Write-Host "跳过已存在模型: $($asset.processKey)" -ForegroundColor DarkGray
     continue

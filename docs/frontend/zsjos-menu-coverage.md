@@ -58,7 +58,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 38.1 | 班级管理 | `/zsjos/class-management` | `DeliveryClassPage`（按服务端权限选择数据范围） | `zsjos/class-management` |
 | 38.2 | 班级管理（兼容旧路径） | `/zsjos/my-classes` | `DeliveryClassPage`（按服务端权限选择数据范围） | `zsjos/my-classes` |
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
-| 40 | 采访表单配置 | `/zsjos/director-config/interview-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
+| 40 | 定位访谈大纲配置 | `/zsjos/director-config/interview-template` | `DirectorTemplateConfigPage`（新定位访谈 API，服务端授权菜单） | `zsjos/directorTemplate/index` |
 | 40.1 | 定位卡模板配置 | `/zsjos/director-config/positioning-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
 | 40.2 | 编导时效配置 | `/zsjos/director-config/sla` | `DirectorConfigPage` | `zsjos/directorConfig/index` |
 | 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |

@@ -48,6 +48,11 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
         appendDimension(query, "account_type", req.getAccountType(), req.getRecommendation());
         appendDimension(query, "profession", req.getProfession(), req.getRecommendation());
         appendDimension(query, "account_stage", req.getAccountStage(), req.getRecommendation());
+        if(req.getPlatform()!=null && !req.getPlatform().isBlank()) {
+            query.apply("EXISTS (SELECT 1 FROM zsjos_material_version pv WHERE pv.id=zsjos_material.current_effective_version_id "
+                    + "AND pv.tenant_id=zsjos_material.tenant_id AND pv.deleted=b'0' "
+                    + "AND JSON_UNQUOTE(JSON_EXTRACT(pv.values_json,'$.account_platform'))={0})",req.getPlatform());
+        }
         if (Boolean.TRUE.equals(req.getRecommendation())) {
             query.eq(MaterialDO::getStatus, "EFFECTIVE").isNotNull(MaterialDO::getCurrentEffectiveVersionId)
                     .apply("EXISTS (SELECT 1 FROM zsjos_material_type mt WHERE mt.id=zsjos_material.material_type_id "
@@ -64,10 +69,14 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                                                             String accountTypeSecondary,
                                                             String professionPrimary,
                                                             String professionSecondary,
-                                                            String accountStage) {
+                                                            String accountStage,
+                                                            String accountTypeTypeIds,
+                                                            String professionTypeIds,
+                                                            String accountStageTypeIds) {
         Page<MaterialDO> page = MyBatisUtils.buildPage(req);
         List<MaterialDO> rows = selectRecommendationRows(page, req, userId, tenantId,
-                accountTypePrimary, accountTypeSecondary, professionPrimary, professionSecondary, accountStage);
+                accountTypePrimary, accountTypeSecondary, professionPrimary, professionSecondary, accountStage,
+                accountTypeTypeIds, professionTypeIds, accountStageTypeIds);
         return new PageResult<>(rows, page.getTotal());
     }
 
@@ -78,7 +87,10 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                                               @Param("accountTypeSecondary") String accountTypeSecondary,
                                               @Param("professionPrimary") String professionPrimary,
                                               @Param("professionSecondary") String professionSecondary,
-                                              @Param("accountStage") String accountStage);
+                                              @Param("accountStage") String accountStage,
+                                              @Param("accountTypeTypeIds") String accountTypeTypeIds,
+                                              @Param("professionTypeIds") String professionTypeIds,
+                                              @Param("accountStageTypeIds") String accountStageTypeIds);
 
     final class RecommendationSqlProvider {
         private RecommendationSqlProvider() {
@@ -101,21 +113,20 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                     + "<if test='request.favorite == true'>AND EXISTS (SELECT 1 FROM zsjos_material_favorite f "
                     + "WHERE f.material_id=m.id AND f.user_id=#{userId} AND f.active=b'1' "
                     + "AND f.tenant_id=m.tenant_id AND f.deleted=b'0') </if>"
-                    + dimensionFilter("account_type", "accountTypePrimary", "accountTypeSecondary")
-                    + dimensionFilter("profession", "professionPrimary", "professionSecondary")
-                    + dimensionFilter("account_stage", "accountStage", null)
+                    + dimensionFilter("account_type", "accountTypePrimary", "accountTypeSecondary", "accountTypeTypeIds")
+                    + dimensionFilter("profession", "professionPrimary", "professionSecondary", "professionTypeIds")
+                    + dimensionFilter("account_stage", "accountStage", null, "accountStageTypeIds")
                     + "ORDER BY " + dimensionScore() + " DESC, " + primaryScore() + " DESC, "
                     + secondaryScore() + " DESC, m.pinned DESC, m.priority DESC, mv.effective_at DESC, m.id DESC"
                     + "</script>";
         }
 
-        private static String dimensionFilter(String dimension, String primary, String secondary) {
+        private static String dimensionFilter(String dimension, String primary, String secondary, String typeIds) {
             String hasValue = primary + " != null and " + primary + " != \"\"";
             if (secondary != null) hasValue += " or " + secondary + " != null and " + secondary + " != \"\"";
             String exact = "d.dimension_value=#{" + primary + "}";
             if (secondary != null) exact += " OR d.dimension_value=#{" + secondary + "}";
-            return "AND (COALESCE(JSON_CONTAINS(mt.recommendation_config_json,"
-                    + "JSON_QUOTE('" + dimension + "'),'$.dimensions'),0)=0 OR EXISTS (SELECT 1 "
+            return "AND (FIND_IN_SET(mt.id,#{" + typeIds + "})=0 OR EXISTS (SELECT 1 "
                     + "FROM zsjos_material_dimension d WHERE d.material_version_id=mv.id "
                     + "AND d.tenant_id=m.tenant_id AND d.deleted=b'0' AND d.dimension_key='" + dimension + "' "
                     + "<choose><when test='" + hasValue + "'>AND (d.unlimited=b'1' OR " + exact + ") "
@@ -123,32 +134,32 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
         }
 
         private static String dimensionScore() {
-            return "((CASE WHEN " + exactExists("account_type", "accountTypePrimary", "accountTypeSecondary")
+            return "((CASE WHEN " + exactExists("account_type", "accountTypePrimary", "accountTypeSecondary",
+                    "accountTypeTypeIds")
                     + " THEN 1 ELSE 0 END)+(CASE WHEN "
-                    + exactExists("profession", "professionPrimary", "professionSecondary")
+                    + exactExists("profession", "professionPrimary", "professionSecondary", "professionTypeIds")
                     + " THEN 1 ELSE 0 END)+(CASE WHEN "
-                    + exactExists("account_stage", "accountStage", null) + " THEN 1 ELSE 0 END))";
+                    + exactExists("account_stage", "accountStage", null, "accountStageTypeIds") + " THEN 1 ELSE 0 END))";
         }
 
         private static String primaryScore() {
-            return "((CASE WHEN " + exactExists("account_type", "accountTypePrimary", null)
+            return "((CASE WHEN " + exactExists("account_type", "accountTypePrimary", null, "accountTypeTypeIds")
                     + " THEN 1 ELSE 0 END)+(CASE WHEN "
-                    + exactExists("profession", "professionPrimary", null)
+                    + exactExists("profession", "professionPrimary", null, "professionTypeIds")
                     + " THEN 1 ELSE 0 END)+(CASE WHEN "
-                    + exactExists("account_stage", "accountStage", null) + " THEN 1 ELSE 0 END))";
+                    + exactExists("account_stage", "accountStage", null, "accountStageTypeIds") + " THEN 1 ELSE 0 END))";
         }
 
         private static String secondaryScore() {
-            return "((CASE WHEN " + exactExists("account_type", "accountTypeSecondary", null)
+            return "((CASE WHEN " + exactExists("account_type", "accountTypeSecondary", null, "accountTypeTypeIds")
                     + " THEN 1 ELSE 0 END)+(CASE WHEN "
-                    + exactExists("profession", "professionSecondary", null) + " THEN 1 ELSE 0 END))";
+                    + exactExists("profession", "professionSecondary", null, "professionTypeIds") + " THEN 1 ELSE 0 END))";
         }
 
-        private static String exactExists(String dimension, String first, String second) {
+        private static String exactExists(String dimension, String first, String second, String typeIds) {
             String values = "d.dimension_value=#{" + first + "}";
             if (second != null) values += " OR d.dimension_value=#{" + second + "}";
-            return "COALESCE(JSON_CONTAINS(mt.recommendation_config_json,JSON_QUOTE('" + dimension
-                    + "'),'$.dimensions'),0)=1 AND EXISTS (SELECT 1 FROM zsjos_material_dimension d "
+            return "FIND_IN_SET(mt.id,#{" + typeIds + "})>0 AND EXISTS (SELECT 1 FROM zsjos_material_dimension d "
                     + "WHERE d.material_version_id=mv.id "
                     + "AND d.tenant_id=m.tenant_id AND d.deleted=b'0' AND d.unlimited=b'0' "
                     + "AND d.dimension_key='" + dimension + "' AND (" + values + "))";

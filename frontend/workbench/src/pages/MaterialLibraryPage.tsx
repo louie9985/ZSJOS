@@ -1,5 +1,6 @@
 import {
   BookOutlined,
+  CloseOutlined,
   EditOutlined,
   HeartFilled,
   HeartOutlined,
@@ -23,7 +24,6 @@ import {
   Input,
   List,
   Modal,
-  Pagination,
   Select,
   Skeleton,
   Space,
@@ -36,6 +36,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
 import SafeRichText from '../components/SafeRichText'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
+import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
 import { hasPermission } from '../services/managementAccess'
 import {
@@ -136,7 +137,7 @@ function FieldValue({ field, version, value, snapshot, path, groupIndex = -1 }: 
   return <Typography.Text className="material-field-text">{displaySnapshot(value)}</Typography.Text>
 }
 
-function MaterialFields({ version }: { version: MaterialVersion }) {
+export function MaterialFields({ version }: { version: MaterialVersion }) {
   if (!version.fields.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容字段" />
   return <div className="material-field-grid">{version.fields.map(field => {
     const value = version.values[field.key]
@@ -420,9 +421,12 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const [versions, setVersions] = useState<MaterialVersion[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create')
+  const [formTypeCode, setFormTypeCode] = useState<'viral_account' | 'viral_content'>('viral_account')
   const [dicts, setDicts] = useState<Record<string, Array<{ value: string; label: string }>>>({})
   const [dictError, setDictError] = useState('')
   const [dictLoading, setDictLoading] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const [hasMore, setHasMore] = useState(true)
   const accountRequestRef = useRef(0)
   const accountSearchTimerRef = useRef<number | undefined>(undefined)
 
@@ -441,7 +445,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   }, [])
 
   const loadDictionaries = useCallback(async () => {
-    const dictTypes = ['zsjos_account_platform', 'zsjos_persona_type', 'zsjos_material_profession', 'zsjos_media_account_stage']
+    const dictTypes = ['zsjos_account_platform', 'zsjos_viral_content_type', 'zsjos_persona_type', 'zsjos_material_profession', 'zsjos_media_account_stage', 'zsjos_media_account_primary_problem']
     setDictLoading(true)
     setDictError('')
     const results = await Promise.allSettled(dictTypes.map(dictType => api.dictDataByType(dictType)))
@@ -522,16 +526,14 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
         favorite: view === 'favorite' || undefined,
         mine: view === 'mine' || undefined
       })
-      setRows(result.list)
+      setRows(targetPage === 1 ? result.list : current => [...current, ...result.list.filter(item => !current.some(existing => existing.id === item.id))])
       setTotal(result.total)
       setPage(targetPage)
-      const nextId = result.list.some(item => item.id === preferredId) ? preferredId : result.list[0]?.id
-      if (nextId) await loadDetail(nextId)
-      else { setSelectedId(undefined); setSelected(undefined) }
+      setHasMore(targetPage * PAGE_SIZE < result.total && result.list.length > 0)
+      if (preferredId && result.list.some(item => item.id === preferredId)) await loadDetail(preferredId)
+      else if (targetPage === 1) { setSelectedId(undefined); setSelected(undefined) }
     } catch (cause) {
-      setRows([])
-      setSelected(undefined)
-      setSelectedId(undefined)
+      if (targetPage === 1) { setRows([]); setSelected(undefined); setSelectedId(undefined) }
       setError(errorText(cause))
     } finally {
       setLoading(false)
@@ -539,6 +541,15 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   }, [accountId, keyword, loadDetail, materialTypeId, view])
 
   useEffect(() => { void load(1) }, [view, keyword, materialTypeId, accountId])
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!target) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting && hasMore && !loading) void load(page + 1)
+    }, { rootMargin: '480px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMore, loading, load, page])
 
   const interact = async (kind: 'like' | 'favorite') => {
     if (!selected) return
@@ -571,22 +582,35 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   }
 
   const viralType = types.find(type => type.code === 'viral_account')
+  const viralContentType = types.find(type => type.code === 'viral_content')
+  const toggleCategoryFilter = (type: MaterialType | undefined, checked: boolean) => {
+    setMaterialTypeId(checked ? type?.id : undefined)
+  }
   const openCreate = () => {
     if (!viralType) return message.warning('爆款账号模板尚未发布')
     setSelected(undefined)
+    setFormTypeCode('viral_account')
     setFormMode('create')
     setFormOpen(true)
   }
+  const openContentCreate = () => {
+    if (!viralContentType) return message.warning('爆款内容模板尚未发布')
+    setSelected(undefined); setFormTypeCode('viral_content'); setFormMode('create'); setFormOpen(true)
+  }
   const openEdit = () => {
-    if (!selected || !viralType || selected.materialTypeId !== viralType.id) return
+    if (!selected || !viralType || !viralContentType) return
+    if (![viralType.id, viralContentType.id].includes(selected.materialTypeId)) return
+    setFormTypeCode(selected.materialTypeId === viralContentType.id ? 'viral_content' : 'viral_account')
     setFormMode('edit')
     setFormOpen(true)
   }
   const openView = () => {
     if (!selected || !viralType || selected.materialTypeId !== viralType.id) return
+    setFormTypeCode('viral_account')
     setFormMode('view')
     setFormOpen(true)
   }
+  const canUpdate = selected?.availableActions.includes('UPDATE') && hasPermission(permissions, 'zsjos:material:update')
   const onFormSaved = async () => {
     setFormOpen(false)
     await load(page, selectedId)
@@ -595,19 +619,25 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const currentVersion = selected?.currentVersion
   return <section className="workspace-page material-library-page">
     <header className="material-library-filter-shell">
-      <Tabs activeKey={view} onChange={key => setView(key as ViewKey)} items={[
-        { key: 'recommendation', label: '推荐' },
-        { key: 'all', label: '全部' },
-        { key: 'favorite', label: '收藏' },
-        { key: 'mine', label: '我的素材' }
-      ]} />
       <div className="material-library-toolbar">
-        <Input.Search allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
+        <Tabs className="material-library-view-tabs" activeKey={view} onChange={key => setView(key as ViewKey)} items={[
+          { key: 'recommendation', label: '推荐' },
+          { key: 'all', label: '全部' },
+          { key: 'favorite', label: '收藏' },
+          { key: 'mine', label: '我的素材' }
+        ]} />
+        <div className="material-library-category-checks">
+          <Checkbox checked={materialTypeId === viralType?.id} disabled={!viralType}
+            onChange={event => toggleCategoryFilter(viralType, event.target.checked)}>爆款账号</Checkbox>
+          <Checkbox checked={materialTypeId === viralContentType?.id} disabled={!viralContentType}
+            onChange={event => toggleCategoryFilter(viralContentType, event.target.checked)}>爆款内容</Checkbox>
+        </div>
+        <Input.Search className="material-library-search" allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
           onSearch={value => setKeyword(value.trim())} placeholder="搜索标题、摘要或内容" />
-        <Select allowClear placeholder="素材类型" value={materialTypeId} onChange={setMaterialTypeId}
+        <Select className="material-library-select" allowClear placeholder="素材类型" value={materialTypeId} onChange={setMaterialTypeId}
           loading={metadataLoading} disabled={metadataLoading || Boolean(metadataError)}
           options={types.map(type => ({ value: type.id, label: type.name }))} />
-        {view === 'recommendation' && <Select allowClear showSearch filterOption={false} placeholder="搜索账号画像"
+        {view === 'recommendation' && <Select className="material-library-select" allowClear showSearch filterOption={false} placeholder="搜索账号画像"
           loading={accountLoading}
           value={accountId} onChange={setAccountId} options={accounts.map(account => ({
             value: account.id,
@@ -617,8 +647,8 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
             if (accountSearchTimerRef.current) window.clearTimeout(accountSearchTimerRef.current)
             accountSearchTimerRef.current = window.setTimeout(() => void loadAccounts(value), 250)
           }} />}
-        <Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void load(page, selectedId)} /></Tooltip>
-        {hasPermission(permissions, 'zsjos:material:create') && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>创建爆款账号</Button>}
+        <Tooltip title="刷新"><Button className="material-library-refresh" icon={<ReloadOutlined />} onClick={() => void load(page, selectedId)} /></Tooltip>
+        {hasPermission(permissions, 'zsjos:material:create') && <Space className="material-library-actions"><Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>创建爆款账号</Button><Button type="primary" icon={<PlusOutlined />} onClick={openContentCreate}>创建爆款内容</Button></Space>}
       </div>
     </header>
     {metadataError && <Alert type="error" showIcon message={`素材类型加载失败：${metadataError}`}
@@ -636,7 +666,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
             <button type="button" key={item.id} className={`material-library-item${selectedId === item.id ? ' active' : ''}`}
               onClick={() => void loadDetail(item.id)}>
               <span className="material-library-cover">{item.coverPreviewUrl
-                ? <img src={item.coverPreviewUrl} alt="" /> : <BookOutlined />}</span>
+                ? <img src={item.coverPreviewUrl} alt="" loading="lazy" /> : <BookOutlined />}</span>
               <span className="material-library-item-copy">
                 <strong>{item.title}</strong>
                 <span>{item.materialTypeName} · {item.materialNo}</span>
@@ -644,11 +674,11 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
               </span>
             </button>) : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={view === 'recommendation' && !accountId ? '请选择账号查看推荐素材' : '暂无素材'} />}
+          <div ref={loadMoreRef} className="material-library-load-more">{loading && rows.length ? '加载中...' : hasMore ? '' : rows.length ? '已加载全部素材' : ''}</div>
         </div>
-        {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total}
-          onChange={value => void load(value)} />}
       </aside>
-      <main className="material-library-detail-pane">
+      <main className={`material-library-detail-pane${selected ? ' open' : ''}`}>
+        {selected && <Button className="material-detail-close" type="text" icon={<CloseOutlined />} aria-label="关闭素材详情" onClick={() => { setSelected(undefined); setSelectedId(undefined) }} />}
         {detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError
           ? <Alert type="error" showIcon message={detailError} action={selectedId
             ? <Button size="small" onClick={() => void loadDetail(selectedId)}>重试</Button> : undefined} />
@@ -668,8 +698,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
                 <Tooltip title="查看版本"><Button icon={<HistoryOutlined />} onClick={() => void openVersions()} /></Tooltip>
                 {selected.availableActions.includes('REFERENCE') && hasPermission(permissions, 'zsjos:material:reference')
                   && <Button type="primary" icon={<LinkOutlined />} onClick={() => setReferenceOpen(true)}>引用</Button>}
-                {selected.materialTypeId === viralType?.id && selected.availableActions.includes('UPDATE')
-                  && <Button icon={<EditOutlined />} onClick={openEdit}>编辑</Button>}
+                {canUpdate && <Button icon={<EditOutlined />} onClick={openEdit}>编辑</Button>}
                 {selected.materialTypeId === viralType?.id && <Button onClick={openView}>查看布局</Button>}
               </Space>
             </div>
@@ -695,11 +724,14 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           </Space>} />
       </List.Item>} />
     </Drawer>
-    {viralType && <Drawer
-      title={formMode === 'create' ? '创建爆款账号拆解' : formMode === 'edit' ? '编辑爆款账号拆解' : '查看爆款账号拆解'}
+    {(viralType || viralContentType) && <Drawer
+      title={formMode === 'create' ? (formTypeCode === 'viral_content' ? '创建爆款内容拆解' : '创建爆款账号拆解') : formMode === 'edit' ? '编辑爆款拆解' : '查看爆款拆解'}
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
-      <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
-        material={selected} dicts={dicts} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
+      {formTypeCode === 'viral_content'
+        ? viralContentType && <ViralContentMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralContentType}
+          material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
+        : viralType && <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
+          material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />}
     </Drawer>}
   </section>
 }

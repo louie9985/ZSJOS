@@ -1,0 +1,53 @@
+{
+  "key": "zsjos_media_positioning_ip",
+  "name": "新媒体定位专业风险审核",
+  "category": "general-module",
+  "description": "新媒体专业风险定位由指定 IP 审核人员审批",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/zsjos/media-students",
+  "formCustomViewPath": "/zsjos/media-students",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "ipReviewer",
+      "type": 11,
+      "name": "IP审核",
+      "showText": "业务服务提交时指定审批人",
+      "candidateStrategy": 35,
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

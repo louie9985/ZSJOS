@@ -213,9 +213,6 @@ public class MaterialSchemaService {
             Set<String> childKeys = new HashSet<>();
             for (MaterialFieldDefinition child : field.getChildren()) {
                 validateField(child, true, childKeys, dimensions, validateDictionaryOptions);
-                if (child.getRecommendationDimension() != null) {
-                    throw exception(MATERIAL_SCHEMA_INVALID, "推荐字段不能放在重复字段组中");
-                }
             }
         } else if (field.getChildren() != null && !field.getChildren().isEmpty()) {
             throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 不能配置子字段");
@@ -230,33 +227,27 @@ public class MaterialSchemaService {
         } else if (field.getDictType() != null && !field.getDictType().isBlank()) {
             throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 不是字典字段");
         }
-        validateRecommendation(field, dimensions);
+        validateRecommendationDimension(field, nested, dimensions);
         validateLimits(field);
     }
 
-    private void validateRecommendation(MaterialFieldDefinition field, Set<String> dimensions) {
-        String dimension = field.getRecommendationDimension();
-        if (dimension == null || dimension.isBlank()) {
+    /**
+     * 推荐维度由字段字典自动归属，不再人工配置；每个维度在模板内只能有一个承载字段。
+     */
+    private void validateRecommendationDimension(MaterialFieldDefinition field, boolean nested,
+                                                 Set<String> dimensions) {
+        String dimension = recommendationDimensionOf(field.getDictType());
+        if (dimension == null) {
             if (Boolean.TRUE.equals(field.getAllowUnlimited())) {
-                throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 不是推荐维度，不能配置不限");
+                throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 不是推荐维度字典字段，不能配置不限");
             }
             return;
         }
-        if (!RECOMMENDATION_DIMENSIONS.contains(dimension)
-                || !(FIELD_DICT_SINGLE.equals(field.getType()) || FIELD_DICT_MULTI.equals(field.getType()))) {
-            throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 的推荐维度配置无效");
+        if (nested) {
+            throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 是推荐维度字段，不能放在重复字段组中");
         }
         if (!dimensions.add(dimension)) {
             throw exception(MATERIAL_SCHEMA_INVALID, "推荐维度重复：" + dimension);
-        }
-        String expectedDictType = switch (dimension) {
-            case DIMENSION_ACCOUNT_TYPE -> DICT_ACCOUNT_TYPE;
-            case DIMENSION_PROFESSION -> DICT_PROFESSION;
-            case DIMENSION_ACCOUNT_STAGE -> DICT_ACCOUNT_STAGE;
-            default -> null;
-        };
-        if (!Objects.equals(expectedDictType, field.getDictType())) {
-            throw exception(MATERIAL_SCHEMA_INVALID, field.getLabel() + " 必须使用字典 " + expectedDictType);
         }
     }
 
@@ -387,6 +378,7 @@ public class MaterialSchemaService {
                                              Map<String, DictionarySnapshotValue> trustedDictionarySnapshots) {
         int max = field.getMaxCount() == null ? 100 : field.getMaxCount();
         int min = field.getMinCount() == null ? 0 : field.getMinCount();
+        String dimension = recommendationDimensionOf(field.getDictType());
         Map<String, DictDataRespDTO> options = new LinkedHashMap<>();
         enabledDictionary(field.getDictType()).forEach(option -> options.put(option.getValue(), option));
         List<String> values = new ArrayList<>();
@@ -414,8 +406,8 @@ public class MaterialSchemaService {
             values.add(code);
             snapshots.add(snapshot("type", field.getDictType(), "value", code, "label", label));
             indexes.add(IndexValue.code(path, groupIndex, code, label));
-            if (field.getRecommendationDimension() != null) {
-                dimensions.add(new DimensionValue(field.getRecommendationDimension(), code, label, unlimited));
+            if (dimension != null) {
+                dimensions.add(new DimensionValue(dimension, code, label, unlimited));
             }
             search.add(label);
         }

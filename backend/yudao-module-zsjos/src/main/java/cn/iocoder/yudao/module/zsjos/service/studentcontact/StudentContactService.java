@@ -27,6 +27,4 @@ public interface StudentContactService {
     void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId);
     Integer saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId);
     void submitDirectorPrecheck(Long relationId, DirectorStageSaveReqVO request, Long userId);
-    Integer saveDirectorInterviewDraft(Long relationId, DirectorStageSaveReqVO request, Long userId);
-    void submitDirectorInterview(Long relationId, DirectorStageSaveReqVO request, Long userId);
 }

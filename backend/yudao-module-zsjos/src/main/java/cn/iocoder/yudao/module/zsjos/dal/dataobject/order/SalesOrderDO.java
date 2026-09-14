@@ -49,6 +49,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private String remark;
     private String studentSpecialRequirements;
     private String materialDeliveryContact;
+    private String giftItems;
+    private String giftShippingAddress;
     private String paymentVoucherRefs;
     private Long currentApprovalRoundId;
     private Long supersedesOrderId;

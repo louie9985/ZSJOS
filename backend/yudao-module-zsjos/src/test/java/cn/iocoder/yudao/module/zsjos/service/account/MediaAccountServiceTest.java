@@ -11,8 +11,10 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSav
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,17 +26,19 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_TYPE;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PERSONA_TYPE;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PROFESSION;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_FIELD_CONFIG_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,135 +52,137 @@ class MediaAccountServiceTest {
     @Mock private MediaAccountFieldConfigService fieldConfigService;
     @Mock private MediaAccountObjectPermissionProvider objectPermissionProvider;
     @Mock private ServiceRelationMapper relationMapper;
+    @Mock private PositioningInterviewMapper positioningInterviewMapper;
     @Mock private DictDataApi dictDataApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryPlanService studentDeliveryPlanService;
 
     @Test
-    void ordinaryCreatorIsBoundAsDirectorAndSnapshotsConfiguredDetails() {
+    void directorCreatesEmptyAccountWithOwnersFromSelectedRelation() {
         TenantContextHolder.setTenantId(1L);
-        MediaAccountSaveReqVO request = new MediaAccountSaveReqVO();
-        request.setStudentPersonId(40L); request.setDirectorUserId(999L);
-        request.setPlatformValue("douyin"); request.setPlatformLabelSnapshot("抖音");
-        request.setDetailValues(Map.of("uid", "dy-100", "nickname", "中世健课堂"));
+        MediaAccountSaveReqVO request = baseCreateRequest();
+        stubCreatePrerequisites(request);
+        assertEquals(9L, service.create(request, 248L));
+        ArgumentCaptor<MediaAccountDO> saved = ArgumentCaptor.forClass(MediaAccountDO.class);
+        verify(mapper).insert(saved.capture());
+        assertEquals("MA-001", saved.getValue().getAccountNo());
+        assertEquals(40L, saved.getValue().getStudentPersonId());
+        assertEquals(248L, saved.getValue().getDirectorUserId());
+        assertEquals(248L, saved.getValue().getOwnerOperatorUserId());
+        assertNull(saved.getValue().getNickname());
+        assertNull(saved.getValue().getPlatformValue());
+        assertNull(saved.getValue().getSStage());
+        assertEquals("{}", saved.getValue().getDetailValuesJson());
+    }
+
+    @Test
+    void unrelatedOperatorCannotCreateEvenIfClientClaimsDirector() {
+        TenantContextHolder.setTenantId(1L);
+        var request = baseCreateRequest(); request.setDirectorUserId(248L);
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
+        assertEquals(MEDIA_ACCOUNT_SERVICE_INVALID.getCode(), assertThrows(ServiceException.class,
+                () -> service.create(request, 600L)).getCode());
+        verify(mapper, never()).insert(any(MediaAccountDO.class));
+    }
+
+    @Test
+    void assignedOperatorCreatesWithRelationDirectorAndSeparateCreator() {
+        TenantContextHolder.setTenantId(1L);
+        var request = baseCreateRequest();
+        request.setDirectorUserId(248L);
+        stubCreatePrerequisites(request);
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation().setOperatorUserId(600L));
+        assertEquals(9L, service.create(request, 600L));
+        ArgumentCaptor<MediaAccountDO> saved = ArgumentCaptor.forClass(MediaAccountDO.class);
+        verify(mapper).insert(saved.capture());
+        assertEquals(248L, saved.getValue().getDirectorUserId());
+        assertEquals(600L, saved.getValue().getOwnerOperatorUserId());
+        assertEquals(600L, saved.getValue().getCreateOperatorUserId());
+        assertEquals(30L, saved.getValue().getCreateServiceRelationId());
+        verify(relationMapper, never()).selectActiveAcceptedByPersonForUpdate(any(), any());
+    }
+
+    @Test
+    void createRejectsPrepopulatedBusinessFields() {
+        TenantContextHolder.setTenantId(1L);
+        var request = baseCreateRequest(); request.setNickname("unexpected");
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
+        assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(), assertThrows(ServiceException.class,
+                () -> service.create(request, 248L)).getCode());
+        verify(mapper, never()).insert(any(MediaAccountDO.class));
+    }
+
+    @Test
+    void createRejectsIncompletePositioningInterview() {
+        TenantContextHolder.setTenantId(1L);
+        MediaAccountSaveReqVO request = baseCreateRequest();
+        ServiceRelationDO relation = createRelation().setDirectorStage("positioning_interview");
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(relation);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.create(request, 248L));
+
+        assertEquals(MEDIA_ACCOUNT_POSITIONING_INCOMPLETE.getCode(), error.getCode());
+        verify(mapper, never()).insert(any(MediaAccountDO.class));
+    }
+
+    @Test
+    void createRejectsRelationVersionConflict() {
+        TenantContextHolder.setTenantId(1L);
+        MediaAccountSaveReqVO request = baseCreateRequest();
+        request.setVersion(2);
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.create(request, 248L));
+
+        assertEquals(STUDENT_SERVICE_VERSION_CONFLICT.getCode(), error.getCode());
+        verify(mapper, never()).insert(any(MediaAccountDO.class));
+    }
+
+    @Test
+    void exactCreateReplayReturnsOriginalAccountWithoutDuplicate() {
+        TenantContextHolder.setTenantId(1L);
+        MediaAccountSaveReqVO request = baseCreateRequest();
+        AtomicReference<MediaAccountDO> inserted = new AtomicReference<>();
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
+        when(mapper.selectByCreateIdempotencyKey("account-create-key"))
+                .thenAnswer(invocation -> inserted.get());
         when(personMapper.selectById(40L)).thenReturn(new PersonDO().setId(40L));
-        when(permissionApi.hasAnyPermissions(248L, "zsjos:media-account:query-all")).thenReturn(false);
         when(numberService.next()).thenReturn("MA-001");
-        when(dictDataApi.getDictDataList("zsjos_account_platform"))
-                .thenReturn(List.of(dict("zsjos_account_platform", "douyin", "抖音", true)));
-        MediaAccountDetailSnapshotVO uid = new MediaAccountDetailSnapshotVO();
-        uid.setKey("uid"); uid.setLabel("UID"); uid.setValue("dy-100"); uid.setDisplayValue("dy-100");
         when(fieldConfigService.validateAndSnapshot(request.getDetailValues())).thenReturn(
-                new MediaAccountFieldConfigService.DetailSnapshot(12L, request.getDetailValues(), List.of(uid)));
+                new MediaAccountFieldConfigService.DetailSnapshot(12L, request.getDetailValues(), List.of()));
         when(mapper.insert(any(MediaAccountDO.class))).thenAnswer(invocation -> {
-            invocation.<MediaAccountDO>getArgument(0).setId(9L); return 1;
+            MediaAccountDO account = invocation.getArgument(0);
+            account.setId(9L);
+            inserted.set(account);
+            return 1;
         });
 
         assertEquals(9L, service.create(request, 248L));
-        verify(mapper).insert(org.mockito.ArgumentMatchers.argThat((MediaAccountDO account) ->
-                account.getStudentPersonId().equals(40L)
-                        && account.getDirectorUserId().equals(248L)
-                        && account.getOwnerOperatorUserId().equals(248L)
-                        && account.getPlatformAccountId().equals("dy-100")
-                        && account.getNickname().equals("中世健课堂")
-                        && account.getDetailConfigVersionId().equals(12L)));
-        verify(adminUserApi).validateUser(248L);
+        assertEquals(9L, service.create(request, 248L));
+
+        verify(mapper, org.mockito.Mockito.times(1)).insert(any(MediaAccountDO.class));
     }
 
     @Test
-    void createSnapshotsEnabledRecommendationDictionaryLabels() {
+    void reusedCreateKeyWithDifferentPayloadIsRejected() {
         TenantContextHolder.setTenantId(1L);
         MediaAccountSaveReqVO request = baseCreateRequest();
-        request.setAccountTypePrimaryValue("expert");
-        request.setTrackPrimaryValue("law");
-        when(dictDataApi.getDictDataList("zsjos_account_platform"))
-                .thenReturn(List.of(dict("zsjos_account_platform", "douyin", "抖音", true)));
-        when(dictDataApi.getDictDataList(DICT_ACCOUNT_TYPE))
-                .thenReturn(List.of(dict(DICT_ACCOUNT_TYPE, "expert", "专家型", true)));
-        when(dictDataApi.getDictDataList(DICT_PROFESSION))
-                .thenReturn(List.of(dict(DICT_PROFESSION, "law", "法学", true)));
-        stubCreatePrerequisites(request);
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
+        when(mapper.selectByCreateIdempotencyKey("account-create-key")).thenReturn(new MediaAccountDO()
+                .setId(9L).setStudentPersonId(40L).setCreateServiceRelationId(30L)
+                .setCreateOperatorUserId(248L).setCreateIdempotencyKey("account-create-key")
+                .setCreateRequestFingerprint("different"));
 
-        service.create(request, 248L);
+        ServiceException error = assertThrows(ServiceException.class, () -> service.create(request, 248L));
 
-        verify(mapper).insert(org.mockito.ArgumentMatchers.argThat((MediaAccountDO account) ->
-                "expert".equals(account.getAccountTypePrimaryValue())
-                        && "专家型".equals(account.getAccountTypePrimaryLabelSnapshot())
-                        && "law".equals(account.getTrackPrimaryValue())
-                        && "法学".equals(account.getTrackPrimaryLabelSnapshot())));
+        assertEquals(MEDIA_ACCOUNT_CREATE_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+        verify(mapper, never()).insert(any(MediaAccountDO.class));
     }
 
     @Test
-    void updateRejectsDisabledRecommendationDictionaryValue() {
-        MediaAccountDO account = existingAccount();
-        when(mapper.selectById(9L)).thenReturn(account);
-        when(dictDataApi.getDictDataList(DICT_ACCOUNT_TYPE))
-                .thenReturn(List.of(dict(DICT_ACCOUNT_TYPE, "expert", "专家型", false)));
-        MediaAccountUpdateReqVO request = updateRequest();
-        request.setAccountTypePrimaryValue("expert");
-
-        ServiceException error = assertThrows(ServiceException.class,
-                () -> service.update(9L, request, 248L));
-
-        assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(), error.getCode());
-    }
-
-    @Test
-    void updateRejectsMissingRecommendationDictionaryValue() {
-        MediaAccountDO account = existingAccount();
-        when(mapper.selectById(9L)).thenReturn(account);
-        when(dictDataApi.getDictDataList(DICT_PROFESSION)).thenReturn(List.of());
-        MediaAccountUpdateReqVO request = updateRequest();
-        request.setTrackPrimaryValue("missing");
-
-        ServiceException error = assertThrows(ServiceException.class,
-                () -> service.update(9L, request, 248L));
-
-        assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(), error.getCode());
-    }
-
-    @Test
-    void updateClearsRecommendationValueAndLabelPairsForBlankSelections() {
-        MediaAccountDO account = existingAccount()
-                .setAccountTypePrimaryValue("expert").setAccountTypePrimaryLabelSnapshot("专家型")
-                .setAccountTypeSecondaryValue("personal").setAccountTypeSecondaryLabelSnapshot("个人型")
-                .setTrackPrimaryValue("law").setTrackPrimaryLabelSnapshot("法学")
-                .setTrackSecondaryValue("finance").setTrackSecondaryLabelSnapshot("金融学");
-        when(mapper.selectById(9L)).thenReturn(account);
-        when(mapper.updateProfile(any(MediaAccountDO.class), org.mockito.ArgumentMatchers.eq(3))).thenReturn(1);
-        MediaAccountUpdateReqVO request = updateRequest();
-        request.setAccountTypePrimaryValue(" ");
-        request.setAccountTypeSecondaryValue("");
-        request.setTrackPrimaryValue("  ");
-        request.setTrackSecondaryValue("");
-
-        service.update(9L, request, 248L);
-
-        ArgumentCaptor<MediaAccountDO> captor = ArgumentCaptor.forClass(MediaAccountDO.class);
-        verify(mapper).updateProfile(captor.capture(), org.mockito.ArgumentMatchers.eq(3));
-        MediaAccountDO updated = captor.getValue();
-        assertNull(updated.getAccountTypePrimaryValue());
-        assertNull(updated.getAccountTypePrimaryLabelSnapshot());
-        assertNull(updated.getAccountTypeSecondaryValue());
-        assertNull(updated.getAccountTypeSecondaryLabelSnapshot());
-        assertNull(updated.getTrackPrimaryValue());
-        assertNull(updated.getTrackPrimaryLabelSnapshot());
-        assertNull(updated.getTrackSecondaryValue());
-        assertNull(updated.getTrackSecondaryLabelSnapshot());
-    }
-
-    @Test
-    void updateKeepsHistoricalRecommendationLabelWhenSelectionIsUnchanged() {
-        MediaAccountDO account = existingAccount()
-                .setAccountTypePrimaryValue("expert").setAccountTypePrimaryLabelSnapshot("原专家标签");
-        when(mapper.selectById(9L)).thenReturn(account);
-        when(mapper.updateProfile(any(MediaAccountDO.class), org.mockito.ArgumentMatchers.eq(3))).thenReturn(1);
-
-        service.update(9L, updateRequest(), 248L);
-
-        verify(mapper).updateProfile(org.mockito.ArgumentMatchers.argThat((MediaAccountDO updated) ->
-                "expert".equals(updated.getAccountTypePrimaryValue())
-                        && "原专家标签".equals(updated.getAccountTypePrimaryLabelSnapshot())),
-                org.mockito.ArgumentMatchers.eq(3));
-        org.mockito.Mockito.verifyNoInteractions(dictDataApi);
+    void legacyFullUpdateCannotBypassProfileFieldPolicy() {
+        assertEquals(MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED.getCode(), assertThrows(ServiceException.class,
+                () -> service.update(9L, updateRequest(), 248L)).getCode());
+        verify(mapper, never()).updateById(any(MediaAccountDO.class));
     }
 
     @Test
@@ -200,16 +206,15 @@ class MediaAccountServiceTest {
 
     private MediaAccountSaveReqVO baseCreateRequest() {
         MediaAccountSaveReqVO request = new MediaAccountSaveReqVO();
-        request.setStudentPersonId(40L);
-        request.setPlatformValue("douyin");
-        request.setPlatformLabelSnapshot("客户端标签不可信");
-        request.setDetailValues(Map.of("uid", "dy-100", "nickname", "中世健课堂"));
+        request.setStudentPersonId(40L); request.setServiceRelationId(30L); request.setVersion(3);
+        request.setIdempotencyKey("account-create-key");
+        request.setDetailValues(Map.of());
         return request;
     }
 
     private void stubCreatePrerequisites(MediaAccountSaveReqVO request) {
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(createRelation());
         when(personMapper.selectById(40L)).thenReturn(new PersonDO().setId(40L));
-        when(permissionApi.hasAnyPermissions(248L, "zsjos:media-account:query-all")).thenReturn(false);
         when(numberService.next()).thenReturn("MA-001");
         when(fieldConfigService.validateAndSnapshot(request.getDetailValues())).thenReturn(
                 new MediaAccountFieldConfigService.DetailSnapshot(12L, request.getDetailValues(), List.of()));
@@ -217,6 +222,12 @@ class MediaAccountServiceTest {
             invocation.<MediaAccountDO>getArgument(0).setId(9L);
             return 1;
         });
+    }
+
+    private ServiceRelationDO createRelation() {
+        return new ServiceRelationDO().setId(30L).setPersonId(40L).setContentDirectorUserId(248L)
+                .setOperatorUserId(248L).setStatus("active").setAcceptanceStatus("accepted")
+                .setDirectorStage("positioning_interview_completed").setVersion(3);
     }
 
     private MediaAccountDO existingAccount() {

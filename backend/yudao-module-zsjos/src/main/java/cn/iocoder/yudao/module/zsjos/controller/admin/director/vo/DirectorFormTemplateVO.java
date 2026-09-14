@@ -29,6 +29,10 @@ public final class DirectorFormTemplateVO {
         @NotNull private Boolean systemField;
         @NotNull private Integer sort;
         @Size(max = 500) private String description;
+        @Size(max = 1000) private String interviewNote;
+        private Boolean allowRemark;
+        private Boolean requireAttachment;
+        private Boolean studentVisible;
         @Size(max = 100) private String dictType;
         private Boolean multiple;
         private Integer minSelections;

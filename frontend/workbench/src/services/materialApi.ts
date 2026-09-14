@@ -27,9 +27,10 @@ export type MaterialFieldDefinition = {
   group?: string
   stageCode?: string
   required?: boolean
+  placeholder?: string
+  initialCount?: number
   searchable?: boolean
   multiple?: boolean
-  recommendationDimension?: 'account_type' | 'profession' | 'account_stage'
   allowUnlimited?: boolean
   dictType?: string
   maxLength?: number
@@ -151,6 +152,7 @@ export type MaterialSaveRequest = {
 }
 
 export type MaterialPageParams = {
+  platform?: string
   pageNo: number
   pageSize: number
   keyword?: string

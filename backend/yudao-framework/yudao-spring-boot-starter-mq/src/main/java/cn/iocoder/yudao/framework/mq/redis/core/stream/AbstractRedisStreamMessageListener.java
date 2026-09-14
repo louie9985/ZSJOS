@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.framework.mq.redis.core.stream;
 
 import cn.hutool.core.util.TypeUtil;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContextHolder;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditRunner;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.mq.redis.core.RedisMQTemplate;
 import cn.iocoder.yudao.framework.mq.redis.core.interceptor.RedisMessageInterceptor;
@@ -14,6 +18,8 @@ import org.springframework.data.redis.stream.StreamListener;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * Redis Stream 监听器抽象类，用于实现集群消费
@@ -46,6 +52,9 @@ public abstract class AbstractRedisStreamMessageListener<T extends AbstractRedis
      */
     @Setter
     private RedisMQTemplate redisMQTemplate;
+    /** Optional business integration hooks; empty when no audit implementation is present. */
+    @Setter
+    private List<ExecutionAuditHook> executionAuditHooks = Collections.emptyList();
 
     @SneakyThrows
     protected AbstractRedisStreamMessageListener() {
@@ -64,19 +73,26 @@ public abstract class AbstractRedisStreamMessageListener<T extends AbstractRedis
         // 消费消息
         T messageObj = JsonUtils.parseObject(message.getValue(), messageType);
         try {
-            consumeMessageBefore(messageObj);
-            // 消费消息
-            this.onMessage(messageObj);
-            // ack 消息消费完成
-            redisMQTemplate.getRedisTemplate().opsForStream().acknowledge(group, message);
+            ExecutionAuditContext parent = ExecutionAuditContextHolder.get();
+            ExecutionAuditContext context = new ExecutionAuditContext("SYSTEM_REDIS_STREAM", streamKey,
+                    parent == null ? null : parent.traceId(), parent == null ? null : parent.parentAuditId(),
+                    parent == null ? null : parent.initiatorUserId(), parent == null ? null : parent.initiatorName(),
+                    parent == null ? null : parent.tenantId(),
+                    Map.of("messageType", messageType.getName(), "messageId", String.valueOf(message.getId()), "group", group));
+            ExecutionAuditRunner.run(context, executionAuditHooks, () -> {
+                consumeMessageBefore(messageObj);
+                try {
+                    this.onMessage(messageObj);
+                    redisMQTemplate.getRedisTemplate().opsForStream().acknowledge(group, message);
+                } finally { consumeMessageAfter(messageObj); }
+                return null;
+            });
             // TODO 芋艿：需要额外考虑以下几个点：
             // 1. 处理异常的情况
             // 2. 发送日志；以及事务的结合
             // 3. 消费日志；以及通用的幂等性
             // 4. 消费失败的重试，https://zhuanlan.zhihu.com/p/60501638
-        } finally {
-            consumeMessageAfter(messageObj);
-        }
+        } catch (Exception ex) { throw new IllegalStateException("Redis Stream message consumption failed", ex); }
     }
 
     /**

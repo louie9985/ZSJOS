@@ -24,22 +24,6 @@ import static cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplat
 public class DirectorFormTemplateController {
     @Resource private DirectorFormTemplateService service;
 
-    @GetMapping("/director-interview-template/list")
-    @PreAuthorize("@ss.hasPermission('zsjos:director-interview-template:query')")
-    public CommonResult<List<DirectorFormTemplateVO.TemplateResp>> interviewList() { return success(service.list(SCENE_INTERVIEW)); }
-    @GetMapping("/director-interview-template/{id}")
-    @PreAuthorize("@ss.hasPermission('zsjos:director-interview-template:query')")
-    public CommonResult<DirectorFormTemplateVO.TemplateResp> interviewGet(@PathVariable Long id) { return success(service.get(id, SCENE_INTERVIEW)); }
-    @PostMapping("/director-interview-template/{id}/draft/copy")
-    @PreAuthorize("@ss.hasPermission('zsjos:director-interview-template:update')")
-    public CommonResult<Long> interviewCopy(@PathVariable Long id, @RequestParam Integer version) { return success(service.copyDraft(id, version, SCENE_INTERVIEW)); }
-    @PutMapping("/director-interview-template/{id}/draft")
-    @PreAuthorize("@ss.hasPermission('zsjos:director-interview-template:update')")
-    public CommonResult<Boolean> interviewUpdate(@PathVariable Long id, @Valid @RequestBody DirectorFormTemplateVO.SaveDraftReq req) { service.updateDraft(id, req, SCENE_INTERVIEW); return success(true); }
-    @PostMapping("/director-interview-template/{id}/publish")
-    @PreAuthorize("@ss.hasPermission('zsjos:director-interview-template:publish')")
-    public CommonResult<Boolean> interviewPublish(@PathVariable Long id, @Valid @RequestBody DirectorFormTemplateVO.PublishReq req) { service.publish(id, req, getLoginUserId(), SCENE_INTERVIEW); return success(true); }
-
     @GetMapping("/positioning-template/list")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-template:query')")
     public CommonResult<List<DirectorFormTemplateVO.TemplateResp>> positioningList() { return success(service.list(SCENE_POSITIONING)); }

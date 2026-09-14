@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior;
 
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
 import lombok.Setter;
 import org.flowable.bpmn.model.Activity;
 import org.flowable.bpmn.model.UserTask;
@@ -21,9 +22,12 @@ public class BpmActivityBehaviorFactory extends DefaultActivityBehaviorFactory {
 
     private BpmTaskCandidateInvoker taskCandidateInvoker;
 
+    private BpmProcessDefinitionService processDefinitionService;
+
     @Override
     public UserTaskActivityBehavior createUserTaskActivityBehavior(UserTask userTask) {
         return new BpmUserTaskActivityBehavior(userTask)
+                .setProcessDefinitionService(processDefinitionService)
                 .setTaskCandidateInvoker(taskCandidateInvoker);
     }
 

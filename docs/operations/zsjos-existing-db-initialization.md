@@ -31,11 +31,11 @@ BPM 定义由 `yudao-module-bpm` 和 Flowable 所有，不能通过 SQL 复制 `
 
 1. 在仓库根目录运行 `python script/bpm/validate_manifest.py`。
 2. 打开管理端“审批管理 -> 流程模型”。
-3. 对 `script/bpm/manifest.json` 中每个 `recommended=true` 的资产，使用其 `path` 对应文件创建/导入模型；Simple 资产使用“导入模型”，BPMN 资产在流程设计器中使用“打开文件”。
+3. 对 `script/bpm/manifest.json` 中每个 `recommended=true` 的资产，使用其 `path` 对应文件创建/导入模型；SIMPLE 资产使用“导入模型”。已存在同一 Process Key 的模型时打开并更新为 SIMPLE 后重新发布，不重复导入；历史 BPMN 资产仅供旧实例兼容。
 4. 选择当前租户中已启用的 BPM 分类，审核候选人变量和任务 Key 后发布并启用。
 5. 记录 Process Key、资产版本、SHA-256、Flowable 定义 ID/版本、部署时间和操作人。不要复制旧环境的模型管理员 ID。
 
-当前清单包含 10 个推荐资产，涵盖客资申诉、客资流转、订单双中心会签、提现、学员联系延期、反馈需求审批、新媒体流程和 EAM 资产流转。已有流程实例和历史版本不应被删除或覆盖。
+当前清单包含 12 个推荐 SIMPLE 资产，涵盖客资申诉、客资流转、订单双中心会签、提现、学员联系延期、反馈需求审批、新媒体流程、班级调班和 EAM 资产流转。已有流程实例和历史版本不应被删除或覆盖。退款审批 `zsjos_payment_refund_approval` 尚缺权威审批人配置，不在可发布资产内。
 
 ## 验证
 

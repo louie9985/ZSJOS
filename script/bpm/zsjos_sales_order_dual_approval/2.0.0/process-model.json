@@ -1,0 +1,82 @@
+{
+  "key": "zsjos_sales_order_dual_approval",
+  "name": "成交订单双中心会签",
+  "category": "general-module",
+  "description": "成交订单由报名履约中心与财务结算中心并行审批",
+  "type": 20,
+  "formType": 10,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "ParallelSplit",
+      "type": 52,
+      "name": "双中心并行会签",
+      "conditionNodes": [
+        {
+          "id": "flow_split_registration",
+          "type": 50,
+          "name": "报名履约中心",
+          "showText": "无需配置条件同时执行",
+          "childNode": {
+            "id": "registrationReview",
+            "type": 11,
+            "name": "报名履约中心审批",
+            "showText": "业务服务提交时指定审批人",
+            "candidateStrategy": 35,
+            "approveType": 1,
+            "approveMethod": 3,
+            "fieldsPermission": [],
+            "signEnable": false,
+            "reasonRequire": true
+          }
+        },
+        {
+          "id": "flow_split_finance",
+          "type": 50,
+          "name": "财务结算中心",
+          "showText": "无需配置条件同时执行",
+          "childNode": {
+            "id": "financeReview",
+            "type": 11,
+            "name": "财务结算中心审批",
+            "showText": "业务服务提交时指定审批人",
+            "candidateStrategy": 35,
+            "approveType": 1,
+            "approveMethod": 3,
+            "fieldsPermission": [],
+            "signEnable": false,
+            "reasonRequire": true
+          }
+        }
+      ],
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

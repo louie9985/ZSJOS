@@ -428,6 +428,8 @@
             ><template #default="scope"
               >¥{{ Number(scope.row.price).toFixed(2) }}</template
             ></el-table-column
+          ><el-table-column label="最低成交价" width="110"><template #default="scope">{{ scope.row.minDealType === 'DISCOUNT_RATE' ? `${(Number(scope.row.minDealRate) * 10).toFixed(1)}折` : scope.row.minDealPrice == null ? '-' : `¥${Number(scope.row.minDealPrice).toFixed(2)}` }}</template></el-table-column
+          ><el-table-column label="计价单位" width="100" prop="priceUnit" />
           >
           <el-table-column label="状态" width="70"
             ><template #default="scope">{{
@@ -472,6 +474,12 @@
       <el-form-item label="价格" required
         ><el-input-number v-model="skuForm.price" :min="0" :precision="2" class="w-full"
       /></el-form-item>
+      <el-form-item label="最低成交价"><el-input-number v-model="skuForm.minDealPrice" :min="0" :precision="2" class="w-full" /></el-form-item>
+      <el-form-item label="成交价类型"><el-select v-model="skuForm.minDealType" class="w-full" clearable><el-option label="固定金额" value="FIXED"/><el-option label="折扣率" value="DISCOUNT_RATE"/><el-option label="区域优惠/可议价" value="NEGOTIABLE"/></el-select></el-form-item>
+      <el-form-item v-if="skuForm.minDealType === 'DISCOUNT_RATE'" label="折扣率"><el-input-number v-model="skuForm.minDealRate" :min="0" :max="1" :step="0.01" :precision="4" class="w-full" /></el-form-item>
+      <el-form-item label="考试费"><el-input-number v-model="skuForm.examFee" :min="0" :precision="2" class="w-full" /></el-form-item>
+      <el-form-item label="计价单位"><el-select v-model="skuForm.priceUnit" class="w-full"><el-option label="套餐" value="PACKAGE"/><el-option label="单科" value="SUBJECT"/><el-option label="全科" value="FULL_COURSE"/></el-select></el-form-item>
+      <el-form-item label="价格说明"><el-input v-model="skuForm.pricingNote" type="textarea" /></el-form-item>
       <el-form-item label="状态" required
         ><el-switch v-model="skuForm.status" :active-value="0" :inactive-value="1"
       /></el-form-item>
@@ -538,6 +546,8 @@ const skuForm = reactive<ProductApi.ProductSkuSaveReqVO>({
   skuName: '',
   attrValues: {},
   price: 0,
+  retailPrice: 0,
+  priceUnit: 'PACKAGE',
   status: 1,
   sort: 0,
   remark: ''

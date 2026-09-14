@@ -33,6 +33,8 @@ public class SalesOrderListItemRespVO {
     private String remark;
     private String studentSpecialRequirements;
     private String materialDeliveryContact;
+    private String giftItems;
+    private String giftShippingAddress;
     private String repurchaseReason;
     private String terminationReason;
     private String productSummary;

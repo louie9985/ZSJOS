@@ -27,11 +27,56 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DirectorFormTemplateServiceTest {
 
+    @Test
+    void legacyPositioningTemplateDoesNotRequireNewCardFields() {
+        String[][] legacy = {
+                {"identityTags", "checkbox_group"}, {"strongStoryHook", "text"},
+                {"existingMaterials", "checkbox_group"}, {"timeInvestment", "radio"},
+                {"appearanceWillingness", "radio"}, {"expressionAbility", "radio"},
+                {"executionStability", "radio"}, {"riskTags", "checkbox_group"},
+                {"commercialPositioning", "textarea"}, {"personaTypes", "checkbox_group"},
+                {"targetAudience", "radio"}, {"contentPillars", "checkbox_group"},
+                {"videoFormats", "checkbox_group"}, {"imageTextFormats", "checkbox_group"},
+                {"recommendedMatchRate", "number"}
+        };
+        List<DirectorFormTemplateVO.Field> fields = new java.util.ArrayList<>();
+        for (String[] definition : legacy) {
+            DirectorFormTemplateVO.Field field = textField(definition[0], false);
+            field.setType(definition[1]);
+            if (List.of("radio", "checkbox_group").contains(definition[1])) {
+                field.setDictType("zsjos_test");
+            }
+            fields.add(field);
+        }
+        DictDataRespDTO option = new DictDataRespDTO();
+        option.setValue("enabled"); option.setLabel("可选项"); option.setStatus(0);
+        when(dictDataApi.getDictDataList("zsjos_test")).thenReturn(List.of(option));
+        DirectorFormTemplateVO.CreateReq request = new DirectorFormTemplateVO.CreateReq();
+        request.setTemplateCode("legacy_copy"); request.setName("旧模板副本");
+        request.setDefaultTemplate(false); request.setFields(fields);
+
+        service.createPositioning(request);
+
+        verify(templateMapper).insert(org.mockito.ArgumentMatchers.<DirectorFormTemplateDO>any());
+        verify(versionMapper).insert(org.mockito.ArgumentMatchers.<DirectorFormTemplateVersionDO>any());
+    }
+
     @InjectMocks private DirectorFormTemplateService service;
     @Mock private DirectorFormTemplateMapper templateMapper;
     @Mock private DirectorFormTemplateVersionMapper versionMapper;
     @Mock private DictDataApi dictDataApi;
     @Mock private AreaApi areaApi;
+
+    @Test
+    void retiredInterviewTemplateCannotBeCopiedSavedOrPublished() {
+        assertThrows(ServiceException.class, () -> service.copyDraft(10L, 0,
+                DirectorFormTemplateService.SCENE_INTERVIEW));
+        assertThrows(ServiceException.class, () -> service.updateDraft(10L,
+                new DirectorFormTemplateVO.SaveDraftReq(), DirectorFormTemplateService.SCENE_INTERVIEW));
+        assertThrows(ServiceException.class, () -> service.publish(10L,
+                new DirectorFormTemplateVO.PublishReq(), 7L, DirectorFormTemplateService.SCENE_INTERVIEW));
+        verifyNoInteractions(templateMapper, versionMapper, dictDataApi, areaApi);
+    }
 
     @Test
     void existingDraftKeepsArchivedVersionAndHistoricalDictionaryLabel() {

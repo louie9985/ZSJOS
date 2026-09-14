@@ -25,6 +25,7 @@
 
 <script setup lang="ts">
 import type { MaterialFieldDefinition } from '@/api/zsjos/material'
+import { RECOMMENDATION_DICT_DIMENSIONS } from '@/api/zsjos/material'
 import MaterialSchemaFieldCard from './MaterialSchemaFieldCard.vue'
 
 defineOptions({ name: 'MaterialSchemaDesigner' })
@@ -73,11 +74,13 @@ const validateFields = (fields: MaterialFieldDefinition[]): string => {
       if (['dict-single', 'dict-multi'].includes(field.type) && !field.dictType) {
         return `字典字段“${field.label}”必须选择系统字典`
       }
-      if (field.recommendationDimension) {
-        if (dimensions.has(field.recommendationDimension)) {
-          return `推荐维度不能重复：${field.recommendationDimension}`
+      const dimension = field.dictType ? RECOMMENDATION_DICT_DIMENSIONS[field.dictType] : undefined
+      if (dimension) {
+        if (nested) return `推荐维度字段“${field.label}”不能放在重复字段组中`
+        if (dimensions.has(dimension)) {
+          return `推荐维度不能重复：${dimension}`
         }
-        dimensions.add(field.recommendationDimension)
+        dimensions.add(dimension)
       }
       if (field.min != null && field.max != null && field.min > field.max) {
         return `字段“${field.label}”的最小值不能大于最大值`

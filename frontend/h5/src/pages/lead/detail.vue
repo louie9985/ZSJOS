@@ -4,7 +4,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isAxiosError } from 'axios'
 import { showToast, showConfirmDialog, showImagePreview } from 'vant'
-import { getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone } from '@/api/lead'
+import { getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone, type LeadRemarkAttachmentItem } from '@/api/lead'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
 import type { ApiDateValue } from '@/utils/format'
 import LeadSubmitterFeedback from '@/components/LeadSubmitterFeedback.vue'
@@ -16,8 +16,8 @@ const router = useRouter()
 const leadId = Number(route.params.id)
 
 const lead = ref<LeadListItem>()
-const remarks = computed(() => lead.value?.remarkHistory ?? (lead.value?.remark
-  ? [{ id: 'legacy-current', kind: 'legacy', content: lead.value.remark, occurredAt: undefined, operatorName: undefined }] : []))
+const remarks = computed<Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: ApiDateValue; operatorName?: string; attachments?: LeadRemarkAttachmentItem[] }>>(() => lead.value?.remarkHistory ?? (lead.value?.remark
+  ? [{ id: 'legacy-current', kind: 'legacy', content: lead.value.remark, occurredAt: undefined, operatorName: undefined, attachments: [] }] : []))
 const activity = ref<PartnerLeadActivity>()
 const loading = ref(true)
 const loadError = ref('')
@@ -136,6 +136,12 @@ function previewAttachment(index: number) {
     startPosition: index,
     closeable: true
   })
+}
+
+function previewRemarkAttachments(attachments: LeadRemarkAttachmentItem[], index: number) {
+  const images = attachments.map(file => file.fileUrl).filter((url): url is string => Boolean(url))
+  if (!images.length) return
+  showImagePreview({ images, startPosition: Math.min(index, images.length - 1), closeable: true })
 }
 
 async function loadActivity() {
@@ -289,9 +295,10 @@ function goAppeal() {
           <div class="section-title">备注信息</div>
           <van-notice-bar v-if="lead.remarkHistoryIncomplete" text="部分历史备注无法还原" />
           <div v-for="item in remarks" :key="item.id" class="record-item">
-            <div class="record-head"><strong>{{ item.kind === 'submission' ? '提交备注' : item.kind === 'supplement' ? '补充备注' : '历史备注' }}</strong></div>
+            <div class="record-head"><strong>{{ item.kind === 'submission' ? '首次提交资料' : item.kind === 'supplement' ? '补充资料' : '历史备注' }}</strong></div>
             <div v-if="item.operatorName || item.occurredAt">{{ item.operatorName }} {{ item.occurredAt ? formatDateTime(typeof item.occurredAt === 'number' ? new Date(item.occurredAt).toISOString() : item.occurredAt) : '' }}</div>
             <p style="white-space: pre-wrap; overflow-wrap: anywhere">{{ item.content }}</p>
+            <div v-if="item.attachments?.length" class="attachment-grid"><button v-for="(file, fileIndex) in item.attachments" :key="file.infraFileId" type="button" class="attachment-item" @click="previewRemarkAttachments(item.attachments || [], fileIndex)"><img :src="file.fileUrl || ''" :alt="file.originalName" /><span>{{ file.originalName }}</span></button></div>
           </div>
           <van-empty v-if="!remarks.length" description="暂无备注" :image-size="64" />
         </div>

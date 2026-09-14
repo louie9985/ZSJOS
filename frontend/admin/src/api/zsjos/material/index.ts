@@ -20,14 +20,28 @@ export type MaterialFieldType =
 
 export type RecommendationDimension = 'account_type' | 'profession' | 'account_stage'
 
+/** 字段字典自动归属的推荐维度；只有这三个字典的字段参与推荐。 */
+export const RECOMMENDATION_DICT_DIMENSIONS: Record<string, RecommendationDimension> = {
+  zsjos_persona_type: 'account_type',
+  zsjos_material_profession: 'profession',
+  zsjos_media_account_stage: 'account_stage'
+}
+
+export const isRecommendationDictionary = (dictType?: string): boolean =>
+  !!dictType && dictType in RECOMMENDATION_DICT_DIMENSIONS
+
 export interface MaterialFieldDefinition {
   key: string
   label: string
   type: MaterialFieldType
+  section?: 'ACCOUNT_DETAIL' | 'DIRECTOR_ANALYSIS' | 'BUILD_SUGGESTION'
+  group?: string
+  stageCode?: string
   required?: boolean
+  placeholder?: string
+  initialCount?: number
   searchable?: boolean
   multiple?: boolean
-  recommendationDimension?: RecommendationDimension
   allowUnlimited?: boolean
   dictType?: string
   maxLength?: number

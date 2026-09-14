@@ -15,6 +15,8 @@ import java.util.List;
 
 @Mapper
 public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
+    @Select("SELECT * FROM zsjos_media_account WHERE tenant_id=#{tenantId} AND run_status='active' AND director_user_id IS NOT NULL")
+    List<MediaAccountDO> selectActiveForDiagnosis(@Param("tenantId") Long tenantId);
     @Select("SELECT * FROM zsjos_media_account WHERE id=#{id} AND tenant_id=#{tenantId} "
             + "AND deleted=b'0' FOR UPDATE")
     MediaAccountDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
@@ -38,16 +40,19 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
     default List<MediaAccountDO> selectMaterialRecommendationCandidates(String keyword, Long userId,
                                                                          Long tenantId, boolean all) {
         LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();
+        query.eq(MediaAccountDO::getTenantId, tenantId);
         if (keyword != null && !keyword.isBlank()) {
             query.and(row -> row.like(MediaAccountDO::getAccountNo, keyword.trim())
                     .or().like(MediaAccountDO::getNickname, keyword.trim()));
         }
         if (!all) {
-            query.and(row -> row.eq(MediaAccountDO::getOwnerOperatorUserId, userId)
-                    .or().eq(MediaAccountDO::getDirectorUserId, userId)
+            query.and(row -> row.nested(legacy -> legacy.isNull(MediaAccountDO::getCreateServiceRelationId)
+                    .and(owner -> owner.eq(MediaAccountDO::getOwnerOperatorUserId, userId)
+                            .or().eq(MediaAccountDO::getDirectorUserId, userId)))
                     .or().apply("student_person_id IS NOT NULL AND EXISTS (SELECT 1 FROM zsjos_service_relation sr "
-                                    + "WHERE sr.person_id=zsjos_media_account.student_person_id "
-                                    + "AND sr.tenant_id={0} AND sr.deleted=b'0' AND sr.status='active' "
+                                    + "WHERE sr.id=zsjos_media_account.create_service_relation_id "
+                                    + "AND sr.person_id=zsjos_media_account.student_person_id "
+                                    + "AND sr.tenant_id=zsjos_media_account.tenant_id AND sr.tenant_id={0} AND sr.deleted=b'0' AND sr.status='active' "
                                     + "AND sr.acceptance_status='accepted' "
                                     + "AND (sr.content_director_user_id={1} OR sr.operator_user_id={1}))",
                             tenantId, userId));
@@ -109,6 +114,11 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
     }
     default MediaAccountDO selectByAccountNo(String accountNo) {
         return selectOne(new LambdaQueryWrapperX<MediaAccountDO>().eq(MediaAccountDO::getAccountNo, accountNo));
+    }
+
+    default MediaAccountDO selectByCreateIdempotencyKey(String idempotencyKey) {
+        return selectOne(new LambdaQueryWrapperX<MediaAccountDO>()
+                .eq(MediaAccountDO::getCreateIdempotencyKey, idempotencyKey));
     }
 
     default List<MediaAccountDO> selectByDirectorAndStudent(Long directorUserId, Long studentPersonId) {

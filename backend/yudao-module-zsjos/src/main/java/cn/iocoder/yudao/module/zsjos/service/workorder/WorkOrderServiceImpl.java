@@ -226,6 +226,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         AdminUserRespDTO target = versioned ? validateTarget(req, published) : validateTarget(req, scene);
         List<WorkOrderFieldDefinition> definitions = parseDefinitions(versioned ? published.getFieldsJson() : scene.getFieldsJson());
         Map<String, Object> values = normalizeValues(definitions, req.getValues());
+        if (versioned && ("PRODUCTION_TICKET".equals(published.getProcessorType())
+                || "FILMING_FIELD_WORK".equals(published.getProcessorType()))) {
+            if (req.getRelatedAccountId() == null) {
+                throw exception(ZsjosErrorCodeConstants.WORK_ORDER_RELATED_ACCOUNT_REQUIRED);
+            }
+            values.put("accountId", req.getRelatedAccountId());
+        }
         List<Long> attachments = validateAttachments(mergeAttachmentIds(attachmentIds,
                 dynamicAttachmentIds(definitions, values)), userId, 100);
 
@@ -242,7 +249,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         row.setTargetDeptId(req.getTargetDeptId());
         row.setSourceNameSnapshot(source.getNickname());
         row.setTargetNameSnapshot(target == null ? null : target.getNickname());
-        row.setStatus(req.getTargetDeptId() != null || "PUBLIC_POOL".equals(scene.getAssignmentMode()) ? "AVAILABLE" : "PENDING_ACCEPT");
+        row.setStatus(req.getTargetUserId() == null && (versioned || "PUBLIC_POOL".equals(scene.getAssignmentMode())) ? "AVAILABLE" : "PENDING_ACCEPT");
         if (versioned) {
             row.setRejectionStrategySnapshot(published.getRejectionStrategy());
             row.setCandidateQualificationMode(published.getTargetQualificationMode());
@@ -639,7 +646,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     private void validateScene(WorkOrderSceneCreateReqVO req) {
         if (req.getProcessorType() != null) {
-            if (!Set.of("GENERIC", "PRODUCTION_TICKET").contains(req.getProcessorType())
+            if (!Set.of("GENERIC", "PRODUCTION_TICKET", "FILMING_FIELD_WORK").contains(req.getProcessorType())
                     || !validQualification(req.getSourceQualificationMode(), req.getSourceRoleIds(), req.getSourceDeptIds())
                     || !validQualification(req.getTargetQualificationMode(), req.getTargetRoleIds(), req.getTargetDeptIds())
                     || req.getAllowedAssignmentTypes() == null || req.getAllowedAssignmentTypes().isEmpty()

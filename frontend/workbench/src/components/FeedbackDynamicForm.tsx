@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { DatePicker, Form, Image, Input, Rate, Select, Upload, Button, Space, Typography } from 'antd'
+import { DatePicker, Form, Image, Input, Rate, Select, Upload, Button, Space, Typography, message } from 'antd'
 import { DeleteOutlined, PaperClipOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import type { FormInstance, UploadProps } from 'antd'
 import dayjs from 'dayjs'
 import type { FeedbackAttachment, FeedbackField } from '../services/feedbackApi'
 import { feedbackApi } from '../services/feedbackApi'
+import { useClipboardPasteTarget } from './ClipboardPasteTarget'
 
 export function normalizeFeedbackInitialValues(
   fields: FeedbackField[],
@@ -49,6 +50,8 @@ export function FeedbackAttachmentInput({
   imageOnly?: boolean
 }) {
   const localPreviewUrls = useRef(new Set<string>())
+  const attachmentsRef = useRef(value)
+  attachmentsRef.current = value
 
   useEffect(() => () => {
     localPreviewUrls.current.forEach(url => URL.revokeObjectURL(url))
@@ -61,7 +64,9 @@ export function FeedbackAttachmentInput({
     if (localPreviewUrl) localPreviewUrls.current.add(localPreviewUrl)
     try {
       const uploaded = await feedbackApi.upload(file)
-      onChange?.([...value, { ...uploaded, previewUrl: localPreviewUrl }])
+      const next = [...attachmentsRef.current, { ...uploaded, previewUrl: localPreviewUrl }]
+      attachmentsRef.current = next
+      onChange?.(next)
       options.onSuccess?.(uploaded)
     } catch (cause) {
       if (localPreviewUrl) {
@@ -80,16 +85,40 @@ export function FeedbackAttachmentInput({
     onChange?.(value.filter(item => item.id !== file.id))
   }
 
-  return <div className="feedback-attachment-input">
-    <Upload
-      accept={imageOnly ? 'image/*' : undefined}
-      customRequest={customRequest}
-      fileList={[]}
-      showUploadList={false}
-      disabled={value.length >= 20}
-    >
-      <Button icon={<UploadOutlined/>}>上传{imageOnly ? '图片' : '附件'}</Button>
-    </Upload>
+  const uploadFile = async (file: File) => {
+    const localPreviewUrl = imageOnly ? URL.createObjectURL(file) : undefined
+    if (localPreviewUrl) localPreviewUrls.current.add(localPreviewUrl)
+    try {
+      const uploaded = await feedbackApi.upload(file)
+      const next = [...attachmentsRef.current, { ...uploaded, previewUrl: localPreviewUrl }]
+      attachmentsRef.current = next
+      onChange?.(next)
+    } catch (cause) {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl)
+        localPreviewUrls.current.delete(localPreviewUrl)
+      }
+      message.error(cause instanceof Error ? cause.message : '附件上传失败')
+    }
+  }
+
+  const { targetRef, targetProps, pasteButtonProps } = useClipboardPasteTarget({
+    canPaste: () => value.length < 20,
+    onFiles: files => files.slice(0, 20 - value.length).forEach(file => { void uploadFile(file) }),
+  })
+  return <div ref={targetRef} className="feedback-attachment-input" {...targetProps}>
+    <div className="attachment-upload-actions">
+      <Upload
+        accept={imageOnly ? 'image/*' : undefined}
+        customRequest={customRequest}
+        fileList={[]}
+        showUploadList={false}
+        disabled={value.length >= 20}
+      >
+        <Button icon={<UploadOutlined/>}>上传附件</Button>
+      </Upload>
+      <Button {...pasteButtonProps} icon={<PictureOutlined />}>上传剪贴板截图</Button>
+    </div>
     {value.length > 0 && <>
       {value.some(file => isImageAttachment(file)) && <Image.PreviewGroup>
         <div className="feedback-image-grid">

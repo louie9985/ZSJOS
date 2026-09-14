@@ -536,8 +536,7 @@ const fieldRulesText = (field: MaterialApi.MaterialFieldDefinition) => [
   field.required ? '必填' : '',
   field.searchable ? '可检索' : '',
   field.maxLength ? `最长 ${field.maxLength}` : '',
-  field.maxCount ? `最多 ${field.maxCount} 项` : '',
-  field.recommendationDimension ? `推荐：${field.recommendationDimension}` : ''
+  field.maxCount ? `最多 ${field.maxCount} 项` : ''
 ].filter(Boolean).join('；') || '-'
 
 const loadReviewConfig = async () => {
@@ -592,7 +591,7 @@ const mappingOptions = (field: MaterialApi.MaterialFieldDefinition) => {
   ]
   if (['dict-single', 'dict-multi'].includes(field.type)) {
     const source = {
-      zsjos_material_account_type: { label: '账号类型', value: 'accountType' },
+      zsjos_persona_type: { label: '账号类型', value: 'accountType' },
       zsjos_material_profession: { label: '专业方向', value: 'profession' },
       zsjos_media_account_stage: { label: '账号时期', value: 'accountStage' }
     }[field.dictType || '']

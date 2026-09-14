@@ -109,21 +109,6 @@ public class StudentContactController {
         return success(true);
     }
 
-    @PostMapping("/{relationId}/interview/draft")
-    @PreAuthorize("@ss.hasPermission('zsjos:student:director-interview')")
-    public CommonResult<Integer> saveDirectorInterviewDraft(@PathVariable Long relationId,
-                                                             @Valid @RequestBody DirectorStageSaveReqVO request) {
-        return success(service.saveDirectorInterviewDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
-    }
-
-    @PostMapping("/{relationId}/interview/submit")
-    @PreAuthorize("@ss.hasPermission('zsjos:student:director-interview')")
-    public CommonResult<Boolean> submitDirectorInterview(@PathVariable Long relationId,
-                                                          @Valid @RequestBody DirectorStageSaveReqVO request) {
-        service.submitDirectorInterview(relationId, request, SecurityFrameworkUtils.getLoginUserId());
-        return success(true);
-    }
-
     @GetMapping("/{relationId}/collaborator-candidates")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct', 'zsjos:student:director-operator-assign')")
     public CommonResult<List<StudyPlannerSimpleRespVO>> getCollaboratorCandidates(

@@ -20,12 +20,36 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
     @Select("SELECT * FROM zsjos_cashback WHERE order_id=#{orderId} AND tenant_id=#{tenantId} AND deleted=0 ORDER BY id FOR UPDATE")
     List<CashbackDO> selectByOrderIdForUpdate(@Param("orderId") Long orderId, @Param("tenantId") Long tenantId);
     default CashbackDO selectByBusinessKey(String key) { return selectOne(CashbackDO::getBusinessKey, key); }
-    default PageResult<CashbackDO> selectPage(CashbackPageReqVO request, Long beneficiaryUserId) {
-        return selectPage(request, new LambdaQueryWrapperX<CashbackDO>()
+    default PageResult<CashbackDO> selectCashbackPage(CashbackPageReqVO request, Long beneficiaryUserId) {
+        return selectCashbackPage(request, beneficiaryUserId, null);
+    }
+    default PageResult<CashbackDO> selectCashbackPage(CashbackPageReqVO request, Long beneficiaryUserId, List<Long> matchedIds) {
+        if (matchedIds != null && matchedIds.isEmpty()) return new PageResult<>(List.of(), 0L);
+        var query = new LambdaQueryWrapperX<CashbackDO>()
                 .eqIfPresent(CashbackDO::getBeneficiaryUserId, beneficiaryUserId)
                 .eqIfPresent(CashbackDO::getType, request.getType())
                 .eqIfPresent(CashbackDO::getStatus, request.getStatus())
-                .orderByDesc(CashbackDO::getGeneratedAt).orderByDesc(CashbackDO::getId));
+                .orderByDesc(CashbackDO::getGeneratedAt).orderByDesc(CashbackDO::getId);
+        query.inIfPresent(CashbackDO::getId, matchedIds)
+                .eqIfPresent(CashbackDO::getBeneficiaryUserId, request.getBeneficiaryUserId())
+                .eqIfPresent(CashbackDO::getPartnerId, request.getPartnerId())
+                .geIfPresent(CashbackDO::getAmount, request.getAmountMin())
+                .leIfPresent(CashbackDO::getAmount, request.getAmountMax())
+                .geIfPresent(CashbackDO::getGeneratedAt, request.getGeneratedAtFrom())
+                .leIfPresent(CashbackDO::getGeneratedAt, request.getGeneratedAtTo())
+                .geIfPresent(CashbackDO::getAvailableAt, request.getAvailableAtFrom())
+                .leIfPresent(CashbackDO::getAvailableAt, request.getAvailableAtTo())
+                .geIfPresent(CashbackDO::getSettledAt, request.getSettledAtFrom())
+                .leIfPresent(CashbackDO::getSettledAt, request.getSettledAtTo());
+        query.likeIfPresent(CashbackDO::getProductNameSnapshot, request.getProductName());
+        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
+            query.and(q -> q.like(CashbackDO::getCashbackNo, request.getKeyword().trim())
+                    .or().apply("EXISTS (SELECT 1 FROM zsjos_lead fl WHERE fl.id=zsjos_cashback.lead_id AND fl.tenant_id=zsjos_cashback.tenant_id AND fl.deleted=0 AND fl.lead_no LIKE {0})", "%" + request.getKeyword().trim() + "%"));
+        }
+        if (request.getOrderNo() != null && !request.getOrderNo().isBlank()) {
+            query.apply("EXISTS (SELECT 1 FROM zsjos_sales_order fo WHERE fo.id=zsjos_cashback.order_id AND fo.tenant_id=zsjos_cashback.tenant_id AND fo.deleted=0 AND fo.order_no LIKE {0})", "%" + request.getOrderNo().trim() + "%");
+        }
+        return selectPage(request, query);
     }
     default List<CashbackDO> selectMatured(LocalDateTime now) {
         return selectList(new LambdaQueryWrapperX<CashbackDO>().eq(CashbackDO::getStatus, "pending_settlement")

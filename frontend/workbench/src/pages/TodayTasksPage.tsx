@@ -162,6 +162,24 @@ function BusinessTaskPanel({
   }
 
   const open = (task: BusinessTask) => {
+    if (task.actionCode === 'MEDIA_ACCOUNT_DIAGNOSIS') {
+      window.location.assign(`/zsjos/media-students?accountId=${task.bizId}`)
+      return
+    }
+    if (task.actionCode === 'STUDENT_DELIVERY_CONFIRM') {
+      // The stage task is scoped to its service relation; open that student's
+      // workbench context so the existing delivery-stage form enforces the same
+      // relation boundary on the server.
+      navigate(APP_ROUTES.MY_STUDENTS, {
+        state: {
+          serviceRelationId: task.serviceRelationId,
+          openContactTask: true,
+          taskId: task.targetRecordId ?? task.bizId,
+          taskType: 'student_delivery_stage'
+        }
+      })
+      return
+    }
     if (!task.actionable) return
     if (task.actionCode === 'OPEN_LEAD_ASSIGNMENT') {
       onOpenAssignment()

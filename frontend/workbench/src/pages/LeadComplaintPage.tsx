@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Avatar, Button, Drawer, Empty, Form, Image, Input, Modal, Pagination, Segmented, Space, Spin, Tag, Typography, message } from 'antd'
+import { ProTable } from '@ant-design/pro-components'
 import { CheckOutlined } from '@ant-design/icons'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { api, type LeadComplaint } from '../services/api'
 import { formatTimestamp } from '../services/time'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const PAGE_SIZE = 20
 const RESULT_LABELS = { founded: '成立', unfounded: '不成立' } as const
@@ -20,6 +23,7 @@ export default function LeadComplaintPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<{ result: 'founded' | 'unfounded'; opinion: string }>()
+  const { useTableLayout } = useInboxTableLayout()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -96,9 +100,17 @@ export default function LeadComplaintPage() {
     </section>}
   </div> : <Empty description="从左侧选择一条投诉"/>
 
-  return <section className="workspace-page business-inbox-page lead-complaint-page">
+  const tableColumns = [
+    { title: '客资编号', dataIndex: 'leadNo', width: 160 },
+    { title: '投诉人', dataIndex: 'complainantUserName', width: 140 },
+    { title: '被投诉销售', dataIndex: 'salesUserName', width: 140 },
+    { title: '投诉原因', dataIndex: 'reason', ellipsis: true },
+    { title: '状态', dataIndex: 'status', width: 100, render: (_: unknown, row: LeadComplaint) => <Tag color={row.status === 'pending' ? 'processing' : 'success'}>{row.status === 'pending' ? '待处理' : '已处理'}</Tag> },
+    { title: '提交时间', dataIndex: 'createTime', width: 180, render: (_: unknown, row: LeadComplaint) => formatTimestamp(row.createTime) }
+  ]
+  return <section className={`workspace-page business-inbox-page lead-complaint-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar"><div className="business-inbox-scope-row"><Segmented value={status} onChange={value => { setStatus(value as typeof status); setPage(1); setDrawerOpen(false) }} options={[{ label: '待处理', value: 'pending' }, { label: '已处理', value: 'handled' }]}/></div></header>
-    <div className="business-inbox-layout">
+    {useTableLayout ? <div className="business-inbox-table-shell"><ProTable<LeadComplaint> rowKey="id" search={false} options={{ density: true, fullScreen: true, setting: true }} loading={loading} dataSource={items} pagination={{ current: page, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: setPage }} onRow={item => ({ onClick: () => { setSelectedId(item.id); setDrawerOpen(true) } })} columns={tableColumns} /></div> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
         {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
         <div className="business-inbox-scroll">
@@ -110,8 +122,8 @@ export default function LeadComplaintPage() {
         {total > PAGE_SIZE && <div className="business-inbox-pagination"><Pagination simple current={page} pageSize={PAGE_SIZE} total={total} onChange={setPage}/></div>}
       </aside>
       <main className="business-inbox-detail-pane">{detailContent}</main>
-    </div>
-    <Drawer className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="投诉详情" width="100%">{detailContent}</Drawer>
+    </div>}
+    {useTableLayout ? <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="投诉详情" placement="right" width="720px">{detailContent}</ResizableDetailDrawer> : <Drawer className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="投诉详情" width="100%">{detailContent}</Drawer>}
     <Modal title="处理销售投诉" open={Boolean(current)} confirmLoading={saving} onCancel={() => setCurrent(undefined)} onOk={() => void decide()}>
       <Form form={form} layout="vertical"><Form.Item name="result" label="处理结论" rules={[{ required: true }]}><Segmented block options={[{ label: '成立', value: 'founded' }, { label: '不成立', value: 'unfounded' }]}/></Form.Item><Form.Item name="opinion" label="处理意见" rules={[{ required: true }, { max: 1000 }]}><Input.TextArea rows={5} showCount maxLength={1000}/></Form.Item></Form>
     </Modal>

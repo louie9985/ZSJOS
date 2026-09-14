@@ -292,7 +292,7 @@ cd frontend/h5 && npm run build
 | STU-003 | P0 | Workbench/API | 报名完成并生成服务关系 | 只生成应有服务关系，通知和业务事件幂等 |
 | STU-004 | P0 | Workbench/API | 规划师接收、首联、学习计划、督学 | 任务阶段和 `availableActions` 按服务关系推进 |
 | STU-005 | P1 | Workbench/API | 学员联系、服务记录、退出路径 | 责任人、快照、状态和审计正确 |
-| STU-006 | P1 | Workbench/API | 采访表单和定位卡模板/草稿/提交 | 字典标签保存快照，版本/乐观锁/附件正确 |
+| STU-006 | P1 | Workbench/API | 定位访谈大纲配置/草稿/完成与定位卡模板/提交 | 字典标签保存快照，版本/乐观锁/附件正确 |
 | STU-007 | P1 | H5/Workbench/API | 学生确认、驳回、变更、历史版本 | 确认锁定，旧有效版本和新轮次关系正确 |
 | MEDIA-001 | P1 | Workbench/API | 编导/新媒体学员可见范围 | 只按服务关系、账号责任和任务对象授权 |
 | MEDIA-002 | P1 | Admin/Workbench | 第三方账号字段、账号维护和日历 | 字段配置、快照、负责人和日期投影正确 |

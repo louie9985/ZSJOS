@@ -21,8 +21,14 @@ public abstract class ApiRequestFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         // 只过滤 API 请求的地址
         String apiUri = request.getRequestURI().substring(request.getContextPath().length());
-        return !StrUtil.startWithAny(apiUri, webProperties.getAdminApi().getPrefix(),
-                webProperties.getAppApi().getPrefix(), webProperties.getPartnerApi().getPrefix());
+        return !(isApiPath(apiUri, webProperties.getAdminApi().getPrefix())
+                || isApiPath(apiUri, webProperties.getAppApi().getPrefix())
+                || isApiPath(apiUri, webProperties.getPartnerApi().getPrefix())
+                || isApiPath(apiUri, webProperties.getPublicApi().getPrefix()));
+    }
+
+    private static boolean isApiPath(String uri, String prefix) {
+        return StrUtil.equals(uri, prefix) || StrUtil.startWith(uri, prefix + "/");
     }
 
 }

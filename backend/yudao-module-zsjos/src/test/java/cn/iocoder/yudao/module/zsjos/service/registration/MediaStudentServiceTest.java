@@ -46,11 +46,36 @@ class MediaStudentServiceTest {
     @Mock private ContentMapper contentMapper;
     @Mock private ProductionTicketMapper ticketMapper;
     @Mock private MediaAccountService accountService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountObjectPermissionProvider accountPermissionProvider;
     @Mock private ContentService contentService;
     @Mock private PositioningCardService positioningService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private MediaStudentTalkRecordMapper talkRecordMapper;
     @Mock private PermissionApi permissionApi;
+
+    @Test
+    void detailFiltersForeignAccountBeforeLoadingItsBusinessDataAndTimeline() {
+        MyStudentRespVO student = new MyStudentRespVO();
+        student.setPersonId(2L); student.setServices(List.of());
+        MediaAccountDO visible = new MediaAccountDO().setId(3L).setAccountNo("MA-3");
+        MediaAccountDO foreign = new MediaAccountDO().setId(99L).setAccountNo("MA-99");
+        foreign.setUpdateTime(java.time.LocalDateTime.now());
+        when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
+        when(accountMapper.selectByStudent(2L)).thenReturn(List.of(visible, foreign));
+        when(accountPermissionProvider.hasPermission(3L, "read", 1L)).thenReturn(true);
+        when(accountPermissionProvider.hasPermission(99L, "read", 1L)).thenReturn(false);
+        when(accountService.projectStudentReadOnly(visible)).thenReturn(new MediaAccountRespVO());
+
+        var result = service.getDetail(1L, 2L);
+
+        assertEquals(List.of(3L), result.getAccounts().stream().map(MediaStudentDetailRespVO.AccountVO::getId).toList());
+        assertTrue(result.getOperationTimeline().stream().noneMatch(row -> "account-99".equals(row.getKey())));
+        verify(positioningMapper).selectByStudentAndAccountIds(2L, List.of(3L));
+        verify(positioningSubmissionMapper).selectByStudentAndAccountIds(2L, List.of(3L));
+        verify(contentMapper).selectByAccountIds(List.of(3L));
+        verify(ticketMapper).selectByAccountIds(List.of(3L));
+        verify(accountService, never()).projectStudentReadOnly(foreign);
+    }
 
     @Test
     void detailUsesOnlyDirectorOwnedStudentAccounts() {
@@ -67,7 +92,8 @@ class MediaStudentServiceTest {
         ProductionTicketDO ticket = new ProductionTicketDO(); ticket.setId(6L); ticket.setAccountId(3L); ticket.setStatus("pending_accept");
 
         when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
-        when(accountMapper.selectByParticipantAndStudent(1L, 2L)).thenReturn(List.of(account));
+        when(accountMapper.selectByStudent(2L)).thenReturn(List.of(account));
+        when(accountPermissionProvider.hasPermission(3L, "read", 1L)).thenReturn(true);
         MediaAccountRespVO accountDetail = new MediaAccountRespVO();
         accountDetail.setAvailableActions(List.of("update")); accountDetail.setDetailSnapshots(List.of());
         when(accountService.get(3L, 1L)).thenReturn(accountDetail);
@@ -122,7 +148,8 @@ class MediaStudentServiceTest {
                 .setAccountId(3L).setStudentPersonId(2L).setSubmissionNo(1)
                 .setStatus("confirmed").setSubmittedAt(java.time.LocalDateTime.now().minusDays(1));
         when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
-        when(accountMapper.selectByParticipantAndStudent(1L, 2L)).thenReturn(List.of(account));
+        when(accountMapper.selectByStudent(2L)).thenReturn(List.of(account));
+        when(accountPermissionProvider.hasPermission(3L, "read", 1L)).thenReturn(true);
         when(accountService.get(3L, 1L)).thenReturn(new MediaAccountRespVO().setDetailSnapshots(List.of()));
         when(positioningMapper.selectByStudentAndAccountIds(2L, List.of(3L))).thenReturn(List.of(card));
         when(positioningSubmissionMapper.selectByStudentAndAccountIds(2L, List.of(3L)))

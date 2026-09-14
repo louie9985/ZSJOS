@@ -1,29 +1,30 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { canViewAccountHistory } from "./AccountMaintenancePanel";
-import { expectSourceNotToContainTokens, expectSourceToContainTokens } from "../test/sourceGuard";
+import {
+  expectSourceNotToContainTokens,
+  expectSourceToContainTokens,
+} from "../test/sourceGuard";
 
 describe("media account maintenance panel", () => {
-  it("loads all four authoritative dictionaries and persists values rather than labels", () => {
+  it("uses published field dictionaries and server editable keys", () => {
     const source = readFileSync(
-      "src/components/AccountMaintenancePanel.tsx",
+      "src/components/AccountProfilePanel.tsx",
       "utf8",
     );
-    expect(source).toContain("MEDIA_ACCOUNT_CURRENT_STATUS");
-    expect(source).toContain("MEDIA_ACCOUNT_STAGE");
-    expect(source).toContain("MEDIA_ACCOUNT_PRIMARY_PROBLEM");
-    expect(source).toContain("MEDIA_ACCOUNT_EXECUTION_MEASURE");
-    expect(source).toContain("primaryProblemValues");
-    expectSourceNotToContainTokens(source, "currentStatusLabelSnapshot: values");
+    expect(source).toContain("api.dictDataByType(type)");
+    expect(source).toContain("profile?.editableFields");
+    expect(source).not.toContain("api.mediaAccount.maintain(");
   });
 
   it("exposes only immutable maintenance history without retired legacy-stage records", () => {
     const source = readFileSync(
-      "src/components/AccountMaintenancePanel.tsx",
+      "src/components/AccountProfilePanel.tsx",
       "utf8",
     );
     const api = readFileSync("src/services/api.ts", "utf8");
-    expect(source).toContain("maintenanceHistory");
+    expect(source).not.toContain("maintenanceHistory");
+    expect(source).toContain("accountProfileApi.history");
     expect(source).not.toContain("legacyStageHistory");
     expect(source).not.toContain("原阶段记录");
     expect(api).not.toContain("MediaAccountLegacyStage");
@@ -46,13 +47,13 @@ describe("media account maintenance panel", () => {
     expect(canViewAccountHistory(undefined)).toBe(false);
 
     const source = readFileSync(
-      "src/components/AccountMaintenancePanel.tsx",
+      "src/components/AccountProfilePanel.tsx",
       "utf8",
     );
-    expectSourceToContainTokens(source, "if (!account || !canViewHistory) return");
-    expectSourceToContainTokens(source, "if (account && canViewHistory) void loadHistory");
-    expectSourceToContainTokens(source, "{canViewHistory && (");
-    expect(source).toContain('className="media-account-history-tabs"');
+    expectSourceToContainTokens(
+      source,
+      "if (!account || !profile?.canViewHistory) return",
+    );
   });
 
   it("does not expose the retired ordered stage transition contract", () => {

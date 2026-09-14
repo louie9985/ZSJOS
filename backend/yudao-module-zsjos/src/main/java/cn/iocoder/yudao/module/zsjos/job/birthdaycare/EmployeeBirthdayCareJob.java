@@ -11,6 +11,8 @@ import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.zsjos.service.birthdaycare.BirthdayCareConstants;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
+import cn.iocoder.yudao.module.zsjos.service.audit.AuditActionCatalog;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,6 +32,7 @@ public class EmployeeBirthdayCareJob implements JobHandler {
     @Resource private HrmEmployeeReminderApi birthdayCareApi;
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Resource private BusinessAuditService auditService;
 
     @Override
     @TenantJob
@@ -66,6 +69,7 @@ public class EmployeeBirthdayCareJob implements JobHandler {
                 }
             }
         }
+        auditService.recordExecution(AuditActionCatalog.EXECUTION_QUARTZ, "employee-birthday-care", Map.of("processed", created));
         return "生日关怀：处理 " + created + " 条";
     }
 }

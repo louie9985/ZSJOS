@@ -7,7 +7,7 @@ SELECT 'new_media_workflow_schema' AS check_name,
            AND table_name IN ('zsjos_media_account','zsjos_content','zsjos_content_version','zsjos_production_ticket',
                               'zsjos_production_ticket_item','zsjos_positioning_card','zsjos_positioning_card_version',
                               'zsjos_positioning_exec_card','zsjos_interview_record',
-                              'zsjos_workbench_capacity','zsjos_partner_student_link'))=12
+                              'zsjos_workbench_capacity','zsjos_partner_student_link'))=11
           AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
                           AND table_name IN ('zsjos_cooperation_assessment','zsjos_exception_ticket','zsjos_graduation_application'))
           AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V096'), 'PASS','FAIL') AS result;
@@ -33,7 +33,8 @@ SELECT 'V129 director form dictionaries' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'partner_student_active_unique_keys' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V098')
-          AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
+          AND (SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics
+               WHERE table_schema=DATABASE()
                AND table_name='zsjos_partner_student_link' AND non_unique=0
                AND index_name IN ('uk_tenant_active_partner','uk_tenant_active_student'))=2,
           'PASS','FAIL') AS result;
@@ -156,7 +157,7 @@ SELECT 'feedback_ready_notification' AS check_name,
                     AND checksum=SHA2('V155__feedback_ready_notification.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V155'
-                        AND checksum=SHA2('V155__feedback_ready_notification.sql',256))
+                        AND checksum='a41203e2b36ab97596548a62a67dbffda77cb2b4fa1d37411f398275e2dd467e')
           AND EXISTS (SELECT 1 FROM system_notify_template
                       WHERE code='ZSJOS_FEEDBACK_READY_FOR_HANDLING'
                         AND scene_code='zsjos.feedback.ready_for_handling'
@@ -183,7 +184,7 @@ SELECT 'feedback_number_counter_repair' AS check_name,
                     AND checksum=SHA2('V156__repair_feedback_number_counter.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V156'
-                        AND checksum=SHA2('V156__repair_feedback_number_counter.sql',256))
+                        AND checksum='3fa031d4a5263e7c4b1f22fc284fece7a50951e9be8eae921d0a78dac0b01cb8')
           AND NOT EXISTS (
             SELECT 1
             FROM (
@@ -221,7 +222,7 @@ SELECT 'feedback_number_counter_repair' AS check_name,
 SELECT 'student_delivery_stages_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V114' AND checksum='student-delivery-stages-v6')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V114'
-                     AND checksum=SHA2('student-delivery-stages-v6',256)), 'PASS','FAIL') AS result;
+                     AND checksum='1fef9e871cde4bfd670367634d45cabc0c5683ce5a9edda1918d056c1b57952d'), 'PASS','FAIL') AS result;
 SELECT 'generic_work_order_idempotency_contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                   AND table_name='zsjos_work_order' AND column_name='idempotency_key'
@@ -232,12 +233,12 @@ SELECT 'generic_work_order_idempotency_contract' AS check_name,
 SELECT 'generic_work_order_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V115' AND checksum='V115__generic_work_order.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V115'
-                     AND checksum=SHA2('V115__generic_work_order.sql',256)), 'PASS','FAIL') AS result;
+                     AND checksum='8179641835e24d1312573213737d763b02050156eca15a4d8e35c22179f05d4e'), 'PASS','FAIL') AS result;
 SELECT 'study_planner_repurchase_schema_gate' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V116'
                   AND checksum='study-planner-repurchase-permission-v5')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V116'
-                     AND checksum=SHA2('study-planner-repurchase-permission-v5',256))
+                     AND checksum='38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324')
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management' AND path='sales-orders'
@@ -252,23 +253,23 @@ SELECT 'sales_order_team_management_legacy' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V136'
                   AND checksum='V136__sales_order_team_management.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136'
-                     AND checksum=SHA2('V136__sales_order_team_management.sql',256))
+                     AND checksum='7dc898a066f84acc51fd760148b2022bc4781e4eace275ba1220d583393e1abb')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73510
                      AND permission='zsjos:sales-order:query-team' AND parent_id=6735
                      AND path='sales-orders/team' AND deleted=b'1'), 'PASS','FAIL') AS result;
 SELECT 'sales_order_management_unification' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V193')
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V195')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management'
                      AND path='sales-orders' AND type=2 AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:sales-order:query-own','zsjos:sales-order:query-team') AND deleted=b'0'),
            'PASS','FAIL') AS result;
 SELECT 'delivery_class_access_repair' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version
-                  WHERE version='V195'
-                    AND checksum='V195__delivery_class_access_repair.sql')
+                  WHERE version='V193'
+                    AND checksum=SHA2('V193__delivery_class_access_repair.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-                      WHERE module_code='core' AND version='V195'
-                        AND checksum=SHA2('V195__delivery_class_access_repair.sql',256))
+                      WHERE module_code='core' AND version='V193'
+                        AND checksum='fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                      AND name='学员管理' AND visible=b'1' AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_role_menu managed
@@ -1147,10 +1148,28 @@ SELECT 'V071 zero-ZSJOS roles' AS check_name,
          JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
          WHERE r.deleted=b'0' AND r.code IN
            ('center_head','content_director','filming_editor','study_planner','academic_specialist',
-            'delivery_manager','exam_manager','exam_specialist','career_planner','career_manager',
+            'exam_manager','exam_specialist','career_planner','career_manager',
             'ip_teacher','product_rd_head','teaching_assistant','recruitment_manager',
             'recruitment_specialist','hr_specialist','admin_manager','admin_specialist')
        ), 'PASS','FAIL') AS result;
+SELECT 'V205 delivery manager department student scope' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V205')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V205')
+          AND NOT EXISTS (SELECT 1 FROM system_role
+                          WHERE code='delivery_manager' AND deleted=b'0' AND data_scope<>4)
+          AND NOT EXISTS (
+            SELECT r.id FROM system_role r
+            LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+            WHERE r.code='delivery_manager' AND r.deleted=b'0'
+            GROUP BY r.id
+            HAVING COUNT(DISTINCT CASE WHEN rm.menu_id IN (73620,73628,73020) THEN rm.menu_id END)<>3)
+          AND NOT EXISTS (
+            SELECT 1 FROM system_role r
+            JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+            WHERE r.code='delivery_manager' AND r.deleted=b'0'
+              AND rm.menu_id IN (73621,73622,73623,73625,73427,73428,73440)),
+          'PASS','FAIL') AS result;
 SELECT 'V071 no duplicate role permissions' AS check_name,
        IF(NOT EXISTS (
          SELECT rm.role_id,rm.tenant_id,m.permission
@@ -1425,7 +1444,7 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
             AND checksum='study-planner-repurchase-permission-v5')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V116'
-              AND checksum=SHA2('study-planner-repurchase-permission-v5',256))
+              AND checksum='38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324')
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6813
@@ -1449,7 +1468,7 @@ SELECT 'lead_category_label_snapshot' AS check_name,
                    WHERE version='V117' AND checksum='lead-category-label-snapshot-v1')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V117'
-                         AND checksum=SHA2('lead-category-label-snapshot-v1',256))
+                         AND checksum='6f335145ee5d80901a9ed50ba50d9f6fd7c188f0cd33f52442ecb496d0eebc30')
           AND EXISTS (SELECT 1 FROM information_schema.columns
                        WHERE table_schema=DATABASE() AND table_name='zsjos_lead'
                          AND column_name='lead_category_label_snapshot')
@@ -1462,7 +1481,7 @@ SELECT 'workbench_relative_child_paths' AS check_name,
                    WHERE version='V119' AND checksum='workbench-relative-child-paths-v1')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V119'
-                         AND checksum=SHA2('workbench-relative-child-paths-v1',256))
+                         AND checksum='f32885d1ccca5ba900280e68f97d0cb670eb42b735b4fb06988bf2a7e1afa923')
           AND NOT EXISTS (SELECT 1 FROM system_menu child_menu
               JOIN system_menu root_menu ON root_menu.id=child_menu.parent_id
                 AND root_menu.path='/zsjos' AND root_menu.parent_id=0
@@ -1475,7 +1494,7 @@ SELECT 'student_group_handoff_stage_retired' AS check_name,
                    WHERE version='V123' AND checksum='V123__retire_student_group_handoff_stage.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V123'
-                         AND checksum=SHA2('V123__retire_student_group_handoff_stage.sql',256))
+                         AND checksum='0c6b1f7241e0df07993cc19dc9151849515e9a1d41eb8d7c8ce19a07289e0dbb')
           AND NOT EXISTS (SELECT 1 FROM zsjos_service_relation
                            WHERE deleted=b'0' AND delivery_stage='group_handoff'),
           'PASS','FAIL') AS result;
@@ -1496,7 +1515,7 @@ SELECT 'V125 student business number migration' AS check_name,
                      AND checksum='V125__student_business_number.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V125'
-                        AND checksum=SHA2('V125__student_business_number.sql',256)),
+                        AND checksum='f32d268aebd81358283af8b16a947d272f5941f6bff1cd21c1cb4e5ea3af6d45'),
           'PASS','FAIL') AS result;
 SELECT 'V128 media director student flow' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V128')
@@ -1526,7 +1545,7 @@ SELECT 'V137 Workbench menu rendering mode compatibility' AS check_name,
               AND checksum=SHA2('V137__repair_workbench_menu_render_mode_version_collision.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V137'
-              AND checksum=SHA2('V137__repair_workbench_menu_render_mode_version_collision.sql',256))
+              AND checksum='2eefd4d793e121579697de4beaa6a77483bf2b1890c110a118f98fccb137ddbe')
           AND EXISTS (SELECT 1 FROM information_schema.columns
             WHERE table_schema=DATABASE() AND table_name='system_menu'
               AND column_name='workbench_render_mode'),
@@ -1733,7 +1752,7 @@ SELECT 'V149 feedback version registration' AS check_name,
                   WHERE version='V149' AND checksum=SHA2('V149__feedback_management.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V149'
-                        AND checksum=SHA2('V149__feedback_management.sql',256)),
+                        AND checksum='c8539b2373568630f2147e56fd0073cda308c70174a6df62666bce224606877e'),
           'PASS','FAIL') AS result;
 
 SELECT 'V149 feedback schema and idempotency' AS check_name,
@@ -2183,8 +2202,7 @@ SELECT 'V194 material library menus and package coverage' AS check_name,
 
 SELECT 'V191 dictionaries, default material types, and content-review config' AS check_name,
        IF((SELECT COUNT(*) FROM system_dict_type
-           WHERE type IN ('zsjos_material_account_type','zsjos_material_profession')
-             AND status=0 AND deleted=b'0')=2
+           WHERE type='zsjos_material_profession' AND status=0 AND deleted=b'0')=1
           AND (SELECT COUNT(*) FROM system_dict_data
                WHERE dict_type='zsjos_material_profession' AND deleted=b'0')=9
           AND NOT EXISTS (SELECT 1 FROM system_dict_data
@@ -2216,9 +2234,8 @@ SELECT 'V191 dictionaries, default material types, and content-review config' AS
           AND NOT EXISTS (SELECT 1 FROM zsjos_material_type
                WHERE code='viral_content' AND deleted=b'0'
                  AND HEX(name)<>'E78886E6ACBEE8A786E9A2912FE59BBEE69687')
-          AND EXISTS (SELECT 1 FROM system_dict_type
-               WHERE type='zsjos_material_account_type'
-                 AND HEX(name)='E7B4A0E69D90E98082E9858DE8B4A6E58FB7E7B1BBE59E8B' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_dict_type
+               WHERE type='zsjos_material_account_type' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_dict_type
                WHERE type='zsjos_material_profession'
                  AND HEX(name)='E7B4A0E69D90E98082E9858DE4B893E4B89AE696B9E59091' AND deleted=b'0'),
@@ -2266,22 +2283,8 @@ SELECT 'V178 lead submit specify permission' AS check_name,
                  AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
           'PASS','FAIL') AS result;
 
-SELECT 'EAM production baseline' AS check_name,
-       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
-             AND table_name IN ('eam_category','eam_category_field','eam_asset','eam_code_rule'))=4
-          AND (SELECT COUNT(*) FROM eam_category WHERE tenant_id=1 AND parent_id=0 AND deleted=b'0'
-               AND code IN ('IT','DIGITAL','FURNITURE','SUPPLIES','BOOKS','OTHER'))=6
-          AND (SELECT COUNT(*) FROM eam_category_field WHERE tenant_id=1 AND deleted=b'0')>=6
-          AND EXISTS (SELECT 1 FROM eam_code_rule WHERE tenant_id=1 AND category_id IS NULL AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM eam_asset WHERE deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM eam_stock_balance WHERE deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM eam_purchase WHERE deleted=b'0'), 'PASS','FAIL') AS result;
-
-SELECT 'EAM module registry' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version
-             WHERE module_code='eam' AND version IN
-               ('V001','V002','V003','V004','V005','V006','V007','V008','V009','V010','V011'))=11,
-          'PASS','FAIL') AS result;
+-- The EAM checks are owned by `verify/eam.sql`, which the executor runs when the eam
+-- module is enabled: the baseline is not installed there in a Core-only database.
 
 SELECT 'V171 lead duplicate rule contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V171')
@@ -2452,8 +2455,14 @@ SELECT 'V188 pending class and UTF-8 snapshot' AS check_name,
                               OR HEX(class_name)<>'E5BE85E58886E78FAD')),
           'PASS','FAIL') AS result;
 
-SELECT 'V188 delivery class menus and package coverage' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
+SELECT 'V192/V193 delivery class menus and package coverage' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V192'
+                    AND checksum=SHA2('V192__unify_delivery_class_menu.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V192'
+                        AND checksum='470a704a3327062ad975b7c3ccd7460c704f78096d70f64b4fd83a3f0a4ebb5e')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
                    WHERE path='/zsjos' AND parent_id=0 AND deleted=b'0' ORDER BY id LIMIT 1)
                    AND path='class-management' AND permission='zsjos:delivery-class:query'
                    AND component='zsjos/class-management' AND deleted=b'0')
@@ -2462,7 +2471,7 @@ SELECT 'V188 delivery class menus and package coverage' AS check_name,
                AND permission IN ('zsjos:delivery-class:query-managed','zsjos:delivery-class:query-my')
                AND visible=b'0' AND deleted=b'0')=2
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
-                      AND permission='zsjos:student:query-my' AND status=0 AND visible=b'0' AND deleted=b'0')
+                      AND permission='zsjos:student:query-my' AND status=0 AND visible=b'1' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73621,73622,73623,73625,73626,73627)
                AND type=3 AND deleted=b'0')=6
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
@@ -2489,9 +2498,112 @@ SELECT 'V191 course calendar' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73630 AND path='course-calendar' AND permission='zsjos:course-calendar:query' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73632 AND permission='zsjos:course-calendar:manage' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 
-SELECT 'V192 lead qualification ownership timing' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V192')
+SELECT 'V196 lead qualification ownership timing' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V196'
+                    AND checksum=SHA2('V196__lead_qualification_from_ownership.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V196'
+                        AND checksum='cedb32fbe05423c1a4c45e4ba7bc30f4e02cd81af294a7cceccd5df7badc22be')
           AND NOT EXISTS (SELECT 1 FROM zsjos_lead
                           WHERE status='submitted' AND assignment_status='owned'
                             AND ownership_started_at IS NOT NULL
                             AND qualification_deadline_at IS NULL AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+SELECT 'V197 submitter supplement notification' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V197' AND description='Lead submitter supplement materials')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V197')
+          AND EXISTS (SELECT 1 FROM system_notify_template
+                      WHERE code='ZSJOS_LEAD_SUBMITTER_SUPPLEMENTED'
+                        AND scene_code='zsjos.lead.submitter_supplemented'
+                        AND JSON_CONTAINS(params, '\"lead.no\"'))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant tenant_row
+                          WHERE tenant_row.deleted=b'0'
+                            AND NOT EXISTS (SELECT 1 FROM system_notify_rule rule_row
+                                            WHERE rule_row.tenant_id=tenant_row.id
+                                              AND rule_row.scene_code='zsjos.lead.submitter_supplemented'
+                                              AND rule_row.deleted=b'0')),
+          'PASS','FAIL') AS result;
+SELECT 'V204 media account create command contract' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_media_account' AND column_name IN (
+               'create_service_relation_id','create_operator_user_id','create_idempotency_key','create_request_fingerprint'))=4
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+             AND table_name='zsjos_media_account' AND index_name='uk_tenant_account_create_key'),
+          'PASS','FAIL') AS result;
+-- V198 viral content decompose contract
+SELECT CASE WHEN (SELECT COUNT(*) FROM system_menu WHERE id IN (80041,80042) AND parent_id=6735 AND permission='zsjos:material:create' AND deleted=b'0')=2 THEN 1 ELSE 0 END AS v198_menu_ok;
+SELECT CASE WHEN (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_viral_content_type' AND value IN ('traffic','lead','low_follower','image_text','hot_topic','video','format','content') AND deleted=b'0')=8 THEN 1 ELSE 0 END AS v198_dictionary_ok;
+
+-- V207 account creation and positioning interview authorization contract
+SELECT 'V207 content director account creation and interview actions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V207')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V207')
+          AND NOT EXISTS (
+            SELECT m.permission FROM system_menu m
+            WHERE m.deleted=b'0' AND m.permission IN (
+              'zsjos:media-account:create',
+              'zsjos:student:positioning-interview',
+              'zsjos:student:positioning-interview-query',
+              'zsjos:student:positioning-interview-complete')
+              AND NOT EXISTS (SELECT 1 FROM system_role r
+                              JOIN system_role_menu rm ON rm.role_id=r.id AND rm.menu_id=m.id
+                                AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+                              WHERE r.code='content_director' AND r.deleted=b'0'))
+          AND NOT EXISTS (
+            SELECT 1 FROM system_menu m
+            WHERE m.deleted=b'0' AND m.permission IN (
+              'zsjos:student:positioning-interview',
+              'zsjos:student:positioning-interview-query',
+              'zsjos:student:positioning-interview-complete')
+              AND NOT EXISTS (SELECT 1 FROM system_tenant_package p
+                              WHERE p.deleted=b'0' AND JSON_CONTAINS(p.menu_ids,'7022','$')
+                                AND JSON_CONTAINS(p.menu_ids,CAST(m.id AS CHAR),'$'))),
+          'PASS','FAIL') AS result;
+
+-- V208 viral-account immutable template V3 contract
+SELECT 'V208 viral account template V3 registries' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V208'
+                    AND checksum=SHA2('V208__viral_account_template_v3.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V208'
+                        AND checksum='26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad'),
+          'PASS','FAIL') AS result;
+SELECT 'V208 viral account template V3 layout' AS check_name,
+       IF(EXISTS (
+            SELECT 1 FROM zsjos_material_type type_row
+            JOIN zsjos_material_schema_version schema_row
+              ON schema_row.id=type_row.current_schema_version_id
+             AND schema_row.material_type_id=type_row.id
+             AND schema_row.tenant_id=type_row.tenant_id
+             AND schema_row.deleted=b'0'
+            WHERE type_row.code='viral_account' AND type_row.deleted=b'0'
+              AND BINARY schema_row.schema_hash=
+                  BINARY '2eca37103ae612ca55b56fe0a84f262fbb67f4f8d41a7d804a2090999dff278a'
+              AND schema_row.status='PUBLISHED' AND JSON_LENGTH(schema_row.fields_json)=36
+              AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[23].key'))='build_notify'
+              AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[23].section'))='DIRECTOR_ANALYSIS'
+              AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[29].key'))='s1_stage_plan'
+              AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[34].key'))='s6_stage_plan'
+              AND JSON_LENGTH(JSON_EXTRACT(schema_row.fields_json,'$[34].children'))=4
+              AND HEX(JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[0].label')))
+                  ='E8B4A6E58FB7E5908DE7A7B0')
+          AND NOT EXISTS (
+            SELECT 1 FROM zsjos_material_type type_row
+            JOIN zsjos_material_schema_version schema_row
+              ON schema_row.id=type_row.current_schema_version_id
+             AND schema_row.material_type_id=type_row.id
+             AND schema_row.tenant_id=type_row.tenant_id
+             AND schema_row.deleted=b'0'
+            WHERE type_row.code='viral_account' AND type_row.deleted=b'0'
+              AND BINARY schema_row.schema_hash IN (
+                '25df599cf13a2f333b0faa545de2d5e99d4a0ecf789cbfa2a8cf45e60217e31e',
+                'b1369fe4d75afb37b65e1cd8837505b14c0feedc9ffe6df4c0f46fd6d1044e59'
+              )
+          ),
+          'PASS','FAIL') AS result;
+
+SOURCE script/sql/mysql/verify-media-account-profile.sql;

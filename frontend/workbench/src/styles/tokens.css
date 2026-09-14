@@ -168,6 +168,9 @@
 
   /* ==================== Tier 3 布局 ==================== */
   --crm-header-h: 48px;
+  /* 页签栏（.crm-tab-bar）高度。用于需要按视口算高度的页面扣减 ——
+     它在 .crm-shell 里与 header 并列，都是 content-layout 之外的高度。 */
+  --crm-tabbar-h: 34px;
 
   /* 侧栏宽度。**须与 constants.ts 的 LAYOUT_SIZES 一致** ——
      antd Sider 的 width prop 由 JS 传入，CSS 侧保留同值镜像，
@@ -211,6 +214,7 @@ html[data-crm-density='loose'] {
   --crm-gap: 14px;
   --crm-gap-sm: 10px;
   --crm-header-h: 56px;
+  --crm-tabbar-h: 38px;
   --crm-row-h: 56px;
 }
 
@@ -227,6 +231,7 @@ html[data-crm-density='compact'] {
   --crm-gap: 8px;
   --crm-gap-sm: 6px;
   --crm-header-h: 40px;
+  --crm-tabbar-h: 30px;
   --crm-row-h: 40px;
 }
 
@@ -304,6 +309,7 @@ html[data-crm-no-motion] *::after {
     --crm-gap: 10px;
     --crm-gap-sm: 8px;
     --crm-header-h: 48px;
+    --crm-tabbar-h: 34px;
     --crm-row-h: 48px;
   }
 }

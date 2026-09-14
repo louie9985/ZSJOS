@@ -34,7 +34,11 @@ public interface StudentContactConstants {
     String CONTEXT_ACTION_ASSIGN_CAREER_PLANNER = "ASSIGN_CAREER_PLANNER";
     String CONTEXT_ACTION_DIRECTOR_PRECHECK = "DIRECTOR_PRECHECK";
     String CONTEXT_ACTION_DIRECTOR_INTERVIEW = "DIRECTOR_INTERVIEW";
+    String CONTEXT_ACTION_START_POSITIONING_INTERVIEW = "START_POSITIONING_INTERVIEW";
+    String CONTEXT_ACTION_CONTINUE_POSITIONING_INTERVIEW = "CONTINUE_POSITIONING_INTERVIEW";
+    String CONTEXT_ACTION_VIEW_POSITIONING_INTERVIEW = "VIEW_POSITIONING_INTERVIEW";
     String CONTEXT_ACTION_ASSIGN_OPERATOR = "ASSIGN_OPERATOR";
+    String CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT = "CREATE_MEDIA_ACCOUNT";
     String COLLABORATOR_DIRECTOR = "content_director";
     String COLLABORATOR_CAREER = "career_planner";
     String COLLABORATOR_OPERATOR = "operator";
@@ -63,6 +67,7 @@ public interface StudentContactConstants {
     String PERMISSION_DIRECTOR_PRECHECK = "zsjos:student:director-precheck";
     String PERMISSION_DIRECTOR_INTERVIEW = "zsjos:student:director-interview";
     String PERMISSION_DIRECTOR_OPERATOR_ASSIGN = "zsjos:student:director-operator-assign";
+    String PERMISSION_MEDIA_ACCOUNT_CREATE = "zsjos:media-account:create";
     String NOTIFY_FIRST_CONTACT = "zsjos.student.first_contact_reminder";
     String NOTIFY_STUDY_PLAN = "zsjos.student.study_plan_reminder";
     String NOTIFY_CONTACT = "zsjos.student.contact_reminder";

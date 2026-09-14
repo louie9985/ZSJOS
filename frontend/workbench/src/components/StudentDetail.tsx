@@ -8,7 +8,7 @@ import type { LeadDetailExtraTab } from './LeadDetail'
 import StudentInfoPanel from './StudentInfoPanel'
 import SubjectAvatar from './SubjectAvatar'
 
-export default function StudentDetail({ student, service, contactContext, contactRecords = [], toolbar, overviewSlots, overviewContent, contextHeader, extraTabs = [], activeTab: controlledActiveTab, onTabChange }: {
+export default function StudentDetail({ student, service, contactContext, contactRecords = [], toolbar, overviewSlots, overviewContent, contextHeader, extraTabs = [], activeTab: controlledActiveTab, onTabChange, overviewOnly = false }: {
   student: MyStudent
   service: MyStudent['services'][number]
   contactContext?: StudentContactContext
@@ -20,6 +20,7 @@ export default function StudentDetail({ student, service, contactContext, contac
   extraTabs?: LeadDetailExtraTab[]
   activeTab?: string
   onTabChange?: (key: string) => void
+  overviewOnly?: boolean
 }) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview')
   const studentContext = contactContext ? { service, contactContext, contactRecords } : undefined
@@ -28,7 +29,7 @@ export default function StudentDetail({ student, service, contactContext, contac
     key: 'overview',
     label: '概览',
     children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview student={student} showFollowUp={false} categoryLabel={() => '-'} channelLabel={() => '-'} toolbar={toolbar} studentContext={studentContext} studentService={service} slots={overviewSlots} />}</div>
-  }, ...(collectionLeadId && contactContext?.visibleTabs.includes('student-info') ? [{ key: 'student-info', label: '学员信息', children: <StudentInfoPanel key={collectionLeadId} leadId={collectionLeadId} /> }] : []), ...extraTabs]
+  }, ...(overviewOnly ? [] : (collectionLeadId && contactContext?.visibleTabs.includes('student-info') ? [{ key: 'student-info', label: '学员信息', children: <StudentInfoPanel key={collectionLeadId} leadId={collectionLeadId} /> }] : [])), ...extraTabs]
   const keys = new Set(items.map(item => item.key))
   const activeTab = controlledActiveTab && keys.has(controlledActiveTab)
     ? controlledActiveTab : keys.has(internalActiveTab) ? internalActiveTab : items[0]?.key

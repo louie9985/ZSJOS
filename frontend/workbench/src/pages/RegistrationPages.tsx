@@ -1,6 +1,6 @@
 import ProductSpecs from '../components/ProductSpecs'
 import { productSpecText } from '../services/productSpecs'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ClipboardEvent as ReactClipboardEvent } from "react";
 import {
   Alert,
   Badge,
@@ -27,13 +27,30 @@ import {
 } from "antd";
 import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
+import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import dayjs from "dayjs";
+import { ClipboardUploadButtons } from "../components/ClipboardPasteTarget";
 import LeadDetailOverview, { NameAvatar } from "../components/LeadDetailOverview";
 import LeadDetail from "../components/LeadDetail";
 import StudentDetail from "../components/StudentDetail";
 import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
 import { hasPermission } from "../services/managementAccess";
 import OverflowToolbar, { type ToolbarAction } from "../components/OverflowToolbar";
+import ResizableDetailDrawer from "../components/ResizableDetailDrawer";
+import { useInboxTableLayout } from "../services/inboxLayout";
+
+const STUDENT_TABLE_WIDTHS_KEY = "crm-student-management-table-widths";
+const clampStudentWidth = (value: number) => Math.max(100, Math.round(value));
+function readStudentWidths(): Record<string, number> {
+  try { const parsed = JSON.parse(window.localStorage.getItem(STUDENT_TABLE_WIDTHS_KEY) || "{}"); return Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isFinite(value)).map(([key, value]) => [key, clampStudentWidth(Number(value))])); } catch { return {}; }
+}
+function resizeStudentColumn(event: React.PointerEvent<HTMLElement>, width: number, onResize: (next: number) => void) {
+  if (event.currentTarget.getBoundingClientRect().right - event.clientX > 12) return;
+  event.preventDefault(); event.stopPropagation(); const startX = event.clientX;
+  const move = (next: PointerEvent) => onResize(clampStudentWidth(width + next.clientX - startX));
+  const done = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", done); };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", done, { once: true });
+}
 import {
   api,
   type DictData,
@@ -502,11 +519,11 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                     ))}
                   </div>
                 </div>
-                <Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                <ClipboardUploadButtons disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled"].includes(selected.status)} canPaste={() => !attachmentSavingIds.has(item.id) && (item.attachments?.length || 0) < 9 && !["completed", "cancelled"].includes(selected.status)} onFiles={files => { const file = files[0]; if (file) void uploadAttachment(item, file) }}><Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
                   disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled"].includes(selected.status)}
                   beforeUpload={(file) => { void uploadAttachment(item, file); return Upload.LIST_IGNORE; }}>
                   <Button icon={<UploadOutlined />} loading={attachmentSavingIds.has(item.id)}>上传附件</Button>
-                </Upload>
+                </Upload></ClipboardUploadButtons>
               </div>
             ) : (
               <div className="registration-checklist-row" key={item.id}>
@@ -668,6 +685,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 }
 
 export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+  const { useTableLayout } = useInboxTableLayout();
   const location = useLocation();
   const taskTarget = location.state as { personId?: number; serviceRelationId?: number; classId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedPersonId = Number(taskTarget?.personId) || undefined;
@@ -675,6 +693,10 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   const requestedClassId = Number(taskTarget?.classId) || undefined;
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [studentColumnWidths, setStudentColumnWidths] = useState<Record<string, number>>(() => typeof window === "undefined" ? {} : readStudentWidths());
+  const [studentSort, setStudentSort] = useState<{ key?: string; order?: "ascend" | "descend" }>({});
+  useEffect(() => { window.localStorage.setItem(STUDENT_TABLE_WIDTHS_KEY, JSON.stringify(studentColumnWidths)); }, [studentColumnWidths]);
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
   const [selectedServiceId, setSelectedServiceId] = useState<number>();
   const [repurchaseOpen, setRepurchaseOpen] = useState(false);
@@ -941,6 +963,32 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   ) : (
     <Empty description="从左侧选择一名学员" />
   );
+  const studentTableColumnSource: ProColumns<MyStudent>[] = [
+    { title: "学员姓名", dataIndex: "name", width: 170, render: (_, row) => <Space><NameAvatar name={row.name || "学员"} seed={row.personNo} size={30} subjectType="student" /><Typography.Text strong>{row.name || "未填写姓名"}</Typography.Text></Space> },
+    { title: "客资编号", dataIndex: "leadNo", width: 150, render: value => value || "暂无客资编号" },
+    { title: "手机号", dataIndex: "mobile", width: 140, render: value => value || "-" },
+    { title: "微信号", dataIndex: "wechatId", width: 140, render: value => value || "-" },
+    { title: "班级", width: 180, render: (_, row) => row.services?.find(service => service.className)?.className || "未分班" },
+    { title: "课程服务", width: 240, render: (_, row) => row.services?.map(service => service.courseName || service.skuName || "课程服务").join("、") || "-" },
+    { title: "服务状态", width: 140, render: (_, row) => <Space wrap>{row.services?.map(service => <Tag key={service.serviceRelationId} color={service.status === "active" ? "success" : undefined}>{serviceStatusLabel(service.status)}</Tag>) || "-"}</Space> },
+    { title: "订单号", width: 170, render: (_, row) => row.services?.map(service => service.orderNo || `订单 ${service.orderId}`).join("、") || "-" },
+    { title: "激活时间", key: "activatedAt", width: 180, sorter: true, render: (_, row) => formatTimestamp(row.activatedAt) }
+  ];
+  const studentTableColumns = studentTableColumnSource.map(column => {
+    const key = String(column.key || column.dataIndex || column.title);
+    const width = studentColumnWidths[key] ?? Number(column.width || 140);
+    return { ...column, key, width, ellipsis: true, sortOrder: studentSort.key === key ? studentSort.order : null,
+      onHeaderCell: () => ({ onPointerDownCapture: (event: React.PointerEvent<HTMLElement>) => resizeStudentColumn(event, width, next => setStudentColumnWidths(current => ({ ...current, [key]: next }))) }) };
+  });
+  const studentTableRows = useMemo(() => {
+    if (!studentSort.key || !studentSort.order) return rows;
+    const direction = studentSort.order === "ascend" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = studentSort.key === "activatedAt" ? new Date(String(a.activatedAt || 0)).getTime() : String(a.name || "");
+      const bv = studentSort.key === "activatedAt" ? new Date(String(b.activatedAt || 0)).getTime() : String(b.name || "");
+      return (av < bv ? -1 : av > bv ? 1 : 0) * direction;
+    });
+  }, [rows, studentSort]);
   return (
     <section className="workspace-page registration-page">
       <header className="registration-filter-shell">
@@ -953,7 +1001,22 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
       {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
-      <div className="lead-inbox-layout">
+      {useTableLayout ? <ProTable<MyStudent>
+        className="lead-management-table"
+        rowKey="personId"
+        search={false}
+        toolBarRender={() => [<Space key="student-filters" wrap><Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}
+        options={{ density: true, fullScreen: true, setting: true, reload: () => { void load(1, { force: true }); void loadDictionaries() } }}
+        columnsState={{ persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
+        loading={loading}
+        dataSource={studentTableRows}
+        pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], onChange: value => void load(value) }}
+        scroll={{ x: 1400 }}
+        locale={{ emptyText: error ? "学员列表加载失败" : "当前筛选下暂无学员" }}
+        onRow={row => ({ onClick: () => { void loadStudent(row.personId); setDrawerOpen(true); } })}
+        columns={studentTableColumns}
+        onChange={(_, __, sorter) => { const active = Array.isArray(sorter) ? sorter[0] : sorter; setStudentSort({ key: String(active?.columnKey || ""), order: active?.order || undefined }); }}
+      /> : <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
             <Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} optionFilterProp="label" value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: '100%', marginBottom: 8 }}
@@ -1011,6 +1074,10 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
                         {row.mobile || "无手机号"} ·{" "}
                         {row.wechatId || "无微信号"}
                       </span>
+                      <span>
+                        {row.services?.find((service) => service.className)
+                          ?.className || "未分班"}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -1029,7 +1096,8 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
           )}
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
-      </div>
+      </div>}
+      {useTableLayout && <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="学员详情" placement="right" width="860px">{detailContent}</ResizableDetailDrawer>}
       {repurchaseOpen && selected && <SalesOrderEntryModal
         lead={{ id: selected.personId, submittedName: selected.name || '', submittedMobile: selected.mobile, submittedWechatId: selected.wechatId,
           provinceCode: leadDetail?.provinceCode, provinceName: leadDetail?.provinceName, cityCode: leadDetail?.cityCode, cityName: leadDetail?.cityName }}
@@ -1112,12 +1180,12 @@ function StudentContactForm({
     <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
     <Space wrap className="student-contact-time-shortcuts">{FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => <Button key={shortcut.key} size="small" onClick={() => form.setFieldValue("nextContactAt", applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>)}</Space>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const successful = getFieldValue("successful") === true; const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact"; const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0; const extended = Boolean(value && timeout && new Date(String(value)).getTime() > Date.now() + timeout * 60000); return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
-    <Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>添加附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space>
+    <ClipboardUploadButtons disabled={attachmentUploads.length >= 20} canPaste={() => attachmentUploads.length < 20} onFiles={files => { const file = files[0]; if (!file) return; const uid = `paste-${Date.now()}`; setAttachmentUploads(items => [...items, { uid, name: file.name, status: "uploading" }]); void api.studentContactUpload(relationId, file).then(uploaded => { setAttachmentUploads(items => items.map(item => item.uid === uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); }).catch(error => { setAttachmentUploads(items => items.map(item => item.uid === uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); }) }}><Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>上传附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space></ClipboardUploadButtons>
     <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首联" : taskType === "student_study_plan" ? "学习计划" : "普通跟进"}</Button></Space>
   </Form>;
 }
 
-function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, children }: {
+export function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, children }: {
   student: MyStudent;
   service: MyStudent["services"][number];
   context: import("../services/api").StudentContactContext;

@@ -2,14 +2,78 @@
   "schemaVersion": 1,
   "assets": [
     {
+      "processKey": "zsjos_class_transfer",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "originalSupervisorReview"
+      ],
+      "businessVariables": [
+        "classTransferRequestId",
+        "serviceRelationId",
+        "fromClassId",
+        "targetClassId",
+        "reviewerUserId"
+      ],
+      "assigneeVariables": [],
+      "runtimeOnlyVariables": [
+        "classTransferRequestId",
+        "serviceRelationId",
+        "fromClassId",
+        "targetClassId",
+        "reviewerUserId"
+      ],
+      "businessKeyFormat": "class-transfer:{requestId}",
+      "minimumMigration": "V188",
+      "path": "zsjos_class_transfer/1.0.0/process-model.json",
+      "sha256": "09928c6b9fa9e0b78a03a4bd49c6d25cd4c92d6c1179ba7c6d5cc0737c4017f8"
+    },
+    {
       "processKey": "eam_asset_transfer",
       "assetVersion": "1.0.0",
       "recommended": true,
       "assetFormat": "simple",
-      "taskKeys": ["departmentLeaderReview", "sourceDepartmentReview", "targetDepartmentReview", "assetAdministratorReview", "receiverSign"],
-      "businessVariables": ["transferId", "transferType", "assetId", "assetCode", "fromEmployeeId", "fromDeptId", "toEmployeeId", "toDeptId", "expectedReturnDate", "isAllocate", "sameDepartment"],
-      "assigneeVariables": ["departmentLeaderUsers", "sourceDepartmentUsers", "targetDepartmentUsers", "assetAdministratorUsers", "receiverUsers"],
-      "runtimeOnlyVariables": ["transferId", "transferType", "assetId", "assetCode", "fromEmployeeId", "fromDeptId", "toEmployeeId", "toDeptId", "expectedReturnDate", "isAllocate", "sameDepartment"],
+      "taskKeys": [
+        "departmentLeaderReview",
+        "sourceDepartmentReview",
+        "targetDepartmentReview",
+        "assetAdministratorReview",
+        "receiverSign"
+      ],
+      "businessVariables": [
+        "transferId",
+        "transferType",
+        "assetId",
+        "assetCode",
+        "fromEmployeeId",
+        "fromDeptId",
+        "toEmployeeId",
+        "toDeptId",
+        "expectedReturnDate",
+        "isAllocate",
+        "sameDepartment"
+      ],
+      "assigneeVariables": [
+        "departmentLeaderUsers",
+        "sourceDepartmentUsers",
+        "targetDepartmentUsers",
+        "assetAdministratorUsers",
+        "receiverUsers"
+      ],
+      "runtimeOnlyVariables": [
+        "transferId",
+        "transferType",
+        "assetId",
+        "assetCode",
+        "fromEmployeeId",
+        "fromDeptId",
+        "toEmployeeId",
+        "toDeptId",
+        "expectedReturnDate",
+        "isAllocate",
+        "sameDepartment"
+      ],
       "businessKeyFormat": "asset-transfer:{transferId}:round:{roundNo}",
       "minimumMigration": "EAM-V010",
       "path": "eam_asset_transfer/1.0.0/process-model.json",
@@ -18,11 +82,31 @@
     {
       "processKey": "zsjos_feedback_requirement_approval",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["departmentLeaderReview", "chairmanReview"],
-      "businessVariables": ["feedbackId", "workOrderId", "feedbackNo", "roundNo", "hasDepartmentLeader"],
-      "assigneeVariables": ["departmentLeaderUsers", "departmentLeaderAssignee", "chairmanUsers", "chairmanAssignee"],
-      "runtimeOnlyVariables": ["feedbackId", "workOrderId", "feedbackNo", "roundNo", "hasDepartmentLeader"],
+      "recommended": false,
+      "taskKeys": [
+        "departmentLeaderReview",
+        "chairmanReview"
+      ],
+      "businessVariables": [
+        "feedbackId",
+        "workOrderId",
+        "feedbackNo",
+        "roundNo",
+        "hasDepartmentLeader"
+      ],
+      "assigneeVariables": [
+        "departmentLeaderUsers",
+        "departmentLeaderAssignee",
+        "chairmanUsers",
+        "chairmanAssignee"
+      ],
+      "runtimeOnlyVariables": [
+        "feedbackId",
+        "workOrderId",
+        "feedbackNo",
+        "roundNo",
+        "hasDepartmentLeader"
+      ],
       "businessKeyFormat": "feedback:{workOrderId}:round:{roundNo}",
       "minimumMigration": "V149",
       "path": "zsjos_feedback_requirement_approval/1.0.0/process.bpmn20.xml",
@@ -31,11 +115,24 @@
     {
       "processKey": "zsjos_media_reposition",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["operatorReviewer"],
-      "businessVariables": ["positioningCardId", "accountId", "reason"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["positioningCardId", "accountId", "reason"],
+      "recommended": false,
+      "taskKeys": [
+        "operatorReviewer"
+      ],
+      "businessVariables": [
+        "positioningCardId",
+        "accountId",
+        "reason"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "positioningCardId",
+        "accountId",
+        "reason"
+      ],
       "businessKeyFormat": "media-reposition:{positioningCardId}:v{versionNo}",
       "minimumMigration": "V096",
       "path": "zsjos_media_reposition/1.0.0/process.bpmn20.xml",
@@ -44,11 +141,24 @@
     {
       "processKey": "zsjos_media_rebind",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["managerReviewer"],
-      "businessVariables": ["accountId", "fromStudentId", "toStudentId"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["accountId", "fromStudentId", "toStudentId"],
+      "recommended": false,
+      "taskKeys": [
+        "managerReviewer"
+      ],
+      "businessVariables": [
+        "accountId",
+        "fromStudentId",
+        "toStudentId"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "accountId",
+        "fromStudentId",
+        "toStudentId"
+      ],
       "businessKeyFormat": "media-rebind:{accountId}:v{versionNo}",
       "minimumMigration": "V096",
       "path": "zsjos_media_rebind/1.0.0/process.bpmn20.xml",
@@ -57,11 +167,24 @@
     {
       "processKey": "zsjos_media_over_entitlement",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["entitlementReviewer"],
-      "businessVariables": ["ticketId", "remainingCount", "handling"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["ticketId", "remainingCount", "handling"],
+      "recommended": false,
+      "taskKeys": [
+        "entitlementReviewer"
+      ],
+      "businessVariables": [
+        "ticketId",
+        "remainingCount",
+        "handling"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "ticketId",
+        "remainingCount",
+        "handling"
+      ],
       "businessKeyFormat": "media-over-entitlement:{ticketId}:v{versionNo}",
       "minimumMigration": "V096",
       "path": "zsjos_media_over_entitlement/1.0.0/process.bpmn20.xml",
@@ -70,11 +193,22 @@
     {
       "processKey": "zsjos_media_positioning_ip",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["ipReviewer"],
-      "businessVariables": ["positioningCardId", "accountId"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["positioningCardId", "accountId"],
+      "recommended": false,
+      "taskKeys": [
+        "ipReviewer"
+      ],
+      "businessVariables": [
+        "positioningCardId",
+        "accountId"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "positioningCardId",
+        "accountId"
+      ],
       "businessKeyFormat": "positioning-card:{positioningCardId}:v{versionNo}",
       "minimumMigration": "V096",
       "path": "zsjos_media_positioning_ip/1.0.0/process.bpmn20.xml",
@@ -83,11 +217,29 @@
     {
       "processKey": "zsjos_sales_order_dual_approval",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["registrationReview", "financeReview"],
-      "businessVariables": ["orderId", "leadId", "personId", "roundNo"],
-      "assigneeVariables": ["registrationUsers", "financeUsers", "registrationAssignee", "financeAssignee"],
-      "runtimeOnlyVariables": ["orderId", "leadId", "personId", "roundNo"],
+      "recommended": false,
+      "taskKeys": [
+        "registrationReview",
+        "financeReview"
+      ],
+      "businessVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo"
+      ],
+      "assigneeVariables": [
+        "registrationUsers",
+        "financeUsers",
+        "registrationAssignee",
+        "financeAssignee"
+      ],
+      "runtimeOnlyVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo"
+      ],
       "businessKeyFormat": "sales-order:{orderId}",
       "minimumMigration": "V023",
       "path": "zsjos_sales_order_dual_approval/1.0.0/process.bpmn20.xml",
@@ -96,11 +248,26 @@
     {
       "processKey": "zsjos_lead_appeal_review",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["appealReview"],
-      "businessVariables": ["appealId", "leadId", "roundNo", "reviewStage"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["appealId", "leadId", "roundNo", "reviewStage"],
+      "recommended": false,
+      "taskKeys": [
+        "appealReview"
+      ],
+      "businessVariables": [
+        "appealId",
+        "leadId",
+        "roundNo",
+        "reviewStage"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "appealId",
+        "leadId",
+        "roundNo",
+        "reviewStage"
+      ],
       "businessKeyFormat": "lead-appeal:{appealId}",
       "minimumMigration": "V024",
       "path": "zsjos_lead_appeal_review/1.0.0/process.bpmn20.xml",
@@ -109,11 +276,26 @@
     {
       "processKey": "zsjos_lead_transfer_request",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["ownerManagerReview"],
-      "businessVariables": ["requestId", "leadId", "fromOwnerUserId", "requestedOwnerUserId"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["requestId", "leadId", "fromOwnerUserId", "requestedOwnerUserId"],
+      "recommended": false,
+      "taskKeys": [
+        "ownerManagerReview"
+      ],
+      "businessVariables": [
+        "requestId",
+        "leadId",
+        "fromOwnerUserId",
+        "requestedOwnerUserId"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "requestId",
+        "leadId",
+        "fromOwnerUserId",
+        "requestedOwnerUserId"
+      ],
       "businessKeyFormat": "lead-transfer:{requestId}",
       "minimumMigration": "V034",
       "path": "zsjos_lead_transfer_request/1.0.0/process.bpmn20.xml",
@@ -122,11 +304,22 @@
     {
       "processKey": "zsjos_partner_withdrawal",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["financeReview"],
-      "businessVariables": ["withdrawalId", "applicationAmount"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["withdrawalId", "applicationAmount"],
+      "recommended": false,
+      "taskKeys": [
+        "financeReview"
+      ],
+      "businessVariables": [
+        "withdrawalId",
+        "applicationAmount"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "withdrawalId",
+        "applicationAmount"
+      ],
       "businessKeyFormat": "withdrawal:{withdrawalId}",
       "minimumMigration": "V052",
       "path": "zsjos_partner_withdrawal/1.0.0/process.bpmn20.xml",
@@ -135,15 +328,342 @@
     {
       "processKey": "zsjos_student_contact_extension",
       "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["deliverySupervisorReview"],
-      "businessVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
+      "recommended": false,
+      "taskKeys": [
+        "deliverySupervisorReview"
+      ],
+      "businessVariables": [
+        "extensionId",
+        "serviceRelationId",
+        "requestedDueAt"
+      ],
+      "assigneeVariables": [
+        "coll_userList",
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "extensionId",
+        "serviceRelationId",
+        "requestedDueAt"
+      ],
       "businessKeyFormat": "student-contact-extension:{extensionId}",
       "minimumMigration": "V094",
       "path": "zsjos_student_contact_extension/1.0.0/process.bpmn20.xml",
       "sha256": "0f86f6fb459d56cab490b46e9ff983571089a88ecccf988c586908c95ad6d4ec"
+    },
+    {
+      "processKey": "zsjos_feedback_requirement_approval",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "departmentLeaderReview",
+        "chairmanReview"
+      ],
+      "businessVariables": [
+        "feedbackId",
+        "workOrderId",
+        "feedbackNo",
+        "roundNo",
+        "hasDepartmentLeader"
+      ],
+      "assigneeVariables": [
+        "departmentLeaderUsers",
+        "chairmanUsers"
+      ],
+      "runtimeOnlyVariables": [
+        "feedbackId",
+        "workOrderId",
+        "feedbackNo",
+        "roundNo",
+        "hasDepartmentLeader",
+        "departmentLeaderUsers",
+        "chairmanUsers"
+      ],
+      "businessKeyFormat": "feedback:{workOrderId}:round:{roundNo}",
+      "minimumMigration": "V149",
+      "path": "zsjos_feedback_requirement_approval/2.0.0/process-model.json",
+      "sha256": "3e82ec752e2fb66f7caa0ea132f8486ed5b891275e12fd1d547c44317c01a16d",
+      "startUserSelectTaskKeys": [
+        "departmentLeaderReview",
+        "chairmanReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_media_reposition",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "operatorReviewer"
+      ],
+      "businessVariables": [
+        "positioningCardId",
+        "accountId",
+        "reason"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "positioningCardId",
+        "accountId",
+        "reason",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "media-reposition:{positioningCardId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_reposition/2.0.0/process-model.json",
+      "sha256": "a16a320ad2d0ae8d39ac023cd3d5a0063a186c2cdabcee81ffd025c71ffb368f",
+      "startUserSelectTaskKeys": [
+        "operatorReviewer"
+      ]
+    },
+    {
+      "processKey": "zsjos_media_rebind",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "managerReviewer"
+      ],
+      "businessVariables": [
+        "accountId",
+        "fromStudentId",
+        "toStudentId"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "accountId",
+        "fromStudentId",
+        "toStudentId",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "media-rebind:{accountId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_rebind/2.0.0/process-model.json",
+      "sha256": "7838a35bf7b52150485bae8ad8c3e88af1ce627551e27a785fb2fbad7ab05253",
+      "startUserSelectTaskKeys": [
+        "managerReviewer"
+      ]
+    },
+    {
+      "processKey": "zsjos_media_over_entitlement",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "entitlementReviewer"
+      ],
+      "businessVariables": [
+        "ticketId",
+        "remainingCount",
+        "handling"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "ticketId",
+        "remainingCount",
+        "handling",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "media-over-entitlement:{ticketId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_over_entitlement/2.0.0/process-model.json",
+      "sha256": "0aa59436bfa67df48ccc3c3e8e17e8f415de68285c54f760aae809a2eec50c3c",
+      "startUserSelectTaskKeys": [
+        "entitlementReviewer"
+      ]
+    },
+    {
+      "processKey": "zsjos_media_positioning_ip",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "ipReviewer"
+      ],
+      "businessVariables": [
+        "positioningCardId",
+        "accountId"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "positioningCardId",
+        "accountId",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "positioning-card:{positioningCardId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_positioning_ip/2.0.0/process-model.json",
+      "sha256": "ae305666854dee9ca902488e419490c19cd50d0c63e842a191de060a1bae770f",
+      "startUserSelectTaskKeys": [
+        "ipReviewer"
+      ]
+    },
+    {
+      "processKey": "zsjos_sales_order_dual_approval",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "registrationReview",
+        "financeReview"
+      ],
+      "businessVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo"
+      ],
+      "assigneeVariables": [
+        "registrationUsers",
+        "financeUsers"
+      ],
+      "runtimeOnlyVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo",
+        "registrationUsers",
+        "financeUsers"
+      ],
+      "businessKeyFormat": "sales-order:{orderId}",
+      "minimumMigration": "V023",
+      "path": "zsjos_sales_order_dual_approval/2.0.0/process-model.json",
+      "sha256": "d980cf49e727d4cf7fd82aa92a81e74197bb600168a3fed6be90975eadc223ae",
+      "startUserSelectTaskKeys": [
+        "registrationReview",
+        "financeReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_lead_appeal_review",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "appealReview"
+      ],
+      "businessVariables": [
+        "appealId",
+        "leadId",
+        "roundNo",
+        "reviewStage"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "appealId",
+        "leadId",
+        "roundNo",
+        "reviewStage",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "lead-appeal:{appealId}",
+      "minimumMigration": "V024",
+      "path": "zsjos_lead_appeal_review/2.0.0/process-model.json",
+      "sha256": "97b7dde00f1e4ee0e491cc8e35afde981a564ff9c891efb7f7c40a6ba4fab314",
+      "startUserSelectTaskKeys": [
+        "appealReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_lead_transfer_request",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "ownerManagerReview"
+      ],
+      "businessVariables": [
+        "requestId",
+        "leadId",
+        "fromOwnerUserId",
+        "requestedOwnerUserId"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "requestId",
+        "leadId",
+        "fromOwnerUserId",
+        "requestedOwnerUserId",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "lead-transfer:{requestId}",
+      "minimumMigration": "V034",
+      "path": "zsjos_lead_transfer_request/2.0.0/process-model.json",
+      "sha256": "f4071ef54cb666aa91f34f4b414f87d80d103ed0fc0329dfefdfb5b7e8353aaa",
+      "startUserSelectTaskKeys": [
+        "ownerManagerReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_partner_withdrawal",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "financeReview"
+      ],
+      "businessVariables": [
+        "withdrawalId",
+        "applicationAmount"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "withdrawalId",
+        "applicationAmount",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "withdrawal:{withdrawalId}",
+      "minimumMigration": "V052",
+      "path": "zsjos_partner_withdrawal/2.0.0/process-model.json",
+      "sha256": "7ae63924eb86322b94d60f59d0cb62769dae2902c6875078d4e2ccff1a5fe828",
+      "startUserSelectTaskKeys": [
+        "financeReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_student_contact_extension",
+      "assetVersion": "2.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "deliverySupervisorReview"
+      ],
+      "businessVariables": [
+        "extensionId",
+        "serviceRelationId",
+        "requestedDueAt"
+      ],
+      "assigneeVariables": [
+        "coll_userList"
+      ],
+      "runtimeOnlyVariables": [
+        "extensionId",
+        "serviceRelationId",
+        "requestedDueAt",
+        "coll_userList"
+      ],
+      "businessKeyFormat": "student-contact-extension:{extensionId}",
+      "minimumMigration": "V094",
+      "path": "zsjos_student_contact_extension/2.0.0/process-model.json",
+      "sha256": "c975f8d85f9e08184de8781786763a18e4054e4251b12600829eb1b98a44db9f",
+      "startUserSelectTaskKeys": [
+        "deliverySupervisorReview"
+      ]
     }
   ]
 }

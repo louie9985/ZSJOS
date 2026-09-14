@@ -34,6 +34,18 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        // Responsibility is cumulative: the service owner can also be its director.
+        if (Set.of("director-precheck", "director-interview").contains(action)) {
+            return "active".equals(relation.getStatus())
+                    && "accepted".equals(relation.getAcceptanceStatus())
+                    && Objects.equals(relation.getContentDirectorUserId(), userId);
+        }
+        if ("create-account".equals(action)) {
+            return "active".equals(relation.getStatus())
+                    && "accepted".equals(relation.getAcceptanceStatus())
+                    && (Objects.equals(relation.getContentDirectorUserId(), userId)
+                        || Objects.equals(relation.getOperatorUserId(), userId));
+        }
         if ("direct-transfer".equals(action) && Set.of("active", "paused", "completed").contains(relation.getStatus())) {
             DeliveryClassDO source = relation.getClassId() == null ? null : deliveryClassMapper.selectById(relation.getClassId());
             return source != null && (Boolean.TRUE.equals(source.getSystemClass())
@@ -55,9 +67,6 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         }
         if ("assign".equals(action) && Objects.equals(relation.getContentDirectorUserId(), userId)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) return true;
-        if (Set.of("director-precheck", "director-interview").contains(action)
-                && "accepted".equals(relation.getAcceptanceStatus())
-                && Objects.equals(relation.getContentDirectorUserId(), userId)) return true;
         return "assign".equals(action) && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
     }
 

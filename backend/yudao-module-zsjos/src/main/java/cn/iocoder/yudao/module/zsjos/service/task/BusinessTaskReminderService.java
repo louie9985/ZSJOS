@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.zsjos.service.task;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.system.api.notify.NotifyRuleApi;
+import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyTimingRuleRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -17,6 +19,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskNotifyStageMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadNotifyEventPublisher;
 import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactNotifyPublisher;
@@ -44,15 +47,18 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 public class BusinessTaskReminderService {
     private static final List<String> TASK_TYPES = List.of(
             TASK_TYPE_FIRST_FOLLOW_UP, TASK_TYPE_FOLLOW_UP_REMINDER, TASK_TYPE_QUALIFICATION,
-            TYPE_FIRST_CONTACT, TYPE_STUDY_PLAN, TYPE_CONTACT);
+            TYPE_FIRST_CONTACT, TYPE_STUDY_PLAN, TYPE_CONTACT,
+            TASK_TYPE_ACCOUNT_DIAGNOSIS_7D, TASK_TYPE_ACCOUNT_DIAGNOSIS_14D, TASK_TYPE_ACCOUNT_DIAGNOSIS_28D,
+            "student_delivery_confirmation");
     private static final List<String> SCENES = List.of(
             FIRST_FOLLOW_UP_REMINDER, NEXT_FOLLOW_UP_REMINDER, QUALIFICATION_REMINDER,
-            NOTIFY_FIRST_CONTACT, NOTIFY_STUDY_PLAN, NOTIFY_CONTACT);
+            NOTIFY_FIRST_CONTACT, NOTIFY_STUDY_PLAN, NOTIFY_CONTACT, "media.account.diagnosis", "student.delivery.confirmation");
 
     @Resource private BusinessTaskMapper taskMapper;
     @Resource private BusinessTaskNotifyStageMapper stageMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private NotifyRuleApi notifyRuleApi;
+    @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private StudentContactNotifyPublisher studentNotifyPublisher;
     @Resource private AdminUserApi adminUserApi;
@@ -60,6 +66,7 @@ public class BusinessTaskReminderService {
     @Resource private PermissionApi permissionApi;
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private ServiceRelationMapper relationMapper;
+    @Resource private MediaAccountMapper mediaAccountMapper;
 
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "business-task.emit-reminders", targetType = "business-task")
     @Transactional(rollbackFor = Exception.class)
@@ -110,6 +117,42 @@ public class BusinessTaskReminderService {
             }
             return 1;
         }
+        if ("media_account_diagnosis".equals(task.getBizType())) {
+            Long supervisorId = currentSupervisorForDiagnosis(task.getAssigneeId());
+            var account = mediaAccountMapper.selectById(task.getBizId());
+            context.put("supervisorUserId", supervisorId);
+            context.put("directorUserId", task.getAssigneeId());
+            context.put("accountName", account == null || account.getNickname() == null ? "未命名账号" : account.getNickname());
+            notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().tenantId(TenantContextHolder.getRequiredTenantId())
+                    .sceneCode(scene).sourceEventKey("media-account-diagnosis:" + task.getId() + ":" + urgent.getTimingStage())
+                    .targetRuleId(urgent.getId()).bizType(task.getBizType()).bizId(task.getBizId()).operatorUserId(task.getAssigneeId())
+                    .occurredAt(now).payload(context).build());
+            return 1;
+        }
+        if ("student_delivery_confirmation".equals(task.getTaskType())) {
+            context.put("assigneeUserId", task.getAssigneeId());
+            if (task.getPayload() != null) {
+                try {
+                    Map<?, ?> payload = JsonUtils.parseObject(task.getPayload(), Map.class);
+                    if (payload != null) payload.forEach((key, value) -> context.put(String.valueOf(key), value));
+                } catch (RuntimeException ignored) {
+                    // A malformed optional payload must not prevent the assignee reminder.
+                }
+            }
+            Object accountId = context.get("accountId");
+            if (accountId instanceof Number number) {
+                var account = mediaAccountMapper.selectById(number.longValue());
+                context.put("accountName", account == null || account.getNickname() == null
+                        ? "未命名账号" : account.getNickname());
+                context.put("deepLink", "/zsjos/media-students?accountId=" + number.longValue()
+                        + "&taskId=" + task.getId() + "&taskType=student_delivery_stage");
+            }
+            notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().tenantId(TenantContextHolder.getRequiredTenantId())
+                    .sceneCode(scene).sourceEventKey("student-delivery-reminder:" + task.getId() + ":" + urgent.getTimingStage())
+                    .targetRuleId(urgent.getId()).bizType(task.getBizType()).bizId(task.getBizId())
+                    .operatorUserId(task.getAssigneeId()).occurredAt(now).payload(context).build());
+            return 1;
+        }
         LeadDO lead = leadMapper.selectById(task.getBizId());
         context.put("ownerUserId", task.getAssigneeId());
         context.put("submitterUserId", lead == null ? null : lead.getSourceUserId());
@@ -151,6 +194,8 @@ public class BusinessTaskReminderService {
 
     private String sceneFor(String taskType) {
         return switch (taskType) {
+            case TASK_TYPE_ACCOUNT_DIAGNOSIS_7D, TASK_TYPE_ACCOUNT_DIAGNOSIS_14D, TASK_TYPE_ACCOUNT_DIAGNOSIS_28D -> "media.account.diagnosis";
+            case "student_delivery_confirmation" -> "student.delivery.confirmation";
             case TASK_TYPE_FIRST_FOLLOW_UP -> FIRST_FOLLOW_UP_REMINDER;
             case TASK_TYPE_QUALIFICATION -> QUALIFICATION_REMINDER;
             case TYPE_FIRST_CONTACT -> NOTIFY_FIRST_CONTACT;
@@ -168,6 +213,15 @@ public class BusinessTaskReminderService {
         return supervisor == null || plannerUserId.equals(supervisorId)
                 || !CommonStatusEnum.ENABLE.getStatus().equals(supervisor.getStatus())
                 || !permissionApi.hasAnyPermissions(supervisorId, PERMISSION_EXTENSION_REVIEW) ? null : supervisorId;
+    }
+
+    private Long currentSupervisorForDiagnosis(Long directorUserId) {
+        AdminUserRespDTO director = adminUserApi.getUser(directorUserId);
+        DeptRespDTO dept = director == null || director.getDeptId() == null ? null : deptApi.getDept(director.getDeptId());
+        Long supervisorId = dept == null ? null : dept.getLeaderUserId();
+        AdminUserRespDTO supervisor = supervisorId == null ? null : adminUserApi.getUser(supervisorId);
+        return supervisor == null || Objects.equals(supervisorId, directorUserId)
+                || !CommonStatusEnum.ENABLE.getStatus().equals(supervisor.getStatus()) ? null : supervisorId;
     }
 
     private void createAssistanceTask(BusinessTaskDO task, Long supervisorId) {

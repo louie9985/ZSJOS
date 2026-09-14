@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_STAGE;
-import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_TYPE;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PERSONA_TYPE;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PROFESSION;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_COLLECTION_INVALID;
 
@@ -106,7 +106,7 @@ public class ContentReviewMaterialService {
     private Map<String, MaterialSchemaService.DictionarySnapshotValue> sourceDictionarySnapshots(
             Map<String, Object> account) {
         Map<String, MaterialSchemaService.DictionarySnapshotValue> snapshots = new LinkedHashMap<>();
-        putDictionarySnapshot(snapshots, "accountType", DICT_ACCOUNT_TYPE,
+        putDictionarySnapshot(snapshots, "accountType", DICT_PERSONA_TYPE,
                 account.get("accountTypePrimaryValue"), account.get("accountTypePrimaryLabel"));
         putDictionarySnapshot(snapshots, "profession", DICT_PROFESSION,
                 account.get("trackPrimaryValue"), account.get("trackPrimaryLabel"));

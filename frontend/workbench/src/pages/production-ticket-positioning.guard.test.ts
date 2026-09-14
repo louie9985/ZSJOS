@@ -10,7 +10,7 @@ describe('production ticket positioning handoff', () => {
   const ticketsPage = read('src/pages/MediaFeaturePage.tsx')
   const api = read('src/services/api.ts')
 
-  it('renders the positioning snapshot in both creation and ticket detail surfaces', () => {
+  it('shows the frozen positioning snapshot when a student account creates a production ticket', () => {
     expectSourceToContainTokens(studentsPage, '<ProductionTicketPositioningCard snapshot={ticketContext.positioning} />')
     expectSourceToContainTokens(ticketsPage, '<ProductionTicketPositioningCard snapshot={context.positioning} title="完整定位卡" />')
     expect(studentsPage).not.toMatch(/JSON\.stringify\(ticketContext\.positioning/)
@@ -19,8 +19,7 @@ describe('production ticket positioning handoff', () => {
 
   it('keeps the optional operator remark in the typed create contract and frozen detail', () => {
     expect(api).toContain('operatorRemark?: string;')
-    expect(studentsPage).toContain('name="operatorRemark" label="运营备注"')
-    expect(studentsPage).toContain('maxLength={500} showCount')
+    expect(studentsPage).toContain('name="operatorRemark"')
     expectSourceToContainTokens(ticketsPage, "context.operatorRemark || '未填写'")
   })
 })

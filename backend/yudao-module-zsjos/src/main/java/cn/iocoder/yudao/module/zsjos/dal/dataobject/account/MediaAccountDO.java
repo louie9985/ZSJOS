@@ -77,5 +77,9 @@ public class MediaAccountDO extends TenantBaseDO {
     private Long rebindReviewerUserId;
     private String rebindStatus;
     private String rebindResultReason;
+    private Long createServiceRelationId;
+    private Long createOperatorUserId;
+    private String createIdempotencyKey;
+    private String createRequestFingerprint;
     private Integer version;
 }

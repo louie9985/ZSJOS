@@ -36,12 +36,15 @@ BEGIN
   BEGIN
     ROLLBACK;
     IF lock_acquired = 1 THEN
-      DO RELEASE_LOCK(CONCAT(DATABASE(), ':V133-director-interview-form-presentation'));
+      DO RELEASE_LOCK(CONCAT(DATABASE(), ':V133-director-interview'));
     END IF;
     RESIGNAL;
   END;
 
-  SELECT GET_LOCK(CONCAT(DATABASE(), ':V133-director-interview-form-presentation'), 30) INTO lock_acquired;
+  -- MySQL caps user-level lock names at 64 characters, so the suffix stays short: the full
+  -- form-presentation name overflows for any database name longer than 22 characters, GET_LOCK
+  -- then returns NULL and this SIGNAL aborts the whole bootstrap at V133.
+  SELECT GET_LOCK(CONCAT(DATABASE(), ':V133-director-interview'), 30) INTO lock_acquired;
   IF lock_acquired <> 1 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unable to acquire V133 migration lock';
   END IF;
@@ -138,7 +141,7 @@ BEGIN
     VALUES ('V133','director interview form presentation',SHA2('V133__director_interview_form_presentation.sql',256),NOW());
   END IF;
   COMMIT;
-  DO RELEASE_LOCK(CONCAT(DATABASE(), ':V133-director-interview-form-presentation'));
+  DO RELEASE_LOCK(CONCAT(DATABASE(), ':V133-director-interview'));
 END$$
 
 CALL `zsjos_apply_v133`()$$

@@ -184,7 +184,7 @@
                   >删除</el-button
                 ></div
               >
-              <el-upload
+              <ClipboardUploadActions :disabled="!canUpdate || !isEditable(detail.status) || savingItemId === item.id || (item.attachments?.length || 0) >= 9" :can-paste="canUpdate && isEditable(detail.status) && savingItemId !== item.id && (item.attachments?.length || 0) < 9" @files="files => pasteAttachment(item, files)"><el-upload
                 :show-file-list="false"
                 :http-request="(options) => uploadAttachment(item, options.file as File)"
                 accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
@@ -194,7 +194,7 @@
                   savingItemId === item.id ||
                   (item.attachments?.length || 0) >= 9
                 "
-                ><el-button :loading="savingItemId === item.id">上传附件</el-button></el-upload
+                ><el-button :loading="savingItemId === item.id">上传附件</el-button></el-upload></ClipboardUploadActions
               >
             </div>
             <el-tag v-else type="info">系统固定项</el-tag>
@@ -245,6 +245,8 @@ const classDraft = reactive<Record<number, number | undefined>>({})
 const classTree = reactive<Record<number, Array<{ label: string; value: string | number; disabled?: boolean; children?: Array<{ label: string; value: number }> }>>>({})
 const savingItemId = ref<number>()
 const completing = ref(false)
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
+const pasteAttachment = (item: RegistrationApi.RegistrationChecklistItem, files: File[]) => { const file = files[0]; if (file) void uploadAttachment(item, file) }
 
 const statusOptions = [
   { value: 'pending', label: '待办理' },

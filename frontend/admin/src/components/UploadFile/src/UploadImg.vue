@@ -1,6 +1,8 @@
 <template>
   <div class="upload-box" :style="uploadStyle">
+    <ClipboardUploadActions :disabled="props.disabled" :can-paste="!props.modelValue" @files="handlePasteFiles">
     <el-upload
+      ref="uploadRef"
       :id="uuid"
       :accept="fileType.join(',')"
       :action="uploadUrl"
@@ -35,11 +37,12 @@
         <div class="upload-empty">
           <slot name="empty">
             <Icon icon="ep:plus" />
-            <!-- <span>请上传图片</span> -->
+            <span>上传附件</span>
           </slot>
         </div>
       </template>
     </el-upload>
+    </ClipboardUploadActions>
     <div class="el-upload__tip">
       <slot name="tip"></slot>
     </div>
@@ -47,12 +50,13 @@
 </template>
 
 <script lang="ts" setup>
-import type { UploadProps } from 'element-plus'
+import { genFileId, type UploadInstance, type UploadProps, type UploadRawFile } from 'element-plus'
 
 import { generateUUID } from '@/utils'
 import { propTypes } from '@/utils/propTypes'
 import { createImageViewer } from '@/components/ImageViewer'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
+import ClipboardUploadActions from './ClipboardUploadActions.vue'
 
 defineOptions({ name: 'UploadImg' })
 
@@ -108,6 +112,13 @@ const deleteImg = () => {
 }
 
 const { uploadUrl, httpRequest } = useUpload(props.directory, props.isAvatar)
+
+const uploadRef = ref<UploadInstance>()
+const handlePasteFiles = (files: File[]) => {
+  const file = files[0]
+  if (!file) return
+  uploadRef.value?.handleStart(Object.assign(file, { uid: genFileId() }) as UploadRawFile)
+}
 
 const editImg = () => {
   const dom = document.querySelector(`#${uuid.value} .el-upload__input`)

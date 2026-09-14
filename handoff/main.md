@@ -23621,3 +23621,656 @@ equestAttachments。
 - Verification evidence: 删除前 `git clean -nd -- output/playwright` 精确列出目标文件；删除后 `git ls-files --others --exclude-standard -- output/playwright/**` 返回 0，已跟踪文件仍为 20 个；未执行代码测试（本次仅清理产物）。
 - Dependency or integration impact: 无新增依赖、数据库、服务、分支、提交或推送变更；其他本地修改和未跟踪文件保持不变。
 - Remaining work: None。
+# main workstream
+
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- Base commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- Target branch: main
+- Owner: /root
+- Goal: 完成编导定位卡字段、字典、素材选择和历史版本方案设计
+- Non-goals: 本轮不实现代码、不执行数据库同步、不创建审批流程、不增加数据可见性限制
+- Scope: docs/superpowers/specs/2026-09-11-director-positioning-card-design.md
+- Verification plan: 文档自检，核对已确认需求与仓库现有模板、字典、素材库和历史版本约定
+- Integration order: 设计确认后再制定实现计划
+
+## Delivery entries
+
+### 2026-09-11 设计文档交付
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 调整编导定位卡字段、字典、素材选择和历史版本
+- Key decisions: 全字段纳入；三项字典均多选；素材默认筛选可调整；数量仅提示；正式提交生成历史版本；本期无可见性限制和新增字典审批
+- Execution result: 完成设计文档，未进入实现
+- Changed files: docs/superpowers/specs/2026-09-11-director-positioning-card-design.md; handoff/main.md
+- Verification evidence: 已核对现有访谈逐行布局、定位卡模板服务、素材库字典和历史快照约定；完成文档自检
+- Dependency or integration impact: None
+- Remaining work: 用户审阅设计文档后，制定实现计划
+
+### 2026-09-11 实现计划交付
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 基于已确认设计制定编导定位卡实现计划
+- Key decisions: 按模板/字典、素材引用、历史版本、Workbench、后台配置分阶段实现；验证覆盖单测、SQL、构建和浏览器
+- Execution result: 完成实现计划文档，未修改实现代码
+- Changed files: docs/superpowers/specs/2026-09-11-director-positioning-card-implementation-plan.md; handoff/main.md
+- Verification evidence: 计划与已确认设计逐项核对，明确范围、文件边界、验证和风险
+- Dependency or integration impact: None
+- Remaining work: 用户确认实现计划后开始编码
+
+### 2026-09-11 实现阶段 1
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 落地编导定位卡调整
+- Key decisions: 先新增可配置主要内容形式字典，使用22个稳定值与中文快照标签；不绑定角色、不增加审批
+- Execution result: 新增可重复执行的 V210 字典初始化 migration
+- Changed files: script/sql/mysql/migrations/V210__director_positioning_content_form_dictionary.sql; handoff/main.md
+- Verification evidence: SQL 静态检查；未连接开发数据库，utf8mb4/HEX/空库执行未验证
+- Dependency or integration impact: 依赖 system_dict_type/system_dict_data 既有表结构；后续模板字段需引用该字典
+- Remaining work: 更新定位卡模板、后端素材关联与历史快照、Workbench 表单和配置页
+
+### 2026-09-11 实现阶段 1b
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 落地编导定位卡调整
+- Key decisions: 前端协议常量引用新增字典类型，避免组件硬编码
+- Execution result: 增加 Workbench 字典常量
+- Changed files: frontend/workbench/src/constants.ts; handoff/main.md
+- Verification evidence: 文本检查通过；前端构建尚未运行
+- Dependency or integration impact: Workbench 字典加载可引用新增类型
+- Remaining work: 完成定位卡模板与素材选择实现
+
+### 2026-09-11 实现阶段 2
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 落地编导定位卡调整
+- Key decisions: 定位卡模板系统字段扩展为账号定位、专业定位、主要内容形式、历史/采访、平台主页和S0-S6交付字段；三项字典均多选语义
+- Execution result: 扩展 DirectorFormTemplateService 定位卡字段白名单，允许新字段类型进入模板规范化
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java; handoff/main.md
+- Verification evidence: 静态检查通过；后端编译和模板接口测试尚未运行
+- Dependency or integration impact: 新字段仍需默认模板 migration 与前端渲染适配
+- Remaining work: 默认模板 JSON、素材选择接口和历史版本 UI
+
+### 2026-09-11 实现阶段 2b
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 落地编导定位卡调整
+- Key decisions: 定位卡模板系统字段扩展为账号定位、专业定位、主要内容形式、历史/采访、平台主页和S0-S6交付字段
+- Execution result: 扩展定位卡字段白名单，允许新字段类型进入模板规范化
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java; handoff/main.md
+- Verification evidence: 静态检查通过；后端编译和模板接口测试尚未运行
+- Dependency or integration impact: 新字段仍需默认模板 migration 与前端渲染适配
+- Remaining work: 默认模板 JSON、素材选择接口和历史版本 UI
+
+### 2026-09-11 实现阶段 3
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 落地编导定位卡调整
+- Key decisions: 定位卡字段统一包裹为单列逐行区域，保留服务端 description 作为填写提示
+- Execution result: Workbench 定位卡表单增加单列字段容器与间距样式
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/styles/pages/media-students.css; handoff/main.md
+- Verification evidence: 静态检查通过；typecheck/build 尚未运行
+- Dependency or integration impact: 仅影响定位卡弹窗布局
+- Remaining work: 素材选择器、附件上传、默认模板字段和历史版本展示
+
+## 2026-09-11 收件箱表格布局交付
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 为销售投诉收件箱和消息收件箱接入统一表格布局切换
+- Key decisions: 复用 useInboxTableLayout；投诉页新增 ProTable 与详情抽屉；消息页统一布局状态来源；不改后端接口和权限
+- Execution result: 已完成前端布局分支与行详情联动
+- Changed files: frontend/workbench/src/pages/LeadComplaintPage.tsx; frontend/workbench/src/pages/MessageInboxPage.tsx; handoff/main.md
+- Verification evidence: git diff --check；typecheck 首次发现并修复投诉表格列类型和 Input 导入问题，最终结果待复跑
+- Dependency or integration impact: None
+- Remaining work: 完成最终 typecheck/build
+
+## 2026-09-11 收件箱表格布局验证完成
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 为销售投诉收件箱和消息收件箱接入统一表格布局切换
+- Key decisions: 投诉表格列使用 ProTable 兼容签名；消息页使用共享布局 hook
+- Execution result: 实现完成
+- Changed files: frontend/workbench/src/pages/LeadComplaintPage.tsx; frontend/workbench/src/pages/MessageInboxPage.tsx; handoff/main.md
+- Verification evidence: npm run typecheck 通过；npm run build 通过；git diff --check 通过
+- Dependency or integration impact: None
+- Remaining work: 浏览器实际交互验证未执行
+
+## 2026-09-11 学员管理表格布局接入
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 让学员管理支持统一收件箱表格布局切换
+- Key decisions: 复用现有学员分页接口和详情内容；桌面端 ProTable，移动端保留卡片列表
+- Execution result: 实施中
+- Changed files: frontend/workbench/src/pages/RegistrationPages.tsx; handoff/main.md
+- Verification evidence: 待验证
+- Dependency or integration impact: None
+- Remaining work: 完成实现与构建验证
+
+## 2026-09-11 学员管理表格布局验证完成
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 让学员管理支持统一收件箱表格布局切换
+- Key decisions: 复用现有 myStudents 分页和详情数据；桌面端 ProTable；行点击打开可调整详情抽屉；移动端保留卡片布局
+- Execution result: 实现完成
+- Changed files: frontend/workbench/src/pages/RegistrationPages.tsx; handoff/main.md
+- Verification evidence: npm run typecheck 通过；npm run build 通过；git diff --check 通过
+- Dependency or integration impact: None
+- Remaining work: 浏览器实际交互验证未执行
+
+## 2026-09-11 学员管理表格样式完善
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 参考客资管理完善学员管理表格字段、样式和功能
+- Key decisions: 增加头像/姓名、客资编号、联系方式、班级、课程服务、服务状态、订单号；增加筛选工具栏、列设置、刷新、分页大小和横向滚动
+- Execution result: 完善完成
+- Changed files: frontend/workbench/src/pages/RegistrationPages.tsx; handoff/main.md
+- Verification evidence: npm run typecheck、npm run build、git diff --check 均通过
+- Dependency or integration impact: None
+- Remaining work: 浏览器实际交互验证未执行
+
+## Delivery - 2026-09-11 00:00 +08:00
+- Workstream ID: main-viral-account-s6-rown- Branch: mainn- Worktree: D:\ZSJ-OSn- HEAD: f338087e9aaa8b8d881cd0aee80427d8773ab284n- User goal: 修复爆款账号拆解 S6 稳定增长期少一行问题。n- Decisions: 重复组按 minCount 初始化默认行，并显示字段阶段标题；新增行继续归属当前 S6 重复组。n- Changed files: frontend/workbench/src/components/ViralAccountMaterialForm.tsxn- Verification: npm run typecheck 未通过，存在既有 MediaStudentsPage.tsx TS2367 错误，与本次文件无关。n- Remaining: None。
+
+## 2026-09-11 学员表格字段与列宽完善
+- Beijing time: 2026-09-11
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 完善学员表格完整字段、排序和列宽自定义
+- Key decisions: 增加课程服务、订单号、激活时间等字段；列宽使用 localStorage 持久化并支持拖拽；支持姓名和激活时间升降序
+- Execution result: 实现完成
+- Changed files: frontend/workbench/src/pages/RegistrationPages.tsx; handoff/main.md
+- Verification evidence: 变更代码已完成；typecheck 被既有 MediaStudentsPage.tsx 的 CREATE_POSITIONING_CARD 类型错误阻断；build 同步阻断；git diff --check 未见本次新增错误
+- Dependency or integration impact: None
+- Remaining work: 修复既有类型错误后重跑全量验证；确认“爆款排序”若指特定后端业务排序需补充服务端字段/接口
+
+## Workstream Registration - 2026-09-11 17:50 +08:00
+- Workstream ID: `main-fix-zsjos-java-illegal-characters`
+- Goal: 修复 yudao-module-zsjos 两个 Java 文件中的非法转义字符导致的编译失败。
+- Non-goals: 不改变业务行为，不触碰其他既有改动，不进行分支、提交或外部状态操作。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- Target branch: `main`
+- Ownership scope: 两个报错 Java 文件及本交付记录。
+- Owner: Codex `/root`
+- Verification plan: 运行 yudao-module-zsjos Maven compile，并执行 git diff --check。
+
+## Workstream Registration - 2026-09-11 18:10:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`
+- Goal: 统一记录业务 API、认证 API、公开回调、文件访问和管理接口的全部请求，包括匿名、鉴权失败和异常请求。
+- Non-goals: 不记录静态资源、健康检查、Swagger、Prometheus 等系统请求；不删除或重置既有改动；不改分支、提交、推送或外部数据库。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284`; Owner: Codex `/root`。
+- Ownership scope: API access log framework/filter/config/tests, directly affected API log documentation, and this handoff record.
+- Dependencies: existing `infra_api_access_log`, `ApiAccessLogCommonApi`, WebProperties prefixes; no new dependency.
+- Integration order: extend request scope to public API and configured file/business paths -> enforce all in-scope requests are persisted despite endpoint annotation opt-outs -> harden request/result sanitization and anonymous/error coverage -> add focused tests/docs -> run module tests and diff checks.
+- Verification plan: focused framework/infra tests, Maven compile/test for affected modules, scoped `git diff --check`.
+
+## Delivery Entry - 2026-09-11 18:28:30 +08:00
+- Workstream ID: `main-unified-business-request-audit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284` (uncommitted worktree).
+- User goal: 记录业务 API、认证 API、公开回调、文件访问和管理接口的全部请求。
+- Key decisions: 复用现有 `infra_api_access_log`；将 `public-api` 纳入 API 请求过滤范围；取消 `@ApiAccessLog(enable=false)` 对日志行的禁用能力，仅允许其继续控制请求/响应载荷记录，确保轮询等业务 API 也留下请求记录；静态资源和系统端点仍按 API 前缀过滤排除。
+- Execution result: 完成 API 请求范围与强制落库规则调整。
+- Changed files: `backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/web/core/filter/ApiRequestFilter.java`; `backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/apilog/core/filter/ApiAccessLogFilter.java`; `handoff/main.md`。
+- Verification evidence: `mvn -pl yudao-framework/yudao-spring-boot-starter-web,yudao-module-infra -am -DskipTests compile` passed; `git diff --check` produced no whitespace errors (only existing LF-to-CRLF notices).
+- Dependency or integration impact: No new dependency, no database schema change, no branch/commit/push or external state mutation. Existing callers of `enable=false` now retain row-level audit while payload capture remains disabled where configured.
+- Remaining work: Full integration test with anonymous, rejected, exception, file and public callback requests requires a running application and database; not executed in this turn.
+
+### 2026-09-11 18:49 (Beijing)
+- Branch/worktree/HEAD: local main / D:\ZSJ-OS / current HEAD
+- User goal: 完善业务 API 请求审计过滤与脱敏
+- Key decisions: API 前缀采用精确边界；二进制请求体不采集；敏感字段扩展且脱敏失败固定返回 [REDACTED]；空节点安全处理；保留 enable=false 仅禁载荷语义。
+- Execution result: 已完成公共 Web/API 日志代码修改。
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/web/core/filter/ApiRequestFilter.java; backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/apilog/core/filter/ApiAccessLogFilter.java
+- Verification evidence: mvn -pl yudao-framework/yudao-spring-boot-starter-web -am -DskipTests compile 成功。
+- Dependency or integration impact: 无新增依赖、无数据库变更。
+- Remaining work: 聚焦单元测试尚未新增；建议由主工作流补充并执行。
+
+- 2026-09-11 异步审计：补充 Quartz 支付对账任务统一执行审计入口及 execution 动作目录。
+
+## Delivery Entry - 2026-09-11 19:02:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `f338087e9aaa8b8d881cd0aee80427d8773ab284` (uncommitted worktree).
+- User goal: 按全后端计划补全统一请求与执行审计，并由子智能体分工执行。
+- Key decisions: 覆盖所有后端 API；同时保存触发用户与执行身份；HTTP 使用现有 API 访问日志；异步审计保持异步写入。
+- Execution result: 公共 HTTP 审计已补强并接入 public-api、精确前缀、强制日志行、敏感脱敏和二进制保护；ZSJOS 审计目录新增执行动作，PaymentReconciliationJob 接入执行审计入口。
+- Changed files: 公共 Web API 审计过滤器、ZSJOS AuditActionCatalog/BusinessAuditService/PaymentReconciliationJob，以及相关既有工作树文件。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` and infra/framework compile passed; scoped diff check clean apart from line-ending notices.
+- Dependency or integration impact: No new dependency, schema migration, branch, commit, push, or external state mutation.
+- Remaining work: 其余 Quartz 任务、BPM 公共事件边界、全仓 MQ/@Async 入口、统一查询字段和运行环境集成测试尚未完成，当前不能宣称全计划已完全实现。
+
+## Delivery Entry - 2026-09-12
+- Workstream ID: `main-unified-business-request-audit`; User goal: extend audit records for initiator/executor linkage.
+- Execution result: added additive audit identity fields to DO/response/bootstrap/schema and repeatable V213 migration.
+- Changed files: BusinessAuditLogDO.java; BusinessAuditRespVO.java; 00-bootstrap-schema.sql; schema/core.sql; V213__audit_execution_identity.sql; handoff/main.md.
+- Verification evidence: static SQL/source inspection; Maven verification pending.
+- Remaining work: populate fields at BPM/MQ/async boundaries and run controlled database migration verification.
+
+## Delivery Entry - 2026-09-12 00:00 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: current uncommitted worktree.
+- User goal: 实现账号创建后 7/14/28 天周期诊断任务与账号主页诊断配置行为。
+- Key decisions: 使用现有 BusinessTask 幂等任务机制；周期从账号创建日第1天计算；7/14/28 模板同日独立生成；状态和瓶颈不再强制显示为待配置；暂不触发重新定位流程。
+- Execution result: 新增周期扫描器、三类任务类型和任务展示 provider；活动账号每日按周期生成独立诊断任务；调整账号资料读取与主页状态展示。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/account/MediaAccountMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisScheduler.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisTaskSceneProvider.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountProfileService.java`; `frontend/workbench/src/components/AccountProfilePanel.tsx`.
+- Verification evidence: Workbench `npm run typecheck` passed; `git diff --check` passed with existing line-ending notices. Maven compile was started but did not return within the tool window and remains unverified.
+- Dependency or integration impact: Reuses existing tenant scheduler and BusinessTask infrastructure; no new dependency, branch, commit, push, or database mutation.
+- Remaining work: structured diagnosis form submission, pause-day persistence, overdue supervisor notification wiring, and focused automated tests still require completion.
+
+## Delivery Entry - 2026-09-12 20:05 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: current uncommitted worktree.
+- User goal: 继续完成账号周期诊断任务与表单接入。
+- Key decisions: 复用账号资料记录表保存独立诊断 JSON 快照；新增后端结构化请求校验；任务点击跳转账号学员页。
+- Execution result: 新增 DiagnosisRequest、`POST /zsjos/media-account/{id}/profile/diagnosis`，强制校验模板、阶段、状态、配合、瓶颈、证据、结论、措施、观测数据和重新定位字段；Workbench 新增诊断 API 类型和任务跳转动作。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/account/vo/MediaAccountProfileVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountProfileService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/account/MediaAccountProfileController.java`; `frontend/workbench/src/services/mediaAccountProfile.ts`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/TodayTasksPage.tsx`.
+- Verification evidence: Workbench `npm run typecheck` passed. Maven compile reached module recompilation; a subsequent full result was not captured within the command window, so final backend compile remains to be rerun.
+- Dependency or integration impact: No new dependency, migration, branch, commit, push, or external database mutation.
+- Remaining work: pause/resume date persistence and dedicated supervisor overdue notification remain incomplete; diagnosis form UI still needs wiring to the new endpoint.
+
+## Delivery Entry - 2026-09-12 20:30 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完成诊断表单前端接入并验证。
+- Execution result: AccountProfilePanel 新增“填写周期诊断”表单弹窗，支持三类模板、阶段/状态/瓶颈字典选择、证据与文本字段、重新定位是/否，并调用诊断提交接口。
+- Changed files: `frontend/workbench/src/components/AccountProfilePanel.tsx`; `frontend/workbench/src/services/mediaAccountProfile.ts`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/TodayTasksPage.tsx`.
+- Verification evidence: `npm run typecheck` passed; `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed.
+- Dependency or integration impact: No new dependency or external state mutation.
+- Remaining work: pause/resume scheduling semantics and dedicated overdue-supervisor notification still need implementation; focused diagnosis tests remain.
+
+## Delivery Entry - 2026-09-12 21:00 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完成暂停顺延和逾期通知。
+- Execution result: 周期扫描器 now subtracts the account maintenance pause interval from effective account age and skips inactive accounts; diagnosis task types are included in the existing timed reminder pipeline with scene `media.account.diagnosis`, publishing notification events with director and current supervisor context when configured timing rules fire.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisScheduler.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderService.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: Reuses maintenance dates, tenant scheduler, System notification event API and existing timing-rule configuration; no new dependency or external state mutation.
+- Remaining work: ensure notification scene/timing rules are seeded/configured in the deployment environment and add focused scheduler/reminder tests.
+
+## Delivery Entry - 2026-09-12 21:20 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完善诊断逾期通知场景。
+- Execution result: MediaNotifySceneProvider now exposes `media.account.diagnosis` as a timed notification scene with assignee/supervisor roles; supervisor and director recipients are resolved from event payload. Existing reminder service routes diagnosis tasks into this scene.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/media/MediaNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderService.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: Runtime notification delivery depends on an enabled System notification rule/template for the new scene; no database mutation performed.
+- Remaining work: add a repeatable notification rule seed if the product wants a default deployment rule, and add focused tests.
+
+## Delivery Entry - 2026-09-12 21:45 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续补充周期诊断测试。
+- Execution result: 抽取 `effectiveDay` 计算方法并新增创建日、第7/14/28天及维护暂停扣除测试；测试源码已修正为避免继承链式 setter 类型问题。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisScheduler.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisSchedulerTest.java`.
+- Verification evidence: 主模块 compile previously passed. Maven testCompile currently blocked by an unrelated existing `CashbackServiceImplTest` API mismatch; the new test's initial setter error was fixed, but full test compilation remains blocked by that pre-existing failure.
+- Dependency or integration impact: None.
+- Remaining work: resolve or isolate existing cashback test compile failure before claiming full test-suite verification.
+
+## Delivery Entry - 2026-09-12 22:05 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完成诊断周期测试验证。
+- Execution result: 修正 Cashback 测试对已重命名 mapper 方法的过时调用，解除 testCompile 阻塞；诊断周期测试通过。
+- Changed files: `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/cashback/CashbackServiceImplTest.java`（机械兼容修正）；`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisSchedulerTest.java`。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am "-Dtest=MediaAccountDiagnosisSchedulerTest" "-Dsurefire.failIfNoSpecifiedTests=false" test -q` exited 0.
+- Dependency or integration impact: No new dependency or external state mutation.
+- Remaining work: full suite and live notification-rule verification remain optional follow-up checks.
+
+## Delivery Entry - 2026-09-12 22:30 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 完成最终构建与测试核验。
+- Execution result: Workbench production build passed; full reactor tests ran but failed in unrelated `CodegenEngineUniappTest.testExecute_treeSearch` in `yudao-module-infra`.
+- Verification evidence: `npm run build` passed (Vite built 6277 modules); `mvn -pl yudao-module-zsjos -am test -q` reached infra tests and failed only on the pre-existing Uniapp codegen assertion. Focused `MediaAccountDiagnosisSchedulerTest` passed separately.
+- Dependency or integration impact: No new dependency or external state mutation.
+- Remaining work: unrelated infra test failure remains outside this feature scope; live notification rule configuration is environment-dependent.
+
+## Delivery Entry - 2026-09-12 23:00 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完成默认逾期通知配置。
+- Execution result: 新增可重复执行的 V215 migration，创建账号周期诊断逾期通知模板和按直属上级接收、首次逾期阶段发送的默认通知规则，并记录 schema version。
+- Changed files: `script/sql/mysql/migrations/V215__media_account_diagnosis_notifications.sql`.
+- Verification evidence: SQL 静态检查；未执行开发数据库迁移，未进行 UTF-8/HEX 数据库验证。
+- Dependency or integration impact: 依赖现有 system_notify_template/system_notify_rule/system_tenant/zsjos_schema_version；不改变已有通知规则。
+- Remaining work: migration must be executed and verified in a controlled database before release; full reactor test still has unrelated infra failure.
+
+## Delivery Entry - 2026-09-12 23:25 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续收敛字典契约与诊断表单选项来源。
+- Execution result: 新增 `zsjos_media_account_cooperation_level` 管理字典及 V216 可重复迁移；诊断表单改为从服务端字典加载配合等级，且显式加载阶段、状态、瓶颈和配合等级字典，不再使用前端静态业务选项。
+- Changed files: `script/sql/mysql/migrations/V216__media_account_cooperation_level_dictionary.sql`; `frontend/workbench/src/components/AccountProfilePanel.tsx`.
+- Verification evidence: Workbench `npm run typecheck` passed; scoped SQL diff check passed.
+- Dependency or integration impact: Adds one administrator-maintained dictionary type and three initial entries; migration execution remains pending controlled database verification.
+- Remaining work: controlled SQL execution/HEX verification and optional full reactor test rerun after unrelated infra failure.
+
+## Delivery Entry - 2026-09-12 23:50 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完成编导变更后的任务归属处理。
+- Execution result: 周期扫描每次运行都会按账号当前责任编导重新分配三类未完成诊断任务，保留原任务计划日期、周期和历史；已完成任务不会改变。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountDiagnosisScheduler.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: Reuses existing BusinessTaskCommandService.reassignPending; no schema or external state mutation.
+- Remaining work: controlled execution of V215/V216 migrations and environment-level notification verification.
+
+## Delivery Entry - 2026-09-13 00:10 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续进行数据库迁移前检查。
+- Execution result: 运行只读 `python script/sql/mysql/tools/zsjos_db.py check`；检查被仓库既有重复迁移版本 V211 阻断，当前版本序列包含两个 211，随后为 V212-V216。
+- Changed files: None.
+- Verification evidence: Read-only migration check output explicitly reports duplicate V211; no database mutation performed.
+- Dependency or integration impact: V215/V216 source migrations remain syntactically reviewed but repository-wide migration guard must be repaired or explicitly reconciled before release.
+- Remaining work: resolve existing duplicate V211 migration numbering and then rerun migration guard; execute V215/V216 only after required database confirmation.
+
+## Delivery Entry - 2026-09-13 00:30 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续完善逾期通知内容。
+- Execution result: 诊断逾期通知事件现在从账号记录读取昵称并填充 `accountName`，默认模板可以展示具体账号名称；未命名账号使用安全回退文本。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderService.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: Reuses tenant-scoped MediaAccountMapper; no schema or external state mutation.
+- Remaining work: existing duplicate V211 migration guard remains outside this feature and requires explicit destructive-migration review.
+
+## Delivery Entry - 2026-09-13 00:45 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续同步账号诊断 API 与行为文档。
+- Execution result: 更新账号档案 API 文档，加入结构化诊断提交接口和周期任务、暂停顺延、编导转移、逾期提醒、不审批等运行规则，移除与当前实现冲突的“无自动提醒”描述。
+- Changed files: `docs/api/media-account-profile.md`.
+- Verification evidence: 文档静态检查完成。
+- Dependency or integration impact: None.
+- Remaining work: database migration guard still reports pre-existing duplicate V211; controlled migration execution remains pending.
+
+## Delivery Entry - 2026-09-13 01:05 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续修正 28 天诊断字段契约。
+- Execution result: 诊断提交接口兼容现有档案配置字段 `adjustment_28d`；客户端仍可使用模板语义 `diagnosis_28d`，后端在保存时映射到实际记录字段，避免 28 天提交因字段不存在失败。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountProfileService.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: No schema change; preserves existing V209 profile field key.
+- Remaining work: controlled migration execution and environment-level verification remain pending.
+
+## Delivery Entry - 2026-09-13 01:25 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 继续修正诊断逾期通知直属上级解析。
+- Execution result: 诊断通知使用专用直属上级解析，不再要求与客资协助场景无关的扩展审核权限；仍校验直属上级启用且不能是编导本人。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderService.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile -q` passed with EXIT=0.
+- Dependency or integration impact: Existing lead/student reminder behavior remains on the original permission-aware supervisor resolver.
+- Remaining work: controlled migration execution and runtime notification verification.
+
+## Delivery Entry - 2026-09-13 01:50 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 解决迁移版本阻塞。
+- Key decisions: 保留已记录的 destructive `V211__reset_media_account_operation_data.sql` 不变；将未记录的 gift config migration 重新编号为 V215，并将本功能通知/字典迁移顺延为 V216/V217，保持连续版本序列且不改已应用历史版本。
+- Execution result: `zsjos_db.py check` 已越过 duplicate V211/版本连续性错误，当前进入下一项既有 schema mapping 缺失检查。
+- Changed files: renamed `V211__gift_config.sql` -> `V215__gift_config.sql`; renamed diagnosis notification migration to `V216__media_account_diagnosis_notifications.sql`; renamed cooperation dictionary migration to `V217__media_account_cooperation_level_dictionary.sql`; updated embedded version markers.
+- Verification evidence: migration checker no longer reports duplicate or non-continuous core versions; it now reports enabled Java mappings missing from Core schema for existing gift/student-delivery tables.
+- Dependency or integration impact: No database mutation; V211 destructive migration remains untouched.
+- Remaining work: reconcile existing Core schema mapping files before full migration guard can pass; execute V216/V217 only in controlled DB.
+
+## Delivery Entry - 2026-09-13 02:20 +08:00
+- Workstream ID: `main-media-account-diagnosis`
+- User goal: 修复迁移映射检查错误。
+- Key decisions: 保持 Java 模块启用范围不变，仅将已有后续迁移提供的 Gift/Student Delivery 表登记为 Core 允许映射表；不伪造基线表结构、不执行数据库。
+- Execution result: `python script/sql/mysql/tools/zsjos_db.py check` 已通过；账号模块编译也通过。
+- Changed files: `script/sql/mysql/modules/core.json`.
+- Verification evidence: migration checker PASS；`mvn -pl yudao-module-zsjos -am -DskipTests compile -q` EXIT=0；scoped `git diff --check` 无错误。
+- Dependency or integration impact: 仅影响静态 schema mapping guard，承认 V214/V215 等迁移新增表的 Java 映射；无运行时行为变化。
+- Remaining work: V216/V217 controlled database execution and live notification verification remain environment-dependent.
+
+## Delivery Entry - 2026-09-12 22:50:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`; User goal: 完成 BPM 事件审计接入。
+- Execution result: 新增 ZsjosBpmAuditHook，实现 BPM 状态事件到 ZSJOS 业务审计的桥接，记录 eventKey、流程实例/定义、业务标识、状态、原因、触发用户和执行身份。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/framework/audit/ZsjosBpmAuditHook.java; handoff/main.md。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed。
+- Remaining work: migration 尚未在真实数据库执行；MQ/@Async 全仓统一包装、父审计字段实际写入、集成验收和失败告警监控仍需完成。
+
+## Delivery Entry - 2026-09-12 22:52:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`; User goal: 继续完成全后端统一请求与执行审计。
+- Execution result: 复核 BPM 审计钩子、V213 字段迁移和公共 HTTP 审计；确认 ZSJOS BPM 事件已通过 SPI 写入业务审计，触发用户/执行身份事件字段可传递。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed; migration/source diff check clean。
+- Remaining work: V213 尚未执行真实数据库；27 个全仓 MQ/@Async 入口尚未统一包装；Quartz 仍非公共执行器包装；父审计字段尚未由所有入口填充；集成验收和失败告警监控未完成。
+
+## Delivery Entry - 2026-09-12 22:57:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`; User goal: 继续完成审计字段实际使用与查询。
+- Execution result: BusinessAuditServiceImpl.record 将执行详情映射到 initiator/executor/parent/executionKey 字段；审计分页请求与 Mapper 增加对应筛选条件。
+- Changed files: BusinessAuditServiceImpl.java; BusinessAuditPageReqVO.java; BusinessAuditLogMapper.java; handoff/main.md。
+- Verification evidence: source inspection; compilation follows.
+- Remaining work: MQ/@Async 公共包装、真实数据库 migration 执行与集成验收仍未完成。
+
+## Delivery Entry - 2026-09-12 23:00:00 +08:00
+- Workstream ID: `main-unified-business-request-audit`; User goal: 继续完善执行审计。
+- Execution result: 增加 executionKey 查询并在业务审计写入前做幂等检查，避免重复 BPM eventKey 产生重复审计；完成执行身份字段写入和查询。
+- Changed files: BusinessAuditServiceImpl.java; BusinessAuditLogMapper.java; handoff/main.md。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed。
+- Remaining work: 真实数据库迁移、MQ/@Async公共包装、Quartz公共执行器、监控告警和集成验收仍未完成。
+
+## Delivery Entry - 2026-09-13 03:10 +08:00
+- Workstream ID: `main-unified-business-request-audit`; User goal: 公共 MQ/Async 执行审计 SPI。
+- Key decisions: 在 yudao-common 提供可选、无业务依赖的执行审计 Hook；异步执行器通过任务装饰器统一捕获开始/成功/失败，Hook 异常不影响业务。
+- Scope: yudao-common audit SPI 与 starter-job Async 装饰器；不改业务模块、不新增依赖。
+- Remaining work: MQ listener 需按具体 broker 适配器接入，真实运行验收依赖环境。
+
+## Workstream Registration - 2026-09-12 23:40 +08:00
+- ID: main-unified-business-request-audit; owner: docker_audit_verify (delegated by root).
+- Goal: execute and verify approved V213 in local Docker development database.
+- Non-goals: business data changes, service lifecycle changes, other migrations, Git operations.
+- Branch: fix/media-account-create-columns-v204; worktree: D:/ZSJ-OS; base and target HEAD: f338087e9aaa8b8d881cd0aee80427d8773ab284; target branch: current branch.
+- Ownership: script/sql/mysql/migrations/V213__audit_execution_identity.sql and handoff/main.md; sole active writer.
+- Dependencies/integration order: existing audit table -> repair unexecuted V213 repeatability -> execute twice -> schema and encoding verification.
+- Verification: Docker mysql UTF-8 connection; six column definitions, composite index, version row, row-count preservation and repeatability.
+
+## Delivery Entry - 2026-09-12 23:46 +08:00
+- Workstream ID: `main-unified-business-request-audit`; user goal: execute approved V213 in the Docker development database.
+- Key decisions: repaired the still-unapplied V213 index creation to be metadata-guarded and documented scope/repeatability/rollback limits; no data deletion or container lifecycle operation.
+- Execution result: applied V213 through `yudao-mysql` with `MYSQL_PWD` sourced inside the container, then applied it a second time successfully.
+- Changed files: `script/sql/mysql/migrations/V213__audit_execution_identity.sql`; `handoff/main.md`.
+- Verification evidence: both runs returned success; audit row count remained `564795`; all six columns exist with expected types; `idx_execution_key(tenant_id,execution_key)` exists; `zsjos_schema_version` contains V213; helper procedure removed; client/connection/results all `utf8mb4`; representative Chinese column comments returned valid UTF-8 bytes and HEX.
+- Dependency/integration impact: local Docker `yudao-mysql` only; no application restart, no other migration, no business data mutation.
+- Remaining work: live API/MQ audit acceptance and broader audit coverage remain outside this database execution subtask.
+
+## 2026-09-12 mq-audit
+- scope: common MQ listener execution wrapper and websocket consumersn- owner: mq_auditn- branch: fix/media-account-create-columns-v204n- changes: add reusable audit runner; wrap RabbitMQ/RocketMQ listener handlersn- verification: pending compilen- remaining: framework-wide listener container interception and runtime MQ validation
+
+## Scope Extension - 2026-09-12 23:48 +08:00
+- Workstream: main-unified-business-request-audit; sole writer: docker_audit_verify.
+- Additional ownership: script/sql/mysql/00-bootstrap-schema.sql and script/sql/mysql/schema/core.sql, limited to the business audit execution-key index.
+- Goal: align fresh table DDL with approved V213 schema; no other tables or business rows affected.
+- Verification: execute extracted DDL as a connection-local temporary table, compare six audit columns and execution-key index with migrated database.
+
+## Delivery Entry - 2026-09-12 23:51 +08:00
+- Workstream ID: `main-unified-business-request-audit`; user goal: align baseline audit DDL with V213.
+- Execution result: added `idx_execution_key (tenant_id, execution_key)` to both baseline audit table definitions. The two extracted `zsjos_business_audit_log` DDL blocks are byte-identical; connection-local temporary DDL execution reproduced all six columns and both index parts.
+- Changed files: `script/sql/mysql/00-bootstrap-schema.sql` (line 5776); `script/sql/mysql/schema/core.sql` (line 5776); `handoff/main.md`.
+- Verification evidence: `rg` found the index in both files; `git diff --check` produced no errors for these files; Docker temporary-table probe returned expected column types and index sequence. No business table or row was copied or changed.
+- Dependency/integration impact: fresh baseline schema now structurally matches the V213 audit identity columns/index; this does not prove full bootstrap execution because only the isolated audit DDL was probed.
+- Remaining work: full bootstrap and live API/MQ audit acceptance remain pending.
+
+## Delivery 2026-09-13 14:15 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: ExecutionAuditRunner hook failures emit structured warnings and remain non-blocking.
+- Changed files: backend/yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/audit/ExecutionAuditRunner.java
+- Verification: mvn -f backend/pom.xml -pl yudao-framework/yudao-common -am -DskipTests compile (SUCCESS)
+- Dependency/integration impact: None; no new dependency.
+- Remaining work: real hook wiring, MQ/Quartz/Redis integration, runtime acceptance.
+
+## 2026-09-13 14:17 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- Goal: 接入 Redis Pub/Sub 与 Stream 执行审计
+- Decisions: 在两个抽象监听器中以可选 ExecutionAuditHook 调用 ExecutionAuditRunner；保留拦截器顺序、Stream 成功后 ack 语义；失败继续抛出；Hook 异常由 Runner 隔离。
+- Result: Redis Pub/Sub/Stream 消费现在产生开始、成功、失败审计回调，元数据包含消息类型、Stream messageId/group；无 Hook 时行为保持兼容。
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-mq/src/main/java/cn/iocoder/yudao/framework/mq/redis/core/pubsub/AbstractRedisChannelMessageListener.java; backend/yudao-framework/yudao-spring-boot-starter-mq/src/main/java/cn/iocoder/yudao/framework/mq/redis/core/stream/AbstractRedisStreamMessageListener.java
+- Verification: mvn -f backend/pom.xml -pl yudao-framework/yudao-spring-boot-starter-mq -am -DskipTests compile (BUILD SUCCESS)
+- Integration impact: Uses existing yudao-common audit API; no new dependencies.
+- Remaining: Hook implementation/context propagation and broker integrations.
+
+## 2026-09-13 14:24 (Asia/Shanghai)
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- HEAD: current working tree (uncommitted)
+- User goal: 接入 Quartz 公共执行入口审计。
+- Key decisions: JobHandlerInvoker 使用可选 ExecutionAuditHook，通过 ExecutionAuditRunner 统一记录 SYSTEM_JOB 成功/失败，并保留 Quartz 重试异常语义。
+- Result: 公共 Quartz 入口已包装审计，记录 jobId、jobLogId、handler、refire/retry 元数据；Hook 异常不阻断任务。
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-job/src/main/java/cn/iocoder/yudao/framework/quartz/core/handler/JobHandlerInvoker.java
+- Verification: mvn -f backend/pom.xml -pl yudao-framework/yudao-spring-boot-starter-job -am -DskipTests compile (BUILD SUCCESS)
+- Integration impact: 复用 yudao-common 审计 API，无新增依赖。
+- Remaining: Rabbit/RocketMQ 容器接入、上下文传播、真实 Hook 落库和端到端验收。
+
+## Delivery 2026-09-13 14:30 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: Added optional ZSJOS ExecutionAuditHook persistence adapter and catalog actions for async/Redis execution.
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/framework/audit/ZsjosExecutionAuditHook.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/audit/AuditActionCatalog.java
+- Verification: mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile (SUCCESS)
+- Dependency/integration impact: Uses existing BusinessAuditService; no new dependency.
+- Remaining work: contextual propagation, broker listeners, runtime acceptance.
+
+## Delivery 2026-09-13 14:33 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: Added ThreadLocal ExecutionAuditContextHolder with capture/restore scope for safe async context propagation.
+- Changed files: backend/yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/audit/ExecutionAuditContextHolder.java
+- Verification: yudao-common compile SUCCESS.
+- Dependency/integration impact: None.
+- Remaining work: wire holder into HTTP/Async/MQ/Quartz and verify propagation.
+
+## Delivery 2026-09-13 14:36 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: Redis execution audit now inherits trace, parent audit, initiator and tenant fields from ExecutionAuditContextHolder.
+- Changed files: Redis Pub/Sub and Stream abstract listeners.
+- Verification: MQ module compile SUCCESS.
+- Remaining work: populate holder at HTTP/async boundaries and broker integrations.
+
+## Delivery 2026-09-13 14:39 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: HTTP API filter now seeds and clears ExecutionAuditContextHolder with trace, login user id and request metadata.
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/apilog/core/filter/ApiAccessLogFilter.java
+- Verification: web module compile SUCCESS.
+- Remaining work: tenant/name propagation, async capture, broker adapters and runtime acceptance.
+
+## Delivery 2026-09-13 14:42 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: Async task decorator captures parent ExecutionAuditContext at submission and restores/clears it around execution.
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-job/src/main/java/cn/iocoder/yudao/framework/quartz/config/AuditTaskDecorator.java
+- Verification: job module compile SUCCESS after variable-scope correction.
+- Remaining work: reliable Future exception observation, Rabbit/Rocket integration and runtime acceptance.
+
+## Delivery 2026-09-13 14:52 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: Async decorator now delegates lifecycle callbacks to ExecutionAuditRunner while restoring holder context.
+- Changed files: backend/yudao-framework/yudao-spring-boot-starter-job/src/main/java/cn/iocoder/yudao/framework/quartz/config/AuditTaskDecorator.java
+- Verification: job module compile SUCCESS.
+- Remaining work: Future exception semantics, broker integration, runtime acceptance.
+
+## Delivery 2026-09-13 14:58 +08:00
+- Branch: fix/media-account-create-columns-v204
+- Worktree: D:\ZSJ-OS
+- User goal: 继续完成全后端统一请求与执行审计
+- Key decisions: RabbitMQ and RocketMQ WebSocket consumers now wrap delivery with ExecutionAuditRunner and optional hooks.
+- Changed files: RabbitMQWebSocketMessageConsumer.java; RocketMQWebSocketMessageConsumer.java
+- Verification: websocket module compile SUCCESS.
+- Remaining work: container-wide listener interception, full context propagation, runtime acceptance.
+
+## Workstream Registration - 2026-09-13
+
+- Workstream ID: `main-student-collaboration-group-design`
+- Goal: Define complete repair design for collaboration-group-isolated student positioning, accounts, delivery tasks, notifications, and material library.
+- Non-goals: No business implementation, SQL, permission changes, external state, branch, commit, or push in this turn.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: Inspect at implementation start; preserve existing changes.
+- Target branch: `main`
+- Ownership scope: `docs/superpowers/specs/2026-09-13-student-collaboration-group-design.md`; this handoff entry.
+- Owner: `/root`
+- Dependencies: Existing student service relations, positioning interview/card, media accounts, delivery stages, diagnosis tasks, System notifications, material library, BPM.
+- Integration order: User-approved design -> implementation plan -> serialized backend/schema/frontend changes -> focused verification.
+- Verification plan: Spec self-review now; implementation will require backend tests, Workbench typecheck/build, controlled SQL verification, and browser/API acceptance.
+
+## Delivery Entry - 2026-09-13 14:59:01 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 讨论并确认编导接收学员后的完整修复方案。
+- Key decisions: 以“学员 + 完全隔离的编导/运营协作组”为权限和业务边界；每组独立访谈、定位卡、账号、S0-S6、7/14/28 诊断、通知和素材引用；学员概览只做汇总入口。
+- Result: 完成设计文档并通过占位符、对象关系和范围自检；未实施业务代码或数据库变更。
+- Changed files: `docs/superpowers/specs/2026-09-13-student-collaboration-group-design.md`; `handoff/main.md`。
+- Verification evidence: 静态自检未发现 TODO/TBD；未运行业务测试，因本轮仅设计。
+- Dependency/integration impact: 后续实现将影响协作组数据模型、对象权限、定位、账号、任务、通知、素材库和前端概览；需先生成实施计划。
+- Remaining work: 用户审阅设计文档并提出修改或批准进入实施计划；不执行 Git commit（当前未获提交确认）。
+
+## Delivery Entry - 2026-09-13 15:02:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD: `f338087e9aaa8b8d881cd0aee80427d8773ab284`
+- User goal: 确认设计并进入实施计划。
+- Key decisions: 用户确认完全隔离的协作组模型；计划按数据权限、定位账号、任务通知、素材库和验收串行实施。
+- Result: 完成实施计划文档。
+- Changed files: `docs/superpowers/plans/2026-09-13-student-collaboration-group-plan.md`; `handoff/main.md`。
+- Verification evidence: 计划与已确认设计逐项对应；未运行业务测试。
+- Dependency/integration impact: 后续实施需协调数据库基线、System 通知、BPM、Workbench 和现有未提交改动。
+- Remaining work: 用户确认实施计划后开始代码变更；未提交 Git。
+
+## Workstream Registration - 2026-09-13 collab-data-impl
+- Workstream ID: `main-collab-data-impl`
+- Goal: 建立学员编导/运营协作组基础模型，按组隔离现有服务关系边界。
+- Non-goals: 不修改任务通知、素材库、前端或业务流程；不提交 Git。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Owner: `/root/collab_data_impl`。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/.../collaboration`; `script/sql/mysql/migrations/V215__student_collaboration_group.sql`; 定向测试；本 handoff。
+- Dependencies: 现有 `zsjos_service_relation`、租户/逻辑删除规范；无新增依赖。
+- Verification plan: ZSJOS 编译与协作组定向测试、SQL 静态检查。
+
+## Delivery Entry - 2026-09-13 15:26:00 +08:00
+- Workstream ID: `main-collab-data-impl`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted).
+- User goal: 为学员建立编导/运营协作组基础数据边界，并保持现有服务关系数据可回填。
+- Key decisions: 以现有服务关系的学员、编导、运营三元组回填协作组；为服务关系增加 collaboration_group_id；迁移幂等且非破坏，不删除业务数据。
+- Execution result: 新增协作组表、DO、Mapper，服务关系 DO 暴露协作组字段；V215 为现有关系创建并回填组 ID。
+- Changed files: `script/sql/mysql/migrations/V215__student_collaboration_group.sql`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/collaboration/CollaborationGroupDO.java`; `.../dal/mysql/collaboration/CollaborationGroupMapper.java`; `.../dal/dataobject/registration/ServiceRelationDO.java`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; SQL reviewed for idempotent CREATE/ALTER/INSERT/UPDATE and UTF-8 source.
+- Dependency/integration impact: 后续权限查询需改为使用 collaboration_group_id 精确过滤；本轮未改任务、通知、素材库、前端，也未执行数据库。
+- Remaining work: 为账号、定位卡、访谈及其对象权限提供器补充协作组一致性校验和跨组测试；部署时按 SQL 规则执行 V215 并核对回填差异。
+
+## Delivery Entry - 2026-09-14 16:30:00 +08:00
+
+- Workstream ID: `main-gitee-origin-pull-20260914`; Branch: `fix/media-account-create-columns-v204`; Worktree: `D:\ZSJ-OS`; HEAD: `05ea0b6fd9`。
+- User goal: 拉取远程最新代码并合并到本地，冲突需确认。
+- Key decisions: 远程 `origin/main` 快进合并到当前分支；恢复本地改动时仅 `handoff/main.md` 冲突，按用户确认合并双方内容，保留两侧交接记录。
+- Execution or analysis result: 远程从 `f338087e9a` 更新至 `05ea0b6fd9`；本地改动已从 stash 恢复；冲突已解决并暂存。
+- Changed files: `handoff/main.md`。
+- Verification evidence: `git diff --name-only --diff-filter=U` 无输出；冲突标记扫描无命中；本地与 `origin/main` 当前 `0 ahead / 0 behind`。
+- Dependency or integration impact: 未提交、未推送；恢复 stash `codex-pre-pull-20260914-fix-media-account` 仍保留；未执行数据库或共享服务操作。
+- Remaining work: 用户确认后可继续提交；当前工作区仍包含原有大量本地改动。
+- Status: `merged-awaiting-commit`

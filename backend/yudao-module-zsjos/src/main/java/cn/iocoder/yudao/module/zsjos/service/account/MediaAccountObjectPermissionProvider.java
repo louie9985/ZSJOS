@@ -27,11 +27,22 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;
         if ("maintenance".equals(action)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;
-        if ("read".equals(action) && account.getStudentPersonId() != null
-                && relationMapper.existsActiveByDirectorOrOperatorAndPerson(userId, account.getStudentPersonId())) return true;
-        boolean related = userId.equals(account.getOwnerOperatorUserId()) || userId.equals(account.getDirectorUserId());
+        boolean related;
+        boolean operator;
+        if (account.getCreateServiceRelationId() != null) {
+            var relation = relationMapper.selectById(account.getCreateServiceRelationId());
+            if (relation == null || !java.util.Objects.equals(relation.getPersonId(), account.getStudentPersonId())
+                    || !java.util.Objects.equals(relation.getTenantId(), account.getTenantId())
+                    || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())) return false;
+            operator = userId.equals(relation.getOperatorUserId());
+            related = operator || userId.equals(relation.getContentDirectorUserId());
+        } else {
+            // Legacy accounts have no proven group; only their explicit stored owners retain access.
+            operator = userId.equals(account.getOwnerOperatorUserId());
+            related = operator || userId.equals(account.getDirectorUserId());
+        }
         if ("production-ticket-create".equals(action)) {
-            return userId.equals(account.getOwnerOperatorUserId());
+            return operator;
         }
         return related && ("read".equals(action) || "update".equals(action) || "edit".equals(action)
                 || "maintenance".equals(action)

@@ -628,6 +628,32 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void reviseReleasesSourcePaymentOrderKeySoTheSuccessorCanCarryIt() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L);
+        order.setStatus(STATUS_REVISION_REQUIRED); order.setSourcePaymentOrderId(900L);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        mockEligibleLeadAndOpportunity();
+        SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setId(200L); previous.setRoundNo(1);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(previous);
+        SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
+        when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
+        when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; })
+                .when(orderMapper).insert(any(SalesOrderDO.class));
+
+        service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+
+        // uk_tenant_source_payment_order spans (tenant_id, source_payment_order_id), so the superseded
+        // row must release the key before the successor carries it, or the insert fails.
+        assertNull(order.getSourcePaymentOrderId());
+    }
+
+    @Test
     void reviseRechecksIdempotencyAfterLockAndReturnsConcurrentSuccessor() {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setStatus(STATUS_REVISION_REQUIRED);

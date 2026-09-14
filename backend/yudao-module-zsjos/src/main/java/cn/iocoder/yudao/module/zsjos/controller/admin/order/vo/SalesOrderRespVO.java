@@ -45,6 +45,8 @@ public class SalesOrderRespVO {
     private String remark;
     private String studentSpecialRequirements;
     private String materialDeliveryContact;
+    private String giftItems;
+    private String giftShippingAddress;
     private List<ItemVO> items;
     private List<AttachmentVO> paymentVouchers;
     private Integer approvalRoundNo;

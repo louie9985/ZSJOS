@@ -7,6 +7,7 @@ import {
   SaveOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
+import { ClipboardUploadButtons } from '../components/ClipboardPasteTarget'
 import {
   Alert,
   App,
@@ -207,7 +208,7 @@ function VersionEditor({ content, initial, onSaved, onCancel }: {
     setDeliverables(parseFileSnapshot(initial?.deliverableSnapshotJson, initial?.files.filter(file => file.fieldKey === 'deliverable')))
   }, [content, form, initial])
 
-  const upload = async (files: FileList | null, kind: 'cover' | 'deliverable') => {
+  const upload = async (files: Iterable<File> | null, kind: 'cover' | 'deliverable') => {
     const selected = Array.from(files || [])
     if (!selected.length) return
     if (kind === 'cover' && selected.length > 1) return message.warning('封面只能上传 1 个文件')
@@ -225,7 +226,6 @@ function VersionEditor({ content, initial, onSaved, onCancel }: {
     } catch (cause) { message.error(errorText(cause)) }
     finally { setUploading(false) }
   }
-
   const save = async () => {
     try {
       const values = await form.validateFields()
@@ -258,16 +258,16 @@ function VersionEditor({ content, initial, onSaved, onCancel }: {
       <Form.Item name="topicSnapshot" label="选题说明"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
       <Form.Item name="scriptText" label="脚本或正文"><Input.TextArea rows={9} maxLength={20000} showCount /></Form.Item>
       <div className="content-production-upload-grid">
-        <div><Typography.Text strong>封面</Typography.Text><div className="content-production-upload-row">
+        <ClipboardUploadButtons disabled={uploading || cover.length > 0} canPaste={() => !uploading && cover.length === 0} onFiles={files => void upload(files, 'cover')}><Typography.Text strong>封面</Typography.Text><div className="content-production-upload-row">
           <input ref={coverInput} hidden type="file" accept="image/*" onChange={event => { void upload(event.target.files, 'cover'); event.target.value = '' }} />
-          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => coverInput.current?.click()}>上传封面</Button>
+          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => coverInput.current?.click()}>上传附件</Button>
           {cover.map(file => <div className="content-production-uploaded" key={file.fileId}><FilePreview file={file} /><span>{fileLabel(file)}</span><Button type="text" danger onClick={() => setCover([])}>移除</Button></div>)}
-        </div></div>
-        <div><Typography.Text strong>成品图片或视频</Typography.Text><div className="content-production-upload-row">
+        </div></ClipboardUploadButtons>
+        <ClipboardUploadButtons disabled={uploading || deliverables.length >= 20} canPaste={() => !uploading && deliverables.length < 20} onFiles={files => void upload(files, 'deliverable')}><Typography.Text strong>成品图片或视频</Typography.Text><div className="content-production-upload-row">
           <input ref={deliverableInput} hidden type="file" multiple accept="image/*,video/*" onChange={event => { void upload(event.target.files, 'deliverable'); event.target.value = '' }} />
-          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => deliverableInput.current?.click()}>上传成品</Button>
+          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => deliverableInput.current?.click()}>上传附件</Button>
           {deliverables.map(file => <div className="content-production-uploaded" key={file.fileId}><FilePreview file={file} /><span>{fileLabel(file)}</span><Button type="text" danger onClick={() => setDeliverables(current => current.filter(item => item.fileId !== file.fileId))}>移除</Button></div>)}
-        </div></div>
+        </div></ClipboardUploadButtons>
       </div>
       <div className="content-production-form-grid">
         <Form.Item name="deliverableUrl" label="成品 HTTPS 外链" rules={[{ type: 'url', message: '请输入有效链接' }, { pattern: /^https:\/\//i, message: '链接必须使用 HTTPS' }]}><Input placeholder="https://" /></Form.Item>

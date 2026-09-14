@@ -293,6 +293,7 @@ import * as FeedbackApi from '@/api/zsjos/feedback'
 import { useMessage } from '@/hooks/web/useMessage'
 import { useUserStore } from '@/store/modules/user'
 import { formatDate } from '@/utils/formatTime'
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 
 const props = defineProps<{
   feedbackType: Exclude<FeedbackApi.FeedbackType, 'SURVEY'>
@@ -424,15 +425,17 @@ const FeedbackUpload = defineComponent({
       )
     return () =>
       h('div', { class: 'feedback-upload' }, [
-        h(
-          resolveComponent('el-upload') as any,
-          {
-            httpRequest: upload,
-            showFileList: false,
-            disabled: componentProps.modelValue.length >= 20
-          },
-          () => h(resolveComponent('el-button') as any, null, () => '上传附件')
-        ),
+        h(ClipboardUploadActions, {
+          disabled: componentProps.modelValue.length >= 20,
+          canPaste: componentProps.modelValue.length < 20,
+          onFiles: (files: File[]) => { const file = files[0]; if (file) void upload({ file } as any) }
+        }, {
+          default: () => h(
+            resolveComponent('el-upload') as any,
+            { httpRequest: upload, showFileList: false, disabled: componentProps.modelValue.length >= 20 },
+            () => h(resolveComponent('el-button') as any, null, () => '上传附件')
+          )
+        }),
         ...componentProps.modelValue.map((item) =>
           h('div', { class: 'feedback-upload-item', key: item.id }, [
              isImageAttachment(item) ? imagePreview(item, 72) : h('span', item.name || `附件 ${item.id}`),

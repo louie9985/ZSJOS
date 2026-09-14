@@ -43,7 +43,13 @@
     <el-row :gutter="12">
       <el-col v-if="isDictionary" :xs="24" :sm="12" :lg="8">
         <el-form-item label="系统字典" required>
-          <el-select v-model="field.dictType" filterable class="!w-100%" placeholder="选择管理员维护的字典">
+          <el-select
+            v-model="field.dictType"
+            filterable
+            class="!w-100%"
+            placeholder="选择管理员维护的字典"
+            @change="normalizeDictionary"
+          >
             <el-option
               v-for="dict in dictTypes"
               :key="dict.type"
@@ -53,22 +59,7 @@
           </el-select>
         </el-form-item>
       </el-col>
-      <el-col v-if="isDictionary && !nested" :xs="24" :sm="12" :lg="8">
-        <el-form-item label="推荐维度">
-          <el-select
-            v-model="field.recommendationDimension"
-            clearable
-            class="!w-100%"
-            placeholder="不参与推荐"
-            @change="applyRecommendationDictionary"
-          >
-            <el-option label="账号类型" value="account_type" />
-            <el-option label="专业方向" value="profession" />
-            <el-option label="账号时期" value="account_stage" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col v-if="field.recommendationDimension" :xs="12" :sm="8" :lg="4">
+      <el-col v-if="isRecommendationField" :xs="12" :sm="8" :lg="4">
         <el-form-item label="允许不限"><el-switch v-model="field.allowUnlimited" /></el-form-item>
       </el-col>
       <el-col v-if="supportsMultiple" :xs="12" :sm="8" :lg="4">
@@ -80,6 +71,12 @@
         <el-form-item label="最大长度">
           <el-input-number v-model="field.maxLength" :min="1" :max="200000" controls-position="right" />
         </el-form-item>
+      </el-col>
+      <el-col v-if="supportsLength" :xs="24" :sm="16" :lg="8">
+        <el-form-item label="占位提示"><el-input v-model="field.placeholder" maxlength="500" /></el-form-item>
+      </el-col>
+      <el-col v-if="field.type === 'repeat-group'" :xs="12" :sm="8" :lg="4">
+        <el-form-item label="初始行数"><el-input-number v-model="field.initialCount" :min="0" :max="100" /></el-form-item>
       </el-col>
       <el-col v-if="field.type === 'number'" :xs="12" :sm="8" :lg="4">
         <el-form-item label="最小值"><el-input-number v-model="field.min" controls-position="right" /></el-form-item>
@@ -141,11 +138,8 @@
 </template>
 
 <script setup lang="ts">
-import type {
-  MaterialFieldDefinition,
-  MaterialFieldType,
-  RecommendationDimension
-} from '@/api/zsjos/material'
+import { isRecommendationDictionary } from '@/api/zsjos/material'
+import type { MaterialFieldDefinition, MaterialFieldType } from '@/api/zsjos/material'
 
 defineOptions({ name: 'MaterialSchemaFieldCard' })
 
@@ -184,6 +178,9 @@ const availableFieldTypes = computed(() =>
   props.nested ? fieldTypes.filter((item) => item.value !== 'repeat-group') : fieldTypes
 )
 const isDictionary = computed(() => ['dict-single', 'dict-multi'].includes(props.field.type))
+const isRecommendationField = computed(
+  () => isDictionary.value && isRecommendationDictionary(props.field.dictType)
+)
 const supportsLength = computed(() => ['text', 'textarea', 'rich-text'].includes(props.field.type))
 const supportsMultiple = computed(() => ['employee', 'department'].includes(props.field.type))
 const fileType = computed(() => ['image', 'video', 'attachment'].includes(props.field.type))
@@ -195,15 +192,8 @@ const supportsCount = computed(
     (supportsMultiple.value && props.field.multiple)
 )
 
-const recommendationDict: Record<RecommendationDimension, string> = {
-  account_type: 'zsjos_material_account_type',
-  profession: 'zsjos_material_profession',
-  account_stage: 'zsjos_media_account_stage'
-}
-
-const applyRecommendationDictionary = (dimension?: RecommendationDimension) => {
-  if (dimension) props.field.dictType = recommendationDict[dimension]
-  else props.field.allowUnlimited = false
+const normalizeDictionary = () => {
+  if (!isRecommendationDictionary(props.field.dictType)) props.field.allowUnlimited = false
 }
 
 const normalizeMultiple = () => {
@@ -217,11 +207,10 @@ const normalizeType = () => {
   const field = props.field
   if (!['dict-single', 'dict-multi'].includes(field.type)) {
     field.dictType = undefined
-    field.recommendationDimension = undefined
     field.allowUnlimited = false
   }
   if (!['employee', 'department'].includes(field.type)) field.multiple = undefined
-  if (!['text', 'textarea', 'rich-text'].includes(field.type)) field.maxLength = undefined
+  if (!['text', 'textarea', 'rich-text'].includes(field.type)) { field.maxLength = undefined; field.placeholder = undefined }
   if (field.type !== 'number') {
     field.min = undefined
     field.max = undefined
@@ -237,9 +226,11 @@ const normalizeType = () => {
   }
   if (field.type === 'repeat-group') {
     field.children ||= [newField(false)]
+    field.initialCount ??= 0
     field.searchable = false
   } else {
     field.children = undefined
+    field.initialCount = undefined
   }
 }
 

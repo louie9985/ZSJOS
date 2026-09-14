@@ -10,6 +10,7 @@ import {
 } from '../services/api'
 import { loadWorkPlanPageResources } from '../services/workPlanLoading'
 import DetailFieldGrid from '../components/DetailFieldGrid'
+import { ClipboardUploadButtons } from '../components/ClipboardPasteTarget'
 
 const STATUS: Record<string, string> = {
   draft: '草稿', active: '进行中', completed: '已完成', cancelled: '已取消',
@@ -85,7 +86,13 @@ const SUPPLEMENTAL_SECTIONS = [
 
 function AttachmentPicker({ value = [], onChange }: { value?: number[]; onChange?: (value: number[]) => void }) {
   const [uploading, setUploading] = useState(false)
-  return <Upload
+  const uploadFile = async (file: File) => {
+    setUploading(true)
+    try { const result = await api.uploadWorkPlanAttachment(file); onChange?.([...new Set([...value, result.infraFileId])]) }
+    catch (error) { message.error(error instanceof Error ? error.message : '附件上传失败') }
+    finally { setUploading(false) }
+  }
+  return <ClipboardUploadButtons disabled={uploading} canPaste={() => !uploading} onFiles={files => { const file = files[0]; if (file) void uploadFile(file) }}><Upload
     fileList={value.map(id => ({ uid: String(id), name: `附件 #${id}`, status: 'done' as const }))}
     customRequest={async options => {
       setUploading(true)
@@ -101,7 +108,7 @@ function AttachmentPicker({ value = [], onChange }: { value?: number[]; onChange
       }
     }}
     onRemove={file => { onChange?.(value.filter(id => String(id) !== file.uid)); return true }}
-  ><Button loading={uploading} icon={<UploadOutlined />}>上传附件</Button></Upload>
+  ><Button loading={uploading} icon={<UploadOutlined />}>上传附件</Button></Upload></ClipboardUploadButtons>
 }
 
 function parseOptions(field: WorkPlanTemplateField) {

@@ -1,0 +1,53 @@
+{
+  "key": "zsjos_partner_withdrawal",
+  "name": "提现财务审批",
+  "category": "partner_withdrawal",
+  "description": "兼职人员提交提现后，由有提现审核权限的财务人员审批",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/zsjos/withdrawal",
+  "formCustomViewPath": "/zsjos/withdrawal",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": false,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "financeReview",
+      "type": 11,
+      "name": "财务审批",
+      "showText": "业务服务提交时指定审批人",
+      "candidateStrategy": 35,
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

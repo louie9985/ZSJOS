@@ -5,16 +5,22 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.thread.ThreadUtil;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobDataKeyEnum;
 import cn.iocoder.yudao.framework.quartz.core.service.JobLogFrameworkService;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditRunner;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.PersistJobDataAfterExecution;
 import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.quartz.QuartzJobBean;
 
 import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 import static cn.hutool.core.exceptions.ExceptionUtil.getRootCauseMessage;
 
@@ -33,6 +39,9 @@ public class JobHandlerInvoker extends QuartzJobBean {
 
     @Resource
     private JobLogFrameworkService jobLogFrameworkService;
+
+    @Resource
+    private ObjectProvider<ExecutionAuditHook> executionAuditHooks;
 
     @Override
     protected void executeInternal(JobExecutionContext executionContext) throws JobExecutionException {
@@ -53,7 +62,14 @@ public class JobHandlerInvoker extends QuartzJobBean {
             // 记录 Job 日志（初始）
             jobLogId = jobLogFrameworkService.createJobLog(jobId, startTime, jobHandlerName, jobHandlerParam, refireCount + 1);
             // 执行任务
-            data = this.executeInternal(jobHandlerName, jobHandlerParam);
+            ExecutionAuditContext auditContext = new ExecutionAuditContext(
+                    "SYSTEM_JOB", jobHandlerName, null, null, null, null, null,
+                    Map.of("jobId", jobId == null ? "" : jobId, "jobLogId", jobLogId == null ? "" : jobLogId,
+                            "jobHandlerParam", jobHandlerParam == null ? "" : jobHandlerParam,
+                            "refireCount", refireCount, "retryCount", retryCount));
+            List<ExecutionAuditHook> hooks = executionAuditHooks == null ? List.of() : executionAuditHooks.orderedStream().toList();
+            data = ExecutionAuditRunner.run(auditContext, hooks,
+                    () -> this.executeInternal(jobHandlerName, jobHandlerParam));
         } catch (Throwable ex) {
             exception = ex;
         }

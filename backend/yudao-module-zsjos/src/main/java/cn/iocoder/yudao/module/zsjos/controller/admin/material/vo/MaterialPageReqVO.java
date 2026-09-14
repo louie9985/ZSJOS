@@ -19,4 +19,5 @@ public class MaterialPageReqVO extends PageParam {
     private String accountType;
     private String profession;
     private String accountStage;
+    @Size(max=100) private String platform;
 }

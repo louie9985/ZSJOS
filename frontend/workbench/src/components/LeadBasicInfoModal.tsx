@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, App, Button, Cascader, Form, Input, Modal, Select, Space, Spin } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type AreaNode, type DictData, type LeadCatalog, type ManagedLead } from '../services/api'
+import { api, type AreaNode, type DictData, type LeadCatalog, type LeadAttachment, type ManagedLead } from '../services/api'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { selectionFromManagedProduct, type IntendedProductSelection } from './LeadIntendedProductEditor'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import { createIdempotencyKey } from '../services/idempotency'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
+import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 
 type Values = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
@@ -21,7 +23,7 @@ const configLabels: Record<ConfigSource, string> = {
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : '加载失败'
 
-export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onDirtyChange, submitterOnly = false }: {
+function LeadBasicInfoModalImpl({ lead, open, onClose, onChanged, onDirtyChange, submitterOnly = false }: {
   lead: ManagedLead; open: boolean; onClose: () => void; onChanged: () => void
   onDirtyChange?: (dirty: boolean) => void; submitterOnly?: boolean
 }) {
@@ -115,18 +117,12 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
       const intendedProducts = products.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown,
         skuUnknown: item.skuUnknown, primary: item.key === primaryKey }))
-      if (submitterOnly) {
-        const payload = { provinceCode, cityCode, leadCategory: values.leadCategory!, intendedProducts, remark: values.reason?.trim() || undefined }
-        const content = JSON.stringify(payload)
-        if (supplementAttempt.current?.content !== content) supplementAttempt.current = { content, key: createIdempotencyKey() }
-        await api.supplementLead(lead.id, { ...payload, idempotencyKey: supplementAttempt.current.key })
-      }
-      else await api.updateLeadBasicInfo(lead.id, {
+      await api.updateLeadBasicInfo(lead.id, {
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode, leadCategory: values.leadCategory,
         intendedProducts, reason: values.reason!.trim()
       })
-      setDirty(false); message.success(submitterOnly ? '资料已补充' : '基础信息已更新'); onClose(); onChanged()
+      setDirty(false); message.success('基础信息已更新'); onClose(); onChanged()
     } catch (saveError) { message.error(saveError instanceof Error ? saveError.message : '保存失败') }
     finally { setSaving(false) }
   }
@@ -160,4 +156,43 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
       </Form>
     </Spin>
   </Modal>
+}
+
+function SubmitterSupplementModal({ lead, open, onClose, onChanged }: { lead: ManagedLead; open: boolean; onClose: () => void; onChanged: () => void }) {
+  const { message } = App.useApp()
+  const [remark, setRemark] = useState('')
+  const [attachments, setAttachments] = useState<DeferredUploadItem<LeadAttachment>[]>([])
+  const [saving, setSaving] = useState(false)
+  const [attempt, setAttempt] = useState<{ content: string; key: string }>()
+  useEffect(() => { if (open) { setRemark(''); setAttachments([]); setAttempt(undefined) } }, [open, lead.id])
+  const submit = async () => {
+    const normalized = remark.trim()
+    if (!normalized) { message.warning('请填写补充说明'); return }
+    setSaving(true)
+    try {
+      const uploaded = await uploadDeferredFiles(attachments, api.uploadLeadAttachment, setAttachments)
+      if (uploaded.failed) { message.error('有图片上传失败，请重试失败项'); return }
+      const payload = { remark: normalized, attachments: uploaded.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })) }
+      const content = JSON.stringify(payload)
+      const current = attempt?.content === content ? attempt : { content, key: createIdempotencyKey() }
+      if (!attempt || attempt.content !== content) setAttempt(current)
+      await api.supplementLead(lead.id, { ...payload, idempotencyKey: current.key })
+      message.success('补充资料已提交'); onClose(); onChanged()
+    } catch (error) { message.error(error instanceof Error ? error.message : '提交失败') }
+    finally { setSaving(false) }
+  }
+  return <Modal title="补充资料" open={open} onCancel={onClose} onOk={() => void submit()} okText="提交补充" confirmLoading={saving} destroyOnHidden>
+    <Form layout="vertical">
+      <Form.Item label="补充说明" required help="请填写本次需要补充的客户信息">
+        <Input.TextArea value={remark} onChange={event => setRemark(event.target.value)} rows={6} maxLength={1000} showCount placeholder="请输入补充说明" disabled={saving}/>
+      </Form.Item>
+      <Form.Item label="图片附件（可选）"><DeferredAttachmentPicker value={attachments} onChange={setAttachments} accept="image/jpeg,image/png,image/webp" maxCount={9} disabled={saving}/></Form.Item>
+    </Form>
+  </Modal>
+}
+
+export default function LeadBasicInfoModal(props: { lead: ManagedLead; open: boolean; onClose: () => void; onChanged: () => void; onDirtyChange?: (dirty: boolean) => void; submitterOnly?: boolean }) {
+  return props.submitterOnly
+    ? <SubmitterSupplementModal lead={props.lead} open={props.open} onClose={props.onClose} onChanged={props.onChanged}/>
+    : <LeadBasicInfoModalImpl {...props}/>
 }

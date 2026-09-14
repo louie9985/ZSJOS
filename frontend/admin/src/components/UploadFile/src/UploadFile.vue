@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!disabled" class="upload-file">
+  <ClipboardUploadActions v-if="!disabled" :disabled="disabled || fileList.length >= props.limit" :can-paste="fileList.length < props.limit" @files="handlePasteFiles">
     <el-upload
       ref="uploadRef"
       v-model:file-list="fileList"
@@ -22,12 +22,13 @@
     >
       <el-button type="primary">
         <Icon icon="ep:upload-filled" />
-        选取文件
+        上传附件
       </el-button>
       <template v-if="isShowTip" #tip>
         <div style="font-size: 8px">
           格式为 <b style="color: #f56c6c">{{ fileType.join('/') }}</b> 的文件
         </div>
+        <div style="font-size: 12px">可通过“上传剪贴板截图”直接读取截图</div>
       </template>
       <template #file="row">
         <div class="flex items-center">
@@ -49,7 +50,7 @@
         </div>
       </template>
     </el-upload>
-  </div>
+  </ClipboardUploadActions>
 
   <!-- 上传操作禁用时 -->
   <div v-if="disabled" class="upload-file">
@@ -66,10 +67,11 @@
 <script lang="ts" setup>
 import { propTypes } from '@/utils/propTypes'
 import { getFileNameFromUrl } from '@/utils/file'
-import type { UploadProps, UploadRawFile, UploadUserFile } from 'element-plus'
+import { genFileId, type UploadInstance, type UploadProps, type UploadRawFile, type UploadUserFile } from 'element-plus'
 import { isString } from '@/utils/is'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
 import { UploadFile } from 'element-plus/es/components/upload/src/upload'
+import ClipboardUploadActions from './ClipboardUploadActions.vue'
 
 defineOptions({ name: 'UploadFile' })
 
@@ -93,6 +95,11 @@ const fileList = ref<UploadUserFile[]>([])
 const uploadNumber = ref<number>(0)
 
 const { uploadUrl, httpRequest } = useUpload(props.directory)
+const uploadRef = ref<UploadInstance>()
+
+const handlePasteFiles = (files: File[]) => {
+  files.slice(0, props.limit - fileList.value.length).forEach(file => uploadRef.value?.handleStart(Object.assign(file, { uid: genFileId() }) as UploadRawFile))
+}
 
 // 移除校验未通过的待上传文件
 const removeRejectedFile = (file: UploadRawFile) => {

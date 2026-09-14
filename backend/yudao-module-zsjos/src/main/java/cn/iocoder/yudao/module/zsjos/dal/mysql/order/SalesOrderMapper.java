@@ -26,6 +26,8 @@ import static cn.hutool.core.util.StrUtil.isNotBlank;
 
 @Mapper
 public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
+    @Select("SELECT COUNT(*) AS deals, COALESCE(SUM(o.payable_amount),0) AS amount FROM zsjos_order o JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=b'0' WHERE o.tenant_id=#{tenantId} AND o.deleted=b'0' AND l.partner_id=#{partnerId} AND o.status IN ('paid','effective','completed','won') AND COALESCE(o.effective_at,o.customer_paid_at,o.create_time) >= #{from}")
+    java.util.Map<String,Object> aggregatePartnerDeals(@Param("tenantId") Long tenantId, @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from);
     default SalesOrderDO selectLatestFirstPurchaseByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
                 .eq(SalesOrderDO::getOrderType, ORDER_TYPE_FIRST_PURCHASE)

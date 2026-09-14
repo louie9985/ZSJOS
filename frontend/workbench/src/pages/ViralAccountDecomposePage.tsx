@@ -1,0 +1,13 @@
+import { Alert, App, Empty, Spin } from 'antd'
+import { useEffect, useState } from 'react'
+import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
+import { api, type DictData } from '../services/api'
+import { materialApi, type MaterialType } from '../services/materialApi'
+
+export default function ViralAccountDecomposePage() {
+  const { message } = App.useApp()
+  const [type, setType] = useState<MaterialType>(); const [dicts, setDicts] = useState<Record<string, Array<{ value: string; label: string }>>>({}); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [formKey, setFormKey] = useState(0)
+  useEffect(() => { void (async () => { try { const names = ['zsjos_account_platform', 'zsjos_persona_type', 'zsjos_material_profession', 'zsjos_media_account_stage']; const [types, ...rows] = await Promise.all([materialApi.types(), ...names.map(name => api.dictDataByType(name))]); setType(types.find(item => item.code === 'viral_account')); const next: Record<string, Array<{ value: string; label: string }>> = {}; rows.forEach((row, index) => { next[names[index]] = (row as DictData[]).map(item => ({ value: item.value, label: item.label })) }); setDicts(next) } catch (cause) { setError(cause instanceof Error ? cause.message : '加载失败') } finally { setLoading(false) } })() }, [])
+  if (loading) return <Spin />; if (error) return <Alert type="error" showIcon message={error} />; if (!type) return <Empty description="爆款账号模板尚未发布" />
+  return <section className="workspace-page standalone-viral-decompose"><ViralAccountMaterialForm key={formKey} mode="create" type={type} dicts={dicts} onClose={() => setFormKey(value => value + 1)} onSaved={() => { message.success('已保存，继续创建下一条'); setFormKey(value => value + 1) }} /></section>
+}

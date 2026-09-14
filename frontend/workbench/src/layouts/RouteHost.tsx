@@ -42,6 +42,7 @@ import {
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
 import { ProductionTicketsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
+import { DirectorTemplateConfigPage } from '../pages/DirectorConfigPages'
 import MediaCalendarPage from '../pages/MediaCalendarPage'
 import PersonalCalendarPage from '../pages/PersonalCalendarPage'
 import ExamCalendarPage from '../pages/ExamCalendarPage'
@@ -52,6 +53,8 @@ import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
 import AnnouncementCenterPage from '../pages/AnnouncementCenterPage'
 import DeliveryClassPage from '../pages/DeliveryClassPage'
 import MaterialLibraryPage from '../pages/MaterialLibraryPage'
+import ViralAccountDecomposePage from '../pages/ViralAccountDecomposePage'
+import ViralContentDecomposePage from '../pages/ViralContentDecomposePage'
 import ContentProductionPage from '../pages/ContentProductionPage'
 import ContentReviewBatchPage from '../pages/ContentReviewBatchPage'
 
@@ -69,6 +72,7 @@ interface RouteHostProps {
  */
 export default function RouteHost({ menu, permissions, roles, authPlatform, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
+  if (menu?.path === APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE) return <DirectorTemplateConfigPage permissions={permissions} />
   if (authPlatform === 'MOBILE' && PC_ONLY_NATIVE_ROUTES.has(menu?.path || location.pathname)) {
     return <Result status="info" title="请使用电脑端访问" subTitle="内容生产和内容审核仅支持电脑端操作。" />
   }
@@ -141,6 +145,8 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_LIBRARY) return <MaterialLibraryPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.VIRAL_ACCOUNT_DECOMPOSE) return <ViralAccountDecomposePage />
+  if (menu?.path === APP_ROUTES.VIRAL_CONTENT_DECOMPOSE) return <ViralContentDecomposePage />
   if (menu?.path === APP_ROUTES.CONTENT_PRODUCTION) return <ContentProductionPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.CONTENT_REVIEW) return <ContentReviewBatchPage permissions={permissions}/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>

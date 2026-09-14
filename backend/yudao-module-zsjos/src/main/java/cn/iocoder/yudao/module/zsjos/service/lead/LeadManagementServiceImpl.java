@@ -16,6 +16,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadRemarkRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadRemarkAttachmentRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -412,7 +414,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setFollowUpStatus(LeadStateProjection.followUp(lead, opportunity));
         result.setOperationalStatus(LeadStateProjection.operational(lead));
         if (detail) {
-            var remarks = remarkHistoryService.get(lead, result.getSourceUserName(), blindIdentity && viewerIsOwner);
+            result.setAttachments(attachments.stream().map(attachment -> convertAttachment(attachment, attachmentUrls)).toList());
+            // attachmentUrls is keyed by the attachment row id, so pass it through as such instead of
+            // building a separate list that would be keyed by infraFileId and left unused.
+            var remarks = remarkHistoryService.get(lead, result.getSourceUserName(), blindIdentity && viewerIsOwner,
+                    attachments, attachmentUrls);
             result.setRemarkHistory(remarks.items());
             result.setRemarkHistoryIncomplete(remarks.incomplete());
             if (visibleTabs.contains(DETAIL_TAB_FOLLOW_UPS)) {
@@ -420,8 +426,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 result.setNextFollowUpAt(pendingFollowUp == null ? null : pendingFollowUp.getDueAt());
             }
             result.setIntendedProducts(products.stream().map(this::convertProduct).toList());
-            result.setAttachments(attachments.stream()
-                    .map(attachment -> convertAttachment(attachment, attachmentUrls)).toList());
             result.setInvalidEvidence(convertEvidence(lead.getInvalidEvidenceRefs()));
             if (opportunity != null) {
                 LeadManagementRespVO.OpportunityVO opportunityVO = new LeadManagementRespVO.OpportunityVO();

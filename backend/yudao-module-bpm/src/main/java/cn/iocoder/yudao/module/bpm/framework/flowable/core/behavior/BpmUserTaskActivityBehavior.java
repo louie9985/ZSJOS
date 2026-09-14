@@ -1,8 +1,16 @@
 package cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.convert.Convert;
 import cn.hutool.core.util.RandomUtil;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmExternalStartUtils;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants;
+import org.flowable.engine.impl.util.ProcessDefinitionUtil;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.bpmn.model.UserTask;
@@ -21,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Set;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED;
+
 /**
  * 自定义的【单个】流程任务的 assignee 负责人的分配
  * 第一步，基于分配规则，计算出分配任务的【单个】候选人。如果找不到，则直接报业务异常，不继续执行后续的流程；
@@ -34,8 +45,41 @@ public class BpmUserTaskActivityBehavior extends UserTaskActivityBehavior {
     @Setter
     private BpmTaskCandidateInvoker taskCandidateInvoker;
 
+    @Setter
+    private BpmProcessDefinitionService processDefinitionService;
+
     public BpmUserTaskActivityBehavior(UserTask userTask) {
         super(userTask);
+    }
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // Use persisted engine identity, not mutable process variables or the current operator.
+        var instance = CommandContextUtil.getExecutionEntityManager().findById(execution.getProcessInstanceId());
+        if (instance == null) {
+            super.execute(execution);
+            return;
+        }
+        var subject = BpmStartSubjectDTO.fromFlowableId(instance.getStartUserId());
+        if (subject != null && !UserTypeEnum.ADMIN.getValue().equals(subject.getUserType())
+                && processDefinitionService != null
+                // The definition lookup is tenant-scoped; an async engine thread loses tenant context,
+                // so wrap it as BpmTaskCandidateInvoker does to keep the external check from failing open.
+                && FlowableUtils.execute(execution.getTenantId(), () -> BpmExternalStartUtils.isSubmissionTask(
+                        processDefinitionService.getProcessDefinitionInfo(execution.getProcessDefinitionId()),
+                        ProcessDefinitionUtil.getBpmnModel(execution.getProcessDefinitionId()), userTask))) {
+            // A return-to-submitter requires an external editing contract; never silently resubmit it.
+            if (Boolean.TRUE.equals(execution.getVariable(String.format(
+                    BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_RETURN_FLAG, userTask.getId())))
+                    || Boolean.FALSE.equals(Convert.toBool(execution.getVariable(
+                            BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_SKIP_START_USER_NODE)))) {
+                throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+            }
+            // Keep activity history, but never create a Partner task or invoke empty-ADMIN-candidate policies.
+            leave(execution);
+            return;
+        }
+        super.execute(execution);
     }
 
     @Override

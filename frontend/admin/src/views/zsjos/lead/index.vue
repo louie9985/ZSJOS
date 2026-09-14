@@ -176,10 +176,11 @@
             <el-alert v-if="detail.remarkHistoryIncomplete" title="部分历史备注无法还原" type="warning" :closable="false" />
             <template v-if="detail.remarkHistory != null">
               <div v-for="item in detail.remarkHistory" :key="item.id">
-                <strong>{{ item.kind === 'submission' ? '提交备注' : item.kind === 'supplement' ? '补充备注' : '历史备注' }}</strong>
+                <strong>{{ item.kind === 'submission' ? '首次提交资料' : item.kind === 'supplement' ? '补充资料' : '历史备注' }}</strong>
                 <span v-if="item.operatorName"> · {{ item.operatorName }}</span>
                 <span v-if="item.occurredAt"> · {{ formatZsjosTimestamp(item.occurredAt) }}</span>
                 <p style="white-space: pre-wrap; overflow-wrap: anywhere">{{ item.content }}</p>
+                <div v-if="item.attachments?.length" class="lead-remark-attachments"><el-image v-for="file in item.attachments" :key="file.infraFileId" :src="file.fileUrl" :preview-src-list="item.attachments.map(item => item.fileUrl).filter(Boolean)" fit="cover" style="width:72px;height:72px;margin-right:8px" /></div>
               </div>
               <span v-if="!detail.remarkHistory.length">暂无备注</span>
             </template>

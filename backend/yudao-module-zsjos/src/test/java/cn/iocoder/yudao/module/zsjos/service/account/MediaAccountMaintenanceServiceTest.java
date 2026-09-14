@@ -47,78 +47,11 @@ class MediaAccountMaintenanceServiceTest {
     @Mock private MediaAccountCalendarScopeService calendarScopeService;
 
     @Test
-    void maintainAllowsArbitraryStageSnapshotsAndNotifiesOnlyOtherParticipant() {
-        MediaAccountDO account = account().setSStage("s6").setSStageLabelSnapshot("S6 稳定增长");
-        when(accountMapper.selectById(1L)).thenReturn(account);
-        when(dictDataApi.getDictDataList(MediaAccountMaintenanceService.DICT_CURRENT_STATUS))
-                .thenReturn(List.of(dict("a_active_growth", "A类：活跃增长账号")));
-        when(dictDataApi.getDictDataList(MediaAccountMaintenanceService.DICT_STAGE))
-                .thenReturn(List.of(dict("s1", "S1 定位期")));
-        when(dictDataApi.getDictDataList(MediaAccountMaintenanceService.DICT_PRIMARY_PROBLEM))
-                .thenReturn(List.of(dict("b1", "B1 定位不清"), dict("b2", "B2 学员不执行")));
-        when(dictDataApi.getDictDataList(MediaAccountMaintenanceService.DICT_EXECUTION_MEASURE))
-                .thenReturn(List.of(dict("cold_start_7d", "冷启动7天")));
-        when(accountMapper.updateMaintenance(any(), eq(0))).thenReturn(1);
-        when(revisionMapper.selectMaxRevisionNo(1L)).thenReturn(0);
-        AdminUserRespDTO operator = new AdminUserRespDTO(); operator.setId(20L); operator.setNickname("运营甲");
-        when(adminUserApi.getUser(20L)).thenReturn(operator);
-
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(0); req.setCurrentStatusValue("a_active_growth"); req.setStageValue("s1");
-        req.setPrimaryProblemValues(List.of("b1", "b1", "b2"));
-        req.setExecutionMeasureValue("cold_start_7d"); req.setAdjustmentDirection("优化定位");
-        req.setStartDate(LocalDate.of(2026, 8, 26)); req.setEndDate(LocalDate.of(2026, 9, 1));
-
-        assertEquals(1, service.maintain(1L, req, 20L));
-        assertEquals("s1", account.getSStage());
-        assertEquals("S1 定位期", account.getSStageLabelSnapshot());
-        assertTrue(account.getPrimaryProblemsJson().contains("B1 定位不清"));
-        ArgumentCaptor<MediaAccountMaintenanceRevisionDO> revision = ArgumentCaptor.forClass(MediaAccountMaintenanceRevisionDO.class);
-        verify(revisionMapper).insert(revision.capture());
-        assertEquals(1, revision.getValue().getRevisionNo());
-        assertTrue(revision.getValue().getChangedFieldsJson().contains("stage"));
-        verify(workflowEventService).notify(eq("media.account.maintenance_changed"), eq("media-account"),
-                eq(1L), eq(30L), eq(20L), anyString(), argThat(payload -> "运营甲".equals(payload.get("operatorName"))));
-        verify(workflowEventService, times(1)).notify(anyString(), anyString(), anyLong(), anyLong(),
-                anyLong(), anyString(), anyMap());
-    }
-
-    @Test
-    void unchangedMaintenanceDoesNotWriteRevisionOrNotify() {
-        MediaAccountDO account = account();
-        when(accountMapper.selectById(1L)).thenReturn(account);
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(0); req.setPrimaryProblemValues(List.of());
-
-        assertEquals(0, service.maintain(1L, req, 20L));
-        verify(accountMapper, never()).updateMaintenance(any(), anyInt());
-        verifyNoInteractions(revisionMapper, workflowEventService);
-    }
-
-    @Test
-    void staleVersionIsRejectedEvenWhenMaintenanceIsUnchanged() {
-        when(accountMapper.selectById(1L)).thenReturn(account().setVersion(3));
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(2); req.setPrimaryProblemValues(List.of());
-
-        ServiceException error = assertThrows(ServiceException.class, () -> service.maintain(1L, req, 20L));
-
-        assertEquals(1_900_011_003, error.getCode());
-        verifyNoInteractions(dictDataApi, revisionMapper, workflowEventService);
-        verify(accountMapper, never()).updateMaintenance(any(), anyInt());
-    }
-
-    @Test
-    void datesMustBeBothEmptyOrAValidPair() {
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(0); req.setStartDate(LocalDate.of(2026, 8, 26));
-        ServiceException error = assertThrows(ServiceException.class, () -> service.maintain(1L, req, 20L));
-        assertEquals(1_900_011_013, error.getCode());
-
-        req.setEndDate(LocalDate.of(2026, 8, 25));
-        assertEquals(1_900_011_013, assertThrows(ServiceException.class,
-                () -> service.maintain(1L, req, 20L)).getCode());
-        verifyNoInteractions(accountMapper);
+    void legacyMaintenanceCannotWriteAutomaticStatusOrStage() {
+        when(accountMapper.selectById(1L)).thenReturn(account());
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED.getCode(),
+                assertThrows(ServiceException.class, () -> service.maintain(1L, new MediaAccountMaintenanceReqVO(), 20L)).getCode());
+        verifyNoInteractions(revisionMapper, stageLogMapper, workflowEventService);
     }
 
     @Test
@@ -133,49 +66,6 @@ class MediaAccountMaintenanceServiceTest {
 
         assertEquals(3, service.calendar(req, 20L).getUnscheduledCount());
         verify(accountMapper).selectCalendarPage(req, Set.of(20L, 21L, 30L), false);
-    }
-
-    @Test
-    void maintainCanClearEveryFieldAndDeduplicatesRecipients() {
-        MediaAccountDO account = account().setDirectorUserId(30L).setOwnerOperatorUserId(30L)
-                .setCurrentStatusValue("a_active_growth").setCurrentStatusLabelSnapshot("A类：活跃增长账号")
-                .setSStage("s3").setSStageLabelSnapshot("S3 内容验证")
-                .setPrimaryProblemsJson("[{\"value\":\"b4\",\"labelSnapshot\":\"B4 平台分发弱\"}]")
-                .setExecutionMeasureValue("content_validation_7d").setExecutionMeasureLabelSnapshot("内容验证7天")
-                .setAdjustmentDirection("旧方向").setMaintenanceStartDate(LocalDate.of(2026, 8, 1))
-                .setMaintenanceEndDate(LocalDate.of(2026, 8, 7));
-        when(accountMapper.selectById(1L)).thenReturn(account);
-        when(accountMapper.updateMaintenance(any(), eq(0))).thenReturn(1);
-        when(revisionMapper.selectMaxRevisionNo(1L)).thenReturn(4);
-        AdminUserRespDTO operator = new AdminUserRespDTO(); operator.setNickname("运营甲");
-        when(adminUserApi.getUser(20L)).thenReturn(operator);
-
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(0); req.setPrimaryProblemValues(List.of()); req.setAdjustmentDirection("   ");
-
-        assertEquals(1, service.maintain(1L, req, 20L));
-        ArgumentCaptor<MediaAccountMaintenanceRevisionDO> revision = ArgumentCaptor.forClass(MediaAccountMaintenanceRevisionDO.class);
-        verify(revisionMapper).insert(revision.capture());
-        assertEquals(5, revision.getValue().getRevisionNo());
-        assertNull(revision.getValue().getCurrentStatusValue());
-        assertEquals("[]", revision.getValue().getPrimaryProblemsJson());
-        verify(workflowEventService, times(1)).notify(eq("media.account.maintenance_changed"), anyString(),
-                eq(1L), eq(30L), eq(20L), anyString(), anyMap());
-    }
-
-    @Test
-    void versionConflictDoesNotWriteRevisionOrNotify() {
-        when(accountMapper.selectById(1L)).thenReturn(account());
-        when(dictDataApi.getDictDataList(MediaAccountMaintenanceService.DICT_STAGE))
-                .thenReturn(List.of(dict("s2", "S2 冷启动")));
-        when(accountMapper.updateMaintenance(any(), eq(0))).thenReturn(0);
-        MediaAccountMaintenanceReqVO req = new MediaAccountMaintenanceReqVO();
-        req.setVersion(0); req.setStageValue("s2");
-
-        ServiceException error = assertThrows(ServiceException.class, () -> service.maintain(1L, req, 20L));
-        assertEquals(1_900_011_003, error.getCode());
-        verify(revisionMapper, never()).insert(any(MediaAccountMaintenanceRevisionDO.class));
-        verifyNoInteractions(workflowEventService);
     }
 
     @Test

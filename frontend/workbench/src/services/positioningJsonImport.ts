@@ -104,7 +104,12 @@ export const parsePositioningJson = (
 ): PositioningJsonImportPreview => {
   let parsed: unknown
   try {
-    parsed = JSON.parse(text)
+    // AI outputs sometimes wrap an otherwise valid JSON object in a Markdown
+    // fence or prepend a UTF-8 BOM. Accept that transport noise while keeping
+    // the actual payload contract strict (a flat object keyed by field key).
+    const normalized = text.replace(/^\uFEFF/, '').trim()
+    const fenced = normalized.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+    parsed = JSON.parse(fenced ? fenced[1] : normalized)
   } catch {
     throw new Error('JSON 格式不正确，请检查括号、引号和逗号')
   }

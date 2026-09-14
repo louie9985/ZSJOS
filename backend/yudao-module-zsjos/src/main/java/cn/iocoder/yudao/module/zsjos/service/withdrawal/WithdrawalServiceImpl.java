@@ -61,6 +61,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private static final Pattern CARD_PATTERN = Pattern.compile("\\d{12,32}");
     private static final Set<String> PROOF_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
     private static final long MAX_PROOF_SIZE = 20L * 1024 * 1024;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService advancedFilterService;
     @Resource private WithdrawalMapper withdrawalMapper;
     @Resource private WithdrawalItemMapper itemMapper;
     @Resource private PartnerBankCardMapper cardMapper;
@@ -278,7 +279,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     @Override
     public PageResult<WithdrawalRespVO> getPage(WithdrawalPageReqVO request, Long applicantUserId) {
-        PageResult<WithdrawalDO> page = withdrawalMapper.selectPage(request, applicantUserId);
+        PageResult<WithdrawalDO> page = withdrawalMapper.selectPageByApplicant(request, applicantUserId);
         return new PageResult<>(page.getList().stream().map(item -> toResponse(item, false)).toList(), page.getTotal());
     }
 

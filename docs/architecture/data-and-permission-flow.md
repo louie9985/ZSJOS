@@ -54,6 +54,49 @@ The audit protocol inserts a `STARTED` row in an independent transaction before 
 
 Audit rows store the tenant, operator ID and name snapshot, source IP, category, stable action and target type, public target identifier when safely available, request method/path and trace ID. They never store query strings, request or response bodies, file content, passwords, tokens, mobile numbers, full bank cards or other sensitive payloads. Internal Lead IDs must not be presented as customer-facing identifiers; when `leadNo` is unavailable at the generic boundary, the audit target identifier remains empty.
 
+## Media Account Source-Relation Boundary
+
+Positioning card creation and historical import require an explicit service
+relation matching the account's `createServiceRelationId`; missing relations are
+never inferred from the student or director. Import candidates and commands must
+keep source submission, source card, source account and target in that same
+relation. The target's active accepted director is required even when the caller
+has global read permission. This remains an account-based positioning workflow;
+it does not implement the planned one-card-per-collaboration-group presentation.
+
+Positioning interview uploads use a relation-specific directory. Bound historical
+files are read through their persisted interview's tenant, student and relation;
+the current authorized director can read them after reassignment. Unbound legacy
+uploads without a relation-specific directory are rejected and require re-upload.
+V203's development correction changes draft uniqueness from student to service
+relation while preserving snapshots and the legacy generated-column name. It
+must be applied to the development database together with the corrected source;
+the present verification uses an isolated MySQL container, not the shared database.
+
+An account with `createServiceRelationId` authorizes normal reads and writes only
+through that exact relation: the tenant and student must match, the relation must
+be active and accepted, and the caller must be its current director or operator.
+Being assigned to another relation of the same student grants no account access.
+The media student detail filters accounts before loading their positioning,
+content, production-ticket and account-timeline projections. Material account
+recommendation candidates apply the same exact-relation boundary in SQL.
+
+Both current members may create an account when the configured create permission
+and the completed-interview precondition pass. Its director and operator come
+from the selected relation, while `createOperatorUserId` records the actual caller.
+The command never chooses an operator from another relation of the same person.
+
+Legacy accounts without a source relation retain explicit stored-owner access;
+this is a compatibility exception, not proof of a collaboration-group binding.
+The existing `zsjos:media-account:query-all` read and maintenance exceptions remain;
+they do not grant generic update or production-ticket creation. Both Admin and
+Workbench consume the same backend permission boundary. No frontend compatibility
+or browser validation is implied by backend tests.
+
+This incremental boundary does not yet migrate legacy account ownership, change
+all account list/calendar data-scope queries, or bind positioning and interview
+objects to collaboration groups. Those remaining paths require separate integration.
+
 ## Authentication and tenant flow
 
 The employee workbench exposes the authenticated user's fixed `/user/profile` route from
@@ -246,18 +289,21 @@ default and are updated only when the administrator explicitly requests migratio
 
 ## Menu and route flow
 
-Media-account stage is an operator-maintained dictionary snapshot rather than an enforced S0-S6 state.
-The current accepted service-relation operator is synchronized to the media-account
-operator owner in the same transaction as operator assignment; account maintenance still
-requires both the configured `zsjos:media-account:maintenance` permission and the account
-object relationship.
-machine. The current snapshot lives on the account and every actual change appends an immutable revision;
-the pre-existing stage log is retained as read-only legacy history. Maintenance requires both
-`zsjos:media-account:maintenance` and the account object relationship. Any changed maintenance field emits
-one notification to the current director and operator after de-duplication, excluding the actor.
-Maintenance and legacy history accept either the account-query or account-maintenance feature permission,
-then independently require account-object read access. Account projections expose `VIEW_ACCOUNT_HISTORY`
-only after both layers pass, and Workbench must not probe either history endpoint without that capability.
+Media-account profiles use published field responsibilities plus configured feature and object permissions.
+The profile query permission is a button beneath the active media-student page, not the retired account
+page. V209 development reconciliation grants query only from existing edit/maintenance/query-all
+capabilities and preserves object read checks. Workbench blocks profile requests without the query
+permission; Admin manages the button through the existing System menu/role configuration.
+The accepted service-relation operator remains synchronized to the account owner on assignment.
+Profile edits require `zsjos:media-account:edit` or `zsjos:media-account:maintenance`, account edit access,
+and the current user matching the configured field's director/operator responsibility. AUTO and
+UNASSIGNED fields are immutable via the profile API; role names do not imply responsibility.
+The previous whole-account and manual status maintenance write APIs fail closed with an upgrade error.
+Existing maintenance history and calendar projections remain readable. Stage values are retained
+historical/system snapshots; new empty accounts do not default stage or operating metrics.
+Records append immutable actor/time/field-label/content/file snapshots. No new timer or notification
+cadence is enabled by this change. Historical account-query/maintenance permission and object read
+requirements remain in force. See [the profile contract](../api/media-account-profile.md).
 
 The server-owned top-level `/calendar` directory contains the relative `overview` and `personal` children.
 The account Gantt projection shows only complete current date pairs that intersect the requested
@@ -582,7 +628,7 @@ otherwise
 - V078 将 V007 的两个固定入口收拢为单一“客资管理”页面，原权限节点保留为隐藏范围能力；不根据角色名、岗位名或前端标签推断数据范围。
 - V121 退役独立“异常客资”页面菜单；挂起与回收待处理客资仍通过统一“客资管理”读取，恢复、转派、回收、释放动作由详情 `availableActions` 返回并在 `lead-action-toolbar` 中展示。后端异常处置 API 与权限标识保留。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
-- V193 将“我的订单”和“团队订单”合并为“订单管理”。统一查询使用 `zsjos:sales-order:query-management`，订单提交人集合由 System 数据权限（本人、部门、部门及下属、指定部门或全部）动态解析，多角色范围取并集；旧菜单、角色授权和订单筛选模板迁移后逻辑删除，订单业务记录不改写。
+- V195 将“我的订单”和“团队订单”合并为“订单管理”。统一查询使用 `zsjos:sales-order:query-management`，订单提交人集合由 System 数据权限（本人、部门、部门及下属、指定部门或全部）动态解析，多角色范围取并集；旧菜单、角色授权和订单筛选模板迁移后逻辑删除，订单业务记录不改写。
 
 ### Qualification exception authorization
 
@@ -847,3 +893,15 @@ allowlist. The request must supply `tenantId` as a positive query parameter; the
 validate that value against the resolved client address before setting `TenantContextHolder`.
 Forwarded IP headers are accepted only from configured trusted proxies. Frontend routing, request
 headers, or a user-selected tenant cannot grant access independently.
+
+### 定位访谈配置替代旧采访（2026-09-11）
+
+当前访谈配置和运行时仅使用 `director_positioning_interview`，Admin 与 Workbench 消费同一
+`/zsjos/positioning-interview-template` 版本化接口。既有菜单路径和
+`zsjos:director-interview-template:query/update/publish` 是兼容的授权标识，不代表旧采访业务仍可编辑。
+旧采访模板及提交 HTTP 接口移除，旧 `zsjos:student:director-interview` 菜单按钮停用；历史记录只读，
+不重新解析当前模板。定位卡保留独立场景和授权。菜单名称和显隐来自 System；不通过前端静态菜单替换。
+
+## 编导定位卡
+
+正式提交使用账号档案对象权限与可配置的定位卡创建权限累积校验。字段、字典和素材引用均由服务端模板及所属业务 API 提供；前端只渲染授权字段。草稿保存不生成正式定位版本，每次正式提交冻结模板、字典标签和素材版本快照。
