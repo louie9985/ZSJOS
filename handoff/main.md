@@ -24311,6 +24311,18 @@ equestAttachments。
 - Remaining work: 提交后按用户后续指示推送；发布后验证 H5 实际请求。
 - Status: `ready-to-commit`
 
+## Delivery Entry - 2026-09-14 17:10:00 +08:00
+
+- Workstream ID: `main-content-review-positioning-20260914`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `a3e634c3fc`。
+- User goal: 提交当前内容审查、定位卡、权限与 SQL 迁移改动并推送。
+- Key decisions: 纳入有效源码、测试、迁移、校验脚本和文档；排除验证目录、输出目录及 Python 缓存。
+- Execution or analysis result: 已创建提交 `a3e634c3fc`。
+- Changed files: 后端内容审查/定位卡/媒体账号、Admin 与 Workbench 对应实现、V223-V229 迁移及校验脚本、文档和测试。
+- Verification evidence: 无未合并文件；提交成功。`git diff --check` 仅报告若干既有/交接文档尾随空白和文件末尾空行，未改动其历史内容。
+- Dependency or integration impact: 未执行数据库迁移或共享服务操作。
+- Remaining work: 推送 `main` 并核对远程同步状态。
+- Status: `commit-created`
+
 ## Delivery Entry - 2026-09-14 17:00:00 +08:00
 
 - Workstream ID: `main-order-gift-items-schema-20260914`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `6e180edf2c`（修改前）。
