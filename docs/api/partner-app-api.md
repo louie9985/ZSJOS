@@ -71,6 +71,8 @@ Token 恢复由 HTTP 客户端内部单航班完成。普通业务请求的 HTTP
 
 来源和分类不使用前端静态值。分别调用 `GET /app-api/system/dict-data/type?type=zsjos_lead_source_channel` 和 `GET /app-api/system/dict-data/type?type=zsjos_lead_category` 获取启用项。
 
+H5 客资列表使用服务端手动分页，每页固定请求 20 条，通过“上一页/下一页”切换；搜索、状态或高级筛选变化后回到第 1 页。列表页面由 KeepAlive 保留，进入客资详情后返回必须恢复进入详情前的页码和滚动位置；当前页请求失败时保留原列表并提供当前页重试，不得进入无限加载状态。
+
 兼职端首页的“客资跟进提醒”以待跟进、未联系上、已判无效三个分区显示数量，点击分区进入独立 `/lead/follow-up?view=follow_up_pending|unreachable|invalid` 页面并直接选中对应分类；缺失或非法 `view` 时回退到 `follow_up_pending`。该页面读取 `/lead/inbox/submitted/summary`，返回 `followUpPendingCount`、`unreachableCount` 和 `invalidCount`，并在页面内按三个分类分别分页，不跳转或复用“我的客资”主列表页面状态。分页接口支持服务端视图参数 `view=follow_up_pending|unreachable|invalid`：待跟进覆盖待首跟、待判定和有效后仍在跟进，未联系上取 Lead 与 Opportunity 合并后的最新跟进结果 `unreachable`，已判无效取当前 `lead.status=invalid`。三个统计允许同一客资重叠，均限定当前 Partner 的客资范围；前端不得自行拼接状态条件。
 
 `availableActions` 的结构为 `{ code, enabled }[]`。H5 只消费启用的大写编码：`SUBMITTER_SUPPLEMENT`、`URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`。补充资料仅提交去首尾空白后 1–1000 字的 `remark`、可选的最多 9 张 JPG/PNG/WebP 图片 `attachments` 和 `idempotencyKey`；旧客户端的地区、分类、意向课程字段可传入但服务端忽略。所有用户可见客资编号只展示 `leadNo`；缺失时显示“客资编号暂未生成”，不得回退到 `id` 或 `leadId`。

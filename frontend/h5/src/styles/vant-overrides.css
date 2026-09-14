@@ -186,6 +186,62 @@
   -webkit-backdrop-filter: saturate(160%) blur(var(--h5-glass-blur-strong));
 }
 
+/* 确认/提示弹窗：内部主题化 + 圆角胶囊按钮 */
+.van-dialog {
+  --van-dialog-radius: 20px;
+  --van-dialog-header-padding-top: 24px;
+}
+
+.van-dialog__header {
+  color: var(--h5-text-primary);
+  font-size: 17px;
+}
+
+.van-dialog__message {
+  color: var(--h5-text-secondary) !important;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.van-dialog__footer {
+  gap: 10px;
+  padding: 12px 20px 20px;
+}
+
+.van-dialog__footer .van-dialog__cancel,
+.van-dialog__footer .van-dialog__confirm {
+  height: 42px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.van-dialog__footer .van-dialog__cancel::after,
+.van-dialog__footer .van-dialog__confirm::after {
+  display: none;
+}
+
+.van-dialog__footer .van-dialog__cancel {
+  border: 1px solid var(--h5-glass-border);
+  background: var(--h5-glass-surface);
+  color: var(--h5-text-secondary);
+}
+
+.van-dialog__footer .van-dialog__confirm {
+  border: 0;
+  background: var(--h5-primary);
+  color: #fff;
+}
+
+.van-dialog__footer .van-dialog__cancel:active {
+  background: var(--h5-glass-sunken);
+}
+
+.van-dialog__footer .van-dialog__confirm:active {
+  background: var(--h5-primary-dark);
+  color: #fff;
+}
+
 .van-toast.van-popup {
   --van-toast-text-color: #fff;
   --van-toast-loading-icon-color: #fff;

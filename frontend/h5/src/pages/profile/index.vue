@@ -358,20 +358,22 @@ async function handleLogout() {
 }
 
 .profile-logout-button {
-  --van-button-default-color: var(--h5-primary);
-  --van-button-default-border-color: color-mix(in srgb, var(--h5-primary) 28%, var(--h5-glass-border));
+  --van-button-default-color: var(--h5-text-secondary);
+  --van-button-default-border-color: var(--h5-glass-border);
   --van-button-plain-background: var(--h5-glass-surface);
-  height: 44px;
-  border-color: color-mix(in srgb, var(--h5-primary) 28%, var(--h5-glass-border));
+  height: 46px;
+  border-color: var(--h5-glass-border);
   background: var(--h5-glass-surface);
-  box-shadow: var(--h5-glass-shadow);
-  color: var(--h5-primary);
-  backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
-  -webkit-backdrop-filter: saturate(150%) blur(var(--h5-glass-blur));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 8px rgba(31, 35, 48, 0.05);
+  color: var(--h5-text-secondary);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: transform 0.16s ease, background 0.16s ease;
 }
 
 .profile-logout-button:active {
-  background: var(--h5-primary-opacity);
+  transform: scale(0.99);
+  background: var(--h5-glass-sunken);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

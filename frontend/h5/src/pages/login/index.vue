@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showConfirmDialog } from 'vant'
 import { useAuth } from '@/composables/useAuth'
 import { wecomAuthorizeUrl } from '@/api/auth'
 import { isInWecom } from '@/utils/wecom'
@@ -22,6 +22,23 @@ const agreementAccepted = ref(false)
 
 // 获取登录后跳转地址
 const redirectPath = () => (route.query.redirect as string) || '/home'
+
+// 确保已同意协议：未勾选则弹窗引导，点“同意并继续”自动勾选后放行
+async function ensureAgreement() {
+  if (agreementAccepted.value) return true
+  try {
+    await showConfirmDialog({
+      title: '用户协议与隐私政策',
+      message: '为了保障你的权益，请阅读并同意《用户协议》和《隐私政策》后继续。',
+      confirmButtonText: '同意并继续',
+      cancelButtonText: '再看看'
+    })
+    agreementAccepted.value = true
+    return true
+  } catch {
+    return false
+  }
+}
 
 function buildWecomRedirectUri() {
   const url = new URL('/login', window.location.origin)
@@ -58,13 +75,14 @@ onMounted(async () => {
   }
 
   if (shouldAutoStartWecomLogin()) {
-    await handleWecomLogin()
+    await handleWecomLogin({ skipAgreement: true })
   }
 })
 
 async function handleLogin() {
   if (!/^1\d{10}$/.test(mobile.value.trim())) return showToast('请输入正确的手机号')
   if (!password.value) return showToast('请输入密码')
+  if (!(await ensureAgreement())) return
 
   const success = await loginWithPassword(mobile.value.trim(), password.value)
   if (success) {
@@ -84,6 +102,7 @@ async function handleActivate() {
   }
   if (activatePassword.value !== activateConfirmPassword.value) return showToast('两次输入的密码不一致')
   if (!/^[A-Z]{4}\d{4}$/.test(normalizedCode)) return showToast('请输入四位字母加四位数字的邀请码')
+  if (!(await ensureAgreement())) return
 
   const success = await activateWithInvite(
     normalizedMobile,
@@ -96,7 +115,8 @@ async function handleActivate() {
   }
 }
 
-async function handleWecomLogin() {
+async function handleWecomLogin(options?: { skipAgreement?: boolean }) {
+  if (!options?.skipAgreement && !(await ensureAgreement())) return
   try {
     window.sessionStorage.setItem(wecomAutoLoginKey, '1')
     window.location.href = await wecomAuthorizeUrl(buildWecomRedirectUri())
@@ -190,7 +210,7 @@ async function handleWecomLogin() {
           登录
         </van-button>
 
-        <van-button block round plain class="login-wecom-btn" :loading="loading" @click="handleWecomLogin">
+        <van-button block round plain class="login-wecom-btn" :loading="loading" @click="handleWecomLogin()">
           企业微信登录
         </van-button>
 

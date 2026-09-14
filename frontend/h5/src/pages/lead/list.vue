@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ProductSpecs from '../../components/ProductSpecs.vue'
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { usePageList } from '@/composables/usePageList'
@@ -85,9 +85,45 @@ const filterParams = computed(() => ({
   ...(filters.orderReviewStatus ? { orderReviewStatus: filters.orderReviewStatus } : {})
 }))
 
-const { list, total, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
-  (params) => getMyLeadPage(params as Parameters<typeof getMyLeadPage>[0]), filterParams
+const { list, total, pageNo, pageCount, loading, refreshing, error, loadPage, refresh } = usePageList(
+  (params) => getMyLeadPage(params as Parameters<typeof getMyLeadPage>[0]), filterParams,
+  { mode: 'page', pageSize: 20 }
 )
+
+const savedListPosition = ref<{ scrollTop: number }>()
+const lastScrollTop = ref(0)
+const failedPage = ref<number>()
+
+function rememberScrollPosition() {
+  lastScrollTop.value = window.scrollY
+}
+
+onMounted(() => {
+  rememberScrollPosition()
+  window.addEventListener('scroll', rememberScrollPosition, { passive: true })
+})
+onBeforeUnmount(() => window.removeEventListener('scroll', rememberScrollPosition))
+
+function saveListPosition() {
+  const scrollTop = window.scrollY
+  lastScrollTop.value = scrollTop
+  savedListPosition.value = { scrollTop }
+}
+
+async function restoreListPosition() {
+  const saved = savedListPosition.value
+  if (!saved) return
+  await nextTick()
+  const restore = () => window.scrollTo({ top: saved.scrollTop, behavior: 'auto' })
+  restore()
+  requestAnimationFrame(restore)
+  window.setTimeout(restore, 100)
+}
+
+onActivated(() => { void restoreListPosition() })
+onDeactivated(() => {
+  if (!savedListPosition.value) saveListPosition()
+})
 
 const activeFilterSummary = computed(() => {
   const values = [
@@ -166,15 +202,19 @@ async function loadOptions() {
 }
 
 function openFilters() { Object.assign(draftFilters, filters); showFilters.value = true; void loadOptions() }
-function submitSearch() { keyword.value = keywordInput.value.trim(); refresh() }
-function clearSearch() { keywordInput.value = ''; keyword.value = ''; refresh() }
-function selectStatus(status: string) { activeTab.value = status; refresh() }
+async function refreshList() {
+  failedPage.value = undefined
+  await refresh()
+}
+function submitSearch() { keyword.value = keywordInput.value.trim(); void refreshList() }
+function clearSearch() { keywordInput.value = ''; keyword.value = ''; void refreshList() }
+function selectStatus(status: string) { activeTab.value = status; void refreshList() }
 function applyFilters() {
   if (Boolean(draftFilters.startDate) !== Boolean(draftFilters.endDate)) { showToast('请选择完整的提交时间范围'); return }
   if (draftFilters.startDate && draftFilters.endDate && draftFilters.startDate > draftFilters.endDate) { showToast('开始日期不能晚于结束日期'); return }
   Object.assign(filters, draftFilters)
   showFilters.value = false
-  refresh()
+  void refreshList()
 }
 function resetDraftFilters() {
   Object.assign(draftFilters, emptyFilters())
@@ -182,7 +222,7 @@ function resetDraftFilters() {
 function clearActiveFilters() {
   Object.assign(filters, emptyFilters())
   Object.assign(draftFilters, emptyFilters())
-  refresh()
+  void refreshList()
 }
 function clearQuery() {
   activeTab.value = 'all'
@@ -190,7 +230,7 @@ function clearQuery() {
   keyword.value = ''
   Object.assign(filters, emptyFilters())
   Object.assign(draftFilters, emptyFilters())
-  refresh()
+  void refreshList()
 }
 function openOptionPicker(field: FilterKey) {
   pickerField.value = field
@@ -218,7 +258,23 @@ function confirmPicker(values?: { selectedValues?: string[] } | string[]) {
   showPicker.value = false
 }
 function cancelPicker() { showPicker.value = false }
-function goDetail(id: number) { router.push(`/lead/${id}`) }
+function goDetail(id: number) {
+  saveListPosition()
+  void router.push(`/lead/${id}`)
+}
+async function changePage(targetPage: number) {
+  if (loading.value) return
+  failedPage.value = targetPage
+  await loadPage(targetPage)
+  if (!error.value) {
+    failedPage.value = undefined
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }
+}
+async function retryCurrentPage() {
+  await loadPage(failedPage.value ?? pageNo.value)
+  if (!error.value) failedPage.value = undefined
+}
 function goSubmit() { router.push('/lead/submit') }
 
 function statusClass(status: string) {
@@ -276,15 +332,14 @@ function cardDate(item: LeadListItem) {
       </button>
     </section>
 
-    <van-pull-refresh v-model="refreshing" @refresh="refresh">
-      <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
+    <van-pull-refresh v-model="refreshing" @refresh="refreshList">
         <div v-if="loading && list.length === 0" class="lead-list lead-list--skeleton">
           <div v-for="index in 3" :key="index" class="page-list-card lead-card lead-card--skeleton"><van-skeleton title :row="3" /></div>
         </div>
 
-        <div v-else-if="!loading && error" class="page-empty-card">
+        <div v-else-if="!loading && error && list.length === 0" class="page-empty-card">
           <van-empty :description="listErrorText" image="error" :image-size="72">
-            <van-button type="primary" round size="small" @click="refresh">重新加载</van-button>
+            <van-button type="primary" round size="small" @click="retryCurrentPage">重新加载</van-button>
           </van-empty>
         </div>
 
@@ -296,7 +351,7 @@ function cardDate(item: LeadListItem) {
         </div>
 
         <div v-else class="lead-list">
-          <button v-for="item in list" :key="item.id" type="button" class="page-list-card lead-card" @click="goDetail(item.id)">
+          <button v-for="item in list" :key="item.id" :data-lead-id="item.id" type="button" class="page-list-card lead-card" @click="goDetail(item.id)">
             <div class="lead-card__head">
               <SmartAvatar class="lead-card__avatar" :seed="leadAvatarSeed(item.id)" :size="36" shape="rounded" label="" />
               <div class="lead-card__identity">
@@ -317,8 +372,14 @@ function cardDate(item: LeadListItem) {
               </div>
             </div>
           </button>
+          <div v-if="error" class="page-inline-error">
+            <span>{{ listErrorText }}</span>
+            <van-button size="mini" plain type="primary" @click="retryCurrentPage">重试</van-button>
+          </div>
         </div>
-      </van-list>
+        <div v-if="!loading && !error && total > 0" class="lead-pagination">
+          <van-pagination :model-value="pageNo" :page-count="pageCount" mode="simple" :disabled="loading" @change="changePage" />
+        </div>
     </van-pull-refresh>
 
     <button type="button" class="fab-btn" aria-label="提交客资" @click="goSubmit"><van-icon name="plus" size="25" color="#fff" /></button>
@@ -538,6 +599,33 @@ function cardDate(item: LeadListItem) {
   flex-direction: column;
   gap: 12px;
   padding: 6px 16px 0;
+}
+
+.lead-pagination {
+  padding: 18px 16px 12px;
+}
+
+.lead-pagination :deep(.van-pagination) {
+  --van-pagination-background: transparent;
+  --van-pagination-button-width: 42%;
+  --van-pagination-item-default-color: var(--h5-text-primary);
+  --van-pagination-item-disabled-color: var(--h5-text-placeholder);
+  --van-pagination-item-disabled-background: transparent;
+}
+
+.lead-pagination :deep(.van-pagination__page-desc) {
+  color: var(--h5-text-secondary);
+  font-size: 12px;
+}
+
+.page-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0 2px;
+  color: var(--h5-danger);
+  font-size: 12px;
 }
 
 .lead-list .page-list-card + .page-list-card {

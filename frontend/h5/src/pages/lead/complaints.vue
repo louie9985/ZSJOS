@@ -62,9 +62,8 @@ function previewEvidence(files: LeadAppealEvidence[], index: number) {
             <span class="complaint-card__label">投诉内容</span>
             <p class="complaint-card__reason">{{ item.reason }}</p>
           </div>
-          <div v-if="item.salesUserName || item.handlerUserName" class="complaint-card__meta">
-            <span v-if="item.salesUserName">被投诉销售：{{ item.salesUserName }}</span>
-            <span v-if="item.handlerUserName">处理人：{{ item.handlerUserName }}</span>
+          <div v-if="item.handlerUserName" class="complaint-card__meta">
+            <span>处理人：{{ item.handlerUserName }}</span>
           </div>
           <div v-if="item.evidence?.length" class="complaint-evidence">
             <span class="complaint-card__label">投诉证据（{{ item.evidence.length }}）</span>
