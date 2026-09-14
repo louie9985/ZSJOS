@@ -37,7 +37,6 @@ export type AccountProfile = {
   directorName?: string;
   operatorName?: string;
   canViewHistory: boolean;
-  canSubmitPositioning?: boolean;
 };
 export type ProfileEntry = {
   id: number;
@@ -71,39 +70,12 @@ export type DiagnosisRequest = Omit<ProfilePatch, "changes"> & {
 };
 const base = (id: number) => `/zsjos/media-account/${id}/profile`;
 export const accountProfileApi = {
-  submitPositioning: async (id: number, data: ProfilePatch) =>
-    unwrap<number>(await http.post(`${base(id)}/positioning/submit`, data)),
-  positioningVersions: async (id: number, pageNo: number) =>
-    unwrap<PageResult<ProfileEntry>>(
-      await http.get(`${base(id)}/positioning/versions`, {
-        params: { pageNo, pageSize: 10 },
-      }),
-    ),
   get: async (id: number) => unwrap<AccountProfile>(await http.get(base(id))),
-  patch: async (id: number, data: ProfilePatch) =>
-    unwrap<number>(await http.put(base(id), data)),
-  history: async (id: number, pageNo: number) =>
-    unwrap<PageResult<ProfileEntry>>(
-      await http.get(`${base(id)}/history`, {
-        params: { pageNo, pageSize: 10 },
-      }),
-    ),
-  append: async (
-    id: number,
-    data: Omit<ProfilePatch, "changes"> & {
-      fieldKey: string;
-      content: string;
-      fileIds: number[];
-    },
-  ) => unwrap<number>(await http.post(`${base(id)}/records`, data)),
-  diagnosis: async (id: number, data: DiagnosisRequest) =>
-    unwrap<number>(await http.post(`${base(id)}/diagnosis`, data)),
-  upload: async (id: number, fieldKey: string, file: File) => {
-    const data = new FormData();
-    data.append("fieldKey", fieldKey);
-    data.append("file", file);
-    return unwrap<ProfileFile>(await http.post(`${base(id)}/files`, data));
-  },
+  patch: async (id: number, data: ProfilePatch) => unwrap<number>(await http.put(base(id), data)),
+  history: async (id: number, pageNo: number) => unwrap<PageResult<ProfileEntry>>(await http.get(`${base(id)}/history`, { params: { pageNo, pageSize: 10 } })),
+  append: async (id: number, data: Omit<ProfilePatch, "changes"> & { fieldKey: string; content: string; fileIds: number[] }) => unwrap<number>(await http.post(`${base(id)}/records`, data)),
+  diagnosis: async (id: number, data: DiagnosisRequest) => unwrap<number>(await http.post(`${base(id)}/diagnosis`, data)),
+  upload: async (id: number, fieldKey: string, file: File) => { const data = new FormData(); data.append("fieldKey", fieldKey); data.append("file", file); return unwrap<ProfileFile>(await http.post(`${base(id)}/files`, data)); },
 };
 export const fieldEmpty = (value: unknown) =>
   value == null ||

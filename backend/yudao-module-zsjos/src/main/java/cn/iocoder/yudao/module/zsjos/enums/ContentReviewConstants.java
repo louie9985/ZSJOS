@@ -12,6 +12,8 @@ public interface ContentReviewConstants {
     String BATCH_FINAL_REVIEW = "FINAL_REVIEW";
     String BATCH_COMPLETED = "COMPLETED";
     String BATCH_REJECTED = "REJECTED";
+    /** A rejected batch remains available as a historical round while the operator prepares a new one. */
+    String BATCH_NEED_MODIFY = "NEED_MODIFY";
     String BATCH_CANCELLED = "CANCELLED";
 
     String STAGE_DRAFT = "DRAFT";

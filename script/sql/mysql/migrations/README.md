@@ -1152,3 +1152,18 @@ supported predecessor states, custom-hash preservation, UTF-8 bytes, and repeata
 ### V211 Media account operation reset
 
 `V211__reset_media_account_operation_data.sql` is an explicitly authorized development reset. It deletes all positioning cards/submissions/versions/confirmation links/execution cards, account profile entries, content/version rows and production tickets/commands/items linked to existing media accounts. It preserves media accounts, students, service relations, partner accounts and partner metrics. Export the affected tables before execution; the operation is irreversible and must be run only after scoped row-count review.
+
+### V223 Sales-order gift snapshots
+
+V223__sales_order_gift_items.sql follows V222 and adds nullable gift_items JSON and gift_shipping_address columns to zsjos_order. It is repeatable and non-destructive; existing rows are preserved and rollback is forward-only.
+### V227 Lead submission role permissions
+
+`V227__lead_submission_role_permissions.sql` grants `zsjos:lead:submit` to enabled `center_head`, `dept_manager`, `content_director`, `new_media_operator`, and `sales_specialist` roles in every tenant. It retires active self-sourced grants held by other roles, keeps that permission exclusive to `sales_specialist`, changes no users or business rows, and is repeatable. Apply after V226; rollback is forward-only by restoring reviewed role-menu snapshots. Verify with `verify-lead-submission-role-permissions.sql`.
+
+### V228 Content review revision links
+
+`V228__content_review_revision_link.sql` adds the nullable `revision_of_batch_id` reference and index to `zsjos_content_review_batch`. It is repeatable, changes no existing business rows, and must run after V227 so saved drafts and rejected resubmissions can retain an explicit prior-round link. Verify with `verify-content-review-revision-link.sql`.
+
+### V229__content_review_item_revision_link.sql
+Adds previous_item_id and an index to trace a work item to its preceding approval round. Repeatable on MySQL 8; rollback is manual column/index removal.
+

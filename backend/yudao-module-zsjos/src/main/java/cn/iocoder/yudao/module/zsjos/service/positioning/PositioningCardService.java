@@ -51,6 +51,50 @@ import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 
 @Service
 public class PositioningCardService {
+    @jakarta.annotation.Resource private cn.iocoder.yudao.module.infra.api.file.FileApi positioningFileApi;
+
+    public record CardFile(Long id, String name, String type, Long size, String url) {}
+
+    private String fileDirectory(Long id) {
+        return "zsjos/positioning-card/" + cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId() + "/" + id + "/";
+    }
+
+    @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "submit-review")
+    public CardFile uploadAttachment(Long id, String fieldKey, byte[] bytes, String name, String mimeType, Long userId) {
+        var card = require(id); requireStatus(card, POSITIONING_CO_CREATING);
+        if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        var fields = JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
+        if (fields.stream().noneMatch(f -> f.getKey().equals(fieldKey) && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))
+                || bytes.length == 0 || bytes.length > 20 * 1024 * 1024) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        var file = positioningFileApi.createFileInfo(bytes, name == null ? "attachment" : name.replaceAll("[\\\\/\\r\\n]", "_"),
+                fileDirectory(id) + fieldKey, mimeType);
+        return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(file.getId(), 300));
+    }
+
+    @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "read")
+    public CardFile attachment(Long id, Long fileId, Long userId) {
+        require(id);
+        var file = positioningFileApi.getFileInfo(fileId);
+        if (file == null || file.getPath() == null || !file.getPath().startsWith(fileDirectory(id))) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(fileId, 300));
+    }
+
+    private void freezeAttachments(Long id, DirectorFormTemplateVO.Snapshot snapshot) {
+        for (var field : snapshot.getFields()) {
+            if (!"attachment".equals(field.getType())) continue;
+            Object raw = snapshot.getValues().get(field.getKey());
+            if (raw == null) continue;
+            if (!(raw instanceof java.util.Collection<?> ids) || ids.size() > 20) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            List<CardFile> files = new java.util.ArrayList<>();
+            for (Object value : ids) {
+                if (!(value instanceof Number number) || number.longValue() <= 0 || number.doubleValue() != number.longValue()) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+                var file = positioningFileApi.getFileInfo(number.longValue());
+                if (file == null || file.getPath() == null || !file.getPath().startsWith(fileDirectory(id) + field.getKey() + "/")) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+                files.add(new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), null));
+            }
+            snapshot.getDictSnapshots().put(field.getKey(), files);
+        }
+    }
     @Resource private PositioningCardMapper mapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
     @Resource private PermissionApi permissionApi;
@@ -341,6 +385,7 @@ public class PositioningCardService {
         var snapshot = directorFormTemplateService.validateAndSnapshotVersion(
                 DirectorFormTemplateService.SCENE_POSITIONING, card.getTemplateVersionId(), req.getValues(), false,
                 previousDictSnapshots);
+        freezeAttachments(id, snapshot);
         java.time.LocalDate trialEndDate = req.getTrialEndDate();
         String layer1Json = draftJson(req.getLayer1Json(), card.getLayer1Json());
         String layer2Json = draftJson(req.getLayer2Json(), card.getLayer2Json());
@@ -440,8 +485,7 @@ public class PositioningCardService {
             List<DirectorFormTemplateVO.Field> templateFields = StrUtil.isBlank(card.getFieldsSnapshotJson())
                     ? List.of() : JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
             List<String> missing = templateFields.stream().filter(f -> Boolean.TRUE.equals(f.getEnabled()))
-                    // 完整提交要求所有启用字段都有真实内容；附件、多选等字段可能以 JSON
-                    // 字符串落库，因此统一展开后再判断，避免 "[]"/"{}" 被误判为已填写。
+                    .filter(f -> Boolean.TRUE.equals(f.getRequired()) && !"system_history".equals(f.getType()))
                     .filter(f -> emptyPositioningValue(values.get(f.getKey()), f.getType()))
                     .map(DirectorFormTemplateVO.Field::getKey).toList();
             if (!missing.isEmpty()) throw exception(POSITIONING_CARD_FIELD_REQUIRED);
@@ -467,7 +511,7 @@ public class PositioningCardService {
         if (value == null) return true;
         if (value instanceof String text) {
             if (text.isBlank()) return true;
-            if (fieldType != null && Set.of("multi_select", "checkbox_group", "attachment", "region").contains(fieldType)) {
+            if (fieldType != null && Set.of("multi_select", "checkbox_group", "attachment", "material_picker", "region").contains(fieldType)) {
                 String raw = text.trim();
                 if (raw.startsWith("[") || raw.startsWith("{")) {
                     try {

@@ -4689,6 +4689,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '订单备注',
   `student_special_requirements` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生特殊要求',
   `material_delivery_contact` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '教材邮递联系',
+  `gift_items` json DEFAULT NULL COMMENT '礼品项目快照',
+  `gift_shipping_address` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '礼品邮寄地址',
   `payment_voucher_refs` json DEFAULT NULL COMMENT '缴费凭证文件快照',
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次提交幂等键',
   `submission_request_fingerprint` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '规范化提交请求指纹',
@@ -6065,6 +6067,13 @@ CREATE TABLE IF NOT EXISTS `zsjos_content` (
   `status` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL,
   `current_version_no` int NOT NULL DEFAULT '0',
   `script_text` mediumtext COLLATE utf8mb4_unicode_ci,
+  `purpose_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `purpose_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `comment_hook` text COLLATE utf8mb4_unicode_ci,
+  `reference_content_version_id` bigint DEFAULT NULL,
   `script_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `owner_operator_user_id` bigint NOT NULL,
   `filming_editor_user_id` bigint DEFAULT NULL,
@@ -6098,6 +6107,13 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_version` (
   `deliverable_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `deliverable_snapshot_json` json DEFAULT NULL COMMENT '成品视频或图文快照',
   `script_text` mediumtext COLLATE utf8mb4_unicode_ci,
+  `purpose_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `purpose_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `comment_hook` text COLLATE utf8mb4_unicode_ci,
+  `reference_content_version_id` bigint DEFAULT NULL,
   `lead_resource_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '引流资料 HTTPS 链接',
   `planned_publish_at` datetime DEFAULT NULL COMMENT '预计发布时间',
   `frozen_at` datetime DEFAULT NULL COMMENT '进入批审后的冻结时间',
@@ -6721,6 +6737,13 @@ CREATE TABLE IF NOT EXISTS `zsjos_production_ticket` (
   `dispatch_context_snapshot_json` json DEFAULT NULL COMMENT '派单账号与定位上下文快照',
   `idempotency_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '创建幂等键',
   `script_text` mediumtext COLLATE utf8mb4_unicode_ci,
+  `purpose_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `purpose_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `format_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `comment_hook` text COLLATE utf8mb4_unicode_ci,
+  `reference_content_version_id` bigint DEFAULT NULL,
   `script_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `material_refs_json` json DEFAULT NULL,
   `spec_json` json DEFAULT NULL,
@@ -7268,6 +7291,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `batch_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `account_id` bigint NOT NULL,
+  `student_person_id` bigint DEFAULT NULL COMMENT '学员主体',
+  `revision_of_batch_id` bigint DEFAULT NULL COMMENT '上一审批轮次批次ID',
+  `account_ids_json` json DEFAULT NULL COMMENT '本批次多账号集合',
   `operator_user_id` bigint NOT NULL,
   `director_user_id` bigint DEFAULT NULL COMMENT '提交时冻结的责任编导',
   `relation_snapshot_json` json DEFAULT NULL COMMENT '提交时冻结的编导运营关系',
@@ -7293,7 +7319,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch` (
   UNIQUE KEY `uk_content_review_process` (`tenant_id`,`process_instance_id`),
   UNIQUE KEY `uk_content_review_business_key` (`tenant_id`,`business_key`),
   KEY `idx_content_review_list` (`tenant_id`,`status`,`director_user_id`,`id`),
-  KEY `idx_content_review_operator` (`tenant_id`,`operator_user_id`,`status`,`id`)
+  KEY `idx_content_review_operator` (`tenant_id`,`operator_user_id`,`status`,`id`),
+  KEY `idx_zsjos_crb_revision` (`revision_of_batch_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='生产内容批审批次';
 
 CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch_item` (
@@ -7301,6 +7328,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch_item` (
   `batch_id` bigint NOT NULL,
   `content_id` bigint NOT NULL,
   `content_version_id` bigint NOT NULL,
+  `previous_item_id` bigint DEFAULT NULL COMMENT '上一审批轮次对应条目',
   `sort_no` int NOT NULL,
   `content_snapshot_json` json NOT NULL,
   `director_decision` varchar(16) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7458,5 +7486,3 @@ CREATE TABLE IF NOT EXISTS zsjos_student_positioning_interview_attachment (
   KEY idx_tenant_interview (tenant_id,interview_id,deleted),
   KEY idx_tenant_student (tenant_id,student_person_id,deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位访谈稿引用';
-
-

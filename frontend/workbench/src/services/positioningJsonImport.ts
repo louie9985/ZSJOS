@@ -152,6 +152,7 @@ export const serializePositioningFormValues = (
 ) => {
   const serialized = { ...values }
   fields.forEach(field => {
+    if (field.type === 'system_history') { delete serialized[field.key]; return }
     const value = serialized[field.key]
     if ((field.type === 'date' || field.type === 'datetime') && value
       && typeof (value as { format?: unknown }).format === 'function') {

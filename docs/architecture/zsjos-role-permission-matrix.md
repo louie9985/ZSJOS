@@ -68,6 +68,11 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 
 ## 全部角色目标
 
+普通客资提交权限 `zsjos:lead:submit` 由 `center_head`、`dept_manager`、`content_director`、
+`new_media_operator` 和 `sales_specialist` 角色持有；销售自拓权限
+`zsjos:lead:self-sourced:create` 仅由 `sales_specialist` 持有。角色菜单关系按所有租户中的启用角色同步，
+账号岗位和部门资格仍由后端业务校验。
+
 | # | 角色编码 | ZSJOS 目标 |
 |---:|---|---|
 | 1 | `center_head` | 零 ZSJOS 菜单，当前没有已落地职责 |

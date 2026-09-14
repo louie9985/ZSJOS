@@ -18,6 +18,8 @@ public class ContentReviewBatchItemDO extends TenantBaseDO {
     private Long batchId;
     private Long contentId;
     private Long contentVersionId;
+    /** Corresponding item in the preceding approval round, if this is a revision. */
+    private Long previousItemId;
     private Integer sortNo;
     private String contentSnapshotJson;
     private String directorDecision;

@@ -1,6 +1,8 @@
 import { App, Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Result, Row, Select, Space, Spin, Tabs, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type DictData, type DirectorConfig, type DirectorTemplate, type StudentContactFormField } from '../services/api'
+import { materialApi, type MaterialType } from '../services/materialApi'
+import { DICT_TYPE } from '../constants'
 
 const enumTypes = new Set(['select', 'multi_select', 'radio', 'checkbox_group'])
 
@@ -15,6 +17,8 @@ export function DirectorTemplateConfigPage({ positioning = false, permissions }:
   const [fields, setFields] = useState<StudentContactFormField[]>([]), [active, setActive] = useState(0)
   const [historyId, setHistoryId] = useState<number>(), [dirty, setDirty] = useState(false)
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({})
+  const [materialTypes, setMaterialTypes] = useState<MaterialType[]>([])
+  const [platforms, setPlatforms] = useState<DictData[]>([]), [stages, setStages] = useState<DictData[]>([])
   const current = useMemo(() => templates.find(x => x.id === selected), [templates, selected])
   const version = historyId ? current?.versions.find(x => x.id === historyId) : current?.draft || current?.published
   const editable = canUpdate && !!current?.draft && !historyId && !busy && !loading
@@ -26,6 +30,10 @@ export function DirectorTemplateConfigPage({ positioning = false, permissions }:
       const rows = await api.directorConfig.templates(positioning)
       setTemplates(rows); setSelected(value => rows.some(x => x.id === value) ? value : rows[0]?.id)
       setHistoryId(undefined); setDirty(false)
+      if (positioning) {
+        const [types, platformOptions, stageOptions] = await Promise.all([materialApi.types(), api.dictDataByType('zsjos_account_platform'), api.dictDataByType(DICT_TYPE.MEDIA_ACCOUNT_STAGE)])
+        setMaterialTypes(types); setPlatforms(platformOptions); setStages(stageOptions)
+      }
     } catch (e) { setError(e instanceof Error ? e.message : '加载失败，请重试') }
     finally { setLoading(false) }
   }, [positioning, canQuery])
@@ -69,7 +77,7 @@ export function DirectorTemplateConfigPage({ positioning = false, permissions }:
     if (!editable) return
     let key = `field_${fields.length + 1}`
     while (fields.some(x => x.key === key)) key += '_new'
-    setFields(rows => [...rows, { key, title: '新增访谈项', type: 'text', enabled: true, required: false,
+    setFields(rows => [...rows, { key, title: positioning ? '新增定位项' : '新增访谈项', type: 'text', enabled: true, required: false,
       systemField: false, sort: (rows.length + 1) * 10, allowRemark: true, interviewNote: '' }])
     setActive(fields.length); setDirty(true)
   }
@@ -99,7 +107,7 @@ export function DirectorTemplateConfigPage({ positioning = false, permissions }:
       </Space>
       {dirty && <Alert type="info" message="有未保存的修改，请先保存草稿再发布。" />}
       <Row gutter={[16, 16]} style={{ marginInline: 0 }}>
-        <Col xs={24} lg={8}><Card title="字段列表" extra={!positioning && canUpdate && <Button disabled={!editable} onClick={add}>新增字段</Button>}>
+        <Col xs={24} lg={8}><Card title="字段列表" extra={canUpdate && <Button disabled={!editable} onClick={add}>新增字段</Button>}>
           <Space orientation="vertical" style={{ width: '100%' }}>{fields.map((x, i) => <div key={i}>
             <Button type={active === i ? 'primary' : 'text'} block onClick={() => setActive(i)}
               style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'left' }}>{x.title}</Button>
@@ -113,7 +121,19 @@ export function DirectorTemplateConfigPage({ positioning = false, permissions }:
             <Form.Item label="字段编码"><Input aria-label="字段编码" disabled={!editable || field.systemField} value={field.key} onChange={e => update({ key: e.target.value })} /></Form.Item>
             {!positioning && <Form.Item label="访谈注意"><Input.TextArea aria-label="访谈注意" autoSize={{ minRows: 3, maxRows: 10 }} value={field.interviewNote} onChange={e => update({ interviewNote: e.target.value })} /></Form.Item>}
             <Form.Item label="填写备注"><Input.TextArea value={field.description} maxLength={500} showCount onChange={e => update({ description: e.target.value })} /></Form.Item>
-            {positioning && enumTypes.has(field.type) && <Form.Item label="系统字典"><Input value={field.dictType} disabled /><div>当前启用项 {(dicts[field.dictType || ''] || []).length} 个</div></Form.Item>}
+            {positioning && <Form.Item label="字段类型"><Select value={field.type} disabled={field.systemField} onChange={type => update({ type })} options={[
+              { value: 'text', label: '单行文本' }, { value: 'textarea', label: '多行文本' }, { value: 'multi_select', label: '字典多选' },
+              { value: 'attachment', label: '附件' }, { value: 'material_picker', label: '素材选择' }, { value: 'system_history', label: '系统历史（只读）' }
+            ]} /></Form.Item>}
+            {positioning && enumTypes.has(field.type) && <Form.Item label="系统字典"><Select showSearch value={field.dictType} onChange={dictType => update({ dictType })} options={Object.entries(dicts).map(([type, items]) => ({ value: type, label: `${type}（${items.length}项）` }))} /><div>当前启用项 {(dicts[field.dictType || ''] || []).length} 个</div></Form.Item>}
+            {positioning && field.type === 'material_picker' && <>
+              <Form.Item label="素材类型"><Select value={field.materialTypeCode} onChange={materialTypeCode => update({ materialTypeCode })} options={materialTypes.filter(item => item.status === 0 && ['viral_account', 'viral_content'].includes(item.code)).map(item => ({ value: item.code, label: item.name }))} /></Form.Item>
+              <Form.Item label="默认平台"><Select allowClear value={field.defaultPlatform} options={platforms.map(item => ({ value: item.value, label: item.label }))} onChange={defaultPlatform => update({ defaultPlatform })} /></Form.Item>
+              <Form.Item label="默认阶段"><Select allowClear value={field.defaultStage} options={stages.map(item => ({ value: item.value, label: item.label }))} onChange={defaultStage => update({ defaultStage })} /></Form.Item>
+              <Form.Item label="参考字段关联"><Select allowClear value={field.referenceFor} options={fields.filter(x => x.key !== field.key && x.type !== 'material_picker').map(x => ({ value: x.key, label: x.title }))} onChange={referenceFor => update({ referenceFor })} /></Form.Item>
+              <Form.Item label="推荐数量提示"><Input value={field.recommendedCount} onChange={e => update({ recommendedCount: e.target.value })} /></Form.Item>
+              <Checkbox checked={field.filterAdjustable !== false} onChange={e => update({ filterAdjustable: e.target.checked })}>允许调整筛选</Checkbox>
+            </>}
             <Space wrap><Checkbox checked={field.enabled} onChange={e => update({ enabled: e.target.checked })}>启用</Checkbox>
               <Checkbox checked={field.required} onChange={e => update({ required: e.target.checked })}>必填</Checkbox>
               {!positioning && <><Checkbox checked={field.allowRemark} onChange={e => update({ allowRemark: e.target.checked })}>允许备注</Checkbox>

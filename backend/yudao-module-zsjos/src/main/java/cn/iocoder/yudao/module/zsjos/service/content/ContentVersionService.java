@@ -115,7 +115,14 @@ public class ContentVersionService {
         row.setDeliverableUrl(deliverableUrl);
         row.setDeliverableSnapshotJson(deliverableFiles.snapshotJson());
         row.setScriptText(req.getScriptText());
+        row.setPurposeValue(req.getPurposeValue());
+        row.setPurposeLabelSnapshot(req.getPurposeLabelSnapshot());
+        row.setFormatValue(req.getFormatValue());
+        row.setFormatLabelSnapshot(req.getFormatLabelSnapshot());
+        row.setDetailUrl(req.getDetailUrl());
+        row.setCommentHook(req.getCommentHook());
         row.setLeadResourceUrl(leadResourceUrl);
+        row.setReferenceContentVersionId(req.getReferenceContentVersionId());
         row.setPlannedPublishAt(req.getPlannedPublishAt());
         row.setSubmittedByUserId(userId);
         row.setSubmittedAt(LocalDateTime.now());
@@ -127,6 +134,29 @@ public class ContentVersionService {
             throw exception(CONTENT_VERSION_STAGE_INVALID);
         }
         return row.getId();
+    }
+
+    /** Creates the next editable review version under the existing content aggregate. */
+    @Transactional(rollbackFor = Exception.class)
+    public Long copyForReview(ContentVersionDO source, ContentVersionSaveReqVO changes, Long userId) {
+        ContentVersionSaveReqVO req = new ContentVersionSaveReqVO();
+        req.setContentId(source.getContentId());
+        req.setTitleSnapshot(changes.getTitleSnapshot() != null ? changes.getTitleSnapshot() : source.getTitleSnapshot());
+        req.setTopicSnapshot(source.getTopicSnapshot());
+        req.setCoverSnapshotJson(changes.getCoverSnapshotJson() != null ? changes.getCoverSnapshotJson() : source.getCoverSnapshotJson());
+        req.setDeliverableSnapshotJson(source.getDeliverableSnapshotJson());
+        req.setDeliverableUrl(source.getDeliverableUrl());
+        req.setScriptText(changes.getScriptText() != null ? changes.getScriptText() : source.getScriptText());
+        req.setPurposeValue(changes.getPurposeValue() != null ? changes.getPurposeValue() : source.getPurposeValue());
+        req.setPurposeLabelSnapshot(changes.getPurposeLabelSnapshot() != null ? changes.getPurposeLabelSnapshot() : source.getPurposeLabelSnapshot());
+        req.setFormatValue(changes.getFormatValue() != null ? changes.getFormatValue() : source.getFormatValue());
+        req.setFormatLabelSnapshot(changes.getFormatLabelSnapshot() != null ? changes.getFormatLabelSnapshot() : source.getFormatLabelSnapshot());
+        req.setDetailUrl(changes.getDetailUrl() != null ? changes.getDetailUrl() : source.getDetailUrl());
+        req.setCommentHook(changes.getCommentHook() != null ? changes.getCommentHook() : source.getCommentHook());
+        req.setLeadResourceUrl(changes.getLeadResourceUrl() != null ? changes.getLeadResourceUrl() : source.getLeadResourceUrl());
+        req.setReferenceContentVersionId(changes.getReferenceContentVersionId() != null ? changes.getReferenceContentVersionId() : source.getReferenceContentVersionId());
+        req.setPlannedPublishAt(changes.getPlannedPublishAt() != null ? changes.getPlannedPublishAt() : source.getPlannedPublishAt());
+        return create(req, userId);
     }
 
     public ZsjosDirectUploadInitRespVO initUpload(ZsjosDirectUploadInitReqVO request, Long userId) {
@@ -357,3 +387,6 @@ public class ContentVersionService {
     private record BoundFile(String fieldKey, int sortNo, FileInfoRespDTO file, Long uploadedByUserId) {
     }
 }
+
+
+

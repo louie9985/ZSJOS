@@ -59,11 +59,11 @@ class ZsjosAuditCoverageTest {
                 }
             }
         }
-        assertEquals(296, getCount, "Review GET audit classification when endpoint inventory changes");
-        assertEquals(285, postCount, "Review POST audit classification when endpoint inventory changes");
-        assertEquals(30, readOnlyPostCount, "Every POST viewing endpoint must remain explicitly classified");
-        assertEquals(90, putCount, "Review PUT audit classification when endpoint inventory changes");
-        assertEquals(13, deleteCount, "Review DELETE audit classification when endpoint inventory changes");
+        assertEquals(301, getCount, "Review GET audit classification when endpoint inventory changes");
+        assertEquals(296, postCount, "Review POST audit classification when endpoint inventory changes");
+        assertEquals(34, readOnlyPostCount, "Every POST viewing endpoint must remain explicitly classified");
+        assertEquals(91, putCount, "Review PUT audit classification when endpoint inventory changes");
+        assertEquals(14, deleteCount, "Review DELETE audit classification when endpoint inventory changes");
         assertTrue(auditedCount > 250, "The mutation audit inventory unexpectedly shrank");
     }
 

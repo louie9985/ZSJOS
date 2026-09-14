@@ -66,6 +66,49 @@ class DirectorFormTemplateServiceTest {
     @Mock private DirectorFormTemplateVersionMapper versionMapper;
     @Mock private DictDataApi dictDataApi;
     @Mock private AreaApi areaApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.material.MaterialService materialService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.material.MaterialTypeService materialTypeService;
+
+    @Test
+    void textCannotAcceptCollectionsAndHistoryCannotBeWritten() {
+        var text = textField("text", false);
+        var history = textField("history", false); history.setType("system_history");
+        prepareFieldsVersion(List.of(text, history));
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion("positioning_card", 13L,
+                Map.of("text", List.of("invalid")), false, Map.of()));
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion("positioning_card", 13L,
+                Map.of("history", "invented"), false, Map.of()));
+    }
+
+    @Test
+    void retainedMaterialSnapshotSurvivesLaterMaterialChanges() {
+        var field = textField("refs", false); field.setType("material_picker");
+        field.setMaterialTypeCode("viral_account"); field.setMinSelections(3);
+        prepareFieldsVersion(List.of(field));
+        var retained = Map.of("materialVersionId", 42L, "materialTypeCode", "viral_account", "titleSnapshot", "Original");
+        var result = service.validateAndSnapshotVersion("positioning_card", 13L, Map.of("refs", List.of(42L)),
+                false, Map.of("refs", List.of(retained)));
+        assertEquals(List.of(retained), result.getDictSnapshots().get("refs"));
+        verifyNoInteractions(materialService, materialTypeService);
+    }
+
+    @Test
+    void newMaterialRequiresObjectPermissionAndEffectiveVersion() {
+        var field = textField("refs", false); field.setType("material_picker"); field.setMaterialTypeCode("viral_account");
+        prepareFieldsVersion(List.of(field));
+        var version = new cn.iocoder.yudao.module.zsjos.controller.admin.material.vo.MaterialVersionRespVO();
+        version.setId(42L); version.setMaterialId(8L); version.setStatus("DRAFT");
+        var material = new cn.iocoder.yudao.module.zsjos.controller.admin.material.vo.MaterialRespVO();
+        material.setId(8L); material.setMaterialTypeId(3L); material.setStatus("EFFECTIVE");
+        var type = new cn.iocoder.yudao.module.zsjos.controller.admin.material.vo.MaterialTypeRespVO();
+        type.setCode("viral_account"); type.setStatus(0);
+        when(materialService.getVersion(eq(42L), nullable(Long.class))).thenReturn(version);
+        when(materialService.get(eq(8L), nullable(Long.class))).thenReturn(material);
+        when(materialTypeService.getType(3L)).thenReturn(type);
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion("positioning_card", 13L,
+                Map.of("refs", List.of(42L)), false, Map.of()));
+        verify(materialService).get(eq(8L), nullable(Long.class));
+    }
 
     @Test
     void retiredInterviewTemplateCannotBeCopiedSavedOrPublished() {

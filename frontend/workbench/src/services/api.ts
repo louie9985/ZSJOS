@@ -887,7 +887,9 @@ export type StudentContactFormField = {
     | "checkbox_group"
     | "checkbox"
     | "attachment"
-    | "region";
+    | "region"
+    | "material_picker"
+    | "system_history";
   required: boolean;
   enabled: boolean;
   systemField: boolean;
@@ -905,6 +907,7 @@ export type StudentContactFormField = {
   maxValue?: number;
   maxLength?: number;
   group?: string;
+  referenceFor?: string; materialTypeCode?: 'viral_account' | 'viral_content'; defaultPlatform?: string; defaultStage?: string; recommendedCount?: string; filterAdjustable?: boolean;
 };
 export type DirectorTemplateSnapshot = {
   templateId: number;
@@ -3509,6 +3512,9 @@ export const api = {
       topic?: string;
       contentClassValue: string;
       contentClassLabelSnapshot: string;
+      purposeValue?: string; purposeLabelSnapshot?: string; formatValue?: string; formatLabelSnapshot?: string;
+      detailUrl?: string; commentHook?: string; plannedPublishAt?: string;
+    
     }) => unwrap<number>(await http.post("/zsjos/content/create", data)),
     get: async (id: number) =>
       unwrap<MediaContent>(
@@ -3701,6 +3707,11 @@ export const api = {
       ),
   },
   positioningCard: {
+    uploadAttachment: async (id: number, fieldKey: string, file: File) => {
+      const data = new FormData(); data.append('fieldKey', fieldKey); data.append('file', file)
+      return unwrap<{ id: number; name: string; type: string; size: number; url?: string }>(await http.post(`/zsjos/positioning-card/${id}/attachments`, data))
+    },
+    attachment: async (id: number, fileId: number) => unwrap<{ id: number; name: string; type: string; size: number; url?: string }>(await http.get(`/zsjos/positioning-card/${id}/attachments/${fileId}`)),
     publishedTemplate: async (templateId?: number) =>
       unwrap<DirectorTemplateSnapshot>(
         await http.get("/zsjos/positioning-card/published-template", {
@@ -3789,6 +3800,8 @@ export const api = {
           params: { cardId },
         }),
       ),
+    interviews: async (accountId: number) =>
+      unwrap<unknown[]>(await http.get('/zsjos/positioning/workspace/interviews', { params: { accountId } })),
     execCard: async (cardId: number) =>
       unwrap<unknown>(
         await http.get("/zsjos/positioning/workspace/exec-card", {
@@ -4339,6 +4352,8 @@ export const api = {
     unwrap<PurchaseIntent>(
       await http.post(`/zsjos/purchase-intent/${id}/refresh-payment`),
     ),
+  cancelPurchasePayment: async (id: number) =>
+    unwrap<PurchaseIntent>(await http.post(`/zsjos/purchase-intent/${id}/cancel-payment`)),
   applyPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
     unwrap<PaymentRefund>(await http.post("/zsjos/payment-refund/apply", data)),
   directPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
@@ -5719,3 +5734,4 @@ export const api = {
       }),
     ),
 };
+

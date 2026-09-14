@@ -247,7 +247,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
               <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
               <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
-                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button></Space>
+                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button>
+                {purchaseIntent.paymentStatus !== 'paid' && <Button danger size="small" onClick={async () => { const updated = await api.cancelPurchasePayment(purchaseIntent.id); setPurchaseIntent(updated); setCollectionMode(updated.collectionMode) }}>取消支付链接</Button>}</Space>
             </Space>}/>}</>}
          {repurchase && <Form.Item name="repurchaseReason" label="复购说明"
            rules={[{ required: true, whitespace: true, message: '请填写复购说明' }, { max: 1000 }]}>

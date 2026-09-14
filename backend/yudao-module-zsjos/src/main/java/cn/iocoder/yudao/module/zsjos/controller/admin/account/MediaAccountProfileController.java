@@ -30,16 +30,6 @@ public class MediaAccountProfileController {
     public CommonResult<Integer> diagnosis(@PathVariable Long id, @Valid @RequestBody DiagnosisRequest req) {
         return success(service.submitDiagnosis(id, req, getLoginUserId()));
     }
-    @PostMapping("/positioning/submit")
-    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create') && @ss.hasAnyPermissions('zsjos:media-account:edit','zsjos:media-account:maintenance')")
-    public CommonResult<Integer> submitPositioning(@PathVariable Long id, @Valid @RequestBody Patch req) {
-        return success(service.submitPositioning(id, req, getLoginUserId()));
-    }
-    @GetMapping("/positioning/versions")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:query')")
-    public CommonResult<PageResult<Entry>> positioningVersions(@PathVariable Long id, @Valid PageParam page) {
-        return success(service.positioningVersions(id, page, getLoginUserId()));
-    }
     @GetMapping("/history")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")
     public CommonResult<PageResult<Entry>> history(@PathVariable Long id,@Valid PageParam page){return success(service.history(id,page,getLoginUserId()));}

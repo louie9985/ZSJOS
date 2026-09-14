@@ -55,47 +55,6 @@ class MediaAccountProfileServiceTest {
         when(configs.getPublished()).thenReturn(config);
     }
     Patch patch(Map<String,Object> changes){var r=new Patch();r.setVersion(3);r.setConfigVersionId(8L);r.setIdempotencyKey("test-command");r.setChanges(changes);return r;}
-    @Test void positioningSubmissionFreezesFieldsAndRetriesWithoutAnotherVersion() {
-        writable(10L);
-        config.getFields().getFirst().setGroup("POSITIONING");
-        when(permissionApi.hasAnyPermissions(10L,"zsjos:positioning-card:create")).thenReturn(true);
-        var value=new MediaAccountDetailSnapshotVO();value.setKey("goal");value.setLabel("提交时标题");value.setValue("定位决策");value.setDisplayValue("定位决策");
-        when(configs.validateAndSnapshot(anyMap(),anyList())).thenReturn(new MediaAccountFieldConfigService.DetailSnapshot(8L,Map.of("goal","定位决策"),List.of(value)));
-        when(mapper.update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
-        var request=patch(Map.of("goal","定位决策"));
-        assertEquals(4,service.submitPositioning(1L,request,10L));
-        var capture=ArgumentCaptor.forClass(MediaAccountProfileEntryDO.class);
-        verify(entries,times(2)).insert(capture.capture());
-        var submitted=capture.getAllValues().stream().filter(e->"POSITIONING".equals(e.getKind())).findFirst().orElseThrow();
-        var snapshot=cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(submitted.getContent(),PositioningSnapshot.class);
-        assertEquals(8L,snapshot.getConfigVersionId());assertEquals(1,snapshot.getFields().size());
-        assertEquals("定位决策",snapshot.getValues().getFirst().getDisplayValue());
-        when(entries.replay(1L,10L,"test-command")).thenReturn(submitted);account.setVersion(4);
-        assertEquals(4,service.submitPositioning(1L,request,10L));
-        verify(entries,times(2)).insert(any(MediaAccountProfileEntryDO.class));
-    }
-    @Test void positioningSubmissionRequiresConfiguredPermission() {
-        when(mapper.selectByIdForUpdate(1L,7L)).thenReturn(account);
-        when(objects.hasPermission(1L,"edit",10L)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(10L,"zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
-        assertEquals(MEDIA_ACCOUNT_PERMISSION_DENIED.getCode(),assertThrows(ServiceException.class,
-            ()->service.submitPositioning(1L,patch(Map.of()),10L)).getCode());
-        verify(entries,never()).insert(any(MediaAccountProfileEntryDO.class));
-    }
-    @Test void positioningSubmissionCannotModifyOtherProfileSections() {
-        writable(10L);config.getFields().getFirst().setGroup("POSITIONING");
-        when(permissionApi.hasAnyPermissions(10L,"zsjos:positioning-card:create")).thenReturn(true);
-        assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(),assertThrows(ServiceException.class,
-            ()->service.submitPositioning(1L,patch(Map.of("nickname","changed")),10L)).getCode());
-        verify(entries,never()).insert(any(MediaAccountProfileEntryDO.class));
-    }
-    @Test void positioningSubmissionChecksRequiredFieldsBeforeWriting() {
-        writable(10L);config.getFields().getFirst().setGroup("POSITIONING");config.getFields().getFirst().setRequired(true);
-        when(permissionApi.hasAnyPermissions(10L,"zsjos:positioning-card:create")).thenReturn(true);
-        assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(),assertThrows(ServiceException.class,
-            ()->service.submitPositioning(1L,patch(Map.of()),10L)).getCode());
-        verify(entries,never()).insert(any(MediaAccountProfileEntryDO.class));
-    }
     @Test void policyMatrixFailsClosedForBothOwnersAndUnknownKeys(){
         for(var f:config.getFields()) for(Long user:List.of(10L,20L,30L)) {
             boolean allowed=f.getOwnerType().equals("DIRECTOR")&&user==10L||f.getOwnerType().equals("OPERATOR")&&user==20L;

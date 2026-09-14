@@ -41,8 +41,6 @@ import {
   type DiagnosisRequest,
 } from "../services/mediaAccountProfile";
 import { formatTimestamp } from "../services/time";
-import AccountPositioningVersions from "./AccountPositioningVersions";
-import PositioningMaterialPicker from "./PositioningMaterialPicker";
 
 type Account = MediaStudentDetail["accounts"][number];
 const owners = {
@@ -351,36 +349,6 @@ export default function AccountProfilePanel({
       setSaving(false);
     }
   };
-  const submitPositioning = async () => {
-    if (!profile?.canSubmitPositioning || !account || saving || uploading)
-      return;
-    const positioningKeys = new Set(
-      fields.filter((f) => f.group === "POSITIONING").map((f) => f.key),
-    );
-    const payload = {
-      version: profile.account.version,
-      configVersionId: profile.config.id,
-      changes: Object.fromEntries(
-        Object.entries(changes).filter(([field]) => positioningKeys.has(field)),
-      ),
-    };
-    setSaving(true);
-    try {
-      await accountProfileApi.submitPositioning(account.id, {
-        ...payload,
-        idempotencyKey: key({ command: "submit-positioning", ...payload }),
-      });
-      pending.current = undefined;
-      message.success("定位卡已提交，历史版本已保存");
-      await load();
-      await loadHistory();
-      await onSaved();
-    } catch (cause) {
-      message.error(errorText(cause));
-    } finally {
-      setSaving(false);
-    }
-  };
   const display = (f: ProfileField) => {
     const v = profile?.values[f.key];
     if (fieldEmpty(v))
@@ -453,17 +421,7 @@ export default function AccountProfilePanel({
         </Space>
       );
     if (f.type === "materials")
-      return (
-        <PositioningMaterialPicker
-          field={f}
-          value={Array.isArray(value) ? (value as number[]) : []}
-          snapshots={
-            profile?.snapshots.find((s) => s.key === f.key)?.materialVersions
-          }
-          disabled={disabled}
-          onChange={update}
-        />
-      );
+      return <div className="account-profile-readonly">{display(f)}</div>;
     if (!allowed)
       return <div className="account-profile-readonly">{display(f)}</div>;
     if (f.type === "attachment")
@@ -804,9 +762,6 @@ export default function AccountProfilePanel({
             >
               <div className="account-profile-section-heading">
                 <Typography.Title level={5}>{name}</Typography.Title>
-                {k === "POSITIONING" && account && profile.canViewHistory && (
-                  <AccountPositioningVersions accountId={account.id} />
-                )}
                 {fields.some(
                   (f) => profileSection(f) === k && editable.includes(f.key),
                 ) && (
@@ -1071,24 +1026,6 @@ export default function AccountProfilePanel({
                   >
                     <div className="account-profile-section-heading">
                       <Typography.Title level={5}>{name}</Typography.Title>
-                      {k === "POSITIONING" && profile.canSubmitPositioning && (
-                        <Button
-                          loading={saving}
-                          disabled={
-                            uploading ||
-                            Object.keys(changes).some(
-                              (key) =>
-                                !fields.some(
-                                  (f) =>
-                                    f.key === key && f.group === "POSITIONING",
-                                ),
-                            )
-                          }
-                          onClick={() => void submitPositioning()}
-                        >
-                          正式提交定位卡
-                        </Button>
-                      )}
                       <Typography.Text type="secondary">
                         待补{" "}
                         {missing.filter((f) => profileSection(f) === k).length}

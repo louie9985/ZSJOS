@@ -613,6 +613,12 @@
 
 .media-students-positioning-fields { display: flex; flex-direction: column; gap: 4px; }
 .media-students-positioning-fields .ant-form-item { margin-bottom: 12px; }
+.positioning-card-fields { display: flex; flex-direction: column; gap: 0; width: 100%; }
+.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(260px, 2fr) minmax(260px, 2fr); gap: 12px; padding: 12px; border-bottom: 1px solid var(--crm-border); }
+.positioning-card-field-head { font-weight: 600; background: var(--crm-bg-sunken); }
+.positioning-card-field-hint { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--crm-text-secondary); }
+.positioning-card-field-control { min-width: 0; }
+@media (max-width: 768px) { .positioning-card-field-head { display: none; } .positioning-card-field-row { display: flex; flex-direction: column; gap: 6px; } .positioning-card-field-row > strong::before { content: '定位卡项目：'; color: var(--crm-text-secondary); font-weight: 400; } }
 
 .account-profile-editor-columns > [data-profile-section="POSITIONING"] { grid-column: 1 / -1; }
 .account-positioning-table { width: 100%; table-layout: fixed; border-collapse: collapse; }

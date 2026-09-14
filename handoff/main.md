@@ -24310,3 +24310,97 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、数据库或共享服务变更。
 - Remaining work: 提交后按用户后续指示推送；发布后验证 H5 实际请求。
 - Status: `ready-to-commit`
+
+## Delivery Entry - 2026-09-14 17:00:00 +08:00
+
+- Workstream ID: `main-order-gift-items-schema-20260914`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `6e180edf2c`（修改前）。
+- User goal: 修复订单查询因 `zsjos_order.gift_items` 缺失导致的 SQL 异常。
+- Key decisions: 同步 fresh bootstrap 与可重复迁移；字段保存礼品项目 JSON 文本，允许历史订单为空；仅修改订单表结构和直接相关交接记录。
+- Execution or analysis result: 已确认 Java `SalesOrderDO` 及订单 VO/提交接口均消费该字段，当前基线和迁移均缺列。
+- Changed files: None（登记阶段）。
+- Verification evidence: 待执行受控数据库结构检查、SQL 语法/迁移执行和后端编译测试。
+- Dependency or integration impact: 影响 `zsjos_order` 结构；无新增依赖。
+- Remaining work: 编写并执行修复，完成验证并追加最终交付记录。
+
+## Delivery Entry - 2026-09-14 17:05:00 +08:00
+
+- Workstream ID: main-order-gift-items-schema-20260914; Branch: main; Worktree: D:\ZSJ-OS; HEAD: 6e180edf2c（修改后未提交）。
+- User goal: 修复 zsjos_order 缺少 gift_items 导致订单查询失败。
+- Key decisions: 在 fresh bootstrap/core schema 增加 nullable JSON gift_items 与 gift_shipping_address；新增可重复、非破坏 V223 迁移，保留历史行。
+- Execution or analysis result: 迁移与基线已同步；mysql 客户端在环境中不可用，未直接改开发库。
+- Changed files: script/sql/mysql/00-bootstrap-schema.sql; script/sql/mysql/schema/core.sql; script/sql/mysql/migrations/V223__sales_order_gift_items.sql; script/sql/mysql/migrations/README.md; handoff/main.md。
+- Verification evidence: backend Maven reactor compile 成功（yudao-module-zsjos 及依赖）；数据库结构/接口实请求未验证，因 mysql 客户端不可用。
+- Dependency or integration impact: 需按迁移顺序执行 V223；无新增依赖。
+- Remaining work: 在具备 MySQL 客户端和目标数据库的环境执行 V223，检查两列及 media-students 接口。
+
+## Delivery Entry - 2026-09-14 17:20:00 +08:00
+
+- Workstream ID: main; Branch: main; Worktree: `D:\ZSJ-OS`; HEAD: `6e180edf2c`（修改后未提交）。
+- User goal: 为学员账号交付接口补充缺失权限。
+- Key decisions: 新增可重复迁移 V224，创建交付页面元数据及 query/create/submit/defer/complete、配置 query/update 按钮权限；继承已有 ZSJOS 根菜单角色授权。
+- Execution or analysis result: SQL 已写入，未执行共享数据库变更。
+- Changed files: `script/sql/mysql/migrations/V224__student_delivery_permissions.sql`; `handoff/main.md`。
+- Verification evidence: 完成静态 SQL 结构检查；后端编译待执行。
+- Dependency or integration impact: 影响 System 菜单与角色菜单授权，不修改用户、业务数据或新增依赖。
+- Remaining work: 执行 Maven 模块编译；在目标数据库执行 V224 后刷新用户权限缓存或重新登录。
+
+
+## 2026-09-14 11:29 (Beijing)
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: Allow sales staff to cancel a generated online payment link during sales order entry.
+- Key decisions: Added owner/initiator-checked cancel endpoint; close latest created/expired/closed payment intent, unlock draft, and switch collection mode to offline.
+- Result: Backend and workbench wiring implemented.
+- Changed files: backend/.../PurchaseIntentController.java; backend/.../PurchaseIntentService.java; frontend/workbench/src/services/api.ts; frontend/workbench/src/components/SalesOrderEntryModal.tsx
+- Verification: SalesOrderEntryModal.test.ts passed (4 tests). Backend build/type checks not run.
+- Dependency/integration impact: Existing sales-order create permission reused; no new dependencies.
+- Remaining work: Backend compilation and end-to-end endpoint verification remain unverified.
+## Workstream registration: lead-submission-role-permissions
+- Goal: Grant ordinary Lead submission to center_head, dept_manager, content_director, new_media_operator, sales_specialist across all enabled tenant roles; retain self-sourced permission only for sales_specialist.
+- Non-goals: No user, post, department, Lead, or frontend changes.
+- Branch/worktree: main / D:\ZSJ-OS
+- Base commit: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- Target branch: main
+- Ownership scope: lead permission migration, verification SQL, role matrix documentation, handoff.
+- Owner: /root
+- Dependencies: existing system_menu permissions and V226 migration order.
+- Integration order: apply migration after V226, then run verification.
+- Verification plan: SQL static review, migration replay/idempotence, permission matrix checks, focused controller tests where available.
+
+## 2026-09-14 12:00 (Beijing)
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 修复新媒体及销售专员无法普通提交客资的角色权限配置。
+- Key decisions: V227 按稳定角色编码向五类启用角色授予 `zsjos:lead:submit`；自拓权限仍仅销售专员；不修改用户、岗位、部门或业务数据。
+- Execution or analysis result: 已新增幂等角色菜单迁移、重复有效授权清理、验证 SQL，并更新权限矩阵；测试数据库执行待完成。
+- Changed files: script/sql/mysql/migrations/V227__lead_submission_role_permissions.sql; script/sql/mysql/verify-lead-submission-role-permissions.sql; docs/architecture/zsjos-role-permission-matrix.md; handoff/main.md
+- Verification evidence: 静态 SQL 检查通过；数据库同步、迁移重放和后端测试待执行。
+- Dependency or integration impact: 仅影响 System 菜单与角色菜单授权；无新增依赖。
+- Remaining work: 在测试数据库执行 V227，运行核对 SQL及权限测试。
+## 2026-09-14 12:08 (Beijing)
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 同步新媒体及销售专员普通客资提交权限。
+- Key decisions: V227 覆盖 center_head、dept_manager、content_director、new_media_operator、sales_specialist；自拓权限仅 sales_specialist；跨所有启用租户角色；不改用户或业务数据。
+- Execution or analysis result: V227 已在 ruoyi-vue-pro 测试数据库成功执行；首次执行发现并修复跨排序规则比较问题；重复执行验证通过，非销售自拓授权已逻辑停用。
+- Changed files: script/sql/mysql/migrations/V227__lead_submission_role_permissions.sql; script/sql/mysql/verify-lead-submission-role-permissions.sql; docs/architecture/zsjos-role-permission-matrix.md; handoff/main.md
+- Verification evidence: 权限核对返回五类普通提交授权，销售自拓仅销售专员，结果 PASS；迁移可重复执行。
+- Dependency or integration impact: 仅 System 角色菜单关系；应用需重新登录或刷新权限缓存。
+- Remaining work: Lead Controller 专项测试未发现现成可直接运行目标；需在发布流程执行完整后端测试。
+- Additional verification: Added V227 migration README entry. Targeted Maven invocation was attempted but reactor stopped in yudao-common because the test pattern is absent in upstream modules; no Lead test execution result.
+
+## Delivery entry
+- Beijing time: 2026-09-14 14:xx
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: Fix missing audit framework classes during zsjos compilation.
+- Key decisions: Existing yudao-common dependency was already present in the working tree; no source edit was needed.
+- Execution result: Module compile completed successfully.
+- Changed files: handoff/main.md (delivery record only)
+- Verification evidence: mvn -pl yudao-module-zsjos -am -DskipTests compile succeeded.
+- Dependency/integration impact: yudao-common is resolved in reactor.
+- Remaining work: None.

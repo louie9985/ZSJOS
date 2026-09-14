@@ -29,8 +29,6 @@ class MediaAccountProfilePermissionTest {
             assertThrows(AccessDeniedException.class,()->controller.patch(1L,new Patch()));
             assertThrows(AccessDeniedException.class,()->controller.append(1L,new RecordRequest()));
             assertThrows(AccessDeniedException.class,()->controller.history(1L,new PageParam()));
-            assertThrows(AccessDeniedException.class,()->controller.submitPositioning(1L,new Patch()));
-            assertThrows(AccessDeniedException.class,()->controller.positioningVersions(1L,new PageParam()));
             verifyNoInteractions(ctx.getBean(MediaAccountProfileService.class));
         }
     }
@@ -39,17 +37,6 @@ class MediaAccountProfilePermissionTest {
             when(ctx.getBean(SecurityFrameworkService.class).hasAnyPermissions("zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
             when(ctx.getBean(MediaAccountProfileService.class).patch(eq(1L),any(),isNull())).thenReturn(2);
             assertEquals(2,ctx.getBean(MediaAccountProfileController.class).patch(1L,new Patch()).getData());
-        }
-    }
-    @Test void positioningSubmitNeedsBothCardAndProfilePermissions(){
-        try(var ctx=context()){
-            var ss=ctx.getBean(SecurityFrameworkService.class);
-            var controller=ctx.getBean(MediaAccountProfileController.class);
-            when(ss.hasPermission("zsjos:positioning-card:create")).thenReturn(true);
-            assertThrows(AccessDeniedException.class,()->controller.submitPositioning(1L,new Patch()));
-            when(ss.hasAnyPermissions("zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
-            controller.submitPositioning(1L,new Patch());
-            verify(ctx.getBean(MediaAccountProfileService.class)).submitPositioning(eq(1L),any(),isNull());
         }
     }
     @Test void configuredQueryReachesObjectCheckedService(){

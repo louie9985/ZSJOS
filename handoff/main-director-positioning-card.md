@@ -1,5 +1,23 @@
 # Workstream: main-director-positioning-card
 
+## Active scope correction 2026-09-14
+- Owner: Codex /root; branch/target: main; worktree: D:/ZSJ-OS; base: 60b15fd459e3b353a696cca210c7867a288b4e3b.
+- Goal: Complete the existing positioning template/card workflow per the approved pasted plan.
+- Non-goals: Account profile workflow, unrelated content review/payment work, branch operations.
+- Scope: positioning/director backend and focused tests; Workbench positioning components, MediaStudentsPage, DirectorConfigPages, API types, related CSS; existing Vue directorTemplate; positioning SQL and directly affected docs; this log.
+- Dependencies/order: Existing material/System/Infra APIs; field contracts -> picker/files/snapshots -> templates -> runtime verification.
+- Verification: focused backend/frontend tests, builds, real API and desktop/mobile UI, controlled SQL replay and UTF-8 checks. Earlier partial delivery statements do not establish full completion.
+
+## Delivery — 2026-09-14 12:45 +08:00
+- Branch: main; Worktree: D:\ZSJ-OS; HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b.
+- User goal: 完成定位卡素材、附件、历史和校验闭环。
+- Key decisions: 复用现有 positioning-card；素材仅接受 EFFECTIVE 版本并由服务端生成快照；附件绑定定位卡草稿目录；system_history 只读且提交时拒绝写入。
+- Execution result: 新增 Workbench 素材选择器（搜索、字典筛选、分页、多选、预览、重试、移除）、定位卡附件上传/读取组件和后端端点；扩展 DirectorFormTemplateService 对字段类型、素材版本、素材类型、附件归属和历史字段的校验；提交缺失校验仅针对 required 字段。
+- Changed files: frontend/workbench/src/components/PositioningCardMaterialPicker.tsx; frontend/workbench/src/components/PositioningCardAttachments.tsx; frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/services/api.ts; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/positioning/PositioningCardController.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateServiceTest.java; frontend/workbench/src/services/positioningJsonImport.ts; this handoff.
+- Verification evidence: `npm run typecheck` passed; focused `DirectorFormTemplateServiceTest` passed; module compile reached unrelated existing audit-hook missing-class errors in `ZsjosBpmAuditHook`/`ZsjosExecutionAuditHook`.
+- Dependency or integration impact: Requires existing material query permission and Infra FileApi; no database writes performed. SQL replay, runtime API and browser verification remain unverified.
+- Remaining work: bind attachment IDs into request values with upload lifecycle tests; verify template migration and admin configuration; run controlled SQL/browser/API checks; resolve or isolate pre-existing audit-hook compile failures.
+
 - Owner: Codex /root
 - Beijing time: 2026-09-11 16:10:07 +08:00
 - Branch: fix/media-account-create-columns-v204
@@ -72,4 +90,107 @@
 - Verification: frontend/workbench npm run typecheck 通过。
 - Dependency/integration impact: None
 - Remaining work: None
+
+
+## 2026-09-14 北京时间
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 定位卡旧草稿打开时使用最新模板并按字段 key 合并。
+- Key decisions: 旧字段值和字典快照按 key 保留；新增字段为空；删除字段不进入当前表单；保存沿用现有草稿接口写回最新模板快照。
+- Execution result: 前端打开草稿流程先加载 publishedTemplate，再合并旧草稿值。
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx
+- Verification evidence: frontend/workbench npm run typecheck 通过。
+- Dependency/integration impact: None
+- Remaining work: None
+
+## 2026-09-14 北京时间（清理修复）
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 清除错误的账号档案定位卡改造残留，恢复现有定位卡链路可编译
+- Key decisions: 保留现有账号档案业务 API；定位卡继续使用 positioning-template/positioning-card 链路；仅修复误删方法、残留 JSX 与字段类型契约
+- Execution result: 恢复 accountProfileApi 的 get/patch/history/append/diagnosis/upload；移除 AccountProfilePanel 残留空 JSX；补充 material_picker/system_history 前端字段联合类型
+- Changed files: frontend/workbench/src/components/AccountProfilePanel.tsx; frontend/workbench/src/services/mediaAccountProfile.ts; frontend/workbench/src/services/api.ts
+- Verification evidence: frontend/workbench npm run typecheck 通过
+- Dependency or integration impact: None; 未执行数据库写入、提交或推送
+- Remaining work: 定位卡素材弹窗、历史记录展示及模板配置的完整业务联调仍需继续
+
+## 2026-09-14 北京时间（继续修复）
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 继续完成现有定位卡填写链路
+- Key decisions: 保持既有 positioning-card 接口；暂将新增字段类型纳入前端渲染契约，避免旧类型判断阻断编译
+- Execution result: 新增字段类型可正常进入填写页，系统历史与素材字段保留只读状态，待后续接入真实数据展示
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx
+- Verification evidence: frontend/workbench npm run typecheck 通过
+- Dependency or integration impact: None
+- Remaining work: 真实素材选择弹窗、历史记录接口映射、附件上传和后端 material_picker 校验
+
+## 2026-09-14 北京时间（字段校验）
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 继续推进定位卡完整链路
+- Key decisions: 新增素材/系统历史字段沿用现有模板快照校验，允许文本或集合值通过基础类型校验
+- Execution result: DirectorFormTemplateService 已纳入 material_picker/system_history 类型校验
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java
+- Verification evidence: 未运行后端 Maven；前端类型检查此前通过
+- Dependency or integration impact: None
+- Remaining work: 接通素材库弹窗、历史记录及附件上传
+
+## 2026-09-14 北京时间（复用历史接口）
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 按确认方案修复现有定位卡链路
+- Key decisions: 复用 PositioningWorkspaceController 现有历史版本与采访记录接口，不新增账号档案定位接口
+- Execution result: 新增 `api.positioningCard.interviews(accountId)` 对现有 `/zsjos/positioning/workspace/interviews` 的类型化调用
+- Changed files: frontend/workbench/src/services/api.ts
+- Verification evidence: 接口路径与后端 Controller 已核对；未完成端到端联调
+- Dependency or integration impact: None
+- Remaining work: 在填写页显示历史数据并完成素材弹窗、附件快照
+
+## 2026-09-14 北京时间（历史记录接入）
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b
+- User goal: 修复现有定位卡并继续接入真实历史数据
+- Key decisions: 填写定位卡打开时调用现有 interviews 接口，历史字段只读展示
+- Execution result: 定位卡页面加载账号采访记录并渲染到 system_history 字段
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/services/api.ts
+- Verification evidence: frontend/workbench npm run typecheck 通过
+- Dependency or integration impact: None
+- Remaining work: 素材库弹窗、附件上传及素材版本快照
+
+## Delivery — 2026-09-14 12:52 +08:00
+- Branch: main; Worktree: D:\ZSJ-OS; HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b.
+- User goal: 继续完成定位卡附件闭环。
+- Key decisions: 上传前确保现有定位卡草稿存在；文件 ID 通过动态表单回写并触发自动保存。
+- Execution result: 附件组件接入动态定位卡表单，支持已选附件展示、下载、移除和最多 20 个文件；服务端按定位卡草稿目录校验归属并冻结元数据。
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/components/PositioningCardAttachments.tsx; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/positioning/PositioningCardController.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java; this handoff.
+- Verification evidence: `npm run typecheck` passed; backend compile is blocked by pre-existing audit-hook missing classes.
+- Dependency or integration impact: Uses existing Infra FileApi and positioning-card permissions; no database write performed.
+- Remaining work: 管理端素材规则编辑、SQL 重放、真实接口及桌面/移动浏览器验收。
+
+## Delivery — 2026-09-14 12:58 +08:00
+- Branch: main; Worktree: D:\ZSJ-OS; HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b.
+- User goal: 完善模板配置和定位卡四列布局。
+- Key decisions: 四列由模板字段关联关系驱动；参考素材字段作为第四列渲染；管理端和 Workbench 字典选项均来自服务端。
+- Execution result: 新增 PositioningCardFields 响应式四列布局组件；Workbench 模板配置支持字段类型、字典、素材类型、默认平台/阶段、关联字段、推荐数量和筛选调整；后端限制字段类型、素材关联和系统历史必填规则。
+- Changed files: frontend/workbench/src/components/PositioningCardFields.tsx; frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/pages/DirectorConfigPages.tsx; frontend/workbench/src/styles/pages/media-students.css; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java; this handoff.
+- Verification evidence: `npm run typecheck` passed; `mvn -q -f backend/pom.xml -pl yudao-module-zsjos -DskipTests compile` passed.
+- Dependency or integration impact: Uses server dictionaries and material type API; SQL and browser checks remain unverified.
+- Remaining work: Admin Vue editor must expose material metadata; attachment IDs should be covered by runtime integration; controlled migration replay and browser acceptance remain.
+
+## Delivery — 2026-09-14 13:05 +08:00
+- Branch: main; Worktree: D:\ZSJ-OS; HEAD: 60b15fd459e3b353a696cca210c7867a288b4e3b.
+- User goal: 完成管理端模板素材规则配置。
+- Key decisions: Vue 管理端沿用现有模板编辑器和权限；素材类型仍仅允许系统素材类型代码，筛选值继续由服务端字典提供。
+- Execution result: Admin DirectorTemplate 字段模型及编辑器支持 material_picker、attachment、system_history，并可配置素材类型、默认平台、默认阶段、关联字段、推荐数量和筛选调整；WorkBench 保持四列布局与选择器。
+- Changed files: frontend/admin/src/api/zsjos/director/index.ts; frontend/admin/src/views/zsjos/directorTemplate/index.vue; this handoff.
+- Verification evidence: `pnpm ts:check` completed with exit code 0; Workbench typecheck and backend module compile had passed in prior delivery.
+- Dependency or integration impact: Uses existing admin permissions, System dictionaries and material APIs; no database writes.
+- Remaining work: SQL migration replay/HEX, real API and desktop/mobile browser acceptance; attachment end-to-end refresh verification.
 

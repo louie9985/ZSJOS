@@ -21,6 +21,12 @@ export interface DirectorField {
   maxValue?: number
   maxLength?: number
   group?: string
+  referenceFor?: string
+  materialTypeCode?: 'viral_account' | 'viral_content'
+  defaultPlatform?: string
+  defaultStage?: string
+  recommendedCount?: string
+  filterAdjustable?: boolean
 }
 export interface TemplateVersion {
   id: number

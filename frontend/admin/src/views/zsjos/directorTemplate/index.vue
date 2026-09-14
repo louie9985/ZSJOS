@@ -87,8 +87,16 @@
                 :value="item.type" /></el-select
             ><div class="dict-preview"
               >当前启用项 {{ dictCount }} 个<span v-if="dictError">，加载失败，请重试</span></div
-            ></el-form-item
+          ></el-form-item
           >
+          <template v-if="positioning && activeField?.type === 'material_picker'">
+            <el-form-item label="素材类型"><el-select v-model="activeField.materialTypeCode" class="w-100%"><el-option label="爆款账号" value="viral_account" /><el-option label="爆款内容" value="viral_content" /></el-select></el-form-item>
+            <el-form-item label="默认平台字典值"><el-input v-model="activeField.defaultPlatform" /></el-form-item>
+            <el-form-item label="默认阶段字典值"><el-input v-model="activeField.defaultStage" /></el-form-item>
+            <el-form-item label="推荐数量提示"><el-input v-model="activeField.recommendedCount" /></el-form-item>
+            <el-form-item label="参考字段关联"><el-select v-model="activeField.referenceFor" clearable class="w-100%"><el-option v-for="target in fields.filter((x) => x.key !== activeField.key && x.type !== 'material_picker')" :key="target.key" :label="target.title" :value="target.key" /></el-select></el-form-item>
+            <el-switch v-model="activeField.filterAdjustable" active-text="允许调整筛选" />
+          </template>
           <el-form-item label="分组"><el-input v-model="activeField.group" /></el-form-item>
           <el-form-item label="填写备注"
             ><el-input
@@ -261,7 +269,10 @@ const fieldTypes = [
   { value: 'radio', label: '单选' },
   { value: 'checkbox_group', label: '多选' },
   { value: 'checkbox', label: '开关' },
-  { value: 'region', label: '地区' }
+  { value: 'region', label: '地区' },
+  { value: 'attachment', label: '附件' },
+  { value: 'material_picker', label: '素材选择' },
+  { value: 'system_history', label: '系统历史（只读）' }
 ]
 const sync = () => {
   viewingHistory.value = false

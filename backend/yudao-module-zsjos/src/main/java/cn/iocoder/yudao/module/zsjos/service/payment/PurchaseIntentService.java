@@ -153,6 +153,21 @@ public class PurchaseIntentService {
         return convert(intent);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseIntentRespVO cancelPayment(Long id, Long userId) {
+        PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(id);
+        if (intent == null) throw exception(PURCHASE_INTENT_NOT_EXISTS);
+        if (!userId.equals(intent.getOwnerUserId()) && !userId.equals(intent.getInitiatorUserId())) throw exception(PURCHASE_INTENT_PERMISSION_DENIED);
+        PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(id);
+        if (payment == null || !List.of("created", "expired", "closed").contains(payment.getStatus()))
+            throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        if (!"closed".equals(payment.getStatus())) payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason("销售取消支付链接");
+        paymentIntentMapper.updateById(payment);
+        intent.setSnapshotLocked(false).setCollectionMode("offline_paid");
+        purchaseIntentMapper.updateById(intent);
+        return convert(intent);
+    }
+
     public PublicPaymentDetailRespVO publicDetail(String no, String token) {
         if (!allinpayProperties.isEnabled()) throw exception(PAYMENT_GATEWAY_UNAVAILABLE);
         PaymentIntentDO payment = requirePublic(no, token);

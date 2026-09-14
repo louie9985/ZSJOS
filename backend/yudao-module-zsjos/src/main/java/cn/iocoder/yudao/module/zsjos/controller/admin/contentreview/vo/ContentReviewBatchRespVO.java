@@ -11,6 +11,9 @@ public class ContentReviewBatchRespVO {
     private Long id;
     private String batchNo;
     private Long accountId;
+    private Long studentPersonId;
+    private Long revisionOfBatchId;
+    private List<Long> accountIds;
     private Long operatorUserId;
     private String operatorName;
     private Long directorUserId;

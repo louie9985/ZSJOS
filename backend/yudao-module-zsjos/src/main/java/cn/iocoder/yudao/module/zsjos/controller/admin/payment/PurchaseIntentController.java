@@ -52,4 +52,11 @@ public class PurchaseIntentController {
     public CommonResult<PurchaseIntentRespVO> refresh(@PathVariable Long id) {
         return success(service.refreshPayment(id, WebFrameworkUtils.getLoginUserId()));
     }
+
+    @PostMapping("/{id}/cancel-payment")
+    @Operation(summary = "取消支付链接")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<PurchaseIntentRespVO> cancel(@PathVariable Long id) {
+        return success(service.cancelPayment(id, WebFrameworkUtils.getLoginUserId()));
+    }
 }

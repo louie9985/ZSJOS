@@ -73,8 +73,6 @@ public class MediaAccountProfileService {
         if (a.getPrimaryProblemCodeValue() != null) values.put("bottleneck", a.getPrimaryProblemCodeValue());
         result.setValues(values);result.setSourceNotes(notes);result.setSnapshots(readSnapshots(a));
         boolean write=canMaintain(a,userId);
-        result.setCanSubmitPositioning(write && permissionApi.hasAnyPermissions(userId,"zsjos:positioning-card:create")
-                && config.getFields().stream().anyMatch(f -> "POSITIONING".equals(f.getGroup()) && MediaAccountFieldPolicy.canWrite(f,a,userId)));
         result.setEditableFields(config.getFields().stream().filter(f->write&&MediaAccountFieldPolicy.canWrite(f,a,userId)).map(f->f.getKey()).toList());
         var missing=config.getFields().stream().filter(f->Boolean.TRUE.equals(f.getEnabled())&&Boolean.TRUE.equals(f.getRequiredForComplete())
             && !MediaAccountFieldPolicy.POSITIONING_SYNC_FIELDS.contains(f.getKey())
@@ -267,61 +265,6 @@ public class MediaAccountProfileService {
         return String.valueOf(value);
     }
 
-    @Transactional(rollbackFor=Exception.class)
-    @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
-    public Integer submitPositioning(Long id, Patch req, Long userId) {
-        MediaAccountDO account=lock(id);
-        requireMaintain(account,userId);
-        if (!permissionApi.hasAnyPermissions(userId,"zsjos:positioning-card:create")) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
-        var config=configs.getPublished();
-        var fields=config.getFields().stream().filter(f -> Boolean.TRUE.equals(f.getEnabled()) && "POSITIONING".equals(f.getGroup())).toList();
-        if (fields.stream().noneMatch(f -> MediaAccountFieldPolicy.canWrite(f,account,userId))) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
-        Set<String> keys=fields.stream().map(MediaAccountFieldConfigRespVO.FieldVO::getKey).collect(java.util.stream.Collectors.toSet());
-        if (!keys.containsAll(req.getChanges().keySet())) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
-        String fp=fingerprint("POSITIONING",req.getVersion(),req.getConfigVersionId(),req.getChanges());
-        Integer prior=replay(id,userId,req.getIdempotencyKey(),fp);
-        if (prior!=null) return prior;
-        requireVersion(account,req.getVersion(),req.getConfigVersionId(),config.getId());
-        Map<String,Object> prospective=readValues(account);prospective.putAll(req.getChanges());
-        if (fields.stream().anyMatch(f -> Boolean.TRUE.equals(f.getRequired()) && !"AUTO".equals(f.getOwnerType())
-                && !"record".equals(f.getType()) && MediaAccountFieldPolicy.empty(prospective.get(f.getKey())))) {
-            throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
-        }
-        // Saving the draft and freezing a submission share this transaction and account lock.
-        Patch draft=new Patch();draft.setVersion(req.getVersion());draft.setConfigVersionId(req.getConfigVersionId());
-        draft.setChanges(req.getChanges());draft.setIdempotencyKey("positioning-draft-"+DigestUtil.sha256Hex(req.getIdempotencyKey()));
-        Integer version=patch(id,draft,userId);
-        MediaAccountDO savedAccount=lock(id);
-        var snapshot=new PositioningSnapshot();snapshot.setConfigVersionId(config.getId());snapshot.setFields(fields);
-        snapshot.setValues(readSnapshots(savedAccount).stream().filter(s -> keys.contains(s.getKey())).toList());
-        List<FileVO> frozenFiles=new ArrayList<>();
-        for(var s:snapshot.getValues()) {
-            if("image".equals(s.getType())&&s.getValue() instanceof Number n)frozenFiles.add(file(n.longValue(),id,null));
-            if("attachment".equals(s.getType())&&s.getValue() instanceof Collection<?> ids)
-                for(Object fileId:ids)frozenFiles.add(file(((Number)fileId).longValue(),id,null));
-        }
-        snapshot.setFiles(frozenFiles);
-        var entry=entry(id,userId,req.getIdempotencyKey(),fp,version,"POSITIONING",null,"定位卡正式提交",JsonUtils.toJsonString(snapshot));
-        entry.setSnapshotJson(JsonUtils.toJsonString(snapshot.getValues()));
-        entry.setFilesJson(JsonUtils.toJsonString(snapshot.getFiles()));
-        entries.insert(entry);
-        return version;
-    }
-
-    @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
-    public PageResult<Entry> positioningVersions(Long id,PageParam page,Long userId) {
-        accounts.require(id);
-        var rows=entries.positioningPage(id,page);
-        return new PageResult<>(rows.getList().stream().map(row -> {
-            Entry value=new Entry();value.setId(row.getId());value.setKind(row.getKind());value.setTitle(row.getTitle());
-            value.setOperatedBy(row.getOperatedByName());value.setOperatedAt(row.getCreateTime());value.setResultVersion(row.getResultVersion());
-            value.setPositioning(JsonUtils.parseObject(row.getContent(),PositioningSnapshot.class));
-            value.setSnapshots(value.getPositioning().getValues());
-            var files=value.getPositioning().getFiles()==null?List.<FileVO>of():value.getPositioning().getFiles();
-            files.forEach(file -> {try {file.setPreviewUrl(fileApi.presignGetUrl(file.getId(),300));} catch (RuntimeException unavailable) {file.setPreviewUrl(null);}});
-            value.setFiles(files);return value;
-        }).toList(),rows.getTotal());
-    }
 
     @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
     public PageResult<Entry> history(Long id, PageParam page, Long userId) {
@@ -329,7 +272,6 @@ public class MediaAccountProfileService {
         return new PageResult<>(result.getList().stream().map(row->{
             Entry v=new Entry();v.setId(row.getId());v.setKind(row.getKind());v.setFieldKey(row.getFieldKey());v.setTitle(row.getTitle());v.setContent(row.getContent());
             v.setOperatedBy(row.getOperatedByName());v.setOperatedAt(row.getCreateTime());v.setResultVersion(row.getResultVersion());
-            if ("POSITIONING".equals(row.getKind())) {v.setPositioning(JsonUtils.parseObject(row.getContent(),PositioningSnapshot.class));v.setContent(null);}
             v.setSnapshots(row.getSnapshotJson()==null?List.of():JsonUtils.parseArray(row.getSnapshotJson(),MediaAccountDetailSnapshotVO.class));
             List<FileVO> files=new ArrayList<>(row.getFilesJson()==null?List.of():JsonUtils.parseArray(row.getFilesJson(),FileVO.class));
             v.getSnapshots().stream().filter(s->"image".equals(s.getType())&&s.getValue() instanceof Number).forEach(s->files.add(storedFile(((Number)s.getValue()).longValue(),id)));

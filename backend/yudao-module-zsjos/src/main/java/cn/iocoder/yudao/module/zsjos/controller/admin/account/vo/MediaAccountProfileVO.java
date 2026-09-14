@@ -21,28 +21,8 @@ public class MediaAccountProfileVO {
     private String directorName;
     private String operatorName;
     private boolean canViewHistory;
-    private boolean canSubmitPositioning;
-    /** Read-only metrics projected from the student's unique partner account. */
     private PartnerMetrics partnerMetrics;
-
-    @Data public static class PartnerMetrics {
-        private Long partnerId;
-        private String sourceStatus;
-        private Long totalLeads;
-        private Long monthLeads;
-        private Long totalDeals;
-        private Long monthDeals;
-        private java.math.BigDecimal totalDealAmount;
-        private java.math.BigDecimal monthDealAmount;
-        private java.math.BigDecimal totalDealRate;
-        private java.math.BigDecimal monthDealRate;
-    }
-    @Data public static class PositioningSnapshot {
-        private Long configVersionId;
-        private List<MediaAccountFieldConfigRespVO.FieldVO> fields;
-        private List<MediaAccountDetailSnapshotVO> values;
-        private List<FileVO> files;
-    }
+    @Data public static class PartnerMetrics { private Long partnerId,totalLeads,monthLeads,totalDeals,monthDeals; private java.math.BigDecimal totalDealAmount=java.math.BigDecimal.ZERO,monthDealAmount=java.math.BigDecimal.ZERO,totalDealRate=java.math.BigDecimal.ZERO,monthDealRate=java.math.BigDecimal.ZERO; private String sourceStatus; }
     @Data public static class Patch {
         @NotNull @PositiveOrZero private Integer version;
         @NotNull private Long configVersionId;
@@ -87,7 +67,6 @@ public class MediaAccountProfileVO {
         private String operatedBy;
         private LocalDateTime operatedAt;
         private Integer resultVersion;
-        private PositioningSnapshot positioning;
     }
     @Data public static class FileVO {
         private Long id;

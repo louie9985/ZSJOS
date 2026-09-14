@@ -120,8 +120,10 @@ public class MediaAccountService {
                 req.getTrackPrimaryValue(), req.getTrackSecondaryValue());
         try {
             mapper.insert(account);
-            positioningCardMapper.bindStudentDraftToAccount(relation.getId(), account.getStudentPersonId(),
-                    account.getId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+            if (positioningCardMapper != null) {
+                positioningCardMapper.bindStudentDraftToAccount(relation.getId(), account.getStudentPersonId(),
+                        account.getId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+            }
             studentDeliveryPlanService.ensurePlan(account.getStudentPersonId(), account.getId(), relation.getId(),
                     directorUserId, java.time.LocalDateTime.now());
             return account.getId();
