@@ -314,6 +314,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_006_012, "该审批任务已由其他人员处理");
     ErrorCode SALES_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_006_013, "成交订单请求幂等键已被其他请求使用");
     ErrorCode SALES_ORDER_CONTINUATION_CONFLICT = new ErrorCode(1_900_006_014, "该驳回订单已被接续或当前协同销售无权接续");
+    ErrorCode SALES_ORDER_HISTORICAL_SNAPSHOT_INVALID = new ErrorCode(1_900_006_029, "历史订单课程快照无法解析，不能接续补正");
     ErrorCode SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE = new ErrorCode(1_900_006_015, "该客户已有活动复购订单");
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
@@ -403,6 +404,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_011_011, "第三方账号字段配置已变化，请刷新后重试");
     ErrorCode MEDIA_ACCOUNT_MAINTENANCE_INVALID = new ErrorCode(1_900_011_013, "账号状态维护内容无效，请检查字典选项和日期范围");
     ErrorCode MEDIA_ACCOUNT_OPERATOR_ASSIGNMENT_CONFLICT = new ErrorCode(1_900_011_014, "该学员存在多个现任运营，请先纠正运营分配");
+    ErrorCode MEDIA_ACCOUNT_SERVICE_INVALID = new ErrorCode(1_900_011_015, "当前学员服务关系无效或无权创建账号");
+    ErrorCode MEDIA_ACCOUNT_POSITIONING_INCOMPLETE = new ErrorCode(1_900_011_016, "完成定位访谈后才能新增账号");
+    ErrorCode MEDIA_ACCOUNT_CREATE_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_011_017, "新增账号幂等键已被其他请求使用");
+    ErrorCode MEDIA_ACCOUNT_PROFILE_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_011_018, "账号资料请求标识已用于不同内容，请重新提交");
+    ErrorCode MEDIA_ACCOUNT_ATTACHMENT_INVALID = new ErrorCode(1_900_011_019, "账号附件无效、超出大小限制或不属于当前账号与上传人");
+    ErrorCode MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED = new ErrorCode(1_900_011_020, "请通过账号档案表单维护资料；旧资料或状态更新接口不再接受修改");
     ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
     ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
 
@@ -437,6 +444,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode POSITIONING_CARD_STATE_INVALID = new ErrorCode(1_900_014_002, "当前定位卡状态不允许该操作");
     ErrorCode POSITIONING_CARD_VERSION_CONFLICT = new ErrorCode(1_900_014_003, "定位卡已被其他人修改，请刷新后重试");
     ErrorCode POSITIONING_CARD_PERMISSION_DENIED = new ErrorCode(1_900_014_004, "无权查看或操作该定位卡");
+    ErrorCode POSITIONING_CARD_FIELD_REQUIRED = new ErrorCode(1_900_014_010, "定位卡所有字段必须填写后才能提交");
     ErrorCode POSITIONING_IP_PROCESS_UNAVAILABLE = new ErrorCode(1_900_014_005, "IP专业审核流程尚未部署、无有效审批人或暂不可用");
     ErrorCode POSITIONING_PARTNER_ACCOUNT_REQUIRED = new ErrorCode(1_900_014_006, "学员尚未开通兼职账号，无法推送定位确认");
     ErrorCode PARTNER_STUDENT_LINK_CONFLICT = new ErrorCode(1_900_014_007, "兼职账号或学员已绑定其他身份");
@@ -483,5 +491,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode FEEDBACK_CHAIRMAN_INVALID = new ErrorCode(1_900_016_016, "boss 角色必须且只能配置一名启用用户");
     ErrorCode FEEDBACK_SURVEY_ALREADY_REQUESTED = new ErrorCode(1_900_016_017, "该反馈已发起过满意度调研");
     ErrorCode FEEDBACK_SURVEY_STATE_INVALID = new ErrorCode(1_900_016_018, "满意度调研尚未发起或已提交");
+    ErrorCode POSITIONING_INTERVIEW_INVALID = new ErrorCode(1_900_090_001, "定位访谈字段无效或必填确认未完成");
+    ErrorCode POSITIONING_INTERVIEW_STATE = new ErrorCode(1_900_090_002, "定位访谈尚未完成资料预审或已经完成");
+    ErrorCode POSITIONING_INTERVIEW_VERSION = new ErrorCode(1_900_090_003, "定位访谈已被修改，请重新加载后重试");
+    ErrorCode POSITIONING_INTERVIEW_ATTACHMENT = new ErrorCode(1_900_090_004, "访谈稿不存在、无权引用或不属于当前学员");
+    ErrorCode POSITIONING_INTERVIEW_TRANSCRIPT_REQUIRED = new ErrorCode(1_900_090_005, "请至少上传一份本次访谈稿");
+    ErrorCode POSITIONING_INTERVIEW_REPLAY = new ErrorCode(1_900_090_006, "该定位访谈请求标识已用于其他内容");
 
 }

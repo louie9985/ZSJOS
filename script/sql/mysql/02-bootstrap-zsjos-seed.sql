@@ -312,10 +312,6 @@ WHERE source.menu_id=6811 AND source.deleted=b'0'
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-order-workbench-views-v1');
 
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V025','Add sales-order workbench personal and approval views',SHA2('sales-order-workbench-views-v1',256),'legacy',NOW());
-
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
 (6814,'下属销售','zsjos:subordinate-sales:query',2,20,6735,'subordinate-sales','ep:user','zsjos/subordinateSales/index','ZsjosSubordinateSales',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
@@ -337,29 +333,15 @@ WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existin
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V034','Lead aging collaboration pool','lead-aging-collaboration-pool-v1'),
        ('V035','Cancel pending lifecycle tasks for invalid leads','cancel-invalid-lead-pending-tasks-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V034','Lead aging collaboration pool',SHA2('lead-aging-collaboration-pool-v1',256),'legacy',NOW()),
-       ('core','V035','Cancel pending lifecycle tasks for invalid leads',SHA2('cancel-invalid-lead-pending-tasks-v1',256),'legacy',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V036','Add subordinate-sales management','subordinate-sales-management-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V036','Add subordinate-sales management',SHA2('subordinate-sales-management-v1',256),'legacy',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V037', 'Unify customer lead opportunity and first-purchase lifecycle', 'lifecycle-domain-unification-v1');
 
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V037','Unify customer lead opportunity and first-purchase lifecycle',SHA2('lifecycle-domain-unification-v1',256),'legacy',NOW());
-
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V038', 'Duplicate Lead review queue and permissions', 'duplicate-lead-review-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V038','Duplicate Lead review queue and permissions',SHA2('duplicate-lead-review-v1',256),'legacy',NOW());
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
@@ -381,36 +363,13 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V043', 'Repair order lifecycle review findings', 'order-lifecycle-review-fixes-v1');
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V044', 'Add global default employee avatar configuration', 'default-employee-avatar-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V040','Submitter actions and sales complaint queue',SHA2('submitter-actions-complaints-v1',256),'legacy',NOW());
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V041','Order repurchase and approval concurrency',SHA2('order-repurchase-concurrency-v1',256),'legacy',NOW());
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V042','Normalize legacy Lead inbox filter status',SHA2('normalize-legacy-lead-filter-status-v1',256),'legacy',NOW());
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V043','Repair order lifecycle review findings',SHA2('order-lifecycle-review-fixes-v1',256),'legacy',NOW());
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V044','Add global default employee avatar configuration',SHA2('default-employee-avatar-v1',256),'legacy',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V045', 'Register Vue components for dual-frontend Workbench menus',
         'dual-frontend-workbench-menu-components-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V045','Register Vue components for dual-frontend Workbench menus',
-        SHA2('dual-frontend-workbench-menu-components-v1',256),'pending',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V055','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1');
-INSERT IGNORE INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V055','Add sales-order supervisor confirmation',
-        SHA2('sales-order-supervisor-confirmation-v1',256),'legacy',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V061','Repair sales-order supervisor menu ID collision',

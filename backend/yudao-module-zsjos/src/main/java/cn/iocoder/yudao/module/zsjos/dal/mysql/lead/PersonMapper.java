@@ -79,6 +79,47 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 
+    /**
+     * Tenant-wide student read, used only when the reader's data scope covers every department.
+     */
+    default PageResult<PersonDO> selectAllStudentPage(MyStudentPageReqVO reqVO,
+                                                      java.util.Collection<Long> matchedIds) {
+        QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
+        String basePredicate = "EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
+                + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                + "AND ({0} IS NULL OR sr.class_id={0}) AND ";
+        if (reqVO.getServiceStatus() == null) {
+            query.apply(basePredicate + "sr.status IN ('active','paused','completed'))", reqVO.getClassId());
+        } else {
+            query.apply(basePredicate + "sr.status={1})", reqVO.getClassId(), reqVO.getServiceStatus());
+        }
+        return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
+    /**
+     * Department-scoped student read. Visibility follows the service owner only, resolved live from
+     * the owner's department rather than a stored snapshot, so a homeroom transfer moves the student
+     * with its owner. Collaborator roles are deliberately excluded: they belong to other business lines.
+     */
+    default PageResult<PersonDO> selectManagedStudentPage(MyStudentPageReqVO reqVO,
+                                                           java.util.Collection<Long> ownerUserIds,
+                                                           java.util.Collection<Long> matchedIds) {
+        QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
+        if (ownerUserIds == null || ownerUserIds.isEmpty()) {
+            return PageResult.empty();
+        }
+        String owners = ownerUserIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        String statusPredicate = reqVO.getServiceStatus() == null
+                ? "sr.status IN ('active','paused','completed')" : "sr.status={1}";
+        query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
+                        + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                        + "AND ({0} IS NULL OR sr.class_id={0}) "
+                        + "AND sr.owner_user_id IN (" + owners + ") "
+                        + "AND " + statusPredicate + ")",
+                reqVO.getClassId(), reqVO.getServiceStatus());
+        return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
     private static QueryWrapperX<PersonDO> studentQuery(MyStudentPageReqVO reqVO,
                                                          java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = new QueryWrapperX<>();

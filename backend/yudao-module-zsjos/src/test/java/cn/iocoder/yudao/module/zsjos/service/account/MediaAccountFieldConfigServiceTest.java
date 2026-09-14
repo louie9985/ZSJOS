@@ -50,14 +50,14 @@ class MediaAccountFieldConfigServiceTest {
     }
 
     @Test
-    void rejectsUnknownAndMissingRequiredFields() {
+    void rejectsUnknownButAllowsMissingRequiredFields() {
         MediaAccountFieldConfigRespVO.FieldVO nickname = field("nickname", "昵称", "text", null, true);
         when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(8L)
                 .setStatus("published").setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils
                         .toJsonString(List.of(nickname))));
 
         assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of("unknown", "value")));
-        assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of()));
+        assertEquals(Map.of(), service.validateAndSnapshot(Map.of()).values());
     }
 
     @Test
@@ -107,6 +107,24 @@ class MediaAccountFieldConfigServiceTest {
         when(mapper.publish(org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.eq(1), any()))
                 .thenReturn(0);
         assertThrows(RuntimeException.class, () -> service.publish(9L, 1));
+    }
+
+    @Test
+    void olderDraftCannotReplaceNewProfileConfiguration() {
+        when(mapper.selectById(9L)).thenReturn(new MediaAccountFieldConfigDO().setId(9L).setVersionNo(2).setVersion(0).setStatus("draft"));
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(10L).setVersionNo(3).setStatus("published"));
+        assertThrows(RuntimeException.class, () -> service.publish(9L, 0));
+        verify(mapper, org.mockito.Mockito.never()).publish(any(),any(),any());
+    }
+
+    @Test
+    void invalidOwnerAndNonStringTextAreRejected() {
+        var f=field("nickname","昵称","text",null,false);f.setOwnerType("ANYONE");
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(8L).setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(List.of(f))));
+        assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of()));
+        f.setOwnerType("OPERATOR");
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(8L).setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(List.of(f))));
+        assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of("nickname",Map.of("nested","value"))));
     }
 
     private MediaAccountFieldConfigRespVO.FieldVO field(String key, String label, String type,

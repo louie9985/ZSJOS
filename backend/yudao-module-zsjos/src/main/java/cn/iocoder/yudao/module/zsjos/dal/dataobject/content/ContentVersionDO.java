@@ -22,9 +22,16 @@ public class ContentVersionDO extends TenantBaseDO {
     private String topicSnapshot;
     private String coverSnapshotJson;
     private String materialRefsJson;
+    private Long referenceContentVersionId;
     private String deliverableUrl;
     private String deliverableSnapshotJson;
     private String scriptText;
+    private String purposeValue;
+    private String purposeLabelSnapshot;
+    private String formatValue;
+    private String formatLabelSnapshot;
+    private String detailUrl;
+    private String commentHook;
     private String leadResourceUrl;
     private LocalDateTime plannedPublishAt;
     private LocalDateTime frozenAt;
@@ -36,3 +43,5 @@ public class ContentVersionDO extends TenantBaseDO {
     private LocalDateTime reviewedAt;
     private String idempotencyKey;
 }
+
+

@@ -11,6 +11,11 @@ import java.util.Map;
 
 @Mapper
 public interface AdvancedFilterMapper {
+    @SelectProvider(type = SqlProvider.class, method = "financeSql")
+    List<Long> selectCashbackIds(@Param("query") AdvancedFilterQuery query);
+
+    @SelectProvider(type = SqlProvider.class, method = "financeSql")
+    List<Long> selectWithdrawalIds(@Param("query") AdvancedFilterQuery query);
     @SelectProvider(type = SqlProvider.class, method = "leadSql")
     List<Long> selectLeadIds(@Param("query") AdvancedFilterQuery query);
 
@@ -42,6 +47,7 @@ public interface AdvancedFilterMapper {
     List<Long> selectDuplicateReviewIdsByKeyword(@Param("tenantId") Long tenantId, @Param("keyword") String keyword);
 
     final class SqlProvider {
+        public static String financeSql(Map<String, Object> ignored) { return "SELECT c.id FROM zsjos_cashback c WHERE 1=0"; }
         public static String leadSql(Map<String, Object> ignored) {
             return "SELECT l.id FROM zsjos_lead l WHERE l.deleted=b'0' AND l.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
         }

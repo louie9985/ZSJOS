@@ -16,10 +16,20 @@ public class ContentVersionSaveReqVO {
     @Size(max = 1000) private String topicSnapshot;
     private String coverSnapshotJson;
     private String materialRefsJson;
+    private Long referenceContentVersionId;
     private String deliverableUrl;
     private String deliverableSnapshotJson;
     private String scriptText;
+    /** 内容生产审批扩展字段，均随版本保存，避免读取当前配置覆盖历史。 */
+    private String purposeValue;
+    private String purposeLabelSnapshot;
+    private String formatValue;
+    private String formatLabelSnapshot;
+    private String detailUrl;
+    private String commentHook;
     private String leadResourceUrl;
     private LocalDateTime plannedPublishAt;
     @Size(max = 128) private String idempotencyKey;
 }
+
+

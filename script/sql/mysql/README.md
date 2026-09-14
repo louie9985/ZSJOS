@@ -14,15 +14,21 @@ python script/sql/mysql/tools/zsjos_db.py test-upgrade
 Production operators use the immutable migrator image through
 `deploy/production/zsjos-db`; see `docs/operations/database-migrations.md`.
 
-`bootstrap.sql` is the fresh-environment entry point. Run it with the MySQL
-client from the repository root so its `SOURCE` paths resolve:
+`bootstrap.sql` is the Core baseline only: the schema DDL plus the reviewed
+System and ZSJOS seeds. It lists no versioned migration; module schemas and every
+`V*.sql` file are applied by `zsjos-db migrate`, which runs the baseline first on
+an empty database and then applies the pending migrations from the module
+manifests, recording their checksums. Empty and non-empty environments therefore
+go through the same executor, and a newly added migration never requires a second
+edit here. Run the baseline with the MySQL client from the repository root so its
+`SOURCE` paths resolve:
 
 ```text
 mysql --default-character-set=utf8mb4 -u USER -p DATABASE < script/sql/mysql/bootstrap.sql
 mysql --default-character-set=utf8mb4 -u USER -p DATABASE < script/sql/mysql/verify-bootstrap.sql
 ```
 
-The bootstrap creates structure and reviewed baseline seeds only. It does not
+The baseline creates structure and reviewed baseline seeds only. It does not
 drop a database, delete rows, or seed products, SKUs, leads, orders, uploads,
 or business dictionary options. The admin password is stored as a BCrypt hash;
 the plaintext password is intentionally not documented here.
@@ -38,9 +44,10 @@ menu grants are imported; employee accounts other than the initial administrator
 are not.
 
 For this production baseline set `ZSJOS_DB_MODULES=core,hrm,fms,eam`. HRM and FMS
-install their MySQL structure and reviewed dictionary values only (`schema/hrm.sql`
-and `schema/fms.sql`, then their `V001`/`V002` migrations). EAM is installed after
-Core (`schema/eam.sql`, then `migrations/eam/V001` through the latest available version).
+install their MySQL structure and reviewed dictionary values only (their `V001`
+applies `schema/hrm.sql` and `schema/fms.sql`, then `V002` the dictionaries). EAM is
+installed after Core (`migrations/eam/V001` applies `schema/eam.sql`, through the
+latest available version).
 HRM employee/payroll/recruitment rows and FMS account-set/voucher/balance rows remain
 empty; EAM asset instances, procurement, inventory,
 transfers, repairs, scrap, holdings, reminders and employee tasks remain empty.
@@ -54,9 +61,10 @@ number counters are created but start on first real business use. Environment
 secrets and endpoints (storage, OAuth, WeCom, SMS, payment and domains) are
 provided through deployment configuration, never this repository's SQL.
 
-For an existing environment, apply files in `migrations/` in version order,
-after a backup and a read-only structure check. Do not re-run historical files
-from `script/sql/` against an already migrated database.
+For an existing environment, use `zsjos-db migrate <environment>` (or
+`zsjos-db plan` first), which applies the pending files in `migrations/` in
+version order after a backup and a read-only structure check. Do not re-run
+historical files from `script/sql/` against an already migrated database.
 
 `V005__lead_inbox_filter_config.sql` must be applied before deploying the backend that reads
 published lead-inbox schemes. It creates configuration and history tables, seeds two published

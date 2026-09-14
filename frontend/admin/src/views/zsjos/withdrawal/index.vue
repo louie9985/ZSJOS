@@ -164,9 +164,9 @@
         ><el-input v-model="payoutForm.bankTransactionNo" maxlength="100"
       /></el-form-item>
       <el-form-item label="打款凭证" required
-        ><el-upload :http-request="upload" :limit="1" accept="image/*,.pdf"
-          ><el-button><Icon icon="ep:upload" />上传图片或 PDF</el-button></el-upload
-        ></el-form-item
+        ><ClipboardUploadActions :disabled="saving" :can-paste="!saving" @files="files => { const file = files[0]; if (file) void upload({ file } as any).catch(() => undefined) }"><el-upload :disabled="saving" :http-request="upload" :limit="1" accept="image/*,.pdf"
+          ><el-button><Icon icon="ep:upload" />上传附件</el-button></el-upload
+        ></ClipboardUploadActions></el-form-item
       >
       <el-form-item label="备注"
         ><el-input v-model="payoutForm.remark" type="textarea" maxlength="500"
@@ -186,6 +186,7 @@ import * as CashbackApi from '@/api/zsjos/cashback'
 import * as ExportTaskApi from '@/api/zsjos/exportTask'
 import { useUserStore } from '@/store/modules/user'
 import { withdrawalDataScope } from '@/utils/zsjosDataScope'
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
 const router = useRouter()
@@ -335,7 +336,7 @@ const upload = async (options: any) => {
   form.append('file', options.file)
   const result = await Api.uploadProof(form)
   payoutForm.proofFileId = result.infraFileId
-  options.onSuccess(result)
+  options.onSuccess?.(result)
 }
 const submitPayout = async () => {
   if (!payoutForm.bankTransactionNo.trim() || !payoutForm.proofFileId) return

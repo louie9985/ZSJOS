@@ -620,19 +620,8 @@ PUT /part-api/zsjos/lead/{id}/submitter-supplement
 
 ```
 {
-  "provinceCode": "110000",
-  "cityCode": "110100",
-  "leadCategory": "adult_education",
-  "intendedProducts": [
-    {
-      "spuRef": "SPU001",
-      "skuRef": "SKU001",
-      "spuUnknown": false,
-      "skuUnknown": false,
-      "primary": true
-    }
-  ],
   "remark": "补充客户意向",
+  "attachments": [{ "infraFileId": 12345 }],
   "idempotencyKey": "supplement-10001-001"
 }
 ```

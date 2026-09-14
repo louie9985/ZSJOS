@@ -10,12 +10,19 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.junit.jupiter.api.Test;
@@ -26,11 +33,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +57,10 @@ class MyStudentServiceImplTest {
     @Mock private SalesOrderItemMapper orderItemMapper;
     @Mock private MediaAccountMapper mediaAccountMapper;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private PermissionApi permissionApi;
+    @Mock private DeliveryClassScopeService classScopeService;
+    @Mock private DeliveryClassMapper deliveryClassMapper;
+    @Mock private AdminUserApi adminUserApi;
 
     @Test
     void getMyStudentReturnsStructuredCourseRights() {
@@ -155,6 +172,56 @@ class MyStudentServiceImplTest {
         assertEquals(0, result.getTotal());
         verify(personMapper).selectMyStudentPage(reqVO, 28L, null);
         verify(relationMapper).selectAssignedByUserAndPersonIds(28L, List.of(), "paused");
+    }
+
+    @Test
+    void getMyPageWithoutManagedPermissionStaysSelfOnly() {
+        MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20);
+        when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
+        when(permissionApi.hasAnyPermissions(28L, DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(false);
+        when(personMapper.selectMyStudentPage(reqVO, 28L, null)).thenReturn(PageResult.empty());
+        when(relationMapper.selectAssignedByUserAndPersonIds(28L, List.of(), null)).thenReturn(List.of());
+
+        service.getMyPage(28L, reqVO);
+
+        verify(personMapper).selectMyStudentPage(reqVO, 28L, null);
+        verify(personMapper, never()).selectManagedStudentPage(any(), anyCollection(), any());
+        verifyNoInteractions(classScopeService);
+    }
+
+    @Test
+    void getMyPageWithManagedPermissionReadsDepartmentSubtreeByServiceOwner() {
+        MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20);
+        PersonDO person = new PersonDO(); person.setId(70L); person.setName("Dept Student");
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(71L); relation.setPersonId(70L); relation.setOwnerUserId(31L);
+        relation.setStatus("active"); relation.setClassId(90L);
+        relation.setActivatedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
+        when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
+        when(permissionApi.hasAnyPermissions(28L, DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(classScopeService.resolve(28L))
+                .thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(1050L, 1051L)));
+        when(adminUserApi.getUserListByDeptIds(Set.of(1050L, 1051L)))
+                .thenReturn(List.of(new AdminUserRespDTO().setId(31L), new AdminUserRespDTO().setId(32L)));
+        Set<Long> expectedOwners = new LinkedHashSet<>(List.of(28L, 31L, 32L));
+        when(personMapper.selectManagedStudentPage(reqVO, expectedOwners, null))
+                .thenReturn(new PageResult<>(List.of(person), 1L));
+        when(relationMapper.selectOwnedByOwnerIdsAndPersonIds(expectedOwners, List.of(70L), null))
+                .thenReturn(List.of(relation));
+        when(personMapper.selectById(70L)).thenReturn(person);
+        when(deliveryClassMapper.selectBatchIds(Set.of(90L)))
+                .thenReturn(List.of(new DeliveryClassDO().setId(90L).setClassName("CLASS-A")));
+
+        PageResult<MyStudentRespVO> result = service.getMyPage(28L, reqVO);
+
+        assertEquals(1, result.getTotal());
+        MyStudentRespVO.ServiceVO service0 = result.getList().getFirst().getServices().getFirst();
+        assertEquals(90L, service0.getClassId());
+        assertEquals("CLASS-A", service0.getClassName());
+        verify(personMapper).selectManagedStudentPage(reqVO, expectedOwners, null);
+        verify(personMapper, never()).selectMyStudentPage(any(), anyLong(), any());
     }
 
     @Test

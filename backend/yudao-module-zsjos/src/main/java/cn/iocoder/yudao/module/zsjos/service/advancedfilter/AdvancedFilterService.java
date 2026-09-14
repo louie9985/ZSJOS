@@ -36,7 +36,7 @@ public class AdvancedFilterService {
     private static final List<String> DURATION_OPS = List.of("gt", "gte", "lt", "lte", "between");
     private static final Map<String, BigDecimal> DURATION_UNIT_FACTORS = Map.of(
             "minute", BigDecimal.ONE, "hour", BigDecimal.valueOf(60), "day", BigDecimal.valueOf(1440));
-    private static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales");
+    private static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales", "cashback", "withdrawal");
     private static final Map<String, Field> FIELDS = fields();
     private static final List<AdvancedFilterCatalogRespVO.OptionVO> RELATIVE_DATES = options(
             "today", "今天", "yesterday", "昨天", "last_7_days", "近 7 天", "last_30_days", "近 30 天",
@@ -96,6 +96,12 @@ public class AdvancedFilterService {
 
     public boolean supportsScene(String scene) {
         return SCENES.contains(scene);
+    }
+
+    public List<Long> matchFinanceIds(String scene, AdvancedFilterGroupReqVO group) {
+        if (!Set.of("cashback", "withdrawal").contains(scene)) throw exception(ADVANCED_FILTER_INVALID);
+        AdvancedFilterQuery query = buildIfPresent(group, scene, Map.of());
+        return query == null ? null : "cashback".equals(scene) ? mapper.selectCashbackIds(query) : mapper.selectWithdrawalIds(query);
     }
 
     public List<Long> matchLeadIds(AdvancedFilterGroupReqVO group) {

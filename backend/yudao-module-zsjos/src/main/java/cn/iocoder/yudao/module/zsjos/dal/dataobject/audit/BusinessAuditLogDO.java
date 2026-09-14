@@ -15,6 +15,12 @@ public class BusinessAuditLogDO extends TenantBaseDO {
     @TableId private Long id;
     private Long operatorUserId;
     private String operatorNameSnapshot;
+    private Long initiatorUserId;
+    private String initiatorNameSnapshot;
+    private String executorType;
+    private String executorIdentity;
+    private Long parentAuditId;
+    private String executionKey;
     private String operatorRoleSnapshot;
     private String categoryCode;
     private String actionCode;

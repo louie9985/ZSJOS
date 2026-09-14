@@ -27,7 +27,6 @@ import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.director.DirectorFormTemplateVersionDO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
@@ -49,6 +48,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 import org.mockito.ArgumentCaptor;
@@ -59,6 +59,7 @@ class StudentContactServiceImplTest {
 
     @InjectMocks private StudentContactServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper positioningInterviewMapper;
     @Mock private StudentContactConfigVersionMapper configMapper;
     @Mock private StudentContactRecordMapper recordMapper;
     @Mock private BusinessTaskMapper taskMapper;
@@ -80,16 +81,33 @@ class StudentContactServiceImplTest {
         lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
         lenient().when(directorConfigService.interviewAppointmentHours()).thenReturn(96);
         lenient().when(directorConfigService.trialDays()).thenReturn(14);
-        DirectorFormTemplateVersionDO interviewVersion = new DirectorFormTemplateVersionDO()
-                .setId(11L).setTemplateId(10L).setVersionNo(1).setStatus("published");
-        lenient().when(directorFormTemplateService.requirePublished(
-                DirectorFormTemplateService.SCENE_INTERVIEW, null)).thenReturn(interviewVersion);
-        lenient().when(directorFormTemplateService.fields(interviewVersion)).thenReturn(List.of());
     }
 
     @AfterEach
     void clearTenant() {
         TenantContextHolder.clear();
+    }
+
+    @Test
+    void emptyLegacyInterviewDoesNotRequireAnActiveQuestionnaireTemplate() {
+        prepareContext();
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+        assertEquals("empty", result.getDirectorForms().getInterview().getState());
+        assertEquals(List.of(), result.getDirectorForms().getInterview().getFields());
+        verifyNoInteractions(directorFormTemplateService);
+    }
+
+    @Test
+    void retiredInterviewSnapshotRemainsReadableWithoutLiveTemplate() {
+        prepareContext();
+        ServiceRelationDO relation = relation("accepted");
+        relation.setDirectorInterviewSnapshotJson("{\"fields\":[],\"values\":{\"legacy\":\"stored value\"},\"templateVersionId\":11}");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+        assertEquals("submitted", result.getDirectorForms().getInterview().getState());
+        assertEquals("stored value", result.getDirectorForms().getInterview().getValues().get("legacy"));
+        assertEquals(11L, result.getDirectorForms().getInterview().getTemplateVersionId());
+        verifyNoInteractions(directorFormTemplateService);
     }
 
     @Test
@@ -113,6 +131,35 @@ class StudentContactServiceImplTest {
         StudentContactContextRespVO result = service.getContext(10L, 7L);
 
         assertEquals(List.of(), result.getAvailableActions());
+    }
+
+    @Test
+    void completedPositioningInterviewProjectsMediaAccountCreationForDirector() {
+        prepareContext();
+        ServiceRelationDO relation = relation("accepted");
+        relation.setPersonId(100L); relation.setContentDirectorUserId(7L);
+        relation.setDirectorStage("positioning_interview_completed");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_MEDIA_ACCOUNT_CREATE)).thenReturn(true);
+
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+
+        assertTrue(result.getAvailableActions().contains(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT));
+    }
+
+    @Test
+    void completedInterviewProjectsCreationForAssignedOperatorOnlyWithFeaturePermission() {
+        prepareContext();
+        ServiceRelationDO relation = relation("accepted");
+        relation.setPersonId(100L); relation.setContentDirectorUserId(8L); relation.setOperatorUserId(7L);
+        relation.setDirectorStage("positioning_interview_completed");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_MEDIA_ACCOUNT_CREATE)).thenReturn(true);
+        assertTrue(service.getContext(10L, 7L).getAvailableActions().contains(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT));
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_MEDIA_ACCOUNT_CREATE)).thenReturn(false);
+        assertFalse(service.getContext(10L, 7L).getAvailableActions().contains(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT));
+        relation.setOperatorUserId(9L);
+        assertFalse(service.getContext(10L, 7L).getAvailableActions().contains(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT));
     }
 
     @Test

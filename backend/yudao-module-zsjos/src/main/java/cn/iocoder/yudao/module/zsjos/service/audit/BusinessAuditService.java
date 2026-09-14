@@ -13,6 +13,9 @@ public interface BusinessAuditService {
     void complete(Long auditId, boolean success, Integer resultCode, String resultMessage, long durationMs);
     void record(String category, String action, String targetType, String targetId,
                 String operatorRoleSnapshot, Map<String, ?> safeDetails);
+    default void recordExecution(String action, String targetId, Map<String, ?> details) {
+        record(AuditActionCatalog.CATEGORY_EXECUTION, action, "execution", targetId, "SYSTEM", details);
+    }
     PageResult<BusinessAuditRespVO> getPage(BusinessAuditPageReqVO reqVO);
     PageResult<ImpersonationAuditRespVO> getImpersonationPage(PageParam page, Long sessionId);
 }

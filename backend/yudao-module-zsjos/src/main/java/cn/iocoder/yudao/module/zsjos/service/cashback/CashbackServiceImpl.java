@@ -56,6 +56,7 @@ public class CashbackServiceImpl implements CashbackService {
     static final int DEFAULT_OBSERVATION_DAYS = 7;
     static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
     static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService advancedFilterService;
     @Resource private CashbackMapper mapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
@@ -145,7 +146,7 @@ public class CashbackServiceImpl implements CashbackService {
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         PageResult<CashbackRespVO> result = BeanUtils.toBean(
-                mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
+                mapper.selectCashbackPage(request, beneficiaryUserId), CashbackRespVO.class);
         Set<Long> leadIds = new HashSet<>();
         result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
         Map<Long, String> leadNumbers = new HashMap<>();

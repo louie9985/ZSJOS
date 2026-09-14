@@ -37,6 +37,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnModelConsta
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.event.BpmProcessInstanceEventPublisher;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmHttpRequestUtils;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmExternalStartUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
@@ -827,6 +828,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         FlowableUtils.filterProcessInstanceFormVariable(variables);
         variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_START_USER_ID, subject.toFlowableId());
         variables.put("externalStartUserName", displayName);
+        // Only the separately validated task map is authoritative, never a form-supplied engine variable.
+        variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_START_USER_SELECT_ASSIGNEES,
+                reqDTO.getStartUserSelectAssignees() == null ? Map.of() : reqDTO.getStartUserSelectAssignees());
         variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_STATUS,
                 BpmProcessInstanceStatusEnum.RUNNING.getStatus());
         variables.put(BpmnVariableConstants.PROCESS_INSTANCE_SKIP_EXPRESSION_ENABLED, true);
@@ -847,9 +851,12 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         Set<Integer> forbidden = Set.of(BpmTaskCandidateStrategyEnum.START_USER.getStrategy(),
                 BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER.getStrategy(),
                 BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER_MULTI.getStrategy());
-        List<UserTask> userTasks = BpmnModelUtils.getBpmnModelElements(
-                modelService.getBpmnModelByDefinitionId(definitionId), UserTask.class);
-        boolean unsupported = userTasks.stream().map(BpmnModelUtils::parseCandidateStrategy)
+        BpmnModel model = modelService.getBpmnModelByDefinitionId(definitionId);
+        List<UserTask> userTasks = BpmnModelUtils.getBpmnModelElements(model, UserTask.class);
+        BpmProcessDefinitionInfoDO info = processDefinitionService.getProcessDefinitionInfo(definitionId);
+        boolean unsupported = userTasks.stream()
+                .filter(task -> !BpmExternalStartUtils.isSubmissionTask(info, model, task))
+                .map(BpmnModelUtils::parseCandidateStrategy)
                 .anyMatch(forbidden::contains);
         if (unsupported) throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
 

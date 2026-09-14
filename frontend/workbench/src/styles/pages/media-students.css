@@ -5,6 +5,31 @@
   flex-direction: column;
 }
 
+/* The student interview overview deliberately balances the two information groups. */
+.media-students-overview-content { display: flex; min-width: 0; flex-direction: column; gap: var(--crm-gap); }
+.media-students-profile-card { min-width: 0; }
+.media-students-summary-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--crm-gap); }
+.media-students-summary-fields dd { margin: 0; overflow-wrap: anywhere; }
+.positioning-interview-table-scroll { width: 100%; min-width: 0; }
+.positioning-interview-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.positioning-interview-table th, .positioning-interview-table td { width: 33.333%; padding: var(--crm-card-pad); border: 1px solid var(--crm-border); vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.positioning-interview-table thead { background: var(--crm-bg-sunken); }
+.positioning-interview-table .ant-radio-group, .positioning-interview-table .ant-space, .positioning-interview-table .ant-picker { width: 100%; min-width: 0; }
+.positioning-interview-table .ant-space-item, .positioning-interview-table .ant-picker-input { min-width: 0; }
+.positioning-interview-table .ant-radio-wrapper { margin-inline-end: 0; white-space: normal; align-items: flex-start; }
+.positioning-interview-table .ant-radio-label { min-width: 0; overflow-wrap: anywhere; }
+.positioning-interview-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.positioning-interview-files { padding: var(--crm-card-pad); }
+.positioning-interview-preview { width: 100%; height: 60vh; border: none; }
+@media (max-width: 768px) {
+  .media-students-profile-card .lead-profile-fields,
+  .media-students-profile-card .lead-profile-meta { grid-template-columns: minmax(0, 1fr); }
+  .positioning-interview-table thead { display: none; }
+  .positioning-interview-table, .positioning-interview-table tbody, .positioning-interview-table tr { display: block; width: 100%; }
+  .positioning-interview-table tr { margin-bottom: var(--crm-gap); border: 1px solid var(--crm-border); }
+  .positioning-interview-table th, .positioning-interview-table td { display: block; box-sizing: border-box; width: 100%; border: none; padding: var(--crm-sp-3); }
+}
+
 .media-students-filter-shell,
 .media-students-detail-hero,
 .media-students-identity,
@@ -363,6 +388,17 @@
 }
 
 .media-account-maintenance { min-width: 0; }
+.media-account-profile-grid { margin-top: var(--crm-sp-5); padding-top: var(--crm-sp-4); border-top: 1px solid var(--crm-border); }
+.media-account-profile-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; margin-bottom: var(--crm-sp-3); }
+.media-account-profile-heading h5 { margin-bottom: 0; }
+.media-account-profile-field { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--crm-sp-3); padding: 9px 10px; border-bottom: 1px solid var(--crm-border); background: var(--crm-bg-sunken); }
+.media-account-profile-field > div { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.media-account-profile-field > div > .ant-typography { overflow-wrap: anywhere; }
+.media-account-profile-field > .ant-typography { overflow-wrap: anywhere; }
+.media-account-owner-dot { width: 4px; height: 18px; border-radius: 2px; background: var(--crm-color-warning); }
+.media-account-profile-field.owner-director .media-account-owner-dot { background: var(--crm-color-primary); }
+.media-account-profile-field.owner-operator .media-account-owner-dot { background: var(--crm-color-warning); }
+.media-account-profile-field .ant-tag { margin-inline-start: auto; }
 .media-account-maintenance .media-students-tab-heading > div { min-width: 0; }
 .media-account-history-tabs {
   margin-top: var(--crm-sp-5);
@@ -480,6 +516,118 @@
   .media-account-context-bar { align-items: flex-start; flex-direction: column; }
   .media-students-service-context { grid-template-columns: minmax(0, 1fr); }
   .media-students-positioning-toolbar { justify-content: flex-start; }
+  .media-account-profile-field { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
   .media-students-json-preview section > div { grid-template-columns: minmax(0, 1fr); }
   .media-students-json-preview section > div > :last-child { text-align: left; }
+}
+
+
+/* 定高版式：左列主页图固定，右侧板块各自滚动，整页不滚。
+   高度用视口算 —— .media-students-detail-pane 是 overflow-y:auto 的滚动容器，
+   没有确定高度可作百分比基准，height:100% 会退化成 auto。 */
+.account-profile {
+  grid-column: 1 / -1;
+  display: flex;
+  height: calc(100vh - var(--crm-header-h) - var(--crm-tabbar-h) - var(--crm-page-pad) * 2);
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.account-profile-legend, .account-profile-missing { display: flex; flex-wrap: wrap; gap: var(--crm-sp-2); margin-block: var(--crm-sp-3); }
+.account-profile-reminder { margin-block: var(--crm-sp-3); }
+.account-owner.owner-auto { color: var(--crm-color-error); background: var(--crm-color-error-bg); }
+.account-owner.owner-director { color: var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.account-owner.owner-operator { color: var(--crm-text); background: var(--crm-color-warning-bg); border-color: var(--crm-color-warning-border); }
+.account-owner.owner-unassigned { color: var(--crm-text-secondary); background: var(--crm-bg-sunken); }
+.account-profile-grid { display: grid; flex: 1; min-height: 0; grid-template-columns: 230px minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1.2fr); gap: var(--crm-gap); align-items: stretch; }
+.account-profile-aside { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-3); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
+/* 主页图是居中的小卡片，不撑满左列宽度 —— 截图里的版式。 */
+.account-profile-cover { display: flex; min-height: 150px; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: var(--crm-sp-2); margin-bottom: 0; padding: var(--crm-sp-4); border: 1px dashed var(--crm-border); border-radius: var(--crm-radius-sm); background: var(--crm-bg-container); text-align: center; }
+.account-profile-aside p { margin: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+/* 三板块是 grid 的直接子项，各自定高内滚。 */
+.account-profile-sections { display: contents; }
+.account-profile-section { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; padding: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.account-profile-section-heading { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--crm-sp-2); padding: var(--crm-sp-3) var(--crm-card-pad); border-bottom: 1px solid var(--crm-border); }
+.account-profile-section-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 var(--crm-card-pad); }
+.account-profile-status-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--crm-gap); }
+.account-profile-status-columns > div { min-width: 0; }
+.account-profile-row .account-owner { font-size: var(--crm-font-sm); margin: 0; }
+.account-profile-section-heading .ant-btn { padding-inline: var(--crm-sp-1); }
+.account-profile-section-heading h5 { margin: 0; }
+/* 每行：上面一行是「字段名 + 归属标签 + ⓘ」，下面一行是值 —— 与截图一致。 */
+.account-profile-row { display: flex; flex-direction: column; gap: var(--crm-sp-2); padding-block: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); overflow-wrap: anywhere; }
+.account-profile-row > div { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-2); flex-wrap: wrap; }
+.account-profile-row > div:first-child { justify-content: flex-start; }
+.account-profile-row > div:first-child .account-owner,
+.account-profile-row > div:first-child .anticon { margin-inline-start: auto; }
+.account-profile-row > div:first-child .anticon + .anticon { margin-inline-start: var(--crm-sp-1); }
+.account-profile-history { margin-top: var(--crm-sp-5); }
+.account-profile-history article { padding-block: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 编辑弹窗：与只读展示区同构 —— 左栏主页图，右侧三组各一列卡片，卡片内部各自滚动。 */
+.account-profile-editor { display: grid; height: 65vh; min-height: 0; grid-template-columns: 220px minmax(0,1fr); gap: var(--crm-gap); padding: var(--crm-pane-pad); }
+.account-profile-editor-aside { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
+.account-profile-editor-aside p { margin: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.account-profile-editor-aside .account-profile-cover { flex: none; min-height: 180px; margin-bottom: 0; }
+.account-profile-editor-actions { display: grid; flex: none; gap: var(--crm-sp-2); }
+.account-profile-editor-actions .ant-space { display: flex; width: 100%; }
+.account-profile-editor-actions .ant-space-item,
+.account-profile-editor-actions .ant-btn,
+.account-profile-editor-actions .ant-upload { width: 100%; }
+.account-profile-editor-main { display: flex; min-height: 0; flex-direction: column; gap: var(--crm-sp-3); }
+.account-profile-editor-toolbar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; }
+/* 三列卡片复用 .account-profile-section / .account-profile-section-body 的定高内滚规则。 */
+.account-profile-editor-columns { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) minmax(0, 1.4fr); gap: var(--crm-gap); align-items: stretch; }
+/* 列内是单列字段流（不再是弹窗原来的两列栅格）。 */
+.account-profile-editor-columns .account-profile-section-body { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
+.account-profile-editor-columns .account-profile-status-columns > div { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
+.account-profile-control { min-width: 0; display: flex; flex-direction: column; gap: var(--crm-sp-2); }
+.account-profile-control.wide { grid-column: 1 / -1; }
+.account-profile-control > div:first-child { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--crm-sp-2); }
+.account-profile-control .ant-select, .account-profile-control .ant-input-number { width: 100%; }
+.account-profile-readonly { padding: var(--crm-sp-3); border-radius: var(--crm-radius-sm); background: var(--crm-bg-sunken); color: var(--crm-text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 窄屏取消定高，还原为整页滚动 —— 定高卡片在单列堆叠下会把内容挤成一条窄缝。 */
+@media (max-width: 1180px) {
+  .account-profile { height: auto; min-height: 0; }
+  .account-profile-grid { flex: none; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .account-profile-aside,
+  .account-profile-section,
+  .account-profile-section-body { overflow: visible; }
+}
+
+@media (max-width: 768px) {
+ .account-profile-editor { height: auto; padding: var(--crm-sp-2); }
+ .account-profile-editor-aside,
+ .account-profile-editor-columns .account-profile-section-body { overflow: visible; }
+ .account-profile-cover { min-height: 120px; }
+ .account-profile-editor,
+ .account-profile-editor-columns,
+ .account-profile-status-columns { grid-template-columns: minmax(0,1fr); }
+}
+
+.account-profile-row.owner-auto { border-inline-start: 3px solid var(--crm-color-error); padding-inline-start: var(--crm-sp-2); }
+.account-profile-row.owner-director { border-inline-start: 3px solid var(--crm-color-primary); padding-inline-start: var(--crm-sp-2); }
+.account-profile-row.owner-operator { border-inline-start: 3px solid var(--crm-color-warning); padding-inline-start: var(--crm-sp-2); }
+
+.account-profile-missing { max-height: 140px; overflow-y: auto; }
+
+.media-students-positioning-fields { display: flex; flex-direction: column; gap: 4px; }
+.media-students-positioning-fields .ant-form-item { margin-bottom: 12px; }
+.positioning-card-fields { display: flex; flex-direction: column; gap: 0; width: 100%; }
+.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(260px, 2fr) minmax(260px, 2fr); gap: 12px; padding: 12px; border-bottom: 1px solid var(--crm-border); }
+.positioning-card-field-head { font-weight: 600; background: var(--crm-bg-sunken); }
+.positioning-card-field-hint { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--crm-text-secondary); }
+.positioning-card-field-control { min-width: 0; }
+@media (max-width: 768px) { .positioning-card-field-head { display: none; } .positioning-card-field-row { display: flex; flex-direction: column; gap: 6px; } .positioning-card-field-row > strong::before { content: '定位卡项目：'; color: var(--crm-text-secondary); font-weight: 400; } }
+
+.account-profile-editor-columns > [data-profile-section="POSITIONING"] { grid-column: 1 / -1; }
+.account-positioning-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.account-positioning-table th, .account-positioning-table td { padding: var(--crm-sp-3); border-bottom: 1px solid var(--crm-border); vertical-align: top; text-align: left; overflow-wrap: anywhere; white-space: pre-wrap; }
+.account-positioning-table th:first-child { width: 20%; }
+.account-positioning-table th:nth-child(2) { width: 30%; }
+.account-positioning-table .ant-select { width: 100%; }
+@media (max-width: 768px) {
+  .account-positioning-table, .account-positioning-table tbody, .account-positioning-table tr, .account-positioning-table th, .account-positioning-table td { display: block; width: 100%; }
+  .account-positioning-table thead { display: none; }
+  .account-positioning-table th:first-child { width: 100%; }
 }

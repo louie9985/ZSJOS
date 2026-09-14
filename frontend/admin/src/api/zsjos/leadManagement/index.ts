@@ -51,7 +51,7 @@ export interface LeadManagementVO {
   cityName?: string
   leadCategory?: string
   leadCategoryLabelSnapshot?: string
-  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: number; operatorName?: string }>
+  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: LeadRemarkAttachmentVO[] }>
   remarkHistoryIncomplete?: boolean
   remark?: string
   status: string
@@ -89,6 +89,8 @@ export interface LeadManagementVO {
   intendedProducts?: LeadProductVO[]
   attachments?: LeadAttachmentVO[]
 }
+
+export type LeadRemarkAttachmentVO = Omit<LeadAttachmentVO, 'id'> & { infraFileId: number }
 
 export interface LeadManagementPageReqVO extends PageParam {
   keyword?: string

@@ -16,12 +16,13 @@ import {
   Upload,
 } from 'antd'
 import type { UploadFile, UploadProps } from 'antd'
-import { InboxOutlined, ReloadOutlined } from '@ant-design/icons'
+import { InboxOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, FORCED_FORM_REQUIRED_CODE, type ForcedForm, type ForcedFormField, type ForcedFormRuntime } from '../services/api'
 import { getAuthPlatform } from '../services/authSession'
 import { formatTimestamp } from '../services/time'
 import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
+import { useClipboardPasteTarget } from './ClipboardPasteTarget'
 
 type ForcedFormContextValue = {
   pendingCount: number
@@ -414,6 +415,16 @@ function ForcedFormFieldRenderer({ formId, field }: { formId: number; field: For
 
 function AttachmentField({ formId, field }: { formId: number; field: ForcedFormField }) {
   const [fileList, setFileList] = useState<UploadFile[]>([])
+  const form = Form.useFormInstance()
+  const uploadFile = async (file: File) => {
+    const result = await api.uploadForcedFormAttachment(formId, field.key, file)
+    const uploaded = { uid: `${Date.now()}-${file.name}`, name: result.fileName, status: 'done' as const, response: result }
+    setFileList(current => {
+      const next = [...current, uploaded]
+      form.setFieldValue(field.key, next.map(item => item.response as AttachmentAnswer))
+      return next
+    })
+  }
   const uploadProps: UploadProps = {
     fileList,
     multiple: (field.maxCount ?? 1) > 1,
@@ -426,8 +437,15 @@ function AttachmentField({ formId, field }: { formId: number; field: ForcedFormF
         onError?.(uploadError instanceof Error ? uploadError : new Error('附件上传失败'))
       }
     },
-    onChange: ({ fileList: next }) => setFileList(next),
+    onChange: ({ fileList: next }) => {
+      setFileList(next)
+      form.setFieldValue(field.key, valueFromEvent({ fileList: next }))
+    },
   }
+  const { targetRef, targetProps, pasteButtonProps } = useClipboardPasteTarget({
+    canPaste: () => fileList.length < (field.maxCount ?? 1),
+    onFiles: files => { const file = files[0]; if (file) void uploadFile(file).catch(() => undefined) },
+  })
   const valueFromEvent = (event: { fileList?: UploadFile[] }) =>
     (event.fileList || [])
       .filter((item) => item.status === 'done' && item.response)
@@ -437,18 +455,21 @@ function AttachmentField({ formId, field }: { formId: number; field: ForcedFormF
     <Form.Item
       name={field.key}
       label={field.label}
-      valuePropName="fileList"
-      getValueFromEvent={valueFromEvent}
       rules={field.required ? [{ required: true, message: `请上传${field.label}` }] : undefined}
       extra={[
         field.maxCount ? `最多 ${field.maxCount} 个` : undefined,
         field.allowedExtensions?.length ? `允许：${field.allowedExtensions.join('、')}` : undefined,
       ].filter(Boolean).join('；')}
     >
-      <Upload.Dragger {...uploadProps}>
+      <div ref={targetRef} {...targetProps}>
+        <div className="attachment-upload-actions">
+          <Upload.Dragger {...uploadProps}>
         <p className="ant-upload-drag-icon"><InboxOutlined /></p>
         <p className="ant-upload-text">点击或拖拽上传附件</p>
-      </Upload.Dragger>
+          </Upload.Dragger>
+          <Button {...pasteButtonProps} icon={<PictureOutlined />}>上传剪贴板截图</Button>
+        </div>
+      </div>
     </Form.Item>
   )
 }

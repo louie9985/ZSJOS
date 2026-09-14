@@ -55,6 +55,12 @@ public class MediaAccountFieldConfigController {
         service.publish(request.getId(), request.getVersion()); return success(true);
     }
 
+    @PostMapping("/draft/reconcile")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account-field-config:update')")
+    public CommonResult<Boolean> reconcile(@Valid @RequestBody VersionReq request) {
+        service.reconcileDraft(request.getId(), request.getVersion()); return success(true);
+    }
+
     @Data
     public static class VersionReq {
         @NotNull private Long id;

@@ -8,4 +8,10 @@ import lombok.Data;
     @Size(max = 1000) private String topic;
     @NotBlank private String contentClassValue;
     @NotBlank private String contentClassLabelSnapshot;
+    private String purposeValue; private String purposeLabelSnapshot;
+    private String formatValue; private String formatLabelSnapshot;
+    private String detailUrl; private String scriptText; private String leadResourceUrl;
+    private java.time.LocalDateTime plannedPublishAt;
 }
+
+

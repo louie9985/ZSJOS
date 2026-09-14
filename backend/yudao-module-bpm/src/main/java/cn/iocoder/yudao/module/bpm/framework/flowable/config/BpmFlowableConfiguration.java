@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmActivityB
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateStrategy;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.event.BpmProcessInstanceEventPublisher;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import org.flowable.common.engine.api.delegate.FlowableFunctionDelegate;
 import org.flowable.common.engine.api.delegate.event.FlowableEventListener;
@@ -13,8 +14,11 @@ import org.flowable.spring.boot.EngineConfigurationConfigurer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
+import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceAuditHook;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -72,9 +76,11 @@ public class BpmFlowableConfiguration {
     // =========== 审批人相关的 Bean ==========
 
     @Bean
-    public BpmActivityBehaviorFactory bpmActivityBehaviorFactory(BpmTaskCandidateInvoker bpmTaskCandidateInvoker) {
+    public BpmActivityBehaviorFactory bpmActivityBehaviorFactory(BpmTaskCandidateInvoker bpmTaskCandidateInvoker,
+            @Lazy BpmProcessDefinitionService processDefinitionService) {
         BpmActivityBehaviorFactory bpmActivityBehaviorFactory = new BpmActivityBehaviorFactory();
         bpmActivityBehaviorFactory.setTaskCandidateInvoker(bpmTaskCandidateInvoker);
+        bpmActivityBehaviorFactory.setProcessDefinitionService(processDefinitionService);
         return bpmActivityBehaviorFactory;
     }
 
@@ -88,8 +94,9 @@ public class BpmFlowableConfiguration {
     // =========== 自己拓展的 Bean ==========
 
     @Bean
-    public BpmProcessInstanceEventPublisher processInstanceEventPublisher(ApplicationEventPublisher publisher) {
-        return new BpmProcessInstanceEventPublisher(publisher);
+    public BpmProcessInstanceEventPublisher processInstanceEventPublisher(ApplicationEventPublisher publisher,
+                                                                            ObjectProvider<BpmProcessInstanceAuditHook> auditHooks) {
+        return new BpmProcessInstanceEventPublisher(publisher, auditHooks);
     }
 
 }

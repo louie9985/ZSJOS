@@ -1,8 +1,8 @@
-import { Alert, App, Avatar, Badge, Button, Drawer, Empty, Grid, Input, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Avatar, Badge, Button, Drawer, Empty, Input, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { BellOutlined, CheckOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useTheme } from '../components/Theme/ThemeContext'
+import { useInboxTableLayout } from '../services/inboxLayout'
 import { api, AuthenticationError, type NotifyMessage } from '../services/api'
 import { applyReadStatus, buildNotifyMessageCursorParams, buildNotifyMessagePageParams, type NotifyMessageView } from '../services/notifyMessage'
 import {
@@ -98,12 +98,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const { message: toast } = App.useApp()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const screens = Grid.useBreakpoint()
-  const { inboxLayoutMode } = useTheme()
-  const isDesktop = typeof window === 'undefined'
-    ? false
-    : (screens.md ?? !window.matchMedia('(max-width: 768px)').matches)
-  const useTableLayout = inboxLayoutMode === 'table' && isDesktop
+  const { isDesktop, useTableLayout } = useInboxTableLayout()
   const shouldOpenDetailDrawer = !isDesktop || useTableLayout
   const { status } = useRealtime()
   const { unreadCount, refreshUnreadCount } = useNotifyMessages()

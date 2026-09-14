@@ -17,9 +17,10 @@ public class MaterialFieldDefinition {
     /** 阶段分组绑定的字典值，例如 s1-s6。 */
     private String stageCode;
     private Boolean required;
+    private String placeholder;
+    private Integer initialCount;
     private Boolean searchable;
     private Boolean multiple;
-    private String recommendationDimension;
     private Boolean allowUnlimited;
     private String dictType;
     private Integer maxLength;

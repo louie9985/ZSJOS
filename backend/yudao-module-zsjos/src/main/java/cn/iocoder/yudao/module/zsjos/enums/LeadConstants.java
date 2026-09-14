@@ -159,6 +159,9 @@ public interface LeadConstants {
     String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
     String TASK_TYPE_SUBMITTER_ASSIST = "lead_submitter_assist";
     String TASK_TYPE_QUALIFICATION = "lead_qualification";
+    String TASK_TYPE_ACCOUNT_DIAGNOSIS_7D = "media_account_diagnosis_7d";
+    String TASK_TYPE_ACCOUNT_DIAGNOSIS_14D = "media_account_diagnosis_14d";
+    String TASK_TYPE_ACCOUNT_DIAGNOSIS_28D = "media_account_diagnosis_28d";
     String TASK_STATUS_PENDING = "pending";
     String FOLLOW_UP_RECORD_SCOPE_LEAD = "lead";
     String FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY = "opportunity";

@@ -1082,8 +1082,9 @@ def test_guardrails() -> None:
 
         docker_mysql_query(
             container,
-            "UPDATE zsjos_module_schema_version SET checksum=REPEAT('0',64),release_version='test' "
-            "WHERE module_code='core' AND version='V020'",
+            "INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version) "
+            "VALUES ('core','V020','checksum guard test',REPEAT('a',64),'test') "
+            "ON DUPLICATE KEY UPDATE checksum=REPEAT('0',64),release_version='test'",
         )
         installed = installed_versions(client)
         try:

@@ -369,9 +369,12 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     private ZsjosProductSkuDO toSku(ZsjosProductSkuSaveReqVO req, String json, String hash) {
         ZsjosProductSkuDO sku = new ZsjosProductSkuDO(); sku.setId(req.getId()); sku.setSpuId(req.getSpuId());
         sku.setSkuName(req.getSkuName()); sku.setAttrValuesJson(json); sku.setAttrValuesHash(hash); sku.setPrice(req.getPrice());
+        sku.setRetailPrice(req.getRetailPrice() == null ? req.getPrice() : req.getRetailPrice());
+        sku.setMinDealPrice(req.getMinDealPrice()); sku.setMinDealType(req.getMinDealType()); sku.setMinDealRate(req.getMinDealRate());
+        sku.setExamFee(req.getExamFee()); sku.setPriceUnit(req.getPriceUnit()); sku.setPricingNote(req.getPricingNote());
         sku.setStatus(req.getStatus()); sku.setSort(req.getSort()); sku.setRemark(req.getRemark()); return sku;
     }
     private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku) { return toResp(sku, getAttrs(sku.getSpuId())); }
-    private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku, List<ZsjosProductAttrRespVO> attrs) { return new ZsjosProductSkuRespVO(sku.getId(), sku.getSpuId(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(), sku.getStatus(), sku.getSort(), sku.getRemark(), sku.getUpdateTime(), ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), attrs)); }
+    private ZsjosProductSkuRespVO toResp(ZsjosProductSkuDO sku, List<ZsjosProductAttrRespVO> attrs) { return new ZsjosProductSkuRespVO(sku.getId(), sku.getSpuId(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(), sku.getRetailPrice(), sku.getMinDealPrice(), sku.getMinDealType(), sku.getMinDealRate(), sku.getExamFee(), sku.getPriceUnit(), sku.getPricingNote(), sku.getStatus(), sku.getSort(), sku.getRemark(), sku.getUpdateTime(), ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), attrs)); }
     @SuppressWarnings("unchecked") private Map<String, String> parseAttrs(String json) { return json == null ? Map.of() : JsonUtils.parseObject(json, Map.class); }
 }

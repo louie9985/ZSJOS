@@ -51,6 +51,69 @@
   overflow: hidden;
 }
 
+/* Material feed overrides the legacy inbox layout. */
+.material-library-filter-shell { align-items: flex-start; }
+.material-library-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(140px, .6fr) minmax(180px, .8fr) auto auto; grid-template-areas: "search type account refresh actions"; }
+.material-library-toolbar > :nth-child(1) { grid-area: search; }
+.material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1; }
+.material-library-layout { display: block; overflow: auto; }
+.material-library-list-pane { width: 100%; overflow: visible; }
+.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-direction: initial; gap: 16px; overflow: visible; }
+.material-library-item { display: block; width: 100%; padding: 0; overflow: hidden; text-align: left; border: 1px solid var(--crm-border); border-radius: 8px; background: var(--crm-bg-container); }
+.material-library-cover { display: flex; width: 100%; aspect-ratio: 4 / 5; border-radius: 0; }
+.material-library-cover img { width: 100%; height: 100%; object-fit: cover; }
+.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
+.material-library-detail-pane { display: none; }
+.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
+.material-library-load-more { grid-column: 1 / -1; min-height: 32px; text-align: center; color: var(--crm-text-secondary); }
+/* 独立拆解页：撑满内容区高度，让四列各自滚动，页面本身不滚。
+   素材库抽屉里的同一个表单不加此类，沿用抽屉自身的高度与滚动。
+
+   高度用视口算，不用 height:100% —— .workspace-page 自己没有高度，它上面的
+   .ant-layout-content 高度来自 flex 拉伸而非 height 属性，百分比会退化成 auto，
+   四列的定高与列内滚动会一起失效（表现为截图区不被撑开、按钮下方留一大片空白）。
+
+   扣掉的是 header（--crm-header-h）与页签栏（--crm-tabbar-h），再减掉
+   .workspace-page 的上下内边距 —— 它是 border-box，100% 高度里已含 padding。 */
+.standalone-viral-decompose {
+  display: flex;
+  height: calc(100vh - var(--crm-header-h) - var(--crm-tabbar-h) - var(--crm-page-pad) * 2);
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .standalone-viral-decompose {
+    height: calc(100dvh - var(--crm-header-h) - var(--crm-tabbar-h) - var(--crm-page-pad) * 2);
+  }
+}
+
+@media (max-width: 768px) {
+  .material-library-filter-shell { display: block; }
+  .material-library-toolbar { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: none; }
+  .material-library-toolbar > * { grid-area: auto !important; grid-column: auto !important; grid-row: auto !important; }
+  .material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1 !important; }
+  .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+
+.material-library-list-pane { width: 100%; }
+.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; overflow: auto; }
+.material-library-item { display: block; width: 100%; text-align: left; border: 1px solid var(--crm-border); border-radius: 10px; overflow: hidden; background: var(--crm-bg-container); }
+.material-library-cover { display: block; width: 100%; aspect-ratio: 4 / 5; background: var(--crm-fill-secondary); }
+.material-library-cover img { width: 100%; height: 100%; object-fit: cover; }
+.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
+.material-library-load-more { grid-column: 1 / -1; min-height: 32px; text-align: center; color: var(--crm-text-secondary); }
+@media (max-width: 768px) { .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+
+/* Browse is a feed; the detail pane is opened as a Drawer. */
+.material-library-layout { display: block; overflow: auto; }
+.material-library-detail-pane { display: none; }
+.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
+.material-detail-close { position: sticky; top: 0; float: right; z-index: 1; }
+.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-direction: initial; gap: 16px; overflow: visible; }
+@media (max-width: 768px) { .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+
 .material-library-scroll {
   display: flex;
   flex: 1;
@@ -251,35 +314,58 @@
 }
 
 .viral-account-form {
-  min-height: 100%;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
 }
 
+/* 四列定高：高度由容器决定，不被列内内容撑开，各列内部独立滚动。 */
 .viral-account-grid {
   display: grid;
-  grid-template-columns: minmax(150px, 0.55fr) repeat(3, minmax(0, 1fr));
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(160px, 0.62fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1.15fr);
+  align-items: stretch;
   gap: var(--crm-gap);
-  align-items: start;
 }
 
+/* 每列是一张定高卡片：列头固定，列体滚动。 */
 .viral-account-screenshot,
 .viral-account-section {
+  display: flex;
   min-width: 0;
-  padding: var(--crm-sp-3);
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-container);
 }
 
-.viral-account-screenshot {
-  position: sticky;
-  top: 0;
+.viral-account-screenshot-body,
+.viral-account-section-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--crm-sp-3);
+  display: grid;
+  gap: var(--crm-sp-3);
+  align-content: start;
 }
 
+.viral-account-screenshot-body {
+  overflow: hidden;
+  gap: var(--crm-sp-2);
+}
+
+/* 截图展示区：只做展示，吃满按钮组以上的剩余高度。 */
 .viral-account-screenshot-frame {
   display: flex;
+  flex: 1;
   width: 100%;
-  margin: var(--crm-sp-3) 0;
-  aspect-ratio: 9 / 16;
+  min-height: 0;
   overflow: hidden;
   align-items: center;
   justify-content: center;
@@ -292,11 +378,102 @@
 .viral-account-screenshot-frame img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
+.viral-account-screenshot-empty {
+  display: flex;
+  padding: var(--crm-sp-4);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+  text-align: center;
+}
+
+/* 列头固定，不参与列内滚动。 */
+.viral-account-screenshot > h5,
 .viral-account-section > h5 {
-  margin-top: 0;
+  flex: none;
+  margin: 0;
+  padding: var(--crm-sp-3);
+  border-bottom: 1px solid var(--crm-border);
+  font-size: var(--crm-font-lg);
+}
+
+/* 空状态手机轮廓：拉满高度时仍像个截图位，而不是一块空板。 */
+.viral-account-screenshot-empty .viral-shot-phone {
+  display: flex;
+  width: min(96px, 62%);
+  padding: var(--crm-sp-2);
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  aspect-ratio: 9 / 16;
+  border: 1px solid var(--crm-border-strong);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-container);
+}
+
+.viral-account-screenshot-empty .viral-shot-phone .avatar {
+  width: 22px;
+  height: 22px;
+  margin: var(--crm-sp-1) auto;
+  border-radius: 50%;
+  background: var(--crm-bg-sunken);
+}
+
+.viral-account-screenshot-empty .viral-shot-phone .bar {
+  height: 3px;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.viral-account-screenshot-empty .viral-shot-phone .grid {
+  display: grid;
+  flex: 1;
+  margin-top: var(--crm-sp-1);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--crm-sp-1);
+}
+
+.viral-account-screenshot-empty .viral-shot-phone .grid span {
+  display: block;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+/* 左列按钮组：固定在截图下方，不参与拉伸。 */
+.viral-account-side-actions {
+  display: grid;
+  flex: none;
+  gap: var(--crm-sp-2);
+}
+
+/* 列内操作按钮竖排铺满，与上方上传按钮同一节奏。 */
+.viral-account-actions {
+  display: grid;
+  width: 100%;
+}
+
+.viral-account-actions .ant-btn {
+  width: 100%;
+}
+
+/* 两个上传按钮在窄列里竖排。 */
+.viral-account-side-actions .attachment-upload-actions {
+  display: grid;
+  gap: var(--crm-sp-2);
+}
+
+.viral-account-side-actions .ant-btn {
+  width: 100%;
+}
+
+.viral-account-unassigned {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--crm-sp-3);
 }
 
 .viral-account-field-grid {
@@ -353,15 +530,10 @@
   justify-content: space-between;
 }
 
-.viral-account-actions {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-  margin-top: var(--crm-gap);
-  padding: var(--crm-sp-3) 0 0;
-  background: var(--crm-bg-container);
+.viral-account-unassigned {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--crm-sp-3);
 }
 
 @media (max-width: 900px) {
@@ -418,17 +590,38 @@
   .material-detail-heading {
     flex-direction: column;
   }
+}
 
-  .viral-account-grid {
-    grid-template-columns: minmax(0, 1fr);
+/* 窄屏还原为纵向堆叠：定高卡片改回按内容撑开，整页滚动。 */
+@media (max-width: 1180px) {
+  .viral-account-form {
+    height: auto;
   }
 
-  .viral-account-screenshot {
-    position: static;
+  .viral-account-grid {
+    display: grid;
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .viral-account-screenshot,
+  .viral-account-section {
+    overflow: visible;
+  }
+
+  .viral-account-screenshot-body,
+  .viral-account-section-body {
+    overflow: visible;
   }
 
   .viral-account-screenshot-frame {
-    width: min(220px, 100%);
+    flex: none;
+    height: min(280px, 46vh);
+  }
+
+  .viral-account-side-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .viral-account-field-grid {
@@ -437,5 +630,138 @@
 
   .viral-account-field-wide {
     grid-column: auto;
+  }
+}
+
+/* Final feed rules intentionally follow the legacy responsive inbox rules. */
+.material-library-filter-shell { align-items: flex-start; }
+.material-library-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(140px, .6fr) minmax(180px, .8fr) auto auto; }
+.material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1; }
+.material-library-layout { display: block; overflow: auto; }
+.material-library-list-pane { width: 100%; overflow: visible; }
+.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-direction: initial; gap: 16px; overflow: visible; max-height: none; }
+.material-library-item { display: block; width: 100%; padding: 0; overflow: hidden; text-align: left; border-radius: 8px; }
+.material-library-cover { display: flex; width: 100%; aspect-ratio: 4 / 5; border-radius: 0; }
+.material-library-cover img { width: 100%; height: 100%; object-fit: cover; }
+.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
+.material-library-detail-pane { display: none; }
+.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
+
+@media (max-width: 768px) {
+  .material-library-filter-shell { display: block; }
+  .material-library-toolbar { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
+  .material-library-toolbar > * { grid-column: auto !important; grid-row: auto !important; }
+  .material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1 !important; }
+  .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+
+/* Keep all desktop search, filters, refresh, and create actions on one row. */
+.material-library-filter-shell {
+  display: block;
+  padding: var(--crm-sp-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.material-library-toolbar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  padding: 0;
+  flex-wrap: nowrap;
+  gap: var(--crm-sp-2);
+}
+
+.material-library-view-tabs {
+  padding-inline-end: var(--crm-sp-3);
+  border-inline-end: 1px solid var(--crm-border);
+  flex: 0 0 auto;
+}
+
+.material-library-view-tabs .ant-tabs-nav {
+  margin: 0;
+}
+
+.material-library-search {
+  min-width: 210px;
+  flex: 1 1 260px;
+}
+
+.material-library-category-checks {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  padding-inline: var(--crm-sp-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.material-library-category-checks .ant-checkbox-wrapper {
+  margin: 0;
+  color: var(--crm-text);
+}
+
+.material-library-select {
+  width: 150px;
+  flex: 0 1 150px;
+}
+
+.material-library-refresh,
+.material-library-actions {
+  flex: 0 0 auto;
+}
+
+.material-library-actions {
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .material-library-toolbar {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .material-library-view-tabs {
+    border-inline-end: 0;
+  }
+
+  .material-library-search {
+    min-width: min(220px, 100%);
+  }
+}
+
+@media (max-width: 768px) {
+  .material-library-toolbar {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .material-library-search {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+
+  .material-library-view-tabs {
+    width: 100%;
+    padding-inline-end: 0;
+    border-bottom: 1px solid var(--crm-border);
+  }
+
+  .material-library-category-checks {
+    width: 100%;
+  }
+
+  .material-library-select {
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+
+  .material-library-actions {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }

@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_sku` (
   `attr_values_json` json NOT NULL,
   `attr_values_hash` varchar(64) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `retail_price` decimal(10,2) DEFAULT NULL COMMENT '零售价',
+  `min_deal_price` decimal(10,2) DEFAULT NULL COMMENT '最低成交价',
+  `min_deal_type` varchar(32) DEFAULT NULL COMMENT '最低成交价类型',
+  `min_deal_rate` decimal(8,4) DEFAULT NULL COMMENT '最低成交折扣',
+  `exam_fee` decimal(10,2) DEFAULT NULL COMMENT '考试费',
+  `price_unit` varchar(32) NOT NULL DEFAULT 'PACKAGE' COMMENT '计价单位',
+  `pricing_note` varchar(1000) DEFAULT NULL COMMENT '价格说明',
   `status` tinyint NOT NULL DEFAULT 0,
   `sort` int NOT NULL DEFAULT 0,
   `remark` varchar(1000) DEFAULT NULL,
@@ -87,3 +94,4 @@ SELECT role.id, menu.id, '1', NOW(), '1', NOW(), b'0', role.tenant_id
 FROM system_role role JOIN system_menu menu ON menu.permission IN ('zsjos:product:sku-query','zsjos:product:sku-create','zsjos:product:sku-update','zsjos:product:sku-delete','zsjos:product:sku-status','zsjos:product:attr-query','zsjos:product:attr-update') AND menu.deleted = b'0'
 WHERE role.code = 'super_admin' AND role.deleted = b'0'
   AND NOT EXISTS (SELECT 1 FROM system_role_menu rm WHERE rm.role_id = role.id AND rm.menu_id = menu.id AND rm.deleted = b'0');
+

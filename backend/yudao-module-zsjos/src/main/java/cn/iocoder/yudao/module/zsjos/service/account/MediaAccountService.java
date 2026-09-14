@@ -8,9 +8,11 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountStudentL
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountStudentLinkMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceProblemVO;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
@@ -21,6 +23,8 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
+import cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryPlanService;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -28,11 +32,17 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi; import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO; import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountStudentCandidateRespVO;
@@ -40,7 +50,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.*;
-import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_TYPE;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PERSONA_TYPE;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PROFESSION;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -50,6 +60,7 @@ public class MediaAccountService {
     @Resource private MediaAccountMapper mapper;
     @Resource private MediaAccountStudentLinkMapper linkMapper;
     @Resource private ServiceRelationMapper relationMapper;
+    @Resource private PositioningInterviewMapper positioningInterviewMapper;
     @Resource private MediaAccountNumberService numberService;
     @Resource private PermissionApi permissionApi;
     @Resource private MediaAccountObjectPermissionProvider objectPermissionProvider;
@@ -61,14 +72,30 @@ public class MediaAccountService {
     @Resource private MediaWorkflowEventService workflowEventService;
     @Resource private MediaAccountFieldConfigService fieldConfigService;
     @Resource private DictDataApi dictDataApi;
+    @Resource private StudentDeliveryPlanService studentDeliveryPlanService;
+    @Resource private PositioningCardMapper positioningCardMapper;
 
     @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#req.serviceRelationId", action = "create-account")
     public Long create(MediaAccountSaveReqVO req, Long userId) {
-        if (req.getStudentPersonId() == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+        ServiceRelationDO relation = relationMapper.selectByIdForUpdate(req.getServiceRelationId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        validateCreateRelation(relation, req, userId);
+        String fingerprint = createFingerprint(req, userId);
+        MediaAccountDO replay = mapper.selectByCreateIdempotencyKey(req.getIdempotencyKey());
+        if (replay != null) return validateCreateReplay(replay, req, userId, fingerprint);
+        if (!Objects.equals(relation.getVersion(), req.getVersion())) {
+            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        }
+        if (java.util.stream.Stream.of(req.getPlatformValue(), req.getNickname(), req.getPlatformAccountId(),
+                req.getLeadDirection(), req.getAccountTypePrimaryValue(), req.getAccountTypeSecondaryValue(),
+                req.getTrackPrimaryValue(), req.getTrackSecondaryValue()).anyMatch(value -> value != null && !value.isBlank())
+                || req.getDetailValues() != null && !req.getDetailValues().isEmpty()) {
+            throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        }
         validateStudent(req.getStudentPersonId());
-        Long assignedOperator = resolveAssignedOperator(req.getStudentPersonId());
-        Long directorUserId = permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")
-                && req.getDirectorUserId() != null ? req.getDirectorUserId() : userId;
+        Long assignedOperator = relation.getOperatorUserId();
+        Long directorUserId = relation.getContentDirectorUserId();
         adminUserApi.validateUser(directorUserId);
         Map<String, Object> detailValues = mergeCompatibilityValues(
                 req.getDetailValues(), req.getPlatformAccountId(), req.getNickname());
@@ -78,28 +105,79 @@ public class MediaAccountService {
         MediaAccountDO account = new MediaAccountDO();
         account.setAccountNo(numberService.next()).setStudentPersonId(req.getStudentPersonId())
                 .setOwnershipType(req.getStudentPersonId() == null ? OWNERSHIP_COMPANY : OWNERSHIP_STUDENT)
-                .setOwnerOperatorUserId(assignedOperator == null ? userId : assignedOperator).setDirectorUserId(directorUserId)
-                .setPlatformValue(req.getPlatformValue()).setPlatformLabelSnapshot(requirePlatformLabel(req.getPlatformValue()))
+                .setOwnerOperatorUserId(assignedOperator).setDirectorUserId(directorUserId)
+                .setPlatformValue(req.getPlatformValue() == null || req.getPlatformValue().isBlank() ? null : req.getPlatformValue().trim()).setPlatformLabelSnapshot(optionalPlatformLabel(req.getPlatformValue()))
                 .setPlatformAccountId(uid).setNickname(nickname)
                 .setDetailConfigVersionId(details.configVersionId())
                 .setDetailValuesJson(JsonUtils.toJsonString(details.values()))
                 .setDetailSnapshotJson(JsonUtils.toJsonString(details.snapshots()))
                 .setLeadDirection(req.getLeadDirection()).setSStage(null)
                 .setSStageEnteredAt(null).setIsSilent(false).setRunStatus(RUN_STATUS_ACTIVE)
+                .setCreateServiceRelationId(relation.getId()).setCreateOperatorUserId(userId)
+                .setCreateIdempotencyKey(req.getIdempotencyKey()).setCreateRequestFingerprint(fingerprint)
                 .setRescueStatus("none").setWhitelistStatus("none").setVersion(0);
         setRecommendationProfile(account, req.getAccountTypePrimaryValue(), req.getAccountTypeSecondaryValue(),
                 req.getTrackPrimaryValue(), req.getTrackSecondaryValue());
-        mapper.insert(account);
-        return account.getId();
+        try {
+            mapper.insert(account);
+            if (positioningCardMapper != null) {
+                positioningCardMapper.bindStudentDraftToAccount(relation.getId(), account.getStudentPersonId(),
+                        account.getId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+            }
+            studentDeliveryPlanService.ensurePlan(account.getStudentPersonId(), account.getId(), relation.getId(),
+                    directorUserId, java.time.LocalDateTime.now());
+            return account.getId();
+        } catch (DuplicateKeyException duplicate) {
+            MediaAccountDO concurrentReplay = mapper.selectByCreateIdempotencyKey(req.getIdempotencyKey());
+            if (concurrentReplay == null) throw duplicate;
+            return validateCreateReplay(concurrentReplay, req, userId, fingerprint);
+        }
     }
 
-    private Long resolveAssignedOperator(Long studentPersonId) {
-        List<Long> operators = relationMapper
-                .selectActiveAcceptedByPersonForUpdate(studentPersonId,
-                        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
-                .stream().map(ServiceRelationDO::getOperatorUserId).filter(java.util.Objects::nonNull).distinct().toList();
-        if (operators.size() > 1) throw exception(MEDIA_ACCOUNT_OPERATOR_ASSIGNMENT_CONFLICT);
-        return operators.isEmpty() ? null : operators.get(0);
+    private void validateCreateRelation(ServiceRelationDO relation, MediaAccountSaveReqVO req, Long userId) {
+        if (relation == null || !Objects.equals(relation.getPersonId(), req.getStudentPersonId())
+                || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())
+                || relation.getContentDirectorUserId() == null
+                || !(Objects.equals(relation.getContentDirectorUserId(), userId)
+                     || Objects.equals(relation.getOperatorUserId(), userId))
+                || req.getDirectorUserId() != null && !Objects.equals(req.getDirectorUserId(), relation.getContentDirectorUserId())) {
+            throw exception(MEDIA_ACCOUNT_SERVICE_INVALID);
+        }
+        if (!Set.of("positioning_interview_completed", "positioning_ready").contains(relation.getDirectorStage())
+                && !positioningInterviewMapper.existsCompleted(relation.getId(), req.getStudentPersonId())) {
+            throw exception(MEDIA_ACCOUNT_POSITIONING_INCOMPLETE);
+        }
+    }
+
+    private String createFingerprint(MediaAccountSaveReqVO req, Long userId) {
+        return DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(
+                req.getServiceRelationId(), req.getStudentPersonId(), req.getVersion(), userId, req.getPlatformValue(),
+                req.getPlatformAccountId(), req.getNickname(), req.getLeadDirection(),
+                req.getAccountTypePrimaryValue(), req.getAccountTypeSecondaryValue(),
+                req.getTrackPrimaryValue(), req.getTrackSecondaryValue(), canonicalize(req.getDetailValues()))));
+    }
+
+    private Object canonicalize(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> sorted = new TreeMap<>();
+            map.forEach((key, item) -> sorted.put(String.valueOf(key), canonicalize(item)));
+            return sorted;
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.stream().map(this::canonicalize).toList();
+        }
+        return value;
+    }
+
+    private Long validateCreateReplay(MediaAccountDO replay, MediaAccountSaveReqVO req, Long userId,
+                                      String fingerprint) {
+        if (!Objects.equals(replay.getCreateServiceRelationId(), req.getServiceRelationId())
+                || !Objects.equals(replay.getStudentPersonId(), req.getStudentPersonId())
+                || !Objects.equals(replay.getCreateOperatorUserId(), userId)
+                || !Objects.equals(replay.getCreateRequestFingerprint(), fingerprint)) {
+            throw exception(MEDIA_ACCOUNT_CREATE_IDEMPOTENCY_CONFLICT);
+        }
+        return replay.getId();
     }
 
     public MediaAccountDO require(Long id) {
@@ -160,44 +238,18 @@ public class MediaAccountService {
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#id", action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public void update(Long id, MediaAccountUpdateReqVO req, Long userId) {
-        MediaAccountDO account = require(id);
-        Long directorUserId = account.getDirectorUserId();
-        if (req.getDirectorUserId() != null && !req.getDirectorUserId().equals(directorUserId)) {
-            if (!permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) {
-                throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
-            }
-            adminUserApi.validateUser(req.getDirectorUserId());
-            directorUserId = req.getDirectorUserId();
-        }
-        if (req.getDetailValues() != null) {
-            List<MediaAccountDetailSnapshotVO> previousSnapshots = account.getDetailSnapshotJson() == null ? List.of()
-                    : JsonUtils.parseArray(account.getDetailSnapshotJson(), MediaAccountDetailSnapshotVO.class);
-            MediaAccountFieldConfigService.DetailSnapshot details = fieldConfigService.validateAndSnapshot(
-                    mergeCompatibilityValues(req.getDetailValues(), req.getPlatformAccountId(), req.getNickname()),
-                    previousSnapshots);
-            account.setDetailConfigVersionId(details.configVersionId())
-                    .setDetailValuesJson(JsonUtils.toJsonString(details.values()))
-                    .setDetailSnapshotJson(JsonUtils.toJsonString(details.snapshots()))
-                    .setPlatformAccountId(stringValue(details.values().get("uid"), req.getPlatformAccountId()))
-                    .setNickname(stringValue(details.values().get("nickname"), req.getNickname()));
-        }
-        requireSnapshotValueUnchanged(account.getAccountGradeValue(), req.getAccountGradeValue());
-        requireSnapshotValueUnchanged(account.getHealthStatusValue(), req.getHealthStatusValue());
-        requireSnapshotValueUnchanged(account.getRiskLevelValue(), req.getRiskLevelValue());
-        account.setLeadDirection(req.getLeadDirection()).setDirectorUserId(directorUserId)
-                .setHealthJson(req.getHealthJson());
-        patchRecommendationProfile(account, req);
-        if (mapper.updateProfile(account, req.getVersion()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        // Old whole-object writes cannot express field responsibility or safe partial updates.
+        throw exception(MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED);
     }
 
     private void patchRecommendationProfile(MediaAccountDO account, MediaAccountUpdateReqVO request) {
         if (request.getAccountTypePrimaryValue() != null) {
-            DictSelection selection = resolveDictSelection(DICT_ACCOUNT_TYPE, request.getAccountTypePrimaryValue());
+            DictSelection selection = resolveDictSelection(DICT_PERSONA_TYPE, request.getAccountTypePrimaryValue());
             account.setAccountTypePrimaryValue(selection.value())
                     .setAccountTypePrimaryLabelSnapshot(selection.label());
         }
         if (request.getAccountTypeSecondaryValue() != null) {
-            DictSelection selection = resolveDictSelection(DICT_ACCOUNT_TYPE, request.getAccountTypeSecondaryValue());
+            DictSelection selection = resolveDictSelection(DICT_PERSONA_TYPE, request.getAccountTypeSecondaryValue());
             account.setAccountTypeSecondaryValue(selection.value())
                     .setAccountTypeSecondaryLabelSnapshot(selection.label());
         }
@@ -214,8 +266,8 @@ public class MediaAccountService {
     private void setRecommendationProfile(MediaAccountDO account, String accountTypePrimary,
                                           String accountTypeSecondary, String trackPrimary,
                                           String trackSecondary) {
-        DictSelection primaryType = resolveDictSelection(DICT_ACCOUNT_TYPE, accountTypePrimary);
-        DictSelection secondaryType = resolveDictSelection(DICT_ACCOUNT_TYPE, accountTypeSecondary);
+        DictSelection primaryType = resolveDictSelection(DICT_PERSONA_TYPE, accountTypePrimary);
+        DictSelection secondaryType = resolveDictSelection(DICT_PERSONA_TYPE, accountTypeSecondary);
         DictSelection primaryTrack = resolveDictSelection(DICT_PROFESSION, trackPrimary);
         DictSelection secondaryTrack = resolveDictSelection(DICT_PROFESSION, trackSecondary);
         account.setAccountTypePrimaryValue(primaryType.value())
@@ -249,6 +301,23 @@ public class MediaAccountService {
                 .filter(item -> java.util.Objects.equals(item.getValue(), value))
                 .map(DictDataRespDTO::getLabel).findFirst()
                 .orElseThrow(() -> exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
+    }
+
+    private void validateDetailFieldOwnership(MediaAccountDO account, Map<String, Object> requested, Long userId) {
+        var published = fieldConfigService.getPublished();
+        if (published == null || published.getFields() == null) return;
+        for (var field : published.getFields()) {
+            if (!requested.containsKey(field.getKey())) continue;
+            String owner = field.getOwnerType();
+            if ("AUTO".equals(owner) || "DIRECTOR".equals(owner) && !Objects.equals(account.getDirectorUserId(), userId)
+                    || "OPERATOR".equals(owner) && !Objects.equals(account.getOwnerOperatorUserId(), userId)) {
+                throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+            }
+        }
+    }
+
+    private String optionalPlatformLabel(String value) {
+        return value == null || value.isBlank() ? null : requirePlatformLabel(value);
     }
 
     private void requireSnapshotValueUnchanged(String storedValue, String requestedValue) {

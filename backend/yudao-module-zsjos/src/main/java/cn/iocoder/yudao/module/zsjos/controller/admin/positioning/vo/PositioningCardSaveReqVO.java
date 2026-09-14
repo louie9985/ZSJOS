@@ -8,7 +8,8 @@ import java.util.Map;
 
 @Data
 public class PositioningCardSaveReqVO {
-    @NotNull private Long accountId;
+    /** Optional while creating a student-level positioning draft; required before submission. */
+    private Long accountId;
     private Long studentPersonId;
     private Long serviceRelationId;
     private Long templateId;

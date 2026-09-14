@@ -77,6 +77,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
+                scene(SUBMITTER_SUPPLEMENTED, "提交人补充资料", ROLE_OWNER),
                 scene(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE, "销售回复提交人", ROLE_SUBMITTER),
                 scene(SUBMITTER_ASSIST_REQUESTED, "请求提交人协助", ROLE_SUBMITTER),
                 scene(PARTNER_ASSIST_REMINDER, "提醒兼职提交人协助", ROLE_PARTNER_OWNER),
@@ -255,6 +256,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
             copyContext(values, event.getPayload(), "urge.reason", "complaint.result",
                     "complaint.handlerUserId", "complaint.handlerOpinion");
+            copyContext(values, event.getPayload(), "supplement.remark", "supplement.attachmentCount");
             copyContext(values, event.getPayload(), "feedback.id", "feedback.summary");
             copyContext(values, event.getPayload(), "assist.requestId", "assist.problem",
                     "assist.expectedAssistance", "assist.remark", "assist.attachmentNames");
@@ -328,6 +330,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("appeal.decisionReason", "裁决理由"));
         } else if (SUBMITTER_URGED.equals(sceneCode)) {
             variables.add(variable("urge.reason", "催促原因"));
+        } else if (SUBMITTER_SUPPLEMENTED.equals(sceneCode)) {
+            variables.add(variable("supplement.remark", "补充说明"));
+            variables.add(variable("supplement.attachmentCount", "补充附件数量"));
         } else if (cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE.equals(sceneCode)) {
             variables.add(variable("feedback.id", "反馈记录ID"));
             variables.add(variable("feedback.summary", "反馈摘要"));

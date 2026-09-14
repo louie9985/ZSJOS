@@ -8,6 +8,12 @@ public final class AuditActionCatalog {
     public static final String CATEGORY_EXPORT = "export";
     public static final String CATEGORY_IMPERSONATION = "impersonation";
     public static final String CATEGORY_WITHDRAWAL = "withdrawal";
+    public static final String CATEGORY_EXECUTION = "execution";
+    public static final String EXECUTION_QUARTZ = "execution.quartz";
+    public static final String EXECUTION_BPM = "execution.bpm";
+    public static final String EXECUTION_ASYNC = "execution.async";
+    public static final String EXECUTION_REDIS_PUBSUB = "execution.redis.pubsub";
+    public static final String EXECUTION_REDIS_STREAM = "execution.redis.stream";
     public static final String EXPORT_CREATE = "export.create";
     public static final String EXPORT_GENERATE = "export.generate";
     public static final String EXPORT_DOWNLOAD = "export.download";
@@ -24,6 +30,8 @@ public final class AuditActionCatalog {
     public static final Map<String, Set<String>> ACTIONS = Map.of(
             CATEGORY_EXPORT, Set.of(EXPORT_CREATE, EXPORT_GENERATE, EXPORT_DOWNLOAD, EXPORT_CANCEL),
             CATEGORY_IMPERSONATION, Set.of(IMPERSONATION_START, IMPERSONATION_END, IMPERSONATION_READ),
+            CATEGORY_EXECUTION, Set.of(EXECUTION_QUARTZ, EXECUTION_BPM, EXECUTION_ASYNC,
+                    EXECUTION_REDIS_PUBSUB, EXECUTION_REDIS_STREAM),
             CATEGORY_WITHDRAWAL, Set.of(WITHDRAWAL_CARD_VIEW, WITHDRAWAL_SUBMITTED,
                     WITHDRAWAL_APPROVED, WITHDRAWAL_REJECTED, WITHDRAWAL_PAYOUT));
 

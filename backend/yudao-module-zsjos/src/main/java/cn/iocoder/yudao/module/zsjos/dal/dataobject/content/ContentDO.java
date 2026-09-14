@@ -27,6 +27,9 @@ public class ContentDO extends TenantBaseDO {
     private String status;
     private Integer currentVersionNo;
     private String scriptText;
+    private String purposeValue; private String purposeLabelSnapshot;
+    private String formatValue; private String formatLabelSnapshot; private String detailUrl; private String leadResourceUrl;
+    private LocalDateTime plannedPublishAt;
     private String scriptUrl;
     private Long ownerOperatorUserId;
     private Long filmingEditorUserId;
@@ -36,3 +39,5 @@ public class ContentDO extends TenantBaseDO {
     private Integer rejectCount;
     private Integer version;
 }
+
+

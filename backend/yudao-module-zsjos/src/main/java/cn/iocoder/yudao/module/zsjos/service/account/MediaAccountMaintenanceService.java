@@ -63,59 +63,9 @@ public class MediaAccountMaintenanceService {
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "maintenance")
     @Transactional(rollbackFor = Exception.class)
     public Integer maintain(Long accountId, MediaAccountMaintenanceReqVO req, Long operatorUserId) {
-        validateDates(req);
-        MediaAccountDO account = require(accountId);
-        if (!Objects.equals(account.getVersion(), req.getVersion())) {
-            throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
-        }
-        List<MediaAccountMaintenanceProblemVO> oldProblems = parseProblems(account.getPrimaryProblemsJson());
-        Snapshot status = snapshot(DICT_CURRENT_STATUS, normalize(req.getCurrentStatusValue()),
-                account.getCurrentStatusValue(), account.getCurrentStatusLabelSnapshot());
-        Snapshot stage = snapshot(DICT_STAGE, normalize(req.getStageValue()),
-                account.getSStage(), account.getSStageLabelSnapshot());
-        List<String> problemValues = normalizeValues(req.getPrimaryProblemValues());
-        List<MediaAccountMaintenanceProblemVO> problems = problemValues.equals(values(oldProblems))
-                ? oldProblems : snapshotProblems(problemValues);
-        Snapshot measure = snapshot(DICT_EXECUTION_MEASURE, normalize(req.getExecutionMeasureValue()),
-                account.getExecutionMeasureValue(), account.getExecutionMeasureLabelSnapshot());
-        String direction = normalize(req.getAdjustmentDirection());
-
-        LinkedHashMap<String, String> changes = new LinkedHashMap<>();
-        compare(changes, "currentStatus", account.getCurrentStatusValue(), status.value(),
-                account.getCurrentStatusLabelSnapshot(), status.label());
-        compare(changes, "stage", account.getSStage(), stage.value(), account.getSStageLabelSnapshot(), stage.label());
-        compare(changes, "primaryProblems", values(oldProblems), values(problems), labels(oldProblems), labels(problems));
-        compare(changes, "executionMeasure", account.getExecutionMeasureValue(), measure.value(),
-                account.getExecutionMeasureLabelSnapshot(), measure.label());
-        compareText(changes, "adjustmentDirection", account.getAdjustmentDirection(), direction);
-        compare(changes, "startDate", account.getMaintenanceStartDate(), req.getStartDate(),
-                account.getMaintenanceStartDate(), req.getStartDate());
-        compare(changes, "endDate", account.getMaintenanceEndDate(), req.getEndDate(),
-                account.getMaintenanceEndDate(), req.getEndDate());
-        if (changes.isEmpty()) return account.getVersion();
-
-        account.setCurrentStatusValue(status.value()).setCurrentStatusLabelSnapshot(status.label())
-                .setSStage(stage.value()).setSStageLabelSnapshot(stage.label())
-                .setPrimaryProblemsJson(JsonUtils.toJsonString(problems))
-                .setExecutionMeasureValue(measure.value()).setExecutionMeasureLabelSnapshot(measure.label())
-                .setAdjustmentDirection(direction).setMaintenanceStartDate(req.getStartDate())
-                .setMaintenanceEndDate(req.getEndDate());
-        if (accountMapper.updateMaintenance(account, req.getVersion()) == 0) {
-            throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        int revisionNo = revisionMapper.selectMaxRevisionNo(accountId) + 1;
-        revisionMapper.insert(new MediaAccountMaintenanceRevisionDO().setAccountId(accountId)
-                .setRevisionNo(revisionNo).setCurrentStatusValue(status.value())
-                .setCurrentStatusLabelSnapshot(status.label()).setStageValue(stage.value())
-                .setStageLabelSnapshot(stage.label()).setPrimaryProblemsJson(JsonUtils.toJsonString(problems))
-                .setExecutionMeasureValue(measure.value()).setExecutionMeasureLabelSnapshot(measure.label())
-                .setAdjustmentDirection(direction).setStartDate(req.getStartDate()).setEndDate(req.getEndDate())
-                .setChangedFieldsJson(JsonUtils.toJsonString(changes.keySet()))
-                .setOperatedByUserId(operatorUserId).setOperatedAt(now));
-        notifyParticipants(account, operatorUserId, changes, revisionNo);
-        return req.getVersion() + 1;
+        require(accountId);
+        // Account status/stage are now system-owned. Keep read/history/calendar contracts only.
+        throw exception(MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED);
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "read")

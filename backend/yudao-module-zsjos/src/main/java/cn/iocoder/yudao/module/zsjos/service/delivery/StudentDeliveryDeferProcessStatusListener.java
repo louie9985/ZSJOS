@@ -1,0 +1,3 @@
+package cn.iocoder.yudao.module.zsjos.service.delivery;
+import cn.iocoder.yudao.module.bpm.api.event.*; import jakarta.annotation.Resource; import org.springframework.stereotype.Component;
+@Component public class StudentDeliveryDeferProcessStatusListener extends BpmProcessInstanceStatusEventListener { @Resource private StudentDeliveryDeferService service; @Override protected String getProcessDefinitionKey(){ return "zsjos_student_contact_extension"; } @Override protected void onEvent(BpmProcessInstanceStatusEvent event){ service.handleProcessResult(event.getId(), event.getStatus(), event.getReason()); } }

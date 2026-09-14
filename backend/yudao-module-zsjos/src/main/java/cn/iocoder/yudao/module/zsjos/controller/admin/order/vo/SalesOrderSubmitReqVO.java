@@ -30,6 +30,8 @@ public class SalesOrderSubmitReqVO {
     @Size(max = 1000) private String remark;
     @Size(max = 1000) private String studentSpecialRequirements;
     @Size(max = 1000) private String materialDeliveryContact;
+    @Size(max = 1000) private String giftShippingAddress;
+    private List<String> giftItems;
     @NotEmpty @Size(max = 50) private List<@Valid Item> items;
     @NotEmpty @Size(max = 6) private List<@Valid Attachment> paymentVouchers;
     @NotBlank @Size(max = 128) private String idempotencyKey;

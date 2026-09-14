@@ -23,12 +23,16 @@ public final class DirectorFormTemplateVO {
     @Data public static class Field {
         @NotBlank @Pattern(regexp = "^[a-z][a-zA-Z0-9_]{1,63}$") private String key;
         @NotBlank @Size(max = 100) private String title;
-        @NotBlank @Pattern(regexp = "text|textarea|number|date|datetime|select|multi_select|radio|checkbox_group|checkbox|attachment|region") private String type;
+        @NotBlank @Pattern(regexp = "text|textarea|number|date|datetime|select|multi_select|radio|checkbox_group|checkbox|attachment|region|material_picker|system_history") private String type;
         @NotNull private Boolean enabled;
         @NotNull private Boolean required;
         @NotNull private Boolean systemField;
         @NotNull private Integer sort;
         @Size(max = 500) private String description;
+        @Size(max = 1000) private String interviewNote;
+        private Boolean allowRemark;
+        private Boolean requireAttachment;
+        private Boolean studentVisible;
         @Size(max = 100) private String dictType;
         private Boolean multiple;
         private Integer minSelections;
@@ -37,6 +41,7 @@ public final class DirectorFormTemplateVO {
         private Integer maxValue;
         private Integer maxLength;
         @Size(max = 64) private String group;
+        private String referenceFor; private String materialTypeCode; private String defaultPlatform; private String defaultStage; private String recommendedCount; private Boolean filterAdjustable;
     }
     @Data public static class CreateReq {
         @NotBlank @Size(max = 64) @Pattern(regexp = "^[a-z][a-z0-9_]{2,63}$") private String templateCode;

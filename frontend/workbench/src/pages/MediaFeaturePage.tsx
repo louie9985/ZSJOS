@@ -323,7 +323,7 @@ export default function MediaFeaturePage({
       api.mediaStudents.page({ pageNo: 1, pageSize: 100 }),
       api.dictDataByType("zsjos_account_platform"),
       api.dictDataByType("zsjos_content_class"),
-      api.dictDataByType(DICT_TYPE.MATERIAL_ACCOUNT_TYPE),
+      api.dictDataByType(DICT_TYPE.PERSONA_TYPE),
       api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
     ]);
     const [a, u, s, p, c, accountTypeResult, professionResult] = results;
@@ -423,7 +423,7 @@ export default function MediaFeaturePage({
       (!accountTypes.length || !professions.length)
     ) {
       const results = await Promise.allSettled([
-        api.dictDataByType(DICT_TYPE.MATERIAL_ACCOUNT_TYPE),
+        api.dictDataByType(DICT_TYPE.PERSONA_TYPE),
         api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
       ]);
       if (results[0].status === "fulfilled") setAccountTypes(results[0].value);
@@ -606,7 +606,7 @@ export default function MediaFeaturePage({
       <header className="media-feature-heading">
         <Typography.Title level={4}>{titles[feature]}</Typography.Title>
         <Space>
-          {canCreate && (
+          {canCreate && feature !== "tickets" && (
             <Button type="primary" onClick={() => void openCreate()}>
               新增
             </Button>

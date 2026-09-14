@@ -17,6 +17,9 @@ public class ContentReviewBatchDO extends TenantBaseDO {
     @TableId private Long id;
     private String batchNo;
     private Long accountId;
+    private Long studentPersonId;
+    private Long revisionOfBatchId;
+    private String accountIdsJson;
     private Long operatorUserId;
     private Long directorUserId;
     private String relationSnapshotJson;
@@ -35,3 +38,5 @@ public class ContentReviewBatchDO extends TenantBaseDO {
     private LocalDateTime finalizedAt;
     private Integer version;
 }
+
+

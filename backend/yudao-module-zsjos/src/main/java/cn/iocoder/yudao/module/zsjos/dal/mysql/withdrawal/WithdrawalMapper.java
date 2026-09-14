@@ -16,11 +16,30 @@ import java.util.List;
 
 @Mapper
 public interface WithdrawalMapper extends BaseMapperX<WithdrawalDO> {
-    default PageResult<WithdrawalDO> selectPage(WithdrawalPageReqVO req, Long userId) {
-        return selectPage(req, new LambdaQueryWrapperX<WithdrawalDO>()
+    default PageResult<WithdrawalDO> selectPageByApplicant(WithdrawalPageReqVO req, Long userId) {
+        return selectPageByApplicant(req, userId, null);
+    }
+    default PageResult<WithdrawalDO> selectPageByApplicant(WithdrawalPageReqVO req, Long userId, List<Long> matchedIds) {
+        if (matchedIds != null && matchedIds.isEmpty()) return new PageResult<>(List.of(), 0L);
+        var query = new LambdaQueryWrapperX<WithdrawalDO>()
                 .eqIfPresent(WithdrawalDO::getApplicantUserId, userId)
                 .eqIfPresent(WithdrawalDO::getStatus, req.getStatus())
-                .orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId));
+                .orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId);
+        query.inIfPresent(WithdrawalDO::getId, matchedIds)
+                .eqIfPresent(WithdrawalDO::getApplicantUserId, req.getApplicantUserId())
+                .eqIfPresent(WithdrawalDO::getPartnerId, req.getPartnerId())
+                .geIfPresent(WithdrawalDO::getApplicationAmount, req.getAmountMin())
+                .leIfPresent(WithdrawalDO::getApplicationAmount, req.getAmountMax())
+                .geIfPresent(WithdrawalDO::getSubmittedAt, req.getSubmittedAtFrom())
+                .leIfPresent(WithdrawalDO::getSubmittedAt, req.getSubmittedAtTo())
+                .geIfPresent(WithdrawalDO::getReviewedAt, req.getReviewedAtFrom())
+                .leIfPresent(WithdrawalDO::getReviewedAt, req.getReviewedAtTo())
+                .geIfPresent(WithdrawalDO::getPaidAt, req.getPaidAtFrom())
+                .leIfPresent(WithdrawalDO::getPaidAt, req.getPaidAtTo());
+        query.likeIfPresent(WithdrawalDO::getWithdrawalNo, req.getWithdrawalNo())
+                .likeIfPresent(WithdrawalDO::getWithdrawalNo, req.getKeyword())
+                .likeIfPresent(WithdrawalDO::getBankTransactionNo, req.getBankTransactionNo());
+        return selectPage(req, query);
     }
     default PageResult<WithdrawalDO> selectPartnerPage(WithdrawalPageReqVO req, Long partnerId) {
         return selectPage(req, new LambdaQueryWrapperX<WithdrawalDO>()

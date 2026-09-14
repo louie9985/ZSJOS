@@ -29,8 +29,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class DirectorFormTemplateService {
     public static final String SCENE_INTERVIEW = "director_interview";
+    public static final String SCENE_POSITIONING_INTERVIEW = "director_positioning_interview";
     public static final String SCENE_POSITIONING = "positioning_card";
     private static final Set<String> ENUM_TYPES = Set.of("select", "multi_select", "radio", "checkbox_group");
+    private static final Set<String> FIELD_TYPES = Set.of("text", "textarea", "number", "date", "datetime", "select", "multi_select", "radio", "checkbox_group", "checkbox", "attachment", "region", "material_picker", "system_history");
     private static final Map<String, String> INTERVIEW_SYSTEM_FIELDS = orderedMap(new String[][]{
             {"certificates", "checkbox_group"}, {"certificatePractice", "radio"}, {"examPreparation", "text"},
             {"age", "number"}, {"gender", "radio"}, {"region", "region"}, {"currentOccupation", "text"},
@@ -52,6 +54,8 @@ public class DirectorFormTemplateService {
     @Resource private DirectorFormTemplateVersionMapper versionMapper;
     @Resource private DictDataApi dictDataApi;
     @Resource private AreaApi areaApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.material.MaterialService materialService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.material.MaterialTypeService materialTypeService;
 
     public List<DirectorFormTemplateVO.TemplateResp> list(String scene) {
         requireScene(scene);
@@ -83,6 +87,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long copyDraft(Long templateId, Integer templateVersion, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         if (!Objects.equals(template.getVersion(), templateVersion)) throw exception(DIRECTOR_FORM_TEMPLATE_VERSION_CONFLICT);
         DirectorFormTemplateVersionDO existing = versionMapper.selectDraft(templateId);
@@ -100,6 +105,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void updateDraft(Long templateId, DirectorFormTemplateVO.SaveDraftReq request, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         DirectorFormTemplateVersionDO draft = versionMapper.selectById(request.getVersionId());
         if (draft == null || !Objects.equals(draft.getTemplateId(), templateId) || !"draft".equals(draft.getStatus())) {
@@ -120,6 +126,7 @@ public class DirectorFormTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void publish(Long templateId, DirectorFormTemplateVO.PublishReq request, Long userId, String scene) {
+        requireWritableScene(scene);
         DirectorFormTemplateDO template = requireTemplate(templateId, scene);
         DirectorFormTemplateVersionDO draft = versionMapper.selectById(request.getVersionId());
         if (draft == null || !Objects.equals(draft.getTemplateId(), templateId) || !"draft".equals(draft.getStatus())) {
@@ -195,11 +202,18 @@ public class DirectorFormTemplateService {
         Map<String, Object> dictSnapshots = new LinkedHashMap<>();
         for (DirectorFormTemplateVO.Field field : fields) {
             Object raw = values.get(field.getKey());
+            if ("system_history".equals(field.getType())) {
+                if (!empty(raw)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+                continue;
+            }
             if (submit && Boolean.TRUE.equals(field.getRequired()) && empty(raw)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
             if (empty(raw)) continue;
             validateScalar(field, raw, submit);
             Object normalized = "region".equals(field.getType()) ? normalizeRegion(raw, submit) : raw;
             persisted.put(field.getKey(), normalized);
+            if ("material_picker".equals(field.getType())) {
+                dictSnapshots.put(field.getKey(), snapshotMaterials(field, raw, priorSnapshots.get(field.getKey())));
+            }
             if (field.getDictType() != null) {
                 dictSnapshots.put(field.getKey(), snapshotDictionary(field, raw, priorSnapshots.get(field.getKey())));
             }
@@ -209,6 +223,45 @@ public class DirectorFormTemplateService {
         result.setTemplateId(version.getTemplateId()); result.setTemplateVersionId(version.getId());
         result.setTemplateVersionNo(version.getVersionNo()); result.setFields(fields);
         result.setValues(persisted); result.setDictSnapshots(dictSnapshots);
+        return result;
+    }
+
+    private Object snapshotMaterials(DirectorFormTemplateVO.Field field, Object raw, Object previousSnapshot) {
+        if (!(raw instanceof Collection<?> ids)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        Map<Long, Map<?, ?>> retained = new HashMap<>();
+        if (previousSnapshot instanceof Collection<?> previous) {
+            for (Object entry : previous) {
+                if (entry instanceof Map<?, ?> snapshot && snapshot.get("materialVersionId") instanceof Number id
+                        && Objects.equals(field.getMaterialTypeCode(), snapshot.get("materialTypeCode"))) {
+                    retained.put(id.longValue(), snapshot);
+                }
+            }
+        }
+        List<Object> result = new ArrayList<>();
+        Set<Long> unique = new HashSet<>();
+        Long userId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        for (Object rawId : ids) {
+            Long id = ((Number) rawId).longValue();
+            if (!unique.add(id)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            // Unchanged selections retain the business snapshot frozen in this draft/submission.
+            if (retained.containsKey(id)) { result.add(retained.get(id)); continue; }
+            var version = materialService.getVersion(id, userId);
+            var material = materialService.get(version.getMaterialId(), userId);
+            var type = materialTypeService.getType(material.getMaterialTypeId());
+            if (!"EFFECTIVE".equals(version.getStatus()) || "DISABLED".equals(material.getStatus())
+                    || !Objects.equals(type.getStatus(), 0) || !Objects.equals(type.getCode(), field.getMaterialTypeCode())) {
+                throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            }
+            Map<String, Object> snapshot = new LinkedHashMap<>();
+            snapshot.put("materialId", material.getId()); snapshot.put("materialVersionId", version.getId());
+            snapshot.put("materialTypeCode", type.getCode()); snapshot.put("titleSnapshot", version.getTitle());
+            Map<String, Object> materialDictionary = version.getDictSnapshot() == null ? Map.of() : version.getDictSnapshot();
+            snapshot.put("platformSnapshot", materialDictionary.get("account_platform"));
+            snapshot.put("stageSnapshot", materialDictionary.get("account_stage"));
+            snapshot.put("fields", version.getFields()); snapshot.put("values", version.getValues());
+            snapshot.put("dictSnapshot", version.getDictSnapshot()); snapshot.put("files", version.getFiles());
+            result.add(snapshot);
+        }
         return result;
     }
 
@@ -260,6 +313,9 @@ public class DirectorFormTemplateService {
         if (Set.of("text", "textarea").contains(field.getType()) && !(raw instanceof String)) {
             throw exception(DIRECTOR_FORM_VALUE_INVALID);
         }
+        if ("material_picker".equals(field.getType()) && (!(raw instanceof Collection<?> refs)
+                || refs.stream().anyMatch(id -> !(id instanceof Number number) || number.longValue() <= 0
+                || number.doubleValue() != number.longValue()))) throw exception(DIRECTOR_FORM_VALUE_INVALID);
         if (Set.of("multi_select", "checkbox_group").contains(field.getType())
                 && (!(raw instanceof Collection<?> collection)
                 || collection.stream().anyMatch(value -> !(value instanceof String)))) {
@@ -268,7 +324,7 @@ public class DirectorFormTemplateService {
         if (Set.of("select", "radio").contains(field.getType()) && !(raw instanceof String)) {
             throw exception(DIRECTOR_FORM_VALUE_INVALID);
         }
-        if (submit && raw instanceof Collection<?> collection) {
+        if (submit && !"material_picker".equals(field.getType()) && raw instanceof Collection<?> collection) {
             int size = collection.size();
             if (field.getMinSelections() != null && size < field.getMinSelections()
                     || field.getMaxSelections() != null && size > field.getMaxSelections()) throw exception(DIRECTOR_FORM_VALUE_INVALID);
@@ -355,14 +411,27 @@ public class DirectorFormTemplateService {
     private List<DirectorFormTemplateVO.Field> normalize(String scene, List<DirectorFormTemplateVO.Field> source) {
         requireScene(scene);
         if (source == null || source.isEmpty()) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
-        Map<String, String> system = SCENE_INTERVIEW.equals(scene) ? INTERVIEW_SYSTEM_FIELDS : POSITIONING_SYSTEM_FIELDS;
+        Map<String, String> system = SCENE_POSITIONING_INTERVIEW.equals(scene)
+                ? Map.of("studentIdentity", "text", "collectedAt", "date")
+                : SCENE_INTERVIEW.equals(scene) ? INTERVIEW_SYSTEM_FIELDS : Map.of();
         Set<String> keys = new HashSet<>();
         for (DirectorFormTemplateVO.Field field : source) {
-            if (field == null || !keys.add(field.getKey()) || field.getSort() == null || field.getEnabled() == null
+            if (field == null || field.getType() == null || !FIELD_TYPES.contains(field.getType()) || !keys.add(field.getKey()) || field.getSort() == null || field.getEnabled() == null
                     || field.getRequired() == null || field.getTitle() == null || field.getTitle().isBlank()) {
                 throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
             }
             String systemType = system.get(field.getKey());
+            if ("material_picker".equals(field.getType()) && (field.getMaterialTypeCode() == null
+                    || !Set.of("viral_account", "viral_content").contains(field.getMaterialTypeCode()))) {
+                throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+            }
+            if ("system_history".equals(field.getType()) && Boolean.TRUE.equals(field.getRequired())) {
+                throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+            }
+            if (!ENUM_TYPES.contains(field.getType()) && field.getDictType() != null) field.setDictType(null);
+            if (SCENE_POSITIONING_INTERVIEW.equals(scene) && !Set.of("text", "date").contains(field.getType())) {
+                throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+            }
             if (systemType != null && !systemType.equals(field.getType())) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
             field.setSystemField(systemType != null);
             boolean enumField = ENUM_TYPES.contains(field.getType());
@@ -379,6 +448,13 @@ public class DirectorFormTemplateService {
             if (Set.of("select", "radio").contains(field.getType())) field.setMultiple(false);
         }
         if (!keys.containsAll(system.keySet())) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+        for (var field : source) {
+            if (field.getReferenceFor() != null && (!"material_picker".equals(field.getType())
+                    || !keys.contains(field.getReferenceFor()) || field.getKey().equals(field.getReferenceFor())
+                    || source.stream().anyMatch(target -> target.getKey().equals(field.getReferenceFor()) && "material_picker".equals(target.getType())))) {
+                throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+            }
+        }
         return source.stream().sorted(Comparator.comparing(DirectorFormTemplateVO.Field::getSort)
                 .thenComparing(DirectorFormTemplateVO.Field::getKey)).toList();
     }
@@ -408,8 +484,14 @@ public class DirectorFormTemplateService {
         if (template == null || !scene.equals(template.getScene())) throw exception(DIRECTOR_FORM_TEMPLATE_NOT_EXISTS);
         return template;
     }
+    private void requireWritableScene(String scene) {
+        // Old template rows remain for historical interpretation, never for new edits or publication.
+        if (SCENE_INTERVIEW.equals(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+        requireScene(scene);
+    }
+
     private void requireScene(String scene) {
-        if (!Set.of(SCENE_INTERVIEW, SCENE_POSITIONING).contains(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
+        if (!Set.of(SCENE_INTERVIEW, SCENE_POSITIONING, SCENE_POSITIONING_INTERVIEW).contains(scene)) throw exception(DIRECTOR_FORM_TEMPLATE_INVALID);
     }
     private void clearDefault(String scene, Long except) {
         LambdaUpdateWrapper<DirectorFormTemplateDO> update = new LambdaUpdateWrapper<DirectorFormTemplateDO>()

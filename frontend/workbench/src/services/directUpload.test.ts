@@ -67,7 +67,7 @@ describe('direct upload', () => {
       '/upload/init',
       '/upload/complete',
       new File(['x'], 'image.png', { type: 'image/png' }),
-    )).rejects.toThrow('upload failed')
+    )).rejects.toThrow('文件传输失败：upload failed')
 
     expect(post).toHaveBeenCalledTimes(1)
   })

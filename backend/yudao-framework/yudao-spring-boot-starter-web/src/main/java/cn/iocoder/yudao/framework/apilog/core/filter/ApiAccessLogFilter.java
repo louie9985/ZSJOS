@@ -15,6 +15,8 @@ import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstant
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditContextHolder;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.web.config.WebProperties;
 import cn.iocoder.yudao.framework.web.core.filter.ApiRequestFilter;
@@ -49,7 +51,7 @@ import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString
 @Slf4j
 public class ApiAccessLogFilter extends ApiRequestFilter {
 
-    private static final String[] SANITIZE_KEYS = new String[]{"password", "token", "accessToken", "refreshToken"};
+    private static final String[] SANITIZE_KEYS = new String[]{"password", "token", "accessToken", "refreshToken", "authorization", "cookie", "secret", "captcha", "verifyCode", "phone", "mobile", "idCard", "bankCard", "fileContent"};
 
     private final String applicationName;
 
@@ -67,9 +69,13 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             throws ServletException, IOException {
         // 获得开始时间
         LocalDateTime beginTime = LocalDateTime.now();
+        ExecutionAuditContextHolder.set(new ExecutionAuditContext("HTTP", request.getRequestURI(),
+                TracerUtils.getTraceId(), null, WebFrameworkUtils.getLoginUserId(),
+                null, null,
+                Map.of("method", request.getMethod())));
         // 提前获得参数，避免 XssFilter 过滤处理
         Map<String, String> queryString = ServletUtils.getParamMap(request);
-        String requestBody = ServletUtils.getBody(request);
+        String requestBody = isBinary(request) ? null : ServletUtils.getBody(request);
 
         try {
             // 继续过滤器
@@ -80,6 +86,8 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             // 异常执行，记录日志
             createApiAccessLog(request, beginTime, queryString, requestBody, ex);
             throw ex;
+        } finally {
+            ExecutionAuditContextHolder.set(null);
         }
     }
 
@@ -104,9 +112,8 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
         ApiAccessLog accessLogAnnotation = null;
         if (handlerMethod != null) {
             accessLogAnnotation = handlerMethod.getMethodAnnotation(ApiAccessLog.class);
-            if (accessLogAnnotation != null && BooleanUtil.isFalse(accessLogAnnotation.enable())) {
-                return false;
-            }
+            // In-scope API requests are always recorded. The annotation can still
+            // control payload/response capture, but cannot disable the audit row.
         }
 
         // 处理用户信息
@@ -204,7 +211,7 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
         } catch (Exception e) {
             // 脱敏失败的情况下，直接忽略异常，避免影响用户请求
             log.error("[sanitizeJson][脱敏({}) 发生异常]", jsonString, e);
-            return jsonString;
+            return "[REDACTED]";
         }
     }
 
@@ -220,11 +227,14 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
         } catch (Exception e) {
             // 脱敏失败的情况下，直接忽略异常，避免影响用户请求
             log.error("[sanitizeJson][脱敏({}) 发生异常]", jsonString, e);
-            return jsonString;
+            return "[REDACTED]";
         }
     }
 
     private static void sanitizeJson(JsonNode node, String[] sanitizeKeys) {
+        if (node == null || node.isNull()) {
+            return;
+        }
         // 情况一：数组，遍历处理
         if (node.isArray()) {
             for (JsonNode childNode : node) {
@@ -247,6 +257,11 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             }
             sanitizeJson(entry.getValue(), sanitizeKeys);
         }
+    }
+
+    private static boolean isBinary(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && (contentType.startsWith("multipart/") || contentType.startsWith("application/octet-stream") || contentType.startsWith("image/") || contentType.startsWith("video/") || contentType.startsWith("audio/"));
     }
 
 }

@@ -27,9 +27,10 @@ export type MaterialFieldDefinition = {
   group?: string
   stageCode?: string
   required?: boolean
+  placeholder?: string
+  initialCount?: number
   searchable?: boolean
   multiple?: boolean
-  recommendationDimension?: 'account_type' | 'profession' | 'account_stage'
   allowUnlimited?: boolean
   dictType?: string
   maxLength?: number
@@ -151,6 +152,7 @@ export type MaterialSaveRequest = {
 }
 
 export type MaterialPageParams = {
+  platform?: string
   pageNo: number
   pageSize: number
   keyword?: string
@@ -233,6 +235,9 @@ export type ContentReviewBatch = {
   id: number
   batchNo: string
   accountId: number
+  studentPersonId?: number
+  revisionOfBatchId?: number
+  accountIds?: number[]
   operatorUserId: number
   operatorName?: string
   directorUserId?: number
@@ -324,6 +329,42 @@ export const contentReviewApi = {
   get: async (id: number) => unwrap<ContentReviewBatch>(
     await http.get('/zsjos/content-review/batch/get', { params: { id } })
   ),
+  history: async (id: number) => unwrap<ContentReviewBatch[]>(
+    await http.get('/zsjos/content-review/batch/history', { params: { id } })
+  ),
+  createFromStudent: async (data: {
+    contentVersionIds?: number[]
+    studentPersonId: number
+    accountIds: number[]
+    accountSnapshots?: Record<string, Record<string, unknown>>
+    works?: Array<{
+      coverFileId?: number
+      purposeValue?: string
+      purposeLabelSnapshot?: string
+      formatValue?: string
+      formatLabelSnapshot?: string
+      title?: string
+      scriptText?: string
+      detailUrl?: string
+      leadResourceUrl?: string
+      commentHook?: string
+      referenceContentVersionId?: number
+      plannedPublishAt?: string
+    }>
+  }) =>
+    unwrap<number>(await http.post('/zsjos/content-review/batch/create-from-student', data)),
+  resubmitFromStudent: async (batchId: number, data: {
+    studentPersonId: number
+    accountIds: number[]
+    accountSnapshots?: Record<string, Record<string, unknown>>
+    works: Array<Record<string, unknown>>
+  }) => unwrap<number>(await http.post(`/zsjos/content-review/batch/${batchId}/resubmit-from-student`, data)),
+  saveStudentDraft: async (batchId: number, data: {
+    studentPersonId: number
+    accountIds: number[]
+    accountSnapshots?: Record<string, Record<string, unknown>>
+    works: Array<Record<string, unknown>>
+  }) => unwrap<number>(await http.post(`/zsjos/content-review/batch/${batchId}/save-student-draft`, data)),
   create: async (contentVersionIds: number[]) => unwrap<number>(
     await http.post('/zsjos/content-review/batch/create', { contentVersionIds })
   ),

@@ -42,6 +42,10 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.gift.GiftConfigMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.gift.GiftConfigDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.giftpurchase.GiftPurchaseMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.giftpurchase.GiftPurchaseDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentIntentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentTransactionDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PurchaseIntentDO;
@@ -126,6 +130,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private PaymentIntentMapper paymentIntentMapper;
     @Resource private PaymentTransactionMapper paymentTransactionMapper;
     @Resource private OrderPaymentAllocationMapper orderPaymentAllocationMapper;
+    @Resource private GiftConfigMapper giftConfigMapper;
+    @Resource private GiftPurchaseMapper giftPurchaseMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -141,7 +147,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (orderMapper.selectActiveByLeadId(leadId, ACTIVE_ORDER_STATUSES) != null) throw exception(SALES_ORDER_ACTIVE_DUPLICATE);
         if (orderMapper.hasEffectiveOrder(lead.getPersonId())) throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         OpportunityDO opportunity = requireEligibleOpportunity(lead);
-        ValidatedSubmission validated = validateSubmission(reqVO, userId);
+        ValidatedSubmission validated = validateSubmission(reqVO, userId, List.of());
         PaymentIntentDO paymentIntent = validatePurchaseIntent(reqVO, validated.total(), lead.getPersonId(), null);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
@@ -227,7 +233,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (orderMapper.selectActiveRepurchaseByPersonId(personId, ACTIVE_ORDER_STATUSES) != null) {
             throw exception(SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE);
         }
-        ValidatedSubmission validated = validateSubmission(submission, userId);
+        ValidatedSubmission validated = validateSubmission(submission, userId, List.of());
         PaymentIntentDO paymentIntent = validatePurchaseIntent(submission, validated.total(), personId, null);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
@@ -303,7 +309,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
             requireNoOtherActiveOrder(order.getId(), null, order.getPersonId());
         }
-        ValidatedSubmission validated = validateSubmission(reqVO, userId);
+        List<SalesOrderItemDO> historicalItems = itemMapper.selectListByOrderId(orderId);
+        ValidatedSubmission validated = validateSubmission(reqVO, userId, historicalItems);
         if (reqVO.getPurchaseIntentId() == null) reqVO.setPurchaseIntentId(order.getPurchaseIntentId());
         validatePurchaseIntent(reqVO, validated.total(), order.getPersonId(), order.getId());
         LocalDateTime now = LocalDateTime.now();
@@ -315,8 +322,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         registrationService.cancelByOrderId(orderId, "原订单已被接续", now);
         if (latest != null) supervisorConfirmationService.cancelPending(latest.getId(), now);
 
-        // Release the generated active-order key before inserting the independent successor.
+        // Release both generated active-order keys before inserting the independent successor:
+        // the superseded row must not keep the active_lead_id/active_repurchase_person_id or the
+        // uk_tenant_source_payment_order key that the successor is about to carry. Lineage is kept
+        // through supersedes_order_id, so the payment intent remains reachable from the successor.
         order.setStatus(STATUS_SUPERSEDED); order.setSupersededByOrderId(null);
+        order.setSourcePaymentOrderId(null);
         orderMapper.updateById(order);
         SalesOrderDO successor = copyForSuccessor(order, userId, now);
         successor.setSupersedesOrderId(orderId); successor.setSupersededByOrderId(null);
@@ -932,6 +943,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         OpportunityDO opportunity = order.getOpportunityId() == null ? null : opportunityMapper.selectById(order.getOpportunityId());
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_APPROVED); order.setStatus(STATUS_EFFECTIVE); order.setEffectiveAt(now);
+            createGiftPurchaseIfNeeded(order, now);
             if (opportunity != null) {
                 opportunity.setStatus(OPPORTUNITY_STATUS_WON); opportunity.setWonAt(now);
                 opportunity.setNextFollowUpAt(null); opportunityMapper.updateById(opportunity);
@@ -984,6 +996,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             publishOrderNotification(REJECTED, order, "sales-order-rejected:" + round.getId(),
                     List.of(), resultUserIds, leadSubmitterUserId, partnerId, reason, now);
         }
+    }
+
+    private void createGiftPurchaseIfNeeded(SalesOrderDO order, LocalDateTime now) {
+        if (StrUtil.isBlank(order.getGiftItems()) || "[]".equals(order.getGiftItems())) return;
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        if (giftPurchaseMapper.selectCount(com.baomidou.mybatisplus.core.toolkit.Wrappers.lambdaQuery(GiftPurchaseDO.class)
+                .eq(GiftPurchaseDO::getTenantId, tenantId).eq(GiftPurchaseDO::getOrderId, order.getId())) > 0) return;
+        GiftPurchaseDO p = new GiftPurchaseDO();
+        p.setOrderId(order.getId()); p.setOrderNo(order.getOrderNo()); p.setStudentName(order.getStudentName());
+        p.setStudentMobile(order.getStudentMobile()); p.setStudentWechatId(order.getStudentWechatId());
+        p.setGiftItemsJson(order.getGiftItems()); p.setShippingAddress(order.getGiftShippingAddress()); p.setGeneratedAt(now);
+        try { giftPurchaseMapper.insert(p); } catch (DuplicateKeyException ignored) { }
     }
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
@@ -1202,7 +1226,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         orderPaymentAllocationMapper.insert(allocation);
     }
 
-    private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId) {
+    private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId,
+                                                   List<SalesOrderItemDO> historicalItems) {
         if (StrUtil.isBlank(req.getStudentMobile()) && StrUtil.isBlank(req.getStudentWechatId())) throw exception(SALES_ORDER_CONTACT_REQUIRED);
         if (StrUtil.isNotBlank(req.getStudentMobile()) && !ValidationUtils.isMobile(req.getStudentMobile().trim())) {
             throw exception(LEAD_MOBILE_INVALID);
@@ -1219,13 +1244,43 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         BigDecimal total = BigDecimal.ZERO;
         for (SalesOrderSubmitReqVO.Item item : req.getItems()) {
             if (!skuRefs.add(item.getSkuRef())) throw exception(PRODUCT_SKU_DUPLICATE);
-            LeadProductSnapshot snapshot = skuService.validateLeadProduct(item.getSpuRef(), false, item.getSkuRef(), false);
+            SalesOrderItemDO previous = historicalItems.stream()
+                    .filter(candidate -> Objects.equals(candidate.getProductRef(), item.getSpuRef())
+                            && Objects.equals(candidate.getSkuRef(), item.getSkuRef()))
+                    .findFirst().orElse(null);
+            LeadProductSnapshot snapshot = previous == null ? null : historicalProductSnapshot(previous);
+            if (previous != null && snapshot == null) throw exception(SALES_ORDER_HISTORICAL_SNAPSHOT_INVALID);
+            if (snapshot == null) {
+                snapshot = skuService.validateLeadProduct(item.getSpuRef(), false, item.getSkuRef(), false);
+            }
             BigDecimal amount = item.getActualAmount().setScale(2);
             total = total.add(amount); items.add(new ValidatedItem(snapshot, amount));
         }
         List<VoucherRef> vouchers = validateVouchers(req.getPaymentVouchers(), userId);
         if (vouchers.isEmpty()) throw exception(SALES_ORDER_VOUCHER_REQUIRED);
+        validateGifts(req);
         return new ValidatedSubmission(items, vouchers, total.setScale(2));
+    }
+
+    private void validateGifts(SalesOrderSubmitReqVO req) {
+        if (req.getGiftItems() == null || req.getGiftItems().isEmpty()) return;
+        LinkedHashSet<String> codes = new LinkedHashSet<>(req.getGiftItems());
+        if (codes.stream().anyMatch(StrUtil::isBlank)) throw new IllegalArgumentException("礼品编码无效");
+        if (StrUtil.isBlank(req.getGiftShippingAddress()) || req.getGiftShippingAddress().length() > 1000)
+            throw new IllegalArgumentException("选择礼品后邮寄地址必填且不超过1000字");
+        List<GiftConfigDO> all = giftConfigMapper.selectList(null);
+        Map<String, GiftConfigDO> byCode = all.stream().collect(java.util.stream.Collectors.toMap(GiftConfigDO::getCode, x -> x, (a,b)->a));
+        List<Map<String,Object>> snapshots = new ArrayList<>();
+        for (String code : codes) {
+            GiftConfigDO g = byCode.get(code);
+            if (g == null || !Objects.equals(g.getStatus(), 1)) throw new IllegalArgumentException("礼品不存在或已停用");
+            if (all.stream().anyMatch(x -> Objects.equals(x.getParentId(), g.getId()))) throw new IllegalArgumentException("只能选择叶子礼品");
+            List<String> path = new ArrayList<>(); GiftConfigDO cur = g; Set<Long> seen = new HashSet<>();
+            while (cur != null && cur.getId()!=null && seen.add(cur.getId())) { path.add(cur.getName()); Long pid=cur.getParentId(); cur=pid==null||pid==0?null:all.stream().filter(x->Objects.equals(x.getId(),pid)).findFirst().orElse(null); }
+            Collections.reverse(path); snapshots.add(Map.of("code",code,"name",g.getName(),"path",path,"snapshotAt",LocalDateTime.now().toString()));
+        }
+        req.setGiftItems(codes.stream().toList());
+        req.setGiftItems(snapshots.stream().map(JsonUtils::toJsonString).toList());
     }
 
     private RegionSnapshot validateRegion(String provinceCode, String cityCode) {
@@ -1295,6 +1350,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setCustomerPaidAt(req.getCustomerPaidAt()); order.setFeeMode(req.getFeeMode()); order.setPaymentMethod(req.getPaymentMethod());
         order.setRemark(StrUtil.trim(req.getRemark())); order.setStudentSpecialRequirements(StrUtil.trim(req.getStudentSpecialRequirements()));
         order.setMaterialDeliveryContact(StrUtil.trim(req.getMaterialDeliveryContact()));
+        order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
+        order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
+        order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
+        order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
+                order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
+                order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
         order.setPaymentVoucherRefs(JsonUtils.toJsonString(validated.vouchers())); order.setSubmittedAt(now);
     }
 
@@ -1688,16 +1749,33 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     @SuppressWarnings("unchecked")
     private SalesOrderRespVO.ItemVO convertItem(SalesOrderItemDO item) {
-        LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
+        LeadProductSnapshot snapshot = historicalProductSnapshot(item);
         SalesOrderRespVO.ItemVO result = new SalesOrderRespVO.ItemVO(); result.setId(item.getId());
         result.setProductRef(item.getProductRef()); result.setSkuRef(item.getSkuRef()); result.setActualAmount(item.getPayableAmount());
         if (snapshot != null) {
             result.setProductName(snapshot.name()); result.setSkuName(snapshot.skuName());
-            result.setCategoryPath(snapshot.categoryPath().stream().map(node -> node.name()).toList());
-            result.setAttrValues(snapshot.selectedAttrValuesJson() == null ? Map.of() : JsonUtils.parseObject(snapshot.selectedAttrValuesJson(), Map.class));
+            result.setCategoryPath(snapshot.categoryPath() == null ? List.of() : snapshot.categoryPath().stream().map(node -> node.name()).toList());
+            result.setAttrValues(snapshot.selectedAttrValuesJson() == null ? Map.of() : Optional.ofNullable(JsonUtils.parseObjectQuietly(snapshot.selectedAttrValuesJson(), Map.class)).orElseGet(Map::of));
             result.setSpecs(snapshot.displaySpecs());
+        } else {
+            result.setProductName("历史课程信息缺失");
+            result.setSkuName(null);
+            result.setCategoryPath(List.of());
+            result.setAttrValues(Map.of());
+            result.setSpecs(List.of());
         }
         return result;
+    }
+
+    private LeadProductSnapshot historicalProductSnapshot(SalesOrderItemDO item) {
+        if (StrUtil.isBlank(item.getProductSnapshot())) return null;
+        try {
+            LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
+            if (snapshot == null) return null;
+            return snapshot.specs() == null ? snapshot.withSpecs(snapshot.displaySpecs()) : snapshot;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private List<SalesOrderRespVO.AttachmentVO> convertVouchers(String json) {
@@ -1720,3 +1798,5 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}
 }
+
+

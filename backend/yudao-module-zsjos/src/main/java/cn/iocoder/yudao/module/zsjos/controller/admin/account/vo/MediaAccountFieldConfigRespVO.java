@@ -30,5 +30,18 @@ public class MediaAccountFieldConfigRespVO {
         private Integer sort;
         private String dictType;
         private Boolean searchable;
+        /** Field responsibility: AUTO, DIRECTOR, OPERATOR or UNASSIGNED. */
+        private String ownerType;
+        private String group;
+        private Boolean requiredForCreate;
+        private Boolean requiredForComplete;
+        private String sourceType;
+        private String snapshotPolicy;
+        private String description;
+        private String referenceFor;
+        private String materialTypeCode;
+        private String defaultPlatform;
+        private String defaultAccountStage;
+        private String recommendedCount;
     }
 }

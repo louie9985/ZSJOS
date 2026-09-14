@@ -30,19 +30,25 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
 
     @Autowired
     public BusinessTaskServiceImpl(BusinessTaskMapper taskMapper, List<BusinessTaskSceneProvider> providers) {
-        this(taskMapper, providers, Clock.systemDefaultZone());
+        this.taskMapper = taskMapper;
+        this.clock = Clock.systemDefaultZone();
+        this.sceneProviders = buildProviders(providers);
     }
 
     BusinessTaskServiceImpl(BusinessTaskMapper taskMapper, List<BusinessTaskSceneProvider> providers, Clock clock) {
         this.taskMapper = taskMapper;
         this.clock = clock;
-        this.sceneProviders = new HashMap<>();
+        this.sceneProviders = buildProviders(providers);
+    }
+    private Map<String, BusinessTaskSceneProvider> buildProviders(List<BusinessTaskSceneProvider> providers) {
+        Map<String, BusinessTaskSceneProvider> map = new HashMap<>();
         for (BusinessTaskSceneProvider provider : providers) {
-            BusinessTaskSceneProvider previous = sceneProviders.put(provider.getBizType(), provider);
+            BusinessTaskSceneProvider previous = map.put(provider.getBizType(), provider);
             if (previous != null) {
                 throw new IllegalStateException("Duplicate business task provider: " + provider.getBizType());
             }
         }
+        return map;
     }
 
     @Override

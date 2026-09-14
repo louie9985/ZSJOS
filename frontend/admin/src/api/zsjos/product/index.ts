@@ -83,6 +83,13 @@ export interface ProductSkuVO {
   skuName: string
   attrValues: Record<string, string>
   price: number
+  retailPrice?: number
+  minDealPrice?: number
+  minDealType?: 'FIXED' | 'DISCOUNT_RATE' | 'NEGOTIABLE'
+  minDealRate?: number
+  examFee?: number
+  priceUnit?: 'PACKAGE' | 'SUBJECT' | 'FULL_COURSE'
+  pricingNote?: string
   status: number
   sort: number
   remark?: string
@@ -95,6 +102,13 @@ export interface ProductSkuSaveReqVO {
   skuName: string
   attrValues: Record<string, string>
   price: number
+  retailPrice?: number
+  minDealPrice?: number
+  minDealType?: 'FIXED' | 'DISCOUNT_RATE' | 'NEGOTIABLE'
+  minDealRate?: number
+  examFee?: number
+  priceUnit?: 'PACKAGE' | 'SUBJECT' | 'FULL_COURSE'
+  pricingNote?: string
   status: number
   sort: number
   remark?: string

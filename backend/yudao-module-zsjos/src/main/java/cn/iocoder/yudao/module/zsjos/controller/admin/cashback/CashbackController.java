@@ -18,6 +18,22 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class CashbackController {
     @Resource private CashbackService service;
 
+    @PostMapping("/search-page")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query')")
+    public CommonResult<PageResult<CashbackRespVO>> searchPage(@Valid @RequestBody CashbackPageReqVO request) {
+        return success(service.getPage(request, null));
+    }
+
+    @PostMapping("/my-search-page")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:cashback:my-query')")
+    public CommonResult<PageResult<CashbackRespVO>> mySearchPage(@Valid @RequestBody CashbackPageReqVO request) {
+        return success(service.getPage(request, WebFrameworkUtils.getLoginUserId()));
+    }
+
+
+
     @GetMapping("/my-page")
     @PreAuthorize("@ss.hasPermission('zsjos:cashback:my-query')")
     public CommonResult<PageResult<CashbackRespVO>> myPage(@Valid CashbackPageReqVO request) {

@@ -209,6 +209,7 @@ export type EamCategoryField = {
   dictType?: string;
 };
 export type MediaAccountDetailSnapshot = {
+  materialVersions?: import('./materialApi').MaterialVersion[];
   key: string;
   label: string;
   type: string;
@@ -217,6 +218,12 @@ export type MediaAccountDetailSnapshot = {
   dictType?: string;
 };
 export type MediaAccountField = {
+  referenceFor?: string;
+  materialTypeCode?: string;
+  defaultPlatform?: string;
+  defaultAccountStage?: string;
+  recommendedCount?: string;
+  description?: string;
   key: string;
   label: string;
   type:
@@ -226,12 +233,18 @@ export type MediaAccountField = {
     | "date"
     | "select"
     | "multi_select"
-    | "boolean";
+    | "boolean"
+    | "image"
+    | "attachment"
+    | "materials"
+    | "record"
+    | "url";
   required: boolean;
   enabled: boolean;
   sort: number;
   dictType?: string;
   searchable: boolean;
+  ownerType?: "AUTO" | "DIRECTOR" | "OPERATOR" | "UNASSIGNED";
 };
 export type MediaAccountFieldConfig = {
   id: number;
@@ -445,7 +458,7 @@ export type ProductionTicketCreateContext = ProductionTicketDispatchContext & {
 export type PositioningCard = {
   id: number;
   cardNo: string;
-  accountId: number;
+  accountId?: number;
   studentPersonId?: number;
   serviceRelationId?: number;
   directorUserId?: number;
@@ -463,7 +476,7 @@ export type PositioningCard = {
   availableActions: string[];
 };
 export type PositioningCardDraftRequest = {
-  accountId: number;
+  accountId?: number;
   studentPersonId?: number;
   serviceRelationId?: number;
   templateId?: number;
@@ -702,6 +715,8 @@ export type MyStudent = {
     leadNo?: string;
     orderId?: number;
     orderNo?: string;
+    classId?: number;
+    className?: string;
     courseName?: string;
     skuName?: string;
     categoryPath?: string[];
@@ -872,12 +887,18 @@ export type StudentContactFormField = {
     | "checkbox_group"
     | "checkbox"
     | "attachment"
-    | "region";
+    | "region"
+    | "material_picker"
+    | "system_history";
   required: boolean;
   enabled: boolean;
   systemField: boolean;
   sort: number;
   description?: string;
+  interviewNote?: string;
+  allowRemark?: boolean;
+  requireAttachment?: boolean;
+  studentVisible?: boolean;
   dictType?: string;
   multiple?: boolean;
   minSelections?: number;
@@ -886,6 +907,7 @@ export type StudentContactFormField = {
   maxValue?: number;
   maxLength?: number;
   group?: string;
+  referenceFor?: string; materialTypeCode?: 'viral_account' | 'viral_content'; defaultPlatform?: string; defaultStage?: string; recommendedCount?: string; filterAdjustable?: boolean;
 };
 export type DirectorTemplateSnapshot = {
   templateId: number;
@@ -907,7 +929,7 @@ export type DirectorTemplateVersion = {
 };
 export type DirectorTemplate = {
   id: number;
-  scene: "director_interview" | "positioning_card";
+  scene: "director_positioning_interview" | "positioning_card";
   templateCode: string;
   name: string;
   defaultTemplate: boolean;
@@ -955,6 +977,11 @@ export type StudentContactAction =
   | "END_SERVICE"
   | "DIRECTOR_PRECHECK"
   | "DIRECTOR_INTERVIEW"
+  | "START_POSITIONING_INTERVIEW"
+  | "CONTINUE_POSITIONING_INTERVIEW"
+  | "VIEW_POSITIONING_INTERVIEW"
+  | "CREATE_MEDIA_ACCOUNT"
+  | "ASSIGN_OPERATOR"
   | "DIRECTOR_OPERATOR_ASSIGN";
 export type StudentDeliveryStage = {
   code: string;
@@ -1080,7 +1107,9 @@ export type AdvancedFilterScene =
   | "duplicate_review"
   | "registration"
   | "student"
-  | "subordinate_sales";
+  | "subordinate_sales"
+  | "cashback"
+  | "withdrawal";
 export type AdvancedFilterField = {
   fieldKey: string;
   group: string;
@@ -1160,6 +1189,13 @@ export type LeadCatalogSku = {
   skuName: string;
   attrValues: Record<string, string>;
   price: number;
+  retailPrice?: number;
+  minDealPrice?: number;
+  minDealType?: 'FIXED' | 'DISCOUNT_RATE' | 'NEGOTIABLE';
+  minDealRate?: number;
+  examFee?: number;
+  priceUnit?: 'PACKAGE' | 'SUBJECT' | 'FULL_COURSE';
+  pricingNote?: string;
 };
 export type LeadCatalog = {
   categoryTree: LeadCategoryNode[];
@@ -1292,6 +1328,8 @@ export type ManagedLeadAttachment = {
   contentType: string;
   fileSize: number;
 };
+export type ManagedLeadRemarkAttachment = Omit<ManagedLeadAttachment, 'id'> & { infraFileId: number };
+export type ManagedLeadRemark = { id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: ManagedLeadRemarkAttachment[] };
 export type ManagedLead = {
   version?: number;
   id: number;
@@ -1323,7 +1361,7 @@ export type ManagedLead = {
   cityName?: string;
   leadCategory?: string;
   leadCategoryLabelSnapshot?: string;
-  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string }>;
+  remarkHistory?: ManagedLeadRemark[];
   remarkHistoryIncomplete?: boolean;
   remark?: string;
   status: string;
@@ -1667,10 +1705,12 @@ export type SalesOrderSubmitRequest = {
   remark?: string;
   studentSpecialRequirements?: string;
   materialDeliveryContact?: string;
+  giftItems?: string[]; giftShippingAddress?: string;
   items: Array<{ spuRef: string; skuRef: string; actualAmount: number }>;
   paymentVouchers: Array<{ infraFileId: number }>;
   idempotencyKey: string;
 };
+export type GiftNode = { id: number; parentId: number; name: string; code: string; status: number; sort: number; children?: GiftNode[] };
 export type CollectionMode = "online_link" | "offline_paid";
 export type PurchaseIntentDraftRequest = {
   id?: number;
@@ -1779,6 +1819,7 @@ export type SalesOrder = {
   remark?: string;
   studentSpecialRequirements?: string;
   materialDeliveryContact?: string;
+  giftItems?: string[]; giftShippingAddress?: string;
   items: Array<{
     id: number;
     productRef: string;
@@ -2064,12 +2105,17 @@ export type BusinessTask = {
     | "OPEN_STUDENT_FIRST_CONTACT"
     | "OPEN_STUDENT_STUDY_PLAN"
     | "OPEN_STUDENT_CONTACT"
-    | "OPEN_STUDENT_CONTACT_ASSISTANCE";
+    | "OPEN_STUDENT_CONTACT_ASSISTANCE"
+    | "MEDIA_ACCOUNT_DIAGNOSIS"
+    | "STUDENT_DELIVERY_CONFIRM";
   serviceRelationId?: number;
   targetTab?: string;
   targetRecordId?: number;
   actionable: boolean;
 };
+export type StudentDeliveryPlan = { id: number; accountId: number; status: string; accountOpenedAt: Timestamp; stages: Array<{ id: number; stageCode: string; status: string; triggerAt?: Timestamp; dueAt?: Timestamp; completedAt?: Timestamp }> };
+export type StudentDeliverySubmission = { id: number; stageId: number; submittedAt: Timestamp };
+export type StudentDeliveryDefer = { id: number; stageId: number; requestedDays: number; status: string };
 export type BpmTask = {
   id: string;
   name: string;
@@ -2404,6 +2450,13 @@ export type ProductSku = {
   skuName: string;
   attrValues: Record<string, string>;
   price: number;
+  retailPrice?: number;
+  minDealPrice?: number;
+  minDealType?: 'FIXED' | 'DISCOUNT_RATE' | 'NEGOTIABLE';
+  minDealRate?: number;
+  examFee?: number;
+  priceUnit?: 'PACKAGE' | 'SUBJECT' | 'FULL_COURSE';
+  pricingNote?: string;
   status: number;
   sort: number;
   remark?: string;
@@ -2415,6 +2468,13 @@ export type ProductSkuSaveRequest = {
   skuName: string;
   attrValues: Record<string, string>;
   price: number;
+  retailPrice?: number;
+  minDealPrice?: number;
+  minDealType?: 'FIXED' | 'DISCOUNT_RATE' | 'NEGOTIABLE';
+  minDealRate?: number;
+  examFee?: number;
+  priceUnit?: 'PACKAGE' | 'SUBJECT' | 'FULL_COURSE';
+  pricingNote?: string;
   status: number;
   sort: number;
   remark?: string;
@@ -2957,22 +3017,26 @@ export const uploadDirectFile = async <T>(
   file: File,
   onUploadProgress?: (event: AxiosProgressEvent) => void,
 ): Promise<T> => {
-  const init = unwrap<DirectUploadInit>(
-    await http.post(initUrl, {
+  let init: DirectUploadInit
+  try {
+    init = unwrap<DirectUploadInit>(await http.post(initUrl, {
       name: file.name,
       contentType: file.type || "application/octet-stream",
       size: file.size,
-    }),
-  );
-  await axios.put(init.uploadUrl, file, {
-    headers: init.uploadHeaders,
-    timeout: 0,
-    withCredentials: false,
-    onUploadProgress,
-  });
-  return unwrap<T>(
-    await http.post(completeUrl, { uploadToken: init.uploadToken }),
-  );
+    }))
+  } catch (cause) {
+    throw new Error(`上传初始化失败：${cause instanceof Error ? cause.message : '请重试'}`)
+  }
+  try {
+    await axios.put(init.uploadUrl, file, { headers: init.uploadHeaders, timeout: 0, withCredentials: false, onUploadProgress })
+  } catch (cause) {
+    throw new Error(`文件传输失败：${cause instanceof Error ? cause.message : '请检查对象存储跨域配置'}`)
+  }
+  try {
+    return unwrap<T>(await http.post(completeUrl, { uploadToken: init.uploadToken }))
+  } catch (cause) {
+    throw new Error(`上传确认失败：${cause instanceof Error ? cause.message : '请重试'}`)
+  }
 };
 
 async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
@@ -3303,9 +3367,12 @@ export const api = {
   mediaAccount: {
     create: async (data: {
       studentPersonId: number;
+      serviceRelationId: number;
+      version: number;
+      idempotencyKey: string;
       directorUserId?: number;
-      platformValue: string;
-      platformLabelSnapshot: string;
+      platformValue?: string;
+      platformLabelSnapshot?: string;
       platformAccountId?: string;
       nickname?: string;
       leadDirection?: string;
@@ -3445,6 +3512,9 @@ export const api = {
       topic?: string;
       contentClassValue: string;
       contentClassLabelSnapshot: string;
+      purposeValue?: string; purposeLabelSnapshot?: string; formatValue?: string; formatLabelSnapshot?: string;
+      detailUrl?: string; commentHook?: string; plannedPublishAt?: string;
+    
     }) => unwrap<number>(await http.post("/zsjos/content/create", data)),
     get: async (id: number) =>
       unwrap<MediaContent>(
@@ -3637,6 +3707,11 @@ export const api = {
       ),
   },
   positioningCard: {
+    uploadAttachment: async (id: number, fieldKey: string, file: File) => {
+      const data = new FormData(); data.append('fieldKey', fieldKey); data.append('file', file)
+      return unwrap<{ id: number; name: string; type: string; size: number; url?: string }>(await http.post(`/zsjos/positioning-card/${id}/attachments`, data))
+    },
+    attachment: async (id: number, fileId: number) => unwrap<{ id: number; name: string; type: string; size: number; url?: string }>(await http.get(`/zsjos/positioning-card/${id}/attachments/${fileId}`)),
     publishedTemplate: async (templateId?: number) =>
       unwrap<DirectorTemplateSnapshot>(
         await http.get("/zsjos/positioning-card/published-template", {
@@ -3725,6 +3800,8 @@ export const api = {
           params: { cardId },
         }),
       ),
+    interviews: async (accountId: number) =>
+      unwrap<unknown[]>(await http.get('/zsjos/positioning/workspace/interviews', { params: { accountId } })),
     execCard: async (cardId: number) =>
       unwrap<unknown>(
         await http.get("/zsjos/positioning/workspace/exec-card", {
@@ -3738,13 +3815,13 @@ export const api = {
         await http.get(
           positioning
             ? "/zsjos/positioning-template/list"
-            : "/zsjos/director-interview-template/list",
+            : "/zsjos/positioning-interview-template/list",
         ),
       ),
     copyDraft: async (positioning: boolean, id: number, version: number) =>
       unwrap<number>(
         await http.post(
-          `${positioning ? "/zsjos/positioning-template" : "/zsjos/director-interview-template"}/${id}/draft/copy`,
+          `${positioning ? "/zsjos/positioning-template" : "/zsjos/positioning-interview-template"}/${id}/draft/copy`,
           null,
           { params: { version } },
         ),
@@ -3762,7 +3839,7 @@ export const api = {
     ) =>
       unwrap<boolean>(
         await http.put(
-          `${positioning ? "/zsjos/positioning-template" : "/zsjos/director-interview-template"}/${id}/draft`,
+          `${positioning ? "/zsjos/positioning-template" : "/zsjos/positioning-interview-template"}/${id}/draft`,
           data,
         ),
       ),
@@ -3773,7 +3850,7 @@ export const api = {
     ) =>
       unwrap<boolean>(
         await http.post(
-          `${positioning ? "/zsjos/positioning-template" : "/zsjos/director-interview-template"}/${id}/publish`,
+          `${positioning ? "/zsjos/positioning-template" : "/zsjos/positioning-interview-template"}/${id}/publish`,
           data,
         ),
       ),
@@ -4040,11 +4117,8 @@ export const api = {
   supplementLead: async (
     id: number,
     data: {
-      provinceCode: string;
-      cityCode: string;
-      leadCategory: string;
-      intendedProducts: LeadCreateRequest["intendedProducts"];
-      remark?: string;
+      remark: string;
+      attachments?: Array<{ infraFileId: number }>;
       idempotencyKey: string;
     },
   ) =>
@@ -4252,6 +4326,8 @@ export const api = {
   },
   salesOrderCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/sales-order/product/catalog")),
+  giftConfigList: async () =>
+    unwrap<GiftNode[]>(await http.get("/zsjos/gift-config/list", { params: { status: 1 } })),
   currentPurchaseIntent: async (
     data: Pick<
       PurchaseIntentDraftRequest,
@@ -4276,6 +4352,8 @@ export const api = {
     unwrap<PurchaseIntent>(
       await http.post(`/zsjos/purchase-intent/${id}/refresh-payment`),
     ),
+  cancelPurchasePayment: async (id: number) =>
+    unwrap<PurchaseIntent>(await http.post(`/zsjos/purchase-intent/${id}/cancel-payment`)),
   applyPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
     unwrap<PaymentRefund>(await http.post("/zsjos/payment-refund/apply", data)),
   directPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
@@ -4629,6 +4707,19 @@ export const api = {
     unwrap<BusinessTaskSummary>(
       await http.get("/zsjos/business-task/my-summary"),
     ),
+  studentDelivery: {
+    plan: async (accountId: number) => unwrap<StudentDeliveryPlan | null>(await http.get("/zsjos/student-delivery/plan", { params: { accountId } })),
+    ensurePlan: async (data: { studentPersonId: number; accountId: number; serviceRelationId?: number; directorUserId?: number; accountOpenedAt: string }) =>
+      unwrap<StudentDeliveryPlan>(await http.post("/zsjos/student-delivery/plan", undefined, { params: data })),
+    submit: async (data: { stageId: number; submittedBy: number; templateVersionId?: number; fieldValuesJson: string; dictionarySnapshotJson?: string; attachmentSnapshotJson?: string }) =>
+      unwrap<StudentDeliverySubmission>(await http.post("/zsjos/student-delivery/submission", data)),
+    defer: async (data: { stageId: number; requestedBy: number; requestedDays: 1 | 2 | 3; reason: string; supervisorUserId?: number }) =>
+      unwrap<StudentDeliveryDefer>(await http.post("/zsjos/student-delivery/defer", data)),
+  },
+  studentDeliveryConfig: {
+    get: async () => unwrap<Record<string, number>>(await http.get('/zsjos/student-delivery/config')),
+    update: async (data: Record<string, number>) => unwrap<boolean>(await http.put('/zsjos/student-delivery/config', data)),
+  },
   menuTaskSummary: async () =>
     unwrap<MenuTaskSummary>(await http.get("/zsjos/business-task/menu-task-summary")),
   businessTaskPage: async (
@@ -5499,36 +5590,6 @@ export const api = {
         data,
       ),
     ),
-  studentDirectorInterviewDraft: async (
-    relationId: number,
-    data: {
-      interviewAt?: string;
-      data: Record<string, unknown>;
-      version: number;
-      idempotencyKey: string;
-    },
-  ) =>
-    unwrap<number>(
-      await http.post(
-        `/zsjos/student/service/${relationId}/interview/draft`,
-        data,
-      ),
-    ),
-  studentDirectorInterviewSubmit: async (
-    relationId: number,
-    data: {
-      interviewAt?: string;
-      data: Record<string, unknown>;
-      version: number;
-      idempotencyKey: string;
-    },
-  ) =>
-    unwrap<boolean>(
-      await http.post(
-        `/zsjos/student/service/${relationId}/interview/submit`,
-        data,
-      ),
-    ),
   studentCollaboratorCandidates: async (
     relationId: number,
     type: "content_director" | "career_planner" | "operator",
@@ -5673,3 +5734,4 @@ export const api = {
       }),
     ),
 };
+

@@ -21,6 +21,13 @@ public class ZsjosProductSkuDO extends TenantBaseDO {
     private String attrValuesJson;
     private String attrValuesHash;
     private BigDecimal price;
+    private BigDecimal retailPrice;
+    private BigDecimal minDealPrice;
+    private String minDealType;
+    private BigDecimal minDealRate;
+    private BigDecimal examFee;
+    private String priceUnit;
+    private String pricingNote;
     private Integer status;
     private Integer sort;
     private String remark;

@@ -313,7 +313,7 @@ export function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
       {remarks.map(remark => (
         <div className="lead-remark-block" key={remark.id}>
           <Typography.Text type="secondary" className="lead-remark-label">
-            {remark.kind === 'submission' ? '提交备注' : remark.kind === 'supplement' ? '补充备注' : '历史备注'}
+            {remark.kind === 'submission' ? '首次提交资料' : remark.kind === 'supplement' ? '补充资料' : '历史备注'}
             {remark.operatorName && ` · ${remark.operatorName}`}
             {remark.occurredAt && ` · ${formatTimestamp(remark.occurredAt)}`}
           </Typography.Text>
@@ -324,6 +324,7 @@ export function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
           >
             {remark.content}
           </Typography.Paragraph>
+          {remark.attachments?.length ? <div className="lead-attachment-thumbs"><Image.PreviewGroup>{remark.attachments.map(file => <Image key={file.infraFileId} className="lead-attachment-thumb" src={file.fileUrl} alt={file.originalName} width={72} height={72}/>)}</Image.PreviewGroup></div> : null}
         </div>
       ))}
       {lead.invalidDescription && (
@@ -340,7 +341,9 @@ export function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
           </div>
         </div>
       )}
-      {hasAttachments && (
+      {/* Hide the gallery only when the submission remark already renders these same files; a
+          supplement carrying its own image must not suppress the original attachments. */}
+      {hasAttachments && !remarks.some(remark => remark.attachments?.some(file => lead.attachments!.some(own => own.fileUrl === file.fileUrl && own.originalName === file.originalName))) && (
         <div className="lead-attachment-thumbs">
           <Image.PreviewGroup>
             {lead.attachments!.map(file => (

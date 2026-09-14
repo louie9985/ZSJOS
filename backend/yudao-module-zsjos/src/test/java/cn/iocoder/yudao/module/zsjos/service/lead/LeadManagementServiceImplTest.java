@@ -138,8 +138,11 @@ class LeadManagementServiceImplTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "leadIdentityMaskingService",
                 new LeadIdentityMaskingService(leadObjectPermissionService));
+        // Production resolves remarks through the signed-url overload, so the stub must bind the same
+        // five-argument signature; bound to anyList() it never matches and every test sees null.
         org.mockito.Mockito.lenient().when(remarkHistoryService.get(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyBoolean()))
+                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyBoolean(),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyMap()))
                 .thenReturn(new LeadRemarkHistoryService.History(java.util.List.of(), false, false, java.util.Map.of()));
         org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null);
         org.mockito.Mockito.lenient().when(securityFrameworkService.hasPermission(
@@ -920,7 +923,8 @@ class LeadManagementServiceImplTest {
         var item = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadRemarkRespVO(
                 "event:1", "supplement", "remark", null, "masked");
         when(remarkHistoryService.get(org.mockito.ArgumentMatchers.eq(lead),
-                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.eq(true)))
+                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.eq(true),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyMap()))
                 .thenReturn(new LeadRemarkHistoryService.History(List.of(item), true, false, Map.of()));
         LeadManagementRespVO result = assertActions(lead, null);
         assertEquals(List.of(item), result.getRemarkHistory());

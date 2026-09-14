@@ -137,9 +137,9 @@
             <div class="cover-upload">
               <el-image v-if="coverUpload?.previewUrl" :src="coverUpload.previewUrl" :preview-src-list="[coverUpload.previewUrl]" fit="cover" />
               <div v-else-if="editorForm.coverFileId" class="cover-upload__placeholder">文件 {{ editorForm.coverFileId }}</div>
-              <el-upload :show-file-list="false" :http-request="uploadCover" accept="image/*">
-                <el-button :loading="coverUploading"><Icon icon="ep:upload" class="mr-4px" />上传封面</el-button>
-              </el-upload>
+            <ClipboardUploadActions :disabled="coverUploading || Boolean(editorForm.coverFileId)" :can-paste="!coverUploading && !editorForm.coverFileId" @files="handlePasteCover"><el-upload :show-file-list="false" :http-request="uploadCover" accept="image/*">
+                <el-button :loading="coverUploading"><Icon icon="ep:upload" class="mr-4px" />上传附件</el-button>
+              </el-upload></ClipboardUploadActions>
               <el-button v-if="editorForm.coverFileId" link type="danger" @click="clearCover">移除</el-button>
             </div>
           </el-form-item>
@@ -231,6 +231,7 @@ import * as UserApi from '@/api/system/user'
 import * as DeptApi from '@/api/system/dept'
 import * as MaterialApi from '@/api/zsjos/material'
 import MaterialDynamicForm from './components/MaterialDynamicForm.vue'
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 
 defineOptions({ name: 'ZsjosMaterial' })
 
@@ -273,6 +274,7 @@ const defaultEditor = (): EditorForm => ({
   expectedMaterialVersion: undefined
 })
 const editorForm = reactive<EditorForm>(defaultEditor())
+const handlePasteCover = (files: File[]) => { const file = files[0]; if (file) void uploadCover({ file } as UploadRequestOptions) }
 const editorRules: FormRules = {
   materialTypeId: [{ required: true, message: '请选择素材类型', trigger: 'change' }],
   title: [{ required: true, message: '请输入标题', trigger: 'blur' }]

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Typography, message } from 'antd'
+import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Typography, message, TreeSelect } from 'antd'
 import { CopyOutlined, DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, type AreaNode, type CollectionMode, type DictData, type LeadCatalog, type PurchaseIntent, type PurchaseIntentDraftRequest, type SalesOrder, type SalesOrderSubmitRequest, type SalesOrderVoucher } from '../services/api'
@@ -19,6 +19,7 @@ type Values = {
   agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
   customerPaidAt: Dayjs; feeMode: string; paymentMethod: string; remark?: string
   specialRequirements?: string; materialDeliveryContact?: string
+  giftItems?: string[]; giftShippingAddress?: string
   items: Array<{ courseKey?: string; actualAmount?: number }>
 }
 
@@ -58,6 +59,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const wechatId = Form.useWatch('wechatId', form)
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [catalog, setCatalog] = useState<LeadCatalog>(emptyCatalog)
+  const [giftNodes, setGiftNodes] = useState<Array<{ value: string; title: string; children?: any[] }>>([])
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({})
   const [loading, setLoading] = useState(false)
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
@@ -84,11 +86,13 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     setLoading(true); setLoadError('')
     const dictTypes = [DICT_TYPE.ORDER_STUDENT_NATURE, DICT_TYPE.ORDER_SERVICE_PERIOD, DICT_TYPE.ORDER_STUDENT_SOURCE, DICT_TYPE.ORDER_FEE_MODE, DICT_TYPE.ORDER_PAYMENT_METHOD]
     try {
-      const [areaResult, catalogResult, orderResult, ...dictResults] = await Promise.all([
-        api.areaTree(), api.salesOrderCatalog(), orderId ? api.salesOrder(orderId) : Promise.resolve(undefined),
+      const [areaResult, catalogResult, giftResult, orderResult, ...dictResults] = await Promise.all([
+        api.areaTree(), api.salesOrderCatalog(), api.giftConfigList(), orderId ? api.salesOrder(orderId) : Promise.resolve(undefined),
         ...dictTypes.map(type => api.dictDataByType(type))
       ])
       setAreas(areaResult as AreaNode[]); setCatalog(catalogResult as LeadCatalog)
+      const leaf = (nodes: any[]): any[] => nodes.flatMap(n => n.children?.length ? leaf(n.children) : n.code ? [{ value: n.code, title: n.name }] : [])
+      setGiftNodes(leaf(giftResult as any[]))
       setDicts(Object.fromEntries(dictTypes.map((type, index) => [type, dictResults[index] as DictData[]])))
       const order = orderResult as SalesOrder | undefined
       setOrderNo(order?.orderNo)
@@ -105,6 +109,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         studentSource: order?.studentSource, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
         feeMode: order?.feeMode, paymentMethod: order?.paymentMethod, remark: order?.remark,
         specialRequirements: order?.studentSpecialRequirements, materialDeliveryContact: order?.materialDeliveryContact,
+        giftItems: order?.giftItems, giftShippingAddress: order?.giftShippingAddress,
         items: order?.items.map(item => ({ courseKey: `${item.productRef}::${item.skuRef}`, actualAmount: item.actualAmount }))
           || [{ courseKey: hasPrimary ? primary : undefined, actualAmount: undefined }]
       })
@@ -167,6 +172,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     if (!values) return
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
     if (validationError) { message.warning(validationError); return }
+    if (values.giftItems?.length && !values.giftShippingAddress?.trim()) { message.warning('选择礼品后请填写邮寄地址'); return }
     setPendingValues(values); setConfirmOpen(true)
   }
   const submit = async () => {
@@ -186,6 +192,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
         studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
         materialDeliveryContact: values.materialDeliveryContact?.trim() || undefined,
+        giftItems: values.giftItems?.length ? values.giftItems : undefined, giftShippingAddress: values.giftShippingAddress?.trim() || undefined,
         items: values.items.map(item => { const [spuRef, skuRef] = item.courseKey!.split('::'); return { spuRef, skuRef, actualAmount: Number(item.actualAmount) } }),
         paymentVouchers: [], idempotencyKey
       }
@@ -240,7 +247,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
               <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
               <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
-                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button></Space>
+                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button>
+                {purchaseIntent.paymentStatus !== 'paid' && <Button danger size="small" onClick={async () => { const updated = await api.cancelPurchasePayment(purchaseIntent.id); setPurchaseIntent(updated); setCollectionMode(updated.collectionMode) }}>取消支付链接</Button>}</Space>
             </Space>}/>}</>}
          {repurchase && <Form.Item name="repurchaseReason" label="复购说明"
            rules={[{ required: true, whitespace: true, message: '请填写复购说明' }, { max: 1000 }]}>
@@ -286,6 +294,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false} maxCount={6}/>
           </Form.Item></Col>
         </Row>
+        <Divider titlePlacement="start">礼品</Divider>
+        <Row gutter={16}><Col xs={24} md={12}><Form.Item name="giftItems" label="礼品"><TreeSelect treeData={giftNodes} treeCheckable showCheckedStrategy={TreeSelect.SHOW_CHILD} multiple allowClear placeholder="请选择礼品" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col><Col xs={24} md={12}><Form.Item name="giftShippingAddress" label="礼品邮寄地址"><Input.TextArea rows={3} maxLength={1000} showCount placeholder="选择礼品后必填"/></Form.Item></Col></Row>
         <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}
           {paymentLinkActionLabel && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>{paymentLinkActionLabel}</Button>}
           <IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
@@ -293,3 +303,4 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     </Spin>
   </Modal>
 }
+

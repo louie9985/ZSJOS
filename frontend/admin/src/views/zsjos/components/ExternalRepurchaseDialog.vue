@@ -122,15 +122,15 @@
       /></el-form-item>
       <el-form-item label="缴费凭证" required>
         <div class="voucher-area">
-          <el-upload
+          <ClipboardUploadActions :disabled="vouchers.length >= 6 || saving" :can-paste="vouchers.length < 6 && !saving" @files="handlePasteFiles"><el-upload
             :auto-upload="false"
             :show-file-list="false"
             :on-change="handleVoucherSelect"
             accept="image/jpeg,image/png,image/webp,application/pdf"
             :disabled="vouchers.length >= 6"
           >
-            <el-button :disabled="vouchers.length >= 6">选择文件</el-button>
-          </el-upload>
+            <el-button :disabled="vouchers.length >= 6">上传附件</el-button>
+          </el-upload></ClipboardUploadActions>
           <span class="voucher-hint">1–6 份 JPG、PNG、WebP 或 PDF</span>
           <el-empty v-if="vouchers.length === 0" description="尚未上传缴费凭证" :image-size="56" />
           <div v-for="item in vouchers" :key="item.uid" class="voucher-row">
@@ -170,6 +170,7 @@ import type { FormInstance, FormRules, UploadFile } from 'element-plus'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
 import { getSimpleDictDataList, type DictDataVO } from '@/api/system/dict/dict.data'
+import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 const emit = defineEmits<{ success: [] }>()
 const message = useMessage()
 const visible = ref(false)
@@ -193,6 +194,7 @@ type VoucherItem = {
   error?: string
 }
 const vouchers = ref<VoucherItem[]>([])
+const handlePasteFiles = (files: File[]) => { const file = files[0]; if (file) handleVoucherSelect({ uid: `paste-${Date.now()}`, name: file.name, raw: file, status: 'ready', type: file.type } as unknown as UploadFile) }
 const hasUploading = computed(() => vouchers.value.some((item) => item.status === 'uploading'))
 const empty = () => ({
   customerName: '',

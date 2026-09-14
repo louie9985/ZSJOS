@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentRe
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCandidatePageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCandidateRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCompleteReqVO;
@@ -74,6 +75,29 @@ public class ContentReviewController {
         return success(batchService.create(request, getLoginUserId()));
     }
 
+    @PostMapping("/batch/create-from-student")
+    @Operation(summary = "从学员概览创建生产内容审核草稿")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:create')")
+    public CommonResult<Long> createFromStudent(@Valid @RequestBody ContentReviewStudentDraftCreateReqVO request) {
+        return success(batchService.createFromStudent(request, getLoginUserId()));
+    }
+
+    @PostMapping("/batch/{batchId}/resubmit-from-student")
+    @Operation(summary = "驳回后创建新的生产内容审核轮次")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
+    public CommonResult<Long> resubmitFromStudent(@PathVariable Long batchId,
+                                                   @Valid @RequestBody ContentReviewStudentDraftCreateReqVO request) {
+        return success(batchService.resubmit(batchId, request, getLoginUserId()));
+    }
+
+    @PostMapping("/batch/{batchId}/save-student-draft")
+    @Operation(summary = "保存学员概览内容审批草稿")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
+    public CommonResult<Long> saveStudentDraft(@PathVariable Long batchId,
+                                                @Valid @RequestBody ContentReviewStudentDraftCreateReqVO request) {
+        return success(batchService.saveStudentDraft(batchId, request, getLoginUserId()));
+    }
+
     @GetMapping("/candidate/page")
     @Operation(summary = "获得当前运营可组批的完整内容版本")
     @PreAuthorize("@ss.hasPermission('zsjos:content-review:create')")
@@ -94,6 +118,13 @@ public class ContentReviewController {
     @PreAuthorize("@ss.hasPermission('zsjos:content-review:query')")
     public CommonResult<ContentReviewBatchRespVO> get(@RequestParam Long id) {
         return success(batchService.get(id, getLoginUserId()));
+    }
+
+    @GetMapping("/batch/history")
+    @Operation(summary = "查询内容审核批次历史轮次")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:query')")
+    public CommonResult<List<ContentReviewBatchRespVO>> history(@RequestParam Long id) {
+        return success(batchService.history(id, getLoginUserId()));
     }
 
     @PostMapping("/batch/{batchId}/submit")

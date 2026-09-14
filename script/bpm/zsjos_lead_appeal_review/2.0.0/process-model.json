@@ -1,0 +1,51 @@
+{
+  "key": "zsjos_lead_appeal_review",
+  "name": "客资申诉复核",
+  "category": "general-module",
+  "description": "客资申诉提交后由指定复核人员裁决",
+  "type": 20,
+  "formType": 10,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "appealReview",
+      "type": 11,
+      "name": "客资申诉裁决",
+      "showText": "业务服务提交时指定审批人",
+      "candidateStrategy": 35,
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

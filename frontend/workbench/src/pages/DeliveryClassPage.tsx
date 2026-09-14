@@ -137,7 +137,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
     try { await api.deliveryClasses.complete(row.id); message.success('班级已结课'); await load(1) }
     catch (e) { message.error(e instanceof Error ? e.message : '结课失败') }
   }
-  const pendingClass = rows.find(row => row.systemClass)
+  const orderedRows = [...rows].sort((left, right) => Number(right.systemClass) - Number(left.systemClass))
   return <section className="workspace-page">
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -151,14 +151,13 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
       <Segmented value={status} onChange={value => setStatus(String(value))} options={[{ label: '服务中', value: 'SERVING' }, { label: '已结课', value: 'COMPLETED' }]} />
       {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>} />}
       {loading && rows.length === 0 ? <Spin /> : rows.length === 0 ? <Empty description="暂无班级" /> : <>
-        {pendingClass && <Card className="delivery-class-pending" size="small"><div><Typography.Text strong>{pendingClass.className}</Typography.Text><Typography.Text type="secondary">待分班系统班</Typography.Text></div><Tag>固定入口</Tag></Card>}
-        <div className="delivery-class-grid">{rows.filter(row => !row.systemClass).map(row => <Card key={row.id} className="delivery-class-card" hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}>
-          <div className="delivery-class-card-head"><Typography.Title level={5} ellipsis={{ tooltip: row.className }}>{row.className}</Typography.Title><Tag color={row.status === 'SERVING' ? 'green' : 'default'}>{row.status === 'SERVING' ? '服务中' : '已结课'}</Tag></div>
-          <div className="delivery-class-card-meta"><span>创建时间</span><strong>{row.createTime ? formatTimestamp(row.createTime) : '未记录'}</strong></div>
-          <div className="delivery-class-card-meta"><span>考期</span><strong>{row.exactDate || row.examScheduleSnapshot || '未设置'}</strong></div>
-          <div className="delivery-class-card-foot"><span>{row.studentCount} 名学员</span><span>{row.classNo}</span></div>
-          {row.scheduleType === 'ROUGH' && <Alert type="warning" showIcon icon={<WarningOutlined />} message="未设置精确考期" />}
-          {manage && <Space onClick={event => event.stopPropagation()}>{has(permissions, 'zsjos:delivery-class:update') && row.status === 'SERVING' && <Button type="text" icon={<EditOutlined />} aria-label="编辑班级" onClick={() => void openEditor(row)} />}{has(permissions, 'zsjos:delivery-class:complete') && row.status === 'SERVING' && <Popconfirm title="确认结课该班级？" onConfirm={() => void complete(row)}><Button type="link" danger>结课</Button></Popconfirm>}</Space>}
+        <div className="delivery-class-grid">{orderedRows.map(row => <Card key={row.id} className={`delivery-class-card${row.systemClass ? ' delivery-class-pending' : ''}`} hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}>
+          <div className="delivery-class-card-head"><Typography.Title level={5} ellipsis={{ tooltip: row.className }}>{row.className}</Typography.Title>{row.systemClass ? <Tag color="blue">系统班</Tag> : <Tag color={row.status === 'SERVING' ? 'green' : 'default'}>{row.status === 'SERVING' ? '服务中' : '已结课'}</Tag>}</div>
+          <div className="delivery-class-card-meta"><span>{row.systemClass ? '当前状态' : '创建时间'}</span><strong>{row.systemClass ? '待分班' : row.createTime ? formatTimestamp(row.createTime) : '未记录'}</strong></div>
+          <div className="delivery-class-card-meta"><span>{row.systemClass ? '学员人数' : '考期'}</span><strong>{row.systemClass ? `${row.studentCount} 名` : row.exactDate || row.examScheduleSnapshot || '未设置'}</strong></div>
+          <div className="delivery-class-card-foot"><span>{row.systemClass ? '点击查看待分班学员' : `${row.studentCount} 名学员`}</span><span>{row.classNo}</span></div>
+          {!row.systemClass && row.scheduleType === 'ROUGH' && <Alert type="warning" showIcon icon={<WarningOutlined />} message="未设置精确考期" />}
+          {manage && !row.systemClass && <Space onClick={event => event.stopPropagation()}>{has(permissions, 'zsjos:delivery-class:update') && row.status === 'SERVING' && <Button type="text" icon={<EditOutlined />} aria-label="编辑班级" onClick={() => void openEditor(row)} />}{has(permissions, 'zsjos:delivery-class:complete') && row.status === 'SERVING' && <Popconfirm title="确认结课该班级？" onConfirm={() => void complete(row)}><Button type="link" danger>结课</Button></Popconfirm>}</Space>}
         </Card>)}</div>
       </>}
       <div ref={sentinelRef} className="delivery-class-sentinel">{loading && rows.length > 0 ? '加载中…' : hasMore ? '加载更多' : rows.length ? '已加载全部班级' : ''}</div>

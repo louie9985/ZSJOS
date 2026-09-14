@@ -22,6 +22,12 @@ public interface ContentReviewBatchItemMapper extends BaseMapperX<ContentReviewB
                 .orderByAsc(ContentReviewBatchItemDO::getId));
     }
 
+    default ContentReviewBatchItemDO selectByContentVersionId(Long versionId) {
+        return selectOne(new LambdaQueryWrapperX<ContentReviewBatchItemDO>()
+                .eq(ContentReviewBatchItemDO::getContentVersionId, versionId)
+                .orderByDesc(ContentReviewBatchItemDO::getId).last("LIMIT 1"));
+    }
+
     default List<ContentReviewBatchItemDO> selectByBatchIds(Collection<Long> batchIds) {
         if (batchIds == null || batchIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ContentReviewBatchItemDO>()

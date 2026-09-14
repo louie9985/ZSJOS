@@ -1,6 +1,8 @@
 <template>
   <div class="upload-box" :style="uploadStyle">
+    <ClipboardUploadActions :disabled="props.disabled" :can-paste="fileList.length < props.limit" @files="handlePasteFiles">
     <el-upload
+      ref="uploadRef"
       v-model:file-list="fileList"
       :accept="fileType.join(',')"
       :action="uploadUrl"
@@ -19,7 +21,7 @@
       <div class="upload-empty">
         <slot name="empty">
           <Icon icon="ep:plus" />
-          <!-- <span>请上传图片</span> -->
+          <span>上传附件</span>
         </slot>
       </div>
       <template #file="{ file }">
@@ -36,18 +38,20 @@
         </div>
       </template>
     </el-upload>
+    </ClipboardUploadActions>
     <div class="el-upload__tip">
       <slot name="tip"></slot>
     </div>
   </div>
 </template>
 <script lang="ts" setup>
-import type { UploadFile, UploadProps, UploadUserFile } from 'element-plus'
+import { genFileId, type UploadFile, type UploadInstance, type UploadProps, type UploadRawFile, type UploadUserFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { createImageViewer } from '@/components/ImageViewer'
 
 import { propTypes } from '@/utils/propTypes'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
+import ClipboardUploadActions from './ClipboardUploadActions.vue'
 
 defineOptions({ name: 'UploadImgs' })
 
@@ -93,8 +97,12 @@ const uploadStyle = computed(() => ({
 const { uploadUrl, httpRequest } = useUpload(props.directory)
 
 const fileList = ref<UploadUserFile[]>([])
+const uploadRef = ref<UploadInstance>()
 const uploadNumber = ref<number>(0)
 const uploadList = ref<UploadUserFile[]>([])
+const handlePasteFiles = (files: File[]) => {
+  files.slice(0, props.limit - fileList.value.length).forEach(file => uploadRef.value?.handleStart(Object.assign(file, { uid: genFileId() }) as UploadRawFile))
+}
 /**
  * @description 文件上传之前判断
  * @param rawFile 上传的文件

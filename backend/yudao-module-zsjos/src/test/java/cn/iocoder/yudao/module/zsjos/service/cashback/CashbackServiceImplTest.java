@@ -112,7 +112,7 @@ class CashbackServiceImplTest {
 
     @Test void pageProjectsLeadNumber() {
         CashbackDO cashback = new CashbackDO().setId(10L).setLeadId(1L);
-        when(mapper.selectPage(any(CashbackPageReqVO.class), isNull(Long.class)))
+        when(mapper.selectCashbackPage(any(CashbackPageReqVO.class), isNull(Long.class)))
                 .thenReturn(new PageResult<>(List.of(cashback), 1L));
         when(leadMapper.selectBatchIds(Set.of(1L))).thenReturn(List.of(
                 new LeadDO().setId(1L).setLeadNo("KZ202608160000000001")));

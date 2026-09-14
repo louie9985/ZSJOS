@@ -32,6 +32,9 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
 import cn.iocoder.yudao.module.bpm.service.comment.BpmCommentService;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmFormService;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmModelService;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmExternalStartUtils;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
 import cn.iocoder.yudao.module.bpm.service.message.BpmMessageService;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenTaskTimeoutReqDTO;
@@ -1060,12 +1063,37 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         validateTaskAction(userId, BpmTaskActionValidator.ACTION_RETURN, task, instance);
         // 1.2 获取流程模型信息
         BpmnModel bpmnModel = modelService.getBpmnModelByDefinitionId(task.getProcessDefinitionId());
+        // 1.2.1 外部主体发起的流程，发起人节点没有可用的外部编辑契约，退回会在引擎命令内抛异常并回滚整个事务，
+        //       因此在这里提前拒绝，让调用方得到与“退回”相符的业务错误。
+        validateReturnTargetNotExternalSubmission(bpmnModel, instance, reqVO.getTargetTaskDefinitionKey());
         // 1.3 校验源头和目标节点的关系，并返回目标元素
         FlowElement targetElement = validateTargetTaskCanReturn(bpmnModel, task.getTaskDefinitionKey(),
                 reqVO.getTargetTaskDefinitionKey());
 
         // 2. 调用 Flowable 框架的退回逻辑
         returnTask(userId, bpmnModel, task, targetElement, reqVO);
+    }
+
+    /**
+     * 校验退回目标不是外部主体发起流程的【发起人】节点。
+     *
+     * 外部发起时该节点不会创建真实任务（见 BpmExternalStartUtils 的使用处），退回它需要在引擎命令内
+     * 抛出异常，会让整个 returnTask 事务回滚，审批人看到与“退回”无关的发起错误。这里在调用引擎之前
+     * 提前拦截，使退回得到一个明确的业务错误。
+     */
+    private void validateReturnTargetNotExternalSubmission(BpmnModel bpmnModel, ProcessInstance instance,
+                                                           String targetKey) {
+        BpmStartSubjectDTO subject = BpmStartSubjectDTO.fromFlowableId(instance.getStartUserId());
+        if (subject == null || UserTypeEnum.ADMIN.getValue().equals(subject.getUserType())) {
+            return;
+        }
+        FlowElement target = BpmnModelUtils.getFlowElementById(bpmnModel, targetKey);
+        if (target instanceof UserTask userTask
+                && BpmExternalStartUtils.isSubmissionTask(
+                        bpmProcessDefinitionService.getProcessDefinitionInfo(instance.getProcessDefinitionId()),
+                        bpmnModel, userTask)) {
+            throw exception(TASK_RETURN_EXTERNAL_START_UNSUPPORTED);
+        }
     }
 
     /**

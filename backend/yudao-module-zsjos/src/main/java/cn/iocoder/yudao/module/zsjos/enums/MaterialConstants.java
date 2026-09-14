@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.enums;
 
+import java.util.Map;
 import java.util.Set;
 
 public interface MaterialConstants {
@@ -40,9 +41,20 @@ public interface MaterialConstants {
 
     String VALUE_UNLIMITED = "__ALL__";
     String LABEL_UNLIMITED = "不限";
-    String DICT_ACCOUNT_TYPE = "zsjos_material_account_type";
+    /** 账号类型维度使用的字典：人设类型。字段字典即维度，不再人工选择推荐维度。 */
+    String DICT_PERSONA_TYPE = "zsjos_persona_type";
     String DICT_PROFESSION = "zsjos_material_profession";
     String DICT_ACCOUNT_STAGE = "zsjos_media_account_stage";
+    /** 字典到推荐维度的自动归属关系；只有这三个字典的字段参与推荐。 */
+    Map<String, String> RECOMMENDATION_DICT_DIMENSIONS = Map.of(
+            DICT_PERSONA_TYPE, DIMENSION_ACCOUNT_TYPE,
+            DICT_PROFESSION, DIMENSION_PROFESSION,
+            DICT_ACCOUNT_STAGE, DIMENSION_ACCOUNT_STAGE);
+
+    /** 返回字段字典自动归属的推荐维度；非推荐维度字典返回 null。 */
+    static String recommendationDimensionOf(String dictType) {
+        return dictType == null ? null : RECOMMENDATION_DICT_DIMENSIONS.get(dictType);
+    }
 
     String BUSINESS_KEY_PREFIX = "material-version:";
     String MATERIAL_BPM_CATEGORY = "zsjos_material";

@@ -265,7 +265,7 @@ class ContentReviewBatchServiceTest {
                 .thenReturn(1);
         when(itemMapper.finalizeItem(eq(returned), eq(RESULT_RETURNED), eq(null), eq(null)))
                 .thenReturn(1);
-        when(batchMapper.finalizeBatch(eq(batch), eq(BATCH_COMPLETED), eq("event-3"), any()))
+        when(batchMapper.finalizeBatch(eq(batch), eq(BATCH_NEED_MODIFY), eq("event-3"), any()))
                 .thenReturn(1);
 
         service.handleProcessResult(processEvent("event-3"));
@@ -274,7 +274,7 @@ class ContentReviewBatchServiceTest {
         verify(contentService).applyBatchReview(returnedContent, 4, false, "需要修改", OPERATOR_ID);
         verify(itemMapper).finalizeItem(approved, RESULT_READY_TO_PUBLISH, null, null);
         verify(itemMapper).finalizeItem(returned, RESULT_RETURNED, null, null);
-        verify(batchMapper).finalizeBatch(eq(batch), eq(BATCH_COMPLETED), eq("event-3"), any());
+        verify(batchMapper).finalizeBatch(eq(batch), eq(BATCH_NEED_MODIFY), eq("event-3"), any());
     }
 
     @Test

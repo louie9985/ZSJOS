@@ -1,0 +1,93 @@
+{
+  "key": "zsjos_feedback_requirement_approval",
+  "name": "需求反馈审批",
+  "category": "general-module",
+  "description": "需求类反馈按部门负责人可选审批后进入董事长终审",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/zsjos/feedback",
+  "formCustomViewPath": "/zsjos/feedback",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "LeaderGateway",
+      "type": 51,
+      "name": "是否有部门负责人",
+      "conditionNodes": [
+        {
+          "id": "flow_department_leader",
+          "type": 50,
+          "name": "有部门负责人",
+          "showText": "${hasDepartmentLeader == true}",
+          "conditionSetting": {
+            "conditionType": 1,
+            "conditionExpression": "${hasDepartmentLeader == true}",
+            "defaultFlow": false
+          },
+          "childNode": {
+            "id": "departmentLeaderReview",
+            "type": 11,
+            "name": "部门负责人审批",
+            "showText": "业务服务提交时指定审批人",
+            "candidateStrategy": 35,
+            "approveType": 1,
+            "approveMethod": 3,
+            "fieldsPermission": [],
+            "signEnable": false,
+            "reasonRequire": true
+          }
+        },
+        {
+          "id": "flow_skip_leader",
+          "type": 50,
+          "name": "其他情况",
+          "showText": "其他情况",
+          "conditionSetting": {
+            "conditionType": 1,
+            "defaultFlow": true
+          }
+        }
+      ],
+      "childNode": {
+        "id": "chairmanReview",
+        "type": 11,
+        "name": "董事长终审",
+        "showText": "业务服务提交时指定审批人",
+        "candidateStrategy": 35,
+        "approveType": 1,
+        "approveMethod": 3,
+        "fieldsPermission": [],
+        "signEnable": false,
+        "reasonRequire": true,
+        "childNode": {
+          "id": "EndEvent",
+          "type": 1,
+          "name": "结束"
+        }
+      }
+    }
+  }
+}

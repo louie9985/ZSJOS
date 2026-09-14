@@ -82,6 +82,7 @@ export const APP_ROUTES = {
   MY_STUDENTS: '/zsjos/my-students',
   CLASS_MANAGEMENT: '/zsjos/class-management',
   MY_CLASSES: '/zsjos/my-classes',
+  POSITIONING_INTERVIEW_TEMPLATE: '/zsjos/director-config/interview-template',
   STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
   STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
@@ -125,6 +126,8 @@ export const APP_ROUTES = {
   COURSE_CALENDAR: '/calendar/course-calendar',
   MEDIA_ALL_CALENDAR: '/calendar/all',
   MATERIAL_LIBRARY: '/zsjos/material-library/browse',
+  VIRAL_ACCOUNT_DECOMPOSE: '/zsjos/viral-account-decompose',
+  VIRAL_CONTENT_DECOMPOSE: '/zsjos/viral-content-decompose',
   CONTENT_PRODUCTION: '/zsjos/material-library/content-production',
   CONTENT_REVIEW: '/zsjos/material-library/content-review'
 } as const
@@ -174,6 +177,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MY_STUDENTS,
   APP_ROUTES.CLASS_MANAGEMENT,
   APP_ROUTES.MY_CLASSES,
+  APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE,
   APP_ROUTES.STUDENT_CONTACT_CONFIG,
   APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS,
   APP_ROUTES.TODAY_TASKS,
@@ -216,6 +220,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.COURSE_CALENDAR,
   APP_ROUTES.MEDIA_ALL_CALENDAR,
   APP_ROUTES.MATERIAL_LIBRARY,
+  APP_ROUTES.VIRAL_ACCOUNT_DECOMPOSE,
+  APP_ROUTES.VIRAL_CONTENT_DECOMPOSE,
   APP_ROUTES.CONTENT_PRODUCTION,
   APP_ROUTES.CONTENT_REVIEW
 ])
@@ -253,8 +259,9 @@ export const DICT_TYPE = {
   ,MEDIA_ACCOUNT_STAGE: 'zsjos_media_account_stage'
   ,MEDIA_ACCOUNT_PRIMARY_PROBLEM: 'zsjos_media_account_primary_problem'
   ,MEDIA_ACCOUNT_EXECUTION_MEASURE: 'zsjos_media_account_execution_measure'
-  ,MATERIAL_ACCOUNT_TYPE: 'zsjos_material_account_type'
+  ,PERSONA_TYPE: 'zsjos_persona_type'
   ,MATERIAL_PROFESSION: 'zsjos_material_profession'
+  ,DIRECTOR_CONTENT_FORM: 'zsjos_director_content_form'
   ,EAM_ASSET_STATUS: 'eam_asset_status'
 } as const
 
@@ -559,3 +566,4 @@ export const BACKGROUND_METAS: BackgroundMeta[] = [
   { key: 'midnight', label: '暗夜', dark: true, value: 'linear-gradient(135deg, #14181d 0%, #171c22 50%, #1a1f26 100%)', preview: 'linear-gradient(135deg, #14181d, #1a1f26)' },
   { key: 'dusk', label: '暮山', dark: true, value: 'linear-gradient(135deg, #22202a 0%, #26232f 50%, #2a2733 100%)', preview: 'linear-gradient(135deg, #22202a, #2a2733)' }
 ]
+

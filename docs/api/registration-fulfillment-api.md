@@ -185,7 +185,11 @@ Generated links must be absolute and target the anonymous H5 page, not the authe
 The backend reads that origin from `ZSJOS_PUBLIC_H5_BASE_URL` and rejects link generation before any
 token or workflow mutation when the value is absent or invalid. Production configuration and reverse
 proxy requirements are documented in `docs/operations/positioning-confirmation-deployment.md`.
-# 编导学员级阶段
+# 历史编导阶段与账号定位兼容契约
+
+媒体学员当前流程已收敛为学员级定位访谈，现行接口与操作以
+[定位访谈契约](positioning-interview.md) 为准。下文保留旧表单和账号交付的历史结构说明；
+旧采访写接口已关闭，媒体学员页面不再提供后续账号／定位卡／内容／拍剪入口。
 
 编导通过 `GET /zsjos/student/service/{relationId}/contact-context` 获取服务关系负责人、编导、
 运营负责人、`directorStage`、访谈预约时间、动态字段和服务端 `availableActions`。学习规划师
@@ -194,12 +198,10 @@ proxy requirements are documented in `docs/operations/positioning-confirmation-d
 首联、学习计划、普通跟进或基础资料修改动作。`/contact-records` 的只读授权边界保持兼容，
 但媒体 Workbench 不请求或展示联系历史。运营的媒体业务操作仍通过账号、定位卡、内容和拍剪接口完成。
 
-阶段命令拆分为四个接口，阶段由 URL 固定，客户端不能伪造阶段。草稿接口的 `version` 是对应阶段的独立草稿版本，不是服务关系全局版本；草稿保存不改变服务关系全局版本，正式提交才推进业务版本：
+预审阶段命令由 URL 固定，客户端不能伪造阶段。草稿接口的 `version` 是对应阶段的独立草稿版本，不是服务关系全局版本；草稿保存不改变服务关系全局版本，正式提交才推进业务版本：
 
 - `POST /zsjos/student/service/{relationId}/precheck/draft`
 - `POST /zsjos/student/service/{relationId}/precheck/submit`
-- `POST /zsjos/student/service/{relationId}/interview/draft`
-- `POST /zsjos/student/service/{relationId}/interview/submit`
 
 ```json
 {
@@ -210,9 +212,9 @@ proxy requirements are documented in `docs/operations/positioning-confirmation-d
 }
 ```
 
-预审不加载业务表单，`data` 必须为空；提交接口要求 `interviewAt`。采访草稿固定当前发布模板版本，
-提交时服务端校验必填字段，并把模板 ID、模板版本、字段定义和值写入不可变快照。预审提交后进入 `interview`，
-采访提交后进入 `positioning_ready`。所有写入均校验当前编导、服务状态和服务关系版本。
+预审不加载业务表单，`data` 必须为空；提交接口要求未来的定位访谈预约时间，提交后进入
+`positioning_interview`。后续草稿与完成使用独立的 `/positioning-interview/*` 契约，详见
+`docs/api/positioning-interview.md`。旧 `/interview/draft`、`/interview/submit` HTTP 接口已移除；`positioning_ready` 和已保存采访快照仅保留历史兼容。
 
 运营候选人与指派复用协作者接口，类型为 `operator`：候选人来自服务端配置的
 `content_director_operator` 人员关系，source 为当前编导、target 为运营。运营归属写入同一学员
@@ -229,21 +231,19 @@ label and must not re-resolve the current dictionary after an administrator rena
 an item. The V129 seed is repeatable and is not executed by application startup.
 ## 编导可配置表单
 
-资料预审接口只接受空 `data`，用于确认资料和保存或提交采访预约。采访接口使用当前已发布的
-`director_interview` 模板；首次草稿冻结模板版本，草稿和提交均保存字段、值及字典标签快照。
-后续保存和提交始终按该 `templateVersionId` 的已发布或已归档版本校验；发布新模板不会迁移
-已有草稿。未改变的历史字典选项继续保留原 `labelSnapshot`，即使当前字典已经改名或停用。
-采访 `region` 字段从 System `/system/area/tree` 选择，业务值保存地区 `code` 与服务端生成的
-`labelSnapshot`。旧草稿中的原始地区文本可以继续读取和保存草稿，但正式提交前必须重新选择
-当前有效地区；服务端不信任客户端传入的地区标签。
+资料预审只接受空 `data`，用于确认资料和预约定位访谈。当前访谈只使用
+`director_positioning_interview` 场景，配置入口“编导业务配置 → 定位访谈大纲配置”，
+路径 `/zsjos/director-config/interview-template`；两端读写统一使用
+`/admin-api/zsjos/positioning-interview-template/**`，详见 [定位访谈契约](positioning-interview.md)。
+旧采访配置 API 和业务提交 API 已移除，历史记录从保存的字段、值及字典标签快照读取，
+不依赖旧模板当前是否存在。旧 `director_interview` 模板不能复制、修改或发布。
 
-模板管理接口为 `/admin-api/zsjos/director-interview-template/**`、
-`/admin-api/zsjos/positioning-template/**` 和 `/admin-api/zsjos/director-config`。定位卡业务端通过
+定位卡继续使用 `/admin-api/zsjos/positioning-template/**`，编导时效配置仍使用
+`/admin-api/zsjos/director-config`。定位卡业务端通过
 `GET /admin-api/zsjos/positioning-card/published-template` 获取当前发布模板，创建草稿时保存
 `personId + accountId + serviceRelationId + templateVersionId` 及完整快照。
-模板字段的可选 `description`（最多 500 字）是管理员维护的填写备注，随模板版本保存；Vue
-配置预览以及 Workbench 的采访、定位卡填写控件在字段下方展示该备注，空备注不占位。备注
-仅用于填写指导，不参与字段值校验，也不显示在历史定位卡、拍剪快照或学员确认页。
+模板字段的可选 `description`（最多 500 字）作为填写指导随版本保存；历史字典选项保留
+选择时的标签，发布新模板不会迁移已有草稿或重写历史记录。
 
 定位卡复用导入使用以下接口，并同时要求 `zsjos:positioning-card:create` 与
 `zsjos:positioning-card:query`：

@@ -33,13 +33,15 @@ class LeadSupplementRemarkTest {
     @Mock LeadSubmissionIdentityService identityService;
     @Mock AdminUserApi adminUserApi;
     @Mock PartnerMapper partnerMapper;
+    @Mock LeadAttachmentService attachmentService;
+    @Mock LeadNotifyEventPublisher notifyPublisher;
     final Map<String, BusinessEventDO> events = new HashMap<>();
     LeadDO lead;
 
     @BeforeEach void setup() {
         TenantContextHolder.setTenantId(1L);
         lead = new LeadDO(); lead.setId(1L); lead.setRemark("A"); lead.setStatus(STATUS_SUBMITTED);
-        lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER); lead.setProviderOwnerId(10L); lead.setLeadCategory("cat");
+        lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER); lead.setProviderOwnerId(10L); lead.setLeadCategory("cat"); lead.setCityCode("original");
         lenient().when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         lenient().when(eventMapper.selectByIdempotencyKeyForUpdate(anyString())).thenAnswer(i -> events.get(i.getArgument(0)));
         lenient().doAnswer(i -> { BusinessEventDO event = i.getArgument(0); event.setId((long) events.size() + 1); events.put(event.getIdempotencyKey(), event); return 1; })
@@ -52,6 +54,8 @@ class LeadSupplementRemarkTest {
         lenient().when(productSkuService.validateLeadProduct(any(), anyBoolean(), any(), anyBoolean()))
                 .thenReturn(new LeadProductSnapshot("spu", "课程 A", null, null, List.of(), null, null, null, null,
                         null, null, null, null, false, false, List.of()));
+        lenient().when(attachmentService.validateReferences(anyList(), anyLong())).thenReturn(Map.of());
+        lenient().when(attachmentService.validatePartnerReferences(anyList(), anyLong())).thenReturn(Map.of());
     }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }
 
@@ -66,8 +70,8 @@ class LeadSupplementRemarkTest {
     }
     @Test void blankStillUpdatesOtherFieldsWithoutErasingRemark() {
         service.supplement(1L, 10L, request("blank", " \n "));
-        assertEquals("A", lead.getRemark()); assertEquals("2", lead.getCityCode());
-        assertEquals("", LeadRemarkHistoryService.appendedRemark(events.get("blank")));
+        assertEquals("A", lead.getRemark()); assertEquals("original", lead.getCityCode());
+        assertNull(LeadRemarkHistoryService.appendedRemark(events.get("blank")));
     }
     @Test void ownershipAndLifecycleRejectWithoutWrites() {
         assertThrows(RuntimeException.class, () -> service.supplement(1L, 20L, request("x", "B")));
@@ -137,7 +141,7 @@ class LeadSupplementRemarkTest {
         var jdbc = database();
         var tx = new org.springframework.transaction.support.TransactionTemplate(
                 new org.springframework.jdbc.datasource.DataSourceTransactionManager(jdbc.getDataSource()));
-        doThrow(new IllegalStateException("controlled failure")).when(productMapper).deleteByLeadId(1L);
+        doThrow(new IllegalStateException("controlled failure")).when(eventMapper).insert(any(BusinessEventDO.class));
         assertThrows(IllegalStateException.class,
                 () -> tx.executeWithoutResult(s -> service.supplement(1L, 10L, request("rollback", "B"))));
         assertNull(jdbc.queryForObject("SELECT city FROM note_lead WHERE id=1", String.class));
@@ -167,7 +171,7 @@ class LeadSupplementRemarkTest {
             }, new Object[]{i.getArgument(0)});
             return rows.isEmpty() ? null : rows.getFirst();
         }).when(eventMapper).selectByIdempotencyKeyForUpdate(anyString());
-        doAnswer(i -> { LeadDO row = i.getArgument(0); return jdbc.update("UPDATE note_lead SET remark=?,city=? WHERE id=?",
+        lenient().doAnswer(i -> { LeadDO row = i.getArgument(0); return jdbc.update("UPDATE note_lead SET remark=?,city=? WHERE id=?",
                 row.getRemark(), row.getCityCode(), row.getId()); }).when(leadMapper).updateById(any(LeadDO.class));
         lenient().doAnswer(i -> { BusinessEventDO row = i.getArgument(0); return jdbc.update("INSERT INTO note_event VALUES(?,?,?)",
                 row.getIdempotencyKey(), row.getAggregateId(), row.getRelatedObjectRefs()); }).when(eventMapper).insert(any(BusinessEventDO.class));

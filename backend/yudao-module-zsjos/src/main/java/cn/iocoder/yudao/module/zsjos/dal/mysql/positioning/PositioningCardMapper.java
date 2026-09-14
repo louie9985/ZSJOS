@@ -40,13 +40,24 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
     @Select("SELECT * FROM zsjos_positioning_card WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     PositioningCardDO selectByIdForUpdate(Long id, Long tenantId);
     default PositioningCardDO selectLatestCreatingDraft(Long serviceRelationId, Long accountId, Long tenantId) {
-        return selectOne(new LambdaQueryWrapperX<PositioningCardDO>()
+        LambdaQueryWrapperX<PositioningCardDO> query = new LambdaQueryWrapperX<PositioningCardDO>()
                 .eq(PositioningCardDO::getServiceRelationId, serviceRelationId)
-                .eq(PositioningCardDO::getAccountId, accountId)
                 .eq(PositioningCardDO::getTenantId, tenantId)
-                .eq(PositioningCardDO::getStatus, "co_creating")
-                .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId)
+                .eq(PositioningCardDO::getStatus, "co_creating");
+        if (accountId == null) query.isNull(PositioningCardDO::getAccountId);
+        else query.eq(PositioningCardDO::getAccountId, accountId);
+        return selectOne(query.orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId)
                 .last("LIMIT 1"));
+    }
+    default int bindStudentDraftToAccount(Long serviceRelationId, Long studentPersonId, Long accountId,
+                                          Long tenantId) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
+                .eq(PositioningCardDO::getServiceRelationId, serviceRelationId)
+                .eq(PositioningCardDO::getStudentPersonId, studentPersonId)
+                .isNull(PositioningCardDO::getAccountId)
+                .eq(PositioningCardDO::getStatus, "co_creating")
+                .eq(PositioningCardDO::getTenantId, tenantId)
+                .set(PositioningCardDO::getAccountId, accountId));
     }
     default PositioningCardDO selectByIpProcessId(String id) { return selectOne(PositioningCardDO::getIpProcessInstanceId, id); }
     default int updateByVersion(PositioningCardDO card, Integer version, String fromStatus) {

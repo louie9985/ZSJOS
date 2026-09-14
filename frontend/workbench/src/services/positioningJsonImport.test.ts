@@ -37,6 +37,12 @@ describe('positioning JSON import', () => {
     expect(() => parsePositioningJson(raw, context)).toThrow()
   })
 
+  it('accepts a BOM and a JSON Markdown fence around the standard payload', () => {
+    const result = parsePositioningJson('\uFEFF```json\n{"story":"经历"}\n```', context)
+    expect(result.values).toEqual({ story: '经历' })
+    expect(result.skipped).toEqual([])
+  })
+
   it('skips unknown keys, invalid types, labels and constraints independently', () => {
     const result = parsePositioningJson(JSON.stringify({
       unknown: 'x', story: 'too long', score: 101, enabled: 'true', category: '专家型', tags: [],

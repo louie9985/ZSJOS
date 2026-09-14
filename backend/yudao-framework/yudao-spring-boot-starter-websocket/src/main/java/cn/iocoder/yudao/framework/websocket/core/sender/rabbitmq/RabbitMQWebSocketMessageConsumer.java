@@ -1,8 +1,9 @@
 package cn.iocoder.yudao.framework.websocket.core.sender.rabbitmq;
 
-import lombok.RequiredArgsConstructor;
+import cn.iocoder.yudao.framework.audit.*;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.rabbit.annotation.*;
+import java.util.List;
 
 /**
  * {@link RabbitMQWebSocketMessage} 广播消息的消费者，真正把消息发送出去
@@ -24,16 +25,21 @@ import org.springframework.amqp.rabbit.annotation.*;
                 )
         )
 )
-@RequiredArgsConstructor
 public class RabbitMQWebSocketMessageConsumer {
 
     private final RabbitMQWebSocketMessageSender rabbitMQWebSocketMessageSender;
+    private final List<ExecutionAuditHook> executionAuditHooks;
+    public RabbitMQWebSocketMessageConsumer(RabbitMQWebSocketMessageSender sender) { this(sender, java.util.Collections.emptyList()); }
+    public RabbitMQWebSocketMessageConsumer(RabbitMQWebSocketMessageSender sender, List<ExecutionAuditHook> hooks) { this.rabbitMQWebSocketMessageSender = sender; this.executionAuditHooks = hooks; }
 
     @RabbitHandler
     public void onMessage(RabbitMQWebSocketMessage message) {
-        rabbitMQWebSocketMessageSender.send(message.getSessionId(),
-                message.getUserType(), message.getUserId(),
-                message.getMessageType(), message.getMessageContent());
+        try {
+            ExecutionAuditRunner.run(new ExecutionAuditContext("SYSTEM_RABBITMQ", "websocket", null, null, null, null, null,
+                    java.util.Map.of("messageType", message.getMessageType())), executionAuditHooks, () -> {
+                rabbitMQWebSocketMessageSender.send(message.getSessionId(), message.getUserType(), message.getUserId(), message.getMessageType(), message.getMessageContent()); return null;
+            });
+        } catch (Exception e) { throw new IllegalStateException("RabbitMQ message consumption failed", e); }
     }
 
 }

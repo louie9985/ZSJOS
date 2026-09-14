@@ -53,6 +53,9 @@ public class ContentService {
         content.setTopic(req.getTopic());
         content.setContentClassValue(req.getContentClassValue());
         content.setContentClassLabelSnapshot(requireContentClassLabel(req.getContentClassValue()));
+        content.setPurposeValue(req.getPurposeValue()); content.setPurposeLabelSnapshot(req.getPurposeLabelSnapshot());
+        content.setFormatValue(req.getFormatValue()); content.setFormatLabelSnapshot(req.getFormatLabelSnapshot());
+        content.setDetailUrl(req.getDetailUrl()); content.setScriptText(req.getScriptText()); content.setLeadResourceUrl(req.getLeadResourceUrl()); content.setPlannedPublishAt(req.getPlannedPublishAt());
         content.setStatus(CONTENT_TOPIC);
         // The first immutable content version is created explicitly by the content editor.
         content.setCurrentVersionNo(0);
@@ -230,3 +233,5 @@ public class ContentService {
         };
     }
 }
+
+

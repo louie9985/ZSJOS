@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.definition.BpmDefinitionReadApi;
 import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmProcessDefinitionMetadataRespDTO;
@@ -157,13 +158,60 @@ public class MaterialService {
         if (account == null) {
             throw exception(MEDIA_ACCOUNT_NOT_EXISTS);
         }
+        List<MaterialTypeDO> types = recommendationTypes(request.getMaterialTypeId());
         request.setPageSize(Math.min(request.getPageSize(), recommendationMaxResults(request.getMaterialTypeId())));
         return materialMapper.selectRecommendationPage(request, userId, tenantId(),
                 trimToNull(account.getAccountTypePrimaryValue()),
                 trimToNull(account.getAccountTypeSecondaryValue()),
                 trimToNull(account.getTrackPrimaryValue()),
                 trimToNull(account.getTrackSecondaryValue()),
-                trimToNull(account.getSStage()));
+                trimToNull(account.getSStage()),
+                effectiveTypeIds(types, DIMENSION_ACCOUNT_TYPE),
+                effectiveTypeIds(types, DIMENSION_PROFESSION),
+                effectiveTypeIds(types, DIMENSION_ACCOUNT_STAGE));
+    }
+
+    private List<MaterialTypeDO> recommendationTypes(Long materialTypeId) {
+        if (materialTypeId != null) {
+            MaterialTypeDO type = typeMapper.selectById(materialTypeId);
+            return type != null && CommonStatusEnum.ENABLE.getStatus().equals(type.getStatus())
+                    && Boolean.TRUE.equals(type.getRecommendationEnabled()) ? List.of(type) : List.of();
+        }
+        return typeMapper.selectList(new LambdaQueryWrapperX<MaterialTypeDO>()
+                .eq(MaterialTypeDO::getStatus, CommonStatusEnum.ENABLE.getStatus())
+                .eq(MaterialTypeDO::getRecommendationEnabled, true));
+    }
+
+    /**
+     * 推荐维度只按“类型配置维度 ∩ 模板实际承载维度”生效；模板缺少某维度字段时该维度自动忽略，
+     * 避免类型配置声明了维度但模板无对应字典字段导致该类型推荐结果恒为空。
+     */
+    private String effectiveTypeIds(List<MaterialTypeDO> types, String dimension) {
+        return types.stream()
+                .filter(type -> effectiveDimensions(type).contains(dimension))
+                .map(type -> String.valueOf(type.getId()))
+                .collect(Collectors.joining(","));
+    }
+
+    private Set<String> effectiveDimensions(MaterialTypeDO type) {
+        if (type.getCurrentSchemaVersionId() == null || type.getRecommendationConfigJson() == null) {
+            return Set.of();
+        }
+        Object raw = JsonUtils.parseMap(type.getRecommendationConfigJson()).get("dimensions");
+        if (!(raw instanceof Collection<?> configured) || configured.isEmpty()) {
+            return Set.of();
+        }
+        MaterialSchemaVersionDO schema = schemaMapper.selectById(type.getCurrentSchemaVersionId());
+        if (schema == null) {
+            return Set.of();
+        }
+        Set<String> templateDimensions = schemaService.parseFields(schema.getFieldsJson()).stream()
+                .map(field -> recommendationDimensionOf(field.getDictType()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return configured.stream().map(String::valueOf)
+                .filter(templateDimensions::contains)
+                .collect(Collectors.toSet());
     }
 
     private int recommendationMaxResults(Long materialTypeId) {
@@ -437,6 +485,10 @@ public class MaterialService {
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long materialId, MaterialSubmitReqVO request, Long userId) {
         MaterialDO material = lockMaterial(materialId);
+        // A disabled material must be restored before it can re-enter approval; submit is not a restore path.
+        if (MATERIAL_DISABLED.equals(material.getStatus())) {
+            throw exception(MATERIAL_STATE_INVALID);
+        }
         if (!Objects.equals(material.getVersion(), request.getExpectedVersion())
                 || material.getCurrentDraftVersionId() == null) {
             throw exception(MATERIAL_VERSION_CONFLICT);
@@ -842,7 +894,12 @@ public class MaterialService {
                 && (version.getCoverSnapshotJson() == null || version.getCoverSnapshotJson().isBlank())) {
             throw exception(MATERIAL_FIELD_INVALID, "账号主页截图不能为空");
         }
-        resolveTitle(type, new MaterialSaveReqVO().setValues(normalized.values()), fields, true);
+        // The draft version already stores the resolved title (including viral content's
+        // work_title field). Reconstructing a save request with values only loses that
+        // title and incorrectly rejects an otherwise complete content draft.
+        resolveTitle(type, new MaterialSaveReqVO()
+                .setTitle(version.getTitle())
+                .setValues(normalized.values()), fields, true);
     }
 
     private void validateAutoCollectionSnapshot(AutoCollectionSnapshot snapshot, String materialTypeCode,

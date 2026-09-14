@@ -11,7 +11,6 @@
     "yudao-module-infra",
     "yudao-module-bpm",
     "yudao-module-pay",
-    "yudao-module-crm",
     "yudao-module-ai",
     "yudao-module-zsjos"
   ],
@@ -21,6 +20,7 @@
     "yudao_demo03_course",
     "yudao_demo03_grade",
     "yudao_demo03_student"
+    ,"zsjos_gift_config","zsjos_gift_purchase","zsjos_student_delivery_config","zsjos_student_delivery_defer","zsjos_student_delivery_plan","zsjos_student_delivery_stage","zsjos_student_delivery_submission"
   ],
   "allowedExtraTables": [
     "zsjos_schema_version"

@@ -42,8 +42,6 @@ import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
-import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
-import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +65,7 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 @Service
 @Slf4j
 public class StudentContactServiceImpl implements StudentContactService {
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper positioningInterviewMapper;
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     @Resource private ServiceRelationMapper relationMapper;
@@ -91,7 +90,6 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private StudentContactNotifyPublisher studentContactNotifyPublisher;
-    @Resource private DirectorFormTemplateService directorFormTemplateService;
     @Resource private DirectorConfigService directorConfigService;
     @Resource private PositioningCardMapper positioningCardMapper;
     @Resource private MediaAccountMapper mediaAccountMapper;
@@ -170,13 +168,38 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         boolean director = Objects.equals(relation.getContentDirectorUserId(), userId);
         String directorStage = StrUtil.blankToDefault(relation.getDirectorStage(), "precheck");
+        var positioningInterview = positioningInterviewMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO>()
+                        .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO::getServiceRelationId, relation.getId())
+                        .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO::getStudentPersonId, relation.getPersonId())
+                        .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO::getStatus, List.of("draft", "completed"))
+                        .orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO::getId).last("LIMIT 1"));
+        if (positioningInterview != null) directorStage = "completed".equals(positioningInterview.getStatus())
+                ? "positioning_interview_completed" : "positioning_interview";
         if (operational && accepted && director && "precheck".equals(directorStage)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_PRECHECK)) {
             availableActions.add(CONTEXT_ACTION_DIRECTOR_PRECHECK);
         }
-        if (operational && accepted && director && "interview".equals(directorStage)
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_INTERVIEW)) {
-            availableActions.add(CONTEXT_ACTION_DIRECTOR_INTERVIEW);
+        if (operational && accepted && director && Set.of("positioning_interview", "interview", "positioning_ready").contains(directorStage)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:student:positioning-interview")) {
+            boolean hasDraft = positioningInterview != null;
+            availableActions.add(hasDraft ? CONTEXT_ACTION_CONTINUE_POSITIONING_INTERVIEW
+                    : CONTEXT_ACTION_START_POSITIONING_INTERVIEW);
+        }
+        if (operational && accepted && director && "positioning_interview_completed".equals(directorStage)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:student:positioning-interview-query")) {
+            availableActions.add(CONTEXT_ACTION_VIEW_POSITIONING_INTERVIEW);
+        }
+        if (operational && accepted && director
+                && Set.of("positioning_interview_completed", "positioning_ready").contains(directorStage)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:create")) {
+            availableActions.add("CREATE_POSITIONING_CARD");
+        }
+        if (operational && accepted && (director || Objects.equals(relation.getOperatorUserId(), userId))
+                && relation.getContentDirectorUserId() != null
+                && Set.of("positioning_interview_completed", "positioning_ready").contains(directorStage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_MEDIA_ACCOUNT_CREATE)) {
+            availableActions.add(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT);
         }
         if (operational && accepted && director
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) {
@@ -887,34 +910,19 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-precheck")
     public Integer saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        return saveDirectorStage(relationId, "precheck", false, request, userId);
+        return saveDirectorPrecheck(relationId, false, request, userId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-precheck")
     public void submitDirectorPrecheck(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        saveDirectorStage(relationId, "precheck", true, request, userId);
+        saveDirectorPrecheck(relationId, true, request, userId);
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-interview")
-    public Integer saveDirectorInterviewDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        return saveDirectorStage(relationId, "interview", false, request, userId);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-interview")
-    public void submitDirectorInterview(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        saveDirectorStage(relationId, "interview", true, request, userId);
-    }
-
-    private Integer saveDirectorStage(Long relationId, String stage, boolean submit,
+    private Integer saveDirectorPrecheck(Long relationId, boolean submit,
                                       DirectorStageSaveReqVO request, Long userId) {
-        String permission = "precheck".equals(stage) ? PERMISSION_DIRECTOR_PRECHECK : PERMISSION_DIRECTOR_INTERVIEW;
-        if (!permissionApi.hasAnyPermissions(userId, permission)) throw exception(STUDENT_PERMISSION_DENIED);
+        if (!permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_PRECHECK)) throw exception(STUDENT_PERMISSION_DENIED);
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId,
                 TenantContextHolder.getRequiredTenantId());
         if (relation == null || !"active".equals(relation.getStatus())
@@ -924,77 +932,53 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         String current = StrUtil.blankToDefault(relation.getDirectorStage(), "precheck");
         String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(Map.of(
-                "stage", stage, "submit", submit,
+                "stage", "precheck", "submit", submit,
                 "interviewAt", request.getInterviewAt() == null ? "" : request.getInterviewAt().toString(),
                 "data", request.getData())));
-        String previousJson = "precheck".equals(stage) ? relation.getDirectorPrecheckDraftJson()
-                : relation.getDirectorInterviewDraftJson();
-        Integer draftVersion = "precheck".equals(stage) ? relation.getDirectorPrecheckDraftVersion()
-                : relation.getDirectorInterviewDraftVersion();
+        String previousJson = relation.getDirectorPrecheckDraftJson();
+        Integer draftVersion = relation.getDirectorPrecheckDraftVersion();
         if (draftVersion == null) draftVersion = 0;
         if (!Objects.equals(draftVersion, request.getVersion())
                 && directorCommandReplay(previousJson, request.getIdempotencyKey(), fingerprint)) {
             return draftVersion;
         }
-        if (!current.equals(stage) || !Objects.equals(draftVersion, request.getVersion())) {
+        if (!current.equals("precheck") || !Objects.equals(draftVersion, request.getVersion())) {
             throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         }
-        boolean precheck = "precheck".equals(stage);
-        if (precheck && request.getData() != null && !request.getData().isEmpty()) {
+        if (request.getData() != null && !request.getData().isEmpty()) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
-        }
-        StudentContactContextRespVO.DirectorFormVO existing = directorForm(stage, previousJson, null, relation, draftVersion);
-        DirectorFormTemplateVO.Snapshot templateSnapshot = null;
-        if (!precheck) {
-            templateSnapshot = "empty".equals(existing.getState())
-                    ? directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_INTERVIEW,
-                            null, request.getData(), submit)
-                    : directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_INTERVIEW,
-                            existing.getTemplateVersionId(), request.getData(), submit, existing.getDictSnapshots());
         }
         if (submit) {
             LocalDateTime businessNow = LocalDateTime.now(BUSINESS_ZONE);
-            if (precheck
-                    && (request.getInterviewAt() == null || !request.getInterviewAt().isAfter(businessNow))) {
-                log.warn("[saveDirectorStage][invalid interviewAt] relationId={}, stage={}, interviewAt={}, businessNow={}, zone={}",
-                        relationId, stage, request.getInterviewAt(), businessNow, BUSINESS_ZONE);
+            if (request.getInterviewAt() == null || !request.getInterviewAt().isAfter(businessNow)) {
+                log.warn("[saveDirectorPrecheck][invalid interviewAt] relationId={}, interviewAt={}, businessNow={}, zone={}",
+                        relationId, request.getInterviewAt(), businessNow, BUSINESS_ZONE);
                 throw exception(STUDENT_DIRECTOR_INTERVIEW_AT_INVALID);
             }
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("configId", null);
         payload.put("configVersion", null);
-        payload.put("templateId", templateSnapshot == null ? null : templateSnapshot.getTemplateId());
-        payload.put("templateVersionId", templateSnapshot == null ? null : templateSnapshot.getTemplateVersionId());
-        payload.put("templateVersionNo", templateSnapshot == null ? null : templateSnapshot.getTemplateVersionNo());
-        payload.put("fields", templateSnapshot == null ? List.of() : templateSnapshot.getFields());
-        payload.put("values", templateSnapshot == null ? Map.of() : templateSnapshot.getValues());
-        payload.put("dictSnapshots", templateSnapshot == null ? Map.of() : templateSnapshot.getDictSnapshots());
+        payload.put("templateId", null);
+        payload.put("templateVersionId", null);
+        payload.put("templateVersionNo", null);
+        payload.put("fields", List.of());
+        payload.put("values", Map.of());
+        payload.put("dictSnapshots", Map.of());
         payload.put("savedAt", LocalDateTime.now());
         payload.put("savedByUserId", userId);
         if (submit) payload.put("submittedAt", LocalDateTime.now());
         payload.put("idempotencyKey", request.getIdempotencyKey());
         payload.put("requestFingerprint", fingerprint);
         String json = JsonUtils.toJsonString(payload);
-        if ("precheck".equals(stage)) {
-            relation.setDirectorPrecheckDraftJson(json);
-            if (submit) {
-                relation.setDirectorPrecheckSnapshotJson(json);
-                relation.setDirectorInterviewAt(request.getInterviewAt());
-                relation.setDirectorStage("interview");
-            }
-        } else {
-            relation.setDirectorInterviewDraftJson(json);
-            if (submit) {
-                relation.setDirectorInterviewSnapshotJson(json);
-                relation.setDirectorStage("positioning_ready");
-            }
+        relation.setDirectorPrecheckDraftJson(json);
+        if (submit) {
+            relation.setDirectorPrecheckSnapshotJson(json);
+            relation.setDirectorInterviewAt(request.getInterviewAt());
+            relation.setDirectorStage("positioning_interview");
         }
-        relation.setDirectorFormConfigId(templateSnapshot == null ? null : templateSnapshot.getTemplateId());
-        relation.setDirectorFormConfigVersion(templateSnapshot == null ? null : templateSnapshot.getTemplateVersionNo());
         int nextDraftVersion = draftVersion + 1;
-        if ("precheck".equals(stage)) relation.setDirectorPrecheckDraftVersion(nextDraftVersion);
-        else relation.setDirectorInterviewDraftVersion(nextDraftVersion);
+        relation.setDirectorPrecheckDraftVersion(nextDraftVersion);
         if (submit) relation.setVersion(relation.getVersion() + 1);
         relationMapper.updateById(relation);
         return nextDraftVersion;
@@ -1028,17 +1012,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         result.setState(StrUtil.isNotBlank(snapshotJson) ? "submitted" : StrUtil.isNotBlank(draftJson) ? "draft" : "empty");
         result.setInterviewAt("precheck".equals(stage) ? relation.getDirectorInterviewAt() : null);
         if (StrUtil.isBlank(sourceJson)) {
-            if ("precheck".equals(stage)) {
-                result.setFields(List.of());
-            } else {
-                var version = directorFormTemplateService.requirePublished(
-                        DirectorFormTemplateService.SCENE_INTERVIEW, null);
-                result.setTemplateId(version.getTemplateId());
-                result.setTemplateVersionId(version.getId());
-                result.setTemplateVersionNo(version.getVersionNo());
-                result.setFields(directorFormTemplateService.fields(version).stream()
-                        .filter(DirectorFormTemplateVO.Field::getEnabled).map(this::toContextField).toList());
-            }
+            // Historical questionnaires have no current template; only persisted snapshots are readable.
+            result.setFields(List.of());
             result.setValues(Map.of());
             return result;
         }
@@ -1072,10 +1047,6 @@ public class StudentContactServiceImpl implements StudentContactService {
         result.setSavedByUserId(numberAsLong(payload.get("savedByUserId")));
         result.setSubmittedAt(dateTime(payload.get("submittedAt")));
         return result;
-    }
-
-    private StudentContactContextRespVO.FormFieldVO toContextField(DirectorFormTemplateVO.Field source) {
-        return JsonUtils.parseObject(JsonUtils.toJsonString(source), StudentContactContextRespVO.FormFieldVO.class);
     }
 
     private Long numberAsLong(Object value) {

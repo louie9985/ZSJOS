@@ -1,6 +1,7 @@
-import { DeleteOutlined, FileOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Image, Spin, Upload, message, type UploadProps } from 'antd'
+import { DeleteOutlined, FileOutlined, PictureOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Image, Spin, Typography, Upload, message, type UploadProps } from 'antd'
 import { createDeferredUploadItem, type DeferredUploadItem } from '../services/deferredUpload'
+import { useClipboardPasteTarget } from './ClipboardPasteTarget'
 
 export default function DeferredAttachmentPicker<T>({ value, onChange, accept, maxCount = 9,
   imageOnly = true, disabled = false }: {
@@ -11,6 +12,18 @@ export default function DeferredAttachmentPicker<T>({ value, onChange, accept, m
   imageOnly?: boolean
   disabled?: boolean
 }) {
+  const addFiles = (files: File[]) => {
+    const next = [...value]
+    for (const file of files) {
+      if (next.length >= maxCount) break
+      if (imageOnly && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        message.error('仅支持 JPG、PNG、WebP 图片')
+        continue
+      }
+      next.push(createDeferredUploadItem<T>(file))
+    }
+    if (next.length !== value.length) onChange(next)
+  }
   const beforeUpload: UploadProps['beforeUpload'] = file => {
     if (value.length >= maxCount) { message.warning(`最多选择 ${maxCount} 个文件`); return Upload.LIST_IGNORE }
     if (imageOnly && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -19,10 +32,18 @@ export default function DeferredAttachmentPicker<T>({ value, onChange, accept, m
     onChange([...value, createDeferredUploadItem<T>(file)])
     return false
   }
-  return <div className="deferred-attachment-picker">
-    <Upload accept={accept} multiple beforeUpload={beforeUpload} showUploadList={false} disabled={disabled || value.length >= maxCount}>
-      {value.length < maxCount && <Button icon={<PlusOutlined/>} disabled={disabled}>选择文件</Button>}
-    </Upload>
+  const { targetRef, targetProps, pasteButtonProps } = useClipboardPasteTarget({
+    disabled,
+    canPaste: () => value.length < maxCount,
+    onFiles: addFiles,
+  })
+  return <div ref={targetRef} className="deferred-attachment-picker" {...targetProps}>
+    <div className="attachment-upload-actions">
+      <Upload accept={accept} multiple beforeUpload={beforeUpload} showUploadList={false} disabled={disabled || value.length >= maxCount}>
+        {value.length < maxCount && <Button icon={<PlusOutlined/>} disabled={disabled}>上传附件</Button>}
+      </Upload>
+      <Button {...pasteButtonProps} icon={<PictureOutlined />}>上传剪贴板截图</Button>
+    </div>
     <div className="deferred-attachment-grid">
       {value.map(item => <div key={item.uid} className={`deferred-attachment-item status-${item.status}`}>
         {(item.type || '').startsWith('image/') && (item.url || item.previewUrl) ? <Image src={item.url || item.previewUrl} preview={Boolean(item.url || item.previewUrl)} alt={item.name}/> : <FileOutlined className="deferred-attachment-file-icon"/>}

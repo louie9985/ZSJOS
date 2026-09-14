@@ -19,6 +19,11 @@ def fail(message):
     raise SystemExit(1)
 
 
+def text_asset_sha256(data):
+    """Keep manifest checksums stable across Git LF/CRLF checkouts."""
+    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+
+
 def read_base_manifest(base_ref):
     if not base_ref:
         return None
@@ -64,7 +69,10 @@ def validate_asset(asset, registered, current):
     if not path.is_file():
         fail(f"missing file {asset['path']}")
     data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != asset["sha256"]:
+    normalized = data.replace(b"\r\n", b"\n")
+    checksums = {hashlib.sha256(data).hexdigest(), hashlib.sha256(normalized).hexdigest(),
+                 hashlib.sha256(normalized.replace(b"\n", b"\r\n")).hexdigest()}
+    if asset["sha256"] not in checksums:
         fail(f"checksum mismatch {asset['path']}")
     if asset_format == "simple":
         validate_simple_asset(asset, data)
@@ -99,17 +107,54 @@ def validate_simple_asset(asset, data):
     root = model.get("simpleModel")
     if not isinstance(root, dict) or root.get("id") != "StartUserNode" or root.get("type") != 10:
         fail(f"invalid SIMPLE start node {asset['path']}")
-    tasks = {}
-    node = root
-    while isinstance(node, dict):
-        if node.get("type") in {11, 13}:
-            tasks[node.get("id")] = node
-        node = node.get("childNode")
+    tasks, node_ids, end_nodes = {}, set(), []
+
+    def visit(node):
+        if not isinstance(node, dict):
+            return
+        node_id, node_type = node.get("id"), node.get("type")
+        if not node_id or node_id in node_ids:
+            fail(f"missing or duplicate SIMPLE node id in {asset['path']}: {node_id}")
+        node_ids.add(node_id)
+        if node_type not in {1, 10, 11, 13, 50, 51, 52, 53}:
+            fail(f"unsupported SIMPLE node type {node_type} in {asset['path']}")
+        if node_type == 1 and node.get("childNode"):
+            fail(f"end node has a successor in {asset['path']}")
+        if node_type in {11, 13}:
+            tasks[node_id] = node
+        if node_type == 1:
+            end_nodes.append(node_id)
+        branches = node.get("conditionNodes", [])
+        if node_type in {51, 52, 53}:
+            if len(branches) < 2:
+                fail(f"SIMPLE branch {node_id} requires at least two branches in {asset['path']}")
+            if node_type in {51, 53} and sum(bool((b.get("conditionSetting") or {}).get("defaultFlow")) for b in branches) != 1:
+                fail(f"SIMPLE branch {node_id} requires exactly one default branch in {asset['path']}")
+            for branch in branches:
+                if branch.get("type") != 50:
+                    fail(f"invalid SIMPLE branch item under {node_id} in {asset['path']}")
+                if node_type == 51:
+                    setting = branch.get("conditionSetting") or {}
+                    if not setting.get("defaultFlow") and not setting.get("conditionExpression"):
+                        fail(f"missing condition expression for branch {branch.get('id')} in {asset['path']}")
+                visit(branch)
+        elif branches:
+            fail(f"non-branch SIMPLE node {node_id} has conditionNodes in {asset['path']}")
+        visit(node.get("childNode"))
+
+    visit(root)
     if set(tasks) != set(asset["taskKeys"]):
         fail(f"task keys mismatch {asset['path']}")
+    if len(end_nodes) != 1:
+        fail(f"SIMPLE model must contain one end node in {asset['path']}")
     for task_id, task in tasks.items():
-        if task.get("candidateStrategy") != 60 or not task.get("candidateParam"):
+        strategy = task.get("candidateStrategy")
+        if not task.get("name") or strategy not in {35, 60}:
             fail(f"invalid SIMPLE candidate expression for task {task_id} in {asset['path']}")
+        if strategy == 60 and not task.get("candidateParam"):
+            fail(f"missing SIMPLE candidate expression for task {task_id} in {asset['path']}")
+    if "startUserSelectTaskKeys" in asset and {k for k, t in tasks.items() if t.get("candidateStrategy") == 35} != set(asset["startUserSelectTaskKeys"]):
+        fail(f"start-user-selected task contract mismatch {asset['path']}")
     text = data.decode("utf-8")
     for variable in asset["businessVariables"] + asset["assigneeVariables"]:
         if variable not in text and variable not in asset.get("runtimeOnlyVariables", []):
@@ -141,10 +186,11 @@ def main():
     for asset in manifest["assets"]:
         validate_asset(asset, registered, current)
     manifest_paths = {item["path"] for item in manifest["assets"]}
-    for path in ROOT.glob("*/ */process.bpmn20.xml".replace(" ", "")):
-        rel = path.relative_to(ROOT).as_posix()
-        if rel not in manifest_paths:
-            fail(f"unregistered BPMN {rel}")
+    for pattern in ("*/*/process.bpmn20.xml", "*/*/process-model.json"):
+        for path in ROOT.glob(pattern):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel not in manifest_paths:
+                fail(f"unregistered BPM asset {rel}")
     if current != {item["processKey"] for item in manifest["assets"]}:
         fail("each process must have one recommended version")
     validate_immutability(read_base_manifest(args.base_ref), manifest)

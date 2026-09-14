@@ -85,15 +85,31 @@ public class BusinessAuditServiceImpl implements BusinessAuditService {
         HttpServletRequest request = currentRequest();
         Long operatorId = SecurityFrameworkUtils.getLoginUserId();
         String operatorName = operatorId == null ? "系统" : SecurityFrameworkUtils.getLoginUserNickname();
-        mapper.insert(new BusinessAuditLogDO().setOperatorUserId(operatorId)
+        BusinessAuditLogDO log = new BusinessAuditLogDO().setOperatorUserId(operatorId)
                 .setOperatorNameSnapshot(operatorName == null ? "未知账号" : operatorName)
                 .setOperatorRoleSnapshot(operatorRoleSnapshot == null ? "系统" : operatorRoleSnapshot)
                 .setCategoryCode(category).setActionCode(action)
                 .setTargetType(targetType).setTargetId(targetId)
                 .setDetailJson(JsonUtils.toJsonString(safeDetails == null ? Map.of() : safeDetails))
                 .setSourceIp(request == null ? null : ServletUtils.getClientIP(request))
-                .setSourceType("EXPLICIT").setResultStatus("SUCCESS")
-                .setResultCode(0).setOccurredAt(LocalDateTime.now()).setFinishedAt(LocalDateTime.now()));
+                .setSourceType("EXPLICIT")
+                .setResultStatus(safeDetails != null && safeDetails.get("resultStatus") != null
+                        ? String.valueOf(safeDetails.get("resultStatus")) : "SUCCESS")
+                .setResultCode(0).setOccurredAt(LocalDateTime.now()).setFinishedAt(LocalDateTime.now());
+        if (safeDetails != null) {
+            log.setInitiatorUserId(asLong(safeDetails.get("initiatorUserId")))
+                    .setInitiatorNameSnapshot(asString(safeDetails.get("initiatorNameSnapshot")))
+                    .setExecutorType(asString(safeDetails.get("executorType")))
+                    .setExecutorIdentity(asString(safeDetails.get("executorIdentity")))
+                    .setParentAuditId(asLong(safeDetails.get("parentAuditId")))
+                    .setExecutionKey(asString(safeDetails.get("eventKey")));
+            log.setTraceId(asString(safeDetails.get("traceId")));
+            log.setDurationMs(asLong(safeDetails.get("durationMs")));
+        }
+        if (log.getExecutionKey() != null && mapper.selectByExecutionKey(log.getExecutionKey()) != null) {
+            return;
+        }
+        mapper.insert(log);
     }
 
     @Override
@@ -117,6 +133,9 @@ public class BusinessAuditServiceImpl implements BusinessAuditService {
         String value = message.replaceAll("(?i)(password|token|mobile|phone|bank.?card)\\s*[=:]\\s*[^,;\\s]+", "$1=[REDACTED]");
         return value.length() <= 500 ? value : value.substring(0, 500);
     }
+
+    private static Long asLong(Object value) { return value instanceof Number n ? n.longValue() : null; }
+    private static String asString(Object value) { return value == null ? null : String.valueOf(value); }
 
     private static HttpServletRequest currentRequest() {
         return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes

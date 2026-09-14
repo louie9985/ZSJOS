@@ -62,7 +62,7 @@ class ContentReviewConfigServiceTest {
     void updateConfigAcceptsCompatibleSourcesAndValidatedDefaults() {
         List<MaterialFieldDefinition> fields = List.of(
                 field("body", FIELD_RICH_TEXT, true, null),
-                field("account_types", FIELD_DICT_MULTI, true, DICT_ACCOUNT_TYPE),
+                field("account_types", FIELD_DICT_MULTI, true, DICT_PERSONA_TYPE),
                 field("video", FIELD_VIDEO, true, null),
                 field("publish_date", FIELD_DATE, false, null));
         stubUpdate(fields);

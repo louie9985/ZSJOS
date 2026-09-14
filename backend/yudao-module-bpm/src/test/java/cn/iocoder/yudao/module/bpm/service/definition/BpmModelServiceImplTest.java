@@ -14,6 +14,8 @@ import cn.iocoder.yudao.module.bpm.enums.definition.BpmSimpleModelNodeTypeEnum;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.UserTask;
+import org.flowable.bpmn.model.ExclusiveGateway;
+import org.flowable.bpmn.model.InclusiveGateway;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.Model;
 import org.flowable.engine.repository.ModelQuery;
@@ -193,6 +195,61 @@ public class BpmModelServiceImplTest extends BaseMockitoUnitTest {
                 .getFlowElement("sourceDepartmentReview")).getSkipExpression());
         assertEquals("${isAllocate != true || sameDepartment == true}", ((UserTask) bpmnModel.getMainProcess()
                 .getFlowElement("targetDepartmentReview")).getSkipExpression());
+    }
+
+    @Test
+    public void testMigratedSimpleAssetsPreserveTaskKeysAndGatewaySemantics() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.isRegularFile(root.resolve("script/bpm/manifest.json"))) root = root.getParent();
+        assertNotNull(root);
+        String[] keys = {"zsjos_feedback_requirement_approval", "zsjos_lead_appeal_review",
+                "zsjos_lead_transfer_request", "zsjos_media_over_entitlement", "zsjos_media_positioning_ip",
+                "zsjos_media_rebind", "zsjos_media_reposition", "zsjos_partner_withdrawal",
+                "zsjos_sales_order_dual_approval", "zsjos_student_contact_extension"};
+        for (String key : keys) {
+            Path asset = root.resolve("script/bpm").resolve(key).resolve("2.0.0/process-model.json");
+            BpmModelSaveReqVO req = JsonUtils.parseObject(Files.readString(asset), BpmModelSaveReqVO.class);
+            assertNotNull(req.getSimpleModel(), key);
+            BpmnModel bpmn = SimpleModelUtils.buildBpmnModel(req.getKey(), req.getName(), req.getSimpleModel());
+            // Deployment serializes and reparses XML; this also resolves incoming/outgoing flow references.
+            bpmn = cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils.getBpmnModel(
+                    cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils.getBpmnXml(bpmn)
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            BpmnModel original = cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils.getBpmnModel(
+                    Files.readAllBytes(root.resolve("script/bpm").resolve(key).resolve("1.0.0/process.bpmn20.xml")));
+            java.util.Set<String> expected = original.getMainProcess().getFlowElements().stream()
+                    .filter(UserTask.class::isInstance).map(e -> e.getId()).collect(java.util.stream.Collectors.toSet());
+            java.util.Set<String> actual = bpmn.getMainProcess().getFlowElements().stream()
+                    .filter(UserTask.class::isInstance).map(e -> e.getId()).filter(id -> !id.equals("StartUserNode"))
+                    .collect(java.util.stream.Collectors.toSet());
+            assertEquals(expected, actual, key);
+            for (String taskId : expected) {
+                UserTask task = (UserTask) bpmn.getMainProcess().getFlowElement(taskId);
+                assertEquals(35, cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils.parseCandidateStrategy(task));
+            }
+            assertNotNull(bpmn.getMainProcess().getFlowElement("EndEvent"), key);
+            assertTrue(bpmn.getMainProcess().getFlowElements().stream().anyMatch(UserTask.class::isInstance), key);
+            if (key.equals("zsjos_feedback_requirement_approval")) {
+                assertTrue(bpmn.getMainProcess().getFlowElements().stream().anyMatch(ExclusiveGateway.class::isInstance));
+                ExclusiveGateway gateway = (ExclusiveGateway) bpmn.getMainProcess().getFlowElement("LeaderGateway");
+                assertEquals("flow_skip_leader", gateway.getDefaultFlow());
+                org.flowable.bpmn.model.SequenceFlow condition = (org.flowable.bpmn.model.SequenceFlow)
+                        bpmn.getMainProcess().getFlowElement("flow_department_leader");
+                assertEquals("${hasDepartmentLeader == true}", condition.getConditionExpression());
+                assertEquals("departmentLeaderReview", condition.getTargetRef());
+                org.flowable.bpmn.model.SequenceFlow fallback = (org.flowable.bpmn.model.SequenceFlow)
+                        bpmn.getMainProcess().getFlowElement("flow_skip_leader");
+                assertEquals("chairmanReview", fallback.getTargetRef());
+            }
+            if (key.equals("zsjos_sales_order_dual_approval")) {
+                assertEquals(2, bpmn.getMainProcess().getFlowElements().stream().filter(InclusiveGateway.class::isInstance).count());
+                InclusiveGateway split = (InclusiveGateway) bpmn.getMainProcess().getFlowElement("ParallelSplit");
+                assertEquals(2, split.getOutgoingFlows().size());
+                split.getOutgoingFlows().forEach(flow -> assertEquals("${true}", flow.getConditionExpression()));
+                InclusiveGateway join = (InclusiveGateway) bpmn.getMainProcess().getFlowElement("ParallelSplit_join");
+                assertEquals(2, join.getIncomingFlows().size());
+            }
+        }
     }
 
     private Model mockModel(Integer type) {

@@ -19,16 +19,21 @@ import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_ACCOUNT_STAGE;
-import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DIMENSION_ACCOUNT_STAGE;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PERSONA_TYPE;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.FIELD_DICT_MULTI;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.FIELD_HTTPS_LINK;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.FIELD_REPEAT_GROUP;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.FIELD_RICH_TEXT;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.FIELD_TEXT;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.SECTION_ACCOUNT_DETAIL;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.SECTION_BUILD_SUGGESTION;
+import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.SECTION_DIRECTOR_ANALYSIS;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.VALUE_UNLIMITED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_FIELD_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_SCHEMA_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -49,7 +54,7 @@ class MaterialSchemaServiceTest {
         when(dictDataApi.getDictDataList(DICT_ACCOUNT_STAGE)).thenReturn(List.of(
                 dictionary("S1", "起步期"), dictionary("S2", "增长期")));
         List<MaterialFieldDefinition> fields = List.of(field("account_stage", "适配账号时期",
-                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE).setRecommendationDimension(DIMENSION_ACCOUNT_STAGE)
+                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE)
                 .setAllowUnlimited(true).setRequired(true));
 
         MaterialSchemaService.NormalizedMaterial result = service.normalize(fields,
@@ -69,7 +74,7 @@ class MaterialSchemaServiceTest {
     void normalizeUsesTrustedReviewSnapshotAfterDictionaryOptionIsDisabledOrRenamed() {
         when(dictDataApi.getDictDataList(DICT_ACCOUNT_STAGE)).thenReturn(List.of());
         List<MaterialFieldDefinition> fields = List.of(field("account_stage", "适配账号时期",
-                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE).setRecommendationDimension(DIMENSION_ACCOUNT_STAGE)
+                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE)
                 .setRequired(true));
 
         MaterialSchemaService.NormalizedMaterial result = service.normalize(fields,
@@ -87,7 +92,7 @@ class MaterialSchemaServiceTest {
     void normalizeRejectsTrustedSnapshotForAnotherDictionaryOrCode() {
         when(dictDataApi.getDictDataList(DICT_ACCOUNT_STAGE)).thenReturn(List.of());
         List<MaterialFieldDefinition> fields = List.of(field("account_stage", "适配账号时期",
-                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE).setRecommendationDimension(DIMENSION_ACCOUNT_STAGE));
+                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE));
 
         assertFieldInvalid(() -> service.normalize(fields, Map.of("account_stage", "S1"), 7L, Set.of(),
                 Map.of("account_stage", new MaterialSchemaService.DictionarySnapshotValue(
@@ -101,7 +106,7 @@ class MaterialSchemaServiceTest {
     void normalizeAllowsExplicitUnlimitedButRejectsCombiningItWithSpecificValues() {
         when(dictDataApi.getDictDataList(DICT_ACCOUNT_STAGE)).thenReturn(List.of(dictionary("S1", "起步期")));
         List<MaterialFieldDefinition> fields = List.of(field("account_stage", "适配账号时期",
-                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE).setRecommendationDimension(DIMENSION_ACCOUNT_STAGE)
+                FIELD_DICT_MULTI).setDictType(DICT_ACCOUNT_STAGE)
                 .setAllowUnlimited(true));
 
         MaterialSchemaService.NormalizedMaterial unlimited = service.normalize(fields,
@@ -111,6 +116,35 @@ class MaterialSchemaServiceTest {
 
         assertFieldInvalid(() -> service.normalize(fields,
                 Map.of("account_stage", List.of(VALUE_UNLIMITED, "S1")), 7L));
+    }
+
+    @Test
+    void schemaRejectsDuplicateRecommendationDimensionFromSameDictionary() {
+        when(dictDataApi.getDictDataList(DICT_PERSONA_TYPE)).thenReturn(List.of(dictionary("p1", "人设一")));
+        List<MaterialFieldDefinition> fields = List.of(
+                field("persona_primary", "适配账号类型", FIELD_DICT_MULTI).setDictType(DICT_PERSONA_TYPE),
+                field("persona_secondary", "备用账号类型", FIELD_DICT_MULTI).setDictType(DICT_PERSONA_TYPE));
+
+        assertSchemaInvalid(() -> service.validateSchemaForPublish(fields));
+    }
+
+    @Test
+    void schemaRejectsUnlimitedOnNonRecommendationDictionary() {
+        when(dictDataApi.getDictDataList("other_dict")).thenReturn(List.of(dictionary("X", "选项")));
+        List<MaterialFieldDefinition> fields = List.of(field("other", "其他字典", FIELD_DICT_MULTI)
+                .setDictType("other_dict").setAllowUnlimited(true));
+
+        assertSchemaInvalid(() -> service.validateSchemaForPublish(fields));
+    }
+
+    @Test
+    void schemaRejectsRecommendationDictionaryInsideRepeatGroup() {
+        when(dictDataApi.getDictDataList(DICT_PERSONA_TYPE)).thenReturn(List.of(dictionary("p1", "人设一")));
+        MaterialFieldDefinition group = field("cases", "案例", FIELD_REPEAT_GROUP)
+                .setChildren(List.of(field("persona", "适配账号类型", FIELD_DICT_MULTI)
+                        .setDictType(DICT_PERSONA_TYPE)));
+
+        assertSchemaInvalid(() -> service.validateSchemaForPublish(List.of(group)));
     }
 
     @Test
@@ -148,19 +182,48 @@ class MaterialSchemaServiceTest {
     @Test
     void viralAccountTemplateContainsThreeColumnsAndRepeatGroups() {
         List<MaterialFieldDefinition> fields = ViralAccountMaterialSchema.fields();
-
+        assertEquals(36, fields.size());
         assertEquals(3, fields.stream().map(MaterialFieldDefinition::getSection).distinct().count());
+        assertEquals(12, fields.stream().filter(field -> SECTION_ACCOUNT_DETAIL.equals(field.getSection())).count());
+        assertEquals(12, fields.stream().filter(field -> SECTION_DIRECTOR_ANALYSIS.equals(field.getSection())).count());
+        assertEquals(12, fields.stream().filter(field -> SECTION_BUILD_SUGGESTION.equals(field.getSection())).count());
+        assertEquals("build_notify", fields.get(23).getKey());
+        assertEquals(SECTION_DIRECTOR_ANALYSIS, fields.get(23).getSection());
+        assertNull(fields.get(23).getGroup());
         MaterialFieldDefinition contentMatrix = fields.stream().filter(field -> "content_matrix".equals(field.getKey()))
                 .findFirst().orElseThrow();
-        MaterialFieldDefinition buildMatrix = fields.stream().filter(field -> "build_matrix".equals(field.getKey()))
+        MaterialFieldDefinition stageSix = fields.stream().filter(field -> "s6_stage_plan".equals(field.getKey()))
                 .findFirst().orElseThrow();
         assertEquals(FIELD_REPEAT_GROUP, contentMatrix.getType());
         assertEquals(1, contentMatrix.getMinCount());
         assertEquals(4, contentMatrix.getChildren().size());
-        assertEquals(FIELD_REPEAT_GROUP, buildMatrix.getType());
-        assertEquals(1, buildMatrix.getMinCount());
-        assertTrue(fields.stream().filter(field -> field.getStageCode() != null)
-                .map(MaterialFieldDefinition::getStageCode).allMatch(code -> code.matches("s[1-6]")));
+        assertEquals(FIELD_REPEAT_GROUP, stageSix.getType());
+        assertEquals(1, stageSix.getMinCount());
+        assertEquals(List.of("s1_stage_plan", "s2_stage_plan", "s3_stage_plan", "s4_stage_plan",
+                        "s5_stage_plan", "s6_stage_plan"),
+                fields.subList(29, 35).stream().map(MaterialFieldDefinition::getKey).toList());
+        assertTrue(fields.stream().allMatch(field -> field.getSort() != null));
+        assertEquals("zsjos_persona_type", fields.stream()
+                .filter(field -> "adapted_persona_types".equals(field.getKey()))
+                .findFirst().orElseThrow().getDictType());
+    }
+
+    @Test
+    void viralContentTemplateContainsOnlyConfirmedFieldsAndTwoInitialLinks() {
+        List<MaterialFieldDefinition> fields = ViralContentMaterialSchema.fields();
+
+        assertEquals(24, fields.size());
+        assertEquals(3, fields.stream().map(MaterialFieldDefinition::getSection).distinct().count());
+        MaterialFieldDefinition links = fields.stream().filter(field -> "reference_work_links".equals(field.getKey()))
+                .findFirst().orElseThrow();
+        assertEquals(FIELD_REPEAT_GROUP, links.getType());
+        assertEquals(2, links.getInitialCount());
+        assertEquals(0, links.getMinCount());
+        assertEquals(FIELD_HTTPS_LINK, links.getChildren().getFirst().getType());
+        assertEquals("zsjos_viral_content_type", fields.stream()
+                .filter(field -> "viral_content_types".equals(field.getKey())).findFirst().orElseThrow().getDictType());
+        assertEquals("1-3s；3-15s", fields.stream()
+                .filter(field -> "body_structure".equals(field.getKey())).findFirst().orElseThrow().getPlaceholder());
     }
 
     @Test
@@ -184,5 +247,10 @@ class MaterialSchemaServiceTest {
     private void assertFieldInvalid(Runnable action) {
         ServiceException error = assertThrows(ServiceException.class, action::run);
         assertEquals(MATERIAL_FIELD_INVALID.getCode(), error.getCode());
+    }
+
+    private void assertSchemaInvalid(Runnable action) {
+        ServiceException error = assertThrows(ServiceException.class, action::run);
+        assertEquals(MATERIAL_SCHEMA_INVALID.getCode(), error.getCode());
     }
 }

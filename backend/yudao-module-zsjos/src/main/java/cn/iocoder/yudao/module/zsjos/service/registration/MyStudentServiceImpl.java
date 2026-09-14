@@ -16,9 +16,14 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
@@ -43,10 +48,17 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private MediaAccountMapper mediaAccountMapper;
+    @Resource private PermissionApi permissionApi;
+    @Resource private DeliveryClassScopeService classScopeService;
+    @Resource private DeliveryClassMapper deliveryClassMapper;
 
     @Override
     public PageResult<MyStudentRespVO> getMyPage(Long userId, MyStudentPageReqVO reqVO) {
         List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(reqVO.getAdvancedFilter(), userId);
+        // Managed readers see their department subtree by service owner; everyone else stays self-only.
+        if (permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED)) {
+            return getManagedPage(userId, reqVO, matchedIds);
+        }
         PageResult<PersonDO> people = personMapper.selectMyStudentPage(reqVO, userId, matchedIds);
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         Map<Long, List<ServiceRelationDO>> groups = relationMapper
@@ -55,6 +67,33 @@ public class MyStudentServiceImpl implements MyStudentService {
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         return new PageResult<>(people.getList().stream().map(person -> convert(userId, person.getId(), groups.get(person.getId())))
                 .toList(), people.getTotal());
+    }
+
+    /**
+     * Department-scoped student read. The visible owner set is resolved from the reader's persisted data
+     * scope, so DEPT_AND_CHILD covers the whole subtree. Students follow their service owner live, which
+     * also keeps pending-class students visible to the owner's department.
+     */
+    private PageResult<MyStudentRespVO> getManagedPage(Long userId, MyStudentPageReqVO reqVO, List<Long> matchedIds) {
+        DeliveryClassScopeService.Scope scope = classScopeService.resolve(userId);
+        Set<Long> ownerUserIds = new LinkedHashSet<>();
+        ownerUserIds.add(userId);
+        if (!scope.allDepartments() && !scope.deptIds().isEmpty()) {
+            adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
+                    .map(AdminUserRespDTO::getId).filter(Objects::nonNull).forEach(ownerUserIds::add);
+        }
+        PageResult<PersonDO> people = scope.allDepartments()
+                ? personMapper.selectAllStudentPage(reqVO, matchedIds)
+                : personMapper.selectManagedStudentPage(reqVO, ownerUserIds, matchedIds);
+        List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
+        List<ServiceRelationDO> relations = scope.allDepartments()
+                ? relationMapper.selectOwnedByPersonIds(personIds, reqVO.getServiceStatus())
+                : relationMapper.selectOwnedByOwnerIdsAndPersonIds(ownerUserIds, personIds, reqVO.getServiceStatus());
+        Map<Long, List<ServiceRelationDO>> groups = relations.stream()
+                .filter(relation -> reqVO.getClassId() == null || Objects.equals(relation.getClassId(), reqVO.getClassId()))
+                .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
+        return new PageResult<>(people.getList().stream()
+                .map(person -> convert(userId, person.getId(), groups.get(person.getId()))).toList(), people.getTotal());
     }
 
     @Override
@@ -157,6 +196,11 @@ public class MyStudentServiceImpl implements MyStudentService {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
+        Set<Long> classIds = relations.stream().map(ServiceRelationDO::getClassId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DeliveryClassDO> classes = classIds.isEmpty() || deliveryClassMapper == null ? Map.of()
+                : deliveryClassMapper.selectBatchIds(classIds).stream()
+                        .collect(Collectors.toMap(DeliveryClassDO::getId, Function.identity()));
         MyStudentRespVO result = new MyStudentRespVO();
         result.setPersonId(personId);
         result.setPersonNo(person.getPersonNo());
@@ -179,6 +223,9 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());
             row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());
             row.setOrderNo(order == null ? null : order.getOrderNo());
+            row.setClassId(relation.getClassId());
+            DeliveryClassDO deliveryClass = relation.getClassId() == null ? null : classes.get(relation.getClassId());
+            row.setClassName(deliveryClass == null ? null : deliveryClass.getClassName());
             populateCourseRights(row, item == null ? relation.getServiceSnapshot() : item.getProductSnapshot());
             row.setStatus(relation.getStatus()); row.setActivatedAt(relation.getActivatedAt());
             row.setAcceptanceStatus(relation.getAcceptanceStatus()); row.setAcceptedAt(relation.getAcceptedAt());
@@ -204,10 +251,16 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     private void populateCourseRights(MyStudentRespVO.ServiceVO row, String productSnapshot) {
         row.setProductSnapshot(productSnapshot);
-        if (StrUtil.isBlank(productSnapshot)) return;
+        if (StrUtil.isBlank(productSnapshot)) {
+            row.setCourseName("历史课程信息缺失");
+            return;
+        }
         try {
             LeadProductSnapshot snapshot = JsonUtils.parseObject(productSnapshot, LeadProductSnapshot.class);
-            if (snapshot == null) return;
+            if (snapshot == null) {
+                row.setCourseName("历史课程信息缺失");
+                return;
+            }
             row.setCourseName(snapshot.name());
             row.setSkuName(snapshot.skuName());
             row.setCategoryPath(snapshot.categoryPath() == null ? List.of() : snapshot.categoryPath().stream()
@@ -223,6 +276,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         } catch (RuntimeException exception) {
             // Historical snapshots remain readable even when an old payload cannot be normalized.
             log.warn("[populateCourseRights][serviceRelationId({}) product snapshot is invalid]", row.getServiceRelationId());
+            row.setCourseName("历史课程信息缺失");
         }
     }
 

@@ -31,6 +31,8 @@ public class MediaNotifySceneProvider implements NotifySceneProvider {
             Map.entry("media.account.rebind_approved", "账号换绑通过"),
             Map.entry("media.account.rebind_rejected", "账号换绑驳回"),
             Map.entry("media.account.maintenance_changed", "账号状态维护变更"),
+            Map.entry("media.account.diagnosis", "账号周期诊断逾期提醒"),
+            Map.entry("student.delivery.confirmation", "S0-S6交付确认待填写"),
             Map.entry("media.positioning.operator_review", "定位待运营复核"),
             Map.entry("media.positioning.operator_rejected", "定位运营退回"),
             Map.entry("media.positioning.ip_approved", "IP审核通过"),
@@ -52,8 +54,8 @@ public class MediaNotifySceneProvider implements NotifySceneProvider {
                         variable("changedFields", "变更字段"),
                         variable("changeSummary", "变更摘要"),
                         variable("event.time", "发生时间")),
-                List.of(new NotifySceneRoleRespDTO("assignee", "业务责任人")),
-                List.of(NotifyActionType.NONE, NotifyActionType.BUSINESS_DETAIL), false)).toList();
+                List.of(new NotifySceneRoleRespDTO("assignee", "业务责任人"), new NotifySceneRoleRespDTO("supervisor", "直属上级")),
+                List.of(NotifyActionType.NONE, NotifyActionType.BUSINESS_DETAIL), "media.account.diagnosis".equals(entry.getKey()))).toList();
     }
 
     @Override
@@ -68,6 +70,9 @@ public class MediaNotifySceneProvider implements NotifySceneProvider {
         if (assigneeUserId instanceof Number number && number.longValue() > 0) {
             recipients.add(NotifyRecipientDTO.admin(number.longValue()));
         }
+        Object supervisorUserId = payload.get("supervisorUserId");
+        if (supervisorUserId instanceof Number number && number.longValue() > 0)
+            recipients.add(NotifyRecipientDTO.admin(number.longValue()));
         return recipients;
     }
 

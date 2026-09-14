@@ -34,6 +34,17 @@ import java.util.List;
 public class PositioningCardController {
     @Resource private PositioningCardService service;
     @Resource private PositioningConfirmationService confirmationService;
+    @PostMapping("/{id}/attachments")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
+    public CommonResult<PositioningCardService.CardFile> uploadAttachment(@PathVariable Long id,
+            @RequestParam String fieldKey, @RequestParam org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return success(service.uploadAttachment(id, fieldKey, file.getBytes(), file.getOriginalFilename(), file.getContentType(), getLoginUserId()));
+    }
+    @GetMapping("/{id}/attachments/{fileId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<PositioningCardService.CardFile> attachment(@PathVariable Long id, @PathVariable Long fileId) {
+        return success(service.attachment(id, fileId, getLoginUserId()));
+    }
     @GetMapping("/published-template") @Operation(summary = "获得当前定位卡业务模板")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<DirectorFormTemplateVO.Snapshot> publishedTemplate(@RequestParam(required = false) Long templateId) {

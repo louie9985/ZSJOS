@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead.product;
 
 import java.math.BigDecimal;
 import java.util.List;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductCategoryPathNodeVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO;
 
@@ -23,6 +24,21 @@ public record LeadProductSnapshot(String productRef, String name, Long categoryI
         return new LeadProductSnapshot(productRef, name, categoryId, categoryName, categoryPath, level1CategoryId,
                 level1CategoryName, level2CategoryId, level2CategoryName, skuRef, skuName,
                 selectedAttrValuesJson, price, spuUnknown, skuUnknown, specs);
+    }
+
+    /** Rehydrates an existing lead selection without consulting the current product catalog. */
+    public static LeadProductSnapshot fromIntendedProduct(LeadIntendedProductDO source) {
+        List<ZsjosProductCategoryPathNodeVO> path = source.getCategoryPathSnapshot() == null
+                ? List.of() : cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(
+                source.getCategoryPathSnapshot(), ZsjosProductCategoryPathNodeVO.class);
+        List<ProductSpecVO> specs = source.getSelectedSpecsJson() == null
+                ? null : cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(
+                source.getSelectedSpecsJson(), ProductSpecVO.class);
+        return new LeadProductSnapshot(source.getSpuRef(), source.getSpuNameSnapshot(), source.getCategoryId(),
+                source.getCategoryNameSnapshot(), path, source.getLevel1CategoryId(), source.getLevel1CategoryNameSnapshot(),
+                source.getLevel2CategoryId(), source.getLevel2CategoryNameSnapshot(), source.getSkuRef(),
+                source.getSkuNameSnapshot(), source.getSelectedAttrValuesJson(), source.getPriceSnapshot(),
+                Boolean.TRUE.equals(source.getSpuUnknown()), Boolean.TRUE.equals(source.getSkuUnknown()), specs);
     }
 
     public LeadProductSnapshot retainSelection(List<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO> existing) {

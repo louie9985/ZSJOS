@@ -44,7 +44,7 @@ public class ContentReviewConfigService {
     private static final Set<String> IMAGE_SOURCES = Set.of("coverFileIds", "deliverableFileIds");
     private static final Set<String> ATTACHMENT_SOURCES = Set.of("coverFileIds", "deliverableFileIds");
     private static final Map<String, String> DICTIONARY_SOURCE_TYPES = Map.of(
-            "accountType", DICT_ACCOUNT_TYPE,
+            "accountType", DICT_PERSONA_TYPE,
             "profession", DICT_PROFESSION,
             "accountStage", DICT_ACCOUNT_STAGE);
 

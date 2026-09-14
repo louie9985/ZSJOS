@@ -53,6 +53,13 @@ public class BpmProcessInstanceStatusEvent extends ApplicationEvent {
     @NotNull(message = "流程状态事件编号不能为空")
     private String eventKey;
 
+    /** 触发流程的用户快照，可为空（系统触发）。 */
+    private Long initiatorUserId;
+    private String initiatorNameSnapshot;
+    /** 实际执行身份，例如 USER、SYSTEM_BPM。 */
+    private String executorType;
+    private String executorIdentity;
+
     public BpmProcessInstanceStatusEvent(Object source) {
         super(source);
     }

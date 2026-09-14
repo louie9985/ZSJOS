@@ -23,6 +23,22 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class WithdrawalController {
     @Resource private WithdrawalService service;
 
+    @PostMapping("/search-page")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query')")
+    public CommonResult<PageResult<WithdrawalRespVO>> searchPage(@Valid @RequestBody WithdrawalPageReqVO request) {
+        return success(service.getPage(request, null));
+    }
+
+    @PostMapping("/my-search-page")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:my-query')")
+    public CommonResult<PageResult<WithdrawalRespVO>> mySearchPage(@Valid @RequestBody WithdrawalPageReqVO request) {
+        return success(service.getPage(request, WebFrameworkUtils.getLoginUserId()));
+    }
+
+
+
     @PostMapping("/apply")
     @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:apply')")
     public CommonResult<Long> apply(@Valid @RequestBody WithdrawalApplyReqVO request) {

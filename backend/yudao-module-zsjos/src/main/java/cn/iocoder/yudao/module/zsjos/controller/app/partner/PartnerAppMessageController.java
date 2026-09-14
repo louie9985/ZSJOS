@@ -43,7 +43,8 @@ public class PartnerAppMessageController {
     @GetMapping("/page")
     public CommonResult<PageResult<NotifyMessageRespVO>> page(@Valid PartnerMessagePageReqVO reqVO) {
         accountService.requireContext(getLoginUserId());
-        reqVO.setBizType(GROUP_BIZ_TYPE.get(reqVO.getGroup()));
+        String group = reqVO.getGroup();
+        reqVO.setBizType(group == null || "all".equals(group) ? null : GROUP_BIZ_TYPE.get(group));
         PageResult<NotifyMessageDO> page = notifyMessageService.getMyMyNotifyMessagePage(reqVO, getLoginUserId(),
                 UserTypeEnum.PARTNER.getValue());
         return success(BeanUtils.toBean(page, NotifyMessageRespVO.class));

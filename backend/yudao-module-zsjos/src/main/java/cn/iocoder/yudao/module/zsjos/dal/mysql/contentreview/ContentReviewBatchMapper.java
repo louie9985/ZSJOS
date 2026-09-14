@@ -45,6 +45,12 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
     @Select("SELECT * FROM zsjos_content_review_batch WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     ContentReviewBatchDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
+    default List<ContentReviewBatchDO> selectByRevisionOfBatchId(Long batchId) {
+        return selectList(new LambdaQueryWrapperX<ContentReviewBatchDO>()
+                .eq(ContentReviewBatchDO::getRevisionOfBatchId, batchId)
+                .orderByAsc(ContentReviewBatchDO::getId));
+    }
+
     @Select("SELECT DISTINCT process_definition_key FROM zsjos_content_review_batch "
             + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND process_definition_key IS NOT NULL "
             + "AND status IN ('DIRECTOR_REVIEW','FINAL_REVIEW')")
@@ -112,6 +118,17 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
                 .set(ContentReviewBatchDO::getLastEventKey, eventKey)
                 .set(ContentReviewBatchDO::getFinalCompletedAt, finalizedAt)
                 .set(ContentReviewBatchDO::getFinalizedAt, finalizedAt)
+                .set(ContentReviewBatchDO::getVersion, batch.getVersion() + 1));
+    }
+
+    default int markPublished(ContentReviewBatchDO batch, LocalDateTime completedAt) {
+        return update(null, new LambdaUpdateWrapper<ContentReviewBatchDO>()
+                .eq(ContentReviewBatchDO::getId, batch.getId())
+                .eq(ContentReviewBatchDO::getVersion, batch.getVersion())
+                .eq(ContentReviewBatchDO::getStatus, "COMPLETED")
+                .set(ContentReviewBatchDO::getStatus, "PUBLISHED")
+                .set(ContentReviewBatchDO::getCurrentStage, "DONE")
+                .set(ContentReviewBatchDO::getFinalizedAt, completedAt)
                 .set(ContentReviewBatchDO::getVersion, batch.getVersion() + 1));
     }
 }
