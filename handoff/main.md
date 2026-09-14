@@ -23621,3 +23621,18 @@ equestAttachments。
 - Verification evidence: 删除前 `git clean -nd -- output/playwright` 精确列出目标文件；删除后 `git ls-files --others --exclude-standard -- output/playwright/**` 返回 0，已跟踪文件仍为 20 个；未执行代码测试（本次仅清理产物）。
 - Dependency or integration impact: 无新增依赖、数据库、服务、分支、提交或推送变更；其他本地修改和未跟踪文件保持不变。
 - Remaining work: None。
+
+## Delivery Entry - 2026-09-14 19:41:00 +08:00
+
+- Workstream ID: `main-h5-save-and-sync-20260914`
+- Beijing time: 2026-09-14 19:41:00 +08:00
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `05ea0b6f`
+- User goal: 保存当前 H5 页面修改，提交到本地 `main`，再拉取并合并远程 `main`。
+- Key decisions: 仅纳入当前两处 H5 页面修改及用户此前明确要求删除的 `output/playwright` 生成截图；不纳入其他不存在的工作区改动；先提交本地改动，再获取并合并远程提交。
+- Execution or analysis result: 待执行本地提交、远程拉取及合并。
+- Changed files: `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/messages/detail.vue`; 删除 `output/playwright` 下 19 个已跟踪截图；本记录文件。
+- Verification evidence: 合并后检查 `git status --short --branch`、`git rev-list --left-right --count main...origin/main`、未合并冲突文件及 `git diff --check`。
+- Dependency or integration impact: 不新增依赖，不修改数据库、服务或分支。
+- Remaining work: 完成本地提交、远程合并及合并后状态核验。

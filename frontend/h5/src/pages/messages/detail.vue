@@ -60,20 +60,12 @@ onMounted(loadDetail)
       </van-empty>
       <article v-else-if="detail" class="card message-detail">
         <div class="message-detail__head">
-          <div class="message-detail__title-wrap">
-            <h1>{{ detail.templateTitle }}</h1>
-            <div class="message-detail__meta">
-              <span>{{ detail.templateNickname || '中世健' }}</span>
-              <span>{{ formatDateTime(detail.createTime) }}</span>
-            </div>
+          <h1>{{ detail.templateTitle }}</h1>
+          <div class="message-detail__meta">
+            <span>{{ detail.templateNickname || '中世健' }}</span>
+            <span>{{ formatDateTime(detail.createTime) }}</span>
+            <span v-if="detail.readTime">已读于 {{ formatDateTime(detail.readTime) }}</span>
           </div>
-          <div class="message-detail__chips">
-            <span class="message-detail__chip">消息</span>
-          </div>
-        </div>
-
-        <div v-if="detail.readTime" class="message-detail__status">
-          <span v-if="detail.readTime">已读于 {{ formatDateTime(detail.readTime) }}</span>
         </div>
 
         <section v-if="detail.templateSummary" class="message-detail__section message-detail__section--summary">
@@ -116,77 +108,29 @@ onMounted(loadDetail)
 }
 
 .message-detail__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.message-detail__title-wrap {
   min-width: 0;
 }
 
 .message-detail h1 {
-  overflow: hidden;
   color: var(--h5-text-primary);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .message-detail__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 4px 12px;
   margin-top: 8px;
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.message-detail__chips {
-  flex-shrink: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.message-detail__chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--h5-primary-opacity);
-  color: var(--h5-primary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.message-detail__status {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--h5-primary) 6%, var(--h5-glass-surface-strong));
-  color: var(--h5-text-secondary);
+  color: var(--h5-text-placeholder);
   font-size: 12px;
   line-height: 1.4;
 }
 
 .message-detail__section {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--h5-divider);
-}
-
-.message-detail__section--summary {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .message-detail__section-title {
@@ -200,8 +144,8 @@ onMounted(loadDetail)
   padding: 12px;
   border-radius: 14px;
   background: var(--h5-glass-sunken);
-  color: var(--h5-text-secondary);
-  font-size: 13px;
+  color: var(--h5-text-primary);
+  font-size: 14px;
   line-height: 1.7;
 }
 

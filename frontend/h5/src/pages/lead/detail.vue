@@ -57,8 +57,9 @@ const detailProducts = computed(() => {
   return [...products, { ...primary, primary: true }]
 })
 const canViewTab = (tab: string) => !lead.value?.visibleTabs?.length || lead.value.visibleTabs.includes(tab)
-const sourceChannelLabel = computed(() => {
-  return lead.value?.sourceChannelLabelSnapshot || '历史未记录'
+const customerAreaLabel = computed(() => {
+  const parts = [lead.value?.provinceName, lead.value?.cityName].filter(Boolean)
+  return parts.join(' ')
 })
 function timelineTimestamp(value: ApiDateValue): number {
   if (Array.isArray(value)) {
@@ -272,13 +273,10 @@ function goAppeal() {
             <div v-if="lead.submittedMobile" class="detail-field"><span>手机号</span><strong>{{ lead.submittedMobile }}</strong></div>
             <div v-if="lead.submittedWechatId" class="detail-field"><span>微信号</span><strong>{{ lead.submittedWechatId }}</strong></div>
             <div class="detail-field"><span>提交时间</span><strong>{{ formatDateTime(lead.submittedAt) }}</strong></div>
-            <div v-if="lead.sourceUserName" class="detail-field"><span>来源人</span><strong>{{ lead.sourceUserName }}</strong></div>
+            <div v-if="customerAreaLabel" class="detail-field"><span>客户地区</span><strong>{{ customerAreaLabel }}</strong></div>
             <div v-if="lead.providerOwnerNameSnapshot" class="detail-field"><span>提供方</span><strong>{{ lead.providerOwnerNameSnapshot }}</strong></div>
-            <div v-if="lead.ownerUserName" class="detail-field"><span>负责销售</span><strong>{{ lead.ownerUserName }}</strong></div>
             <div v-if="lead.pendingAssigneeUserName" class="detail-field"><span>待接销售</span><strong>{{ lead.pendingAssigneeUserName }}</strong></div>
             <div v-if="lead.assignmentStatus === 'pending_acceptance'" class="detail-field"><span>处理状态</span><strong>等待平台处理</strong></div>
-            <div class="detail-field"><span>来源类型</span><strong>{{ lead.sourceLabel || '来源未配置' }}</strong></div>
-            <div class="detail-field"><span>来源渠道</span><strong>{{ sourceChannelLabel }}</strong></div>
             <div class="detail-field"><span>客资分类</span><strong>{{ lead.leadCategoryLabelSnapshot || lead.leadCategory }}</strong></div>
             <div v-if="lead.closedAt" class="detail-field"><span>关闭时间</span><strong>{{ formatDateTime(lead.closedAt) }}</strong></div>
             <div v-if="lead.closeReason" class="detail-field"><span>关闭原因</span><strong>{{ lead.closeReason }}</strong></div>
