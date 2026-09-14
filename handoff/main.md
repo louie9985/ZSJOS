@@ -24274,3 +24274,39 @@ equestAttachments。
 - Dependency or integration impact: 未提交、未推送；恢复 stash `codex-pre-pull-20260914-fix-media-account` 仍保留；未执行数据库或共享服务操作。
 - Remaining work: 用户确认后可继续提交；当前工作区仍包含原有大量本地改动。
 - Status: `merged-awaiting-commit`
+
+## 2026-09-14 09:45:00 +08:00
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 修复 H5 端看不到站内消息的问题。
+- Key decisions: `all` 或缺省消息分组不设置 bizType 过滤；业务分组继续使用服务端映射。
+- Execution result: 修复 Partner 消息分页接口空 key 导致的 NullPointerException，并新增回归测试。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageController.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageControllerTest.java
+- Verification evidence: 首次 Maven 命令因 reactor 在无匹配测试的上游模块失败；待用 failIfNoSpecifiedTests=false 重跑。
+- Dependency or integration impact: None.
+- Remaining work: 完成测试验证。
+
+## 2026-09-14 09:48:00 +08:00
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f338087e9aaa8b8d881cd0aee80427d8773ab284
+- User goal: 修复 H5 端看不到站内消息的问题。
+- Key decisions: `all` 或缺省消息分组不设置 bizType 过滤；业务分组继续使用服务端映射。
+- Execution result: 修复完成。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageController.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageControllerTest.java
+- Verification evidence: `PartnerAppMessageControllerTest` 通过，Tests run: 2, Failures: 0, Errors: 0.
+- Dependency or integration impact: None.
+- Remaining work: 发布包含该修复的后端版本后验证 H5 实际请求。
+
+## Delivery Entry - 2026-09-14 16:45:00 +08:00
+
+- Workstream ID: `main-partner-message-fix-20260914`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `6e180edf2c`（提交前）。
+- User goal: 提交当前已完成的 Partner 消息分页修复。
+- Key decisions: 仅提交业务源码、回归测试和交接记录；排除日志占位文件、Python 缓存及验证产物。
+- Execution or analysis result: `group=all` 或缺省值不再传入错误的 `bizType` 过滤，保留业务分组映射。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageController.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppMessageControllerTest.java`; `handoff/main.md`。
+- Verification evidence: 交接记录中已记录定向测试通过；本次未重复执行 Maven 测试。
+- Dependency or integration impact: 无新增依赖、数据库或共享服务变更。
+- Remaining work: 提交后按用户后续指示推送；发布后验证 H5 实际请求。
+- Status: `ready-to-commit`

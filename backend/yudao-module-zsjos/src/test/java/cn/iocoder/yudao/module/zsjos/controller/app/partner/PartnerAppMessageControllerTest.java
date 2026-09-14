@@ -61,4 +61,18 @@ class PartnerAppMessageControllerTest {
         verify(messageService).updateNotifyMessageRead(List.of(8L), ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
         verify(messageService).getUnreadNotifyMessageCount(ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
     }
+
+    @Test
+    void allMessageGroupDoesNotSetBizTypeFilter() {
+        PartnerAppMessageController.PartnerMessagePageReqVO request =
+                new PartnerAppMessageController.PartnerMessagePageReqVO();
+        request.setGroup("all");
+        when(messageService.getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue()))
+                .thenReturn(PageResult.empty());
+
+        controller.page(request);
+
+        assertEquals(null, request.getBizType());
+        verify(messageService).getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
+    }
 }
