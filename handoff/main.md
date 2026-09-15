@@ -24329,6 +24329,18 @@ equestAttachments。
 - Remaining work: 工作区仍有未提交的 `GiftPurchaseController.java` 和临时验证产物，需另行确认后处理。
 - Status: `pushed`。
 
+## Delivery Entry - 2026-09-15 17:31:00 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `a5e3bd81b8`。
+- User goal: 将当前有效本地代码提交并推送到远程 `main` 分支。
+- Key decisions: 提交礼品采购 Controller 的权限注解调整；缓存、探针、截图、构建缓存和临时输出不纳入提交。
+- Execution or analysis result: 礼品采购详情与分页接口的权限校验由 Spring 原生 `hasAuthority` 统一为项目安全组件 `@ss.hasPermission`。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/giftpurchase/GiftPurchaseController.java`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile`，BUILD SUCCESS；无未解决 Git 冲突；提交前远程关系为 `0 ahead / 0 behind`。
+- Dependency or integration impact: 无新增依赖、SQL、数据库操作、服务重启或子仓库推送。
+- Remaining work: 提交并推送后核对 `HEAD` 与 `origin/main`。
+- Status: `ready-to-push`。
+
 ## 2026-09-14 09:45:00 +08:00
 - Branch: main
 - Worktree: D:\ZSJ-OS
