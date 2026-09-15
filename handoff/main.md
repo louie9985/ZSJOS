@@ -24317,6 +24317,18 @@ equestAttachments。
 - Remaining work: 创建提交并推送到 `origin/main`。
 - Status: `ready-to-push`。
 
+## Delivery Entry - 2026-09-15 16:20:00 +08:00
+
+- Workstream ID: `main-gitee-origin-pull-20260915`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `ea5dccd279c5e394f1911cb5b778129a7178ad6b`。
+- User goal: 将已确认的有效本地改动提交并推送到远程 `main`。
+- Key decisions: 已提交并推送业务源码、测试、SQL、文档、前端与 BPM 资源；未纳入临时产物、缓存和未确认的后续业务改动。
+- Execution or analysis result: 提交 `ea5dccd279` 已成功推送到 `https://gitee.com/louie9985/ZSJOS.git` 的 `main` 分支。
+- Changed files: 254 个文件，详见提交 `ea5dccd279`；未提交的 `GiftPurchaseController.java` 保留在工作区。
+- Verification evidence: `HEAD` 与 `origin/main` 均为 `ea5dccd279c5e394f1911cb5b778129a7178ad6b`；`git rev-list --left-right --count HEAD...origin/main` 为 `0 0`。
+- Dependency or integration impact: 未推送子仓库；未执行数据库写入或共享服务操作。
+- Remaining work: 工作区仍有未提交的 `GiftPurchaseController.java` 和临时验证产物，需另行确认后处理。
+- Status: `pushed`。
+
 ## 2026-09-14 09:45:00 +08:00
 - Branch: main
 - Worktree: D:\ZSJ-OS
@@ -24782,3 +24794,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Dependency or integration impact: 未提交、未推送；恢复 stash `codex-pre-pull-20260915-latest-main` 仍保留；未执行数据库或共享服务操作。
 - Remaining work: 用户确认后可继续提交；当前工作区仍保留其他本地改动和验证产物。
 - Status: `merged-awaiting-commit`
+
+## Delivery 2026-09-15 17:18 CST
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: 未读取（工作树已有用户改动，未提交）
+- User goal: 修复礼品采购页面超级管理员仍返回 403。
+- Key decisions: 将 GiftPurchaseController 的 `hasAuthority` 改为项目统一的 `@ss.hasPermission`，让权限服务执行数据库权限和超级管理员判定。
+- Execution result: 已修改列表与详情接口权限表达式；本地数据库确认用户 244 属于 tenant 1 的 super_admin，且已拥有两个菜单权限。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/giftpurchase/GiftPurchaseController.java
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` BUILD SUCCESS。
+- Dependency/integration impact: 需重启后端使新注解生效；未修改数据库、未新增依赖。
+- Remaining work: 重启后用管理员请求 `/admin-api/zsjos/gift-purchase/page` 做真实接口验证。
