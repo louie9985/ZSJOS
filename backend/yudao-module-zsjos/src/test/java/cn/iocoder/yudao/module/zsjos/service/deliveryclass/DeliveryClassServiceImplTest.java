@@ -12,15 +12,11 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryC
 import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.examcalendar.ExamScheduleDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.examcalendar.ExamScheduleMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductCategoryMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -46,8 +42,6 @@ class DeliveryClassServiceImplTest {
     @InjectMocks private DeliveryClassServiceImpl service;
     @Mock private DeliveryClassMapper classMapper;
     @Mock private ServiceRelationMapper relationMapper;
-    @Mock private SalesOrderItemMapper orderItemMapper;
-    @Mock private ZsjosProductMapper productMapper;
     @Mock private DeliveryClassScopeService scopeService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
@@ -70,7 +64,7 @@ class DeliveryClassServiceImplTest {
     }
 
     @Test
-    void pendingTransferUsesOrderItemCategoryAndPreservesServiceState() {
+    void pendingTransferSucceedsAcrossProductCategoriesAndPreservesServiceState() {
         plannerRole(20L);
         ServiceRelationDO relation = relation(10L, 100L, 3);
         DeliveryClassDO pending = deliveryClass(100L, true, null, null);
@@ -78,8 +72,6 @@ class DeliveryClassServiceImplTest {
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(target);
         when(classMapper.selectById(100L)).thenReturn(pending);
-        when(orderItemMapper.selectById(300L)).thenReturn(new SalesOrderItemDO().setProductId(400L));
-        when(productMapper.selectById(400L)).thenReturn(new ZsjosProductDO().setCategoryId(8L));
         when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L));
         when(scopeService.contains(9L, 80L)).thenReturn(true);
         when(relationMapper.transferClass(10L, 200L, 20L, 3)).thenReturn(1);
@@ -93,13 +85,10 @@ class DeliveryClassServiceImplTest {
     }
 
     @Test
-    void pendingTransferRejectsDifferentProductCategory() {
+    void directTransferRejectsSystemClassTarget() {
         ServiceRelationDO relation = relation(10L, 100L, 3);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
-        when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(deliveryClass(200L, false, 8L, 20L));
-        when(classMapper.selectById(100L)).thenReturn(deliveryClass(100L, true, null, null));
-        when(orderItemMapper.selectById(300L)).thenReturn(new SalesOrderItemDO().setProductId(400L));
-        when(productMapper.selectById(400L)).thenReturn(new ZsjosProductDO().setCategoryId(9L));
+        when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(deliveryClass(200L, true, null, 20L));
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.directTransfer(10L, request(200L, 3), 9L));

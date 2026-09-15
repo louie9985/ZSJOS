@@ -1273,13 +1273,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<Map<String,Object>> snapshots = new ArrayList<>();
         for (String code : codes) {
             GiftConfigDO g = byCode.get(code);
-            if (g == null || !Objects.equals(g.getStatus(), 1)) throw new IllegalArgumentException("礼品不存在或已停用");
+            if (g == null || !Objects.equals(g.getStatus(), 0)) throw new IllegalArgumentException("礼品不存在或已停用");
             if (all.stream().anyMatch(x -> Objects.equals(x.getParentId(), g.getId()))) throw new IllegalArgumentException("只能选择叶子礼品");
             List<String> path = new ArrayList<>(); GiftConfigDO cur = g; Set<Long> seen = new HashSet<>();
             while (cur != null && cur.getId()!=null && seen.add(cur.getId())) { path.add(cur.getName()); Long pid=cur.getParentId(); cur=pid==null||pid==0?null:all.stream().filter(x->Objects.equals(x.getId(),pid)).findFirst().orElse(null); }
             Collections.reverse(path); snapshots.add(Map.of("code",code,"name",g.getName(),"path",path,"snapshotAt",LocalDateTime.now().toString()));
         }
-        req.setGiftItems(codes.stream().toList());
         req.setGiftItems(snapshots.stream().map(JsonUtils::toJsonString).toList());
     }
 

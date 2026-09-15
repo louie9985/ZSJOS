@@ -4,6 +4,8 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { api } from '../services/api'
+import { materialApi, type Material } from '../services/materialApi'
+import MaterialSelectorModal from './MaterialSelectorModal'
 
 export type ContentApprovalAccount = {
   id: number
@@ -15,6 +17,16 @@ export type ContentApprovalAccount = {
   currentStatusValue?: string
   currentStatusLabelSnapshot?: string
   primaryProblems?: Array<{ value: string; labelSnapshot: string }>
+}
+
+/** 参考素材快照：提交给审批流后即使素材被改动或停用，审批人仍能看到当时的标题与封面。 */
+export type ContentApprovalReferenceMaterial = {
+  materialId: number
+  materialVersionId?: number
+  materialNo?: string
+  title?: string
+  materialTypeName?: string
+  coverPreviewUrl?: string
 }
 
 export type ContentApprovalWork = {
@@ -29,7 +41,10 @@ export type ContentApprovalWork = {
   detailUrl?: string
   leadResourceUrl?: string
   commentHook?: string
-  referenceContentVersionId?: number
+  /** 参考作品链接：纯文本填写。 */
+  referenceWorkUrl?: string
+  /** 素材库参考素材：由弹窗多选产生。 */
+  referenceMaterials?: ContentApprovalReferenceMaterial[]
   plannedPublishAt?: Dayjs
 }
 
@@ -40,7 +55,6 @@ export type ContentApprovalDraftValues = {
 }
 
 type Option = { value: string; label: string }
-type ReferenceOption = { value: number; label: string }
 
 const accountLabel = (account: ContentApprovalAccount) => account.nickname?.trim() || account.accountNo || `账号 ${account.id}`
 const accountSnapshotFields = [
@@ -50,17 +64,30 @@ const accountSnapshotFields = [
   ['currentStatusLabelSnapshot', '账号状态'],
 ] as const
 
+/** 只把审批展示需要的字段传给后端，避免把整个素材对象塞进请求体。 */
+const toReferenceMaterials = (materials: Material[]): ContentApprovalReferenceMaterial[] => materials.map(material => ({
+  materialId: material.id,
+  materialVersionId: material.currentVersion?.id || material.currentEffectiveVersionId,
+  materialNo: material.materialNo,
+  title: material.title,
+  materialTypeName: material.materialTypeName,
+  coverPreviewUrl: material.coverPreviewUrl,
+}))
+
 function CoverUploadField({ name }: { name: (string | number)[] }) {
   const form = Form.useFormInstance()
   const { message } = App.useApp()
   const [uploading, setUploading] = useState(false)
-  const previewUrl = Form.useWatch([...name, 'coverPreviewUrl'], form) as string | undefined
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string>()
+  const previewUrl = Form.useWatch(['works', ...name, 'coverPreviewUrl'], form) as string | undefined
   const handleUpload = async (file: File) => {
     setUploading(true)
     try {
       const uploaded = await api.mediaContent.uploadVersionFile(file)
-      form.setFieldValue([...name, 'coverFileId'], uploaded.fileId)
-      form.setFieldValue([...name, 'coverPreviewUrl'], uploaded.previewUrl || URL.createObjectURL(file))
+      form.setFieldValue(['works', ...name, 'coverFileId'], uploaded.fileId)
+      const preview = uploaded.previewUrl || URL.createObjectURL(file)
+      setLocalPreviewUrl(preview)
+      form.setFieldValue(['works', ...name, 'coverPreviewUrl'], preview)
       message.success('封面图已上传')
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message : '封面图上传失败，请重试')
@@ -72,7 +99,7 @@ function CoverUploadField({ name }: { name: (string | number)[] }) {
     <Upload accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void handleUpload(file); return Upload.LIST_IGNORE }} disabled={uploading}>
       <Button icon={<UploadOutlined />} loading={uploading}>上传封面图</Button>
     </Upload>
-    {previewUrl && <img src={previewUrl} alt="作品封面预览" style={{ width: 160, maxHeight: 100, objectFit: 'cover', borderRadius: 6 }} />}
+    {(previewUrl || localPreviewUrl) && <Space align="start"><img src={previewUrl || localPreviewUrl} alt="作品封面预览" style={{ width: 160, maxHeight: 100, objectFit: 'cover', borderRadius: 6 }} /><Button danger icon={<DeleteOutlined />} onClick={() => { setLocalPreviewUrl(undefined); form.setFieldValue(['works', ...name, 'coverFileId'], undefined); form.setFieldValue(['works', ...name, 'coverPreviewUrl'], undefined) }}>删除图片</Button></Space>}
     <Typography.Text type="secondary">支持 JPG、PNG 等图片格式，提交审批前必须上传。</Typography.Text>
   </Space>
 }
@@ -81,16 +108,17 @@ export default function ContentApprovalDraft({
   accounts = [],
   purposeOptions,
   formatOptions,
-  referenceOptions = [],
 }: {
   accounts?: ContentApprovalAccount[]
   purposeOptions: Option[]
   formatOptions: Option[]
-  referenceOptions?: ReferenceOption[]
 }) {
   const form = Form.useFormInstance()
   const selectedAccountIds = (Form.useWatch('accountIds', form) as number[] | undefined) || []
   const [now] = useState(() => dayjs())
+  // 作品可上移/下移，下标会变化，因此选择缓存挂在 Form.List 稳定的 key 上。
+  const [picker, setPicker] = useState<{ key: number; index: number }>()
+  const [materialsByWork, setMaterialsByWork] = useState<Record<number, Material[]>>({})
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Alert type="info" showIcon message="内容将同步适用于所选账号" description="账号资料只保存为本次审批快照；作品会按当前列表逐件提交和审批。" />
     <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个账号' }]}>
@@ -136,12 +164,47 @@ export default function ContentApprovalDraft({
             <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><Input placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
             <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><Input placeholder="可点击下载的资料链接" /></Form.Item>
             <Form.Item {...field} name={[field.name, 'commentHook']} label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
-            <Form.Item {...field} name={[field.name, 'referenceContentVersionId']} label="参考作品（可选）" extra="从素材库选择已发布内容版本后填写；未选择可留空。"><Select allowClear showSearch optionFilterProp="label" options={referenceOptions} placeholder={referenceOptions.length ? '选择素材库参考作品' : '暂无可用参考作品'} disabled={!referenceOptions.length} /></Form.Item>
+            <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接" extra="直接填写参考作品的链接，可留空。">
+              <Input placeholder="https:// 参考作品链接" allowClear />
+            </Form.Item>
+            <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Button onClick={() => setPicker({ key: field.key, index: field.name })}>素材浏览 · 选择参考素材</Button>
+                {(materialsByWork[field.key] || []).map(material => <Card key={material.id} size="small">
+                  <Space align="start" size={10} style={{ width: '100%' }}>
+                    {material.coverPreviewUrl
+                      ? <img src={material.coverPreviewUrl} alt={material.title} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
+                      : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-surface-raised)' }} />}
+                    <span style={{ flex: 1 }}>
+                      <Typography.Text strong>{material.title}</Typography.Text><br />
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text>
+                    </span>
+                    <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => {
+                      const next = (materialsByWork[field.key] || []).filter(item => item.id !== material.id)
+                      setMaterialsByWork({ ...materialsByWork, [field.key]: next })
+                      form.setFieldValue(['works', field.name, 'referenceMaterials'], toReferenceMaterials(next))
+                    }}>移除</Button>
+                  </Space>
+                </Card>)}
+              </Space>
+            </Form.Item>
           </Card>
         })}
         <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({})} block>新增作品</Button>
         <Typography.Text type="secondary">至少保留一个作品；驳回后可在当前列表中新增、删除和修改作品，再次提交。</Typography.Text>
       </Space>}
     </Form.List>
+    <MaterialSelectorModal
+      open={picker !== undefined}
+      onCancel={() => setPicker(undefined)}
+      onConfirm={(materials) => {
+        if (picker) {
+          setMaterialsByWork({ ...materialsByWork, [picker.key]: materials })
+          form.setFieldValue(['works', picker.index, 'referenceMaterials'], toReferenceMaterials(materials))
+        }
+        setPicker(undefined)
+      }}
+      defaultSelected={picker ? materialsByWork[picker.key] || [] : []}
+    />
   </Space>
 }

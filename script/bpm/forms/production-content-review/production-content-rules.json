@@ -1,0 +1,64 @@
+[
+  {
+    "type": "input",
+    "field": "contentReviewBatchNo",
+    "title": "审核批次编号",
+    "props": {
+      "disabled": true,
+      "type": "input"
+    }
+  },
+  {
+    "type": "input",
+    "field": "accountId",
+    "title": "媒体账号内部ID",
+    "props": {
+      "disabled": true,
+      "type": "input"
+    }
+  },
+  {
+    "type": "input",
+    "field": "accountIds",
+    "title": "账号范围",
+    "props": {
+      "disabled": true,
+      "type": "textarea",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 12
+      }
+    }
+  },
+  {
+    "type": "input",
+    "field": "operatorUserId",
+    "title": "提交运营内部ID",
+    "props": {
+      "disabled": true,
+      "type": "input"
+    }
+  },
+  {
+    "type": "input",
+    "field": "directorUserId",
+    "title": "编导内部ID",
+    "props": {
+      "disabled": true,
+      "type": "input"
+    }
+  },
+  {
+    "type": "input",
+    "field": "contentReviewItems",
+    "title": "待审内容条目快照",
+    "props": {
+      "disabled": true,
+      "type": "textarea",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 12
+      }
+    }
+  }
+]

@@ -10,13 +10,9 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentRe
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCandidatePageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCandidateRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCompleteReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewConfigRespVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewConfigSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewDecisionReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewProcessDefinitionRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewPublishReqVO;
 import cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewBatchService;
-import cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -32,9 +28,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
 @Tag(name = "管理后台 - 生产内容批审")
@@ -44,29 +42,6 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class ContentReviewController {
 
     @Resource private ContentReviewBatchService batchService;
-    @Resource private ContentReviewConfigService configService;
-
-    @GetMapping("/config")
-    @Operation(summary = "获得生产内容批审配置")
-    @PreAuthorize("@ss.hasPermission('zsjos:content-review:config')")
-    public CommonResult<ContentReviewConfigRespVO> getConfig() {
-        return success(configService.getConfig());
-    }
-
-    @PutMapping("/config")
-    @Operation(summary = "更新生产内容批审配置")
-    @PreAuthorize("@ss.hasPermission('zsjos:content-review:config')")
-    public CommonResult<Boolean> updateConfig(@Valid @RequestBody ContentReviewConfigSaveReqVO request) {
-        configService.updateConfig(request, getLoginUserId());
-        return success(true);
-    }
-
-    @GetMapping("/process-definition/list")
-    @Operation(summary = "获得可用的生产内容批审流程")
-    @PreAuthorize("@ss.hasPermission('zsjos:content-review:config')")
-    public CommonResult<List<ContentReviewProcessDefinitionRespVO>> getProcessDefinitions() {
-        return success(configService.getProcessDefinitions());
-    }
 
     @PostMapping("/batch/create")
     @Operation(summary = "创建生产内容审核批次")
@@ -190,3 +165,7 @@ public class ContentReviewController {
         return success(true);
     }
 }
+
+
+
+

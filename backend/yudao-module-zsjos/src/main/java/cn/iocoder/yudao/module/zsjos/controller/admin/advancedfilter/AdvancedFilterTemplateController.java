@@ -36,7 +36,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "获得当前页面可用高级筛选模板")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query-own',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
             + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my')")
     public CommonResult<List<AdvancedFilterTemplateRespVO>> visibleList(
@@ -49,7 +49,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "创建个人高级筛选模板")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query-own',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
             + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my')")
     public CommonResult<Long> createPersonal(@Valid @RequestBody AdvancedFilterTemplateSaveReqVO reqVO) {
@@ -60,7 +60,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "修改个人高级筛选模板")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query-own',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
             + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my')")
     public CommonResult<Boolean> updatePersonal(@Valid @RequestBody AdvancedFilterTemplateSaveReqVO reqVO) {
@@ -72,7 +72,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "删除个人高级筛选模板")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query-own',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
             + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my')")
     public CommonResult<Boolean> deletePersonal(@RequestParam Long id) {

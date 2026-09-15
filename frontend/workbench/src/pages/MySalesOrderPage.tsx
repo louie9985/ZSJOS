@@ -15,6 +15,7 @@ import { useInboxTableLayout } from '../services/inboxLayout'
 import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumns'
+import LeadDetailModal from '../components/LeadDetailModal'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
@@ -46,6 +47,8 @@ export default function MySalesOrderPage() {
   const [terminationReason, setTerminationReason] = useState('')
   const { useTableLayout } = useInboxTableLayout()
   const { submitting: terminating, run: runTermination, resetIntent: resetTerminationIntent } = useSubmissionGuard()
+  const [leadDetailModalOpen, setLeadDetailModalOpen] = useState(false)
+  const [leadDetailModalLeadId, setLeadDetailModalLeadId] = useState<number>()
   const listVersion = useRef(0)
   const detailVersion = useRef(0)
   const activePages = useRef(new Set<string>())
@@ -110,7 +113,10 @@ export default function MySalesOrderPage() {
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
-      : detail ? <><div className="sales-order-detail-actions">{detail.supersedesOrderId && <Button onClick={() => setSelectedId(detail.supersedesOrderId)}>查看原订单</Button>}{detail.supersededByOrderId && <Button type="primary" onClick={() => setSelectedId(detail.supersededByOrderId)}>查看重提订单</Button>}{detail.leadId && <Button onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${detail.leadId}`)}>客户档案</Button>}</div>
+      : detail ? <><div className="sales-order-detail-actions">{detail.supersedesOrderId && <Button onClick={() => setSelectedId(detail.supersedesOrderId)}>查看原订单</Button>}{detail.supersededByOrderId && <Button type="primary" onClick={() => setSelectedId(detail.supersededByOrderId)}>查看重提订单</Button>}{detail.leadId && <Button onClick={() => {
+        setLeadDetailModalLeadId(detail.leadId)
+        setLeadDetailModalOpen(true)
+      }}>客户档案</Button>}</div>
         <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine"
           onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
           onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
@@ -175,5 +181,6 @@ export default function MySalesOrderPage() {
       confirmLoading={terminating} okButtonProps={{ danger: true, disabled: terminating }}>
       <Form.Item label="终止原因" required><Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因"/></Form.Item>
     </Modal>
+    {leadDetailModalLeadId && <LeadDetailModal leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
   </section>
 }

@@ -529,21 +529,21 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId));
     }
 
-    @Select("SELECT partner_id AS partner_id, COUNT(*) AS value FROM zsjos_lead "
+    @Select("SELECT partner_id AS partner_id, NULL AS source_user_id, COUNT(*) AS value FROM zsjos_lead "
             + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id IS NOT NULL "
             + "AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) "
             + "AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) "
-            + "GROUP BY partner_id")
+            + "GROUP BY partner_id UNION ALL SELECT NULL, source_user_id, COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND source_user_id IS NOT NULL AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) GROUP BY source_user_id")
     List<PartnerLeaderboardMetricRow> selectPartnerLeadCountRanking(@Param("tenantId") Long tenantId,
                                                                      @Param("from") LocalDateTime from,
                                                                      @Param("to") LocalDateTime to);
 
-    @Select("SELECT partner_id AS partner_id, COUNT(*) AS value FROM zsjos_lead "
+    @Select("SELECT partner_id AS partner_id, NULL AS source_user_id, COUNT(*) AS value FROM zsjos_lead "
             + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id IS NOT NULL "
             + "AND status IN ('valid','converted','won') "
             + "AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) "
             + "AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) "
-            + "GROUP BY partner_id")
+            + "GROUP BY partner_id UNION ALL SELECT NULL, source_user_id, COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND source_user_id IS NOT NULL AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) GROUP BY source_user_id")
     List<PartnerLeaderboardMetricRow> selectPartnerValidLeadCountRanking(@Param("tenantId") Long tenantId,
                                                                           @Param("from") LocalDateTime from,
                                                                           @Param("to") LocalDateTime to);
@@ -669,11 +669,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     default List<LeadDO> selectByPersonIds(List<Long> personIds) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadDO>()
-                .in(LeadDO::getPersonId, personIds).orderByDesc(LeadDO::getSubmittedAt));
+                .in(LeadDO::getPersonId, personIds)
+                .ne(LeadDO::getStatus, "closed")
+                .orderByDesc(LeadDO::getSubmittedAt));
     }
     default List<LeadDO> selectByName(String name) {
         return selectList(new LambdaQueryWrapperX<LeadDO>()
-                .eq(LeadDO::getSubmittedName, name).orderByDesc(LeadDO::getSubmittedAt));
+                .eq(LeadDO::getSubmittedName, name)
+                .ne(LeadDO::getStatus, "closed")
+                .orderByDesc(LeadDO::getSubmittedAt));
     }
     default List<LeadDO> selectPendingByUserId(Long userId) {
         return selectList(new LambdaQueryWrapperX<LeadDO>()
@@ -821,3 +825,5 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .or().like(LeadDO::getSubmittedWechatId, keyword));
     }
 }
+
+

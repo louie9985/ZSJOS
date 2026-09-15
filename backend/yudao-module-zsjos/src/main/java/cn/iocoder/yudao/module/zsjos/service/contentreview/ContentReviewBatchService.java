@@ -88,8 +88,17 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class ContentReviewBatchService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ContentReviewBatchService.class);
+
     public static final String BUSINESS_KEY_PREFIX = "content-review-batch:";
     private static final int FILE_PREVIEW_SECONDS = 3600;
+    /** SIMPLE 设计器为发起人生成的提交节点编码，由引擎自动通过，不是业务审批节点。 */
+    private static final String SIMPLE_SUBMISSION_TASK_KEY = "StartUserNode";
+    private static final int ACCOUNT_PROFILE_TEXT_MAX = 200;
+    private static final String DICT_ACCOUNT_PLATFORM = "zsjos_account_platform";
+    private static final String DICT_ACCOUNT_CURRENT_STATUS = "zsjos_media_account_current_status";
+    private static final String DICT_ACCOUNT_STAGE = "zsjos_media_account_stage";
 
     @Resource private ContentReviewBatchMapper batchMapper;
     @Resource private ContentReviewBatchItemMapper itemMapper;
@@ -111,6 +120,7 @@ public class ContentReviewBatchService {
     @Resource private DictDataApi dictDataApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private FileApi fileApi;
+    @Resource private ContentReviewNotifyPublisher notifyPublisher;
 
     public PageResult<ContentReviewBatchRespVO> page(ContentReviewBatchPageReqVO request, Long userId) {
         boolean seeAll = canSeeAll(userId);
@@ -288,6 +298,8 @@ public class ContentReviewBatchService {
                 changes.setFormatLabelSnapshot(formatLabel); changes.setDetailUrl(work.getDetailUrl());
                 changes.setLeadResourceUrl(work.getLeadResourceUrl()); changes.setCommentHook(work.getCommentHook());
                 changes.setReferenceContentVersionId(work.getReferenceContentVersionId());
+                changes.setReferenceWorkUrl(work.getReferenceWorkUrl());
+                changes.setMaterialRefsJson(referenceMaterialRefsJson(work));
                 changes.setPlannedPublishAt(work.getPlannedPublishAt());
                 Long versionId = contentVersionService.copyForReview(source, changes, userId);
                 contentIds.add(source.getContentId()); versionIds.add(versionId);
@@ -315,8 +327,9 @@ public class ContentReviewBatchService {
             versionRequest.setTitleSnapshot(work.getTitle());
             versionRequest.setTopicSnapshot(work.getTopic());
             versionRequest.setCoverSnapshotJson(resolveCoverSnapshot(work));
-            versionRequest.setMaterialRefsJson(work.getMaterialRefsJson());
+            versionRequest.setMaterialRefsJson(referenceMaterialRefsJson(work));
             versionRequest.setReferenceContentVersionId(work.getReferenceContentVersionId());
+            versionRequest.setReferenceWorkUrl(work.getReferenceWorkUrl());
             versionRequest.setDeliverableUrl(work.getDeliverableUrl());
             versionRequest.setDeliverableSnapshotJson(work.getDeliverableSnapshotJson());
             versionRequest.setScriptText(work.getScriptText());
@@ -375,6 +388,23 @@ public class ContentReviewBatchService {
         return JsonUtils.toJsonString(List.of(work.getCoverFileId()));
     }
 
+    /** 参考素材只保存审批展示所需的快照，避免审批期间素材被改动或停用影响查看。 */
+    private String referenceMaterialRefsJson(ContentReviewStudentDraftCreateReqVO.Work work) {
+        if (work.getReferenceMaterials() == null || work.getReferenceMaterials().isEmpty()) return null;
+        List<Map<String, Object>> references = new ArrayList<>(work.getReferenceMaterials().size());
+        for (ContentReviewStudentDraftCreateReqVO.ReferenceMaterial material : work.getReferenceMaterials()) {
+            Map<String, Object> reference = new LinkedHashMap<>();
+            reference.put("materialId", material.getMaterialId());
+            reference.put("materialVersionId", material.getMaterialVersionId());
+            reference.put("materialNo", material.getMaterialNo());
+            reference.put("title", material.getTitle());
+            reference.put("materialTypeName", material.getMaterialTypeName());
+            reference.put("coverPreviewUrl", material.getCoverPreviewUrl());
+            references.add(reference);
+        }
+        return JsonUtils.toJsonString(references);
+    }
+
     private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> overrides) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("id", account.getId());
@@ -385,19 +415,71 @@ public class ContentReviewBatchService {
         snapshot.put("nickname", account.getNickname());
         snapshot.put("ownerOperatorUserId", account.getOwnerOperatorUserId());
         snapshot.put("directorUserId", account.getDirectorUserId());
+        // 责任运营姓名由服务端按归属解析，不接受前端传入：归属是权限字段，不能由客户端改写。
+        Set<Long> profileUserIds = java.util.stream.Stream.of(
+                        account.getOwnerOperatorUserId(), account.getDirectorUserId())
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, AdminUserRespDTO> profileUsers = profileUserIds.isEmpty()
+                ? Map.of() : adminUserApi.getUserMap(profileUserIds);
+        // getUserMap 可能返回不可变 Map，get(null) 会抛 NPE；账号未绑定编导时 id 就是 null。
+        snapshot.put("operatorName", nickname(profileUsers, account.getOwnerOperatorUserId()));
+        snapshot.put("directorName", nickname(profileUsers, account.getDirectorUserId()));
         snapshot.put("currentStatusValue", account.getCurrentStatusValue());
         snapshot.put("currentStatusLabel", account.getCurrentStatusLabelSnapshot());
         snapshot.put("sStage", account.getSStage());
         snapshot.put("sStageLabel", account.getSStageLabelSnapshot());
         snapshot.put("primaryProblems", parseJsonValue(account.getPrimaryProblemsJson()));
-        if (overrides != null) {
-            // Only editable profile values are accepted from the client; identity, ownership and
-            // director fields remain server-owned so the historical snapshot cannot be forged.
-            Set<String> editable = Set.of("nickname", "platformLabel", "stageLabel", "stageLabelSnapshot",
-                    "currentStatusLabel", "currentStatusLabelSnapshot", "primaryProblems");
-            overrides.forEach((key, value) -> { if (editable.contains(key)) snapshot.put(key, value); });
-        }
+        // 运营在发起审核时补充的账号档案。这些是纯文本描述、没有字典约束，接受填写；
+        // 身份、归属和编导字段仍由服务端持有，客户端无法伪造历史快照。
+        applyText(snapshot, overrides, "productGoal");
+        applyText(snapshot, overrides, "productFormLabel");
+        applyText(snapshot, overrides, "publishFrequency");
+        applyText(snapshot, overrides, "bottleneckLabel");
+        applyText(snapshot, overrides, "nickname");
+        // 字典字段只接受 value，label 一律由服务端按字典解析后写入，避免客户端伪造展示文案。
+        applyDictionary(snapshot, overrides, "platformValue", "platformLabel", DICT_ACCOUNT_PLATFORM,
+                account.getPlatformValue());
+        applyDictionary(snapshot, overrides, "stageValue", "sStageLabel", DICT_ACCOUNT_STAGE,
+                account.getSStage());
+        applyDictionary(snapshot, overrides, "currentStatusValue", "currentStatusLabel",
+                DICT_ACCOUNT_CURRENT_STATUS, account.getCurrentStatusValue());
         return snapshot;
+    }
+
+    private String nickname(Map<Long, AdminUserRespDTO> users, Long userId) {
+        if (userId == null) return null;
+        AdminUserRespDTO user = users.get(userId);
+        return user == null ? null : user.getNickname();
+    }
+
+    /** 覆盖纯文本档案字段；空白视为未填写，保留服务端原值。 */
+    private void applyText(Map<String, Object> snapshot, Map<String, Object> overrides, String key) {
+        if (overrides == null) return;
+        String value = trimToNull(text(overrides.get(key)));
+        if (value == null) return;
+        if (value.length() > ACCOUNT_PROFILE_TEXT_MAX) throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+        snapshot.put(key, value);
+    }
+
+    /**
+     * 覆盖字典字段：只接受字典内的 value，并按字典解析 label 一起写入快照。
+     * 未填写时沿用服务端原值对应的 label，保证快照始终自带可展示文案。
+     */
+    private void applyDictionary(Map<String, Object> snapshot, Map<String, Object> overrides,
+                                 String valueKey, String labelKey, String dictType, String serverValue) {
+        Map<String, String> labels = dictionaryLabels(dictType);
+        String value = overrides == null ? null : trimToNull(text(overrides.get(valueKey)));
+        if (value == null) {
+            // 服务端原值也要补上 label，前端不必再查字典。
+            if (serverValue != null && labels.containsKey(serverValue)) {
+                snapshot.put(valueKey, serverValue);
+                snapshot.put(labelKey, labels.get(serverValue));
+            }
+            return;
+        }
+        if (!labels.containsKey(value)) throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+        snapshot.put(valueKey, value);
+        snapshot.put(labelKey, labels.get(value));
     }
 
     private Map<String, String> dictionaryLabels(String type) {
@@ -458,7 +540,7 @@ public class ContentReviewBatchService {
 
         String businessKey = BUSINESS_KEY_PREFIX + batchId;
         String processInstanceId = UUID.randomUUID().toString().replace("-", "");
-        Map<String, List<Long>> assignees = Map.of(config.getDirectorTaskKey(),
+        Map<String, List<Long>> assignees = Map.of(ContentReviewConfigService.DIRECTOR_TASK_KEY,
                 List.of(relation.director().getId()));
         BpmProcessInstanceCreateReqDTO processRequest = new BpmProcessInstanceCreateReqDTO();
         processRequest.setProcessDefinitionId(definition.getId());
@@ -480,14 +562,20 @@ public class ContentReviewBatchService {
             if (!Objects.equals(processInstanceId, createdProcessInstanceId)) {
                 throw exception(CONTENT_REVIEW_PROCESS_UNAVAILABLE);
             }
-            BpmTaskRespDTO directorTask = findTodoTask(relation.director().getId(), definition.getKey(),
-                    config.getDirectorTaskKey(), processInstanceId);
-            if (directorTask == null) throw exception(CONTENT_REVIEW_PROCESS_UNAVAILABLE);
+            // 不在此处校验编导待办是否已生成：SIMPLE 流程先停在发起人提交节点，由引擎的任务分配事件
+            // 异步自动通过后才流转到编导审核。在同一事务内必然查不到该待办，早期实现因此每次提交都
+            // 抛"流程不可用"并回滚掉刚创建的实例。实例创建成功即视为启动成功。
         } catch (RuntimeException error) {
+            // 统一对外返回"流程不可用"，但必须留下真实原因：这里吞掉的异常曾让排查只能看到一行调用帧。
+            log.warn("[submit][批次({}) 启动流程失败 definitionKey={} definitionId={} director={}]",
+                    batchId, definition.getKey(), definition.getId(), relation.director().getId(), error);
             if (error instanceof cn.iocoder.yudao.framework.common.exception.ServiceException serviceError
                     && serviceError.getCode() == CONTENT_REVIEW_PROCESS_UNAVAILABLE.getCode()) throw error;
             throw exception(CONTENT_REVIEW_PROCESS_UNAVAILABLE);
         }
+
+        // 发送批次已提交通知
+        notifyPublisher.publishBatchSubmitted(batchId, userId, now);
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "submit")
@@ -512,10 +600,15 @@ public class ContentReviewBatchService {
         if (!Objects.equals(batch.getDirectorUserId(), userId)) throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
         String decision = normalizeDecision(request.getDecision(), request.getComment());
         ContentReviewBatchItemDO item = lockItem(batchId, itemId);
+        LocalDateTime now = LocalDateTime.now();
         if (itemMapper.updateDirectorDecision(itemId, batchId, request.getExpectedVersion(), decision,
-                trimToNull(request.getComment()), userId, LocalDateTime.now()) != 1) {
+                trimToNull(request.getComment()), userId, now) != 1) {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
+
+        // 发送编导逐条决策通知
+        notifyPublisher.publishDirectorItemDecision(batchId, itemId, decision,
+                trimToNull(request.getComment()), userId, now);
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "final-review")
@@ -531,12 +624,17 @@ public class ContentReviewBatchService {
         }
         boolean collect = DECISION_APPROVED.equals(decision) && Boolean.TRUE.equals(request.getCollectMaterial());
         MaterialService.AutoCollectionSnapshot collectionSnapshot = collect ? prepareCollection(batch, item) : null;
+        LocalDateTime now = LocalDateTime.now();
         if (itemMapper.updateFinalDecision(itemId, batchId, request.getExpectedVersion(), decision,
                 trimToNull(request.getComment()), collect,
                 collectionSnapshot == null ? null : JsonUtils.toJsonString(collectionSnapshot),
-                userId, LocalDateTime.now()) != 1) {
+                userId, now) != 1) {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
+
+        // 发送终审逐条决策通知
+        notifyPublisher.publishFinalItemDecision(batchId, itemId, decision,
+                trimToNull(request.getComment()), userId, now);
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "director-review")
@@ -548,8 +646,25 @@ public class ContentReviewBatchService {
         }
         requireStageAndTask(batch, BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR, "directorTaskKey",
                 request.getTaskId(), userId);
-        processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
-                .setTaskId(request.getTaskId()).setReason(request.getReason()));
+
+        // 检查是否有退回的内容
+        List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batchId);
+        boolean hasReturned = items.stream()
+                .anyMatch(item -> DECISION_RETURNED.equals(item.getDirectorDecision()));
+
+        if (hasReturned) {
+            // 有退回内容，直接驳回整个批次，不进入终审
+            processTaskApi.rejectTask(userId, new BpmTaskDecisionReqDTO()
+                    .setTaskId(request.getTaskId()).setReason(request.getReason()));
+            // 发送编导驳回通知
+            notifyPublisher.publishDirectorRejected(batchId, userId, request.getReason(), LocalDateTime.now());
+        } else {
+            // 全部通过，进入终审环节
+            processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
+                    .setTaskId(request.getTaskId()).setReason(request.getReason()));
+            // 发送编导审核通过通知
+            notifyPublisher.publishDirectorCompleted(batchId, userId, LocalDateTime.now());
+        }
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "final-review")
@@ -561,17 +676,37 @@ public class ContentReviewBatchService {
         }
         requireStageAndTask(batch, BATCH_FINAL_REVIEW, STAGE_FINAL, "finalTaskKey",
                 request.getTaskId(), userId);
-        processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
-                .setTaskId(request.getTaskId()).setReason(request.getReason()));
+
+        // 检查是否有退回的内容
+        List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batchId);
+        boolean hasReturned = items.stream()
+                .anyMatch(item -> DECISION_RETURNED.equals(item.getFinalDecision()));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (hasReturned) {
+            // 有退回内容，驳回批次
+            processTaskApi.rejectTask(userId, new BpmTaskDecisionReqDTO()
+                    .setTaskId(request.getTaskId()).setReason(request.getReason()));
+            // 发送终审驳回通知
+            notifyPublisher.publishFinalRejected(batchId, userId, request.getReason(), now);
+        } else {
+            // 全部通过
+            processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
+                    .setTaskId(request.getTaskId()).setReason(request.getReason()));
+            // 发送终审通过通知
+            notifyPublisher.publishFinalCompleted(batchId, userId, now);
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void validateTaskAction(BpmTaskActionContext context) {
         if (context.getBusinessKey() == null || !context.getBusinessKey().startsWith(BUSINESS_KEY_PREFIX)) return;
+        // SIMPLE 设计器的发起人提交节点由引擎在启动后自动通过，它不是业务审批动作：既没有逐条
+        // 结论要校验，也不推进批次阶段。不放行会让流程卡在发起人节点上，批次永远进不到编导审核。
+        if (SIMPLE_SUBMISSION_TASK_KEY.equals(context.getTaskDefinitionKey())) return;
         ContentReviewBatchDO batch = batchMapper.selectByProcessInstanceId(context.getProcessInstanceId());
         if (batch == null || !matchesProcess(batch, context)) throw exception(CONTENT_REVIEW_TASK_INVALID);
         batch = lockBatch(batch.getId());
-        if (!ACTION_APPROVE.equals(context.getAction())) throw exception(CONTENT_REVIEW_TASK_INVALID);
         Map<String, Object> frozen = parseMap(batch.getContextSnapshotJson());
         String directorTaskKey = text(frozen.get("directorTaskKey"));
         String finalTaskKey = text(frozen.get("finalTaskKey"));
@@ -580,14 +715,35 @@ public class ContentReviewBatchService {
             if (!Objects.equals(batch.getDirectorUserId(), context.getUserId())) {
                 throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
             }
-            requireDirectorDecisions(itemMapper.selectByBatchId(batch.getId()));
-            if (batchMapper.markDirectorCompleted(batch, LocalDateTime.now()) != 1) {
-                throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+            List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
+            requireDirectorDecisions(items);
+            // 编导节点支持通过和驳回两种操作
+            if (ACTION_APPROVE.equals(context.getAction())) {
+                // 通过：必须全部通过才能进入终审
+                boolean allApproved = items.stream()
+                        .allMatch(item -> DECISION_APPROVED.equals(item.getDirectorDecision()));
+                if (!allApproved) {
+                    throw exception(CONTENT_REVIEW_TASK_INVALID);
+                }
+                if (batchMapper.markDirectorCompleted(batch, LocalDateTime.now()) != 1) {
+                    throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+                }
+            } else if (ACTION_REJECT.equals(context.getAction())) {
+                // 驳回：有退回内容时允许驳回
+                boolean hasReturned = items.stream()
+                        .anyMatch(item -> DECISION_RETURNED.equals(item.getDirectorDecision()));
+                if (!hasReturned) {
+                    throw exception(CONTENT_REVIEW_TASK_INVALID);
+                }
+                // 批次状态更新由 handleProcessResult 处理
+            } else {
+                throw exception(CONTENT_REVIEW_TASK_INVALID);
             }
             return;
         }
         if (BATCH_FINAL_REVIEW.equals(batch.getStatus()) && STAGE_FINAL.equals(batch.getCurrentStage())
                 && Objects.equals(finalTaskKey, context.getTaskDefinitionKey())) {
+            if (!ACTION_APPROVE.equals(context.getAction())) throw exception(CONTENT_REVIEW_TASK_INVALID);
             List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
             requireFinalDecisions(items);
             for (ContentReviewBatchItemDO item : items) {
@@ -610,9 +766,31 @@ public class ContentReviewBatchService {
                 || BATCH_NEED_MODIFY.equals(batch.getStatus())) return;
         List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
         LocalDateTime now = LocalDateTime.now();
+
+        // 处理驳回情况（编导有退回内容，或终审驳回）
         if (!BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(event.getStatus())) {
+            // 解冻版本，允许运营修改后重新提交
             for (ContentReviewBatchItemDO item : items) {
                 if (contentVersionMapper.unfreeze(item.getContentVersionId()) != 1) {
+                    throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+                }
+            }
+            // 对每条内容落地退回结论
+            for (ContentReviewBatchItemDO item : items) {
+                ContentDO content = contentMapper.selectByIdForUpdate(item.getContentId(), tenantId());
+                ContentVersionDO version = contentVersionMapper.selectByIdForUpdate(item.getContentVersionId(), tenantId());
+                if (content == null || version == null || !Objects.equals(version.getContentId(), content.getId())
+                        || !Objects.equals(content.getCurrentVersionNo(), version.getVersionNo())
+                        || !CONTENT_ACCEPTANCE.equals(content.getStatus())) {
+                    throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+                }
+                // 优先使用编导的退回意见，如果编导通过了但终审退回，则使用终审意见
+                String comment = DECISION_RETURNED.equals(item.getDirectorDecision())
+                        ? firstText(item.getDirectorComment(), "编导审核退回")
+                        : firstText(item.getFinalComment(), "终审审核退回");
+                Long reviewer = item.getDirectorReviewedByUserId();
+                contentService.applyBatchReview(content, content.getVersion(), false, comment, reviewer);
+                if (contentVersionMapper.finishReview(version.getId(), "rejected", comment, reviewer, now) != 1) {
                     throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
                 }
                 if (itemMapper.finalizeItem(item, RESULT_RETURNED, null, null) != 1) {
@@ -624,6 +802,8 @@ public class ContentReviewBatchService {
             }
             return;
         }
+
+        // 处理终审通过情况
         if (!BATCH_FINAL_REVIEW.equals(batch.getStatus()) || !STAGE_FINAL.equals(batch.getCurrentStage())) {
             throw exception(CONTENT_REVIEW_TASK_INVALID);
         }
@@ -942,18 +1122,6 @@ public class ContentReviewBatchService {
         return result;
     }
 
-    private BpmTaskRespDTO findTodoTask(Long userId, String definitionKey, String taskKey,
-                                        String processInstanceId) {
-        BpmTaskPageReqDTO request = new BpmTaskPageReqDTO();
-        request.setPageNo(1);
-        request.setPageSize(2);
-        request.setProcessDefinitionKey(definitionKey);
-        request.setTaskDefinitionKey(taskKey);
-        request.setProcessInstanceIds(List.of(processInstanceId));
-        List<BpmTaskRespDTO> tasks = processTaskApi.getTodoTaskPage(userId, request).getList();
-        return tasks.size() == 1 ? tasks.getFirst() : null;
-    }
-
     private List<ContentReviewBatchRespVO> toResponses(List<ContentReviewBatchDO> batches,
                                                         Map<Long, List<ContentReviewBatchItemDO>> items,
                                                         Map<String, BpmTaskRespDTO> tasks, Long userId) {
@@ -969,15 +1137,34 @@ public class ContentReviewBatchService {
                                                  BpmTaskRespDTO task, Long userId, boolean includeFiles) {
         ContentReviewBatchRespVO response = BeanUtils.toBean(batch, ContentReviewBatchRespVO.class);
         response.setRelationSnapshot(parseMap(batch.getRelationSnapshotJson()));
-        response.setContextSnapshot(parseMap(batch.getContextSnapshotJson()));
+        Map<String, Object> context = parseMap(batch.getContextSnapshotJson());
         response.setAccountIds(parseLongList(batch.getAccountIdsJson()));
-        Set<Long> userIds = java.util.stream.Stream.of(batch.getOperatorUserId(), batch.getDirectorUserId())
+        // 账号快照里存的是用户编号，姓名按编号解析后回填，避免页面退化成展示内部 ID。
+        // 早期冻结的快照没有姓名字段，同样在这里补齐；快照本身不改写。
+        List<Map<String, Object>> accountSnapshots = objectMapList(context.get("accountSnapshots"));
+        Set<Long> userIds = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(batch.getOperatorUserId(), batch.getDirectorUserId()),
+                        accountSnapshots.stream().flatMap(snapshot -> java.util.stream.Stream.of(
+                                longValue(snapshot.get("ownerOperatorUserId")),
+                                longValue(snapshot.get("directorUserId")))))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, AdminUserRespDTO> users = userIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(userIds);
-        response.setOperatorName(users.get(batch.getOperatorUserId()) == null ? null
-                : users.get(batch.getOperatorUserId()).getNickname());
-        response.setDirectorName(users.get(batch.getDirectorUserId()) == null ? null
-                : users.get(batch.getDirectorUserId()).getNickname());
+        if (!accountSnapshots.isEmpty()) {
+            context.put("accountSnapshots", accountSnapshots.stream().map(snapshot -> {
+                Map<String, Object> resolved = new LinkedHashMap<>(snapshot);
+                // 快照里可能存在显式 null，putIfAbsent 不会覆盖，这里按空值判断补齐。
+                if (blank(text(resolved.get("operatorName")))) {
+                    resolved.put("operatorName", nickname(users, longValue(snapshot.get("ownerOperatorUserId"))));
+                }
+                if (blank(text(resolved.get("directorName")))) {
+                    resolved.put("directorName", nickname(users, longValue(snapshot.get("directorUserId"))));
+                }
+                return resolved;
+            }).toList());
+        }
+        response.setContextSnapshot(context);
+        response.setOperatorName(nickname(users, batch.getOperatorUserId()));
+        response.setDirectorName(nickname(users, batch.getDirectorUserId()));
         if (task != null) {
             response.setCurrentTaskId(task.getId());
             response.setCurrentTaskKey(task.getTaskDefinitionKey());
@@ -1031,7 +1218,9 @@ public class ContentReviewBatchService {
                 && Objects.equals(batch.getDirectorUserId(), userId)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:content-review:director-review")) {
             actions.add("DIRECTOR_DECIDE");
-            if (items.stream().allMatch(item -> DECISIONS.contains(item.getDirectorDecision()))) {
+            // 尚未暂存结论时 decision 为 null，DECISIONS 是 Set.of，contains(null) 会抛 NPE。
+            if (items.stream().allMatch(item -> item.getDirectorDecision() != null
+                    && DECISIONS.contains(item.getDirectorDecision()))) {
                 actions.add("DIRECTOR_COMPLETE");
             }
         }
@@ -1039,7 +1228,8 @@ public class ContentReviewBatchService {
                 && permissionApi.hasAnyPermissions(userId, "zsjos:content-review:final-review")) {
             actions.add("FINAL_DECIDE");
             if (items.stream().filter(item -> DECISION_APPROVED.equals(item.getDirectorDecision()))
-                    .allMatch(item -> DECISIONS.contains(item.getFinalDecision()))) {
+                    .allMatch(item -> item.getFinalDecision() != null
+                            && DECISIONS.contains(item.getFinalDecision()))) {
                 actions.add("FINAL_COMPLETE");
             }
         }
@@ -1072,9 +1262,9 @@ public class ContentReviewBatchService {
                                                 cn.iocoder.yudao.module.zsjos.dal.dataobject.material.MaterialSchemaVersionDO schema) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("configVersion", config.getVersion());
-        snapshot.put("directorTaskKey", config.getDirectorTaskKey());
-        snapshot.put("finalTaskKey", config.getFinalTaskKey());
-        snapshot.put("productionMaterialTypeCode", config.getProductionMaterialTypeCode());
+        snapshot.put("directorTaskKey", ContentReviewConfigService.DIRECTOR_TASK_KEY);
+        snapshot.put("finalTaskKey", ContentReviewConfigService.FINAL_TASK_KEY);
+        snapshot.put("productionMaterialTypeCode", ContentReviewConfigService.PRODUCTION_MATERIAL_TYPE_CODE);
         snapshot.put("productionMaterialSchemaVersionId", schema.getId());
         snapshot.put("productionMaterialSchemaHash", schema.getSchemaHash());
         snapshot.put("materialFieldMapping", configService.mapping(config));
@@ -1119,6 +1309,7 @@ public class ContentReviewBatchService {
         snapshot.put("detailUrl", version.getDetailUrl());
         snapshot.put("commentHook", version.getCommentHook());
         snapshot.put("referenceContentVersionId", version.getReferenceContentVersionId());
+        snapshot.put("referenceWorkUrl", version.getReferenceWorkUrl());
         snapshot.put("deliverableUrl", version.getDeliverableUrl());
         snapshot.put("deliverableSnapshot", parseJsonValue(version.getDeliverableSnapshotJson()));
         snapshot.put("leadResourceUrl", version.getLeadResourceUrl());
@@ -1134,7 +1325,10 @@ public class ContentReviewBatchService {
 
     private String normalizeDecision(String decision, String comment) {
         String normalized = decision == null ? null : decision.trim().toUpperCase();
-        if (!DECISIONS.contains(normalized)) throw exception(CONTENT_REVIEW_BATCH_STATE_INVALID);
+        // DECISIONS 是 Set.of，contains(null) 抛 NPE 而非返回 false；缺结论应返回业务错误。
+        if (normalized == null || !DECISIONS.contains(normalized)) {
+            throw exception(CONTENT_REVIEW_BATCH_STATE_INVALID);
+        }
         if (DECISION_RETURNED.equals(normalized) && blank(comment)) {
             throw exception(CONTENT_REVIEW_DECISION_INCOMPLETE);
         }
@@ -1179,6 +1373,11 @@ public class ContentReviewBatchService {
         } catch (RuntimeException ignored) {
             return List.of();
         }
+    }
+
+    private List<Map<String, Object>> objectMapList(Object value) {
+        if (!(value instanceof java.util.List<?> list)) return List.of();
+        return list.stream().filter(item -> item instanceof Map<?, ?>).map(this::objectMap).toList();
     }
 
     @SuppressWarnings("unchecked")
@@ -1255,3 +1454,6 @@ public class ContentReviewBatchService {
                                  Map<String, Object> defaults, Map<String, Object> accountSnapshot) {}
     private record TaskGroup(String definitionKey, String taskKey) {}
 }
+
+
+

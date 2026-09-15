@@ -68,8 +68,8 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 
 ## 全部角色目标
 
-普通客资提交权限 `zsjos:lead:submit` 由 `center_head`、`dept_manager`、`content_director`、
-`new_media_operator` 和 `sales_specialist` 角色持有；销售自拓权限
+普通客资提交权限 `zsjos:lead:submit` 由 `center_head`、`dept_manager`、`content_director` 和
+`new_media_operator` 角色持有；销售自拓权限
 `zsjos:lead:self-sourced:create` 仅由 `sales_specialist` 持有。角色菜单关系按所有租户中的启用角色同步，
 账号岗位和部门资格仍由后端业务校验。
 
@@ -88,7 +88,7 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 | 11 | `finance_specialist` | 与财务主管完全相同的 V071 精确 11 项 |
 | 12 | `study_planner` | `/zsjos/my-students`、学习规划师联系/交付操作、专用学员复购和本人订单；不授予通用订单录入或外部历史客户复购，仅本人负责的服务关系 |
 | 13 | `academic_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 14 | `delivery_manager` | 直属交付部门结业审批；对象责任关系由服务端动态解析 |
+| 14 | `delivery_manager` | 直属交付部门学员只读及主管直接调班；对象责任关系由服务端动态解析 |
 | 15 | `exam_manager` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 16 | `exam_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 17 | `career_planner` | 零 ZSJOS 菜单，当前没有已落地职责 |

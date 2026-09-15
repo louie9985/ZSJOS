@@ -14,6 +14,8 @@ public class ContentVersionRespVO {
     private String topicSnapshot;
     private String coverSnapshotJson;
     private String materialRefsJson;
+    private Long referenceContentVersionId;
+    private String referenceWorkUrl;
     private String deliverableUrl;
     private String deliverableSnapshotJson;
     private String scriptText;

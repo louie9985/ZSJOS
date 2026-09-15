@@ -56,7 +56,7 @@ class V209ReplayTest(unittest.TestCase):
         self.assertEqual('OPERATOR',by_key['nickname']['ownerType'])
         self.assertEqual('DIRECTOR',by_key['joining_goal']['ownerType'])
         self.assertEqual('AUTO',by_key['stage']['ownerType'])
-        self.assertEqual('UNASSIGNED',by_key['cover']['ownerType'])
+        self.assertEqual('OPERATOR',by_key['cover']['ownerType'])
         self.assertTrue(all(not f['requiredForCreate'] for f in fields))
         self.assertEqual(draft,self.sql(container,"SELECT fields_json FROM zsjos_media_account_field_config WHERE tenant_id=1 AND status='draft'"))
         self.assertEqual(historical,self.sql(container,"SELECT CONCAT(platform_value,'|',platform_label_snapshot,'|',nickname,'|',detail_values_json,'|',detail_snapshot_json) FROM zsjos_media_account WHERE id=900209"))

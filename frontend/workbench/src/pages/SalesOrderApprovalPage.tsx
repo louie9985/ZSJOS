@@ -17,6 +17,7 @@ import { useInboxTableLayout } from '../services/inboxLayout'
 import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumns'
+import LeadDetailModal from '../components/LeadDetailModal'
 
 const PAGE_SIZE = 20
 
@@ -64,6 +65,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const profileRequest = useRef<Promise<void> | undefined>(undefined)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { useTableLayout } = useInboxTableLayout()
+  const [leadDetailModalOpen, setLeadDetailModalOpen] = useState(false)
+  const [leadDetailModalLeadId, setLeadDetailModalLeadId] = useState<number>()
   const closeDecision = () => { setConfirmOpen(false); setDecision(undefined); resetIntent() }
 
   const loadProfile = useCallback(() => {
@@ -193,8 +196,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
       : detail ? <><div className="sales-order-detail-actions">{detail.leadId && <Button onClick={() => {
-        const returnTo = `${location.pathname}${location.search}`
-        navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${detail.leadId}&returnTo=${encodeURIComponent(returnTo)}`)
+        setLeadDetailModalLeadId(detail.leadId)
+        setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
         <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'}
           onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
@@ -238,5 +241,6 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       <Form.Item label="申请原因" required><Input.TextArea rows={5} maxLength={1000} showCount value={reason}
         onChange={event => setReason(event.target.value)} placeholder="说明需要主管确认的事项"/></Form.Item>
     </Modal>
+    {leadDetailModalLeadId && <LeadDetailModal leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
   </section>
 }

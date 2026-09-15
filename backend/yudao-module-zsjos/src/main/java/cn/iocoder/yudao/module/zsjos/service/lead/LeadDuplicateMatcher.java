@@ -52,10 +52,13 @@ public class LeadDuplicateMatcher {
                 .filter(person -> !Objects.equals(person.getId(), excludedPersonId)).toList();
         Map<Long, PersonDO> people = new LinkedHashMap<>();
         contactPeople.forEach(person -> people.put(person.getId(), person));
-        List<LeadDO> contactLeads = leadMapper.selectByPersonIds(new ArrayList<>(people.keySet()));
+        List<LeadDO> contactLeads = leadMapper.selectByPersonIds(new ArrayList<>(people.keySet())).stream()
+                .filter(lead -> !STATUS_CLOSED.equals(lead.getStatus())).toList();
         Map<Long, LeadDO> latestByPerson = new LinkedHashMap<>();
         contactLeads.forEach(lead -> latestByPerson.putIfAbsent(lead.getPersonId(), lead));
         for (PersonDO person : contactPeople) {
+            LeadDO matchedLead = latestByPerson.get(person.getId());
+            if (matchedLead == null) continue;
             Set<String> rules = new LinkedHashSet<>();
             String personMobile = StrUtil.trimToNull(person.getMobile());
             String personWechat = normalizeWechat(person.getWechatId());
@@ -64,14 +67,15 @@ public class LeadDuplicateMatcher {
             if (mobile != null && personWechat != null
                     && normalizeWechat(mobile).equals(personWechat)) rules.add(WEAK_MOBILE_TO_WECHAT);
             if (wechat != null && personMobile != null && wechat.equals(personMobile)) rules.add(WEAK_WECHAT_TO_MOBILE);
-            addCandidate(candidates, person, latestByPerson.get(person.getId()), rules);
+            addCandidate(candidates, person, matchedLead, rules);
         }
 
         String name = StrUtil.trimToNull(request.getName());
         String last4 = mobile != null && mobile.length() >= 4 ? mobile.substring(mobile.length() - 4) : null;
         String primaryRef = primaryProductRef(request.getEffectiveProducts());
         if (mobile != null && ordinaryWeakName(name)) {
-            for (LeadDO lead : leadMapper.selectByName(name)) {
+            for (LeadDO lead : leadMapper.selectByName(name).stream()
+                    .filter(candidate -> !STATUS_CLOSED.equals(candidate.getStatus())).toList()) {
                 if (Objects.equals(lead.getPersonId(), excludedPersonId)) continue;
                 Set<String> rules = new LinkedHashSet<>();
                 if (last4 != null && lead.getSubmittedMobile() != null && lead.getSubmittedMobile().endsWith(last4)) {

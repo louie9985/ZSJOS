@@ -6,9 +6,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.definition.BpmDefinitionReadApi;
 import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmProcessDefinitionMetadataRespDTO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewConfigRespVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewConfigSaveReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewProcessDefinitionRespVO;
+import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmUserTaskMetadataRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewConfigDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.material.MaterialSchemaVersionDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.material.MaterialTypeDO;
@@ -38,6 +36,30 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTEN
 @Service
 public class ContentReviewConfigService {
 
+    public static final String PROCESS_DEFINITION_KEY = "zsjos_production_content_review";
+    public static final String DIRECTOR_TASK_KEY = "directorReview";
+    public static final String FINAL_TASK_KEY = "finalReview";
+    /** SIMPLE 设计器为发起人生成的提交节点编码，不是业务审批节点。 */
+    private static final String SIMPLE_SUBMISSION_TASK_KEY = "StartUserNode";
+    public static final String PRODUCTION_MATERIAL_TYPE_CODE = MATERIAL_TYPE_PRODUCTION_CONTENT;
+
+    /**
+     * 内置生产内容模板字段到内容/账号快照来源的固定映射。键为模板字段编码，值为
+     * {@link ContentReviewMaterialService} 支持的来源名；租户删改模板字段时按已发布模板过滤。
+     */
+    private static final Map<String, String> DEFAULT_FIELD_MAPPING = Map.ofEntries(
+            Map.entry("__cover__", "coverFileId"),
+            Map.entry("content_title", "title"),
+            Map.entry("content_topic", "topic"),
+            Map.entry("script_text", "scriptText"),
+            Map.entry("deliverable_url", "deliverableUrl"),
+            Map.entry("lead_resource_url", "leadResourceUrl"),
+            Map.entry("planned_publish_at", "plannedPublishAt"),
+            Map.entry("deliverable_files", "deliverableFileIds"),
+            Map.entry("account_type", "accountType"),
+            Map.entry("profession", "profession"),
+            Map.entry("account_stage", "accountStage"));
+
     private static final Set<String> TEXT_SOURCES = Set.of("title", "topic", "scriptText", "deliverableUrl",
             "leadResourceUrl");
     private static final Set<String> LINK_SOURCES = Set.of("deliverableUrl", "leadResourceUrl");
@@ -56,12 +78,14 @@ public class ContentReviewConfigService {
 
     @Transactional(rollbackFor = Exception.class)
     public void ensureDefaultConfig() {
-        if (contentReviewConfigMapper.selectCurrent() != null) {
+        ContentReviewConfigDO existing = contentReviewConfigMapper.selectCurrent();
+        if (existing != null) {
+            repairEmptyMapping(existing);
             return;
         }
         ContentReviewConfigDO config = new ContentReviewConfigDO();
         config.setProductionMaterialTypeCode(MATERIAL_TYPE_PRODUCTION_CONTENT);
-        config.setMaterialFieldMappingJson("{}");
+        config.setMaterialFieldMappingJson(JsonUtils.toJsonString(defaultMapping()));
         config.setMaterialDefaultValuesJson("{}");
         config.setVersion(0);
         try {
@@ -71,84 +95,80 @@ public class ContentReviewConfigService {
         }
     }
 
-    public ContentReviewConfigRespVO getConfig() {
-        ContentReviewConfigDO config = contentReviewConfigMapper.selectCurrent();
-        if (config == null) throw exception(CONTENT_REVIEW_CONFIG_INVALID);
-        return toResponse(config);
+    /**
+     * V194 与早期启动只写入空映射，收录时每个字段都取不到来源。映射与模板都已是服务端固定契约，
+     * 这里补齐仍为空的存量租户；管理员已配置过的映射不覆盖。
+     */
+    private void repairEmptyMapping(ContentReviewConfigDO config) {
+        if (!mapping(config).isEmpty() || !defaults(config).isEmpty()) {
+            return;
+        }
+        Map<String, String> mapping = defaultMapping();
+        if (mapping.isEmpty()) {
+            return;
+        }
+        config.setProductionMaterialTypeCode(MATERIAL_TYPE_PRODUCTION_CONTENT);
+        config.setMaterialFieldMappingJson(JsonUtils.toJsonString(mapping));
+        config.setMaterialDefaultValuesJson("{}");
+        contentReviewConfigMapper.updateConfig(config, config.getVersion());
     }
 
-    public List<ContentReviewProcessDefinitionRespVO> getProcessDefinitions() {
-        return definitionReadApi.getPublishedProcessDefinitions(BPM_CATEGORY).stream()
-                .map(item -> {
-                    ContentReviewProcessDefinitionRespVO response = BeanUtils.toBean(
-                            item, ContentReviewProcessDefinitionRespVO.class);
-                    response.setUserTasks(item.getUserTasks() == null ? List.of() : item.getUserTasks().stream()
-                            .map(task -> BeanUtils.toBean(task,
-                                    ContentReviewProcessDefinitionRespVO.UserTask.class)).toList());
-                    return response;
-                }).toList();
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void updateConfig(ContentReviewConfigSaveReqVO request, Long userId) {
-        ContentReviewConfigDO config = contentReviewConfigMapper.selectCurrentForUpdate(
-                TenantContextHolder.getRequiredTenantId());
-        if (config == null || !Objects.equals(config.getVersion(), request.getVersion())) {
-            throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+    /**
+     * 默认映射按当前已发布模板过滤，租户自行删改过模板字段时只保留仍存在且类型匹配的来源，
+     * 避免固定映射反过来把 requireReadyConfig 卡死。
+     */
+    private Map<String, String> defaultMapping() {
+        MaterialTypeDO type = materialTypeMapper.selectByCode(PRODUCTION_MATERIAL_TYPE_CODE);
+        if (type == null || type.getCurrentSchemaVersionId() == null) {
+            return Map.of();
         }
-        String processDefinitionKey = request.getProcessDefinitionKey().trim();
-        String directorTaskKey = request.getDirectorTaskKey().trim();
-        String finalTaskKey = request.getFinalTaskKey().trim();
-        BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
-                processDefinitionKey);
-        if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
-                || !BPM_CATEGORY.equals(definition.getCategory())
-                || directorTaskKey.equals(finalTaskKey) || !validTaskSequence(definition, directorTaskKey, finalTaskKey)) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+        List<MaterialFieldDefinition> fields;
+        try {
+            fields = materialSchemaService.parseFields(
+                    materialTypeService.requirePublishedSchema(type).getFieldsJson());
+        } catch (RuntimeException ignored) {
+            return Map.of();
         }
-        validateMaterialMapping(request.getProductionMaterialTypeCode(), request.getMaterialFieldMapping(),
-                request.getMaterialDefaultValues(), userId);
-        config.setProcessDefinitionKey(processDefinitionKey);
-        config.setDirectorTaskKey(directorTaskKey);
-        config.setFinalTaskKey(finalTaskKey);
-        config.setProductionMaterialTypeCode(request.getProductionMaterialTypeCode().trim());
-        config.setMaterialFieldMappingJson(JsonUtils.toJsonString(request.getMaterialFieldMapping()));
-        config.setMaterialDefaultValuesJson(JsonUtils.toJsonString(request.getMaterialDefaultValues()));
-        if (contentReviewConfigMapper.updateConfig(config, request.getVersion()) != 1) {
-            throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
-        }
+        Map<String, MaterialFieldDefinition> byKey = new LinkedHashMap<>();
+        fields.forEach(field -> byKey.put(field.getKey(), field));
+        Map<String, String> mapping = new LinkedHashMap<>();
+        DEFAULT_FIELD_MAPPING.forEach((key, source) -> {
+            if ("__cover__".equals(key) || supportsSource(byKey.get(key), source)) {
+                mapping.put(key, source);
+            }
+        });
+        return mapping;
     }
 
     public ContentReviewConfigDO requireReadyConfig(Long userId) {
         ContentReviewConfigDO config = contentReviewConfigMapper.selectCurrent();
-        if (config == null || blank(config.getProcessDefinitionKey()) || blank(config.getDirectorTaskKey())
-                || blank(config.getFinalTaskKey()) || blank(config.getProductionMaterialTypeCode())) {
+        if (config == null) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
         }
         BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
-                config.getProcessDefinitionKey());
+                PROCESS_DEFINITION_KEY);
         if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
                 || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition, config.getDirectorTaskKey(), config.getFinalTaskKey())) {
+                || !validTaskSequence(definition, DIRECTOR_TASK_KEY, FINAL_TASK_KEY)) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
         }
-        validateMaterialMapping(config.getProductionMaterialTypeCode(), mapping(config), defaults(config), userId);
+        validateMaterialMapping(PRODUCTION_MATERIAL_TYPE_CODE, mapping(config), defaults(config), userId);
         return config;
     }
 
     public BpmProcessDefinitionMetadataRespDTO requireCurrentDefinition(ContentReviewConfigDO config) {
         BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
-                config.getProcessDefinitionKey());
+                PROCESS_DEFINITION_KEY);
         if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
                 || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition, config.getDirectorTaskKey(), config.getFinalTaskKey())) {
+                || !validTaskSequence(definition, DIRECTOR_TASK_KEY, FINAL_TASK_KEY)) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
         }
         return definition;
     }
 
     public MaterialSchemaVersionDO requireProductionMaterialSchema(ContentReviewConfigDO config) {
-        MaterialTypeDO type = materialTypeMapper.selectByCode(config.getProductionMaterialTypeCode());
+        MaterialTypeDO type = materialTypeMapper.selectByCode(PRODUCTION_MATERIAL_TYPE_CODE);
         if (type == null || !CommonStatusEnum.ENABLE.getStatus().equals(type.getStatus())
                 || !Boolean.TRUE.equals(type.getAllowAutoCollect())) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
@@ -156,13 +176,24 @@ public class ContentReviewConfigService {
         return materialTypeService.requirePublishedSchema(type);
     }
 
+    /**
+     * 校验流程仍是"编导 → 终审"两级单人骨架。批审的逐条结论只有一组编导列和一组终审列
+     * （见 zsjos_content_review_batch_item），因此业务审批节点必须恰好两个、都是单人执行、
+     * 且按 directorReview → finalReview → 结束 串联；多出的节点或多人审批方式都无处落库。
+     *
+     * <p>SIMPLE 设计器编译时必然额外生成发起人提交节点，它不是业务审批节点，这里按保留
+     * 节点编码排除后再计数。不使用 definition.simpleSequentialApproval：那个标志按全部
+     * userTask 计数，对任何 SIMPLE 资产都为 false；串联性由 nextUserTaskKeys 自行校验。
+     */
     private boolean validTaskSequence(BpmProcessDefinitionMetadataRespDTO definition,
                                       String directorTaskKey, String finalTaskKey) {
-        if (!Boolean.TRUE.equals(definition.getSimpleSequentialApproval())
-                || definition.getUserTasks() == null || definition.getUserTasks().size() != 2) return false;
-        var directorTask = definition.getUserTasks().stream()
+        if (definition.getUserTasks() == null) return false;
+        List<BpmUserTaskMetadataRespDTO> approvalTasks = definition.getUserTasks().stream()
+                .filter(task -> !SIMPLE_SUBMISSION_TASK_KEY.equals(task.getKey())).toList();
+        if (approvalTasks.size() != 2) return false;
+        var directorTask = approvalTasks.stream()
                 .filter(task -> directorTaskKey.equals(task.getKey())).findFirst().orElse(null);
-        var finalTask = definition.getUserTasks().stream()
+        var finalTask = approvalTasks.stream()
                 .filter(task -> finalTaskKey.equals(task.getKey())).findFirst().orElse(null);
         return directorTask != null && finalTask != null
                 && "SINGLE".equals(directorTask.getExecutionMode())
@@ -248,14 +279,11 @@ public class ContentReviewConfigService {
                 || value instanceof java.util.Collection<?> collection && collection.isEmpty();
     }
 
-    private ContentReviewConfigRespVO toResponse(ContentReviewConfigDO config) {
-        ContentReviewConfigRespVO response = BeanUtils.toBean(config, ContentReviewConfigRespVO.class);
-        response.setMaterialFieldMapping(mapping(config));
-        response.setMaterialDefaultValues(defaults(config));
-        return response;
-    }
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
     }
 }
+
+
+

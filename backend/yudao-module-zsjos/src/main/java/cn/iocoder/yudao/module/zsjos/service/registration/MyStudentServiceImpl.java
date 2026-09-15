@@ -56,7 +56,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     public PageResult<MyStudentRespVO> getMyPage(Long userId, MyStudentPageReqVO reqVO) {
         List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(reqVO.getAdvancedFilter(), userId);
         // Managed readers see their department subtree by service owner; everyone else stays self-only.
-        if (permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED)) {
+        if (hasManagedStudentReadPermission(userId)) {
             return getManagedPage(userId, reqVO, matchedIds);
         }
         PageResult<PersonDO> people = personMapper.selectMyStudentPage(reqVO, userId, matchedIds);
@@ -76,12 +76,7 @@ public class MyStudentServiceImpl implements MyStudentService {
      */
     private PageResult<MyStudentRespVO> getManagedPage(Long userId, MyStudentPageReqVO reqVO, List<Long> matchedIds) {
         DeliveryClassScopeService.Scope scope = classScopeService.resolve(userId);
-        Set<Long> ownerUserIds = new LinkedHashSet<>();
-        ownerUserIds.add(userId);
-        if (!scope.allDepartments() && !scope.deptIds().isEmpty()) {
-            adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
-                    .map(AdminUserRespDTO::getId).filter(Objects::nonNull).forEach(ownerUserIds::add);
-        }
+        Set<Long> ownerUserIds = resolveManagedOwnerIds(userId, scope);
         PageResult<PersonDO> people = scope.allDepartments()
                 ? personMapper.selectAllStudentPage(reqVO, matchedIds)
                 : personMapper.selectManagedStudentPage(reqVO, ownerUserIds, matchedIds);
@@ -123,7 +118,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Override
     @ZsjosPermission(bizType = "student", bizId = "#personId", action = "read")
     public MyStudentRespVO getMyStudent(Long userId, Long personId) {
-        List<ServiceRelationDO> relations = selectAssignedRelationsForPerson(userId, personId);
+        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, personId);
         if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
         return convert(userId, personId, relations);
     }
@@ -152,11 +147,38 @@ public class MyStudentServiceImpl implements MyStudentService {
         if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
             throw exception(STUDENT_NOT_EXISTS);
         }
-        List<ServiceRelationDO> relations = selectAssignedRelationsForPerson(userId, relation.getPersonId());
+        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, relation.getPersonId());
         if (relations.stream().noneMatch(item -> Objects.equals(item.getId(), relationId))) {
             throw exception(STUDENT_NOT_EXISTS);
         }
         return convert(userId, relation.getPersonId(), relations);
+    }
+
+    private boolean hasManagedStudentReadPermission(Long userId) {
+        return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
+                DeliveryClassService.PERMISSION_QUERY_MANAGED);
+    }
+
+    private Set<Long> resolveManagedOwnerIds(Long userId, DeliveryClassScopeService.Scope scope) {
+        Set<Long> ownerIds = new LinkedHashSet<>();
+        ownerIds.add(userId);
+        if (!scope.allDepartments() && !scope.deptIds().isEmpty()) {
+            adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
+                    .map(AdminUserRespDTO::getId).filter(Objects::nonNull).forEach(ownerIds::add);
+        }
+        return ownerIds;
+    }
+
+    private List<ServiceRelationDO> selectVisibleRelationsForPerson(Long userId, Long personId) {
+        // A visible student does not make every course visible: match the managed list's owner scope.
+        if (hasManagedStudentReadPermission(userId)) {
+            DeliveryClassScopeService.Scope scope = classScopeService.resolve(userId);
+            return scope.allDepartments()
+                    ? relationMapper.selectOwnedByPersonIds(List.of(personId), null)
+                    : relationMapper.selectOwnedByOwnerIdsAndPersonIds(
+                            resolveManagedOwnerIds(userId, scope), List.of(personId), null);
+        }
+        return selectAssignedRelationsForPerson(userId, personId);
     }
 
     private List<ServiceRelationDO> selectAssignedRelationsForPerson(Long userId, Long personId) {

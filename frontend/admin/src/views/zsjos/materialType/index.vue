@@ -62,120 +62,6 @@
     </el-table>
   </ContentWrap>
 
-  <ContentWrap v-if="canConfigReview" class="mt-16px" v-loading="reviewLoading">
-    <template #header>
-      <div class="material-review-heading">
-        <div>
-          <strong>生产内容审核配置</strong>
-          <span>绑定两级 BPM 任务，并配置审核通过后的素材字段映射</span>
-        </div>
-        <el-button type="primary" :loading="reviewSaving" @click="saveReviewConfig">保存配置</el-button>
-      </div>
-    </template>
-    <el-alert
-      v-if="reviewError"
-      :title="reviewError"
-      type="error"
-      show-icon
-      :closable="false"
-      class="mb-12px"
-    >
-      <template #default><el-button link type="primary" @click="loadReviewConfig">重试</el-button></template>
-    </el-alert>
-    <el-form v-if="reviewConfig" label-width="130px">
-      <el-row :gutter="18">
-        <el-col :xs="24" :lg="8">
-          <el-form-item label="审核流程" required>
-            <el-select
-              v-model="reviewConfig.processDefinitionKey"
-              filterable
-              class="!w-100%"
-              placeholder="选择已发布流程"
-              @change="changeReviewProcess"
-            >
-              <el-option
-                v-for="definition in reviewDefinitions"
-                :key="definition.id"
-                :label="`${definition.name}（V${definition.version}）`"
-                :value="definition.key"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :xs="24" :lg="8">
-          <el-form-item label="编导审核节点" required>
-            <el-select v-model="reviewConfig.directorTaskKey" class="!w-100%" @change="reviewConfig!.finalTaskKey = undefined">
-              <el-option v-for="task in selectedReviewTasks" :key="task.key" :label="task.name" :value="task.key" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :xs="24" :lg="8">
-          <el-form-item label="总监审核节点" required>
-            <el-select v-model="reviewConfig.finalTaskKey" class="!w-100%">
-              <el-option v-for="task in finalReviewTasks" :key="task.key" :label="task.name" :value="task.key" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-form-item label="收录素材类型" required>
-        <el-select
-          v-model="reviewConfig.productionMaterialTypeCode"
-          class="!w-360px"
-          @change="resetReviewMaterialConfig"
-        >
-          <el-option
-            v-for="type in autoCollectTypes"
-            :key="type.code"
-            :label="type.name"
-            :value="type.code"
-            :disabled="!type.currentSchema"
-          />
-        </el-select>
-      </el-form-item>
-      <el-divider content-position="left">内容字段映射</el-divider>
-      <el-table :data="reviewMaterialFields" empty-text="请先发布生产内容素材模板">
-        <el-table-column prop="label" label="素材字段" min-width="180">
-          <template #default="{ row }">
-            {{ row.label }}<el-tag v-if="row.required" class="ml-6px" size="small" type="danger">必填</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="key" label="字段编码" min-width="170" />
-        <el-table-column prop="type" label="类型" width="130">
-          <template #default="{ row }">{{ fieldTypeLabel(row.type) }}</template>
-        </el-table-column>
-        <el-table-column label="取值来源" min-width="260">
-          <template #default="{ row }">
-            <el-select
-              :model-value="reviewConfig!.materialFieldMapping[row.key]"
-              clearable
-              class="!w-100%"
-              placeholder="使用下方默认值"
-              @update:model-value="setReviewMapping(row.key, $event)"
-            >
-              <el-option
-                v-for="source in mappingOptions(row)"
-                :key="source.value"
-                :label="source.label"
-                :value="source.value"
-              />
-            </el-select>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-divider content-position="left">未映射字段默认值</el-divider>
-      <MaterialDynamicForm
-        v-if="productionType?.currentSchema"
-        ref="reviewDefaultFormRef"
-        v-model="reviewConfig.materialDefaultValues"
-        :fields="defaultValueFields"
-        :dict-data="dictData"
-        :users="users"
-        :departments="departments"
-      />
-      <el-empty v-else description="请先为收录素材类型发布模板" />
-    </el-form>
-  </ContentWrap>
-
   <Dialog v-model="typeDialogVisible" :title="editingTypeId ? '编辑素材类型' : '新增素材类型'" width="720px">
     <el-form ref="typeFormRef" :model="typeForm" :rules="typeRules" label-width="120px">
       <el-form-item label="类型名称" prop="name"><el-input v-model="typeForm.name" maxlength="100" /></el-form-item>
@@ -289,7 +175,6 @@ const dictTypes = ref<DictTypeApi.DictTypeVO[]>([])
 const dictData = ref<DictDataApi.DictDataVO[]>([])
 const users = ref<UserApi.UserSimpleVO[]>([])
 const departments = ref<DeptApi.DeptVO[]>([])
-const canConfigReview = checkPermi(['zsjos:content-review:config'])
 
 const typeDialogVisible = ref(false)
 const editingTypeId = ref<number>()
@@ -335,42 +220,6 @@ const schemaPublishing = ref(false)
 const schemaHistoryVisible = ref(false)
 const historySchema = ref<MaterialApi.MaterialTemplate>()
 
-const reviewLoading = ref(false)
-const reviewSaving = ref(false)
-const reviewError = ref('')
-const reviewConfig = ref<MaterialApi.ContentReviewConfig>()
-const reviewDefinitions = ref<MaterialApi.ContentReviewProcessDefinition[]>([])
-const reviewDefaultFormRef = ref<DynamicFormExpose>()
-const productionType = computed(() =>
-  types.value.find((item) => item.code === reviewConfig.value?.productionMaterialTypeCode)
-)
-const autoCollectTypes = computed(() => types.value.filter(
-  (item) => item.status === 0 && item.allowAutoCollect && item.currentSchema
-))
-const selectedReviewDefinition = computed(() =>
-  reviewDefinitions.value.find((item) => item.key === reviewConfig.value?.processDefinitionKey)
-)
-const selectedReviewTasks = computed(() => selectedReviewDefinition.value?.userTasks || [])
-const finalReviewTasks = computed(() => {
-  const director = selectedReviewTasks.value.find((item) => item.key === reviewConfig.value?.directorTaskKey)
-  return selectedReviewTasks.value.filter((item) => director?.nextUserTaskKeys?.includes(item.key))
-})
-const coverField: MaterialApi.MaterialFieldDefinition = {
-  key: '__cover__',
-  label: '素材封面',
-  type: 'image',
-  required: false
-}
-const reviewMaterialFields = computed(() => [
-  coverField,
-  ...(productionType.value?.currentSchema?.fields || [])
-])
-const defaultValueFields = computed(() =>
-  (productionType.value?.currentSchema?.fields || []).filter(
-    (field) => !reviewConfig.value?.materialFieldMapping[field.key] && !['image', 'video', 'attachment'].includes(field.type)
-  )
-)
-
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const formatTime = (value?: string) => (value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-')
 const processName = (key?: string) => {
@@ -393,13 +242,6 @@ const loadBaseOptions = async () => {
     MaterialApi.getMaterialProcessDefinitions().then((value) => (materialDefinitions.value = value)),
     DictTypeApi.getSimpleDictTypeList().then((value) => (dictTypes.value = value))
   ]
-  if (canConfigReview) {
-    jobs.push(
-      DictDataApi.getSimpleDictDataList().then((value) => (dictData.value = value)),
-      UserApi.getSimpleUserOptions().then((value) => (users.value = value)),
-      DeptApi.getSimpleDeptList().then((value) => (departments.value = value))
-    )
-  }
   await Promise.all(jobs)
 }
 const load = async () => {
@@ -407,7 +249,6 @@ const load = async () => {
   error.value = ''
   try {
     await loadBaseOptions()
-    if (canConfigReview) await loadReviewConfig()
   } catch (cause: any) {
     error.value = cause?.msg || cause?.message || '素材类型加载失败'
   } finally {
@@ -539,40 +380,6 @@ const fieldRulesText = (field: MaterialApi.MaterialFieldDefinition) => [
   field.maxCount ? `最多 ${field.maxCount} 项` : ''
 ].filter(Boolean).join('；') || '-'
 
-const loadReviewConfig = async () => {
-  reviewLoading.value = true
-  reviewError.value = ''
-  try {
-    const [config, definitions] = await Promise.all([
-      MaterialApi.getContentReviewConfig(),
-      MaterialApi.getContentReviewProcessDefinitions()
-    ])
-    reviewConfig.value = config
-    reviewDefinitions.value = definitions
-  } catch (cause: any) {
-    reviewError.value = cause?.msg || cause?.message || '生产内容审核配置加载失败'
-  } finally {
-    reviewLoading.value = false
-  }
-}
-const changeReviewProcess = () => {
-  if (!reviewConfig.value) return
-  reviewConfig.value.directorTaskKey = undefined
-  reviewConfig.value.finalTaskKey = undefined
-}
-const resetReviewMaterialConfig = () => {
-  if (!reviewConfig.value) return
-  reviewConfig.value.materialFieldMapping = {}
-  reviewConfig.value.materialDefaultValues = {}
-}
-const setReviewMapping = (key: string, source?: string) => {
-  if (!reviewConfig.value) return
-  if (source) {
-    reviewConfig.value.materialFieldMapping[key] = source
-    delete reviewConfig.value.materialDefaultValues[key]
-  }
-  else delete reviewConfig.value.materialFieldMapping[key]
-}
 const mappingOptions = (field: MaterialApi.MaterialFieldDefinition) => {
   const text = [
     { label: '内容标题', value: 'title' },
@@ -607,25 +414,6 @@ const mappingOptions = (field: MaterialApi.MaterialFieldDefinition) => {
   }
   return []
 }
-const saveReviewConfig = async () => {
-  const config = reviewConfig.value
-  if (!config?.processDefinitionKey || !config.directorTaskKey || !config.finalTaskKey || !config.productionMaterialTypeCode) {
-    return message.warning('请完整选择审核流程、两级任务和收录素材类型')
-  }
-  const defaultValueProblem = reviewDefaultFormRef.value?.validate()
-  if (defaultValueProblem) return message.warning(defaultValueProblem)
-  reviewSaving.value = true
-  try {
-    await MaterialApi.updateContentReviewConfig(config)
-    await loadReviewConfig()
-    message.success('生产内容审核配置已保存')
-  } catch (cause: any) {
-    message.error(cause?.msg || cause?.message || '配置保存失败')
-  } finally {
-    reviewSaving.value = false
-  }
-}
-
 onMounted(load)
 </script>
 

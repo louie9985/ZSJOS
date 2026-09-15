@@ -22,6 +22,8 @@ public class AllinpayProperties {
     private String notifyUrl;
     private String merchantPrivateKeyLocation;
     private String platformPublicKeyLocation;
+    private String merchantPrivateKey;
+    private String platformPublicKey;
     private String linkHmacSecret;
     private String publicBaseUrl;
     private long linkTtlHours = 24;

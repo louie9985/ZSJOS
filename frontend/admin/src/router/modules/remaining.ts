@@ -1121,6 +1121,42 @@ const remainingRouter: AppRouteRecordRaw[] = [
         ]
       }
     ]
+  },
+  {
+    path: '/zsjos/payment',
+    component: Layout,
+    name: 'ZsjosPayment',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: 'subject',
+        component: () => import('@/views/zsjos/payment/subject/index.vue'),
+        name: 'PaymentSubject',
+        meta: {
+          title: '支付主体管理',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          icon: 'ep:credit-card',
+          activeMenu: '/zsjos/payment/subject'
+        }
+      },
+      {
+        path: 'product-subject',
+        component: () => import('@/views/zsjos/payment/productSubject/index.vue'),
+        name: 'ProductPaymentSubject',
+        meta: {
+          title: '产品支付主体配置',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          icon: 'ep:setting',
+          activeMenu: '/zsjos/payment/product-subject'
+        }
+      }
+    ]
   }
 ]
 

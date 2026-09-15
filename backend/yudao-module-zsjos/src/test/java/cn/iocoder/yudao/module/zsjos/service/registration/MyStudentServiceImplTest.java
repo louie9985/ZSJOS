@@ -38,6 +38,9 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_NOT_EXISTS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -179,7 +182,7 @@ class MyStudentServiceImplTest {
         MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20);
         when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
-        when(permissionApi.hasAnyPermissions(28L, DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(false);
         when(personMapper.selectMyStudentPage(reqVO, 28L, null)).thenReturn(PageResult.empty());
         when(relationMapper.selectAssignedByUserAndPersonIds(28L, List.of(), null)).thenReturn(List.of());
 
@@ -200,7 +203,7 @@ class MyStudentServiceImplTest {
         relation.setStatus("active"); relation.setClassId(90L);
         relation.setActivatedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
         when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
-        when(permissionApi.hasAnyPermissions(28L, DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
         when(classScopeService.resolve(28L))
                 .thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(1050L, 1051L)));
         when(adminUserApi.getUserListByDeptIds(Set.of(1050L, 1051L)))
@@ -240,5 +243,84 @@ class MyStudentServiceImplTest {
         assertEquals(1, result.getTotal());
         assertEquals("媒体学员", result.getList().getFirst().getName());
         assertEquals(List.of(), result.getList().getFirst().getServices());
+    }
+
+    @Test
+    void managedDetailAndByServiceReturnOnlyDepartmentRelations() {
+        ServiceRelationDO visible = detailRelation(71L, 31L);
+        ServiceRelationDO outside = detailRelation(72L, 99L);
+        mockManagedScope(false, Set.of(1050L));
+        when(adminUserApi.getUserListByDeptIds(Set.of(1050L)))
+                .thenReturn(List.of(new AdminUserRespDTO().setId(31L)));
+        when(relationMapper.selectOwnedByOwnerIdsAndPersonIds(Set.of(28L, 31L), List.of(70L), null))
+                .thenReturn(List.of(visible));
+        PersonDO person = new PersonDO(); person.setId(70L);
+        when(personMapper.selectById(70L)).thenReturn(person);
+        when(relationMapper.selectById(71L)).thenReturn(visible);
+        when(relationMapper.selectById(72L)).thenReturn(outside);
+
+        assertEquals(List.of(71L), service.getMyStudent(28L, 70L).getServices().stream()
+                .map(MyStudentRespVO.ServiceVO::getServiceRelationId).toList());
+        assertEquals(List.of(71L), service.getMyStudentByService(28L, 71L).getServices().stream()
+                .map(MyStudentRespVO.ServiceVO::getServiceRelationId).toList());
+        assertEquals(STUDENT_NOT_EXISTS.getCode(), assertThrows(ServiceException.class,
+                () -> service.getMyStudentByService(28L, 72L)).getCode());
+        verify(relationMapper, never()).selectOwnedByPersonIds(anyCollection(), any());
+        verify(relationMapper, never()).selectActiveByPersonIds(anyCollection());
+    }
+
+    @Test
+    void managedDetailRejectsStudentOutsideDepartmentScope() {
+        mockManagedScope(false, Set.of());
+        assertEquals(STUDENT_NOT_EXISTS.getCode(), assertThrows(ServiceException.class,
+                () -> service.getMyStudent(28L, 70L)).getCode());
+        verify(relationMapper).selectOwnedByOwnerIdsAndPersonIds(Set.of(28L), List.of(70L), null);
+        verifyNoInteractions(personMapper, adminUserApi);
+    }
+
+    @Test
+    void globalManagedDetailUsesExistingGlobalScope() {
+        mockManagedScope(true, Set.of());
+        when(relationMapper.selectOwnedByPersonIds(List.of(70L), null))
+                .thenReturn(List.of(detailRelation(71L, 31L), detailRelation(72L, 99L)));
+        PersonDO person = new PersonDO(); person.setId(70L);
+        when(personMapper.selectById(70L)).thenReturn(person);
+        assertEquals(2, service.getMyStudent(28L, 70L).getServices().size());
+        verify(adminUserApi, never()).getUserListByDeptIds(anyCollection());
+    }
+
+    @Test
+    void ordinaryByServiceKeepsOwnedHistoryAndRejectsOtherCourse() {
+        ServiceRelationDO owned = detailRelation(71L, 28L); owned.setStatus("completed");
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(28L, 70L)).thenReturn(List.of(owned));
+        when(relationMapper.selectById(71L)).thenReturn(owned);
+        when(relationMapper.selectById(72L)).thenReturn(detailRelation(72L, 99L));
+        PersonDO person = new PersonDO(); person.setId(70L);
+        when(personMapper.selectById(70L)).thenReturn(person);
+        assertEquals(List.of(71L), service.getMyStudentByService(28L, 71L).getServices().stream()
+                .map(MyStudentRespVO.ServiceVO::getServiceRelationId).toList());
+        assertThrows(ServiceException.class, () -> service.getMyStudentByService(28L, 72L));
+        verifyNoInteractions(classScopeService);
+    }
+
+    @Test
+    void managedScopeFailureDoesNotFallBackToGlobalRead() {
+        when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(classScopeService.resolve(28L)).thenThrow(new IllegalStateException("scope unavailable"));
+        assertThrows(IllegalStateException.class, () -> service.getMyStudent(28L, 70L));
+        verifyNoInteractions(relationMapper, personMapper);
+    }
+
+    private void mockManagedScope(boolean all, Set<Long> departments) {
+        when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(classScopeService.resolve(28L)).thenReturn(new DeliveryClassScopeService.Scope(all, departments));
+    }
+
+    private ServiceRelationDO detailRelation(Long id, Long owner) {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(id); relation.setPersonId(70L); relation.setOwnerUserId(owner);
+        relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
+        relation.setActivatedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
+        return relation;
     }
 }

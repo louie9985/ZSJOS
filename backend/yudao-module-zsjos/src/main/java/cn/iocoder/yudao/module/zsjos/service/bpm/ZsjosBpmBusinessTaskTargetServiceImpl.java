@@ -31,6 +31,7 @@ public class ZsjosBpmBusinessTaskTargetServiceImpl implements ZsjosBpmBusinessTa
     private static final String VIEW_DONE = "done";
     private static final String UNSUPPORTED_MESSAGE = "该流程暂未接入员工端业务审批页，请在完整 BPM 表单中处理。";
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalService materialApprovalService;
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private SalesOrderSupervisorConfirmationService salesOrderTargetService;
     @Resource private LeadAppealMapper leadAppealMapper;
@@ -49,6 +50,19 @@ public class ZsjosBpmBusinessTaskTargetServiceImpl implements ZsjosBpmBusinessTa
         }
         if (APPEAL_PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey())) {
             return leadAppealTarget(task, userId, done);
+        }
+        if (task.getProcessDefinitionKey() != null && java.util.Set.of("zsjos_viral_account_review", "zsjos_viral_content_review").contains(task.getProcessDefinitionKey())) {
+            if (!permissionApi.hasAnyPermissions(userId, "zsjos:material-approval:query")) {
+                throw exception(cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalErrors.INVALID_TASK);
+            }
+            Long versionId = cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalService.versionId(task);
+            materialApprovalService.requireTask(versionId, taskId, done, userId);
+            ZsjosBpmBusinessTaskTargetRespVO target = supported("material", "/zsjos/material-library/manage");
+            target.getQuery().put("taskId", taskId);
+            target.getQuery().put("versionId", versionId);
+            target.getQuery().put("done", done);
+            target.getQuery().put("typeCode", "zsjos_viral_account_review".equals(task.getProcessDefinitionKey()) ? "viral_account" : "viral_content");
+            return target;
         }
         return unsupported();
     }

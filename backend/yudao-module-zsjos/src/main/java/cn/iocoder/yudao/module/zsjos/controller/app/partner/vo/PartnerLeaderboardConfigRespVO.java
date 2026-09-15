@@ -7,6 +7,8 @@ import java.util.List;
 @Data
 public class PartnerLeaderboardConfigRespVO {
     private Boolean enabled;
+    private Boolean includeEmployeeSubmitter;
+    private List<String> employeeRoleCodes;
     private List<String> enabledTypes;
     private String defaultType;
     private String defaultPeriod;

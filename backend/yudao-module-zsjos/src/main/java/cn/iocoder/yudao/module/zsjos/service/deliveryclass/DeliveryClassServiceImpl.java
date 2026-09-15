@@ -283,18 +283,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     private void validateTransferTarget(ServiceRelationDO relation, DeliveryClassDO target) {
         if (target == null || Boolean.TRUE.equals(target.getSystemClass()) || !"SERVING".equals(target.getStatus())
                 || Objects.equals(relation.getClassId(), target.getId())) throw exception(DELIVERY_CLASS_TRANSFER_INVALID);
-        DeliveryClassDO source = require(relation.getClassId());
-        Long sourceCategoryId = source.getCategoryId();
-        if (Boolean.TRUE.equals(source.getSystemClass())) {
-            SalesOrderItemDO orderItem = relation.getOrderItemId() == null ? null
-                    : orderItemMapper.selectById(relation.getOrderItemId());
-            ZsjosProductDO product = orderItem == null || orderItem.getProductId() == null ? null
-                    : productMapper.selectById(orderItem.getProductId());
-            sourceCategoryId = product == null ? null : product.getCategoryId();
-        }
-        if (sourceCategoryId == null || !Objects.equals(sourceCategoryId, target.getCategoryId())) {
-            throw exception(DELIVERY_CLASS_TRANSFER_INVALID);
-        }
+        require(relation.getClassId());
         validateHomeroom(target.getHomeroomUserId());
     }
 

@@ -128,6 +128,7 @@ public class BpmModelServiceImpl implements BpmModelService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @org.springframework.security.access.prepost.PreAuthorize("#reqVO.importForm == null or @ss.hasPermission('bpm:form:create')")
     public String importModel(Long userId, @Valid BpmModelSaveReqVO reqVO) {
         if (!ValidationUtils.isXmlNCName(reqVO.getKey())) {
             throw exception(MODEL_KEY_VALID);
@@ -142,6 +143,15 @@ public class BpmModelServiceImpl implements BpmModelService {
             throw exception(CATEGORY_NOT_EXISTS);
         }
 
+        // Embedded forms are created with the model in one transaction, never by a foreign form ID.
+        if (reqVO.getImportForm() != null) {
+            if (!Objects.equals(reqVO.getFormType(), 10)) {
+                throw exception(MODEL_IMPORT_FAIL_INVALID);
+            }
+            reqVO.getImportForm().setId(null);
+            reqVO.setFormId(bpmFormService.createForm(reqVO.getImportForm()));
+            reqVO.setImportForm(null);
+        }
         // 2. 导入文件不能携带跨环境的管理员关系，模型由当前导入人负责管理
         reqVO.setManagerUserIds(List.of(userId));
         // 3. 创建 Model 对象，并归属到当前租户

@@ -659,26 +659,42 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
     }
 
+    /**
+     * Resolves the product category for an order item. Orders only persist {@code product_ref}, so the live product
+     * has to be looked up by ref rather than id; the order-time snapshot is the fallback when that product has since
+     * been deleted or re-categorised. Either source gives分班 the category it needs to list candidate classes.
+     */
+    private Long resolveOrderItemCategoryId(SalesOrderItemDO orderItem) {
+        ZsjosProductDO product = orderItem.getProductId() != null
+                ? productMapper.selectById(orderItem.getProductId())
+                : (orderItem.getProductRef() == null ? null : productMapper.selectByProductRef(orderItem.getProductRef()));
+        if (product != null && product.getCategoryId() != null) return product.getCategoryId();
+        if (orderItem.getProductSnapshot() == null || orderItem.getProductSnapshot().isBlank()) return null;
+        Map<?, ?> rawSnapshot = JsonUtils.parseObjectQuietly(orderItem.getProductSnapshot(), Map.class);
+        return rawSnapshot != null && rawSnapshot.get("categoryId") instanceof Number categoryId
+                ? categoryId.longValue() : null;
+    }
+
     private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, Long classId, boolean lock) {
-        ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
-        if (product == null || product.getCategoryId() == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        Long categoryId = resolveOrderItemCategoryId(orderItem);
+        if (categoryId == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         DeliveryClassDO deliveryClass = lock
                 ? deliveryClassMapper.selectByIdForUpdate(classId, TenantContextHolder.getRequiredTenantId())
                 : deliveryClassMapper.selectById(classId);
-        return validateClassAssignment(product, deliveryClass);
+        return validateClassAssignment(categoryId, deliveryClass);
     }
 
     private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, DeliveryClassDO deliveryClass) {
-        ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
-        if (product == null || product.getCategoryId() == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
-        return validateClassAssignment(product, deliveryClass);
+        Long categoryId = resolveOrderItemCategoryId(orderItem);
+        if (categoryId == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        return validateClassAssignment(categoryId, deliveryClass);
     }
 
-    private AssignmentSnapshot validateClassAssignment(ZsjosProductDO product, DeliveryClassDO deliveryClass) {
+    private AssignmentSnapshot validateClassAssignment(Long productCategoryId, DeliveryClassDO deliveryClass) {
         if (deliveryClass == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         if (Boolean.TRUE.equals(deliveryClass.getSystemClass())) {
-            CategorySnapshot category = categorySnapshot(product.getCategoryId());
-            return new AssignmentSnapshot(deliveryClass, product.getCategoryId(), category.name(), category.path(), null);
+            CategorySnapshot category = categorySnapshot(productCategoryId);
+            return new AssignmentSnapshot(deliveryClass, productCategoryId, category.name(), category.path(), null);
         }
         AdminUserRespDTO homeroom = null;
         if (deliveryClass.getHomeroomUserId() != null) {
@@ -689,7 +705,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             }
         }
         if (!"SERVING".equals(deliveryClass.getStatus())
-                || !Objects.equals(deliveryClass.getCategoryId(), product.getCategoryId())
+                || !Objects.equals(deliveryClass.getCategoryId(), productCategoryId)
                 || homeroom == null || !Objects.equals(homeroom.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
             throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         }
@@ -789,8 +805,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 result.setClassAssignments(orderItemMapper.selectListByOrderId(order.getId()).stream().map(orderItem -> {
                     RegistrationCaseRespVO.ClassAssignmentVO row = new RegistrationCaseRespVO.ClassAssignmentVO();
                     row.setOrderItemId(orderItem.getId()); row.setProductId(orderItem.getProductId());
-                    ZsjosProductDO product = productMapper.selectById(orderItem.getProductId());
-                    if (product != null) row.setCategoryId(product.getCategoryId());
+                    row.setCategoryId(resolveOrderItemCategoryId(orderItem));
                     row.setProductName("历史标签缺失");
                     if (orderItem.getProductSnapshot() != null && !orderItem.getProductSnapshot().isBlank()) {
                         // A legacy record may retain a reliable name even when its newer typed shape cannot be decoded.

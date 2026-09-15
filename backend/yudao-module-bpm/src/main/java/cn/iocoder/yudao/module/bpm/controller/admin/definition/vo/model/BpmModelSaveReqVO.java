@@ -10,6 +10,10 @@ import lombok.Data;
 @Data
 public class BpmModelSaveReqVO extends BpmModelMetaInfoVO {
 
+    @Schema(description = "仅导入时使用：在当前租户创建并绑定的流程表单")
+    @Valid
+    private cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.form.BpmFormSaveReqVO importForm;
+
     @Schema(description = "编号", example = "1024")
     private String id;
 

@@ -66,6 +66,7 @@ class StudentContactServiceImplTest {
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider serviceReadPermission;
     @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoPermissionProvider studentInfoPermission;
     @Mock private AdminUserApi adminUserApi;
     @Mock private StudentContactConfigService configService;
@@ -530,5 +531,38 @@ class StudentContactServiceImplTest {
     private void assertPermissionDenied(org.junit.jupiter.api.function.Executable command) {
         ServiceException error = assertThrows(ServiceException.class, command);
         assertEquals(STUDENT_PERMISSION_DENIED.getCode(), error.getCode());
+    }
+
+    @Test
+    void managedReaderCanLoadContextAndRecordsWithoutOwnerActions() {
+        prepareContext();
+        when(serviceReadPermission.hasPermission(10L, "read", 9L)).thenReturn(true);
+        PageParam page = new PageParam();
+        when(recordMapper.selectPageByRelationId(page, 10L)).thenReturn(PageResult.empty());
+
+        StudentContactContextRespVO context = service.getContext(10L, 9L);
+        assertEquals(10L, context.getServiceRelationId());
+        assertFalse(context.getAvailableActions().contains(CONTEXT_ACTION_ACCEPT));
+        assertFalse(context.getAvailableActions().contains(CONTEXT_ACTION_FIRST_CONTACT));
+        assertFalse(context.getAvailableActions().contains(CONTEXT_ACTION_STUDY_PLAN));
+        assertEquals(0L, service.getRecords(10L, page, 9L).getTotal());
+        verify(serviceReadPermission, times(2)).hasPermission(10L, "read", 9L);
+    }
+
+    @Test
+    void outOfScopeReaderCannotLoadEitherSubresource() {
+        when(relationMapper.selectById(10L)).thenReturn(relation("accepted"));
+        assertPermissionDenied(() -> service.getContext(10L, 9L));
+        assertPermissionDenied(() -> service.getRecords(10L, new PageParam(), 9L));
+        verifyNoInteractions(recordMapper, taskMapper, configService);
+    }
+
+    @Test
+    void managedReadScopeFailureDoesNotExposeContactRecords() {
+        when(relationMapper.selectById(10L)).thenReturn(relation("accepted"));
+        when(serviceReadPermission.hasPermission(10L, "read", 9L))
+                .thenThrow(new IllegalStateException("scope unavailable"));
+        assertThrows(IllegalStateException.class, () -> service.getRecords(10L, new PageParam(), 9L));
+        verifyNoInteractions(recordMapper);
     }
 }

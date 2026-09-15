@@ -8,10 +8,12 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import { ClipboardUploadButtons } from '../components/ClipboardPasteTarget'
+import MaterialSelectorModal from '../components/MaterialSelectorModal'
 import {
   Alert,
   App,
   Button,
+  Card,
   DatePicker,
   Empty,
   Form,
@@ -30,6 +32,7 @@ import {
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type DictData, type MediaAccount, type MediaContent, type MediaContentVersion, type MediaContentVersionFile } from '../services/api'
+import { type Material } from '../services/materialApi'
 import { hasPermission } from '../services/managementAccess'
 import { formatTimestamp } from '../services/time'
 
@@ -46,11 +49,47 @@ type UploadedFile = {
 
 type ContentFormValues = {
   titleSnapshot: string
-  topicSnapshot?: string
   scriptText?: string
-  deliverableUrl?: string
+  purposeValue?: string
+  formatValue?: string
+  detailUrl?: string
+  commentHook?: string
+  referenceWorkUrl?: string
   leadResourceUrl?: string
   plannedPublishAt?: dayjs.Dayjs
+}
+
+type Option = { value: string; label: string }
+
+/** 参考素材快照：与内容审核链路同一结构，审批时即使素材被改动仍可查看当时信息。 */
+const toReferenceMaterials = (materials: Material[]) => materials.map(material => ({
+  materialId: material.id,
+  materialVersionId: material.currentVersion?.id || material.currentEffectiveVersionId,
+  materialNo: material.materialNo,
+  title: material.title,
+  materialTypeName: material.materialTypeName,
+  coverPreviewUrl: material.coverPreviewUrl,
+}))
+
+/** 把版本快照里的参考素材 JSON 回填为素材选择器可用的对象。 */
+const parseReferenceMaterials = (json: string | undefined): Material[] => {
+  if (!json) return []
+  try {
+    const raw = JSON.parse(json) as unknown
+    const rows = Array.isArray(raw) ? raw : []
+    return rows.map(item => {
+      const ref = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      return {
+        id: Number(ref.materialId),
+        materialNo: String(ref.materialNo || ''),
+        title: String(ref.title || '素材'),
+        materialTypeName: String(ref.materialTypeName || ''),
+        coverPreviewUrl: typeof ref.coverPreviewUrl === 'string' ? ref.coverPreviewUrl : undefined,
+      } as Material
+    }).filter(material => Number.isFinite(material.id) && material.id > 0)
+  } catch {
+    return []
+  }
 }
 
 const statusText: Record<string, string> = {
@@ -113,20 +152,29 @@ function FilePreview({ file }: { file: UploadedFile }) {
   return <LinkOutlined />
 }
 
-function VersionMedia({ version }: { version: MediaContentVersion }) {
-  const files = version.files || []
-  const cover = files.filter(file => file.fieldKey === 'cover')
-  const deliverables = files.filter(file => file.fieldKey === 'deliverable')
-  return <div className="content-production-media">
-    {cover.map(file => <div className="content-production-media-item" key={`cover-${file.id}`}>
-      <FilePreview file={{ fileId: file.infraFileId, name: file.originalName, contentType: file.contentType, size: file.fileSize, previewUrl: file.previewUrl }} />
-      <span>封面 · {file.originalName}</span>
-    </div>)}
-    {deliverables.map(file => <div className="content-production-media-item" key={`deliverable-${file.id}`}>
-      <FilePreview file={{ fileId: file.infraFileId, name: file.originalName, contentType: file.contentType, size: file.fileSize, previewUrl: file.previewUrl }} />
-      <span>成品 · {file.originalName}</span>
-    </div>)}
-    {version.deliverableUrl && <a href={version.deliverableUrl} target="_blank" rel="noreferrer"><LinkOutlined /> 成品外链</a>}
+/** 作品封面：与内容审核页同一版式，放在字段表格左栏。 */
+function VersionCover({ version }: { version: MediaContentVersion }) {
+  const cover = (version.files || []).find(file => file.fieldKey === 'cover' && file.previewUrl
+    && file.contentType.startsWith('image/'))
+  return <div className="content-production-version-cover">
+    {cover
+      ? <Image src={cover.previewUrl} alt={`作品封面图：${cover.originalName}`} />
+      : <Typography.Text type="secondary">暂无封面图</Typography.Text>}
+    <span>作品封面图</span>
+  </div>
+}
+
+/** 参考素材：与内容审核页同一版式，展示提交时的素材快照。 */
+function VersionReferenceMaterials({ version }: { version: MediaContentVersion }) {
+  const materials = parseReferenceMaterials(version.materialRefsJson)
+  if (!materials.length) return null
+  return <div><Typography.Text strong>参考素材</Typography.Text>
+    <div className="content-production-media">{materials.map(material => <div className="content-production-media-item" key={material.id}>
+      {material.coverPreviewUrl
+        ? <Image width={128} height={84} src={material.coverPreviewUrl} alt={`参考素材：${material.title}`} />
+        : null}
+      <span>{material.title} · {material.materialNo}</span>
+    </div>)}</div>
   </div>
 }
 
@@ -181,48 +229,48 @@ function CreateContentDialog({ open, onClose, onCreated }: {
   </Modal>
 }
 
-function VersionEditor({ content, initial, onSaved, onCancel }: {
+function VersionEditor({ content, initial, purposeOptions, formatOptions, onSaved, onCancel }: {
   content: MediaContent
   initial?: MediaContentVersion
+  purposeOptions: Option[]
+  formatOptions: Option[]
   onSaved: () => void
   onCancel: () => void
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<ContentFormValues>()
   const [cover, setCover] = useState<UploadedFile[]>([])
-  const [deliverables, setDeliverables] = useState<UploadedFile[]>([])
+  const [materials, setMaterials] = useState<Material[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const coverInput = useRef<HTMLInputElement>(null)
-  const deliverableInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     form.setFieldsValue({
       titleSnapshot: initial?.titleSnapshot || content.title,
-      topicSnapshot: initial?.topicSnapshot || content.topic,
       scriptText: initial?.scriptText,
-      deliverableUrl: initial?.deliverableUrl,
+      purposeValue: initial?.purposeValue,
+      formatValue: initial?.formatValue,
+      detailUrl: initial?.detailUrl,
+      commentHook: initial?.commentHook,
+      referenceWorkUrl: initial?.referenceWorkUrl,
       leadResourceUrl: initial?.leadResourceUrl,
       plannedPublishAt: initial?.plannedPublishAt ? dayjs(initial.plannedPublishAt) : undefined,
     })
     setCover(parseFileSnapshot(initial?.coverSnapshotJson, initial?.files.filter(file => file.fieldKey === 'cover')))
-    setDeliverables(parseFileSnapshot(initial?.deliverableSnapshotJson, initial?.files.filter(file => file.fieldKey === 'deliverable')))
+    setMaterials(parseReferenceMaterials(initial?.materialRefsJson))
   }, [content, form, initial])
 
-  const upload = async (files: Iterable<File> | null, kind: 'cover' | 'deliverable') => {
+  const upload = async (files: Iterable<File> | null) => {
     const selected = Array.from(files || [])
     if (!selected.length) return
-    if (kind === 'cover' && selected.length > 1) return message.warning('封面只能上传 1 个文件')
-    if (kind === 'deliverable' && deliverables.length + selected.length > 20) return message.warning('成品最多上传 20 个文件')
+    if (selected.length > 1) return message.warning('封面只能上传 1 个文件')
     setUploading(true)
     try {
-      const uploaded = [] as UploadedFile[]
-      for (const file of selected) {
-        if (file.size > MAX_FILE_BYTES) throw new Error('文件不能超过 1GB')
-        const result = await api.mediaContent.uploadVersionFile(file)
-        uploaded.push({ fileId: result.fileId, name: result.name, contentType: result.contentType, size: result.size, previewUrl: result.previewUrl })
-      }
-      if (kind === 'cover') setCover(uploaded)
-      else setDeliverables(current => [...current, ...uploaded])
+      const file = selected[0]
+      if (file.size > MAX_FILE_BYTES) throw new Error('文件不能超过 1GB')
+      const result = await api.mediaContent.uploadVersionFile(file)
+      setCover([{ fileId: result.fileId, name: result.name, contentType: result.contentType, size: result.size, previewUrl: result.previewUrl }])
     } catch (cause) { message.error(errorText(cause)) }
     finally { setUploading(false) }
   }
@@ -233,11 +281,16 @@ function VersionEditor({ content, initial, onSaved, onCancel }: {
       await api.mediaContent.createVersion({
         contentId: content.id,
         titleSnapshot: values.titleSnapshot.trim(),
-        topicSnapshot: values.topicSnapshot?.trim() || undefined,
         scriptText: values.scriptText?.trim() || undefined,
         coverSnapshotJson: fileSnapshot(cover),
-        deliverableSnapshotJson: fileSnapshot(deliverables),
-        deliverableUrl: values.deliverableUrl?.trim() || undefined,
+        materialRefsJson: materials.length ? JSON.stringify(toReferenceMaterials(materials)) : undefined,
+        purposeValue: values.purposeValue || undefined,
+        purposeLabelSnapshot: purposeOptions.find(item => item.value === values.purposeValue)?.label || undefined,
+        formatValue: values.formatValue || undefined,
+        formatLabelSnapshot: formatOptions.find(item => item.value === values.formatValue)?.label || undefined,
+        detailUrl: values.detailUrl?.trim() || undefined,
+        commentHook: values.commentHook?.trim() || undefined,
+        referenceWorkUrl: values.referenceWorkUrl?.trim() || undefined,
         leadResourceUrl: values.leadResourceUrl?.trim() || undefined,
         plannedPublishAt: values.plannedPublishAt?.format('YYYY-MM-DDTHH:mm:ss'),
       })
@@ -251,29 +304,45 @@ function VersionEditor({ content, initial, onSaved, onCancel }: {
   return <section className="content-production-editor">
     <div className="content-production-editor-heading"><div><Typography.Title level={5}>保存新版本</Typography.Title><Typography.Text type="secondary">服务端按当前内容状态记录版本</Typography.Text></div><Space><Button onClick={onCancel}>取消</Button><Button type="primary" icon={<SaveOutlined />} loading={uploading} onClick={() => void save()}>保存版本</Button></Space></div>
     <Form form={form} layout="vertical">
-      <div className="content-production-form-grid">
-        <Form.Item name="titleSnapshot" label="标题/选题" rules={[{ required: true, message: '请输入标题或选题' }]}><Input maxLength={255} /></Form.Item>
-        <Form.Item name="plannedPublishAt" label="预计发布时间"><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
-      </div>
-      <Form.Item name="topicSnapshot" label="选题说明"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
-      <Form.Item name="scriptText" label="脚本或正文"><Input.TextArea rows={9} maxLength={20000} showCount /></Form.Item>
       <div className="content-production-upload-grid">
-        <ClipboardUploadButtons disabled={uploading || cover.length > 0} canPaste={() => !uploading && cover.length === 0} onFiles={files => void upload(files, 'cover')}><Typography.Text strong>封面</Typography.Text><div className="content-production-upload-row">
-          <input ref={coverInput} hidden type="file" accept="image/*" onChange={event => { void upload(event.target.files, 'cover'); event.target.value = '' }} />
-          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => coverInput.current?.click()}>上传附件</Button>
+        <ClipboardUploadButtons disabled={uploading || cover.length > 0} canPaste={() => !uploading && cover.length === 0} onFiles={files => void upload(files)}><Typography.Text strong>作品封面图</Typography.Text><div className="content-production-upload-row">
+          <input ref={coverInput} hidden type="file" accept="image/*" onChange={event => { void upload(event.target.files); event.target.value = '' }} />
+          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => coverInput.current?.click()}>上传封面图</Button>
           {cover.map(file => <div className="content-production-uploaded" key={file.fileId}><FilePreview file={file} /><span>{fileLabel(file)}</span><Button type="text" danger onClick={() => setCover([])}>移除</Button></div>)}
         </div></ClipboardUploadButtons>
-        <ClipboardUploadButtons disabled={uploading || deliverables.length >= 20} canPaste={() => !uploading && deliverables.length < 20} onFiles={files => void upload(files, 'deliverable')}><Typography.Text strong>成品图片或视频</Typography.Text><div className="content-production-upload-row">
-          <input ref={deliverableInput} hidden type="file" multiple accept="image/*,video/*" onChange={event => { void upload(event.target.files, 'deliverable'); event.target.value = '' }} />
-          <Button icon={<UploadOutlined />} loading={uploading} onClick={() => deliverableInput.current?.click()}>上传附件</Button>
-          {deliverables.map(file => <div className="content-production-uploaded" key={file.fileId}><FilePreview file={file} /><span>{fileLabel(file)}</span><Button type="text" danger onClick={() => setDeliverables(current => current.filter(item => item.fileId !== file.fileId))}>移除</Button></div>)}
-        </div></ClipboardUploadButtons>
       </div>
       <div className="content-production-form-grid">
-        <Form.Item name="deliverableUrl" label="成品 HTTPS 外链" rules={[{ type: 'url', message: '请输入有效链接' }, { pattern: /^https:\/\//i, message: '链接必须使用 HTTPS' }]}><Input placeholder="https://" /></Form.Item>
-        <Form.Item name="leadResourceUrl" label="引流资料 HTTPS 链接" rules={[{ type: 'url', message: '请输入有效链接' }, { pattern: /^https:\/\//i, message: '链接必须使用 HTTPS' }]}><Input placeholder="https://" /></Form.Item>
+        <Form.Item name="plannedPublishAt" label="预计发布时间"><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+        <Form.Item name="titleSnapshot" label="发布标题" rules={[{ required: true, whitespace: true, message: '请输入发布标题' }]}><Input maxLength={255} showCount /></Form.Item>
       </div>
+      <div className="content-production-form-grid">
+        <Form.Item name="purposeValue" label="作品目的"><Select allowClear options={purposeOptions} /></Form.Item>
+        <Form.Item name="formatValue" label="作品形式"><Select allowClear options={formatOptions} /></Form.Item>
+      </div>
+      <Form.Item name="scriptText" label="正文文稿"><Input.TextArea rows={9} maxLength={20000} showCount /></Form.Item>
+      <Form.Item name="detailUrl" label="作品详情"><Input placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
+      <Form.Item name="leadResourceUrl" label="引流资料链接"><Input placeholder="可点击下载的资料链接" /></Form.Item>
+      <Form.Item name="commentHook" label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
+      <Form.Item name="referenceWorkUrl" label="参考作品链接" extra="直接填写参考作品的链接，可留空。"><Input placeholder="https:// 参考作品链接" allowClear /></Form.Item>
+      <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Button onClick={() => setPickerOpen(true)}>素材浏览 · 选择参考素材</Button>
+          {materials.map(material => <Card key={material.id} size="small">
+            <Space align="start" size={10} style={{ width: '100%' }}>
+              {material.coverPreviewUrl
+                ? <img src={material.coverPreviewUrl} alt={material.title} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
+                : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-surface-raised)' }} />}
+              <span style={{ flex: 1 }}>
+                <Typography.Text strong>{material.title}</Typography.Text><br />
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text>
+              </span>
+              <Button danger type="text" size="small" onClick={() => setMaterials(current => current.filter(item => item.id !== material.id))}>移除</Button>
+            </Space>
+          </Card>)}
+        </Space>
+      </Form.Item>
     </Form>
+    <MaterialSelectorModal open={pickerOpen} onCancel={() => setPickerOpen(false)} defaultSelected={materials} onConfirm={selected => { setMaterials(selected); setPickerOpen(false) }} />
   </section>
 }
 
@@ -293,6 +362,17 @@ export default function ContentProductionPage({ permissions = [] }: { permission
   const [detailError, setDetailError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [purposes, setPurposes] = useState<DictData[]>([])
+  const [formats, setFormats] = useState<DictData[]>([])
+
+  useEffect(() => {
+    Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')])
+      .then(([purposeRows, formatRows]) => { setPurposes(purposeRows); setFormats(formatRows) })
+      .catch(() => { setPurposes([]); setFormats([]) })
+  }, [])
+
+  const purposeOptions = useMemo(() => purposes.map(item => ({ value: item.value, label: item.label })), [purposes])
+  const formatOptions = useMemo(() => formats.map(item => ({ value: item.value, label: item.label })), [formats])
 
   const currentVersion = useMemo(() => selected && versions.find(version => version.versionNo === selected.currentVersionNo), [selected, versions])
 
@@ -365,9 +445,28 @@ export default function ContentProductionPage({ permissions = [] }: { permission
           {canEditCurrent && <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>保存新版本</Button>}
           {selected.availableActions.map(name => <Button key={name} type={name === 'SUBMIT_ACCEPTANCE' ? 'primary' : undefined} icon={<CheckOutlined />} onClick={() => void action(name)}>{({ COMPLETE_TOPIC: '完成选题', SUBMIT_PRODUCTION: '提交制作', SUBMIT_ACCEPTANCE: '提交审核', START_CONTENT_REVISION: '开始修改', RESUBMIT_PRODUCTION: '重新提交' } as Record<string, string>)[name] || name}</Button>)}
         </Space></div>
-        {editing && <VersionEditor content={selected} initial={currentVersion} onSaved={() => { setEditing(false); void refreshSelected() }} onCancel={() => setEditing(false)} />}
+        {editing && <VersionEditor content={selected} initial={currentVersion} purposeOptions={purposeOptions} formatOptions={formatOptions} onSaved={() => { setEditing(false); void refreshSelected() }} onCancel={() => setEditing(false)} />}
         <section className="content-production-current"><div className="content-production-section-heading"><Typography.Title level={5}>当前版本</Typography.Title><Typography.Text type="secondary">{currentVersion ? `V${currentVersion.versionNo} · ${versionStatusText[currentVersion.reviewDecision ? (currentVersion.reviewDecision === 'approved' ? 'EFFECTIVE' : 'REJECTED') : 'DRAFT'] || currentVersion.stage}` : '尚未保存版本'}</Typography.Text></div>{currentVersion ? <>
-          <Typography.Paragraph>{currentVersion.scriptText || '暂无脚本或正文'}</Typography.Paragraph><VersionMedia version={currentVersion} />{currentVersion.leadResourceUrl && <a href={currentVersion.leadResourceUrl} target="_blank" rel="noreferrer">引流资料链接</a>}
+          {/* 字段顺序与内容审核页一致，运营填写时看到的排布就是编导审核时的排布。 */}
+          <div className="content-production-version-body">
+            <VersionCover version={currentVersion} />
+            <dl className="content-production-fields">
+              <dt>预计发布时间</dt><dd>{formatTimestamp(currentVersion.plannedPublishAt) || '—'}</dd>
+              <dt>作品目的</dt><dd>{currentVersion.purposeLabelSnapshot || currentVersion.purposeValue || '—'}</dd>
+              <dt>作品形式</dt><dd>{currentVersion.formatLabelSnapshot || currentVersion.formatValue || '—'}</dd>
+              <dt>发布标题</dt><dd>{currentVersion.titleSnapshot || '—'}</dd>
+              <dt>选题</dt><dd>{currentVersion.topicSnapshot || '—'}</dd>
+              <dt>正文文稿</dt><dd>{currentVersion.scriptText || '暂无脚本或正文'}</dd>
+              <dt>作品详情</dt><dd>{currentVersion.detailUrl
+                ? <a href={currentVersion.detailUrl} target="_blank" rel="noreferrer">打开详情</a> : '—'}</dd>
+              <dt>引流资料链接</dt><dd>{currentVersion.leadResourceUrl
+                ? <a href={currentVersion.leadResourceUrl} target="_blank" rel="noreferrer">打开链接</a> : '—'}</dd>
+              <dt>评论区钩子</dt><dd>{currentVersion.commentHook || '—'}</dd>
+              <dt>参考作品链接</dt><dd>{currentVersion.referenceWorkUrl
+                ? <a href={currentVersion.referenceWorkUrl} target="_blank" rel="noreferrer">打开参考作品</a> : '—'}</dd>
+            </dl>
+          </div>
+          <VersionReferenceMaterials version={currentVersion} />
         </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={canEdit ? '点击“保存新版本”开始填写内容' : '暂无内容版本'} />}</section>
         <section className="content-production-history"><Typography.Title level={5}>版本历史</Typography.Title><List size="small" dataSource={versions} locale={{ emptyText: '暂无版本' }} renderItem={version => <List.Item><div><strong>V{version.versionNo}</strong><span className="content-production-history-meta">{statusText[version.stage] || version.stage} · {formatTimestamp(version.submittedAt)}</span></div><Space>{version.reviewDecision && <Tag color={version.reviewDecision === 'approved' ? 'success' : 'error'}>{version.reviewDecision === 'approved' ? '审核通过' : '审核退回'}</Tag>}{version.frozenAt && <Tag>已冻结</Tag>}</Space></List.Item>} /></section>
       </> : <Empty description="从左侧选择一条内容" />}</main>

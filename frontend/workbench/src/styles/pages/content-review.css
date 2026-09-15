@@ -117,6 +117,49 @@
   overflow-y: auto;
 }
 
+/*
+  详情工作区：左侧内容流 + 右侧固定轨。
+  右轨承载审批流程与交卷动作，sticky 于详情栏的滚动容器，
+  滚动长内容时流程状态与提交按钮始终可见。
+*/
+.content-review-workspace {
+  display: grid;
+  align-items: start;
+  gap: var(--crm-gap);
+  grid-template-columns: minmax(0, 1fr) var(--crm-process-rail-w);
+}
+
+.content-review-content-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.content-review-process-column {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  /* 右轨自身过长时内部滚动，不跟随内容流拉伸。 */
+  max-height: calc(100vh - var(--crm-page-pad) * 2);
+  overflow-y: auto;
+}
+
+/*
+  低于 1400px 时右轨折到内容下方：继续三栏会把中间内容区压到 700px 以下，
+  封面加字段栅格就排不开了。
+*/
+@media (max-width: 1400px) {
+  .content-review-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-review-process-column {
+    position: static;
+    max-height: none;
+  }
+}
+
 .content-review-heading > div:first-child {
   min-width: 0;
 }
@@ -137,10 +180,16 @@
   box-shadow: var(--crm-shadow-inset);
 }
 
+/*
+ * 编导批量看稿时需要横向对照，宽度够就两列并排。
+ * auto-fit 而非固定两列：只有一条作品时它会撑满整行，不留半屏空白。
+ * 460px 起并排：内容列已让出 360px 给右轨，阈值太高就永远是单列。
+ */
 .content-review-items {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
   gap: var(--crm-gap);
+  align-items: start;
 }
 
 .content-review-item {
@@ -150,6 +199,158 @@
   gap: var(--crm-sp-3);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-md);
+}
+
+/* 卡片主体：左侧封面固定宽度，右侧字段表格占满剩余空间。 */
+.content-review-item-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: var(--crm-sp-3);
+  align-items: start;
+}
+
+.content-review-item-cover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  align-items: center;
+  justify-content: center;
+  padding: var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+/* 封面按原始比例完整显示：竖屏作品和方形图都不该被拉伸。 */
+.content-review-item-cover .ant-image {
+  width: 100%;
+}
+
+.content-review-item-cover .ant-image img {
+  width: 100%;
+  height: auto;
+  max-height: 190px;
+  border-radius: var(--crm-radius-sm);
+  object-fit: contain;
+}
+
+.content-review-item-cover span {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-align: center;
+}
+
+/* 字段分组：短字段栅格并排，链接组单独一块。 */
+.content-review-field-groups {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+/*
+  字段栅格：短字段两列以上并排，把原来 14 行的纵向长表压到几行，
+  让审核动作留在首屏内。标签在上、值在下，避免窄列里标签挤压值。
+*/
+.content-review-fields {
+  display: grid;
+  width: 100%;
+  margin: 0;
+  gap: 1px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-border);
+  overflow: hidden;
+}
+
+/* 内容列被右轨占去 360px，最小列宽相应收窄，保证仍能排到两列。 */
+.content-review-fields-compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.content-review-fields-links {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.content-review-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  background: var(--crm-bg-container);
+}
+
+/* 标题、正文、钩子这类长文本独占整行，不被窄列折成竖条。 */
+.content-review-field-wide {
+  grid-column: 1 / -1;
+}
+
+.content-review-field dt {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.content-review-field dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* 正文文稿可能很长：限高并允许滚动，避免单条内容把卡片撑开。 */
+.content-review-field-text {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* 账号档案区：字段块横向铺开，每个账号一块。 */
+.content-review-account-profiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.content-review-account-profile {
+  display: grid;
+  /*
+    auto-fill 而非 auto-fit：超宽屏下保持列宽稳定，不把 11 个字段拉成稀疏一行。
+    最小列宽取 200px，避免宽屏把 7 个字段挤成一行、值被截断。
+  */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--crm-sp-2) var(--crm-sp-3);
+  margin: 0 0 var(--crm-sp-4);
+  padding: var(--crm-sp-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.content-review-account-profile > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.content-review-account-profile dt {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.content-review-account-profile dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.content-review-account-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--crm-sp-2);
+  grid-column: 1 / -1;
+  padding-bottom: var(--crm-sp-2);
+  border-bottom: 1px solid var(--crm-border);
 }
 
 .content-review-item-heading > div:first-child,
@@ -183,11 +384,38 @@
   white-space: pre-wrap;
 }
 
+/*
+ * 决策区的子元素数量随阶段变化：编导阶段 3 个，终审阶段选了"通过"才有第 4 个（收录开关）。
+ * 原来写死 4 列会让编导阶段错位——意见框被挤进 auto 列、按钮被拉进 1fr 列。
+ * 改用 flex：各元素按自身宽度排布，意见框吃掉剩余空间。
+ */
+/*
+  本条审核结论：与上方内容字段用底色和分隔线区分，明确这是操作区而非展示区。
+  结论选择、意见、提交按钮排成一行，窄屏再回落成多行。
+*/
 .content-review-decision {
   display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
   align-items: start;
-  grid-template-columns: auto auto minmax(220px, 1fr) auto;
-  gap: var(--crm-sp-2);
+  gap: var(--crm-sp-2) var(--crm-sp-3);
+  padding: var(--crm-sp-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.content-review-decision .ant-input-textarea {
+  min-width: 0;
+}
+
+.content-review-decision .content-review-collect {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .content-review-decision {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .content-review-collect {
@@ -250,16 +478,16 @@
     flex-direction: column;
   }
 
+  .content-review-item-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-review-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .content-review-toolbar {
     justify-content: flex-start;
-  }
-
-  .content-review-decision {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .content-review-decision .ant-input-textarea {
-    grid-column: 1 / -1;
   }
 }
 
@@ -283,16 +511,27 @@
     max-height: 38vh;
   }
 
-  .content-review-snapshot,
-  .content-review-decision {
-    grid-template-columns: minmax(0, 1fr);
+  .content-review-snapshot {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .content-review-decision .ant-input-textarea {
-    grid-column: auto;
+  /* 结论区在 900px 断点已回落为单列栅格，这里只需拉伸子项。 */
+  .content-review-decision {
+    align-items: stretch;
   }
 
   .content-review-item-heading {
     flex-direction: column;
   }
+}
+
+/* 分节标题：在长页面里标出阶段边界 */
+.content-review-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--crm-sp-2);
+  padding-bottom: var(--crm-sp-2);
+  border-bottom: 1px solid var(--crm-border);
 }

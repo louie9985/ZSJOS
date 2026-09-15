@@ -45,6 +45,10 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
             "sop", new DefaultType("SOP", "可检索、可引用的标准作业参考文档", true, true, false, false),
             "production_content", new DefaultType("生产内容", "审核通过并明确收录的生产内容", false, false, true, true));
 
+    /** 需要内置默认模板的类型；其余类型由管理员自行建模。 */
+    private static final Set<String> DEFAULT_SCHEMA_TYPES = Set.of(
+            "viral_account", "viral_content", "production_content");
+
     @Resource private MaterialTypeMapper typeMapper;
     @Resource private MaterialSchemaVersionMapper schemaMapper;
     @Resource private MaterialSchemaService schemaService;
@@ -74,7 +78,7 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
         if (typeMapper.selectByCode(request.getCode()) != null) {
             throw exception(MATERIAL_TYPE_CODE_DUPLICATE);
         }
-        validateProcessDefinition(request.getBpmProcessDefinitionKey());
+        normalizeProcessBinding(request);
         MaterialTypeDO type = BeanUtils.toBean(request, MaterialTypeDO.class);
         type.setRecommendationConfigJson(JsonUtils.toJsonString(normalizeRecommendationConfig(
                 request.getRecommendationConfig(), request.getRecommendationEnabled())));
@@ -100,7 +104,7 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
         if (!Objects.equals(existing.getVersion(), request.getVersion())) {
             throw exception(MATERIAL_VERSION_CONFLICT);
         }
-        validateProcessDefinition(request.getBpmProcessDefinitionKey());
+        normalizeProcessBinding(request);
         MaterialTypeDO update = BeanUtils.toBean(request, MaterialTypeDO.class);
         update.setId(id);
         update.setRecommendationConfigJson(JsonUtils.toJsonString(normalizeRecommendationConfig(
@@ -251,8 +255,7 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
     }
 
     private void ensureDefaultSchema(MaterialTypeDO type) {
-        if (!List.of("viral_account", "viral_content").contains(type.getCode())
-                || type.getCurrentSchemaVersionId() != null) {
+        if (!DEFAULT_SCHEMA_TYPES.contains(type.getCode()) || type.getCurrentSchemaVersionId() != null) {
             return;
         }
         MaterialSchemaVersionDO existing = schemaMapper.selectLatestByTypeId(type.getId());
@@ -264,8 +267,7 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
             }
             return;
         }
-        List<MaterialFieldDefinition> fields = "viral_content".equals(type.getCode())
-                ? ViralContentMaterialSchema.fields() : ViralAccountMaterialSchema.fields();
+        List<MaterialFieldDefinition> fields = defaultSchemaFields(type.getCode());
         String fieldsJson = JsonUtils.toJsonString(fields);
         MaterialSchemaVersionDO schema = new MaterialSchemaVersionDO();
         schema.setMaterialTypeId(type.getId());
@@ -280,6 +282,23 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
         if (typeMapper.publishSchema(type.getId(), type.getVersion(), schema.getId()) == 1) {
             type.setCurrentSchemaVersionId(schema.getId());
         }
+    }
+
+    private List<MaterialFieldDefinition> defaultSchemaFields(String code) {
+        return switch (code) {
+            case "viral_content" -> ViralContentMaterialSchema.fields();
+            case "production_content" -> ProductionContentMaterialSchema.fields();
+            default -> ViralAccountMaterialSchema.fields();
+        };
+    }
+
+    private void normalizeProcessBinding(MaterialTypeSaveReqVO request) {
+        if (MaterialApprovalContract.isViral(request.getCode())) {
+            // Ignore stale clients' binding: viral approvals always use their stable BPM key.
+            request.setBpmProcessDefinitionKey(null);
+            return;
+        }
+        validateProcessDefinition(request.getBpmProcessDefinitionKey());
     }
 
     private void validateProcessDefinition(String processDefinitionKey) {
@@ -331,6 +350,9 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
 
     private MaterialTypeRespVO toTypeResp(MaterialTypeDO type) {
         MaterialTypeRespVO response = BeanUtils.toBean(type, MaterialTypeRespVO.class);
+        if (MaterialApprovalContract.isViral(type.getCode())) {
+            response.setBpmProcessDefinitionKey(null);
+        }
         response.setRecommendationConfig(JsonUtils.parseMap(type.getRecommendationConfigJson()));
         if (type.getCurrentSchemaVersionId() != null) {
             MaterialSchemaVersionDO schema = schemaMapper.selectById(type.getCurrentSchemaVersionId());

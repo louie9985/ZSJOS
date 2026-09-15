@@ -7,6 +7,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosObjectPermissionProvider;
 import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +30,12 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     @Resource private DeliveryClassMapper deliveryClassMapper;
     @Resource private DeliveryClassScopeService deliveryClassScopeService;
     @Resource private PermissionApi permissionApi;
+    @Resource private AdminUserApi adminUserApi;
+
+    private boolean hasManagedStudentReadPermission(Long userId) {
+        return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
+                DeliveryClassService.PERMISSION_QUERY_MANAGED);
+    }
 
     @Override public String getBizType() { return "student-service"; }
 
@@ -34,6 +43,16 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        // Managed visibility applies only to reads and to this exact service, never to commands.
+        if ("read".equals(action)
+                && Set.of("active", "paused", "completed").contains(relation.getStatus())
+                && hasManagedStudentReadPermission(userId)) {
+            DeliveryClassScopeService.Scope scope = deliveryClassScopeService.resolve(userId);
+            if (scope.allDepartments() || Objects.equals(relation.getOwnerUserId(), userId)) return true;
+            return !scope.deptIds().isEmpty() && adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
+                    .map(AdminUserRespDTO::getId).filter(Objects::nonNull)
+                    .anyMatch(ownerId -> Objects.equals(ownerId, relation.getOwnerUserId()));
+        }
         // Responsibility is cumulative: the service owner can also be its director.
         if (Set.of("director-precheck", "director-interview").contains(action)) {
             return "active".equals(relation.getStatus())

@@ -1042,6 +1042,11 @@ default and comments as the fresh bootstrap schema; `verify-bootstrap.sql` check
 Rollback is forward-only: retain class, assignment and transfer history while disabling the
 menus or permissions in a later migration.
 
+V236 grants enabled `delivery_manager` roles the existing `zsjos:delivery-class:direct-transfer`
+button. The grant remains limited to the manager's persisted department scope and service-relation
+object check; it does not grant student contact, acceptance, collaborator assignment, or profile
+update operations.
+
 ### V190 Delivery class product scope
 
 V190 follows V188 and adds nullable product, selected specification, and selected SKU JSON snapshots
@@ -1160,6 +1165,8 @@ V223__sales_order_gift_items.sql follows V222 and adds nullable gift_items JSON 
 
 `V227__lead_submission_role_permissions.sql` grants `zsjos:lead:submit` to enabled `center_head`, `dept_manager`, `content_director`, `new_media_operator`, and `sales_specialist` roles in every tenant. It retires active self-sourced grants held by other roles, keeps that permission exclusive to `sales_specialist`, changes no users or business rows, and is repeatable. Apply after V226; rollback is forward-only by restoring reviewed role-menu snapshots. Verify with `verify-lead-submission-role-permissions.sql`.
 
+`V228__sales_self_sourced_permission_separation.sql` removes the ordinary `zsjos:lead:submit` grant from enabled `sales_specialist` roles. Sales self-sourced remains governed solely by `zsjos:lead:self-sourced:create`; no users or business rows change.
+
 ### V228 Content review revision links
 
 `V228__content_review_revision_link.sql` adds the nullable `revision_of_batch_id` reference and index to `zsjos_content_review_batch`. It is repeatable, changes no existing business rows, and must run after V227 so saved drafts and rejected resubmissions can retain an explicit prior-round link. Verify with `verify-content-review-revision-link.sql`.
@@ -1167,3 +1174,20 @@ V223__sales_order_gift_items.sql follows V222 and adds nullable gift_items JSON 
 ### V229__content_review_item_revision_link.sql
 Adds previous_item_id and an index to trace a work item to its preceding approval round. Repeatable on MySQL 8; rollback is manual column/index removal.
 
+### V230 Content production fields
+
+`V230__content_production_fields.sql` follows V229 and repairs existing databases created from the V096 content schema. It adds the nullable `purpose_value`, `purpose_label_snapshot`, `format_value`, `format_label_snapshot`, `detail_url`, `lead_resource_url`, and `planned_publish_at` columns to `zsjos_content`, matching the fresh bootstrap and the current content persistence model. Each column is guarded through `information_schema`, so the migration is repeatable and supports partially repaired databases. It does not update, backfill, delete, or invent values for existing content rows; historical rows retain `NULL` for fields that were not captured. Rollback requires a separately reviewed application rollback followed by manual column removal and may discard values written after this migration.
+
+
+
+### V233 Material approval menus
+
+`V233__material_approval_menu.sql` follows V232 and requires the V194 material-library directory. Adds only the Workbench approval page and approve/reject button metadata, repeatable by permission; grants are explicit System administration operations. No business data or workflow configuration changes. See `docs/api/material-approval.md` for prerequisites, authorization and rollback.
+
+### V234 Remove standalone material approval navigation
+
+`V234__remove_standalone_material_approval_menu.sql` soft-disables the V233 approval page and buttons because approval is hosted in material management detail. It preserves all material and BPM data.
+
+### V237 Content version reference work
+
+`V237__content_version_reference_work.sql` follows V236 and adds the nullable `reference_work_url` column to `zsjos_content_version`, matching the fresh bootstrap and the content persistence model. It carries the free-text 参考作品链接 submitted with a content-review work, independent of the existing `reference_content_version_id`. The column is guarded through `information_schema`, so the migration is repeatable and supports partially repaired databases. Material-library references continue to use the existing `material_refs_json` column, which now stores the approval-time snapshot (material id, version, number, title, type name, cover URL) instead of bare identifiers. It backfills nothing: historical versions keep `NULL` and any previously stored identifiers render without titles. Rollback requires a separately reviewed application rollback followed by manual column removal and may discard links written after this migration.

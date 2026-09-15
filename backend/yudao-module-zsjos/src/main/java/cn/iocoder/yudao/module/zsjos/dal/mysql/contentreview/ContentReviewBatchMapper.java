@@ -131,4 +131,11 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
                 .set(ContentReviewBatchDO::getFinalizedAt, completedAt)
                 .set(ContentReviewBatchDO::getVersion, batch.getVersion() + 1));
     }
+
+    default List<ContentReviewBatchDO> selectByStatusAndStage(Long tenantId, String status, String stage) {
+        return selectList(new LambdaQueryWrapperX<ContentReviewBatchDO>()
+                .eq(ContentReviewBatchDO::getTenantId, tenantId)
+                .eq(ContentReviewBatchDO::getStatus, status)
+                .eq(ContentReviewBatchDO::getCurrentStage, stage));
+    }
 }

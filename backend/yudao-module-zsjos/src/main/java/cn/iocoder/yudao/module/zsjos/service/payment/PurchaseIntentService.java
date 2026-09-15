@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentGatewayEventD
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentIntentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentTransactionDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PurchaseIntentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentSubjectDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentGatewayEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentIntentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentTransactionMapper;
@@ -52,6 +53,8 @@ public class PurchaseIntentService {
     @Resource private AllinpayProperties allinpayProperties;
     @Resource private LeadMapper leadMapper;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private PaymentSubjectService paymentSubjectService;
+    @Resource private ProductPaymentSubjectService productPaymentSubjectService;
 
     public PurchaseIntentRespVO current(PurchaseIntentSaveDraftReqVO request, Long userId) {
         resolvePerson(request, false);
@@ -114,6 +117,10 @@ public class PurchaseIntentService {
         PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(saved.getId());
         PaymentIntentDO existing = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
         if (existing != null && List.of("created", "waiting", "paid").contains(existing.getStatus())) return convert(intent);
+
+        // 选择支付主体：多个产品走学校主体，单个产品走配置的主体（未配置则走默认）
+        PaymentSubjectDO paymentSubject = selectPaymentSubject(request.getItems());
+
         String token = randomToken();
         String no = "PAY" + LocalDateTime.now().toString().replaceAll("\\D", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         LocalDateTime expires = LocalDateTime.now().plusHours(Math.max(1, allinpayProperties.getLinkTtlHours()));
@@ -121,7 +128,8 @@ public class PurchaseIntentService {
         payment.setPaymentOrderNo(no).setPurchaseIntentId(intent.getId()).setLeadId(intent.getLeadId()).setPersonId(intent.getPersonId())
                 .setOpportunityId(intent.getOpportunityId()).setStatus("created").setExpectedAmount(intent.getTotalAmount()).setCurrency("CNY")
                 .setProductItemsSnapshot(intent.getItemSnapshotJson()).setInitiatorUserId(userId).setLinkTokenHash(SecureUtil.sha256(token))
-                .setExpiresAt(expires).setProvider("allinpay").setVersion(0);
+                .setExpiresAt(expires).setProvider("allinpay").setVersion(0)
+                .setSubjectSnapshotJson(JsonUtils.toJsonString(paymentSubject));
         String base = allinpayProperties.getPublicBaseUrl();
         if (base == null || base.isBlank()) throw exception(PAYMENT_GATEWAY_UNAVAILABLE);
         payment.setLinkUrl(base.replaceAll("/+$", "") + "/pay/" + no + "?token=" + token);
@@ -142,7 +150,7 @@ public class PurchaseIntentService {
                     && payment.getExpiresAt().isBefore(LocalDateTime.now())) {
                 payment.setStatus("expired"); paymentIntentMapper.updateById(payment);
             } else if ("waiting".equals(payment.getStatus()) && StrUtil.isNotBlank(payment.getReqsn())) {
-                AllinpayClient.GatewayResponse result = new AllinpayClient(allinpayProperties).query(payment.getReqsn());
+                AllinpayClient.GatewayResponse result = createAllinpayClient(payment).query(payment.getReqsn());
                 recordGatewayEvent(payment, "payment_query", result);
                 payment.setQueriedAt(LocalDateTime.now()); paymentIntentMapper.updateById(payment);
                 int expected = payment.getExpectedAmount().movePointRight(2).intValueExact();
@@ -195,7 +203,7 @@ public class PurchaseIntentService {
             throw exception(PAYMENT_LINK_INVALID);
         }
         if (!"created".equals(payment.getStatus()) && !("waiting".equals(payment.getStatus()) && "alipay".equals(channel))) throw exception(PAYMENT_LINK_INVALID);
-        AllinpayClient client = new AllinpayClient(allinpayProperties);
+        AllinpayClient client = createAllinpayClient(payment);
         String reqsn = payment.getReqsn(); if (reqsn == null || reqsn.isBlank()) reqsn = "ZS" + payment.getPaymentOrderNo();
         int fen = payment.getExpectedAmount().movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).intValueExact();
         String body = "课程服务-" + payment.getPaymentOrderNo();
@@ -231,7 +239,7 @@ public class PurchaseIntentService {
     public boolean publicStatus(String no, String token) {
         PaymentIntentDO payment = requirePublic(no, token);
         if ("waiting".equals(payment.getStatus()) && payment.getReqsn() != null && allinpayProperties.isEnabled()) {
-        AllinpayClient.GatewayResponse result = new AllinpayClient(allinpayProperties).query(payment.getReqsn());
+        AllinpayClient.GatewayResponse result = createAllinpayClient(payment).query(payment.getReqsn());
             recordGatewayEvent(payment, "payment_query", result);
             if (isPaid(result, payment.getExpectedAmount().movePointRight(2).intValueExact())) confirmPaid(payment, result, "query");
             else if (payment.getExpiresAt() != null && payment.getExpiresAt().isBefore(LocalDateTime.now())) closeExpired(payment);
@@ -245,7 +253,7 @@ public class PurchaseIntentService {
     }
 
     private void closeExpired(PaymentIntentDO payment) {
-        AllinpayClient.GatewayResponse result = new AllinpayClient(allinpayProperties).close(payment.getReqsn());
+        AllinpayClient.GatewayResponse result = createAllinpayClient(payment).close(payment.getReqsn());
         recordGatewayEvent(payment, "payment_close", result);
         if (result.isSignatureValid() && "SUCCESS".equals(result.getRetcode())
                 && (StrUtil.isBlank(result.getTrxstatus()) || "0000".equals(result.getTrxstatus()))) {
@@ -257,7 +265,7 @@ public class PurchaseIntentService {
     @Transactional(rollbackFor = Exception.class)
     public void notify(Map<String, Object> payload) {
         String reqsn = text(payload, "reqsn"); PaymentIntentDO payment = paymentIntentMapper.selectByReqsn(reqsn); if (payment == null) throw exception(PAYMENT_CALLBACK_INVALID);
-        AllinpayClient client = new AllinpayClient(allinpayProperties);
+        AllinpayClient client = createAllinpayClient(payment);
         if (!client.verify(payload)) throw exception(PAYMENT_CALLBACK_INVALID);
         int fen; try { fen = Integer.parseInt(text(payload, "trxamt")); } catch (Exception ex) { throw exception(PAYMENT_CALLBACK_INVALID); }
         int expected = payment.getExpectedAmount().movePointRight(2).intValueExact();
@@ -301,6 +309,95 @@ public class PurchaseIntentService {
                 .setPaymentStatus(payment.getStatus()).setPaymentExpiresAt(payment.getExpiresAt()); response.setDisplayStatus("paid".equals(payment.getStatus()) ? "paid_pending_submission" : "waiting".equals(payment.getStatus()) || "created".equals(payment.getStatus()) ? "pending_payment" : "invalid"); }
         else response.setDisplayStatus("order_draft"); return response;
     }
+
+    /**
+     * 选择支付主体逻辑：
+     * 1. 多个产品 -> 学校主体
+     * 2. 单个产品 -> 查询产品配置的主体，未配置则使用默认主体
+     */
+    private PaymentSubjectDO selectPaymentSubject(List<PurchaseIntentSaveDraftReqVO.Item> items) {
+        // 多个产品强制走学校主体
+        if (items.size() > 1) {
+            PaymentSubjectDO schoolSubject = paymentSubjectService.getPaymentSubjectByCode("school");
+            if (schoolSubject == null) throw exception(PAYMENT_GATEWAY_UNAVAILABLE, "学校支付主体未配置");
+            return schoolSubject;
+        }
+
+        // 单个产品：查询产品配置的主体
+        String skuRef = items.get(0).getSkuRef();
+        Long productId = extractProductId(skuRef);
+        if (productId != null) {
+            PaymentSubjectDO configuredSubject = productPaymentSubjectService.getPaymentSubjectByProductId(productId);
+            if (configuredSubject != null) return configuredSubject;
+        }
+
+        // 未配置则使用默认主体
+        PaymentSubjectDO defaultSubject = paymentSubjectService.getDefaultPaymentSubject();
+        if (defaultSubject == null) throw exception(PAYMENT_GATEWAY_UNAVAILABLE, "默认支付主体未配置");
+        return defaultSubject;
+    }
+
+    /**
+     * 从 skuRef 中提取产品ID
+     * skuRef 格式示例: "product:123:sku:456" -> 返回 123
+     */
+    private Long extractProductId(String skuRef) {
+        if (skuRef == null || !skuRef.contains(":")) return null;
+        String[] parts = skuRef.split(":");
+        if (parts.length >= 2 && "product".equals(parts[0])) {
+            try { return Long.parseLong(parts[1]); } catch (NumberFormatException e) { return null; }
+        }
+        return null;
+    }
+
+    /**
+     * 根据支付订单中的主体快照创建 AllinpayClient
+     * 如果快照为空或配置不完整，使用配置文件中的默认配置
+     */
+    private AllinpayClient createAllinpayClient(PaymentIntentDO payment) {
+        if (payment.getSubjectSnapshotJson() == null || payment.getSubjectSnapshotJson().isBlank()) {
+            return new AllinpayClient(allinpayProperties);
+        }
+
+        try {
+            PaymentSubjectDO snapshot = JsonUtils.parseObject(payment.getSubjectSnapshotJson(), PaymentSubjectDO.class);
+            if (snapshot == null || StrUtil.isBlank(snapshot.getCusid()) || StrUtil.isBlank(snapshot.getAppid())) {
+                return new AllinpayClient(allinpayProperties);
+            }
+
+            // 使用快照配置构建动态 Properties
+            AllinpayProperties dynamicProps = new AllinpayProperties();
+            dynamicProps.setEnabled(allinpayProperties.isEnabled());
+            dynamicProps.setCusid(snapshot.getCusid());
+            dynamicProps.setAppid(snapshot.getAppid());
+            dynamicProps.setOrgid(snapshot.getOrgid());
+            dynamicProps.setMerchantPrivateKey(snapshot.getMerchantPrivateKey());
+            dynamicProps.setPlatformPublicKey(snapshot.getPlatformPublicKey());
+
+            // 以下为通用配置，从全局配置读取
+            dynamicProps.setUnionorderUrl(allinpayProperties.getUnionorderUrl());
+            dynamicProps.setUnitorderPayUrl(allinpayProperties.getUnitorderPayUrl());
+            dynamicProps.setQueryUrl(allinpayProperties.getQueryUrl());
+            dynamicProps.setCloseUrl(allinpayProperties.getCloseUrl());
+            dynamicProps.setRefundUrl(allinpayProperties.getRefundUrl());
+            dynamicProps.setRefundQueryUrl(allinpayProperties.getRefundQueryUrl());
+            dynamicProps.setRefundVersion(allinpayProperties.getRefundVersion());
+            dynamicProps.setNotifyUrl(allinpayProperties.getNotifyUrl());
+            dynamicProps.setRefundNotifyUrl(allinpayProperties.getRefundNotifyUrl());
+            dynamicProps.setReturnUrl(allinpayProperties.getReturnUrl());
+            dynamicProps.setPublicBaseUrl(allinpayProperties.getPublicBaseUrl());
+            dynamicProps.setLinkHmacSecret(allinpayProperties.getLinkHmacSecret());
+            dynamicProps.setLinkTtlHours(allinpayProperties.getLinkTtlHours());
+            dynamicProps.setConnectTimeoutSeconds(allinpayProperties.getConnectTimeoutSeconds());
+            dynamicProps.setReadTimeoutSeconds(allinpayProperties.getReadTimeoutSeconds());
+
+            return new AllinpayClient(dynamicProps);
+        } catch (Exception e) {
+            // 解析失败，使用默认配置
+            return new AllinpayClient(allinpayProperties);
+        }
+    }
+
 
     private void validateDraft(PurchaseIntentSaveDraftReqVO request) {
         if (!List.of("online_link", "offline_paid").contains(request.getCollectionMode()) || request.getPersonId() == null || request.getItems() == null || request.getItems().isEmpty()) throw exception(PURCHASE_INTENT_DRAFT_INVALID);

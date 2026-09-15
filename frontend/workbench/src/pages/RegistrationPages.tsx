@@ -324,8 +324,9 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       ? { ...item, selected: true, assigneeUserId, assigneeUserName: candidate?.nickname }
       : item), selected);
   };
-  const loadClassOptions = async (orderItemId: number, categoryId: number) => {
+  const loadClassOptions = async (orderItemId: number, categoryId: number | undefined) => {
     if (classOptions[orderItemId]) return;
+    if (!categoryId) { message.error("该商品缺少产品分类，无法加载班级，请先补全产品信息"); return; }
     try {
       const options = await api.deliveryClasses.options(categoryId, true);
       setClassOptions(current => ({ ...current, [orderItemId]: options }));
@@ -741,13 +742,13 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       const service = student.services.find(item => item.serviceRelationId === (preferredServiceId || selectedServiceId)) || student.services[0];
       setSelectedServiceId(service?.serviceRelationId);
       const leadId = service?.leadId;
-      const [lead, context, records] = await Promise.all([
-        leadId ? api.managedLead(leadId) : Promise.resolve(undefined),
+      const [leadResult, context, records] = await Promise.all([
+        leadId ? api.managedLead(leadId).catch(() => undefined) : Promise.resolve(undefined),
         service ? api.studentContactContext(service.serviceRelationId) : Promise.resolve(undefined),
         service ? api.studentContactRecords(service.serviceRelationId, 1, 100) : Promise.resolve({ list: [], total: 0 }),
       ]);
       if (generation === detailGeneration.current) {
-        setLeadDetail(lead);
+        setLeadDetail(leadResult);
         setStudentContactContext(context);
         setStudentContactRecords(records.list);
       }
@@ -906,7 +907,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
       contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${productSpecText(service)} · ${service.orderNo || service.orderId}` }))}/></div>}
-      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
+      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
         { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: <ProductSpecs product={selectedService} /> }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} /></section> },

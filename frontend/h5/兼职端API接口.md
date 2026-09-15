@@ -1141,3 +1141,6 @@ H5 按 ZSJOS Partner 响应 VO 使用真实字段：课程目录使用分类节�
 
 `docs/api/partner-app-api.md`
 `frontend/h5/docs/real-data.md`
+
+### H5 排行榜配置补充（2026-09-14）
+管理后台通过 `/admin-api/zsjos/partner/leaderboard-config/get` 查询、`PUT /admin-api/zsjos/partner/leaderboard-config/save` 保存当前租户配置。配置包含 `enabled`、`includeEmployeeSubmitter`、`employeeRoleCodes`、`enabledTypes`、`defaultType` 和 `defaultPeriod`；未配置时服务端返回安全默认值。员工提交者只有在开关开启且提交时角色编码命中配置时进入统计。

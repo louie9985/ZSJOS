@@ -1,3 +1,4 @@
+import { MATERIAL_APPROVAL_INVALID_TASK } from '../services/materialApprovalApi'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
@@ -16,18 +17,22 @@ import {
   Typography
 } from 'antd'
 import {
-  AuditOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileSearchOutlined,
-  LinkOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import DateTimeText from '../components/DateTimeText'
-import DetailFieldGrid from '../components/DetailFieldGrid'
-import { api, ApiError, AuthenticationError, type BpmTask } from '../services/api'
+import BpmApprovalDetail from '../components/bpm/BpmApprovalDetail'
+import {
+  api,
+  ApiError,
+  AuthenticationError,
+  type BpmTask,
+  type SimpleUser
+} from '../services/api'
 import { useInboxTableLayout } from '../services/inboxLayout'
 import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
@@ -90,84 +95,63 @@ function formatDuration(duration?: number) {
   return [days ? `${days} 天` : '', hours ? `${hours} 小时` : '', `${remainder} 分钟`].filter(Boolean).join(' ')
 }
 
-function BpmTaskDetail({
-  task,
-  view,
-  canUpdate,
-  locating,
-  onOpenBusiness
-}: {
-  task?: BpmTask
-  view: BpmTaskView
-  canUpdate: boolean
-  locating: boolean
-  onOpenBusiness: (task: BpmTask) => void
-}) {
-  if (!task) return <Empty description="从左侧选择一条审批任务"/>
-  const summary = taskSummary(task)
-  const startUser = task.processInstance?.startUser?.nickname || '-'
-  const assignee = task.assigneeUser?.nickname || task.ownerUser?.nickname || '-'
-  const actionText = view === 'todo' ? '进入业务审批' : '查看业务单据'
-  return <article className="business-inbox-detail bpm-approval-detail">
-    <header className="business-inbox-detail-hero bpm-approval-detail-hero">
-      <Avatar size={44} icon={<AuditOutlined/>}/>
-      <div className="business-inbox-detail-heading">
-        <div>
-          <Space size={8} wrap>
-            <Typography.Title level={4}>{taskSubject(task)}</Typography.Title>
-            <Tag color={taskStatusColor(task.status)}>{taskStatusLabel(task.status)}</Tag>
-          </Space>
-          <Typography.Text type="secondary">{task.name || '流程节点'}</Typography.Text>
-        </div>
-      </div>
-      <Button
-        type={view === 'todo' && canUpdate ? 'primary' : 'default'}
-        icon={<LinkOutlined/>}
-        loading={locating}
-        onClick={() => onOpenBusiness(task)}
-      >
-        {actionText}
-      </Button>
-    </header>
+/**
+ * 已接入员工端业务页的流程，额外提供业务详情入口；
+ * 未接入的流程返回 supported=false，此时只展示通用审批界面。
+ */
+function useBusinessEntry(task: BpmTask | undefined, view: BpmTaskView) {
+  const navigate = useNavigate()
+  const { message } = App.useApp()
+  const [locatingTaskId, setLocatingTaskId] = useState<string>()
+  const [supportedTaskIds, setSupportedTaskIds] = useState<Record<string, boolean>>({})
 
-    <section className="business-inbox-card bpm-approval-card">
-      <Typography.Text type="secondary">流程摘要</Typography.Text>
-      {summary.length > 0
-        ? <div className="bpm-approval-summary-list">
-          {summary.map((item, index) => <Tag key={`${item}-${index}`}>{item}</Tag>)}
-        </div>
-        : <Typography.Paragraph type="secondary">该流程没有返回可展示的摘要字段。</Typography.Paragraph>}
-    </section>
+  useEffect(() => {
+    if (!task || supportedTaskIds[task.id] !== undefined) return
+    let cancelled = false
+    void api.bpmBusinessTaskTarget(task.id, view)
+      .then(target => {
+        if (!cancelled) setSupportedTaskIds(current => ({ ...current, [task.id]: target.supported }))
+      })
+      .catch(() => {
+        // 探测失败不阻塞审批，只是不展示业务入口。
+        if (!cancelled) setSupportedTaskIds(current => ({ ...current, [task.id]: false }))
+      })
+    return () => { cancelled = true }
+  }, [supportedTaskIds, task, view])
 
-    <section className="business-inbox-card bpm-approval-card">
-      <DetailFieldGrid columns={2} items={[
-        { key: 'processName', label: '流程名称', value: task.processInstance?.name || '-' },
-        { key: 'taskName', label: '当前节点', value: task.name || '-' },
-        { key: 'startUser', label: '发起人', value: startUser },
-        { key: 'assignee', label: view === 'todo' ? '当前处理人' : '已处理人', value: assignee },
-        { key: 'processStartedAt', label: '发起时间', value: <DateTimeText value={task.processInstance?.createTime}/> },
-        { key: 'taskCreatedAt', label: view === 'todo' ? '到达时间' : '任务到达', value: <DateTimeText value={task.createTime}/> },
-        ...(view === 'done'
-          ? [{ key: 'taskEndedAt', label: '完成时间', value: <DateTimeText value={task.endTime}/> }]
-          : []),
-        { key: 'formName', label: '表单名称', value: task.formName || '-' },
-        { key: 'processInstanceId', label: '流程实例', value: task.processInstanceId, span: 2 as const },
-        { key: 'taskId', label: '任务编号', value: task.id, span: 2 as const },
-        ...(task.reason
-          ? [{ key: 'reason', label: '审批意见', value: task.reason, span: 2 as const }]
-          : [])
-      ]}/>
-    </section>
+  const open = async () => {
+    if (!task) return
+    setLocatingTaskId(task.id)
+    try {
+      const target = await api.bpmBusinessTaskTarget(task.id, view)
+      if (!target.supported) {
+        message.info(target.message)
+        return
+      }
+      const params = new URLSearchParams()
+      Object.entries(target.query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) params.set(key, String(value))
+      })
+      const route = target.route.startsWith('/') ? target.route : `/${target.route}`
+      navigate(params.toString() ? `${route}?${params.toString()}` : route, { state: target.query })
+    } catch (locateError) {
+      if (locateError instanceof AuthenticationError
+        || (locateError instanceof ApiError
+          && [SALES_ORDER_PERMISSION_DENIED, LEAD_APPEAL_PERMISSION_DENIED, MATERIAL_APPROVAL_INVALID_TASK].includes(locateError.code))) {
+        message.info('当前账号无权打开该业务审批')
+        return
+      }
+      message.error('审批任务定位失败，请重试')
+    } finally {
+      setLocatingTaskId(undefined)
+    }
+  }
 
-    {view === 'todo' && <Alert
-      type="info"
-      showIcon
-      message="审批动作在业务详情或完整 BPM 表单中完成"
-      description={canUpdate
-        ? '当前页面负责承载审批任务入口。涉及动态表单、下一节点审批人、加签、转办等复杂动作时，不在列表页直接复制 BPM 状态机。'
-        : '当前账号没有 bpm:task:update 权限，只能查看审批任务。'}
-    />}
-  </article>
+  return {
+    supported: task ? supportedTaskIds[task.id] === true : false,
+    loading: !!task && locatingTaskId === task.id,
+    open
+  }
 }
 
 export default function BpmApprovalCenterPage({ permissions, initialView }: {
@@ -196,7 +180,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const [countError, setCountError] = useState('')
   const [unauthorized, setUnauthorized] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [locatingTaskId, setLocatingTaskId] = useState<string>()
+  const [users, setUsers] = useState<SimpleUser[]>([])
   const { useTableLayout } = useInboxTableLayout()
   const requestSeq = useRef(0)
   const countSeq = useRef(0)
@@ -212,6 +196,8 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     [selectedId, tasks]
   )
 
+  const businessEntry = useBusinessEntry(selectedTask, view)
+
   const loadCounts = useCallback(async () => {
     if (!canQuery) return
     const seq = ++countSeq.current
@@ -226,11 +212,12 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       setCounts({ todo: todo.total, done: done.total })
     } catch (loadError) {
       if (seq !== countSeq.current) return
+      console.error('[BpmApprovalCenter] loadCounts - error:', loadError)
       setCountError(loadError instanceof Error ? loadError.message : '审批数量加载失败')
     } finally {
       if (seq === countSeq.current) setCountLoading(false)
     }
-  }, [canQuery])
+  }, [canQuery, permissions])
 
   const appendTasks = (current: BpmTask[], incoming: BpmTask[]) => {
     const rows = new Map(current.map(task => [task.id, task]))
@@ -255,6 +242,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       setSelectedId(current => preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
     } catch (loadError) {
       if (seq !== requestSeq.current) return
+      console.error('[BpmApprovalCenter] loadFirstPage - error:', loadError)
       setTasks([])
       setSelectedId(undefined)
       setTotal(0)
@@ -264,7 +252,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [canQuery, keyword, tablePage, tablePageSize, useTableLayout, view])
+  }, [canQuery, keyword, permissions, tablePage, tablePageSize, useTableLayout, view])
 
   const loadMore = useCallback(async () => {
     if (!canQuery || loading || loadingMoreRef.current || tasks.length >= total) return
@@ -308,6 +296,15 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   useEffect(() => { void loadCounts() }, [loadCounts])
   useEffect(() => { void loadFirstPage() }, [loadFirstPage])
   useEffect(() => {
+    // 转办、委派、加签、抄送需要人员候选；无处理权限时不请求。
+    if (!canUpdate) return
+    let cancelled = false
+    void api.simpleUsers()
+      .then(list => { if (!cancelled) setUsers(list) })
+      .catch(() => { if (!cancelled) setUsers([]) })
+    return () => { cancelled = true }
+  }, [canUpdate])
+  useEffect(() => {
     const sentinel = sentinelRef.current
     const root = listRef.current
     if (useTableLayout || !sentinel || !root || loading || loadMoreError || tasks.length >= total) return
@@ -338,45 +335,24 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
 
-  const openBusiness = async (task: BpmTask) => {
-    setLocatingTaskId(task.id)
-    try {
-      const target = await api.bpmBusinessTaskTarget(task.id, view)
-      if (!target.supported) {
-        message.info(target.message)
-        return
-      }
-      const params = new URLSearchParams()
-      Object.entries(target.query).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) params.set(key, String(value))
-      })
-      const route = target.route.startsWith('/') ? target.route : `/${target.route}`
-      navigate(params.toString() ? `${route}?${params.toString()}` : route, { state: target.query })
-    } catch (locateError) {
-      if (locateError instanceof AuthenticationError
-        || (locateError instanceof ApiError
-          && [SALES_ORDER_PERMISSION_DENIED, LEAD_APPEAL_PERMISSION_DENIED].includes(locateError.code))) {
-        message.info('当前账号无权打开该业务审批')
-        return
-      }
-      message.error('审批任务定位失败，请重试')
-    } finally {
-      setLocatingTaskId(undefined)
-    }
-  }
-
   if (!canQuery) {
     return <section className="workspace-page bpm-approval-page">
       <Result status="403" title="无权访问审批中心" subTitle="当前账号缺少 bpm:task:query 权限。"/>
     </section>
   }
 
-  const detail = <BpmTaskDetail
+  const detail = <BpmApprovalDetail
     task={selectedTask}
     view={view}
     canUpdate={canUpdate}
-    locating={!!selectedTask && locatingTaskId === selectedTask.id}
-    onOpenBusiness={openBusiness}
+    users={users}
+    businessEntry={businessEntry.supported
+      ? { loading: businessEntry.loading, onOpen: () => void businessEntry.open() }
+      : undefined}
+    onActionSuccess={() => {
+      void loadCounts()
+      void loadFirstPage(true)
+    }}
   />
 
   return <section className={`workspace-page business-inbox-page bpm-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>

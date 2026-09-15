@@ -117,7 +117,12 @@ export default function LeadSubmissionPage({
 
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
 
-  const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
+  const validateContact = (_: unknown, value?: string) => {
+    if (value && /\s/.test(value)) return Promise.reject(new Error('手机号和微信号不能包含空格'))
+    return form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
+      ? Promise.resolve()
+      : Promise.reject(new Error('请填写手机号或微信号'))
+  }
   const hasUploading = files.some(file => file.status === 'uploading'); const hasUploadError = files.some(file => file.status === 'error')
   const unavailable = Boolean(remote.error || areaState.error) || !areas.length || !sources.length || !categories.length
 

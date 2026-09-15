@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.api.user;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
@@ -69,18 +70,41 @@ public class AdminUserApiImpl implements AdminUserApi {
 
     @Override
     public Long convertPartnerToEmployee(AdminUserPartnerConversionReqDTO reqDTO) {
-        if (reqDTO.getExistingUserId() == null || userService.getUser(reqDTO.getExistingUserId()) == null) {
-            return createUser(new AdminUserCreateReqDTO().setUsername(reqDTO.getUsername())
-                    .setPassword(reqDTO.getPassword()).setNickname(reqDTO.getNickname()).setMobile(reqDTO.getMobile())
-                    .setDeptId(reqDTO.getDeptId()).setPostIds(reqDTO.getPostIds()));
+        AdminUserDO current = null;
+
+        // 优先使用合作方已经绑定的系统用户
+        if (reqDTO.getExistingUserId() != null) {
+            current = userService.getUser(reqDTO.getExistingUserId());
         }
-        AdminUserDO current = userService.getUser(reqDTO.getExistingUserId());
-        UserSaveReqVO update = BeanUtils.toBean(current, UserSaveReqVO.class).setId(current.getId())
-                .setUsername(reqDTO.getUsername()).setNickname(reqDTO.getNickname()).setMobile(reqDTO.getMobile())
-                .setDeptId(reqDTO.getDeptId()).setPostIds(reqDTO.getPostIds());
+
+        // 没有有效绑定关系时，按用户名查找已有账号，避免重复创建
+        if (current == null && StrUtil.isNotBlank(reqDTO.getUsername())) {
+            current = userService.getUserByUsername(reqDTO.getUsername());
+        }
+
+        if (current == null) {
+            return createUser(new AdminUserCreateReqDTO()
+                    .setUsername(reqDTO.getUsername())
+                    .setPassword(reqDTO.getPassword())
+                    .setNickname(reqDTO.getNickname())
+                    .setMobile(reqDTO.getMobile())
+                    .setDeptId(reqDTO.getDeptId())
+                    .setPostIds(reqDTO.getPostIds()));
+        }
+
+        UserSaveReqVO update = BeanUtils.toBean(current, UserSaveReqVO.class)
+                .setId(current.getId())
+                .setUsername(reqDTO.getUsername())
+                .setNickname(reqDTO.getNickname())
+                .setMobile(reqDTO.getMobile())
+                .setDeptId(reqDTO.getDeptId())
+                .setPostIds(reqDTO.getPostIds());
+
         userService.updateUser(update);
         userService.updateUserPassword(current.getId(), reqDTO.getPassword());
-        userService.updateUserStatus(current.getId(), cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.ENABLE.getStatus());
+        userService.updateUserStatus(current.getId(),
+                cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.ENABLE.getStatus());
+
         return current.getId();
     }
 
@@ -154,3 +178,5 @@ public class AdminUserApiImpl implements AdminUserApi {
     }
 
 }
+
+

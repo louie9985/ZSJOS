@@ -58,6 +58,20 @@ class LeadDuplicateMatcherTest {
     }
 
     @Test
+    void closedLeadIsExcludedFromContactAndNameMatching() {
+        LeadCreateReqVO request = request();
+        PersonDO person = person(1L, "13800000000", null);
+        LeadDO closed = lead(10L, 1L, "closed");
+        when(personMapper.selectDuplicateCandidates("13800000000", null)).thenReturn(List.of(person));
+        when(leadMapper.selectByPersonIds(List.of(1L))).thenReturn(List.of(closed));
+        when(leadMapper.selectByName("张三")).thenReturn(List.of(closed));
+
+        LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
+
+        assertFalse(result.hasMatches());
+    }
+
+    @Test
     void crossContactIsWeakMatch() {
         LeadCreateReqVO request = request();
         PersonDO person = person(1L, null, "13800000000");

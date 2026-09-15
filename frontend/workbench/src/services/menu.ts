@@ -129,8 +129,33 @@ export function getAuthenticatedHomeTarget(menus: WorkbenchMenu[]) {
 }
 
 export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string, authorizedMenus?: WorkbenchMenu[]) {
+  // 特殊路径：BPM 审批中心的 todo 和 done 路由共享同一个菜单权限
+  if (path === APP_ROUTES.BPM_DONE && authorizedMenus && findMenuByPath(authorizedMenus, APP_ROUTES.BPM_TODO)) {
+    return undefined
+  }
   if (path === '/' || path === APP_ROUTES.USER_PROFILE || path === APP_ROUTES.WECOM_CLICK || findPageByPath(items, path)
     || (authorizedMenus && findMenuByPath(authorizedMenus, path))) return
+
+  // 今日待办跳转特殊处理：带 query 的路径应检查基础路径或其子路径的权限
+  if (authorizedMenus) {
+    // /zsjos/sales-orders?orderId=xxx → 有 /zsjos/sales-orders/my 或 /zsjos/sales-orders/team 权限即可
+    if (path === APP_ROUTES.SALES_ORDERS && (
+      findMenuByPath(authorizedMenus, APP_ROUTES.MY_SALES_ORDERS) ||
+      findMenuByPath(authorizedMenus, APP_ROUTES.TEAM_SALES_ORDERS)
+    )) {
+      return undefined
+    }
+    // /zsjos/leads/manage?leadId=xxx → 有任意客资相关菜单即可
+    if (path === APP_ROUTES.LEAD_MANAGEMENT && (
+      findMenuByPath(authorizedMenus, APP_ROUTES.SUBMITTED_LEADS) ||
+      findMenuByPath(authorizedMenus, APP_ROUTES.OWNED_LEADS) ||
+      findMenuByPath(authorizedMenus, APP_ROUTES.LEAD_ASSIGNMENT) ||
+      findMenuByPath(authorizedMenus, APP_ROUTES.LEAD_CLAIM_POOL)
+    )) {
+      return undefined
+    }
+  }
+
   return getInitialTarget(items)
 }
 

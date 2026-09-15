@@ -128,6 +128,11 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
   const { resolve: resolveMenuTaskBadge } = useMenuTaskBadges()
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
+
+  // 调试日志：检查权限信息
+  console.log('[Shell] info object:', info)
+  console.log('[Shell] info.permissions:', info.permissions)
+  console.log('[Shell] info.roles:', info.roles)
   const [secondaryCollapsed, setSecondaryCollapsed] = useState(false)
   const [singleSiderOpenKeys, setSingleSiderOpenKeys] = useState<string[]>([])
   const [aiOpen, setAiOpen] = useState(false)
@@ -542,6 +547,9 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     if (!logged) return
     api.permissionInfo()
       .then(permissionInfo => {
+        console.log('[Root] permissionInfo response:', permissionInfo)
+        console.log('[Root] permissions array:', permissionInfo.permissions)
+        console.log('[Root] roles array:', permissionInfo.roles)
         const authorizedMenus = buildMenuTree(permissionInfo.menus || [])
         const homeTarget = getAuthenticatedHomeTarget(authorizedMenus)
         const fallbackTarget = getInitialTarget(buildTwoLevelNavigation(

@@ -1,0 +1,231 @@
+# 支付主体配置功能部署文档
+
+## 📝 功能概述
+
+本功能支持配置多个通联支付主体（公司收款主体），并允许财务主管为产品批量配置支付收款主体。
+
+### 核心能力
+- ✅ 支持多个通联支付主体配置（当前2个：学校、公司）
+- ✅ 支付主体信息集中管理（商户号、密钥等）
+- ✅ 产品关联支付主体，支持单个/批量配置
+- ✅ 权限控制：默认仅财务主管可操作
+- ✅ 支付订单保存主体快照，支持退款
+
+## 🗂️ 数据库变更
+
+### 迁移文件清单
+
+| 文件 | 版本 | 说明 | 状态 |
+|------|------|------|------|
+| V239__payment_subject_config.sql | V239 | 支付主体配置表 + 产品字段扩展 | ✅ 已创建 |
+| V240__init_payment_subjects.sql | V240 | 初始化两个支付主体数据 | ✅ 已创建 |
+| V241__product_payment_subject_association.sql | V241 | 产品支付主体关联表 | ✅ 已创建 |
+| V242__payment_subject_menus.sql | V242 | FMS 菜单、权限与财务主管授权（合并原 V242-V249）| ✅ 已创建 |
+
+> 原 V243-V249 及 V248_FIX / V246_ROLLBACK 已删除：它们反复用固定 ID 硬插菜单（601960/601961 → 6850/6851 → 602180/602181 → 602190/602191 → 602200/602210），但 601960/601961 归 V058 所有、6850/6851 归 V048 所有，守卫式 INSERT 每次都变成空操作，因此菜单始终没建出来。所有内容现已合并进 V242。
+
+### 新增数据表
+
+#### 1. zsjos_payment_subject（支付主体配置表）
+```sql
+主要字段：
+- subject_code: 主体编码（唯一标识，如 school, company）
+- subject_name: 主体名称（公司全称）
+- cusid: 通联商户号
+- appid: 通联应用ID
+- merchant_private_key: 商户私钥（加密存储）
+- platform_public_key: 通联平台公钥
+- is_default: 是否默认主体
+- status: 启用状态
+```
+
+#### 2. zsjos_product_payment_subject（产品支付主体关联表）
+```sql
+主要字段：
+- product_id: 产品ID
+- subject_code: 支付主体编码
+唯一约束：租户+产品ID（一个产品只能配置一个主体）
+```
+
+### 已有表字段扩展
+
+#### zsjos_product（产品表）
+```sql
+新增字段：
+- payment_subject_code: varchar(64) - 支付主体编码（冗余字段，便于查询）
+```
+
+#### zsjos_payment_order（支付订单表）
+```sql
+新增字段：
+- subject_snapshot_json: json - 支付主体配置快照（用于退款）
+```
+
+## 🎨 前端菜单结构
+
+```
+FMS 财务管理（601894）
+└── 设置管理（601951）
+    ├── 支付主体管理（602200）
+    │   ├── 查询（zsjos:payment-subject:query）
+    │   ├── 创建（zsjos:payment-subject:create）
+    │   ├── 修改（zsjos:payment-subject:update）
+    │   └── 删除（zsjos:payment-subject:delete）
+    └── 产品支付主体配置（602210）
+        └── 配置修改（zsjos:product-payment-subject:configure）
+```
+
+页面节点本身不带权限码，路由由上面的操作权限控制（同 V033 的页面/权限拆分约定）。
+产品支付配置的权限码是 `:configure`，与 `ProductPaymentSubjectController` 的 `@PreAuthorize` 一致；原 `:update`/`:batch-update`/`:export` 已作废。
+
+## 🔐 权限配置
+
+### 默认角色权限
+
+**财务主管（finance_manager）**：
+- ✅ 支付主体管理（增删改查）
+- ✅ 产品支付主体配置（批量配置）
+
+### 扩展其他角色
+如需授权其他角色，在 system_role_menu 表中添加相应的 role_id 和 menu_id 关联。
+
+## 🚀 部署步骤
+
+### 1. 数据库迁移
+
+统一走 `zsjos-db` 执行，不要手工按文件灌：它会校验版本连续性和已执行脚本的 SHA-256。
+
+```bash
+# 预览待执行
+python script/sql/mysql/tools/zsjos_db.py plan prod
+
+# 执行
+python script/sql/mysql/tools/zsjos_db.py migrate prod
+```
+
+涉及的迁移为 V239 → V240 → V241 → V242。
+
+### 2. 验证数据库变更
+```sql
+-- 检查表是否创建成功
+SHOW TABLES LIKE 'zsjos_payment%';
+
+-- 检查菜单是否创建（应该在 601951 下）
+SELECT id, name, permission, parent_id FROM system_menu 
+WHERE id IN (602200, 602201, 602202, 602203, 602204, 602210, 602211, 602212) AND deleted = b'0';
+
+-- 检查财务主管是否有权限
+SELECT rm.role_id, r.name, m.name, m.permission 
+FROM system_role_menu rm
+JOIN system_role r ON rm.role_id = r.id
+JOIN system_menu m ON rm.menu_id = m.id
+WHERE r.code = 'finance_manager' 
+  AND m.permission LIKE 'zsjos:%payment-subject:%'
+  AND rm.deleted = b'0';
+
+-- 检查初始化的支付主体数据
+SELECT subject_code, subject_name, is_default, status 
+FROM zsjos_payment_subject WHERE deleted = b'0';
+```
+
+### 3. 后端代码部署
+```bash
+# 后端需要实现的接口（待开发）
+# PaymentSubjectController - 支付主体管理
+# ProductPaymentSubjectController - 产品支付主体配置
+
+cd backend
+mvn clean package -DskipTests
+# 重启后端服务
+```
+
+### 4. 前端代码部署
+```bash
+# 前端需要开发的页面（待开发）
+# zsjos/payment/subject/index.vue - 支付主体管理页面
+# zsjos/payment/productSubject/index.vue - 产品支付主体配置页面
+
+cd frontend
+npm run build
+# 部署前端资源
+```
+
+## ⚠️ 注意事项
+
+### 安全性
+1. **私钥加密**：merchant_private_key 字段需要在应用层加密存储
+2. **权限控制**：严格限制支付主体配置的访问权限
+3. **审计日志**：记录所有配置变更操作
+
+### 数据一致性
+1. **默认主体**：系统必须至少有一个默认主体（is_default=1）
+2. **主体状态**：停用主体前需检查是否有产品正在使用
+3. **订单快照**：创建支付订单时必须保存 subject_snapshot_json
+
+### 迁移兼容性
+1. **存量产品**：未配置支付主体的产品，使用默认主体
+2. **租户隔离**：支付主体配置支持多租户，注意 tenant_id；V242 的 role_menu 授权按角色所属租户写入，不再固定 0
+3. **菜单归属**：V242 在写入前会断言 602200-602212 的所有权，若被其他模块占用会直接 SIGNAL 阻断，不再静默跳过
+
+## 📊 初始数据
+
+系统预置了两个支付主体：
+
+| 主体编码 | 主体名称 | 是否默认 |
+|---------|---------|---------|
+| school | 合肥中世健职业技能培训学校有限公司 | ✅ 是 |
+| company | 安徽省中世健健康管理有限公司 | ❌ 否 |
+
+**注意**：cusid、appid、merchant_private_key、platform_public_key 等字段需要后续手动配置通联提供的实际值。
+
+## 🔧 后续开发任务
+
+### 后端接口
+1. **支付主体管理**
+   - [ ] CRUD 接口
+   - [ ] 启用/停用接口
+   - [ ] 设置默认主体接口
+   - [ ] 私钥加密/解密逻辑
+
+2. **产品支付主体配置**
+   - [ ] 查询产品配置列表接口
+   - [ ] 单个产品配置接口
+   - [ ] 批量配置接口
+   - [ ] 配置导出接口
+
+3. **支付集成**
+   - [ ] 创建订单时保存主体快照
+   - [ ] 支付请求使用产品配置的主体
+   - [ ] 退款使用订单快照的主体配置
+
+### 前端页面
+1. **支付主体管理页面**
+   - [ ] 列表展示（表格）
+   - [ ] 新增/编辑表单（私钥输入需脱敏）
+   - [ ] 启用/停用切换
+   - [ ] 设置默认主体
+
+2. **产品支付主体配置页面**
+   - [ ] 产品列表（支持筛选）
+   - [ ] 单个配置（下拉选择主体）
+   - [ ] 批量配置（勾选产品 + 选择主体）
+   - [ ] 配置状态展示
+   - [ ] 导出功能
+
+### 测试用例
+- [ ] 支付主体 CRUD 测试
+- [ ] 产品配置单个/批量操作测试
+- [ ] 权限控制测试（非财务主管无权限）
+- [ ] 多租户隔离测试
+- [ ] 支付订单快照测试
+
+## 📞 联系方式
+
+如有问题，请联系：
+- 技术负责人：[待填写]
+- 产品负责人：[待填写]
+
+---
+**部署日期**：2026-09-15  
+**文档版本**：v1.0  
+**更新人**：Claude

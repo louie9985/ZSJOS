@@ -17,6 +17,8 @@ public class ContentVersionSaveReqVO {
     private String coverSnapshotJson;
     private String materialRefsJson;
     private Long referenceContentVersionId;
+    /** 参考作品链接，允许任意可读链接文本。 */
+    @Size(max = 1024) private String referenceWorkUrl;
     private String deliverableUrl;
     private String deliverableSnapshotJson;
     private String scriptText;

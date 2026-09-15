@@ -349,6 +349,15 @@ export const contentReviewApi = {
       leadResourceUrl?: string
       commentHook?: string
       referenceContentVersionId?: number
+      referenceWorkUrl?: string
+      referenceMaterials?: Array<{
+        materialId: number
+        materialVersionId?: number
+        materialNo?: string
+        title?: string
+        materialTypeName?: string
+        coverPreviewUrl?: string
+      }>
       plannedPublishAt?: string
     }>
   }) =>

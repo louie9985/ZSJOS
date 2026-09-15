@@ -418,3 +418,4 @@ describe('workbench menu conversion', () => {
     expect(getInaccessiblePathFallback(navigation, APP_ROUTES.USER_PROFILE)).toBeUndefined()
   })
 })
+

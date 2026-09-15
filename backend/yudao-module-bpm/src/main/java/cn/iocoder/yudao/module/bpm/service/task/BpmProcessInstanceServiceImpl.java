@@ -926,9 +926,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
                 processInstanceRelationService.prepare(userId, definition, processDefinitionInfo, variables);
 
         // 2. 创建流程实例
-        if (variables == null) {
-            variables = new HashMap<>();
-        }
+        // 拷贝一份：下面要对 variables 做 remove/put，调用方传入 Map.of 等不可变集合时会抛
+        // UnsupportedOperationException，导致流程无法发起。
+        variables = variables == null ? new HashMap<>() : new HashMap<>(variables);
         FlowableUtils.filterProcessInstanceFormVariable(variables); // 过滤一下，避免 ProcessInstance 系统级的变量被占用
         variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_START_USER_ID, userId); // 设置流程变量，发起人 ID
         variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_STATUS, // 流程实例状态：审批中

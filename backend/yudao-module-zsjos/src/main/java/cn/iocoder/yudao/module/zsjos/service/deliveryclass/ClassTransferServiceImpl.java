@@ -54,7 +54,6 @@ public class ClassTransferServiceImpl implements ClassTransferService {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId,
                 TenantContextHolder.getRequiredTenantId());
         if (relation == null || !List.of("active", "paused", "completed").contains(relation.getStatus())
-                || !Objects.equals(relation.getOwnerUserId(), userId)
                 || !Objects.equals(relation.getVersion(), req.getVersion())) throw exception(CLASS_TRANSFER_INVALID);
         DeliveryClassDO source = classMapper.selectById(relation.getClassId());
         DeliveryClassDO target = classMapper.selectByIdForUpdate(req.getTargetClassId(), relation.getTenantId());

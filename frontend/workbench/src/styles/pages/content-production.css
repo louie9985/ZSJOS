@@ -252,3 +252,87 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 当前版本：左侧封面 + 右侧字段表格，与内容审核页版式一致。 */
+.content-production-version-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: var(--crm-sp-3);
+  align-items: start;
+}
+
+.content-production-version-cover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  align-items: center;
+  justify-content: center;
+  padding: var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.content-production-version-cover .ant-image {
+  width: 100%;
+}
+
+/* 封面按原始比例完整显示：竖屏作品和方形图都不该被拉伸。 */
+.content-production-version-cover .ant-image img {
+  width: 100%;
+  height: auto;
+  max-height: 190px;
+  border-radius: var(--crm-radius-sm);
+  object-fit: contain;
+}
+
+.content-production-version-cover span {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-align: center;
+}
+
+.content-production-fields {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 132px minmax(0, 1fr);
+  margin: 0;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  overflow: hidden;
+}
+
+.content-production-fields dt,
+.content-production-fields dd {
+  min-width: 0;
+  margin: 0;
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  border-bottom: 1px solid var(--crm-border);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.content-production-fields dt {
+  color: var(--crm-text-secondary);
+  background: var(--crm-bg-sunken);
+  border-right: 1px solid var(--crm-border);
+  white-space: nowrap;
+}
+
+.content-production-fields dt:last-of-type,
+.content-production-fields dd:last-of-type {
+  border-bottom: none;
+}
+
+@media (max-width: 900px) {
+  .content-production-version-body,
+  .content-production-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-production-fields dt {
+    border-right: none;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}

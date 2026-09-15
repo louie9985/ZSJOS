@@ -1,0 +1,65 @@
+{
+  "key": "zsjos_production_content_review",
+  "name": "生产内容审核批次",
+  "category": "zsjos_content_review",
+  "description": "生产内容审核批次的两级顺序审批骨架；审批人和表单由 SIMPLE 设计器配置。 业务变量：contentReviewBatchId、contentReviewBatchNo、accountId、accountIds、operatorUserId、directorUserId。",
+  "type": 20,
+  "formType": 10,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "directorReview",
+      "type": 11,
+      "name": "编导审核",
+      "showText": "在 SIMPLE 设计器配置编导审批人",
+      "candidateStrategy": 35,
+      "candidateParam": "",
+      "approveType": 1,
+      "approveMethod": 1,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "finalReview",
+        "type": 11,
+        "name": "终审",
+        "showText": "在 SIMPLE 设计器配置终审审批人",
+        "candidateStrategy": 35,
+        "candidateParam": "",
+        "approveType": 1,
+        "approveMethod": 1,
+        "fieldsPermission": [],
+        "signEnable": false,
+        "reasonRequire": true,
+        "childNode": {
+          "id": "EndEvent",
+          "type": 1,
+          "name": "结束"
+        }
+      }
+    }
+  }
+}

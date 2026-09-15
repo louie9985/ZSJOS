@@ -23,6 +23,8 @@ public class ContentVersionDO extends TenantBaseDO {
     private String coverSnapshotJson;
     private String materialRefsJson;
     private Long referenceContentVersionId;
+    /** 参考作品链接，与素材库引用相互独立，可同时填写。 */
+    private String referenceWorkUrl;
     private String deliverableUrl;
     private String deliverableSnapshotJson;
     private String scriptText;

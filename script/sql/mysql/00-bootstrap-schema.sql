@@ -5840,6 +5840,9 @@ WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.reme
 INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
 SELECT 'ZSJOS品牌配置', 1, '默认员工头像', 'zsjos.user.default-avatar', '', b'1', '未配置个人头像时使用；空值回退昵称首字'
 WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.user.default-avatar' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS大屏配置', 1, '新媒体大屏每日定格时间', 'zsjos.new-media.dashboard-freeze-time', '04:00', b'1', '按租户配置统计日切分时间，格式 HH:mm，默认凌晨四点'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.new-media.dashboard-freeze-time' AND deleted = b'0');
 
 -- zsjos_partner_bank_card / zsjos_withdrawal / zsjos_withdrawal_item (V052)
 CREATE TABLE IF NOT EXISTS `zsjos_partner_bank_card` (
@@ -6109,6 +6112,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_version` (
   `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `comment_hook` text COLLATE utf8mb4_unicode_ci,
   `reference_content_version_id` bigint DEFAULT NULL,
+  `reference_work_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '参考作品链接',
   `lead_resource_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '引流资料 HTTPS 链接',
   `planned_publish_at` datetime DEFAULT NULL COMMENT '预计发布时间',
   `frozen_at` datetime DEFAULT NULL COMMENT '进入批审后的冻结时间',
@@ -7481,3 +7485,8 @@ CREATE TABLE IF NOT EXISTS zsjos_student_positioning_interview_attachment (
   KEY idx_tenant_interview (tenant_id,interview_id,deleted),
   KEY idx_tenant_student (tenant_id,student_person_id,deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位访谈稿引用';
+
+-- 内容审核字典类型（业务字典项由管理员在字典管理中维护）
+INSERT IGNORE INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`updater`)
+VALUES ('作品目的','zsjos_content_purpose',0,'ZSJOS 内容审核作品目的，管理员维护','system','system'),
+       ('作品形式','zsjos_content_format',0,'ZSJOS 内容审核作品形式，管理员维护','system','system');

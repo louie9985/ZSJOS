@@ -239,7 +239,8 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
                 </div>}
           </div>
           <div className="viral-account-side-actions">
-            {!readonly && <ClipboardUploadButtons disabled={uploading || Boolean(coverFileId)} canPaste={() => !uploading && !coverFileId} onFiles={files => { const file = files[0]; if (file) void uploadCover(file) }}><Upload accept="image/*" showUploadList={false} beforeUpload={file => { void uploadCover(file); return false }}><Button block icon={<UploadOutlined />} loading={uploading}>上传附件</Button></Upload></ClipboardUploadButtons>}
+            {!readonly && !coverFileId && <ClipboardUploadButtons disabled={uploading} canPaste={() => !uploading} onFiles={files => { const file = files[0]; if (file) void uploadCover(file) }}><Upload accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void uploadCover(file); return false }}><Button block icon={<UploadOutlined />} loading={uploading}>上传图片</Button></Upload></ClipboardUploadButtons>}
+            {!readonly && coverFileId && <Button danger block icon={<DeleteOutlined />} disabled={uploading} onClick={() => { setCoverFileId(undefined); setCoverPreviewUrl(undefined) }}>删除图片</Button>}
             <Space className="viral-account-actions" direction="vertical" size={8}>{actions}</Space>
           </div>
         </div>

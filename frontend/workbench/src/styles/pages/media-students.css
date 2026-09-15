@@ -564,7 +564,7 @@
 .account-profile-history { margin-top: var(--crm-sp-5); }
 .account-profile-history article { padding-block: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* 编辑弹窗：与只读展示区同构 —— 左栏主页图，右侧三组各一列卡片，卡片内部各自滚动。 */
-.account-profile-editor { display: grid; height: 65vh; min-height: 0; grid-template-columns: 220px minmax(0,1fr); gap: var(--crm-gap); padding: var(--crm-pane-pad); }
+.account-profile-editor { display: grid; height: 65vh; min-height: 0; grid-template-columns: 230px minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1.2fr); gap: var(--crm-gap); padding: var(--crm-pane-pad); }
 .account-profile-editor-aside { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
 .account-profile-editor-aside p { margin: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
 .account-profile-editor-aside .account-profile-cover { flex: none; min-height: 180px; margin-bottom: 0; }
@@ -573,10 +573,10 @@
 .account-profile-editor-actions .ant-space-item,
 .account-profile-editor-actions .ant-btn,
 .account-profile-editor-actions .ant-upload { width: 100%; }
-.account-profile-editor-main { display: flex; min-height: 0; flex-direction: column; gap: var(--crm-sp-3); }
-.account-profile-editor-toolbar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; }
+.account-profile-editor-main { display: contents; }
+.account-profile-editor-toolbar { display: flex; grid-column: 2 / -1; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; }
 /* 三列卡片复用 .account-profile-section / .account-profile-section-body 的定高内滚规则。 */
-.account-profile-editor-columns { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) minmax(0, 1.4fr); gap: var(--crm-gap); align-items: stretch; }
+.account-profile-editor-columns { display: contents; }
 /* 列内是单列字段流（不再是弹窗原来的两列栅格）。 */
 .account-profile-editor-columns .account-profile-section-body { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
 .account-profile-editor-columns .account-profile-status-columns > div { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
@@ -599,6 +599,7 @@
  .account-profile-editor { height: auto; padding: var(--crm-sp-2); }
  .account-profile-editor-aside,
  .account-profile-editor-columns .account-profile-section-body { overflow: visible; }
+ .account-profile-editor-toolbar { grid-column: auto; }
  .account-profile-cover { min-height: 120px; }
  .account-profile-editor,
  .account-profile-editor-columns,
@@ -620,7 +621,7 @@
 .positioning-card-field-control { min-width: 0; }
 @media (max-width: 768px) { .positioning-card-field-head { display: none; } .positioning-card-field-row { display: flex; flex-direction: column; gap: 6px; } .positioning-card-field-row > strong::before { content: '定位卡项目：'; color: var(--crm-text-secondary); font-weight: 400; } }
 
-.account-profile-editor-columns > [data-profile-section="POSITIONING"] { grid-column: 1 / -1; }
+.account-profile-editor-columns > [data-profile-section="POSITIONING"] { min-width: 0; }
 .account-positioning-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .account-positioning-table th, .account-positioning-table td { padding: var(--crm-sp-3); border-bottom: 1px solid var(--crm-border); vertical-align: top; text-align: left; overflow-wrap: anywhere; white-space: pre-wrap; }
 .account-positioning-table th:first-child { width: 20%; }
@@ -631,3 +632,41 @@
   .account-positioning-table thead { display: none; }
   .account-positioning-table th:first-child { width: 100%; }
 }
+
+/* Account actions grow to the left and remain right-aligned when wrapping. */
+.account-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  margin-inline-start: auto;
+}
+.account-published-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: var(--crm-sp-4);
+  margin-block: var(--crm-sp-4);
+}
+.account-work-card { min-width: 0; }
+.account-work-open {
+  width: 100%;
+  padding: 0;
+  text-align: start;
+  color: var(--crm-text);
+  font: inherit;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  overflow: hidden;
+  cursor: pointer;
+}
+.account-work-open:disabled { cursor: default; }
+.account-work-open:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.account-work-cover { aspect-ratio: 3 / 4; display: grid; place-items: center; background: var(--crm-bg-sunken); color: var(--crm-text-secondary); }
+.account-work-cover img { width: 100%; height: 100%; object-fit: cover; }
+.account-work-cover > span { text-align: center; }
+.account-work-caption { display: flex; flex-direction: column; align-items: flex-start; gap: var(--crm-sp-2); padding: var(--crm-card-pad); }
+.account-work-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.account-published-works { grid-column: 1 / -1; min-width: 0; }
+.account-profile > .media-students-tab-heading { flex-wrap: wrap; flex: none; }

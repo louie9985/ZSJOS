@@ -184,6 +184,13 @@ export interface Material {
   updateTime?: string
 }
 
+export interface MaterialApprovalTask {
+  task: { id: string; processInstanceId: string }
+  versionId: number
+  materialNo: string
+  title: string
+}
+
 export interface MaterialPageParams {
   pageNo: number
   pageSize: number
@@ -265,16 +272,6 @@ export interface ContentReviewProcessDefinition {
   userTasks: ContentReviewUserTask[]
 }
 
-export interface ContentReviewConfig {
-  id: number
-  processDefinitionKey?: string
-  directorTaskKey?: string
-  finalTaskKey?: string
-  productionMaterialTypeCode: string
-  materialFieldMapping: Record<string, string>
-  materialDefaultValues: Record<string, unknown>
-  version: number
-}
 
 export const getMaterialTypeList = () =>
   request.get<MaterialType[]>({ url: '/zsjos/material-type/list' })
@@ -389,11 +386,8 @@ export const commitMaterialImport = (id: number, expectedVersion: number) =>
 export const downloadMaterialImportErrors = (id: number) =>
   request.download<Blob>({ url: `/zsjos/material-import/${id}/error-report` })
 
-export const getContentReviewConfig = () =>
-  request.get<ContentReviewConfig>({ url: '/zsjos/content-review/config' })
+export const getMaterialApprovalPage = (typeCode: string, pageNo = 1, pageSize = 100) =>
+  request.get<PageResult<MaterialApprovalTask[]>>({ url: '/zsjos/material-approval/page', params: { typeCode, pageNo, pageSize, done: false } })
 
-export const getContentReviewProcessDefinitions = () =>
-  request.get<ContentReviewProcessDefinition[]>({ url: '/zsjos/content-review/process-definition/list' })
-
-export const updateContentReviewConfig = (data: ContentReviewConfig) =>
-  request.put<boolean>({ url: '/zsjos/content-review/config', data })
+export const decideMaterialApproval = (action: 'approve' | 'reject', versionId: number, taskId: string, reason: string) =>
+  request.post<boolean>({ url: `/zsjos/material-approval/${action}`, data: { versionId, taskId, reason } })

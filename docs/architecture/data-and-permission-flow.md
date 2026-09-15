@@ -905,3 +905,6 @@ headers, or a user-selected tenant cannot grant access independently.
 ## 编导定位卡
 
 正式提交使用账号档案对象权限与可配置的定位卡创建权限累积校验。字段、字典和素材引用均由服务端模板及所属业务 API 提供；前端只渲染授权字段。草稿保存不生成正式定位版本，每次正式提交冻结模板、字典标签和素材版本快照。
+
+## H5 排行榜租户配置（2026-09-14）
+ZSJOS 将 H5 排行榜开关、榜单类型、默认周期及员工提交者统计规则保存在租户隔离的 `zsjos_partner_leaderboard_config` 中。Admin 与 Partner H5 共同读取该服务端来源；缺少记录时使用安全默认值，默认榜单被关闭时按启用榜单顺序回退。员工角色候选通过 System 角色公共 API 获取，ZSJOS 不复制角色表。

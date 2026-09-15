@@ -14,6 +14,8 @@ export interface LeaderboardTypeOption {
 
 export interface LeaderboardConfig {
   enabled: boolean
+  includeEmployeeSubmitter?: boolean
+  employeeRoleCodes?: string[]
   enabledTypes: LeaderboardType[]
   defaultType: LeaderboardType
   defaultPeriod: LeaderboardPeriod

@@ -59,6 +59,45 @@ public class BpmModelServiceImplTest extends BaseMockitoUnitTest {
     @Mock
     private BpmCategoryService categoryService;
 
+    @Mock
+    private BpmFormService bpmFormService;
+
+    @Test
+    public void testImportViralAssetCreatesTenantForm() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.isDirectory(root.resolve("script/bpm"))) root = root.getParent();
+        assertNotNull(root);
+        for (String kind : Arrays.asList("account", "content")) {
+            BpmModelSaveReqVO request = JsonUtils.parseObject(Files.readString(root.resolve(
+                    "script/bpm/zsjos_viral_" + kind + "_review/1.0.0/process-model.json")), BpmModelSaveReqVO.class);
+            request.setManagerUserIds(Collections.singletonList(50L));
+            ValidationUtils.validate(request);
+            assertNotNull(request.getImportForm());
+            request.getImportForm().setId(999L);
+            Model model = mock(Model.class);
+            when(model.getId()).thenReturn(MODEL_ID);
+            when(model.getKey()).thenReturn(request.getKey());
+            when(model.getName()).thenReturn(request.getName());
+            when(repositoryService.createModelQuery()).thenReturn(modelQuery);
+            when(modelQuery.modelTenantId(anyString())).thenReturn(modelQuery);
+            when(modelQuery.modelKey(anyString())).thenReturn(modelQuery);
+            when(repositoryService.newModel()).thenReturn(model);
+            when(categoryService.getCategoryListByCode(anyCollection()))
+                    .thenReturn(Collections.singletonList(new BpmCategoryDO()));
+            doAnswer(call -> {
+                assertNull(((cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.form.BpmFormSaveReqVO)
+                        call.getArgument(0)).getId());
+                return 77L;
+            }).when(bpmFormService).createForm(any());
+            assertEquals(MODEL_ID, modelService.importModel(50L, request));
+            assertEquals(77L, request.getFormId());
+            assertNull(request.getImportForm());
+            BpmnModel bpmn = SimpleModelUtils.buildBpmnModel(request.getKey(), request.getName(), request.getSimpleModel());
+            assertInstanceOf(UserTask.class, bpmn.getMainProcess().getFlowElement("viralReview"));
+            verify(model).setTenantId("1");
+        }
+    }
+
     @BeforeEach
     public void setUp() {
         TenantContextHolder.setTenantId(TENANT_ID);

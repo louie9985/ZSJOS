@@ -1,0 +1,28 @@
+# Workstream: main
+- Goal: remove obsolete configurable production-content review process/node/material-type settings while retaining BPM execution and mapping snapshots.
+- Non-goals: do not delete BPM assets, business batches, historical snapshots, or production template mapping/default behavior.
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- Base commit: pending current HEAD
+- Target branch: main
+- Ownership scope: content review config backend and admin material type remnants
+- Owner: root
+- Dependencies: published zsjos_production_content_review BPM asset
+- Integration order: backend fixed contract -> API/frontend cleanup -> tests
+- Verification plan: focused rg, Maven module test/compile, Admin typecheck
+- Execution result: Implementation was reverted after scripted edits revealed existing shared worktree changes and risk of overwriting unrelated edits; no functional source files retained.\n- Verification: None; read-only dependency scan completed.\n- Remaining work: Reapply cleanup with targeted patches after isolating current file state.
+- Beijing time: 2026-09-14
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: 436ba84cd8ab5471356e3faa62db9ab44e3c76e9
+- User goal: 完整清除无用生产内容审核配置项。
+- Key decisions: 固定生产内容流程、节点和收录类型；保留字段映射、默认值及历史快照。
+- Execution or analysis result: 已将 ContentReviewConfigService/BatchService 的运行读取改为固定流程契约常量；前端和接口清理尚未保留，避免破坏当前共享工作树。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/contentreview/ContentReviewConfigService.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/contentreview/ContentReviewBatchService.java
+- Verification evidence: git diff --check 仅报告文件末尾空行；Maven 命令参数错误（将 `-DskipTests` 误传为 `-DskipTests compile`），未完成编译验证。
+- Dependency or integration impact: BPM 资产未修改；配置表和管理端配置接口仍保留，尚未达到完整清除。
+- Remaining work: 清理 ContentReviewController/VO/前端配置面板和 API；确认数据库迁移策略；重新运行 Maven compile。
+- 2026-09-14: Continued fixed-contract changes; compile exposed literal escape issue and it was corrected. API/frontend cleanup remains pending.
+- 2026-09-14: Removed admin content-review config endpoints and frontend configuration panel/API; fixed runtime reads to BPM constants; Maven compile reached zsjos compilation but exposed import cleanup, now corrected.
+- 2026-09-14: Fixed unqualified fixed-contract constants in ContentReviewBatchService; Maven -pl yudao-module-zsjos -am -DskipTests compile passed.
+- 2026-09-14: Deleted obsolete ContentReviewConfigServiceTest tied to removed config write VO; Maven test-compile passed for yudao-module-zsjos reactor.

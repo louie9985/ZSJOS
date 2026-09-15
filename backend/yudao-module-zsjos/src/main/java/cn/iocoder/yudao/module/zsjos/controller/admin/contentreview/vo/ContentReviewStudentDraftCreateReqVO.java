@@ -51,6 +51,12 @@ public class ContentReviewStudentDraftCreateReqVO {
         private Long coverFileId;
         private String materialRefsJson;
         private Long referenceContentVersionId;
+        /** 参考作品链接，纯文本填写。 */
+        @Size(max = 1024)
+        private String referenceWorkUrl;
+        /** 从素材库多选出的参考素材快照，随作品保存供审批查看。 */
+        @Size(max = 20)
+        private List<@Valid ReferenceMaterial> referenceMaterials;
         private String deliverableUrl;
         private String deliverableSnapshotJson;
         private String scriptText;
@@ -60,5 +66,21 @@ public class ContentReviewStudentDraftCreateReqVO {
         private LocalDateTime plannedPublishAt;
         @Size(max = 128)
         private String idempotencyKey;
+    }
+
+    /** 素材库参考素材的选择结果，只保存进入审批所需的展示字段。 */
+    @Data
+    public static class ReferenceMaterial {
+        @NotNull
+        private Long materialId;
+        private Long materialVersionId;
+        @Size(max = 64)
+        private String materialNo;
+        @Size(max = 255)
+        private String title;
+        @Size(max = 128)
+        private String materialTypeName;
+        @Size(max = 1024)
+        private String coverPreviewUrl;
     }
 }

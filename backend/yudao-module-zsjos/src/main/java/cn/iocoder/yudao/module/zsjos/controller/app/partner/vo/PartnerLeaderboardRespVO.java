@@ -27,6 +27,8 @@ public class PartnerLeaderboardRespVO {
     @Data
     public static class Member {
         private Long partnerId;
+        private Long submitterId;
+        private String submitterType;
         private String displayName;
         private Integer rank;
         private BigDecimal value;
@@ -42,3 +44,5 @@ public class PartnerLeaderboardRespVO {
         private Boolean targetReached;
     }
 }
+
+

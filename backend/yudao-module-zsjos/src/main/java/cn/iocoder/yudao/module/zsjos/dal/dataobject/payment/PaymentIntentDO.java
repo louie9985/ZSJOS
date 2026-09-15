@@ -35,6 +35,7 @@ public class PaymentIntentDO extends TenantBaseDO {
     private String provider;
     private String channel;
     private String reqsn;
+    private String subjectSnapshotJson;
     private LocalDateTime expiresAt;
     private LocalDateTime paidAt;
     private LocalDateTime closedAt;

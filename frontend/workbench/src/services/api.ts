@@ -378,9 +378,17 @@ export type MediaContentVersion = {
   topicSnapshot?: string;
   coverSnapshotJson?: string;
   materialRefsJson?: string;
+  referenceContentVersionId?: number;
+  referenceWorkUrl?: string;
   deliverableUrl?: string;
   deliverableSnapshotJson?: string;
   scriptText?: string;
+  purposeValue?: string;
+  purposeLabelSnapshot?: string;
+  formatValue?: string;
+  formatLabelSnapshot?: string;
+  detailUrl?: string;
+  commentHook?: string;
   leadResourceUrl?: string;
   plannedPublishAt?: Timestamp;
   frozenAt?: Timestamp;
@@ -2065,7 +2073,7 @@ export type BpmBusinessTaskTarget =
       supported: true;
       route: string;
       query: Record<string, string | number | boolean>;
-      bizType: "sales_order" | "lead_appeal";
+      bizType: "sales_order" | "lead_appeal" | "material";
       message?: string;
     }
   | {
@@ -2107,7 +2115,9 @@ export type BusinessTask = {
     | "OPEN_STUDENT_CONTACT"
     | "OPEN_STUDENT_CONTACT_ASSISTANCE"
     | "MEDIA_ACCOUNT_DIAGNOSIS"
-    | "STUDENT_DELIVERY_CONFIRM";
+    | "STUDENT_DELIVERY_CONFIRM"
+    | "COMPLETE_POSITIONING_INTERVIEW"
+    | "COMPLETE_TOPIC";
   serviceRelationId?: number;
   targetTab?: string;
   targetRecordId?: number;
@@ -2116,6 +2126,25 @@ export type BusinessTask = {
 export type StudentDeliveryPlan = { id: number; accountId: number; status: string; accountOpenedAt: Timestamp; stages: Array<{ id: number; stageCode: string; status: string; triggerAt?: Timestamp; dueAt?: Timestamp; completedAt?: Timestamp }> };
 export type StudentDeliverySubmission = { id: number; stageId: number; submittedAt: Timestamp };
 export type StudentDeliveryDefer = { id: number; stageId: number; requestedDays: number; status: string };
+/**
+ * BPM 操作按钮类型，与后端 BpmSimpleModelNodeTypeEnum 的按钮编号一致。
+ * 按钮显隐与显示名由后端 buttonsSetting 下发，前端不自行判断流程语义。
+ */
+export const BPM_OPERATION_BUTTON = {
+  APPROVE: 1,
+  REJECT: 2,
+  TRANSFER: 3,
+  DELEGATE: 4,
+  ADD_SIGN: 5,
+  RETURN: 6,
+  COPY: 7,
+} as const;
+export type BpmOperationButtonType =
+  (typeof BPM_OPERATION_BUTTON)[keyof typeof BPM_OPERATION_BUTTON];
+export type BpmOperationButtonSetting = {
+  displayName?: string;
+  enable?: boolean;
+};
 export type BpmTask = {
   id: string;
   name: string;
@@ -2124,14 +2153,24 @@ export type BpmTask = {
   durationInMillis?: number;
   status: number;
   reason?: string;
+  signPicUrl?: string;
+  attachments?: string[];
   assigneeUser?: { id: number; nickname: string };
   ownerUser?: { id: number; nickname: string };
   processInstanceId: string;
   processDefinitionKey?: string;
   taskDefinitionKey?: string;
   parentTaskId?: string;
+  children?: BpmTask[];
+  formId?: number;
   formName?: string;
+  formConf?: string;
+  formFields?: string[];
+  formVariables?: Record<string, unknown>;
+  buttonsSetting?: Partial<Record<BpmOperationButtonType, BpmOperationButtonSetting>>;
+  signEnable?: boolean;
   reasonRequire?: boolean;
+  nodeType?: number;
   processInstance?: {
     id: string;
     name: string;
@@ -2140,6 +2179,75 @@ export type BpmTask = {
     summary?: Array<{ key: string; value: string }>;
     startUser?: { id: number; nickname: string };
   };
+};
+export type BpmApprovalNodeTask = {
+  id: string;
+  owner?: number;
+  ownerUser?: { id: number; nickname: string; avatar?: string };
+  assignee?: number;
+  assigneeUser?: { id: number; nickname: string; avatar?: string };
+  status?: number;
+  reason?: string;
+  signPicUrl?: string;
+  attachments?: string[];
+  createTime?: Timestamp;
+  endTime?: Timestamp;
+};
+export type BpmApprovalNode = {
+  id: string;
+  name: string;
+  nodeType?: number;
+  status?: number;
+  startTime?: Timestamp;
+  endTime?: Timestamp;
+  tasks?: BpmApprovalNodeTask[];
+  candidateStrategy?: number;
+  candidateUserIds?: number[];
+  candidateUsers?: Array<{ id: number; nickname: string; avatar?: string }>;
+  processInstanceId?: string;
+};
+/** 流程定义的表单配置；formType 10 为流程表单，20 为业务表单（Vue 组件路径，Workbench 无法加载）。 */
+export type BpmProcessDefinitionInfo = {
+  id: string;
+  key: string;
+  name: string;
+  formType?: number;
+  formId?: number;
+  formName?: string;
+  formConf?: string;
+  formFields?: string[];
+  formCustomViewPath?: string;
+  modelType?: number;
+};
+export type BpmApprovalDetail = {
+  status?: number;
+  activityNodes?: BpmApprovalNode[];
+  formFieldsPermission?: Record<string, string>;
+  todoTask?: BpmTask;
+  processDefinition?: BpmProcessDefinitionInfo;
+  processInstance?: {
+    id: string;
+    name: string;
+    status?: number;
+    businessKey?: string;
+    createTime?: Timestamp;
+    startTime?: Timestamp;
+    endTime?: Timestamp;
+    formVariables?: Record<string, unknown>;
+    summary?: Array<{ key: string; value: string }>;
+    startUser?: { id: number; nickname: string; avatar?: string };
+    processDefinitionId?: string;
+  };
+};
+export type BpmComment = {
+  id: string;
+  taskId?: string;
+  processInstanceId?: string;
+  type?: string;
+  message: string;
+  createTime: Timestamp;
+  user?: { id: number; nickname: string; avatar?: string };
+  task?: { id: string; name: string; taskDefinitionKey?: string };
 };
 export type SalesOrderSupervisorApproval = SalesOrderSupervisorConfirmation & {
   taskDefinitionKey: "registrationReview" | "financeReview";
@@ -3586,6 +3694,13 @@ export const api = {
       deliverableUrl?: string;
       deliverableSnapshotJson?: string;
       scriptText?: string;
+      purposeValue?: string;
+      purposeLabelSnapshot?: string;
+      formatValue?: string;
+      formatLabelSnapshot?: string;
+      detailUrl?: string;
+      commentHook?: string;
+      referenceWorkUrl?: string;
       leadResourceUrl?: string;
       plannedPublishAt?: string;
     }) =>
@@ -4327,7 +4442,7 @@ export const api = {
   salesOrderCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/sales-order/product/catalog")),
   giftConfigList: async () =>
-    unwrap<GiftNode[]>(await http.get("/zsjos/gift-config/list", { params: { status: 1 } })),
+    unwrap<GiftNode[]>(await http.get("/zsjos/gift-config/list", { params: { status: 0 } })),
   currentPurchaseIntent: async (
     data: Pick<
       PurchaseIntentDraftRequest,
@@ -4713,7 +4828,7 @@ export const api = {
       unwrap<StudentDeliveryPlan>(await http.post("/zsjos/student-delivery/plan", undefined, { params: data })),
     submit: async (data: { stageId: number; submittedBy: number; templateVersionId?: number; fieldValuesJson: string; dictionarySnapshotJson?: string; attachmentSnapshotJson?: string }) =>
       unwrap<StudentDeliverySubmission>(await http.post("/zsjos/student-delivery/submission", data)),
-    defer: async (data: { stageId: number; requestedBy: number; requestedDays: 1 | 2 | 3; reason: string; supervisorUserId?: number }) =>
+    defer: async (data: { stageId: number; requestedBy: number; requestedDays: number; reason: string; supervisorUserId?: number }) =>
       unwrap<StudentDeliveryDefer>(await http.post("/zsjos/student-delivery/defer", data)),
   },
   studentDeliveryConfig: {
@@ -4771,16 +4886,96 @@ export const api = {
   bpmTaskPage: async (
     view: "todo" | "done",
     params: { pageNo: number; pageSize: number; name?: string; category?: string; status?: number; createTime?: [string, string] },
-  ) =>
-    unwrap<PageResult<BpmTask>>(
-      await http.get(`/bpm/task/${view}-page`, { params }),
+  ) => {
+    console.log('[API] bpmTaskPage - view:', view, 'params:', params)
+    const url = `/bpm/task/${view}-page`
+    console.log('[API] bpmTaskPage - url:', url)
+    try {
+      const response = await http.get(url, { params })
+      console.log('[API] bpmTaskPage - response:', response)
+      const result = unwrap<PageResult<BpmTask>>(response)
+      console.log('[API] bpmTaskPage - unwrapped result:', result)
+      return result
+    } catch (error) {
+      console.error('[API] bpmTaskPage - error:', error)
+      throw error
+    }
+  },
+  bpmApprovalDetail: async (params: {
+    processInstanceId: string;
+    taskId?: string;
+    activityId?: string;
+  }) =>
+    unwrap<BpmApprovalDetail>(
+      await http.get("/bpm/process-instance/get-approval-detail", { params }),
     ),
-  approveBpmTask: async (id: string, reason: string) =>
-    unwrap<boolean>(
-      await http.put("/bpm/task/approve", { id, reason, variables: {} }),
+  bpmTaskListByProcessInstance: async (processInstanceId: string) =>
+    unwrap<BpmTask[]>(
+      await http.get("/bpm/task/list-by-process-instance-id", {
+        params: { processInstanceId },
+      }),
     ),
-  rejectBpmTask: async (id: string, reason: string) =>
-    unwrap<boolean>(await http.put("/bpm/task/reject", { id, reason })),
+  /** 可退回的节点列表；退回目标由引擎按已完成的前序节点计算，前端不自行推导。 */
+  bpmReturnTaskList: async (id: string) =>
+    unwrap<Array<{ id?: string; name: string; taskDefinitionKey?: string; definitionKey?: string }>>(
+      await http.get("/bpm/task/list-by-return", { params: { id } }),
+    ),
+  bpmCommentList: async (processInstanceId: string) =>
+    unwrap<BpmComment[]>(
+      await http.get("/bpm/comment/list-by-process-instance-id", {
+        params: { processInstanceId },
+      }),
+    ),
+  approveBpmTask: async (data: {
+    id: string;
+    reason?: string;
+    signPicUrl?: string;
+    attachments?: string[];
+    variables?: Record<string, unknown>;
+    nextAssignees?: Record<string, number[]>;
+  }) => unwrap<boolean>(await http.put("/bpm/task/approve", data)),
+  rejectBpmTask: async (data: {
+    id: string;
+    reason: string;
+    attachments?: string[];
+  }) => unwrap<boolean>(await http.put("/bpm/task/reject", data)),
+  transferBpmTask: async (data: {
+    id: string;
+    assigneeUserId: number;
+    reason: string;
+  }) => unwrap<boolean>(await http.put("/bpm/task/transfer", data)),
+  delegateBpmTask: async (data: {
+    id: string;
+    delegateUserId: number;
+    reason: string;
+  }) => unwrap<boolean>(await http.put("/bpm/task/delegate", data)),
+  createBpmTaskSign: async (data: {
+    id: string;
+    userIds: number[];
+    type: "before" | "after";
+    reason: string;
+  }) => unwrap<boolean>(await http.put("/bpm/task/create-sign", data)),
+  deleteBpmTaskSign: async (data: { id: string; reason: string }) =>
+    unwrap<boolean>(await http.delete("/bpm/task/delete-sign", { data })),
+  returnBpmTask: async (data: {
+    id: string;
+    targetTaskDefinitionKey: string;
+    reason: string;
+  }) => unwrap<boolean>(await http.put("/bpm/task/return", data)),
+  copyBpmTask: async (data: {
+    id: string;
+    copyUserIds: number[];
+    reason?: string;
+  }) => unwrap<boolean>(await http.put("/bpm/task/copy", data)),
+  createBpmComment: async (data: { taskId: string; message: string }) =>
+    unwrap<boolean>(await http.post("/bpm/comment/create", data)),
+  /** 上传审批签名图片，返回可访问地址。 */
+  uploadBpmSignature: async (file: File) => {
+    const data = new FormData();
+    data.append("file", file);
+    data.append("directory", "bpm/signature");
+    return unwrap<string>(await http.post("/infra/file/upload", data));
+  },
   simpleUsers: async () =>
     unwrap<SimpleUser[]>(await http.get("/system/user/simple-list")),
   simpleDepartments: async () =>

@@ -1,5 +1,4 @@
 import {
-  CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
   LinkOutlined,
@@ -33,7 +32,8 @@ import {
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
-import { ApiError, api } from '../services/api'
+import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
+import { ApiError, api, type SimpleUser } from '../services/api'
 import { hasPermission } from '../services/managementAccess'
 import {
   contentReviewApi,
@@ -41,7 +41,9 @@ import {
   type ContentReviewBatch,
   type ContentReviewCandidate,
   type ContentReviewItem,
+  type Material,
 } from '../services/materialApi'
+import MaterialSelectorModal from '../components/MaterialSelectorModal'
 
 const PAGE_SIZE = 20
 const CANDIDATE_PAGE_SIZE = 10
@@ -73,10 +75,77 @@ const httpsSnapshotUrl = (snapshot: Record<string, unknown>, key: string) => {
   return typeof value === 'string' && /^https:\/\//i.test(value) ? value : undefined
 }
 
+/** 审批只读取提交时的素材快照，因此这里不依赖素材库的实时状态。 */
+const referenceMaterials = (item: ContentReviewItem) =>
+  (Array.isArray(item.contentSnapshot.materialRefs) ? item.contentSnapshot.materialRefs : [])
+    .map(ref => ref as Record<string, unknown>)
+    .map(ref => ({
+      materialId: String(ref.materialId ?? ''),
+      materialNo: String(ref.materialNo || ''),
+      title: String(ref.title || '素材'),
+      coverPreviewUrl: typeof ref.coverPreviewUrl === 'string' ? ref.coverPreviewUrl : undefined,
+    }))
+
+/**
+ * 账号档案区，每个账号一块。数据全部取自提交时冻结的 contextSnapshot.accountSnapshots，
+ * 不实时查账号表：否则账号改名或换阶段会改写历史审批记录。
+ */
+function AccountProfiles({ batch }: { batch: ContentReviewBatch }) {
+  const snapshots = (Array.isArray(batch.contextSnapshot.accountSnapshots)
+    ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
+  if (!snapshots.length) return null
+  const text = (value: unknown) => {
+    const result = value === null || value === undefined ? '' : String(value).trim()
+    return result || '—'
+  }
+  const problems = (value: unknown) => Array.isArray(value)
+    ? value.map(problem => typeof problem === 'object' && problem
+      ? String((problem as Record<string, unknown>).labelSnapshot
+        ?? (problem as Record<string, unknown>).label ?? '')
+      : String(problem)).filter(Boolean).join('、')
+    : ''
+  return <div className="content-review-account-profiles">{snapshots.map(snapshot => {
+    const id = text(snapshot.id)
+    const bottleneck = text(snapshot.bottleneckLabel) !== '—'
+      ? text(snapshot.bottleneckLabel) : text(problems(snapshot.primaryProblems))
+    return <dl className="content-review-account-profile" key={id}>
+      <div className="content-review-account-heading">
+        <Typography.Text strong>账号 {text(snapshot.accountNo)}</Typography.Text>
+      </div>
+      <div><dt>账号名称</dt><dd>{text(snapshot.nickname)}</dd></div>
+      <div><dt>发布平台</dt><dd>{text(snapshot.platformLabel ?? snapshot.platformValue)}</dd></div>
+      <div><dt>平台账号</dt><dd>{text(snapshot.platformAccountId)}</dd></div>
+      <div><dt>当前期段</dt><dd>{text(snapshot.sStageLabel ?? snapshot.sStage)}</dd></div>
+      <div><dt>账号状态</dt><dd>{text(snapshot.currentStatusLabel ?? snapshot.currentStatusValue)}</dd></div>
+      {/* 只展示姓名：内部用户编号对审核人没有意义，服务端已按编号解析昵称。 */}
+      <div><dt>责任运营人员</dt><dd>{text(snapshot.operatorName)}</dd></div>
+      <div><dt>责任编导</dt><dd>{text(snapshot.directorName)}</dd></div>
+      <div><dt>承接产品目标</dt><dd>{text(snapshot.productGoal)}</dd></div>
+      <div><dt>主要产品形式</dt><dd>{text(snapshot.productFormLabel)}</dd></div>
+      <div><dt>当前发布节奏</dt><dd>{text(snapshot.publishFrequency)}</dd></div>
+      <div><dt>当前瓶颈</dt><dd>{bottleneck}</dd></div>
+    </dl>
+  })}</div>
+}
+
+/** 作品封面：放在卡片左栏，与右侧字段表格并排，对齐纸质审核表的版式。 */
+function ItemCover({ item }: { item: ContentReviewItem }) {
+  const cover = item.files?.find(file => file.fieldKey === 'cover' && file.previewUrl
+    && file.contentType.startsWith('image/'))
+  return <div className="content-review-item-cover">
+    {cover
+      ? <Image src={cover.previewUrl} alt={`作品封面图：${cover.originalName}`} />
+      : <Typography.Text type="secondary">暂无封面图</Typography.Text>}
+    <span>作品封面图</span>
+  </div>
+}
+
+/** 成品文件。封面已在卡片左栏单独展示，这里不再重复。 */
 function ReviewFiles({ item }: { item: ContentReviewItem }) {
-  if (!item.files?.length) return null
-  return <div className="content-review-media">{item.files.map(file => {
-    const label = file.fieldKey === 'cover' ? '封面' : '成品'
+  const files = item.files?.filter(file => file.fieldKey !== 'cover') ?? []
+  if (!files.length) return null
+  return <div className="content-review-media">{files.map(file => {
+    const label = '成品'
     if (file.contentType.startsWith('image/') && file.previewUrl) {
       return <div className="content-review-media-item" key={file.id}>
         <Image width={128} height={84} src={file.previewUrl} alt={`${label}：${file.originalName}`} />
@@ -233,11 +302,12 @@ function DecisionEditor({ batch, item, stage, onSaved }: {
   return <div className="content-review-decision">
     <Radio.Group value={decision} onChange={event => setDecision(event.target.value)} optionType="button"
       options={[{ value: 'APPROVED', label: '通过' }, { value: 'RETURNED', label: '退回' }]} />
+    <Input.TextArea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)}
+      placeholder={decision === 'RETURNED' ? '填写退回原因（必填）' : '审核意见（可选）'} />
+    <Button type="primary" loading={loading} onClick={() => void save()}
+      disabled={!decision}>{existingDecision ? '更新本条结论' : '保存本条结论'}</Button>
     {stage === 'final' && decision === 'APPROVED' && <span className="content-review-collect">收录素材库
       <Switch checked={collect} onChange={setCollect} /></span>}
-    <Input.TextArea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)}
-      placeholder={decision === 'RETURNED' ? '填写退回原因' : '审核意见'} />
-    <Button type="primary" loading={loading} onClick={() => void save()}>保存本条</Button>
   </div>
 }
 
@@ -247,14 +317,20 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
   const [loading, setLoading] = useState(false)
   const [purposeOptions, setPurposeOptions] = useState<Array<{ value: string; label: string }>>([])
   const [formatOptions, setFormatOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [referenceOptions, setReferenceOptions] = useState<Array<{ value: number; label: string }>>([])
+  const [platformOptions, setPlatformOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [stageOptions, setStageOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [statusOptions, setStatusOptions] = useState<Array<{ value: string; label: string }>>([])
   const [uploading, setUploading] = useState<number>()
+  const [materialPickerIndex, setMaterialPickerIndex] = useState<number>()
+  const [materialsByWork, setMaterialsByWork] = useState<Record<number, Material[]>>({})
   useEffect(() => {
     if (!open) return
-    void Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format'), materialApi.referenceTargets({ pageNo: 1, pageSize: 50 })]).then(([purpose, format, references]) => {
+    void Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format'), api.dictDataByType('zsjos_account_platform'), api.dictDataByType('zsjos_media_account_stage'), api.dictDataByType('zsjos_media_account_current_status')]).then(([purpose, format, platform, stage, status]) => {
       setPurposeOptions(purpose.map(item => ({ value: item.value, label: item.label })))
       setFormatOptions(format.map(item => ({ value: item.value, label: item.label })))
-      setReferenceOptions(references.list.map(item => ({ value: item.contentVersionId, label: `${item.title} · ${item.contentNo}` })))
+      setPlatformOptions(platform.map(item => ({ value: item.value, label: item.label })))
+      setStageOptions(stage.map(item => ({ value: item.value, label: item.label })))
+      setStatusOptions(status.map(item => ({ value: item.value, label: item.label })))
     })
   }, [open])
   useEffect(() => {
@@ -274,8 +350,20 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
       leadResourceUrl: item.contentSnapshot.leadResourceUrl,
       commentHook: item.contentSnapshot.commentHook,
       referenceContentVersionId: item.contentSnapshot.referenceContentVersionId,
+      referenceWorkUrl: item.contentSnapshot.referenceWorkUrl,
       coverFileId: item.files?.find(file => file.fieldKey === 'cover')?.infraFileId
     })) })
+    // 参考素材按快照回填，审批期间的素材改动不影响已提交内容。
+    setMaterialsByWork(Object.fromEntries(batch.items.map((item, index) => [
+      index,
+      (Array.isArray(item.contentSnapshot.materialRefs) ? item.contentSnapshot.materialRefs : []).map(ref => ({
+        id: Number(ref.materialId),
+        materialNo: String(ref.materialNo || ''),
+        title: String(ref.title || '素材'),
+        materialTypeName: String(ref.materialTypeName || ''),
+        coverPreviewUrl: typeof ref.coverPreviewUrl === 'string' ? ref.coverPreviewUrl : undefined,
+      })) as Material[],
+    ])))
   }, [batch, form, open])
   const accountSnapshotRows = (Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
   const save = async () => {
@@ -293,14 +381,14 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
     } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) }
     finally { setLoading(false) }
   }
-  return <Modal title="编辑内容审批草稿" open={open} onCancel={onClose} onOk={() => void save()} confirmLoading={loading} width="min(760px, calc(100vw - 32px))">
+  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={onClose} onOk={() => void save()} confirmLoading={loading} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
     <Form form={form} layout="vertical">
       <Typography.Text strong>账号资料快照</Typography.Text>
       <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>{accountSnapshotRows.map(snapshot => { const id = String(snapshot.id); return <Card key={id} size="small" title={`账号 ${id}`}>
         <Form.Item name={['accountSnapshots', id, 'nickname']} label="账号名称"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'platformLabel']} label="发布平台"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'sStageLabel']} label="当前期段"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'currentStatusLabel']} label="账号状态"><Input /></Form.Item>
+        <Form.Item name={['accountSnapshots', id, 'platformValue']} label="发布平台"><Select options={platformOptions} /></Form.Item>
+        <Form.Item name={['accountSnapshots', id, 'stageValue']} label="当前期段"><Select options={stageOptions} /></Form.Item>
+        <Form.Item name={['accountSnapshots', id, 'currentStatusValue']} label="账号状态"><Select options={statusOptions} /></Form.Item>
         <Form.Item name={['accountSnapshots', id, 'productGoal']} label="承接产品目标"><Input /></Form.Item>
         <Form.Item name={['accountSnapshots', id, 'productFormLabel']} label="主要产品形式"><Input /></Form.Item>
         <Form.Item name={['accountSnapshots', id, 'publishFrequency']} label="当前发布节奏"><Input /></Form.Item>
@@ -308,18 +396,53 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
         <Form.Item name={['accountSnapshots', id, 'operatorName']} label="责任运营人员"><Input /></Form.Item>
       </Card>})}</Space>
       <Form.List name="works">{(fields, { add, remove, move }) => <Space direction="vertical" style={{ width: '100%' }}>{fields.map((field, index) => <Card key={field.key} size="small" title={<Space>作品 {index + 1}<Button size="small" disabled={index === 0} onClick={() => move(index, index - 1)}>上移</Button><Button size="small" disabled={index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>{fields.length > 1 && <Button danger size="small" onClick={() => remove(field.name)}>删除</Button>}</Space>}>
-        <Form.Item {...field} name={[field.name, 'coverFileId']} label="作品封面图" rules={[{ required: true, message: '请上传封面图' }]}><Space><Button loading={uploading === index} onClick={() => document.getElementById(`draft-cover-${batch.id}-${field.key}`)?.click()}>上传封面</Button><input id={`draft-cover-${batch.id}-${field.key}`} type="file" accept="image/*" hidden onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setUploading(index); try { const uploaded = await api.mediaContent.uploadVersionFile(file); form.setFieldValue(['works', field.name, 'coverFileId'], uploaded.fileId); message.success('封面已上传') } catch (cause) { message.error(errorText(cause)) } finally { setUploading(undefined); event.target.value = '' } }} /></Space></Form.Item>
+        <Form.Item {...field} name={[field.name, 'coverFileId']} label="作品封面图" rules={[{ required: true, message: '请上传封面图' }]}><Space direction="vertical"><Space><Button loading={uploading === index} onClick={() => document.getElementById(`draft-cover-${batch.id}-${field.key}`)?.click()}>上传封面</Button><input id={`draft-cover-${batch.id}-${field.key}`} type="file" accept="image/*" hidden onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setUploading(index); try { const uploaded = await api.mediaContent.uploadVersionFile(file); form.setFieldValue(['works', field.name, 'coverFileId'], uploaded.fileId); form.setFieldValue(['works', field.name, 'coverPreviewUrl'], uploaded.previewUrl || URL.createObjectURL(file)); message.success('封面已上传') } catch (cause) { message.error(errorText(cause)) } finally { setUploading(undefined); event.target.value = '' } }} /></Space><Form.Item noStyle shouldUpdate>{() => { const url = form.getFieldValue(['works', field.name, 'coverPreviewUrl']); return url ? <Image width={160} src={url} alt="作品封面预览" /> : null }}</Form.Item></Space></Form.Item>
         <Form.Item {...field} name={[field.name, 'title']} label="发布标题" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
         <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, message: '请输入正文' }]}><Input.TextArea rows={6} /></Form.Item>
         <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select options={purposeOptions} onChange={value => form.setFieldValue(['works', field.name, 'purposeLabelSnapshot'], purposeOptions.find(item => item.value === value)?.label)} /></Form.Item>
         <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select options={formatOptions} onChange={value => form.setFieldValue(['works', field.name, 'formatLabelSnapshot'], formatOptions.find(item => item.value === value)?.label)} /></Form.Item>
         <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><Input /></Form.Item>
         <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><Input /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'referenceContentVersionId']} label="参考作品"><Select allowClear showSearch optionFilterProp="label" options={referenceOptions} /></Form.Item>
+        <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接"><Input placeholder="https:// 参考作品链接" allowClear /></Form.Item>
+        <Form.Item label="参考素材" extra="从素材库浏览并多选，审批人可在审批详情中查看。">
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Button onClick={() => setMaterialPickerIndex(field.name)}>素材浏览 · 选择参考素材</Button>
+            {(materialsByWork[field.name] || []).map(material => <Card key={material.id} size="small">
+              <Space align="start" size={8}>
+                {material.coverPreviewUrl ? <Image width={48} src={material.coverPreviewUrl} alt={material.title} /> : null}
+                <span><Typography.Text strong>{material.title}</Typography.Text><br /><Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text></span>
+                <Button danger type="text" size="small" onClick={() => {
+                  const next = (materialsByWork[field.name] || []).filter(item => item.id !== material.id)
+                  setMaterialsByWork({ ...materialsByWork, [field.name]: next })
+                  form.setFieldValue(['works', field.name, 'referenceMaterials'], next.map(item => ({ materialId: item.id, materialNo: item.materialNo, title: item.title, materialTypeName: item.materialTypeName, coverPreviewUrl: item.coverPreviewUrl })))
+                }}>移除</Button>
+              </Space>
+            </Card>)}
+          </Space>
+        </Form.Item>
         <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
         {(['purposeLabelSnapshot', 'formatLabelSnapshot', 'commentHook'] as const).map(key => <Form.Item key={key} name={[field.name, key]} hidden />)}
       </Card>)}<Button type="dashed" block onClick={() => add({})}>新增作品</Button></Space>}</Form.List>
     </Form>
+    <MaterialSelectorModal
+      open={materialPickerIndex !== undefined}
+      onCancel={() => setMaterialPickerIndex(undefined)}
+      onConfirm={(materials) => {
+        if (materialPickerIndex !== undefined) {
+          setMaterialsByWork({ ...materialsByWork, [materialPickerIndex]: materials })
+          form.setFieldValue(['works', materialPickerIndex, 'referenceMaterials'], materials.map(item => ({
+            materialId: item.id,
+            materialVersionId: item.currentVersion?.id || item.currentEffectiveVersionId,
+            materialNo: item.materialNo,
+            title: item.title,
+            materialTypeName: item.materialTypeName,
+            coverPreviewUrl: item.coverPreviewUrl,
+          })))
+        }
+        setMaterialPickerIndex(undefined)
+      }}
+      defaultSelected={materialPickerIndex === undefined ? [] : materialsByWork[materialPickerIndex] || []}
+    />
   </Modal>
 }
 
@@ -346,6 +469,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [draftEditOpen, setDraftEditOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyRows, setHistoryRows] = useState<ContentReviewBatch[]>([])
+  const [taskUsers, setTaskUsers] = useState<SimpleUser[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [publishForm] = Form.useForm<{ platformUrl: string; publishedAt: dayjs.Dayjs }>()
 
@@ -376,6 +500,15 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   }, [keyword, loadDetail, mine, status])
 
   useEffect(() => { void load(1) }, [keyword, status, mine])
+  useEffect(() => {
+    // 加签、转办、委派、抄送需要人员候选；无处理权限时不请求。
+    if (!hasPermission(permissions, 'bpm:task:update')) return
+    let cancelled = false
+    void api.simpleUsers()
+      .then(list => { if (!cancelled) setTaskUsers(list) })
+      .catch(() => { if (!cancelled) setTaskUsers([]) })
+    return () => { cancelled = true }
+  }, [permissions])
 
   const submitBatch = async () => {
     if (!selected) return
@@ -482,6 +615,34 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     : selected?.availableActions.includes('FINAL_DECIDE') ? 'final' : undefined
   const canCreate = hasPermission(permissions, 'zsjos:content-review:create')
   const canSeeAll = hasPermission(permissions, 'zsjos:content-review:query-all')
+  const canUpdateTask = hasPermission(permissions, 'bpm:task:update')
+
+  /**
+   * 本级"交卷"动作。后端 requireDirectorDecisions / requireFinalDecisions 会再校验一次，
+   * 这里的进度与禁用只是提前告知，避免填不齐就提交后才报错。
+   */
+  const advanceAction = useMemo(() => {
+    if (!selected) return undefined
+    const completeTarget = selected.availableActions.includes('DIRECTOR_COMPLETE') ? 'director'
+      : selected.availableActions.includes('FINAL_COMPLETE') ? 'final' : undefined
+    if (!completeTarget) return undefined
+    const items = selected.items
+    // 终审只需对编导已通过的条目给结论，被编导退回的条目不进入终审。
+    const pending = completeTarget === 'director'
+      ? items.filter(item => !item.directorDecision)
+      : items.filter(item => item.directorDecision === 'APPROVED' && !item.finalDecision)
+    const required = completeTarget === 'director'
+      ? items.length
+      : items.filter(item => item.directorDecision === 'APPROVED').length
+    return {
+      label: completeTarget === 'director' ? '完成编导审核' : '完成终审',
+      progress: `已完成 ${required - pending.length}/${required} 条结论`,
+      disabledReason: pending.length > 0
+        ? `还有 ${pending.length} 条内容未填写结论，填齐后才能提交`
+        : undefined,
+      onTrigger: () => setCompleteStage(completeTarget)
+    }
+  }, [selected])
 
   return <section className="workspace-page content-review-page">
     <header className="content-review-filter-shell">
@@ -524,13 +685,26 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
               {selected.studentPersonId && <Button onClick={() => void showHistory()}>查看历史轮次</Button>}
               {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
               {selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
-              {selected.availableActions.includes('DIRECTOR_COMPLETE') && <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setCompleteStage('director')}>完成编导审核</Button>}
-              {selected.availableActions.includes('FINAL_COMPLETE') && <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setCompleteStage('final')}>完成终审</Button>}
+              {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
             </Space></div>
             <div className="content-review-meta">
               <span>当前节点：{selected.currentStage || '无'}</span>
               <span>提交时间：<DateTimeText value={selected.submittedAt} /></span>
               <span>内容数量：{selected.items.length}</span>
+            </div>
+            {/*
+              工作区分两栏：左侧是待审内容流，右侧固定轨承载审批流程与交卷动作。
+              右轨 sticky，滚内容时流程状态和提交按钮始终可见；窄屏折到内容下方。
+            */}
+            <div className="content-review-workspace">
+            <div className="content-review-content-column">
+            <AccountProfiles batch={selected} />
+            {/* 分节标题：让"账号档案 → 逐条审核 → 交卷"的顺序在页面上可见。 */}
+            <div className="content-review-section-heading">
+              <Typography.Text strong>待审内容</Typography.Text>
+              <Typography.Text type="secondary">
+                共 {selected.items.length} 条{stage ? '，逐条给出结论后在右侧提交' : ''}
+              </Typography.Text>
             </div>
             <div className="content-review-items">{selected.items.map(item => <section className="content-review-item" key={item.id}>
               <div className="content-review-item-heading"><div>
@@ -541,20 +715,55 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 {item.finalDecision && <Tag color={item.finalDecision === 'APPROVED' ? 'success' : 'error'}>终审：{statusText[item.finalDecision] || item.finalDecision}</Tag>}
                 {item.resultStatus && <Tag>{statusText[item.resultStatus] || item.resultStatus}</Tag>}
               </Space></div>
-              <div className="content-review-snapshot">
-                <p><strong>选题：</strong>{snapshotText(item.contentSnapshot, 'topicSnapshot', snapshotText(item.contentSnapshot, 'topic'))}</p>
-                <p><strong>脚本或正文：</strong>{snapshotText(item.contentSnapshot, 'scriptText')}</p>
-                <p><strong>作品目的：</strong>{snapshotText(item.contentSnapshot, 'purposeLabelSnapshot', snapshotText(item.contentSnapshot, 'purposeValue'))}</p>
-                <p><strong>作品形式：</strong>{snapshotText(item.contentSnapshot, 'formatLabelSnapshot', snapshotText(item.contentSnapshot, 'formatValue'))}</p>
-                <p><strong>预计发布时间：</strong>{snapshotText(item.contentSnapshot, 'plannedPublishAt')}</p>
-                {httpsSnapshotUrl(item.contentSnapshot, 'detailUrl') && <p><strong>作品详情：</strong><a href={httpsSnapshotUrl(item.contentSnapshot, 'detailUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开详情</a></p>}
-                <p><strong>评论区钩子：</strong>{snapshotText(item.contentSnapshot, 'commentHook')}</p>
-                <p><strong>引流资料：</strong>{httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')
-                  ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a>
-                  : snapshotText(item.contentSnapshot, 'leadResourceUrl')}</p>
-                {httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl') && <p><strong>成品外链：</strong>
-                  <a href={httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a></p>}
+              {/*
+                字段按栅格分组：短字段多列并排压缩高度，长文本与链接独占整行。
+                顺序仍对齐纸质审核表：发布计划 → 定位 → 正文 → 各类链接。
+              */}
+              <div className="content-review-item-body">
+                <ItemCover item={item} />
+                <div className="content-review-field-groups">
+                  <dl className="content-review-fields content-review-fields-compact">
+                    <div className="content-review-field"><dt>预计发布时间</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'plannedPublishAt')}</dd></div>
+                    <div className="content-review-field"><dt>作品目的</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'purposeLabelSnapshot', snapshotText(item.contentSnapshot, 'purposeValue'))}</dd></div>
+                    <div className="content-review-field"><dt>作品形式</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'formatLabelSnapshot', snapshotText(item.contentSnapshot, 'formatValue'))}</dd></div>
+                    <div className="content-review-field"><dt>选题</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'topicSnapshot', snapshotText(item.contentSnapshot, 'topic'))}</dd></div>
+                    <div className="content-review-field content-review-field-wide"><dt>发布标题</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'titleSnapshot', snapshotText(item.contentSnapshot, 'title'))}</dd></div>
+                    <div className="content-review-field content-review-field-wide"><dt>正文文稿</dt>
+                      <dd className="content-review-field-text">{snapshotText(item.contentSnapshot, 'scriptText')}</dd></div>
+                    <div className="content-review-field content-review-field-wide"><dt>评论区钩子</dt>
+                      <dd>{snapshotText(item.contentSnapshot, 'commentHook')}</dd></div>
+                  </dl>
+                  {/* 链接单独成组：审核时通常连续打开核对，聚在一起比夹在字段表里更好点。 */}
+                  <dl className="content-review-fields content-review-fields-links">
+                    <div className="content-review-field"><dt>作品详情</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'detailUrl')
+                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'detailUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开详情</a>
+                      : snapshotText(item.contentSnapshot, 'detailUrl')}</dd></div>
+                    <div className="content-review-field"><dt>成品外链</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl')
+                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a>
+                      : snapshotText(item.contentSnapshot, 'deliverableUrl')}</dd></div>
+                    <div className="content-review-field"><dt>引流资料链接</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')
+                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a>
+                      : snapshotText(item.contentSnapshot, 'leadResourceUrl')}</dd></div>
+                    <div className="content-review-field"><dt>参考作品链接</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'referenceWorkUrl')
+                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'referenceWorkUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开参考作品</a>
+                      : snapshotText(item.contentSnapshot, 'referenceWorkUrl')}</dd></div>
+                  </dl>
+                </div>
               </div>
+              {(item.contentSnapshot.materialRefs as Array<Record<string, unknown>> | undefined)?.length
+                ? <div><Typography.Text strong>参考素材</Typography.Text>
+                  <div className="content-review-media">{referenceMaterials(item).map(reference => <div className="content-review-media-item" key={reference.materialId}>
+                    {reference.coverPreviewUrl
+                      ? <Image width={128} height={84} src={reference.coverPreviewUrl} alt={`参考素材：${reference.title}`} />
+                      : null}
+                    <span>{reference.title} · {reference.materialNo}</span>
+                  </div>)}</div></div>
+                : null}
               <ReviewFiles item={item} />
               {stage && (stage === 'director' || item.directorDecision === 'APPROVED') && <DecisionEditor batch={selected} item={item} stage={stage}
                 onSaved={() => void loadDetail(selected.id)} />}
@@ -562,6 +771,19 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 && <Button icon={<ClockCircleOutlined />} onClick={() => setPublishItem(item)}>登记发布</Button>}
               {item.publishedPlatformUrl && <a href={item.publishedPlatformUrl} target="_blank" rel="noreferrer">查看已发布内容</a>}
             </section>)}</div>
+            </div>
+            <aside className="content-review-process-column">
+              <BpmProcessPanel
+                processInstanceId={selected.processInstanceId}
+                taskId={selected.currentTaskId}
+                users={taskUsers}
+                canUpdate={canUpdateTask}
+                allowDecision={false}
+                businessAdvance={advanceAction}
+                onActionSuccess={() => void loadDetail(selected.id)}
+              />
+            </aside>
+            </div>
           </> : <Empty description="从左侧选择一个审核批次" />}
       </main>
     </div>
@@ -590,3 +812,4 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     </Modal>
   </section>
 }
+

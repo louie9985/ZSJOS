@@ -6,6 +6,11 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassD
 import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +29,7 @@ class StudentServiceObjectPermissionProviderTest {
     @Mock private DeliveryClassMapper deliveryClassMapper;
     @Mock private DeliveryClassScopeService deliveryClassScopeService;
     @Mock private PermissionApi permissionApi;
+    @Mock private AdminUserApi adminUserApi;
 
     @Test
     void deliveryStageRequiresActiveOwner() {
@@ -110,5 +116,41 @@ class StudentServiceObjectPermissionProviderTest {
 
         source.setSystemClass(true);
         assertTrue(provider.hasPermission(10L, "direct-transfer", 8L));
+    }
+
+    @Test
+    void managedReadRequiresExactOwnerScopeAndDoesNotGrantCommands() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(deliveryClassScopeService.resolve(9L))
+                .thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(80L)));
+        when(adminUserApi.getUserListByDeptIds(Set.of(80L)))
+                .thenReturn(List.of(new AdminUserRespDTO().setId(31L)));
+        for (String status : List.of("active", "paused", "completed")) {
+            relation.setStatus(status);
+            assertTrue(provider.hasPermission(10L, "read", 9L));
+            assertFalse(provider.hasPermission(10L, "contact", 9L));
+            assertFalse(provider.hasPermission(10L, "accept", 9L));
+        }
+        relation.setOwnerUserId(99L);
+        assertFalse(provider.hasPermission(10L, "read", 9L));
+        relation.setOwnerUserId(31L); relation.setStatus("closed");
+        assertFalse(provider.hasPermission(10L, "read", 9L));
+    }
+
+    @Test
+    void managedReadHonorsGlobalAndEmptyDepartmentScopes() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(deliveryClassScopeService.resolve(9L)).thenReturn(new DeliveryClassScopeService.Scope(true, Set.of()));
+        assertTrue(provider.hasPermission(10L, "read", 9L));
+        when(deliveryClassScopeService.resolve(9L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of()));
+        assertFalse(provider.hasPermission(10L, "read", 9L));
+        relation.setOwnerUserId(9L);
+        assertTrue(provider.hasPermission(10L, "read", 9L));
     }
 }

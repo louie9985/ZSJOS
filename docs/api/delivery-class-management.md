@@ -10,11 +10,10 @@
 - `GET /zsjos/delivery-class/my-page`：只返回当前用户担任班主任的正式班。Workbench 班级管理将该响应按服务端分页加载为卡片；卡片只展示班级摘要和人数，不展示班内学员。
 - `GET /zsjos/delivery-class/{id}`、`GET /zsjos/delivery-class/{id}/students`：读取班级及课程
   服务分页；调用方必须传递并消费 `pageNo`、`pageSize` 和响应 `total`，不得截断为固定前 50 条。
-  学员行以 `serviceRelationId` 为操作边界，并返回订单商品所属 `categoryId`，使待分班服务也能
-  加载同分类目标班。Workbench 从“班级管理”进入学员管理时通过路由 state 传递该 ID；主管管理
-  视图不因此获得 owner 专属的学员服务操作权。
-- `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回同分类、服务中的正式班；
-  只有显式 `includePending=true` 时附加租户待分班班级。
+  学员行以 `serviceRelationId` 为操作边界，并返回订单商品所属 `categoryId`。Workbench 从“班级管理”
+  进入学员管理时通过路由 state 传递该 ID；主管管理视图不因此获得 owner 专属的学员服务操作权。
+- `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回服务中的正式班，可按
+  `categoryId` 过滤；只有显式 `includePending=true` 时附加租户待分班班级。
 - `GET /zsjos/delivery-class/homeroom-candidates`：返回主管部门范围内启用且同时持有
 `zsjos:delivery-class:query-my`、`zsjos:student:query-my` 的用户。
 - `GET /zsjos/delivery-class/product-options`：返回教务端同源的启用产品、规格和 SKU。
@@ -46,9 +45,9 @@ BPM 调班通过、报名分班保存和报名完成都会重新确认账号启�
 
 `POST /zsjos/delivery-class/service/{serviceRelationId}/direct-transfer` 需要独立权限
 `zsjos:delivery-class:direct-transfer`，请求包含 `targetClassId`、服务关系 `version` 和原因。
-主管必须同时覆盖源正式班（待分班除外）与目标班的部门数据范围。目标必须是同订单商品
-产品分类、服务中、非当前班的正式班，且班主任仍启用并具备规划师能力。命令原子更新班级、
-owner 与未完成待办执行人，不重置接收状态或历史。
+主管必须同时覆盖源正式班（待分班除外）与目标班的部门数据范围。目标必须是服务中、非当前班的
+正式班，且班主任仍启用并具备规划师能力。命令原子更新班级、owner 与未完成待办执行人，不重置
+接收状态或历史。
 
 ## 规划师 BPM 调班
 

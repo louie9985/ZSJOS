@@ -37,3 +37,12 @@
 - Scope impact: no yudao-mysql or production data touched.
 - Remaining: browser interaction and focused unit tests; full test compile is blocked by pre-existing CashbackServiceImplTest signature mismatch.
 
+
+### Delivery 2026-09-14 15:42:01 Beijing
+- Branch/worktree/HEAD: main / D:\ZSJ-OS / unchanged
+- User goal: 修复礼品配置页面 Vite 编译错误。
+- Key decisions: 将 enabled 改为 Vue computed 可写绑定，保持 status 0/1 语义。
+- Changed files: frontend/admin/src/views/zsjos/gift/index.vue
+- Verification: pnpm exec vue-tsc --noEmit succeeded.
+- Dependency/integration impact: None.
+- Remaining work: None。

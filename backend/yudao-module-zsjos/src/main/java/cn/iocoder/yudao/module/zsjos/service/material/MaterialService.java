@@ -499,12 +499,12 @@ public class MaterialService {
         }
         validateSubmissionCompleteness(material, version, userId);
         MaterialTypeDO type = typeMapper.selectById(material.getMaterialTypeId());
-        if (type == null || type.getBpmProcessDefinitionKey() == null
-                || type.getBpmProcessDefinitionKey().isBlank()) {
+        String processKey = MaterialApprovalContract.processKey(type);
+        if (processKey == null || processKey.isBlank()) {
             throw exception(MATERIAL_BPM_UNAVAILABLE);
         }
         BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
-                type.getBpmProcessDefinitionKey());
+                processKey);
         if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
                 || !MATERIAL_BPM_CATEGORY.equals(definition.getCategory())) {
             throw exception(MATERIAL_BPM_UNAVAILABLE);
@@ -542,12 +542,15 @@ public class MaterialService {
         processRequest.setProcessDefinitionKey(definition.getKey());
         processRequest.setBusinessKey(businessKey);
         processRequest.setPredefinedProcessInstanceId(processInstanceId);
-        processRequest.setStartUserSelectAssignees(request.getStartUserSelectAssignees());
-        processRequest.setVariables(Map.of(
+        processRequest.setStartUserSelectAssignees(MaterialApprovalContract.isViral(type.getCode())
+                ? Map.of() : request.getStartUserSelectAssignees());
+        Map<String, Object> processVariables = new LinkedHashMap<>(Map.of(
                 "materialId", material.getId(),
                 "materialVersionId", version.getId(),
                 "materialNo", material.getMaterialNo(),
                 "materialVersionNo", version.getVersionNo()));
+        processVariables.putAll(MaterialApprovalContract.snapshotVariables(version));
+        processRequest.setVariables(processVariables);
         try {
             String createdProcessInstanceId = processInstanceApi.createProcessInstance(userId, processRequest);
             if (!Objects.equals(processInstanceId, createdProcessInstanceId)) {

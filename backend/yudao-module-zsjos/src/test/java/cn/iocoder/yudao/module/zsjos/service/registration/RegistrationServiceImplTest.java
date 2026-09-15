@@ -125,6 +125,45 @@ class RegistrationServiceImplTest {
         assertEquals(300L, result.getCategoryId());
     }
 
+    /** Orders persist only product_ref, so the category must resolve without a product_id. */
+    @Test
+    void classAssignmentResolvesCategoryByProductRefWhenIdMissing() {
+        var item = new SalesOrderItemDO(); item.setId(100L); item.setProductRef("SPU-1");
+        item.setProductSnapshot("{\"name\":\"师徒班\",\"categoryId\":999}");
+        var product = new ZsjosProductDO(); product.setId(200L); product.setCategoryId(300L);
+        stubClassAssignmentCase(item);
+        when(productMapper.selectByProductRef("SPU-1")).thenReturn(product);
+
+        var result = service.getCase(1L).getClassAssignments().getFirst();
+
+        assertEquals(300L, result.getCategoryId());
+    }
+
+    @Test
+    void classAssignmentFallsBackToSnapshotCategoryWhenProductDeleted() {
+        var item = new SalesOrderItemDO(); item.setId(100L); item.setProductRef("SPU-1");
+        item.setProductSnapshot(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(
+                cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.of("SPU-1", "师徒班",
+                        List.of(new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductCategoryPathNodeVO(7L, "一级"),
+                                new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductCategoryPathNodeVO(300L, "师徒班")))));
+        stubClassAssignmentCase(item);
+        when(productMapper.selectByProductRef("SPU-1")).thenReturn(null);
+
+        var result = service.getCase(1L).getClassAssignments().getFirst();
+
+        assertEquals(300L, result.getCategoryId());
+        assertEquals("师徒班", result.getProductName());
+    }
+
+    private void stubClassAssignmentCase(SalesOrderItemDO item) {
+        var registrationCase = new RegistrationCaseDO(); registrationCase.setId(1L); registrationCase.setOrderId(10L);
+        registrationCase.setStatus(STATUS_PENDING); registrationCase.setAssignmentMode("class_per_item");
+        var order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL);
+        when(caseMapper.selectById(1L)).thenReturn(registrationCase);
+        when(orderMapper.selectById(10L)).thenReturn(order);
+        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(item));
+    }
+
     @Test
     void getCaseAllowsUncheckedItemWithoutOperator() {
         RegistrationCaseDO registrationCase = new RegistrationCaseDO();

@@ -19,6 +19,7 @@ import { formatTimestamp } from '../services/time'
 import { DirectorAutoSaveCoordinator, type DirectorAutoSaveState } from '../services/directorAutoSave'
 import { mergePositioningJsonValues, parsePositioningJson, serializePositioningFormValues, type PositioningJsonImportPreview } from '../services/positioningJsonImport'
 import { workOrderApi, type WorkOrderDepartment, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
+import AccountPublishedWorks from '../components/AccountPublishedWorks'
 import { StudentDeliveryPanel } from '../components/StudentDeliveryPanel'
 import { contentReviewApi, partnerStudentInvitationApi, type PartnerStudentInvitation } from '../services/materialApi'
 import PositioningCardMaterialPicker from '../components/PositioningCardMaterialPicker'
@@ -121,15 +122,10 @@ export const positioningJsonPrompt = `你是一名专业的新媒体账号定位
 【在此粘贴编导文稿】`
 export const mediaAccountTabKey = (accountId: number) => `account-${accountId}`
 export const buildMediaAccountTabLabels = (accounts: MediaStudentDetail['accounts']) => {
-  const base = accounts.map(account => account.nickname?.trim() || ['未命名账号', account.accountNo || `账号 ${account.id}`].join(' · '))
-  const platformCandidates = accounts.map((account, index) => account.nickname?.trim() ? [base[index], account.platformLabel?.trim() || '未标注平台'].join(' · ') : base[index])
-  const numberedCandidates = accounts.map((account, index) => account.nickname?.trim() ? [platformCandidates[index], account.accountNo || `#${account.id}`].join(' · ') : platformCandidates[index])
-  return new Map(accounts.map((account, index) => {
-    if (base.filter(label => label === base[index]).length === 1) return [account.id, base[index]]
-    if (platformCandidates.filter(label => label === platformCandidates[index]).length === 1) return [account.id, platformCandidates[index]]
-    if (numberedCandidates.filter(label => label === numberedCandidates[index]).length === 1) return [account.id, numberedCandidates[index]]
-    return [account.id, `${numberedCandidates[index]} · #${account.id}`]
-  }))
+  return new Map(accounts.map(account => [
+    account.id,
+    [account.nickname?.trim() || '未命名账号', account.platformLabel?.trim() || '平台待填写'].join(' · '),
+  ]))
 }
 const positioningFormValues = (values: Record<string, unknown>, fields: DirectorTemplateSnapshot['fields'], areaRows: AreaNode[]) => Object.fromEntries(
   Object.entries(values).map(([key, value]) => {
@@ -158,7 +154,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
-  const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'operator' | 'student-partner'>(), [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'operator' | 'student-partner'>(), [saving, setSaving] = useState(false), [contentSubmitAfterSave, setContentSubmitAfterSave] = useState(false)
   const [directorContext, setDirectorContext] = useState<StudentContactContext>(), [operatorCandidates, setOperatorCandidates] = useState<StudyPlanner[]>([])
   const [contentClasses, setContentClasses] = useState<DictData[]>([])
   const [contentPurposes, setContentPurposes] = useState<DictData[]>([])
@@ -470,7 +466,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         return
     } catch (cause) { message.error(errorText(cause)) } finally { setSaving(false) }
   }
-  const submit = async () => { if (!detail || !dialog) return
+  const submit = async (submitContent = contentSubmitAfterSave) => { if (!detail || !dialog) return
     try {
       if (dialog === 'positioning') {
         setSaving(true); await autoSaveCoordinator.current!.saveNow(draftSaveTask()); autoSaveCoordinator.current!.invalidate(); setDialog(undefined); message.success('定位卡草稿已保存')
@@ -484,12 +480,14 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           purposeLabelSnapshot: contentPurposes.find(item => item.value === work.purposeValue)?.label || '',
           formatLabelSnapshot: contentFormats.find(item => item.value === work.formatValue)?.label || '',
         })) : []
-        await contentReviewApi.createFromStudent({
+        const batchId = await contentReviewApi.createFromStudent({
           studentPersonId: detail.student.personId,
           accountIds: Array.isArray(values.accountIds) ? (values.accountIds as unknown[]).map(Number).filter(Number.isFinite) : [],
           accountSnapshots: values.accountSnapshots as Record<string, Record<string, unknown>> | undefined,
           works: works as never,
         })
+        if (submitContent) await contentReviewApi.submit(batchId, 0)
+        setContentSubmitAfterSave(false)
       }
       if (dialog === 'student-partner') {
         const invitation = await partnerStudentInvitationApi.create({
@@ -595,13 +593,20 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       label: actionLabels[action] || action,
       onClick: () => openDirectorAction(action),
     }))
-  const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:create') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => void open('content') }] : []
+  // 内容审批由运营发起；编导只负责后续逐条审核。
+  const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:submit') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => void open('content') }] : []
   const overviewAccountActions: ToolbarAction[] = [
     ...(directorContext?.availableActions.includes('CREATE_MEDIA_ACCOUNT') ? [{
       key: 'CREATE_MEDIA_ACCOUNT',
       icon: <PlusOutlined />,
       label: '新增账号',
-      onClick: () => void createEmptyAccount(),
+      onClick: () => Modal.confirm({
+        title: '确认新增账号？',
+        content: '账号新增后无法直接删除，请确认已核对当前学员和服务信息。',
+        okText: '确认新增',
+        cancelText: '取消',
+        onOk: createEmptyAccount,
+      }),
       disabled: saving,
     }] : []),
     ...(hasPermission(permissions, 'zsjos:partner-invitation:create-student') ? [{
@@ -611,8 +616,10 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       onClick: openStudentPartnerInvitation,
     }] : []),
   ]
-  const overviewContent = (plannerActions: ToolbarAction[]) => <div className="media-students-overview-content">
-    {(plannerActions.length > 0 || directorActions.length > 0 || overviewAccountActions.length > 0) && <OverflowToolbar actions={[...plannerActions, ...directorActions, ...contentApprovalAction, ...overviewAccountActions]} />}
+  const overviewContent = (plannerActions: ToolbarAction[]) => {
+    const overviewToolbarActions = [...plannerActions, ...directorActions, ...contentApprovalAction, ...overviewAccountActions]
+    return <div className="media-students-overview-content">
+      {overviewToolbarActions.length > 0 && <OverflowToolbar actions={overviewToolbarActions} />}
     <section className="lead-card media-students-profile-card">
       <div className="lead-card-header"><Typography.Text strong>学员档案</Typography.Text></div>
       <div className="lead-profile-fields">
@@ -637,18 +644,18 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       </div>
       {summaryError && <Alert type="error" message={summaryError} action={selectedId ? <Button onClick={() => void loadDetail(selectedId, selectedServiceId, selectedAccountId)}>重试</Button> : undefined} />}
     </section>
-  </div>
+    </div>
+  }
 
   const accountTabLabels = buildMediaAccountTabLabels(detail?.accounts || [])
   const tabs = (detail?.accounts || []).map(account => {
     return {
       key: mediaAccountTabKey(account.id),
-      label: `${accountTabLabels.get(account.id) || account.nickname || account.accountNo}${accountMissing[account.id] > 0 ? ` · 待补 ${accountMissing[account.id]}` : ''}`,
+      label: `${accountTabLabels.get(account.id) || '未命名账号 · 平台待填写'}${accountMissing[account.id] > 0 ? ` · 待补 ${accountMissing[account.id]}` : ''}`,
       children: <div className="media-account-workspace-shell">
         <div className="media-account-workspace">
-          <StudentDeliveryPanel accountId={account.id} submittedBy={directorContext?.contentDirectorUserId || 0} onChanged={() => { if (selectedId) void loadDetail(selectedId, selectedServiceId, account.id, true) }} />
-          <AccountMaintenancePanel key={`${account.id}-${maintenanceEditorAccountId === account.id ? 'edit' : 'view'}`} account={account} canQuery={hasPermission(permissions, 'zsjos:media-account:query')} onMissingChange={updateMissing} canMaintain={account.availableActions.includes('MAINTAIN_ACCOUNT')} initiallyEditing={maintenanceEditorAccountId === account.id} onEditingFinished={() => setMaintenanceEditorAccountId(undefined)} onSaved={async () => { if (selectedId) await loadDetail(selectedId, selectedServiceId, account.id, true) }} />
-
+          <AccountMaintenancePanel key={`${account.id}-${maintenanceEditorAccountId === account.id ? 'edit' : 'view'}`} account={account} deliveryActions={<StudentDeliveryPanel accountId={account.id} submittedBy={directorContext?.contentDirectorUserId || 0} canQuery={hasPermission(permissions, 'zsjos:student-delivery:query')} canSubmit={hasPermission(permissions, 'zsjos:student-delivery:submit')} canDefer={hasPermission(permissions, 'zsjos:student-delivery:defer')} onChanged={() => { if (selectedId) void loadDetail(selectedId, selectedServiceId, account.id, true) }} />} canQuery={hasPermission(permissions, 'zsjos:media-account:query')} onMissingChange={updateMissing} canMaintain={account.availableActions.includes('MAINTAIN_ACCOUNT')} initiallyEditing={maintenanceEditorAccountId === account.id} onEditingFinished={() => setMaintenanceEditorAccountId(undefined)} onSaved={async () => { if (selectedId) await loadDetail(selectedId, selectedServiceId, account.id, true) }} />
+          <AccountPublishedWorks key={account.id} accountId={account.id} contents={detail?.contents || []} canQuery={hasPermission(permissions, 'zsjos:content:query')} />
         </div>
       </div>,
     }
@@ -674,7 +681,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
 
   return <section className="workspace-page media-students-page"><header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)} /></Tooltip></header><div className="media-students-inbox-layout"><aside className="media-students-list-pane"><div className="media-students-toolbar"><Input.Search allowClear value={search} onChange={e => setSearch(e.target.value)} onSearch={value => setKeyword(value.trim())} placeholder="搜索姓名或手机号" /></div>{error && <Alert type="error" showIcon message={error} />}<div className="media-students-scroll">{loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(x => <button type="button" className={`media-students-item${selectedId === x.personId ? ' active' : ''}`} key={x.personId} onClick={() => { setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}><NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" /><span className="media-students-item-copy"><strong>{x.name || '未填写姓名'}</strong><span>{x.personNo || '暂无学员编号'}</span><span>{x.mobile || '无手机号'} · {x.services.length} 项服务</span></span></button>) : <Empty description="暂无可见学员" />}</div>{total > PAGE_SIZE && <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} onChange={value => void loadPage(value)} />}</aside><main className="media-students-detail-pane">{body}</main></div>
     {interviewId && <PositioningInterviewDialog relationId={interviewId} onClose={() => setInterviewId(undefined)} onChanged={() => selectedId ? loadDetail(selectedId, selectedServiceId, selectedAccountId) : Promise.resolve()} />}
-    <Modal width={dialog === 'positioning' ? 'min(1180px, calc(100vw - 32px))' : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? (form.getFieldValue('accountId') ? '填写账号定位卡' : '填写定位卡草稿') : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
+    <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1180px, calc(100vw - 32px))' : undefined} maskClosable={false} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? (form.getFieldValue('accountId') ? '填写账号定位卡' : '填写定位卡草稿') : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} footer={dialog === 'content' ? [<Button key="cancel" onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" onValuesChange={scheduleAutoSave}>
         {autoSaveNotice}
         {dialog === 'account' && <Alert type="info" showIcon message="创建空白账号" description="账号归属当前学员，业务资料全部留空。创建后自动打开账号表，由编导与运营分别补充负责字段。" />}

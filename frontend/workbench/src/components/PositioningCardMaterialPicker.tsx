@@ -60,6 +60,7 @@ export default function PositioningCardMaterialPicker({ field, value = [], onCha
   const begin = () => {
     setSelected([...value]); setFilters({ platform: field.defaultPlatform, accountStage: field.defaultStage }); setPage(1); setOpen(true)
   }
+  useEffect(() => { if (!open) setSelected([...value]) }, [value, open])
   return <Space orientation="vertical" style={{ width: '100%', minWidth: 0 }}>
     {value.map(id => <Space key={id} wrap>
       <Typography.Text>{versions[id]?.title || '已关联素材版本'}</Typography.Text>

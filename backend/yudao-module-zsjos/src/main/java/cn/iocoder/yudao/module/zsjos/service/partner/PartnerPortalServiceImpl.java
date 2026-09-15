@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.zsjos.service.partner;
 
 import cn.hutool.core.util.DesensitizedUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerHomeStatisticsDetailPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerHomeStatisticsDetailRespVO;
@@ -89,6 +91,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_TER
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_NOT_EXISTS;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_ACCOUNT_DISABLED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEADERBOARD_DISABLED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_NOT_EXISTS;
 
 @Service
@@ -122,6 +125,10 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
     private SalesOrderMapper salesOrderMapper;
     @Resource
     private PartnerMapper partnerMapper;
+    @Resource
+    private AdminUserApi adminUserApi;
+    @Resource
+    private PartnerLeaderboardConfigService leaderboardConfigService;
 
     @Override
     public PartnerHomeStatisticsRespVO getHomeStatistics(Long partnerId, String period) {
@@ -174,13 +181,17 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
 
     @Override
     public PartnerLeaderboardConfigRespVO getLeaderboardConfig() {
+        var stored = leaderboardConfigService.get();
         PartnerLeaderboardConfigRespVO response = new PartnerLeaderboardConfigRespVO();
-        response.setEnabled(true);
-        response.setEnabledTypes(LEADERBOARD_TYPES.stream().map(TypeDef::key).toList());
-        response.setDefaultType("estimated_income");
-        response.setDefaultPeriod("month");
-        response.setPageSize(20);
-        response.setMaskName(true);
+        response.setEnabled(stored.getEnabled());
+        response.setIncludeEmployeeSubmitter(stored.getIncludeEmployeeSubmitter());
+        response.setEmployeeRoleCodes(PartnerLeaderboardConfigService.splitCodes(stored.getEmployeeRoleCodes()));
+        List<String> enabledTypes = stored.getEnabledTypes() == null ? List.of() : List.of(stored.getEnabledTypes().split(","));
+        response.setEnabledTypes(enabledTypes);
+        response.setDefaultType(enabledTypes.contains(stored.getDefaultType()) ? stored.getDefaultType() : enabledTypes.get(0));
+        response.setDefaultPeriod(stored.getDefaultPeriod());
+        response.setPageSize(stored.getPageSize());
+        response.setMaskName(stored.getMaskName());
         response.setTypeOptions(LEADERBOARD_TYPES.stream().map(type -> {
             PartnerLeaderboardConfigRespVO.TypeOption option = new PartnerLeaderboardConfigRespVO.TypeOption();
             option.setKey(type.key());
@@ -197,13 +208,21 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
     public PartnerLeaderboardRespVO getLeaderboard(Long partnerId, PartnerLeaderboardPageReqVO request) {
         requireEnabledPartner(partnerId);
         DateRange range = leaderboardRange(request.getPeriod());
-        TypeDef type = LEADERBOARD_TYPE_MAP.getOrDefault(request.getType(), LEADERBOARD_TYPE_MAP.get("lead_count"));
-        List<RankRow> rows = rankingRows(type.key(), range, partnerId);
+        var config = leaderboardConfigService.get();
+        if (!Boolean.TRUE.equals(config.getEnabled())) {
+            throw exception(LEADERBOARD_DISABLED);
+        }
+        List<String> enabledTypes = config.getEnabledTypes() == null ? List.of() : List.of(config.getEnabledTypes().split(","));
+        String requestedType = enabledTypes.contains(request.getType()) ? request.getType()
+                : (enabledTypes.contains(config.getDefaultType()) ? config.getDefaultType() : enabledTypes.get(0));
+        TypeDef type = LEADERBOARD_TYPE_MAP.getOrDefault(requestedType, LEADERBOARD_TYPE_MAP.get("lead_count"));
+        List<RankRow> rows = rankingRows(type.key(), range, partnerId,
+                leaderboardConfigService.eligibleEmployeeIds(config));
         int pageNo = Math.max(1, request.getPageNo());
         int pageSize = Math.max(1, request.getPageSize());
         int fromIndex = Math.min((pageNo - 1) * pageSize, rows.size());
         int toIndex = Math.min(fromIndex + pageSize, rows.size());
-        RankRow mine = rows.stream().filter(row -> Objects.equals(row.partnerId(), partnerId)).findFirst()
+        RankRow mine = rows.stream().filter(row -> Objects.equals(row.key(), "partner:" + partnerId)).findFirst()
                 .orElse(null);
 
         PartnerLeaderboardRespVO response = new PartnerLeaderboardRespVO();
@@ -309,37 +328,25 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
         };
     }
 
-    private List<RankRow> rankingRows(String type, DateRange range, Long currentPartnerId) {
+    private List<RankRow> rankingRows(String type, DateRange range, Long currentPartnerId,
+                                     Set<Long> eligibleEmployeeIds) {
         Long tenantId = TenantContextHolder.getRequiredTenantId();
         List<PartnerLeaderboardMetricRow> source = switch (type) {
-            case "estimated_income" -> cashbackMapper.selectPartnerEstimatedIncomeRanking(tenantId,
-                    range.from(), range.to());
-            case "withdrawn_amount" -> withdrawalMapper.selectPartnerWithdrawnAmountRanking(tenantId,
-                    range.from(), range.to());
-            case "valid_lead_count" -> leadMapper.selectPartnerValidLeadCountRanking(tenantId,
-                    range.from(), range.to());
+            case "estimated_income" -> cashbackMapper.selectPartnerEstimatedIncomeRanking(tenantId, range.from(), range.to());
+            case "withdrawn_amount" -> withdrawalMapper.selectPartnerWithdrawnAmountRanking(tenantId, range.from(), range.to());
+            case "valid_lead_count" -> leadMapper.selectPartnerValidLeadCountRanking(tenantId, range.from(), range.to());
             default -> leadMapper.selectPartnerLeadCountRanking(tenantId, range.from(), range.to());
         };
-        Map<Long, BigDecimal> values = source.stream()
-                .filter(row -> row.getPartnerId() != null)
-                .collect(Collectors.toMap(PartnerLeaderboardMetricRow::getPartnerId,
-                        row -> zeroIfNull(row.getValue()), BigDecimal::add, LinkedHashMap::new));
-        values.putIfAbsent(currentPartnerId, BigDecimal.ZERO);
-        Map<Long, PartnerDO> partners = partnerMap(values.keySet());
-        List<RankSeed> seeds = values.entrySet().stream()
-                .map(entry -> new RankSeed(entry.getKey(), entry.getValue(),
-                        displayName(partners.get(entry.getKey()))))
-                .sorted(Comparator.comparing(RankSeed::value).reversed()
-                        .thenComparing(RankSeed::partnerId))
-                .toList();
-        List<RankRow> rows = new ArrayList<>(seeds.size());
-        for (int i = 0; i < seeds.size(); i++) {
-            RankSeed seed = seeds.get(i);
-            BigDecimal gap = i == 0 ? null : seeds.get(i - 1).value().subtract(seed.value()).max(BigDecimal.ZERO);
-            rows.add(new RankRow(seed.partnerId(), seed.displayName(), i + 1, seed.value(),
-                    Objects.equals(seed.partnerId(), currentPartnerId), gap));
-        }
-        return rows;
+        Map<String, BigDecimal> values = source.stream()
+                .filter(r -> r.getPartnerId() != null || (r.getSourceUserId() != null
+                        && eligibleEmployeeIds.contains(r.getSourceUserId())))
+                .collect(Collectors.toMap(r -> r.getPartnerId()!=null ? "partner:"+r.getPartnerId() : "system_user:"+r.getSourceUserId(), r -> zeroIfNull(r.getValue()), BigDecimal::add, LinkedHashMap::new));
+        String mine = "partner:" + currentPartnerId; values.putIfAbsent(mine, BigDecimal.ZERO);
+        Set<Long> pids=values.keySet().stream().filter(k->k.startsWith("partner:")).map(k->Long.valueOf(k.substring(8))).collect(Collectors.toSet());
+        Map<Long, PartnerDO> ps=partnerMap(pids); Set<Long> uids=values.keySet().stream().filter(k->k.startsWith("system_user:")).map(k->Long.valueOf(k.substring(11))).collect(Collectors.toSet());
+        Map<Long, AdminUserRespDTO> us=adminUserApi.getUserMap(uids);
+        List<RankSeed> seeds=values.entrySet().stream().map(e->{String[] x=e.getKey().split(":");Long id=Long.valueOf(x[1]);String n=x[0].equals("partner")?displayName(ps.get(id)):(us.get(id)==null?"未知用户":us.get(id).getNickname());return new RankSeed(e.getKey(),id,x[0],e.getValue(),n);}).sorted(Comparator.comparing(RankSeed::value).reversed().thenComparing(RankSeed::key)).toList();
+        List<RankRow> rows=new ArrayList<>(); for(int i=0;i<seeds.size();i++){RankSeed q=seeds.get(i);rows.add(new RankRow(q.key(),q.id(),q.type(),q.displayName(),i+1,q.value(),q.key().equals(mine),i==0?null:seeds.get(i-1).value().subtract(q.value()).max(BigDecimal.ZERO)));} return rows;
     }
 
     private Map<Long, PartnerDO> partnerMap(Collection<Long> partnerIds) {
@@ -351,7 +358,9 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
 
     private PartnerLeaderboardRespVO.Member toRankMember(RankRow row) {
         PartnerLeaderboardRespVO.Member member = new PartnerLeaderboardRespVO.Member();
-        member.setPartnerId(row.partnerId());
+        member.setPartnerId("partner".equals(row.submitterType()) ? row.partnerId() : null);
+        member.setSubmitterId(row.partnerId());
+        member.setSubmitterType(row.submitterType());
         member.setDisplayName(row.displayName());
         member.setRank(row.rank());
         member.setValue(row.value());
@@ -719,8 +728,9 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
 
     private record TypeDef(String key, String label, String valueLabel, String valueUnit, String ruleText) {}
 
-    private record RankSeed(Long partnerId, BigDecimal value, String displayName) {}
+    private record RankSeed(String key, Long id, String type, BigDecimal value, String displayName) {}
 
-    private record RankRow(Long partnerId, String displayName, Integer rank, BigDecimal value, Boolean isMe,
+    private record RankRow(String key, Long partnerId, String submitterType, String displayName, Integer rank, BigDecimal value, Boolean isMe,
                            BigDecimal gapToPrevious) {}
 }
+

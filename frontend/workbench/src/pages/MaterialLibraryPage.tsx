@@ -33,12 +33,14 @@ import {
   Typography
 } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
 import SafeRichText from '../components/SafeRichText'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
 import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
 import { hasPermission } from '../services/managementAccess'
+import { materialApprovalApi } from '../services/materialApprovalApi'
 import {
   materialApi,
   type Material,
@@ -139,7 +141,10 @@ function FieldValue({ field, version, value, snapshot, path, groupIndex = -1 }: 
 
 export function MaterialFields({ version }: { version: MaterialVersion }) {
   if (!version.fields.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容字段" />
-  return <div className="material-field-grid">{version.fields.map(field => {
+  const groups = [version.fields.slice(0, 1), version.fields.slice(1, 4), version.fields.slice(4, 8), version.fields.slice(8)]
+  const titles = ['账号主截图', '账号详情', '编导拆解', '搭建建议']
+  return <div className="material-four-column-layout">{groups.map((group, groupIndex) => <section className="material-detail-column" key={titles[groupIndex]}>
+    <Typography.Title level={5}>{titles[groupIndex]}</Typography.Title><div className="material-field-grid">{group.map(field => {
     const value = version.values[field.key]
     const snapshot = version.dictSnapshot[field.key]
     if (field.type === 'repeat-group') {
@@ -162,7 +167,7 @@ export function MaterialFields({ version }: { version: MaterialVersion }) {
       <Typography.Text type="secondary">{field.label}</Typography.Text>
       <FieldValue field={field} version={version} value={value} snapshot={snapshot} path={field.key} />
     </section>
-  })}</div>
+  })}</div></section>)}</div>
 }
 
 type SourceOption = { value: string; label: string; type: MaterialFieldDefinition['type'] }
@@ -394,9 +399,10 @@ function ReferenceDialog({ material, open, onClose, onSuccess }: {
   </Modal>
 }
 
-export default function MaterialLibraryPage({ permissions = [] }: { permissions?: string[] }) {
+export default function MaterialLibraryPage({ permissions = [], management = false }: { permissions?: string[]; management?: boolean }) {
+  const [searchParams] = useSearchParams()
   const { message } = App.useApp()
-  const [view, setView] = useState<ViewKey>('recommendation')
+  const [view, setView] = useState<ViewKey>(management ? 'all' : 'recommendation')
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState<number>()
@@ -408,6 +414,11 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const [rows, setRows] = useState<Material[]>([])
   const [selectedId, setSelectedId] = useState<number>()
   const [selected, setSelected] = useState<Material>()
+  const [approvalTaskId, setApprovalTaskId] = useState<string>()
+  const [approvalVersionId, setApprovalVersionId] = useState<number>()
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>()
+  const [approvalReason, setApprovalReason] = useState('')
+  const [approvalSaving, setApprovalSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -501,6 +512,15 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
       setDetailLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    const materialId = Number(searchParams.get('materialId'))
+    const taskId = searchParams.get('taskId') || undefined
+    const versionId = Number(searchParams.get('versionId')) || undefined
+    if (materialId) void loadDetail(materialId)
+    setApprovalTaskId(taskId)
+    setApprovalVersionId(versionId)
+  }, [loadDetail, searchParams])
 
   const load = useCallback(async (targetPage = 1, preferredId?: number) => {
     if (view === 'recommendation' && !accountId) {
@@ -617,6 +637,26 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   }
 
   const currentVersion = selected?.currentVersion
+  const canApprove = Boolean(approvalTaskId && approvalVersionId && selected &&
+    permissions.includes('zsjos:material-approval:approve'))
+  const canReject = Boolean(approvalTaskId && approvalVersionId && selected &&
+    permissions.includes('zsjos:material-approval:reject'))
+  const decideApproval = async () => {
+    if (!approvalAction || !approvalTaskId || !approvalVersionId || !approvalReason.trim()) return
+    setApprovalSaving(true)
+    try {
+      await materialApprovalApi.decide(approvalAction, approvalVersionId, approvalTaskId, approvalReason.trim())
+      message.success(approvalAction === 'approve' ? '审批已通过' : '素材已驳回')
+      setApprovalAction(undefined); setApprovalReason('')
+      await loadDetail(selectedId || selected?.id || 0)
+    } catch (cause) { message.error(errorText(cause)) }
+    finally { setApprovalSaving(false) }
+  }
+  const openMaterial = async (id: number) => {
+    setFormMode('view')
+    setFormOpen(true)
+    await loadDetail(id)
+  }
   return <section className="workspace-page material-library-page">
     <header className="material-library-filter-shell">
       <div className="material-library-toolbar">
@@ -664,7 +704,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
         <div className="material-library-scroll">
           {loading && !rows.length ? <Skeleton active paragraph={{ rows: 10 }} /> : rows.length ? rows.map(item =>
             <button type="button" key={item.id} className={`material-library-item${selectedId === item.id ? ' active' : ''}`}
-              onClick={() => void loadDetail(item.id)}>
+              onClick={() => void openMaterial(item.id)}>
               <span className="material-library-cover">{item.coverPreviewUrl
                 ? <img src={item.coverPreviewUrl} alt="" loading="lazy" /> : <BookOutlined />}</span>
               <span className="material-library-item-copy">
@@ -677,41 +717,6 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           <div ref={loadMoreRef} className="material-library-load-more">{loading && rows.length ? '加载中...' : hasMore ? '' : rows.length ? '已加载全部素材' : ''}</div>
         </div>
       </aside>
-      <main className={`material-library-detail-pane${selected ? ' open' : ''}`}>
-        {selected && <Button className="material-detail-close" type="text" icon={<CloseOutlined />} aria-label="关闭素材详情" onClick={() => { setSelected(undefined); setSelectedId(undefined) }} />}
-        {detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError
-          ? <Alert type="error" showIcon message={detailError} action={selectedId
-            ? <Button size="small" onClick={() => void loadDetail(selectedId)}>重试</Button> : undefined} />
-          : selected && currentVersion ? <>
-            <div className="material-detail-heading">
-              <div>
-                <Space wrap><Tag>{selected.materialTypeName}</Tag><Tag>{statusLabel[selected.status] || selected.status}</Tag>
-                  <Tag>{sourceLabel[selected.source] || selected.source}</Tag></Space>
-                <Typography.Title level={4}>{selected.title}</Typography.Title>
-                <Typography.Text type="secondary">{selected.summary || '暂无摘要'}</Typography.Text>
-              </div>
-              <Space wrap>
-                {selected.availableActions.includes('LIKE') && <Button icon={selected.liked ? <LikeFilled /> : <LikeOutlined />}
-                  type={selected.liked ? 'primary' : 'default'} onClick={() => void interact('like')}>{selected.likeCount}</Button>}
-                {selected.availableActions.includes('FAVORITE') && <Button icon={selected.favorited ? <HeartFilled /> : <HeartOutlined />}
-                  type={selected.favorited ? 'primary' : 'default'} onClick={() => void interact('favorite')}>{selected.favoriteCount}</Button>}
-                <Tooltip title="查看版本"><Button icon={<HistoryOutlined />} onClick={() => void openVersions()} /></Tooltip>
-                {selected.availableActions.includes('REFERENCE') && hasPermission(permissions, 'zsjos:material:reference')
-                  && <Button type="primary" icon={<LinkOutlined />} onClick={() => setReferenceOpen(true)}>引用</Button>}
-                {canUpdate && <Button icon={<EditOutlined />} onClick={openEdit}>编辑</Button>}
-                {selected.materialTypeId === viralType?.id && <Button onClick={openView}>查看布局</Button>}
-              </Space>
-            </div>
-            <div className="material-detail-meta">
-              <span>负责人：{selected.ownerName || '未记录'}</span>
-              <span>当前版本：V{currentVersion.versionNo}</span>
-              <span>调用量：{selected.referenceCount}</span>
-              <span>生效时间：<DateTimeText value={currentVersion.effectiveAt} /></span>
-            </div>
-            {selected.coverPreviewUrl && <Image className="material-detail-cover" src={selected.coverPreviewUrl} alt={selected.title} />}
-            <MaterialFields version={currentVersion} />
-          </> : <Empty description="从左侧选择一条素材" />}
-      </main>
     </div>
     <ReferenceDialog material={selected} open={referenceOpen} onClose={() => setReferenceOpen(false)}
       onSuccess={() => { if (selectedId) void loadDetail(selectedId) }} />
@@ -724,9 +729,20 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           </Space>} />
       </List.Item>} />
     </Drawer>
+    <Modal open={Boolean(approvalAction)} title={approvalAction === 'approve' ? '通过素材审批' : '驳回素材'} confirmLoading={approvalSaving}
+      onCancel={() => !approvalSaving && setApprovalAction(undefined)} onOk={() => void decideApproval()}>
+      <Input.TextArea value={approvalReason} onChange={event => setApprovalReason(event.target.value)} maxLength={1000} rows={4} placeholder="请填写审批意见" />
+    </Modal>
     {(viralType || viralContentType) && <Drawer
       title={formMode === 'create' ? (formTypeCode === 'viral_content' ? '创建爆款内容拆解' : '创建爆款账号拆解') : formMode === 'edit' ? '编辑爆款拆解' : '查看爆款拆解'}
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
+      {formMode === 'view' && selected && <div className="material-layout-summary">
+        <div className="material-layout-summary-info"><span>负责人：{selected.ownerName || '未记录'}</span><span>当前版本：V{selected.currentVersion?.versionNo || '-'}</span><span>调用量：{selected.referenceCount}</span><span>点赞量：{selected.likeCount}</span></div>
+        {(canApprove || canReject) && <div className="material-layout-summary-actions">
+          {canApprove && <Button type="primary" onClick={() => setApprovalAction('approve')}>通过审批</Button>}
+          {canReject && <Button danger onClick={() => setApprovalAction('reject')}>驳回审批</Button>}
+        </div>}
+      </div>}
       {formTypeCode === 'viral_content'
         ? viralContentType && <ViralContentMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />

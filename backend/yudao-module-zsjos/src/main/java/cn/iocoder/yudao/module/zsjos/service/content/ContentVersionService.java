@@ -110,8 +110,9 @@ public class ContentVersionService {
         validateHttps(deliverableUrl);
         validateHttps(leadResourceUrl);
         row.setCoverSnapshotJson(coverFiles.snapshotJson());
-        // 素材引用由服务端写入；创建后续内容版本时完整继承，客户端不能伪造或删除引用审计。
-        row.setMaterialRefsJson(current == null ? null : current.getMaterialRefsJson());
+        // 首个版本接受客户端提交的参考素材快照；创建后续版本时完整继承，不允许客户端改写引用审计。
+        row.setMaterialRefsJson(current == null ? normalizeMaterialRefs(req.getMaterialRefsJson())
+                : current.getMaterialRefsJson());
         row.setDeliverableUrl(deliverableUrl);
         row.setDeliverableSnapshotJson(deliverableFiles.snapshotJson());
         row.setScriptText(req.getScriptText());
@@ -123,6 +124,7 @@ public class ContentVersionService {
         row.setCommentHook(req.getCommentHook());
         row.setLeadResourceUrl(leadResourceUrl);
         row.setReferenceContentVersionId(req.getReferenceContentVersionId());
+        row.setReferenceWorkUrl(normalizeOptional(req.getReferenceWorkUrl()));
         row.setPlannedPublishAt(req.getPlannedPublishAt());
         row.setSubmittedByUserId(userId);
         row.setSubmittedAt(LocalDateTime.now());
@@ -155,6 +157,7 @@ public class ContentVersionService {
         req.setCommentHook(changes.getCommentHook() != null ? changes.getCommentHook() : source.getCommentHook());
         req.setLeadResourceUrl(changes.getLeadResourceUrl() != null ? changes.getLeadResourceUrl() : source.getLeadResourceUrl());
         req.setReferenceContentVersionId(changes.getReferenceContentVersionId() != null ? changes.getReferenceContentVersionId() : source.getReferenceContentVersionId());
+        req.setReferenceWorkUrl(changes.getReferenceWorkUrl() != null ? changes.getReferenceWorkUrl() : source.getReferenceWorkUrl());
         req.setPlannedPublishAt(changes.getPlannedPublishAt() != null ? changes.getPlannedPublishAt() : source.getPlannedPublishAt());
         return create(req, userId);
     }
@@ -186,6 +189,18 @@ public class ContentVersionService {
 
     private String normalizeOptional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** 参考素材快照必须是合法 JSON，否则拒绝，避免脏数据写入版本审计。 */
+    private String normalizeMaterialRefs(String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) return null;
+        try {
+            JsonUtils.parseTree(normalized);
+        } catch (RuntimeException error) {
+            throw exception(CONTENT_VERSION_FILE_INVALID);
+        }
+        return normalized;
     }
 
     private String normalizeIdempotencyKey(String value) {

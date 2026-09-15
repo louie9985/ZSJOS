@@ -25,7 +25,7 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, type DictData, type MediaStudentDetail } from "../services/api";
 import {
   accountProfileApi,
@@ -75,8 +75,10 @@ export default function AccountProfilePanel({
   onEditingFinished,
   onSaved,
   onMissingChange,
+  deliveryActions,
 }: {
   account?: Account;
+  deliveryActions?: ReactNode;
   canQuery: boolean;
   canMaintain: boolean;
   initiallyEditing?: boolean;
@@ -466,7 +468,6 @@ export default function AccountProfilePanel({
           {files[f.key] && (
             <>
               <Image width={90} src={safeLink(files[f.key].previewUrl)} />
-              {fileLink(files[f.key])}
             </>
           )}
           <Space>
@@ -477,7 +478,7 @@ export default function AccountProfilePanel({
                 void upload(f, file);
                 return false;
               }}
-              disabled={disabled}
+              disabled={disabled || !fieldEmpty(value)}
             >
               <Button icon={<UploadOutlined />} disabled={disabled}>
                 上传图片
@@ -687,20 +688,22 @@ export default function AccountProfilePanel({
       <div className="media-students-tab-heading">
         <div>
           <Typography.Title level={5}>
-            {profile.account.nickname || `未命名账号 · ${account.accountNo}`}
+            {profile.account.nickname || "未命名账号"}
           </Typography.Title>
           <Typography.Text type="secondary">
-            {account.accountNo} ·{" "}
             {profile.account.platformLabelSnapshot || "平台待填写"}
           </Typography.Text>
           <Tag>{String(profile.values.current_status || "状态等待来源")}</Tag>
         </div>
+        <div className="account-profile-actions">
+        {deliveryActions}
         {editable.length > 0 && (
           <Button icon={<EditOutlined />} onClick={() => openEditor()}>
             维护账号表
           </Button>
         )}
         {editable.length > 0 && <Button onClick={() => setDiagnosisOpen(true)}>填写周期诊断</Button>}
+        </div>
       </div>
       <Modal title="周期诊断" open={diagnosisOpen} onCancel={() => setDiagnosisOpen(false)} footer={null} destroyOnHidden>
         <Form layout="vertical" onFinish={submitDiagnosis} initialValues={{ reposition: false }}>

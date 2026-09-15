@@ -1,0 +1,7 @@
+{
+  "form": {
+    "labelWidth": "120px"
+  },
+  "submitBtn": false,
+  "resetBtn": false
+}

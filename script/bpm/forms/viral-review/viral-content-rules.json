@@ -1,0 +1,67 @@
+[
+  {
+    "type": "input",
+    "field": "materialNo",
+    "title": "素材编号",
+    "props": {
+      "disabled": true,
+      "type": "text",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 14
+      }
+    }
+  },
+  {
+    "type": "input",
+    "field": "materialVersionNo",
+    "title": "素材版本",
+    "props": {
+      "disabled": true,
+      "type": "text",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 14
+      }
+    }
+  },
+  {
+    "type": "input",
+    "field": "materialTitle",
+    "title": "拆解标题",
+    "props": {
+      "disabled": true,
+      "type": "text",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 14
+      }
+    }
+  },
+  {
+    "type": "input",
+    "field": "materialSummary",
+    "title": "拆解摘要",
+    "props": {
+      "disabled": true,
+      "type": "textarea",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 14
+      }
+    }
+  },
+  {
+    "type": "input",
+    "field": "materialContent",
+    "title": "拆解内容快照",
+    "props": {
+      "disabled": true,
+      "type": "textarea",
+      "autosize": {
+        "minRows": 2,
+        "maxRows": 14
+      }
+    }
+  }
+]

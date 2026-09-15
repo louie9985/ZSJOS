@@ -1,5 +1,33 @@
 # Main Content Review Refactor
 
+## Workstream scope update - 2026-09-14 15:31:42 +08:00
+
+- Workstream ID: `main-content-review-refactor`
+- Goal: Repair the existing-database schema gap that prevents `zsjos_content` queries after the content production-field rollout.
+- Non-goals: No Java, frontend, business-row, permission, branch, worktree, service-lifecycle, or destructive database changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `e78a02f0ed4eceb9975bf92fb428cc19585c8a16`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V230__content_production_fields.sql`, the directly related migration documentation, and this workstream handoff record.
+- Owner: `/root`
+- Dependencies: Existing `V096` content schema, the content production fields already present in the fresh bootstrap, and the applied `V226` content-version field migration.
+- Integration order: Apply after `V229`; add only missing nullable columns to `zsjos_content`.
+- Verification plan: Execute against the controlled local MySQL development database, inspect all seven column definitions, replay the migration to prove repeatability, run focused backend tests/build, and verify the affected authenticated HTTP endpoint when a usable session is available.
+
+## Delivery entry - 2026-09-14 15:38:22 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `e78a02f0ed4eceb9975bf92fb428cc19585c8a16`
+- User goal: Fix the `Unknown column 'purpose_value'` failure when loading media-student details.
+- Key decisions: Preserve the already applied V226 migration and add forward migration V230 for the seven missing nullable `zsjos_content` production fields; retain `NULL` for historical records instead of inventing snapshot values.
+- Execution or analysis result: Added the repeatable V230 migration and deployment documentation. Applied and replayed it successfully on the controlled local `yudao-mysql/ruoyi-vue-pro` database. The running 48080 service uses the `local` profile and points to `192.168.2.17`; read-only inspection found that database already contains all seven columns, so no DDL was executed against the shared database. The formerly failing full-column SELECT parses successfully there.
+- Changed files: `script/sql/mysql/migrations/V230__content_production_fields.sql`; `script/sql/mysql/migrations/README.md`; `handoff/main-content-review-refactor.md`.
+- Verification evidence: V230 UTF-8 validation passed; first execution and repeated replay passed; all seven local columns match the bootstrap types and nullable defaults; representative Chinese column comments were verified through a UTF-8 client and `HEX(COLUMN_COMMENT)`; the exact failing SELECT passed against `192.168.2.17`; `MediaStudentServiceTest` and `ContentReviewBatchServiceTest` passed 15 tests with a successful 21-module Reactor build. The broader unfiltered Reactor test run stopped on the unrelated existing `CodegenEngineUniappTest.testExecute_treeSearch` assertion in `yudao-module-infra` after 237 tests (1 failure, 11 skipped), before reaching ZSJOS.
+- Dependency or integration impact: Existing databases must apply V230 after V229 through the normal migration process. No dependency, API, permission, frontend, business-row, or service-lifecycle change.
+- Remaining work: Authenticated HTTP replay was not available in this terminal session; refresh or retry the media-student detail request to confirm the current browser session. The unrelated Infra code-generator test failure remains outside this workstream.
+
 - Workstream ID: main-content-review-refactor
 - Goal: Implement student overview content approval refactor.
 - Non-goals: No branch/worktree operations; no destructive database changes; no platform publishing integration.
@@ -415,3 +443,27 @@ pm run typecheck -- --pretty false passed.
 - Result: fixed V229 for MySQL versions without ADD COLUMN IF NOT EXISTS using information_schema guarded dynamic SQL; index creation is also repeatable.
 - Verification: corrected after user reported 1064/1072 migration failure; rerun against target DB pending.
 
+
+## Delivery entry - 2026-09-14  (Beijing time)
+- Branch: main
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `e78a02f0ed4eceb9975bf92fb428cc19585c8a16`
+- User goal: 确认“发起内容审批”由运营发起，不由编导发起。
+- Key decisions: 学员概览入口改用 `zsjos:content-review:submit` 权限；从学员概览创建内容审批草稿的后端接口同步改用提交权限。保留编导逐条审核流程和终审流程。
+- Execution or analysis result: 已移除仅持有创建权限的编导入口，并将学员概览草稿创建接口收紧到提交权限；后端批次对象权限原已要求 submit/publish 仅限责任运营。
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/contentreview/ContentReviewController.java`。
+- Verification evidence: `frontend/workbench` `npm run typecheck -- --pretty false` 通过。
+- Dependency or integration impact: 运营角色需持有 `zsjos:content-review:submit` 才能看到并调用该入口；编导审核权限不变。未新增依赖、未改数据库。
+- Remaining work: None.
+
+## Delivery 2026-09-15 00:19:45 Beijing
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: e78a02f0ed4eceb9975bf92fb428cc19585c8a16
+- User goal: 修复生产内容审核提交时报配置失效。
+- Key decisions: 直接修正 Docker 开发库已发布流程 simple_model；仅更新 directorReview/finalReview 的 candidateStrategy=35、approveMethod=1。
+- Execution or analysis result: 已创建 zsjos_fix_backup_content_review_info 备份表并完成更新。
+- Changed files: None；数据库表 bpm_process_definition_info。
+- Verification evidence: UTF-8 查询确认两个节点 strategy=35、method=1。
+- Dependency or integration impact: 需重试提交接口；应用若缓存流程定义需刷新缓存或重启。
+- Remaining work: 未执行真实提交请求。

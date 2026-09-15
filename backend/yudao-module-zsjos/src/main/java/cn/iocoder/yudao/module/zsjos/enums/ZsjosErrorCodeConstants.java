@@ -104,6 +104,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_REFUND_STATE_INVALID = new ErrorCode(1_900_017_012, "当前退款状态不允许该操作");
     ErrorCode PAYMENT_REFUND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_017_013, "退款审批流程暂不可用");
     ErrorCode PAYMENT_REFUND_GATEWAY_UNKNOWN = new ErrorCode(1_900_017_014, "退款结果待通联确认");
+    ErrorCode PAYMENT_SUBJECT_NOT_EXISTS = new ErrorCode(1_900_017_015, "支付主体不存在");
+    ErrorCode PAYMENT_SUBJECT_CODE_DUPLICATE = new ErrorCode(1_900_017_016, "支付主体编码已存在");
+    ErrorCode PAYMENT_SUBJECT_DISABLED = new ErrorCode(1_900_017_017, "支付主体已停用");
+    ErrorCode PAYMENT_SUBJECT_NOT_CONFIGURED = new ErrorCode(1_900_017_018, "产品未配置支付主体，无法使用线上支付");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
@@ -115,6 +119,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_ROLE_NOT_CONFIGURED = new ErrorCode(1_900_000_008, "兼职端角色未配置，请先执行 V063 迁移");
     ErrorCode PARTNER_ACCOUNT_NOT_EXISTS = new ErrorCode(1_900_000_009, "兼职登录账号不存在");
     ErrorCode PARTNER_ACCOUNT_DISABLED = new ErrorCode(1_900_000_010, "兼职登录账号或兼职主体已停用");
+    ErrorCode LEADERBOARD_DISABLED = new ErrorCode(1_900_000_011, "排行榜暂未开放");
     ErrorCode PARTNER_MOBILE_DUPLICATE = new ErrorCode(1_900_000_011, "该手机号已绑定其他兼职账号");
     ErrorCode PARTNER_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_900_000_012, "手机号或密码错误");
     ErrorCode PARTNER_PASSWORD_MISMATCH = new ErrorCode(1_900_000_013, "当前密码错误");

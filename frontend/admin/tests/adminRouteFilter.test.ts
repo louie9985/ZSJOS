@@ -42,3 +42,34 @@ test('drops an empty directory after all unsupported children are removed', () =
     []
   )
 })
+
+test('removes admin_only Workbench pages, which Vue Admin cannot resolve either', () => {
+  const routes = filterAdminRoutes([
+    { path: '/admin', component: 'zsjos/material/index', workbenchRenderMode: 'admin_embed' },
+    { path: '/approvals', component: 'zsjos-workbench', workbenchRenderMode: 'admin_only' }
+  ])
+  assert.deepEqual(
+    routes.map((route) => route.path),
+    ['/admin']
+  )
+})
+
+test('keeps the admin_embed page renderable when a Workbench-only child is removed', () => {
+  const routes = filterAdminRoutes([
+    {
+      path: '/zsjos',
+      children: [
+        {
+          path: 'manage',
+          component: 'zsjos/material/index',
+          workbenchRenderMode: 'admin_embed',
+          children: [
+            { path: 'approvals', component: 'zsjos-workbench', workbenchRenderMode: 'admin_only' }
+          ]
+        }
+      ]
+    }
+  ])
+  assert.deepEqual(routes[0].children?.map((route) => route.path), ['manage'])
+  assert.deepEqual(routes[0].children?.[0].children, [])
+})

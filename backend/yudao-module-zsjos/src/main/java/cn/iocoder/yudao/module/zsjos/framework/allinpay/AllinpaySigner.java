@@ -57,14 +57,28 @@ public class AllinpaySigner {
 
     private PrivateKey loadPrivateKey() throws Exception {
         if (privateKey != null) return privateKey;
-        byte[] der = decodePem(Path.of(properties.getMerchantPrivateKeyLocation()), "PRIVATE KEY");
+        byte[] der;
+        // 优先使用直接传入的密钥内容
+        if (properties.getMerchantPrivateKey() != null && !properties.getMerchantPrivateKey().isBlank()) {
+            der = decodePemString(properties.getMerchantPrivateKey(), "PRIVATE KEY");
+        } else {
+            // 否则从文件路径读取
+            der = decodePem(Path.of(properties.getMerchantPrivateKeyLocation()), "PRIVATE KEY");
+        }
         privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
         return privateKey;
     }
 
     private PublicKey loadPublicKey() throws Exception {
         if (publicKey != null) return publicKey;
-        byte[] der = decodePem(Path.of(properties.getPlatformPublicKeyLocation()), "PUBLIC KEY");
+        byte[] der;
+        // 优先使用直接传入的密钥内容
+        if (properties.getPlatformPublicKey() != null && !properties.getPlatformPublicKey().isBlank()) {
+            der = decodePemString(properties.getPlatformPublicKey(), "PUBLIC KEY");
+        } else {
+            // 否则从文件路径读取
+            der = decodePem(Path.of(properties.getPlatformPublicKeyLocation()), "PUBLIC KEY");
+        }
         publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
         return publicKey;
     }
@@ -75,5 +89,13 @@ public class AllinpaySigner {
                 .replace("-----END " + label + "-----", "")
                 .replaceAll("\\s", "");
         return Base64.getDecoder().decode(pem);
+    }
+
+    private static byte[] decodePemString(String pem, String label) {
+        String cleanPem = pem
+                .replace("-----BEGIN " + label + "-----", "")
+                .replace("-----END " + label + "-----", "")
+                .replaceAll("\\s", "");
+        return Base64.getDecoder().decode(cleanPem);
     }
 }

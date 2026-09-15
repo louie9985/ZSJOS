@@ -165,3 +165,17 @@
 - Verification evidence: Maven PositioningCardServiceTest passed; module compile passed.
 - Dependency/integration impact: No dependencies or schema changes. Existing workflow and account homepage field rules unchanged.
 - Remaining work: Add explicit atomic sync/rollback and attachment fixture tests; run full backend/frontend regression.
+
+## Delivery Entry — 2026-09-14 23:55:25 +08:00
+
+- Beijing time: 2026-09-14 23:55:25 +08:00
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: 436ba84cd8ab5471356e3faa62db9ab44e3c76e9 (uncommitted worktree)
+- User goal: 使维护账号表弹窗与账号主页采用一致的三栏卡片布局。
+- Key decisions: 复用主页四列网格（左侧摘要 + 定位卡/账号状态/复盘记录），弹窗工具栏跨右侧三列；保留现有字段编辑、权限和移动端适配。
+- Execution result: 调整 AccountProfilePanel 弹窗布局 CSS，使三组 section 成为网格直接子项并各自滚动。
+- Changed files: frontend/workbench/src/styles/pages/media-students.css; handoff/main-media-account-profile.md
+- Verification evidence: frontend/workbench npm run typecheck 通过；未执行浏览器检查。
+- Dependency/integration impact: 无新增依赖，保留其他未提交改动。
+- Remaining work: 建议在 1440px 与移动端浏览器确认视觉间距。

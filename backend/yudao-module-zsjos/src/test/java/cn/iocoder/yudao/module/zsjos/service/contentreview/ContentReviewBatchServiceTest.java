@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.contentreview;
 
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -8,12 +9,17 @@ import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEvent;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskActionContext;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import org.springframework.test.util.ReflectionTestUtils;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewPublishReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentVersionDO;
@@ -41,6 +47,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.LongStream;
 
 import static cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_APPROVE;
@@ -50,7 +57,9 @@ import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -86,6 +95,7 @@ class ContentReviewBatchServiceTest {
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
+    @Mock private DictDataApi dictDataApi;
     @Mock private FileApi fileApi;
 
     @BeforeEach
@@ -190,6 +200,158 @@ class ContentReviewBatchServiceTest {
         assertDoesNotThrow(() -> service.validateTaskAction(taskContext("final", 9L)));
 
         verifyNoInteractions(reviewMaterialService);
+    }
+
+    /**
+     * 早期冻结的账号快照只存了用户编号，没有姓名。响应组装时必须按编号解析补齐，
+     * 否则审核页的责任运营和责任编导会退化成展示内部 ID。
+     */
+    @Test
+    void responseBackfillsAccountSnapshotNamesForLegacySnapshots() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        batch.setDirectorUserId(248L);
+        batch.setContextSnapshotJson("{\"accountSnapshots\":[{\"id\":3,"
+                + "\"ownerOperatorUserId\":230,\"directorUserId\":248}]}");
+        when(adminUserApi.getUserMap(Set.of(OPERATOR_ID, 230L, 248L))).thenReturn(Map.of(
+                OPERATOR_ID, new AdminUserRespDTO().setId(OPERATOR_ID).setNickname("提交运营"),
+                230L, new AdminUserRespDTO().setId(230L).setNickname("新媒体一部运营1"),
+                248L, new AdminUserRespDTO().setId(248L).setNickname("编导1")));
+
+        ContentReviewBatchRespVO response = ReflectionTestUtils.invokeMethod(service, "toResponse",
+                batch, List.of(), Map.of(), null, OPERATOR_ID, false);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> snapshots =
+                (List<Map<String, Object>>) response.getContextSnapshot().get("accountSnapshots");
+        assertEquals("新媒体一部运营1", snapshots.getFirst().get("operatorName"));
+        assertEquals("编导1", snapshots.getFirst().get("directorName"));
+    }
+
+    /**
+     * 运营发起审核时填写的账号档案必须写入快照。这些字段曾因不在 editable 白名单里被静默丢弃，
+     * 导致审核页头部区始终空白。
+     */
+    @Test
+    void draftAccountSnapshotKeepsOperatorSuppliedProfileText() {
+        stubProfileDictionaries();
+        MediaAccountDO account = profileAccount();
+
+        Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
+                account, Map.of("productGoal", "私域成交", "publishFrequency", "3条/周",
+                        "productFormLabel", "短视频", "bottleneckLabel", "B3 内容同质化"));
+
+        assertEquals("私域成交", snapshot.get("productGoal"));
+        assertEquals("3条/周", snapshot.get("publishFrequency"));
+        assertEquals("短视频", snapshot.get("productFormLabel"));
+        assertEquals("B3 内容同质化", snapshot.get("bottleneckLabel"));
+    }
+
+    /** 字典字段只接受 value，label 由服务端解析，避免客户端伪造展示文案。 */
+    @Test
+    void draftAccountSnapshotResolvesDictionaryLabelsOnServer() {
+        stubProfileDictionaries();
+        MediaAccountDO account = profileAccount();
+
+        Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
+                account, Map.of("stageValue", "S3", "currentStatusLabel", "伪造的状态"));
+
+        assertEquals("S3", snapshot.get("stageValue"));
+        assertEquals("内容验证期", snapshot.get("sStageLabel"));
+        // 客户端直接传 label 不生效，仍是服务端按原值解析出的文案。
+        assertEquals("状态B", snapshot.get("currentStatusLabel"));
+    }
+
+    /** 字典外的取值必须拒绝，不能写进历史快照。 */
+    @Test
+    void draftAccountSnapshotRejectsValueOutsideDictionary() {
+        // platform 先于 stage 解析，两个字典都要 stub。
+        when(dictDataApi.getDictDataList("zsjos_account_platform")).thenReturn(List.of(
+                dictData("douyin", "抖音")));
+        when(dictDataApi.getDictDataList("zsjos_media_account_stage")).thenReturn(List.of(
+                dictData("S2", "冷启动期")));
+        MediaAccountDO account = profileAccount();
+
+        assertServiceCode(CONTENT_REVIEW_BATCH_ITEMS_INVALID, () ->
+                ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
+                        account, Map.of("stageValue", "S99")));
+    }
+
+    /** 责任运营姓名由服务端按归属解析，不接受前端传入。 */
+    @Test
+    void draftAccountSnapshotResolvesOperatorNameFromOwnership() {
+        stubProfileDictionaries();
+        when(adminUserApi.getUserMap(Set.of(OPERATOR_ID))).thenReturn(Map.of(
+                OPERATOR_ID, new AdminUserRespDTO().setId(OPERATOR_ID).setNickname("运营甲")));
+        MediaAccountDO account = profileAccount();
+        account.setDirectorUserId(null);
+
+        Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
+                account, Map.of("operatorName", "伪造的运营"));
+
+        assertEquals("运营甲", snapshot.get("operatorName"));
+    }
+
+    private void stubProfileDictionaries() {
+        when(dictDataApi.getDictDataList("zsjos_account_platform")).thenReturn(List.of(
+                dictData("douyin", "抖音")));
+        when(dictDataApi.getDictDataList("zsjos_media_account_stage")).thenReturn(List.of(
+                dictData("S2", "冷启动期"), dictData("S3", "内容验证期")));
+        when(dictDataApi.getDictDataList("zsjos_media_account_current_status")).thenReturn(List.of(
+                dictData("B", "状态B")));
+    }
+
+    private MediaAccountDO profileAccount() {
+        MediaAccountDO account = new MediaAccountDO();
+        account.setId(3L);
+        account.setAccountNo("ACC-3");
+        account.setOwnerOperatorUserId(OPERATOR_ID);
+        account.setPlatformValue("douyin");
+        account.setSStage("S2");
+        account.setCurrentStatusValue("B");
+        return account;
+    }
+
+    private DictDataRespDTO dictData(String value, String label) {
+        return new DictDataRespDTO().setValue(value).setLabel(label);
+    }
+
+    /**
+     * 刚进入编导审核时条目还没有结论，decision 为 null。DECISIONS 是 Set.of，
+     * contains(null) 抛 NPE，曾导致编导打开内容审核列表直接 500。
+     */
+    @Test
+    void directorListExposesDecideActionBeforeAnyDecisionIsSaved() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        batch.setDirectorUserId(OPERATOR_ID);
+        when(permissionApi.hasAnyPermissions(OPERATOR_ID, "zsjos:content-review:director-review"))
+                .thenReturn(true);
+        BpmTaskRespDTO task = new BpmTaskRespDTO();
+        task.setId("task-1");
+        task.setTaskDefinitionKey("directorReview");
+
+        List<String> actions = ReflectionTestUtils.invokeMethod(service, "availableActions",
+                batch, List.of(reviewItem(1L, null, null, false)), task, OPERATOR_ID);
+
+        assertTrue(actions.contains("DIRECTOR_DECIDE"));
+        assertFalse(actions.contains("DIRECTOR_COMPLETE"));
+    }
+
+    /** 结论缺失应返回业务错误，而不是 Set.of 的 NPE。 */
+    @Test
+    void decisionWithoutValueFailsAsBusinessError() {
+        assertServiceCode(CONTENT_REVIEW_BATCH_STATE_INVALID, () ->
+                ReflectionTestUtils.invokeMethod(service, "normalizeDecision", null, "备注"));
+    }
+
+    /**
+     * SIMPLE 流程启动后先停在发起人提交节点，由引擎自动通过。该动作必须放行且不推进批次阶段，
+     * 否则流程卡在发起人节点，批次永远进不到编导审核。
+     */
+    @Test
+    void taskActionAllowsEngineAutoApprovalOfSubmissionNode() {
+        service.validateTaskAction(taskContext("StartUserNode", OPERATOR_ID));
+
+        verifyNoInteractions(batchMapper, itemMapper);
     }
 
     @Test

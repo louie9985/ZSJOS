@@ -72,6 +72,12 @@ interface RouteHostProps {
  */
 export default function RouteHost({ menu, permissions, roles, authPlatform, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
+
+  // BPM 审批中心：通过 location.pathname 判断，因为 /bpm/task/done 可能没有对应的 menu
+  if (location.pathname === APP_ROUTES.BPM_TODO || location.pathname === APP_ROUTES.BPM_DONE) {
+    return <BpmApprovalCenterPage permissions={permissions} initialView={location.pathname === APP_ROUTES.BPM_DONE ? "done" : "todo"}/>
+  }
+
   if (menu?.path === APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE) return <DirectorTemplateConfigPage permissions={permissions} />
   if (authPlatform === 'MOBILE' && PC_ONLY_NATIVE_ROUTES.has(menu?.path || location.pathname)) {
     return <Result status="info" title="请使用电脑端访问" subTitle="内容生产和内容审核仅支持电脑端操作。" />
@@ -102,8 +108,6 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage permissions={permissions} onOpenAssignment={onOpenAssignment}/>
-  if (menu?.path === APP_ROUTES.BPM_TODO) return <BpmApprovalCenterPage permissions={permissions} initialView="todo"/>
-  if (menu?.path === APP_ROUTES.BPM_DONE) return <BpmApprovalCenterPage permissions={permissions} initialView="done"/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage/>
@@ -145,6 +149,7 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_LIBRARY) return <MaterialLibraryPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MATERIAL_MANAGEMENT) return <MaterialLibraryPage permissions={permissions} management />
   if (menu?.path === APP_ROUTES.VIRAL_ACCOUNT_DECOMPOSE) return <ViralAccountDecomposePage />
   if (menu?.path === APP_ROUTES.VIRAL_CONTENT_DECOMPOSE) return <ViralContentDecomposePage />
   if (menu?.path === APP_ROUTES.CONTENT_PRODUCTION) return <ContentProductionPage permissions={permissions}/>

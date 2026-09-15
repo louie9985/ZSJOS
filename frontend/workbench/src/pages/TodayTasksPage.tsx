@@ -199,6 +199,22 @@ function BusinessTaskPanel({
       navigate(`${APP_ROUTES.SALES_ORDERS}?orderId=${task.bizId}`)
       return
     }
+    if (task.actionCode === 'COMPLETE_POSITIONING_INTERVIEW' && task.serviceRelationId) {
+      navigate(APP_ROUTES.MY_STUDENTS, {
+        state: {
+          serviceRelationId: task.serviceRelationId,
+          openContactTask: true,
+          taskId: task.targetRecordId,
+          taskType: 'positioning_interview'
+        }
+      })
+      return
+    }
+    if (task.actionCode === 'COMPLETE_TOPIC') {
+      // 媒体选题任务：跳转到制作工单页面
+      navigate(APP_ROUTES.MEDIA_PRODUCTION_TICKETS)
+      return
+    }
     if (task.actionCode?.startsWith('OPEN_STUDENT_') && task.serviceRelationId) {
       navigate(APP_ROUTES.MY_STUDENTS, {
         state: {

@@ -170,7 +170,7 @@
     </template>
   </el-drawer>
 
-  <el-drawer v-model="detailVisible" size="78%" title="素材详情">
+  <el-drawer v-model="detailVisible" size="92%" title="查看爆款拆解" class="material-detail-drawer">
     <div v-loading="detailLoading">
       <el-alert v-if="detailError" :title="detailError" type="error" show-icon :closable="false">
         <template #default><el-button link type="primary" @click="detailId && loadDetail(detailId)">重试</el-button></template>
@@ -208,19 +208,29 @@
           <el-descriptions-item label="生效时间">{{ formatTime(detailVersion.effectiveAt) }}</el-descriptions-item>
           <el-descriptions-item label="流程实例">{{ detailVersion.processInstanceId || '-' }}</el-descriptions-item>
         </el-descriptions>
-        <MaterialDynamicForm
-          v-if="detailVersion"
-          :model-value="detailVersion.values"
-          :snapshots="detailVersion.dictSnapshot"
-          :fields="detailVersion.fields"
-          :dict-data="dictData"
-          :users="users"
-          :departments="departments"
-          :files="detailVersion.files"
-          readonly
-        />
+        <div v-if="detailVersion" class="material-detail-layout">
+          <el-card class="material-detail-cover-card" shadow="never">
+            <el-image v-if="detailVersion.coverPreviewUrl || detail.coverPreviewUrl" :src="detailVersion.coverPreviewUrl || detail.coverPreviewUrl" fit="contain" :preview-src-list="[detailVersion.coverPreviewUrl || detail.coverPreviewUrl]" />
+            <el-empty v-else description="暂无封面" />
+          </el-card>
+          <el-card v-for="section in ['ACCOUNT_DETAIL', 'DIRECTOR_ANALYSIS', 'BUILD_SUGGESTION']" :key="section" shadow="never" class="material-detail-section">
+            <template #header>{{ section === 'ACCOUNT_DETAIL' ? '账号详情' : section === 'DIRECTOR_ANALYSIS' ? '编导拆解' : '搭建建议' }}</template>
+            <MaterialDynamicForm :model-value="detailVersion.values" :snapshots="detailVersion.dictSnapshot" :fields="detailVersion.fields.filter((field) => (field.section || 'ACCOUNT_DETAIL') === section)" :dict-data="dictData" :users="users" :departments="departments" :files="detailVersion.files" readonly />
+          </el-card>
+        </div>
       </template>
     </div>
+    <template #footer>
+      <div class="material-detail-actions">
+        <el-button v-if="detail?.availableActions.includes('UPDATE')" v-hasPermi="['zsjos:material:update']" @click="detail && openEdit(detail)">编辑</el-button>
+        <el-button v-if="detail?.availableActions.includes('SUBMIT')" v-hasPermi="['zsjos:material:submit']" type="primary" @click="detail && submit(detail)">提交审批</el-button>
+        <el-button v-if="detailApproval" v-hasPermi="['zsjos:material-approval:approve']" type="success" @click="decideApproval('approve')">审批通过</el-button>
+        <el-button v-if="detailApproval" v-hasPermi="['zsjos:material-approval:reject']" type="danger" @click="decideApproval('reject')">驳回</el-button>
+        <el-button v-if="detail?.availableActions.includes('DISABLE')" v-hasPermi="['zsjos:material:disable']" type="danger" @click="detail && disable(detail)">停用</el-button>
+        <el-button v-if="detail?.availableActions.includes('RESTORE')" v-hasPermi="['zsjos:material:restore']" @click="detail && restore(detail)">恢复</el-button>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </div>
+    </template>
   </el-drawer>
 </template>
 
@@ -288,6 +298,7 @@ const detail = ref<MaterialApi.Material>()
 const detailVersions = ref<MaterialApi.MaterialVersion[]>([])
 const detailVersionId = ref<number>()
 const detailVersion = ref<MaterialApi.MaterialVersion>()
+const detailApproval = ref<MaterialApi.MaterialApprovalTask>()
 
 const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
@@ -491,6 +502,12 @@ const loadDetail = async (id: number) => {
     detailVersions.value = versions
     detailVersion.value = material.currentVersion || versions[0]
     detailVersionId.value = detailVersion.value?.id
+    detailApproval.value = undefined
+    for (const type of types.value.filter((item) => item.code === 'viral_account' || item.code === 'viral_content')) {
+      const page = await MaterialApi.getMaterialApprovalPage(type.code)
+      const match = page.list.find((item) => item.materialNo === material.materialNo)
+      if (match) { detailApproval.value = match; break }
+    }
   } catch (cause: any) {
     detail.value = undefined
     detailError.value = cause?.msg || cause?.message || '素材详情加载失败'
@@ -507,6 +524,14 @@ const changeDetailVersion = async (id: number) => {
   } finally {
     detailLoading.value = false
   }
+}
+const decideApproval = async (action: 'approve' | 'reject') => {
+  if (!detailApproval.value || !detailVersion.value || !detailId.value) return
+  const result = await ElMessageBox.prompt('请输入审批意见', action === 'approve' ? '通过素材审批' : '驳回素材审批', { inputType: 'textarea', inputValidator: (value) => value.trim().length > 0 || '审批意见不能为空' })
+  await MaterialApi.decideMaterialApproval(action, detailApproval.value.versionId, detailApproval.value.task.id, result.value.trim())
+  message.success(action === 'approve' ? '审批已通过' : '素材已驳回')
+  await loadDetail(detailId.value)
+  await load()
 }
 
 onMounted(async () => {
@@ -577,4 +602,14 @@ onMounted(async () => {
   gap: 16px;
   margin: 20px 0 12px;
 }
+
+.material-detail-layout { display: grid; grid-template-columns: minmax(180px, .8fr) repeat(3, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+.material-detail-layout > .el-card { min-height: 520px; }
+.material-detail-cover-card :deep(.el-card__body) { padding: 12px; }
+.material-detail-cover-card .el-image { width: 100%; max-height: 620px; }
+.material-detail-section { overflow: hidden; }
+.material-detail-section :deep(.el-card__body) { max-height: 620px; overflow: auto; }
+.material-detail-actions { display: flex; justify-content: flex-start; gap: 10px; width: 100%; }
+@media (max-width: 1200px) { .material-detail-layout { grid-template-columns: repeat(2, minmax(260px, 1fr)); } }
+@media (max-width: 720px) { .material-detail-layout { grid-template-columns: 1fr; } }
 </style>

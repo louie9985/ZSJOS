@@ -171,7 +171,7 @@ class ContentVersionServiceTest {
     }
 
     @Test
-    void ignoresClientMaterialReferencesOnFirstVersion() {
+    void persistsClientMaterialReferencesOnFirstVersion() {
         mockInitialContent();
         ContentVersionSaveReqVO request = request(null);
         request.setMaterialRefsJson("[{\"materialVersionId\":999}]");
@@ -180,7 +180,18 @@ class ContentVersionServiceTest {
 
         ArgumentCaptor<ContentVersionDO> captor = ArgumentCaptor.forClass(ContentVersionDO.class);
         verify(mapper).insert(captor.capture());
-        assertNull(captor.getValue().getMaterialRefsJson());
+        assertEquals("[{\"materialVersionId\":999}]", captor.getValue().getMaterialRefsJson());
+    }
+
+    @Test
+    void rejectsInvalidMaterialReferencesJsonOnFirstVersion() {
+        when(contentMapper.selectByIdForUpdate(CONTENT_ID, TENANT_ID)).thenReturn(content(CONTENT_REVISING, 0, 3));
+        when(mapper.selectByContentAndVersionNoForUpdate(CONTENT_ID, 0, TENANT_ID)).thenReturn(null);
+        ContentVersionSaveReqVO request = request(null);
+        request.setMaterialRefsJson("not-json");
+
+        assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
+        verify(mapper, never()).insert(any(ContentVersionDO.class));
     }
 
     private void mockInitialContent() {

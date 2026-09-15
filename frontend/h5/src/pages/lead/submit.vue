@@ -89,6 +89,7 @@ function validateStep1(): boolean {
   if (!form.name.trim()) { showToast('请输入客户姓名'); return false }
   if (!form.mobile.trim() && !form.wechatId.trim()) { showToast('手机号和微信号至少填一个'); return false }
   if (form.mobile.trim() && !/^1\d{10}$/.test(form.mobile.trim())) { showToast('手机号格式不正确'); return false }
+  if (/\s/.test(form.mobile) || /\s/.test(form.wechatId)) { showToast('手机号和微信号不能包含空格'); return false }
   if (!form.area) { showToast('请选择客户地区'); return false }
   return true
 }

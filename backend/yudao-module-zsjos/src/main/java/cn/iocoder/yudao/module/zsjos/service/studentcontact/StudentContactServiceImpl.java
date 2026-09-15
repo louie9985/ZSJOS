@@ -93,6 +93,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private DirectorConfigService directorConfigService;
     @Resource private PositioningCardMapper positioningCardMapper;
     @Resource private MediaAccountMapper mediaAccountMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider serviceReadPermission;
 
     @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
@@ -107,6 +108,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         result.setQuickNotes(JsonUtils.parseArray(config.getQuickNotesJson(), String.class));
         result.setFirstContactTimeoutMinutes(config.getFirstContactTimeoutMinutes());
         result.setStudyPlanTimeoutMinutes(config.getStudyPlanTimeoutMinutes());
+        // Managed-scope access is read-only. Only the service owner receives owner operation projections.
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean operational = "active".equals(relation.getStatus());
         if (owner) result.setVisibleTabs(List.of("overview", "first-contact", "study-plan", "contacts"));
@@ -772,7 +774,8 @@ public class StudentContactServiceImpl implements StudentContactService {
                 && !Objects.equals(relation.getContentDirectorUserId(), userId)
                 && !Objects.equals(relation.getCareerPlannerUserId(), userId)
                 && !Objects.equals(relation.getOperatorUserId(), userId)) {
-            throw exception(STUDENT_PERMISSION_DENIED);
+            // Detail subresources must honor the same managed read scope as the student detail.
+            if (!serviceReadPermission.hasPermission(id, "read", userId)) throw exception(STUDENT_PERMISSION_DENIED);
         }
         return relation;
     }

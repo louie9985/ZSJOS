@@ -181,3 +181,45 @@ Verification is proportional to risk, but evidence is mandatory:
 - Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Use `None` when a field has no applicable content.
 - Entries **MUST** be appended in chronological order. Existing entries **MUST NOT** be rewritten or deleted; corrections must be recorded in a new entry.
 - Handoff files **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.
+
+## 9. AI coding execution defaults
+
+### 默认执行原则
+
+- 当前仓库、当前工作树和当前分支是默认工作范围。只读检查、代码搜索、局部测试、编译、日志诊断和开发服务状态检查可直接执行。
+- 已由本文件、仓库脚本、配置或模块文档明确的事实不得重复询问。命令失败时先检查路径、参数、依赖、环境变量和脚本帮助，再报告具体阻断原因。
+- 新增依赖、分支/工作树操作、提交、推送、发布，以及生产或共享外部状态变更仍需单独确认。
+
+### 本地开发默认上下文
+
+- 默认开发租户为 `tenant_id = 1`，ADMIN 请求默认使用 `tenant-id: 1`；公共接口按接口契约使用 `tenantId` 查询参数。
+- 数据库名、账号、密码、服务地址和端口必须优先从本地配置、Docker Compose 和环境文件读取；不得在本文件记录密码、令牌或个人数据。
+- 多租户任务、租户隔离验证或现有租户不确定时，必须查询配置、API 或数据库，不得根据角色名、页面文案或历史记录猜测。
+
+### 本地数据库操作
+
+- 本地开发数据库允许 AI 直接执行查询、结构检查、备份、可重复迁移、验证脚本和指定范围的数据修复，无需重复询问是否有权限。
+- 本地开发库允许删除或重建指定表、指定租户或指定业务数据，但执行前必须说明目标范围、备份位置、执行顺序、幂等性、恢复方式和预期影响；SQL 必须保留租户条件或明确说明系统表例外。
+- 生产、共享测试和远程数据库，以及批量删除、全库操作、无范围 `TRUNCATE`、`DROP DATABASE` 和不可逆结构变更，必须在执行前获得明确确认。
+- MySQL 写入中文前使用 `mysql --default-character-set=utf8mb4` 并执行 `SET NAMES utf8mb4`；完成后检查代表性文本的 `HEX()`。
+- 数据库初始化、迁移、备份、回滚限制和校验规则详见 [`docs/operations/database-migrations.md`](docs/operations/database-migrations.md)。
+
+### 标准命令入口
+
+- Windows 数据库工具：`./zsjos-db.ps1 check`、`test-fresh`、`test-upgrade`、`test-guardrails`；类 Unix 使用 `./zsjos-db`。
+- 后端：`mvn -f backend/pom.xml -pl yudao-module-zsjos -am test`；编译使用 `-DskipTests compile`。
+- Admin：在 `frontend/admin` 运行 `pnpm ts:check`、`pnpm lint`、`pnpm build:local`。
+- Workbench：在 `frontend/workbench` 运行 `npm run typecheck`、`npm run build`。
+- Docker、数据库连接和模块专项命令以对应脚本及文档为准；按改动范围选择验证，不因全仓库存在无关失败而阻塞局部交付。
+
+### 业务契约摘要
+
+- 菜单、权限、字典、组织、用户和可见性以服务端为准；认证、租户、菜单、权限和字典流程详见 [`docs/architecture/data-and-permission-flow.md`](docs/architecture/data-and-permission-flow.md)。
+- ZSJOS 模块归属、API、SQL、依赖和跨模块边界详见 [`docs/architecture/ownership-and-change-boundaries.md`](docs/architecture/ownership-and-change-boundaries.md)。
+- 跨运行时、启动、前后端验证和系统结构详见 [`docs/architecture/system-overview.md`](docs/architecture/system-overview.md)。
+- Lead 对外标识使用 `leadNo`；BPM 流程使用 `yudao-module-bpm`；详细约束以相关架构和业务文档为准。
+
+### 文档维护
+
+- 本文件只维护稳定的 AI 执行边界、默认上下文、命令入口和契约摘要；模块细节、接口细节和数据库专项流程放在对应文档。
+- 稳定事实应补充到最窄适用范围的文档，并在 handoff 记录中说明；不得把一次性环境值、密码、令牌或个人数据写入本文件。

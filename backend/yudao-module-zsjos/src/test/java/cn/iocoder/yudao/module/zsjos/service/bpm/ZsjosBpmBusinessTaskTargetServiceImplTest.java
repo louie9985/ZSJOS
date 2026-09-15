@@ -34,11 +34,30 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
     private static final Long APPEAL_ID = 200L;
 
     @InjectMocks private ZsjosBpmBusinessTaskTargetServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalService materialApprovalService;
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private SalesOrderSupervisorConfirmationService salesOrderTargetService;
     @Mock private LeadAppealMapper leadAppealMapper;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
+
+    @Test
+    void viralTaskLinksToMaterialApprovalInsteadOfGenericBpmForm() {
+        when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task("zsjos_viral_account_review", "material-version:3", "viralReview", "process"));
+        when(permissionApi.hasAnyPermissions(USER_ID, "zsjos:material-approval:query")).thenReturn(true);
+        var result = service.getTarget(TASK_ID, "todo", USER_ID);
+        assertEquals("/zsjos/material-library/approvals", result.getRoute());
+        assertEquals(3L, result.getQuery().get("versionId"));
+        assertEquals(TASK_ID, result.getQuery().get("taskId"));
+        verify(materialApprovalService).requireTask(3L, TASK_ID, false, USER_ID);
+    }
+
+    @Test
+    void viralTargetRequiresConfiguredBusinessPagePermission() {
+        when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task("zsjos_viral_content_review", "material-version:3", "viralReview", "process"));
+        assertThrows(ServiceException.class, () -> service.getTarget(TASK_ID, "todo", USER_ID));
+        verifyNoInteractions(materialApprovalService);
+    }
 
     @BeforeEach
     void setUp() {

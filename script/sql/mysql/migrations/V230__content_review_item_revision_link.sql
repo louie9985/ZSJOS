@@ -21,3 +21,4 @@ SET @ddl := IF(@has_previous_index = 0,
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+

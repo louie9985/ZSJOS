@@ -125,3 +125,127 @@
     height: 100%;
   }
 }
+
+/* 通用审批动作栏：贴在详情底部，动作按钮由后端配置驱动 */
+.bpm-approval-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--crm-sp-2);
+  padding-top: var(--crm-sp-3);
+  border-top: 1px solid var(--crm-border);
+  flex: none;
+}
+
+.bpm-approval-form-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.bpm-dynamic-form .ant-form-item {
+  margin-bottom: var(--crm-sp-3);
+}
+
+.bpm-approval-timeline {
+  padding-top: var(--crm-sp-2);
+}
+
+.bpm-approval-timeline-node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.bpm-approval-timeline-task {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bpm-approval-timeline-reason {
+  margin: 0;
+  word-break: break-word;
+}
+
+.bpm-approval-records {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.bpm-approval-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+}
+
+.bpm-approval-comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.bpm-approval-comment-input {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.bpm-approval-comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.bpm-approval-comment-body {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* 签名画布：白底便于识别笔迹，触屏下禁用手势滚动 */
+.bpm-signature-canvas {
+  width: 100%;
+  margin-top: var(--crm-sp-2);
+  border: 1px dashed var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  /* 笔迹颜色由 canvas 读取 color 得到，导出 PNG 时同时用作描边色 */
+  color: var(--crm-text);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.bpm-signature-preview {
+  max-height: 64px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+}
+
+/* 业务页内嵌的流程面板：与业务卡片同宽，默认展开 */
+.bpm-process-panel {
+  margin-bottom: var(--crm-sp-3);
+}
+
+.bpm-process-panel .bpm-approval-actions {
+  margin-top: var(--crm-sp-3);
+}
+
+.bpm-process-panel-comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  margin-top: var(--crm-sp-3);
+  padding-top: var(--crm-sp-3);
+  border-top: 1px solid var(--crm-border);
+}
+
+.bpm-approval-decision-hint {
+  width: 100%;
+  margin-bottom: var(--crm-sp-2);
+}
