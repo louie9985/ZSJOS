@@ -16,4 +16,19 @@ if [[ -f "$OVERRIDE_FILE" ]]; then
   COMPOSE_FLAGS+=(-f "$OVERRIDE_FILE")
 fi
 
-docker compose --env-file "$ENV_FILE" "${COMPOSE_FLAGS[@]}" run --rm db-migrator "$@"
+if [[ "${1:-}" == "build-migrator" ]]; then
+  docker compose --env-file "$ENV_FILE" "${COMPOSE_FLAGS[@]}" build --quiet db-migrator
+  exit 0
+fi
+
+docker network inspect zsjos_database >/dev/null 2>&1 || \
+  docker network create --internal zsjos_database >/dev/null
+
+# Keep database dependencies managed as long-running services. Using --no-deps
+# for the one-shot migrator prevents Compose from recreating/stopping them or
+# attempting to remove the shared network when the migrator exits.
+if ! docker compose --env-file "$ENV_FILE" "${COMPOSE_FLAGS[@]}" ps --status running mysql | grep -q 'mysql'; then
+  echo "MySQL service is not running; start it with docker compose up -d mysql." >&2
+  exit 1
+fi
+docker compose --env-file "$ENV_FILE" "${COMPOSE_FLAGS[@]}" run --rm --no-deps db-migrator "$@"

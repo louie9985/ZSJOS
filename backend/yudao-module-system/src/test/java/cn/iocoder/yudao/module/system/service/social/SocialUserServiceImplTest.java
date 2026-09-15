@@ -8,8 +8,10 @@ import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.user.SocialUserPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialUserBindDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialUserDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.social.SocialUserBindMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.social.SocialUserMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum;
 import jakarta.annotation.Resource;
 import me.zhyd.oauth.model.AuthUser;
@@ -31,6 +33,8 @@ import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomString;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +53,8 @@ public class SocialUserServiceImplTest extends BaseDbUnitTest {
     private SocialUserMapper socialUserMapper;
     @Resource
     private SocialUserBindMapper socialUserBindMapper;
+    @Resource
+    private AdminUserMapper adminUserMapper;
 
     @MockitoBean
     private SocialClientService socialClientService;
@@ -119,6 +125,59 @@ public class SocialUserServiceImplTest extends BaseDbUnitTest {
         socialUserService.unbindSocialUser(userId, userType, type, openid);
         // 断言
         assertEquals(0, socialUserBindMapper.selectCount(null).intValue());
+    }
+
+    @Test
+    public void testUnbindSocialUser_wecom_clearsUserAndAllowsRebind() {
+        Long userId = 1L;
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.WECHAT_ENTERPRISE.getType();
+        String openid = "wecom-user-1";
+        socialUserMapper.insert(randomPojo(SocialUserDO.class).setType(type).setOpenid(openid));
+        socialUserBindMapper.insert(randomPojo(SocialUserBindDO.class).setUserType(userType)
+                .setUserId(userId).setSocialType(type));
+        adminUserMapper.insert(new AdminUserDO().setId(userId).setUsername("unbind-user")
+                .setNickname("Unbind User").setPassword("password")
+                .setWecomUserId(openid).setWecomEnabled(true));
+
+        socialUserService.unbindSocialUser(userId, userType, type, openid);
+
+        AdminUserDO user = adminUserMapper.selectById(userId);
+        assertNull(user.getWecomUserId());
+        assertFalse(user.getWecomEnabled());
+        assertEquals(0, socialUserBindMapper.selectCount(null).intValue());
+    }
+
+    @Test
+    public void testBindSocialUser_wecom_movesProjectionToNewAdminUser() {
+        Long previousUserId = 1L;
+        Long nextUserId = 2L;
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.WECHAT_ENTERPRISE.getType();
+        String openid = "wecom-user-1";
+        String code = "test-code";
+        String state = "test-state";
+        SocialUserDO socialUser = randomPojo(SocialUserDO.class).setType(type).setOpenid(openid)
+                .setCode(code).setState(state);
+        socialUserMapper.insert(socialUser);
+        socialUserBindMapper.insert(randomPojo(SocialUserBindDO.class).setUserType(userType)
+                .setUserId(previousUserId).setSocialType(type).setSocialUserId(socialUser.getId()));
+        adminUserMapper.insert(new AdminUserDO().setId(previousUserId).setUsername("previous-user")
+                .setNickname("Previous User").setPassword("password").setWecomUserId(openid).setWecomEnabled(true));
+        adminUserMapper.insert(new AdminUserDO().setId(nextUserId).setUsername("next-user")
+                .setNickname("Next User").setPassword("password").setWecomEnabled(false));
+
+        String result = socialUserService.bindSocialUser(new SocialUserBindReqDTO()
+                .setUserId(nextUserId).setUserType(userType).setSocialType(type).setCode(code).setState(state));
+
+        assertEquals(openid, result);
+        assertNull(adminUserMapper.selectById(previousUserId).getWecomUserId());
+        assertFalse(adminUserMapper.selectById(previousUserId).getWecomEnabled());
+        assertEquals(openid, adminUserMapper.selectById(nextUserId).getWecomUserId());
+        SocialUserBindDO currentBind = socialUserBindMapper
+                .selectByUserTypeAndSocialUserId(userType, socialUser.getId());
+        assertEquals(nextUserId, currentBind.getUserId());
+        assertEquals(1, socialUserBindMapper.selectCount(null).intValue());
     }
 
     @Test

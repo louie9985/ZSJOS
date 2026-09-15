@@ -298,10 +298,6 @@ const menuToBackend = (menu: any) => {
 <!--本组件样式-->
 <style lang="scss" scoped="scoped">
 /* 公共颜色变量 */
-.clearfix {
-  *zoom: 1;
-}
-
 .clearfix::after {
   display: table;
   clear: both;

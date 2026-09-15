@@ -156,12 +156,17 @@ Verification is proportional to risk, but evidence is mandatory:
 - If a check cannot run, **MUST** report it as unverified, explain why, and state the remaining risk.
 - Long tasks **SHOULD** report milestones as: diagnosis, change scope, then verification result. Repeated failure requires a root-cause update before another attempt.
 
-## 7. Default local development and optional workstream isolation
+## 7. Environment-specific workstream records and optional isolation
+
+- The AI **MUST** resolve the current environment before registering or delivering file-changing work. Resolution order is: the `ZSJOS_AGENT_ENV` environment variable, then `/etc/zsjos/agent-environment`, then `local` as the fallback. Accepted values are `local`, `test`, and `production`; any other explicit value **MUST** be reported as invalid instead of guessed.
+- Environment identity **MUST NOT** be inferred from the Git branch, repository path, IP address, or hostname. Server roles can change while those values remain the same.
+- The designated shared-main workstream record is selected by environment: `local` uses `handoff/main.md`, `test` uses `handoff/test_main.md`, and `production` uses `handoff/pro_main.md`.
+- Test-server work **MUST NOT** append routine entries to `handoff/main.md` or `handoff/pro_main.md`. Production-server work **MUST NOT** append routine entries to `handoff/main.md` or `handoff/test_main.md`.
 
 - Unless the user explicitly requests otherwise, new AI file-changing work **MUST** use the currently checked-out local branch and worktree. In the primary repository, the default development location is the existing local `main` worktree.
 - The AI **MUST NOT** create, delete, or switch Git branches or worktrees for new work unless the user explicitly requests that operation. Branch and worktree operations remain subject to the separate explicit-confirmation requirements in sections 2 and 4.
 - File-changing tasks in the same worktree **MUST** be serialized. Concurrent AI tasks may inspect or analyze the repository, but they **MUST NOT** modify files in a shared worktree.
-- Before changing files, the active workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`. Work performed directly on local `main` may reuse and update the designated `main` workstream record.
+- Before changing files, the active workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`. Work performed directly on the shared `main` worktree **MUST** use the environment-designated record above.
 - Each file **MUST** have one active workstream owner. A workstream **MUST NOT** modify files outside its recorded scope without first updating its handoff record and coordinating any affected workstream.
 - Only when the user explicitly requests isolated or parallel development, each file-changing workstream **MUST** use its own branch and worktree, start from a committed base, and avoid dependencies on another workstream's uncommitted changes. AI-owned branches **MUST** use the `codex/<workstream-id>` naming convention unless the user specifies otherwise.
 - For an explicitly requested isolated workstream, the worktree **MUST** belong to exactly one workstream. Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`; affected checks **MUST** be rerun on the integration branch before it is marked `merged`.
@@ -170,7 +175,7 @@ Verification is proportional to risk, but evidence is mandatory:
 ## 8. AI file-change handoff log
 
 - The repository-root `HANDOFF.md` is the stable handoff guide and legacy-log archive. It **MUST NOT** receive per-turn entries or a dynamically maintained workstream index.
-- Every completed AI task turn that adds, deletes, or modifies any repository file **MUST** append one structured delivery entry to the active workstream's `handoff/<workstream-id>.md` before sending the final response. Only that workstream's owner may append to the file.
+- Every completed AI task turn that adds, deletes, or modifies any repository file **MUST** append one structured delivery entry to the active workstream's handoff file before sending the final response. Shared-main work uses the environment-designated record from section 7; isolated work uses `handoff/<workstream-id>.md`. Only that workstream's owner may append to the file.
 - A file-changing task turn means one user request and its final AI response that changes any repository file, including source code, tests, scripts, SQL, configuration, documentation, or repository rules. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
 - Turns that make no repository file changes **MUST NOT** append a handoff entry. This includes discussion, analysis, diagnosis, inspection, review, and explanation requests that remain read-only under section 2.
 - Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Use `None` when a field has no applicable content.

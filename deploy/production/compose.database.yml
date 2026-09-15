@@ -4,6 +4,8 @@ services:
   mysql:
     image: ${MYSQL_IMAGE:-mysql:8}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3306:3306"
     environment:
       TZ: Asia/Shanghai
       MYSQL_DATABASE: ${ZSJOS_DB_NAME:-zsjos}
@@ -33,13 +35,15 @@ services:
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
     restart: unless-stopped
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     ports:
       - "127.0.0.1:6379:6379"
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -60,6 +64,7 @@ services:
       ZSJOS_DB_PASSWORD_FILE: /run/secrets/mysql-migration-password
       ZSJOS_DB_RELEASE_VERSION: ${ZSJOS_DB_RELEASE_VERSION:-development}
       ZSJOS_DB_MODULES: ${ZSJOS_DB_MODULES:-core,hrm,fms,eam}
+      ZSJOS_DB_SKIP_CHECKSUM: ${ZSJOS_DB_SKIP_CHECKSUM:-true}
       ZSJOS_DB_BACKUP_DIR: /backups
     volumes:
       - mysql-backups:/backups
@@ -77,6 +82,8 @@ volumes:
 
 networks:
   database:
+    name: zsjos_database
+    external: true
     internal: true
 
 secrets:

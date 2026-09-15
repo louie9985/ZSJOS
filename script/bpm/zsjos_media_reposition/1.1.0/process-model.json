@@ -1,0 +1,93 @@
+{
+  "key": "zsjos_media_reposition",
+  "name": "新媒体重新定位",
+  "category": "zsjos-business",
+  "description": "新媒体账号重新定位审批",
+  "type": 20,
+  "formType": 20,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "formCustomCreatePath": "/zsjos/media/accounts",
+  "formCustomViewPath": "/zsjos/media/accounts",
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "operatorReviewer",
+      "type": 11,
+      "name": "运营复核",
+      "showText": "流程表达式：${coll_userList}",
+      "candidateStrategy": 60,
+      "candidateParam": "${coll_userList}",
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "buttonsSetting": [
+        {
+          "id": 1,
+          "displayName": "通过",
+          "enable": true
+        },
+        {
+          "id": 2,
+          "displayName": "拒绝",
+          "enable": true
+        },
+        {
+          "id": 3,
+          "displayName": "转办",
+          "enable": true
+        },
+        {
+          "id": 4,
+          "displayName": "委派",
+          "enable": true
+        },
+        {
+          "id": 5,
+          "displayName": "加签",
+          "enable": true
+        },
+        {
+          "id": 6,
+          "displayName": "退回",
+          "enable": false
+        }
+      ],
+      "signEnable": false,
+      "reasonRequire": true,
+      "rejectHandler": {
+        "type": 1
+      },
+      "assignEmptyHandler": {
+        "type": 2
+      },
+      "assignStartUserHandlerType": 1,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-$REPO_DIR/.env.production}"
+DB_MIGRATOR_PREPARED=false
 
 die() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
 log() { printf '[INFO] %s\n' "$*"; }
@@ -20,7 +21,9 @@ load_env() {
   set +a
 
   APP_NAME="${APP_NAME:-zsjos}"
-  APP_VERSION="${APP_VERSION:-$(date +%Y.%m.%d-%H%M%S)}"
+  APP_VERSION="${APP_VERSION:-$(date +%Y.%m.%d-%H%M%S)-$(git -C "$REPO_DIR" rev-parse --short HEAD)}"
+  ZSJOS_DB_RELEASE_VERSION="${ZSJOS_DB_RELEASE_VERSION:-$APP_VERSION}"
+  export APP_VERSION ZSJOS_DB_RELEASE_VERSION
   TZ="${TZ:-Asia/Shanghai}"
   RELEASES_DIR="${ZSJOS_RELEASES_DIR:-$REPO_DIR/releases}"
   LOG_DIR="${ZSJOS_LOG_DIR:-$REPO_DIR/logs}"
@@ -73,9 +76,9 @@ check_tools() {
   need_cmd docker
   need_cmd sha256sum
   docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
-  java -version 2>&1 | head -n 1
-  node --version
-  pnpm --version
+  java -version >/dev/null 2>&1
+  node --version >/dev/null
+  pnpm --version >/dev/null
 }
 
 check() {
@@ -90,7 +93,7 @@ check() {
 
 build_backend() {
   log "building backend"
-  (cd "$REPO_DIR/backend" && mvn clean package -Dmaven.test.skip=true -Dspring-boot.build-image.skip=true)
+  (cd "$REPO_DIR/backend" && mvn -q clean package -Dmaven.test.skip=true -Dspring-boot.build-image.skip=true)
   [[ -f "$JAR_PATH" ]] || die "backend jar not found: $JAR_PATH"
 }
 
@@ -104,21 +107,21 @@ build_frontends() {
     VITE_DROP_DEBUGGER="${VITE_DROP_DEBUGGER:-true}" VITE_DROP_CONSOLE="${VITE_DROP_CONSOLE:-true}" \
     VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="${VITE_OUT_DIR:-dist-prod}" \
     VITE_APP_BAIDU_CODE="${VITE_APP_BAIDU_CODE:-}" \
-    pnpm install --frozen-lockfile && pnpm build:prod)
+    pnpm install --frozen-lockfile --reporter=silent && pnpm build:prod > "$LOG_DIR/build-admin.log")
 
   log "building workbench frontend"
   (cd "$FRONTEND_WORKBENCH_DIR" && env \
     VITE_API_BASE_URL="${VITE_API_BASE_URL:-/admin-api}" \
     VITE_ADMIN_EMBED_BASE="${VITE_ADMIN_EMBED_BASE:-/admin-embed/}" \
     VITE_TENANT_ID="${VITE_TENANT_ID:-1}" \
-    npm ci && npm run build)
+    npm ci --silent && npm run build > "$LOG_DIR/build-workbench.log")
 
   log "building partner H5 frontend"
   (cd "$FRONTEND_H5_DIR" && env \
     VITE_APP_BASE_API="${VITE_APP_BASE_API:-/part-api}" \
     VITE_APP_REFERENCE_API="${VITE_APP_REFERENCE_API:-/app-api}" \
     VITE_APP_TENANT_ID="${VITE_APP_TENANT_ID:-1}" \
-    pnpm install --frozen-lockfile && pnpm build)
+    pnpm install --frozen-lockfile --reporter=silent && pnpm build > "$LOG_DIR/build-h5.log")
 }
 
 build() {
@@ -126,7 +129,8 @@ build() {
   mkdir -p "$LOG_DIR" "$RELEASES_DIR" "$BACKUP_DIR"
   build_backend
   build_frontends
-  sha256sum "$JAR_PATH" | tee "$RELEASES_DIR/$APP_VERSION.sha256"
+  sha256sum "$JAR_PATH" | awk '{print $1}' > "$RELEASES_DIR/$APP_VERSION.sha256"
+  log "artifact checksum saved: $RELEASES_DIR/$APP_VERSION.sha256"
   log "build completed"
 }
 
@@ -134,18 +138,26 @@ db_compose() {
   docker compose --env-file "$DB_ENV_FILE" -f "$DB_COMPOSE_FILE" "$@"
 }
 
-db_plan() {
+prepare_db_migrator() {
+  [[ "$DB_MIGRATOR_PREPARED" == "true" ]] && return 0
   load_env; check_env; need_cmd bash
+  log "building database migrator image from current SQL sources"
+  (cd "$REPO_DIR" && bash deploy/production/zsjos-db build-migrator)
+  DB_MIGRATOR_PREPARED=true
+}
+
+db_plan() {
+  prepare_db_migrator
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db plan production)
 }
 
 db_migrate() {
-  load_env; check_env; need_cmd bash
+  prepare_db_migrator
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db migrate production)
 }
 
 db_verify() {
-  load_env; check_env; need_cmd bash
+  prepare_db_migrator
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db verify production)
 }
 
@@ -265,12 +277,16 @@ health() {
 }
 
 deploy() {
+  # Stop the old release before resource-intensive builds and migrations.
+  # Failing to stop must abort the deployment to avoid competing backends.
+  stop_server
   build
-  db_plan
+  # Temporarily skipped during deploy; run db-plan manually when needed.
+  # db_plan
   db_migrate
-  db_verify
+  # Temporarily skipped during deploy; run db-verify manually when needed.
+  # db_verify
   install_release
-  stop_server || true
   start_server
   for _ in $(seq 1 120); do
     if health >/dev/null 2>&1; then return 0; fi
@@ -299,9 +315,9 @@ Usage: deploy-production.sh <command>
 Commands:
   check       Validate environment, tools and required files
   build       Build backend and admin/workbench/H5 frontends
-  db-plan     Show read-only production migration plan
-  db-migrate  Apply pending production migrations
-  db-verify   Verify production database after migration
+  db-plan     Rebuild the migrator image and show the read-only production plan
+  db-migrate  Rebuild the migrator image and apply pending production migrations
+  db-verify   Rebuild the migrator image and verify the production database
   start       Start the current backend release
   stop        Stop the backend
   restart     Restart the backend

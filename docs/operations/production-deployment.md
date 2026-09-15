@@ -10,12 +10,16 @@ ENV_FILE=/opt/zsjos-runtime/.env.production \
   bash script/shell/deploy-production.sh deploy
 ```
 
-`deploy` 的顺序是：校验环境和 systemd 单元、停止
-`zsjos-backend.service`、构建后端及三个前端、执行数据库 plan/migrate/verify、安装版本
-release、清理旧 `nohup` PID、启动 systemd、输出服务状态并检查健康接口。
+`deploy` 的顺序是：校验环境和工具、构建后端及三个前端、用当前工作树的 SQL
+重建 `db-migrator` 镜像、执行数据库 plan/migrate/verify、安装版本 release、停止并启动
+`zsjos-backend.service`，最后检查健康接口。同一次完整发布只构建一次迁移镜像，因此新加入的
+迁移脚本不会因复用旧镜像而被遗漏。
 
 脚本不会在生产流程中再用 `nohup` 启动后端。`build` 只构建并生成产物，不会安装 release、
 执行迁移或重启服务；不要手工复制 JAR，release 必须由 `deploy` 的安装阶段生成。
+
+独立执行 `db-plan`、`db-migrate` 或 `db-verify` 时，脚本同样会先重建迁移镜像。生产变更前可先
+运行 `db-plan` 检查待执行版本；该命令会更新本机迁移镜像，但不会修改数据库。
 
 ## 运行时约定
 
@@ -27,6 +31,12 @@ ZSJOS_SYSTEMD_SERVICE=zsjos-backend.service
 ZSJOS_RELEASES_DIR=/opt/zsjos-runtime/releases
 ZSJOS_PID_FILE=/opt/zsjos/zsjos-server.pid
 ```
+
+`APP_VERSION` 和 `ZSJOS_DB_RELEASE_VERSION` 默认不要固化在环境文件中。脚本首次加载环境时会按
+`YYYY.MM.DD-HHMMSS-<Git短提交号>` 生成本次命令唯一的 `APP_VERSION`，并让
+`ZSJOS_DB_RELEASE_VERSION` 使用相同值；同一次 `deploy` 内后续构建、迁移、安装和校验都会复用
+该值。确需重放或指定版本时，可以在专用环境文件中显式配置，但目标 release 目录必须确认不会
+覆盖已有版本。
 
 systemd 单元由服务器运维维护，不由仓库脚本创建。发布前应确认：
 

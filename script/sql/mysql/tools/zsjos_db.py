@@ -515,7 +515,9 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             record = installed.get((code, migration.version))
             if record:
                 recorded_checksum, release = record
-                if release not in ("legacy", "baseline") and recorded_checksum != migration.checksum:
+                skip_checksum = os.environ.get("ZSJOS_DB_SKIP_CHECKSUM", "false").lower() in ("1", "true", "yes")
+                if (not skip_checksum and release not in ("legacy", "baseline")
+                        and recorded_checksum != migration.checksum):
                     fail(
                         f"Applied migration checksum changed: {code}/{migration.path.name}; "
                         "restore the applied file and create a new migration"

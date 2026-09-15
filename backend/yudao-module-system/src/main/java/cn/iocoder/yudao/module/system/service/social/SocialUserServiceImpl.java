@@ -70,6 +70,14 @@ public class SocialUserServiceImpl implements SocialUserService {
                 reqDTO.getCode(), reqDTO.getState());
         Assert.notNull(socialUser, "社交用户不能为空");
 
+        // Clear the previous ADMIN projection before assigning the same WeCom identity elsewhere.
+        SocialUserBindDO previousBind = socialUserBindMapper
+                .selectByUserTypeAndSocialUserId(reqDTO.getUserType(), socialUser.getId());
+        if (previousBind != null && !java.util.Objects.equals(previousBind.getUserId(), reqDTO.getUserId())) {
+            clearAdminWecomUserId(previousBind.getUserId(), previousBind.getUserType(), socialUser.getType(),
+                    socialUser.getOpenid(), true);
+        }
+
         // 社交用户可能之前绑定过别的用户，需要进行解绑
         socialUserBindMapper.deleteByUserTypeAndSocialUserId(reqDTO.getUserType(), socialUser.getId());
 
@@ -87,6 +95,7 @@ public class SocialUserServiceImpl implements SocialUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void unbindSocialUser(Long userId, Integer userType, Integer socialType, String openid) {
         // 获得 openid 对应的 SocialUserDO 社交用户
         SocialUserDO socialUser = socialUserMapper.selectByTypeAndOpenid(socialType, openid);
@@ -94,9 +103,13 @@ public class SocialUserServiceImpl implements SocialUserService {
             throw exception(SOCIAL_USER_NOT_FOUND);
         }
 
+        // 先确认当前用户确实绑定了该社交类型；解绑后允许该企微主体绑定其他用户。
+        SocialUserBindDO currentBind = socialUserBindMapper
+                .selectByUserIdAndUserTypeAndSocialType(userId, userType, socialUser.getType());
+
         // 获得对应的社交绑定关系
         socialUserBindMapper.deleteByUserTypeAndUserIdAndSocialType(userType, userId, socialUser.getType());
-        clearAdminWecomUserId(userId, userType, socialUser.getType(), openid);
+        clearAdminWecomUserId(userId, userType, socialUser.getType(), openid, currentBind != null);
     }
 
     private void syncAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid) {
@@ -107,14 +120,15 @@ public class SocialUserServiceImpl implements SocialUserService {
         adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(openid));
     }
 
-    private void clearAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid) {
+    private void clearAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid,
+                                       boolean hadBinding) {
         if (!UserTypeEnum.ADMIN.getValue().equals(userType)
                 || !SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)) {
             return;
         }
         AdminUserDO user = adminUserMapper.selectById(userId);
-        if (user != null && java.util.Objects.equals(user.getWecomUserId(), openid)) {
-            adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(null).setWecomEnabled(false));
+        if (user != null && (hadBinding || java.util.Objects.equals(user.getWecomUserId(), openid))) {
+            adminUserMapper.clearWecomProjection(userId);
         }
     }
 

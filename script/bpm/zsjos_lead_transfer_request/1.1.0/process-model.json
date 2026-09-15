@@ -1,0 +1,93 @@
+{
+  "key": "zsjos_lead_transfer_request",
+  "name": "公海正式转派审批",
+  "category": "zsjos-business",
+  "description": "公海客资正式转派主管审批",
+  "type": 20,
+  "formType": 20,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "formCustomCreatePath": "/zsjos/leads/manage",
+  "formCustomViewPath": "/zsjos/leads/manage",
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "ownerManagerReview",
+      "type": 11,
+      "name": "归属主管审批",
+      "showText": "流程表达式：${coll_userList}",
+      "candidateStrategy": 60,
+      "candidateParam": "${coll_userList}",
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "buttonsSetting": [
+        {
+          "id": 1,
+          "displayName": "通过",
+          "enable": true
+        },
+        {
+          "id": 2,
+          "displayName": "拒绝",
+          "enable": true
+        },
+        {
+          "id": 3,
+          "displayName": "转办",
+          "enable": true
+        },
+        {
+          "id": 4,
+          "displayName": "委派",
+          "enable": true
+        },
+        {
+          "id": 5,
+          "displayName": "加签",
+          "enable": true
+        },
+        {
+          "id": 6,
+          "displayName": "退回",
+          "enable": false
+        }
+      ],
+      "signEnable": false,
+      "reasonRequire": true,
+      "rejectHandler": {
+        "type": 1
+      },
+      "assignEmptyHandler": {
+        "type": 2
+      },
+      "assignStartUserHandlerType": 1,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

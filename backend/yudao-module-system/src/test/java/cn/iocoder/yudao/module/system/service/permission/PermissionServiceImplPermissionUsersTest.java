@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.service.permission;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleMenuDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
@@ -13,11 +14,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum.SUPER_ADMIN;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +49,16 @@ class PermissionServiceImplPermissionUsersTest {
                 user(11L, CommonStatusEnum.ENABLE.getStatus()), user(12L, CommonStatusEnum.DISABLE.getStatus())));
 
         assertEquals(Set.of(11L), service.getEnabledUserIdsByPermission("zsjos:registration:query-pool"));
+    }
+
+    @Test
+    void getEnabledUserIdsByPermission_mustDisableDataPermission() throws NoSuchMethodException {
+        Method method = PermissionServiceImpl.class.getMethod("getEnabledUserIdsByPermission", String.class);
+        DataPermission annotation = method.getAnnotation(DataPermission.class);
+        assertNotNull(annotation, "getEnabledUserIdsByPermission must have @DataPermission annotation");
+        assertFalse(annotation.enable(), "@DataPermission(enable=false) is required to prevent SELF-scope " +
+                "callers from seeing only their own user record, which would cause effectiveDispatchers() to " +
+                "return an empty set for non-admin users even when they have the permission");
     }
 
     private static RoleMenuDO roleMenu(Long roleId) {

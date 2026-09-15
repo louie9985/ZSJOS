@@ -88,12 +88,19 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
+    @DataPermission(enable = false) // 关闭数据权限：这里查询的是"谁拥有该权限"的全局配置，与调用者自身的数据范围无关
     public Set<Long> getEnabledUserIdsByPermission(String permission) {
         if (permission == null || permission.isBlank()) {
             return Collections.emptySet();
         }
+        // Query the DB directly rather than going through the lazy-populated cache.
+        // getMenuRoleIdListByMenuIdFromCache is @Cacheable and only fills on first hit; menus that
+        // are never accessed via hasAnyPermissions (e.g. admin-only button permissions) may never
+        // populate their cache entry, causing effectiveDispatchers-style callers to see an empty
+        // set after every restart. This method is itself uncached and always re-executes, so the
+        // lazy fill provides no benefit here and only introduces the cold-start gap.
         Set<Long> roleIds = menuService.getMenuIdListByPermissionFromCache(permission).stream()
-                .flatMap(menuId -> getMenuRoleIdListByMenuIdFromCache(menuId).stream())
+                .flatMap(menuId -> convertSet(roleMenuMapper.selectListByMenuId(menuId), RoleMenuDO::getRoleId).stream())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         roleService.getRoleListByStatus(Set.of(CommonStatusEnum.ENABLE.getStatus())).stream()
                 .filter(role -> SUPER_ADMIN.getCode().equals(role.getCode()))

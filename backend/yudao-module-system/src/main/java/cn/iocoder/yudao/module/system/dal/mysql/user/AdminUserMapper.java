@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -16,6 +17,16 @@ import java.util.List;
 
 @Mapper
 public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
+
+    /**
+     * Clears the nullable WeCom projection explicitly; updateById ignores null fields by default.
+     */
+    default int clearWecomProjection(Long userId) {
+        return update(null, new LambdaUpdateWrapper<AdminUserDO>()
+                .eq(AdminUserDO::getId, userId)
+                .set(AdminUserDO::getWecomUserId, null)
+                .set(AdminUserDO::getWecomEnabled, false));
+    }
 
     @Select("""
             <script>
