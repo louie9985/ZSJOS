@@ -129,3 +129,63 @@
 - Verification evidence: `sudo nginx -t` passed；HTTPS 请求返回 `200`、`Content-Type: text/plain`、正文 `qI52MOnpdf21ycDu\n`；HTTP 请求按既有策略返回 `301` 到同路径 HTTPS；源文件与运行文件内容一致；scoped `git diff --check` passed。
 - Dependency or integration impact: 无新增依赖；后续 H5 构建会从 `public` 目录复制认证文件，当前测试 release 已立即生效。
 - Remaining work: 在企业微信管理后台重新提交可信域名认证；如平台不跟随 HTTP 到 HTTPS 跳转，应填写 HTTPS 域名地址。
+
+## Workstream Registration - 2026-09-15 17:42:01 +08:00
+
+- Workstream ID: `test-core-baseline-dictionary-sync`
+- Goal: 修复 Core desired schema 与 fresh baseline 的严格差异，并为内容审核作品目的/作品形式空字典类型补齐安全、可重复的升级路径。
+- Non-goals: 不预置业务字典项，不修改管理员已有字典配置，不执行测试或生产数据库迁移，不启停服务，不提交或推送。
+- Branch: `main`; Worktree: `/opt/zsjos`; Base commit: `4419f295f37e0c4c02b244db762c26674935febd`; Target branch: `main`
+- Ownership scope: `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/migrations/V243__content_review_dictionary_types.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/test_main.md`。
+- Owner: Codex `/root`
+- Dependencies: 复用现有 MySQL 8、Core migrator、`system_dict_type` 和双版本登记机制；不新增依赖。`V242` 会清除退役 V243-V249 尝试的版本登记，Core 版本连续性要求本次从 `V243` 恢复编号。
+- Integration order: 同步 baseline/desired schema -> 新增 V243 空字典类型迁移 -> 增加 UTF-8、空选项和版本验证 -> 更新迁移文档 -> 运行静态、fresh、upgrade、guardrail 检查。
+- Verification plan: `cmp` 严格字节比较；`bash ./zsjos-db check`；`bash ./zsjos-db test-fresh`；`bash ./zsjos-db test-upgrade`；`bash ./zsjos-db test-guardrails`；代表性中文 `HEX()` 由验证 SQL检查；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-15 17:48:47 +08:00
+
+- Workstream ID: `test-core-baseline-dictionary-sync`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `4419f295f37e0c4c02b244db762c26674935febd` (uncommitted)
+- User goal: 修复 `Desired schema differs from the fresh baseline for core`，并同步已审迁移。
+- Key decisions: 将 baseline 的 `system_notice_recipient` 纯格式差异对齐 desired schema；保留两个管理员维护的空字典类型并同步到 desired schema；使用连续 `V243` 补齐升级路径，因为 `V242` 已清理退役 V243-V249 的旧登记；不预置作品目的/形式选项，不覆盖活动字典类型。
+- Execution or analysis result: Core desired schema 与 fresh baseline 已字节一致；新增的 V243 只在活动类型缺失时创建 `zsjos_content_purpose`、`zsjos_content_format`，并增加空选项及 UTF-8 验证。未修改或迁移任何共享数据库。
+- Changed files: `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/migrations/V243__content_review_dictionary_types.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/test_main.md`。
+- Verification evidence: `cmp` passed；一次性 `mysql:8` 容器中 V243 连续执行两次后活动类型计数 `2/2`、对应 `system_dict_data` 计数 `0`，中文名称 HEX 分别为 `E4BD9CE59381E79BAEE79A84`、`E4BD9CE59381E5BDA2E5BC8F`；容器已删除；scoped `git diff --check` passed。`bash ./zsjos-db check` 已越过原始 baseline drift 与版本连续性检查，随后被既有缺失 Core 映射表 `zsjos_partner_leaderboard_config`、`zsjos_payment_subject`、`zsjos_product_payment_subject` 阻断，因此 full fresh/upgrade/guardrails 未运行。
+- Dependency or integration impact: 新增一个无第三方依赖的 Core 数据迁移；升级环境在 V242 后创建两个空字典类型，全新环境从 baseline 获得相同结果。未提交、推送、部署或启停服务。
+- Remaining work: 另行修复三张已映射但未纳入 Core desired schema/fresh baseline 的表后，重跑 `check`、`test-fresh`、`test-upgrade`、`test-guardrails`；本次请求的原始 baseline drift 已修复。
+
+## Workstream Registration - 2026-09-15 18:00:04 +08:00
+
+- Workstream ID: `test-v244-pending-schema-gap`
+- Goal: 新增连续 V244，为测试库从 V184 升级时补齐当前 desired schema 已声明但 V185-V243 未覆盖的 13 个 nullable 字段，使 pending migration 能完整解释现有结构差异。
+- Non-goals: 不执行共享测试库迁移，不执行或授权 V211 数据重置，不回填或改写历史业务值，不补齐另行发现的三张 Core baseline 缺失表，不部署、提交或推送。
+- Branch: `main`; Worktree: `/opt/zsjos`; Base commit: `4419f295f37e0c4c02b244db762c26674935febd`; Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V244__pending_schema_gap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/test_main.md`。
+- Owner: Codex `/root`
+- Dependencies: V243；既有 `zsjos_exam_schedule`、`zsjos_lead_intended_product`、`zsjos_production_ticket` 表；MySQL 8 information_schema 守卫；无新增依赖。
+- Integration order: 新增 V244 幂等 DDL -> 增加字段元数据验证 -> 更新迁移文档 -> 一次性 MySQL V184 形态重复执行 -> 运行静态检查和测试库只读 plan。
+- Verification plan: 13 个字段的类型、nullable、注释和顺序审查；V244 重复执行两次；information_schema 元数据比对；`bash ./zsjos-db check`；测试库 `plan production` 只读检查；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-15 18:05:00 +08:00
+
+- Workstream ID: `test-v244-pending-schema-gap`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `4419f295f37e0c4c02b244db762c26674935febd` (uncommitted)
+- User goal: 解除测试库 `Migration is blocked by unexpected schema drift`，继续准备 V185-V243 的正式迁移。
+- Key decisions: 新增 V244 作为 13 个字段的唯一升级路径；全部字段 nullable、无历史回填；不执行共享测试库 migrate，V211 数据重置仍需单独确认。
+- Execution or analysis result: V244 已加入 Core 迁移序列，重建本地 migrator 镜像后测试库只读 plan 已从 BLOCKED 变为 `Status: MIGRATIONS PENDING`，待迁移包含 V185-V244；unexpected schema drift 为 None。
+- Changed files: `script/sql/mysql/migrations/V244__pending_schema_gap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/test_main.md`。
+- Verification evidence: 一次性 MySQL 8 中 V244 连续执行两次后 13 个字段全部存在，类型/nullable/注释核对通过；migrator 镜像构建成功；测试库 `plan production` 只读通过且明确列出 V244；未执行 migrate、未改变测试库数据；scoped `git diff --check` 待最终复核。
+- Dependency or integration impact: migrator 镜像已更新为当前工作树内容；正式迁移仍受 V211 删除范围审计与三张 Core baseline 缺失表的后续修复约束。
+- Remaining work: 在确认 V211 删除范围、备份和执行窗口后，才可运行正式 migrate；先修复 `zsjos_partner_leaderboard_config`、`zsjos_payment_subject`、`zsjos_product_payment_subject` 的 baseline/mapping 一致性问题。
+
+## Delivery Entry - 2026-09-15 18:18:00 +08:00
+
+- Workstream ID: `test-schema-verification-reconciliation`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `4419f295f37e0c4c02b244db762c26674935febd` (uncommitted)
+- User goal: 修复数据库 verification failed 的 Core drift，并恢复测试库迁移前的可验证状态。
+- Key decisions: 新增 V245 补齐 `zsjos_content` 两个遗漏字段；同步已由 V231/V239/V230 创建的内容、支付、审计字段/索引；将已由正式迁移创建的 gift、student-delivery、partner leaderboard、payment subject 表加入显式 `allowedExtraTables`；保留 `zsjos_product_sku.price_unit` nullable 兼容实际数据（NULL 行数为 0），不执行约束变更或数据回填。
+- Execution or analysis result: desired schema 与 fresh baseline 已同步；静态 `bash ./zsjos-db check` 通过；重建 migrator 镜像后测试库只读 plan 显示 `Unexpected schema drift: None`，状态为 `MIGRATIONS PENDING`，仅待 Core V245。
+- Changed files: `script/sql/mysql/migrations/V245__content_snapshot_gap.sql`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/modules/core.json`; `handoff/test_main.md`。
+- Verification evidence: 测试库只读审计确认 `price_unit` NULL 行数为 0；V245 一次性 MySQL 重复执行和字段元数据验证已通过；`cmp`、`git diff --check`、静态 manifest/migration/mapping 检查通过；未执行共享数据库 migrate。
+- Dependency or integration impact: 本地 migrator 镜像已刷新；测试库仍停在 Core V244，V245 尚未执行；V211 删除范围仍需单独确认。
+- Remaining work: 在确认备份、删除范围和执行窗口后再运行正式 migrate；迁移后运行完整 `verify`，并关注 V245 字段与历史数据快照行为。

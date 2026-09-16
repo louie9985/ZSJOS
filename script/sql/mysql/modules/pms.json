@@ -1,0 +1,16 @@
+{
+  "code": "pms",
+  "description": "Project and Knowledge Management module",
+  "dependsOn": [
+    "core"
+  ],
+  "schema": "schema/pms.sql",
+  "baseline": null,
+  "migrations": "migrations/pms",
+  "verify": "verify/pms.sql",
+  "enabledJavaModules": [
+    "yudao-module-pms"
+  ],
+  "ignoredMappedTables": [],
+  "allowedExtraTables": []
+}

@@ -20,9 +20,20 @@
     "yudao_demo03_course",
     "yudao_demo03_grade",
     "yudao_demo03_student"
-    ,"zsjos_gift_config","zsjos_gift_purchase","zsjos_student_delivery_config","zsjos_student_delivery_defer","zsjos_student_delivery_plan","zsjos_student_delivery_stage","zsjos_student_delivery_submission"
+    ,"zsjos_gift_config","zsjos_gift_purchase","zsjos_student_delivery_config","zsjos_student_delivery_defer","zsjos_student_delivery_form","zsjos_student_delivery_plan","zsjos_student_delivery_stage","zsjos_student_delivery_submission","zsjos_partner_leaderboard_config","zsjos_payment_subject","zsjos_product_payment_subject"
   ],
   "allowedExtraTables": [
-    "zsjos_schema_version"
+    "zsjos_schema_version",
+    "zsjos_gift_config",
+    "zsjos_gift_purchase",
+    "zsjos_student_delivery_config",
+    "zsjos_student_delivery_defer",
+    "zsjos_student_delivery_form",
+    "zsjos_student_delivery_plan",
+    "zsjos_student_delivery_stage",
+    "zsjos_student_delivery_submission",
+    "zsjos_partner_leaderboard_config",
+    "zsjos_payment_subject",
+    "zsjos_product_payment_subject"
   ]
 }

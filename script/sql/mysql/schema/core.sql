@@ -5016,6 +5016,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'created/waiting/paid/expired/closed',
   `provider` varchar(32) DEFAULT NULL COMMENT '支付提供方',
   `channel` varchar(32) DEFAULT NULL COMMENT 'wechat/alipay',
+  `subject_snapshot_json` json DEFAULT NULL COMMENT '支付主体配置快照（用于退款）',
   `reqsn` varchar(64) DEFAULT NULL COMMENT '通联商户订单号',
   `expected_amount` decimal(18,2) NOT NULL COMMENT '应收金额',
   `currency` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY' COMMENT '币种',
@@ -5317,7 +5318,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_sku` (
   `min_deal_type` varchar(32) DEFAULT NULL COMMENT '最低成交价类型',
   `min_deal_rate` decimal(8,4) DEFAULT NULL COMMENT '最低成交折扣',
   `exam_fee` decimal(10,2) DEFAULT NULL COMMENT '考试费',
-  `price_unit` varchar(32) NOT NULL DEFAULT 'PACKAGE' COMMENT '计价单位',
+  `price_unit` varchar(32) DEFAULT 'PACKAGE' COMMENT '计价单位',
   `pricing_note` varchar(1000) DEFAULT NULL COMMENT '价格说明',
   `status` tinyint NOT NULL DEFAULT '0',
   `sort` int NOT NULL DEFAULT '0',
@@ -6075,6 +6076,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_content` (
   `format_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `format_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `lead_resource_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '引流资料 HTTPS 链接',
+  `planned_publish_at` datetime DEFAULT NULL COMMENT '预计发布时间',
   `comment_hook` text COLLATE utf8mb4_unicode_ci,
   `reference_content_version_id` bigint DEFAULT NULL,
   `script_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7359,7 +7362,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch_item` (
   UNIQUE KEY `uk_content_review_item` (`tenant_id`,`batch_id`,`content_version_id`,`deleted`),
   KEY `idx_content_review_item_batch` (`tenant_id`,`batch_id`,`sort_no`,`id`),
   KEY `idx_content_review_item_content` (`tenant_id`,`content_id`,`content_version_id`),
-  KEY `idx_content_review_item_version` (`tenant_id`,`content_version_id`,`batch_id`,`deleted`)
+  KEY `idx_content_review_item_version` (`tenant_id`,`content_version_id`,`batch_id`,`deleted`),
+  KEY `idx_content_review_item_previous` (`tenant_id`,`previous_item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='生产内容批审条目';
 
 CREATE TABLE IF NOT EXISTS `zsjos_content_version_file` (
@@ -7491,4 +7495,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_positioning_interview_attachment (
   KEY idx_tenant_student (tenant_id,student_person_id,deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位访谈稿引用';
 
-
+-- 内容审核字典类型（业务字典项由管理员在字典管理中维护）
+INSERT IGNORE INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`updater`)
+VALUES ('作品目的','zsjos_content_purpose',0,'ZSJOS 内容审核作品目的，管理员维护','system','system'),
+       ('作品形式','zsjos_content_format',0,'ZSJOS 内容审核作品形式，管理员维护','system','system');

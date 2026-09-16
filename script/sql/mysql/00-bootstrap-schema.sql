@@ -3003,9 +3003,14 @@ CREATE TABLE IF NOT EXISTS `system_notice_read` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告阅读记录';
 
 CREATE TABLE IF NOT EXISTS `system_notice_recipient` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '接收人记录ID', `notice_id` bigint NOT NULL COMMENT '公告ID', `user_id` bigint NOT NULL COMMENT 'ADMIN用户ID',
-  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0', PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_recipient` (`tenant_id`,`notice_id`,`user_id`), KEY `idx_notice_recipient_user` (`tenant_id`,`user_id`,`notice_id`)
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '接收人记录ID',
+  `notice_id` bigint NOT NULL COMMENT '公告ID',
+  `user_id` bigint NOT NULL COMMENT 'ADMIN用户ID',
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_recipient` (`tenant_id`,`notice_id`,`user_id`),
+  KEY `idx_notice_recipient_user` (`tenant_id`,`user_id`,`notice_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告指定接收人快照';
 
 -- system_notify_message
@@ -5011,6 +5016,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'created/waiting/paid/expired/closed',
   `provider` varchar(32) DEFAULT NULL COMMENT '支付提供方',
   `channel` varchar(32) DEFAULT NULL COMMENT 'wechat/alipay',
+  `subject_snapshot_json` json DEFAULT NULL COMMENT '支付主体配置快照（用于退款）',
   `reqsn` varchar(64) DEFAULT NULL COMMENT '通联商户订单号',
   `expected_amount` decimal(18,2) NOT NULL COMMENT '应收金额',
   `currency` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY' COMMENT '币种',
@@ -5312,7 +5318,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_sku` (
   `min_deal_type` varchar(32) DEFAULT NULL COMMENT '最低成交价类型',
   `min_deal_rate` decimal(8,4) DEFAULT NULL COMMENT '最低成交折扣',
   `exam_fee` decimal(10,2) DEFAULT NULL COMMENT '考试费',
-  `price_unit` varchar(32) NOT NULL DEFAULT 'PACKAGE' COMMENT '计价单位',
+  `price_unit` varchar(32) DEFAULT 'PACKAGE' COMMENT '计价单位',
   `pricing_note` varchar(1000) DEFAULT NULL COMMENT '价格说明',
   `status` tinyint NOT NULL DEFAULT '0',
   `sort` int NOT NULL DEFAULT '0',
@@ -6070,6 +6076,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_content` (
   `format_value` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `format_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `detail_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `lead_resource_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '引流资料 HTTPS 链接',
+  `planned_publish_at` datetime DEFAULT NULL COMMENT '预计发布时间',
   `comment_hook` text COLLATE utf8mb4_unicode_ci,
   `reference_content_version_id` bigint DEFAULT NULL,
   `script_url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7354,7 +7362,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_content_review_batch_item` (
   UNIQUE KEY `uk_content_review_item` (`tenant_id`,`batch_id`,`content_version_id`,`deleted`),
   KEY `idx_content_review_item_batch` (`tenant_id`,`batch_id`,`sort_no`,`id`),
   KEY `idx_content_review_item_content` (`tenant_id`,`content_id`,`content_version_id`),
-  KEY `idx_content_review_item_version` (`tenant_id`,`content_version_id`,`batch_id`,`deleted`)
+  KEY `idx_content_review_item_version` (`tenant_id`,`content_version_id`,`batch_id`,`deleted`),
+  KEY `idx_content_review_item_previous` (`tenant_id`,`previous_item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='生产内容批审条目';
 
 CREATE TABLE IF NOT EXISTS `zsjos_content_version_file` (

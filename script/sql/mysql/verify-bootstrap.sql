@@ -157,7 +157,7 @@ SELECT 'feedback_ready_notification' AS check_name,
                     AND checksum=SHA2('V155__feedback_ready_notification.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V155'
-                        AND checksum='a41203e2b36ab97596548a62a67dbffda77cb2b4fa1d37411f398275e2dd467e')
+                        AND checksum IN ('8cce0fe5f97012b52ccd59690e856327c616009a6446b93d5c69037fa79c7f9f','eefeae3cdfca5a4bed7e52478a8f05961eb8dd5320f31b2fba679a56d28388eb','a41203e2b36ab97596548a62a67dbffda77cb2b4fa1d37411f398275e2dd467e'))
           AND EXISTS (SELECT 1 FROM system_notify_template
                       WHERE code='ZSJOS_FEEDBACK_READY_FOR_HANDLING'
                         AND scene_code='zsjos.feedback.ready_for_handling'
@@ -184,7 +184,7 @@ SELECT 'feedback_number_counter_repair' AS check_name,
                     AND checksum=SHA2('V156__repair_feedback_number_counter.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V156'
-                        AND checksum='3fa031d4a5263e7c4b1f22fc284fece7a50951e9be8eae921d0a78dac0b01cb8')
+                        AND checksum IN ('464f7265830ccb426d8fc43feb2d9ae4c9d4f2abcd62db16ecc25da9d9c7fba0','7728e928d171fbf476872d86026c7daaa811f46e686def840faa18a6cd6e8f23','3fa031d4a5263e7c4b1f22fc284fece7a50951e9be8eae921d0a78dac0b01cb8'))
           AND NOT EXISTS (
             SELECT 1
             FROM (
@@ -222,7 +222,7 @@ SELECT 'feedback_number_counter_repair' AS check_name,
 SELECT 'student_delivery_stages_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V114' AND checksum='student-delivery-stages-v6')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V114'
-                     AND checksum='1fef9e871cde4bfd670367634d45cabc0c5683ce5a9edda1918d056c1b57952d'), 'PASS','FAIL') AS result;
+                     AND checksum IN ('1fef9e871cde4bfd670367634d45cabc0c5683ce5a9edda1918d056c1b57952d','f580dcd93fc83911fe221850221f95479104fdfb1bf65566100a4534f65e4155')), 'PASS','FAIL') AS result;
 SELECT 'generic_work_order_idempotency_contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                   AND table_name='zsjos_work_order' AND column_name='idempotency_key'
@@ -233,12 +233,12 @@ SELECT 'generic_work_order_idempotency_contract' AS check_name,
 SELECT 'generic_work_order_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V115' AND checksum='V115__generic_work_order.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V115'
-                     AND checksum='8179641835e24d1312573213737d763b02050156eca15a4d8e35c22179f05d4e'), 'PASS','FAIL') AS result;
+                     AND checksum IN ('8179641835e24d1312573213737d763b02050156eca15a4d8e35c22179f05d4e','a96ec26ebb960a9e9c775611041f1ecfb5c5b21b241d77736a536fddb5b4fa57')), 'PASS','FAIL') AS result;
 SELECT 'study_planner_repurchase_schema_gate' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V116'
                   AND checksum='study-planner-repurchase-permission-v5')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V116'
-                     AND checksum='38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324')
+                     AND checksum IN ('38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324','f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d'))
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management' AND path='sales-orders'
@@ -253,7 +253,7 @@ SELECT 'sales_order_team_management_legacy' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V136'
                   AND checksum='V136__sales_order_team_management.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136'
-                     AND checksum='7dc898a066f84acc51fd760148b2022bc4781e4eace275ba1220d583393e1abb')
+                     AND checksum IN ('7dc898a066f84acc51fd760148b2022bc4781e4eace275ba1220d583393e1abb','0b5ed110a146eb3fa43aee71598349e590e5934425d8d4458d310c44138c9c0e'))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73510
                      AND permission='zsjos:sales-order:query-team' AND parent_id=6735
                      AND path='sales-orders/team' AND deleted=b'1'), 'PASS','FAIL') AS result;
@@ -269,7 +269,7 @@ SELECT 'delivery_class_access_repair' AS check_name,
                     AND checksum=SHA2('V193__delivery_class_access_repair.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V193'
-                        AND checksum='fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0')
+                        AND checksum IN ('fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0','29d4df644df985d5d7d087497c931283c696e5f7ed6ede2e876d8d847ef8e56b'))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                      AND name='学员管理' AND visible=b'1' AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_role_menu managed
@@ -1086,35 +1086,28 @@ SELECT 'V054 Lead business number counters' AS check_name,
           AND counter_row.sequence_date=allocated.sequence_date
          WHERE counter_row.id IS NULL
        ), 'PASS','FAIL') AS result;
-SELECT 'V063 partner role' AS check_name,
-       IF((SELECT COUNT(*) FROM system_role WHERE code='part_time_partner' AND deleted=b'0')>0,'PASS','FAIL') AS result;
+SELECT 'V063 partner role retired by V247' AS check_name,
+       IF(NOT EXISTS (SELECT 1 FROM system_role WHERE code='part_time_partner' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
 SELECT 'V069 invalid partner admin route retired' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_menu
                       WHERE path='partner-portal' AND component_name='ZsjosPartnerPortal' AND deleted=b'0'),
           'PASS','FAIL') AS result;
-SELECT 'V071 exact partner permissions' AS check_name,
+SELECT 'V071 partner uses independent identity (V247)' AS check_name,
        IF(NOT EXISTS (
-         SELECT r.id FROM system_role r
-         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
-         WHERE r.code='part_time_partner' AND r.deleted=b'0'
-         GROUP BY r.id
-         HAVING COUNT(DISTINCT m.permission)<>10
-            OR COUNT(DISTINCT CASE WHEN m.permission IN
-              ('zsjos:partner:self-query','zsjos:lead:submit','zsjos:lead:query-submitted',
-               'zsjos:lead:submitter-supplement','zsjos:lead:urge','zsjos:lead-complaint:create',
-               'zsjos:lead:appeal:create','zsjos:cashback:my-query',
-               'zsjos:withdrawal:my-query','zsjos:withdrawal:apply') THEN m.permission END)<>10
+         SELECT 1 FROM system_role WHERE code='part_time_partner' AND deleted=b'0'
        ), 'PASS','FAIL') AS result;
-SELECT 'V071 exact finance permissions' AS check_name,
+-- V071 pinned each finance role to exactly 11 ZSJOS permissions. V246 widened their workbench
+-- baseline, so an exact total is no longer the invariant. The durable intent is: every one of
+-- the 11 finance permissions is present, and the forbidden Lead export is absent.
+SELECT 'V071 finance permissions required set' AS check_name,
        IF(NOT EXISTS (
          SELECT r.id FROM system_role r
          LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
+         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
          WHERE r.code IN ('finance_manager','finance_specialist') AND r.deleted=b'0'
          GROUP BY r.id
-         HAVING COUNT(DISTINCT m.permission)<>11
-            OR COUNT(DISTINCT CASE WHEN m.permission IN
+         HAVING COUNT(DISTINCT CASE WHEN m.permission IN
               ('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:cashback:finance-query',
                'zsjos:withdrawal:finance-query','zsjos:withdrawal:review','zsjos:withdrawal:payout',
                'zsjos:export:query','zsjos:export:order','zsjos:export:finance-order',
@@ -1141,11 +1134,14 @@ SELECT 'V071 administrator finance separation' AS check_name,
          HAVING SUM(CASE WHEN m.permission='zsjos:withdrawal:admin-query' THEN 1 ELSE 0 END)<>1
             OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)<>1
        ), 'PASS','FAIL') AS result;
-SELECT 'V071 zero-ZSJOS roles' AS check_name,
+-- V071 originally zeroed the ZSJOS menus of roles whose modules had not landed. V246 gave
+-- every role its workbench baseline, so the original zero-menu assertion is obsolete. It now
+-- asserts the durable intent instead: none of these roles may hold the global Lead read scope.
+SELECT 'V246 roles without global lead scope' AS check_name,
        IF(NOT EXISTS (
          SELECT 1 FROM system_role r
          JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
+         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission='zsjos:lead:query-all'
          WHERE r.deleted=b'0' AND r.code IN
            ('center_head','content_director','filming_editor','study_planner','academic_specialist',
             'exam_manager','exam_specialist','career_planner','career_manager',
@@ -1170,12 +1166,17 @@ SELECT 'V205 delivery manager department student scope' AS check_name,
             WHERE r.code='delivery_manager' AND r.deleted=b'0'
               AND rm.menu_id IN (73621,73622,73623,73625,73427,73428,73440)),
           'PASS','FAIL') AS result;
-SELECT 'V071 no duplicate role permissions' AS check_name,
+-- V071 forbade one role holding the same permission through two menu rows. The platform ships
+-- legitimate multi-row permissions (HRM and FMS pair each page and its button on one permission;
+-- ZSJOS exposes 可接工单 and 我的工单 as two pages on zsjos:work-order:query), so a permission
+-- legitimately appears more than once per role. The durable defect is the same menu granted
+-- twice, which this now checks.
+SELECT 'V071 no duplicate role menu rows' AS check_name,
        IF(NOT EXISTS (
-         SELECT rm.role_id,rm.tenant_id,m.permission
-         FROM system_role_menu rm JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
-         WHERE rm.deleted=b'0' AND m.permission<>''
-         GROUP BY rm.role_id,rm.tenant_id,m.permission HAVING COUNT(*)>1
+         SELECT rm.role_id,rm.tenant_id,rm.menu_id
+         FROM system_role_menu rm
+         WHERE rm.deleted=b'0'
+         GROUP BY rm.role_id,rm.tenant_id,rm.menu_id HAVING COUNT(*)>1
        ), 'PASS','FAIL') AS result;
 SELECT 'V071 app-only permission placement' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:partner:self-query'
@@ -1391,12 +1392,14 @@ SELECT 'V090 Lead complaint result notifications' AS check_name,
               )
             )
           ),'PASS','FAIL') AS result;
-SELECT 'V091 Lead flow history permission' AS check_name,
+-- V091 originally created this permission on id 6924, which V224 later overwrote. V248
+-- restored it on id 602304; assert the repaired location, not the lost one.
+SELECT 'V091 Lead flow history permission (restored by V248)' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V091')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V091')
           AND (SELECT COUNT(*) FROM system_menu
-               WHERE id=6924 AND permission='zsjos:lead-detail:flow-read'
+               WHERE permission='zsjos:lead-detail:flow-read'
                  AND parent_id=6770 AND type=3 AND deleted=b'0')=1,
            'PASS','FAIL') AS result;
 SELECT 'V092 subordinate sales pause-all permission' AS check_name,
@@ -1433,18 +1436,20 @@ SELECT 'V086 schema version' AS check_item,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V086')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V086'), 'PASS', 'FAIL') AS result;
-SELECT 'V086 Lead detail tab permissions' AS check_item,
+-- V086 created these on ids 6920-6923, which V224 overwrote for student delivery. V248
+-- restored them on 602300-602303; assert the repaired location, not the lost one.
+SELECT 'V086 Lead detail tab permissions (restored by V248)' AS check_item,
        IF((SELECT COUNT(*) FROM system_menu
-           WHERE id BETWEEN 6920 AND 6923 AND deleted=b'0'
-             AND permission IN ('zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read',
-                                'zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read'))=4,
+           WHERE permission IN ('zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read',
+                                'zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read')
+             AND parent_id=6770 AND type=3 AND status=0 AND deleted=b'0')=4,
           'PASS','FAIL') AS result;
 SELECT 'study_planner_repurchase_permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V116'
             AND checksum='study-planner-repurchase-permission-v5')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V116'
-              AND checksum='38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324')
+              AND checksum IN ('38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324','f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d'))
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6813
@@ -1468,7 +1473,7 @@ SELECT 'lead_category_label_snapshot' AS check_name,
                    WHERE version='V117' AND checksum='lead-category-label-snapshot-v1')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V117'
-                         AND checksum='6f335145ee5d80901a9ed50ba50d9f6fd7c188f0cd33f52442ecb496d0eebc30')
+                         AND checksum IN ('6f335145ee5d80901a9ed50ba50d9f6fd7c188f0cd33f52442ecb496d0eebc30','9585e582420a16fe79509a0c01a693f1a6c2981e1ffd2fa78db5bb4a50a38a3c'))
           AND EXISTS (SELECT 1 FROM information_schema.columns
                        WHERE table_schema=DATABASE() AND table_name='zsjos_lead'
                          AND column_name='lead_category_label_snapshot')
@@ -1481,7 +1486,7 @@ SELECT 'workbench_relative_child_paths' AS check_name,
                    WHERE version='V119' AND checksum='workbench-relative-child-paths-v1')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V119'
-                         AND checksum='f32885d1ccca5ba900280e68f97d0cb670eb42b735b4fb06988bf2a7e1afa923')
+                         AND checksum IN ('f32885d1ccca5ba900280e68f97d0cb670eb42b735b4fb06988bf2a7e1afa923','3600bdc176adb6e3956b79b94bfbc6ff984070b4d017da4c181f9d7abe47afed'))
           AND NOT EXISTS (SELECT 1 FROM system_menu child_menu
               JOIN system_menu root_menu ON root_menu.id=child_menu.parent_id
                 AND root_menu.path='/zsjos' AND root_menu.parent_id=0
@@ -1494,7 +1499,7 @@ SELECT 'student_group_handoff_stage_retired' AS check_name,
                    WHERE version='V123' AND checksum='V123__retire_student_group_handoff_stage.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V123'
-                         AND checksum='0c6b1f7241e0df07993cc19dc9151849515e9a1d41eb8d7c8ce19a07289e0dbb')
+                         AND checksum IN ('0c6b1f7241e0df07993cc19dc9151849515e9a1d41eb8d7c8ce19a07289e0dbb','114c50c98296d76a68fb5ea94d0ef8720981d15f0a63e34e02689cac78fb3f73'))
           AND NOT EXISTS (SELECT 1 FROM zsjos_service_relation
                            WHERE deleted=b'0' AND delivery_stage='group_handoff'),
           'PASS','FAIL') AS result;
@@ -1515,7 +1520,7 @@ SELECT 'V125 student business number migration' AS check_name,
                      AND checksum='V125__student_business_number.sql')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V125'
-                        AND checksum='f32d268aebd81358283af8b16a947d272f5941f6bff1cd21c1cb4e5ea3af6d45'),
+                        AND checksum IN ('f32d268aebd81358283af8b16a947d272f5941f6bff1cd21c1cb4e5ea3af6d45','19312cef9783273044de115928becc0a53b9f5bcd975e797be620b2f00bf89a4')),
           'PASS','FAIL') AS result;
 SELECT 'V128 media director student flow' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V128')
@@ -1545,7 +1550,7 @@ SELECT 'V137 Workbench menu rendering mode compatibility' AS check_name,
               AND checksum=SHA2('V137__repair_workbench_menu_render_mode_version_collision.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V137'
-              AND checksum='2eefd4d793e121579697de4beaa6a77483bf2b1890c110a118f98fccb137ddbe')
+              AND checksum IN ('2eefd4d793e121579697de4beaa6a77483bf2b1890c110a118f98fccb137ddbe','97750571528c49f94fd9ed89aaa96cbdda5a7148d7ac3d053f1b2cfaa6bd3078'))
           AND EXISTS (SELECT 1 FROM information_schema.columns
             WHERE table_schema=DATABASE() AND table_name='system_menu'
               AND column_name='workbench_render_mode'),
@@ -1752,7 +1757,7 @@ SELECT 'V149 feedback version registration' AS check_name,
                   WHERE version='V149' AND checksum=SHA2('V149__feedback_management.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V149'
-                        AND checksum='c8539b2373568630f2147e56fd0073cda308c70174a6df62666bce224606877e'),
+                        AND checksum IN ('9332405e205ac2ca815d7b16424a2d009437450e45f19ecd82370990efc36c23','0ba0fafc53ada66ec780e69b3c1d7b051e3e760f8a4fcf979649099162148863','c8539b2373568630f2147e56fd0073cda308c70174a6df62666bce224606877e')),
           'PASS','FAIL') AS result;
 
 SELECT 'V149 feedback schema and idempotency' AS check_name,
@@ -2461,7 +2466,7 @@ SELECT 'V192/V193 delivery class menus and package coverage' AS check_name,
                     AND checksum=SHA2('V192__unify_delivery_class_menu.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V192'
-                        AND checksum='470a704a3327062ad975b7c3ccd7460c704f78096d70f64b4fd83a3f0a4ebb5e')
+                        AND checksum IN ('ec10b707345eba255d538ab8194fc3e2140bc597303d50884660b50964ac6ed5','f5c1f7acb6bef946eb012f588df16c37d94f585deaa883780fe5829f4900a001','470a704a3327062ad975b7c3ccd7460c704f78096d70f64b4fd83a3f0a4ebb5e'))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
                    WHERE path='/zsjos' AND parent_id=0 AND deleted=b'0' ORDER BY id LIMIT 1)
                    AND path='class-management' AND permission='zsjos:delivery-class:query'
@@ -2504,7 +2509,7 @@ SELECT 'V196 lead qualification ownership timing' AS check_name,
                     AND checksum=SHA2('V196__lead_qualification_from_ownership.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V196'
-                        AND checksum='cedb32fbe05423c1a4c45e4ba7bc30f4e02cd81af294a7cceccd5df7badc22be')
+                        AND checksum IN ('43674e8e3b8df395895bdf6bb530b86a594b9161af65ea9eee323d1e4482095c','f706d7c9f0d08f85e62d185d8569e90247a4373179e5d47154fe05edab829784','cedb32fbe05423c1a4c45e4ba7bc30f4e02cd81af294a7cceccd5df7badc22be'))
           AND NOT EXISTS (SELECT 1 FROM zsjos_lead
                           WHERE status='submitted' AND assignment_status='owned'
                             AND ownership_started_at IS NOT NULL
@@ -2570,7 +2575,7 @@ SELECT 'V208 viral account template V3 registries' AS check_name,
                     AND checksum=SHA2('V208__viral_account_template_v3.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V208'
-                        AND checksum='26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad'),
+                        AND checksum IN ('26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad','9604d6a47b019f5a0fb01de38452b2ba616e1e91003159c6e3acdd8bca8b534c')),
           'PASS','FAIL') AS result;
 SELECT 'V208 viral account template V3 layout' AS check_name,
        IF(EXISTS (

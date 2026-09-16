@@ -43,14 +43,17 @@ classification tree, category fields and global asset-code rule. Existing role
 menu grants are imported; employee accounts other than the initial administrator
 are not.
 
-For this production baseline set `ZSJOS_DB_MODULES=core,hrm,fms,eam`. HRM and FMS
+For this production baseline set `ZSJOS_DB_MODULES=core,hrm,fms,eam,pms`. HRM and FMS
 install their MySQL structure and reviewed dictionary values only (their `V001`
 applies `schema/hrm.sql` and `schema/fms.sql`, then `V002` the dictionaries). EAM is
 installed after Core (`migrations/eam/V001` applies `schema/eam.sql`, through the
-latest available version).
+latest available version). PMS installs its 33 project/knowledge tables in
+`migrations/pms/V001__pms_schema.sql`; its menus and dictionaries are already part of
+the Core seed (V189).
 HRM employee/payroll/recruitment rows and FMS account-set/voucher/balance rows remain
 empty; EAM asset instances, procurement, inventory,
-transfers, repairs, scrap, holdings, reminders and employee tasks remain empty.
+transfers, repairs, scrap, holdings, reminders and employee tasks remain empty; PMS
+project, iteration, work-item and knowledge rows remain empty.
 ZSJOS Person/Lead/Partner/student-service, order/payment/refund, media/content,
 feedback and generic-work-order instances also remain empty. BPM definitions are
 deployed separately from the reviewed `script/bpm/manifest.json` assets; BPM

@@ -1191,3 +1191,186 @@ Adds previous_item_id and an index to trace a work item to its preceding approva
 ### V237 Content version reference work
 
 `V237__content_version_reference_work.sql` follows V236 and adds the nullable `reference_work_url` column to `zsjos_content_version`, matching the fresh bootstrap and the content persistence model. It carries the free-text 参考作品链接 submitted with a content-review work, independent of the existing `reference_content_version_id`. The column is guarded through `information_schema`, so the migration is repeatable and supports partially repaired databases. Material-library references continue to use the existing `material_refs_json` column, which now stores the approval-time snapshot (material id, version, number, title, type name, cover URL) instead of bare identifiers. It backfills nothing: historical versions keep `NULL` and any previously stored identifiers render without titles. Rollback requires a separately reviewed application rollback followed by manual column removal and may discard links written after this migration.
+
+### V243 Content review dictionary types
+
+`V243__content_review_dictionary_types.sql` follows the V242 payment-menu reconciliation after V242
+removes registry rows from the retired V243-V249 attempts. It creates only the empty administrator-maintained
+`zsjos_content_purpose` and `zsjos_content_format` dictionary types required by content production and
+review selectors. It does not seed business choices and does not rewrite an existing active type.
+The migration sets `utf8mb4`, is repeatable through stable-type guards, and deletes no data. Fresh
+baseline and desired Core schema contain the same two empty types. Rollback is forward-only once
+records may contain value/label snapshots; disable the types through dictionary administration rather
+than deleting historical meaning.
+
+### V244 Pending schema gap
+
+`V244__pending_schema_gap.sql` closes 13 additive gaps that were already present in the desired Core
+schema but had no upgrade path from the V184 test baseline. It adds five nullable product/SKU snapshot
+columns to `zsjos_exam_schedule`, `selected_specs_json` to `zsjos_lead_intended_product`, and seven
+nullable content-production snapshot/reference columns to `zsjos_production_ticket`. Every column is
+guarded through `information_schema`; the migration can be replayed after partial application and does
+not insert, delete, or backfill business rows. Historical values remain `NULL` because the repository
+has no trustworthy source from which to reconstruct those snapshots. Application rollback may retain
+the nullable columns; later removal requires a separate data audit.
+
+### V246 role-menu permission coverage
+
+`V246__role_menu_permission_coverage.sql` configures the currently landed Workbench pages and
+buttons across the 34 stable tenant-1 roles. It closes the coverage gap left by migrations that
+created menu metadata without granting it: the material library, content review and content
+production tree (`80010`-`80042`, `602153`-`602155`), gift config and purchase pages (`8900`-`8911`),
+payment-subject pages and buttons (`602200`-`602212`), student-information-collection config and
+operations (`602136`-`602146`), lead submitter feedback (`602133`/`602134`), personal calendar,
+exam/course calendar, the H5 leaderboard config, and the viral account/content decompose pages
+(`80041`/`80042`).
+
+Grants are resolved from the stable `system_menu.permission` identifiers, never from role names,
+post names, department names, or menu IDs. Each role's ancestor directories are resolved
+individually, and a parent that carries its own page permission is only inherited when the role
+already holds that permission, so a button never silently opens an out-of-scope page. The migration
+is additive only: it never revokes an existing grant, and every insert is guarded by a not-exists
+check, so re-running it adds nothing.
+
+`system_administrator` keeps the V071 allowlist plus the newly landed configuration pages.
+`part_time_partner` is intentionally excluded from every Workbench menu change. Pre-existing
+violations of the documented prohibitions (for example the retained `zsjos:lead:query` grant on
+`part_time_partner`, and the orphaned `dept_manager` BPM menu buttons) are reported by
+`verify-role-menu-coverage.sql` and remain for administrator confirmation rather than being deleted
+here. Rollback deletes only the `creator='V246'` rows and must not be done by menu-ID range.
+
+Run `../verify-role-menu-coverage.sql` after applying to confirm the ungranted-menu count is zero,
+and to review the role counts and outstanding pre-existing findings.
+
+### V247 retire partner System role
+
+`V247__retire_partner_system_role.sql` retires the `part_time_partner` System role. Partner
+accounts have used an independent identity since V072: `zsjos_partner_account`, the
+`/part-api/zsjos/auth/login` endpoint, `UserTypeEnum.PARTNER` tokens, and the compile-time
+`PORTAL_PERMISSIONS` set in `PartnerAuthServiceImpl`. Part-time users never read
+`system_role_menu`, so the V063 role was a shadow role that only misled administrators.
+
+The migration deletes that role's menu grants and user bindings, soft-deletes the role itself
+(only when no `system_user_role` still binds it), and retires orphaned menu `6909`
+("返现查询"), a V063 partner button left attached to the work-plan node after V069/V070 removed
+its original parent. Every statement is idempotent; the role deletion is guarded so a bound role
+is never left dangling. Partner identity rows are untouched, which `R3` in the file confirms.
+
+`V246__role_menu_permission_coverage.sql` no longer includes `part_time_partner`, and
+`verify-bootstrap.sql` now asserts the role is absent rather than asserting its 10 exact
+permissions. Run `../verify-role-menu-coverage.sql` after applying to confirm `active_role=0`
+and `grants=0` for the retired role.
+
+### V248 restore Lead-detail and order permissions
+
+`V248__restore_lead_detail_and_order_permissions.sql` repairs the consequences of a menu-ID
+collision. V086 created the four Lead-detail tab permissions on ids 6920-6926 minus 6924, and
+V091 created `zsjos:lead-detail:flow-read` on 6924. V224 then re-inserted the whole 6920-6927
+range for student delivery. Its ON DUPLICATE KEY UPDATE rewrote the permission column, so the
+five Lead-detail permissions disappeared while V086's grants kept pointing at the reused ids.
+The tabs were unusable for every role, and the configuration UI could not restore them because
+no menu row existed.
+
+The migration re-creates the five permissions on free ids 602300-602304 under the Lead-management
+page, and restores grants by replaying V086's own "source permission to detail permission"
+inheritance table rather than by naming roles. `flow-read` keeps V091's original owner
+(`sales_manager`). `normal_user` and `teaching_assistant` are explicitly excluded: they only hold
+`zsjos:student:query-my` because V246 granted it, and V086's table lists that permission as a
+source, so including them would invent access V086 never derived.
+
+It also defines three permission groups the backend has enforced since V023/V024 but that never
+had a menu row, so no role could be granted them: `zsjos:sales-order:query-own` and
+`query-team`, `zsjos:sales-order:refund-apply`, the three `zsjos:payment-refund:*` actions, and
+`zsjos:student:exam-date-update`. `payment-refund:direct` is a fund-disbursement action and goes
+only to `finance_manager` and `super_admin`.
+
+V246 now also lists the 602300-602311 ids so a fresh environment converges in one pass. Both
+files are idempotent. Rollback is forward-only; removing the new rows would recreate the outage.
+
+`zsjos-db check` gained a menu-ID-reuse guard: a migration that re-seeds an id another migration
+already used with a different permission now fails the check. The collisions already applied to
+live environments (6850, V063's partner block, 6913, 6920-6923) are frozen in
+`FROZEN_LEGACY_COLLISIONS`; any new one is rejected.
+
+### V249 / V250 orphan ancestor grants and cross-tenant rows
+
+`V249__repair_orphan_ancestor_grants.sql` fixes a defect the V246 coverage sweep could not see.
+V109 granted `dept_manager` six BPM buttons and V071 granted `system_administrator` the notify
+rule and channel buttons, but neither granted the parent directories. `get-permission-info`
+returns only directly granted menus and the frontend drops a child whose parent is missing, so
+those buttons were authorized yet unreachable in the UI. The migration grants exactly the nodes on
+each role's path (`1185`/`1186`/`1193`/`2714` for BPM, `2739`/`2144`/`6785`/`602130` for notify),
+matching the existing pattern where `normal_user` holds only `1185` and `1200` rather than the
+whole tree. It adds grants only.
+
+`V250__repair_cross_tenant_grants.sql` corrects three `system_role_menu` rows written with
+`tenant_id=0` while their role belongs to tenant 1, which made `system_administrator`'s notify
+channel grants inert. It rewrites the tenant to the role's own rather than delete-and-recreate, so
+the original creator and timeline survive, then removes any duplicate row the correction exposes.
+It also re-asserts the notify path for that role.
+
+`verify-role-menu-coverage.sql` now checks orphan ancestors, cross-tenant rows, and duplicate
+grants, all expected to return zero rows. V246 no longer grants `system_administrator`
+`zsjos:payment-refund:read`: V242 scoped the payment-subject surface to `finance_manager` and
+`super_admin`, and the permission matrix forbids the administrator from holding financial review
+or fund-movement permissions.
+
+### test-fresh now follows the real install path
+
+`zsjos-db test-fresh` loaded only `bootstrap.sql` plus `V071` and then ran the full
+`verify/core.sql`. That reported a false failure for every check asserting a migration's
+artifact, because those migrations had not run: 145 FAILs on an untouched tree, recorded as
+pre-existing in `handoff/main-delivery-task-closure.md` and `handoff/20260817-wecom-user-id.md`.
+
+It now mirrors `migrate` on an empty database: apply the baseline, apply every migration the
+baseline did not register, then verify. That is the sequence a real fresh install takes, so the
+test exercises the path it claims to test.
+
+The change exposed a genuine defect the old test could not see. The reviewed baseline DDL already
+carries `zsjos_content_review_batch.student_person_id` and `account_ids_json`, but the baseline
+version list does not register V225, and V225 was the only one of fifteen similar migrations
+without an `information_schema` guard. A fresh install therefore aborted with `ERROR 1060
+Duplicate column name`. V225 now guards both columns like V244 does, and the recorded checksum
+was updated to the new file hash so deployments are not blocked.
+
+V246 also stops granting a role both a page and its same-permission button (`73610` plus `73612`,
+`73630` plus `73631`, `73624` plus `73629`, `6811` plus `6849`). Two pages that genuinely share a
+permission (`可接工单` and `我的工单` on `zsjos:work-order:query`, and the viral-decompose pages on
+`zsjos:material:create`) are still both granted, because dropping either would hide a reachable
+page.
+
+Failures dropped from 145 to 16 after the checksum convention was settled (see below); the
+remaining 16 all fail identically against the live development database, so none is a regression
+from this work — they are pre-existing verifier drift that the old test could not reach (V131,
+V150, V178 assert against grants the database has carried since before this work; several
+assertions require a `zsjos_schema_version` row the baseline never seeds).
+
+## The authoritative checksum is `sha256(file bytes)`
+
+The ledger column `zsjos_module_schema_version.checksum` has one authoritative value: the SHA-256
+of the migration file's bytes, computed by the runner in `sha256(path)`. Two legacy conventions
+still exist and are grandfathered:
+
+- 117 migrations self-register their own row with `SHA2(file name, 256)` or a literal tag
+  (e.g. `student-delivery-stages-v6`). The runner overwrites that value the first time it records
+  the migration, so the stored value converges on the file-bytes hash.
+- Rows the bootstrap seeds with release `legacy` or `baseline` keep their seeded value. The seed
+  SQL and several verifier assertions are written against those values, so the runner does not
+  rewrite them.
+
+Concretely:
+
+- `pending_migrations` validates every row *except* `release in ('legacy','baseline')`, which are
+  provenance records rather than runner-written state.
+- `record_migration` always writes the file-bytes hash, so a self-registered filename hash is
+  corrected on the next apply.
+- `zsjos-db reconcile <env>` reports every row that departs from the file-bytes hash; `--apply`
+  corrects the runner-written rows. `--include-seed-rows` also rewrites the seed rows and is for
+  diagnosis only — it breaks the assertions written against the seeded values.
+- `migrate` runs `reconcile --apply` (seed rows excluded) before the pending check.
+- Verifier assertions for rows that may carry either value accept both forms, e.g.
+  `checksum IN ('<file-bytes hash>','<self-registered hash>')`.
+
+The backlog is now closed: `verify-bootstrap.sql` carries no checksum assertion that fails on the
+development database, and `test-fresh` exercises the real install path (baseline, then every
+unregistered migration, then verification) rather than the baseline plus `V071` only.

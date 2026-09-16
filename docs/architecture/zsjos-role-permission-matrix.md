@@ -13,13 +13,14 @@
 读取所有反馈。Partner 使用独立账号/归属验证，不消费 ADMIN 权限列表。
 迁移只创建菜单配置，不自动修改角色或真实账号授权。
 
-本矩阵覆盖当前 34 个稳定角色编码。授权只按 `system_role.code` 和 `system_menu.permission` 处理；菜单 ID、显示名、部门名和岗位名都不是授权依据。BPM 任务候选人与 ZSJOS 功能权限分别校验，个人站内消息按登录身份和消息所有权提供，不复制 ZSJOS 菜单权限。
+本矩阵覆盖 34 个稳定角色编码的评审记录；其中 `part_time_partner` 已于 V247 退役（兼职改用独立账号体系），
+当前有效 System 角色为 33 个。授权只按 `system_role.code` 和 `system_menu.permission` 处理；菜单 ID、显示名、部门名和岗位名都不是授权依据。BPM 任务候选人与 ZSJOS 功能权限分别校验，个人站内消息按登录身份和消息所有权提供，不复制 ZSJOS 菜单权限。
 
 ## V071 精确权限集
 
 | 角色编码 | 精确 ZSJOS 权限 |
 |---|---|
-| `part_time_partner` | `zsjos:partner:self-query`, `zsjos:lead:submit`, `zsjos:lead:query-submitted`, `zsjos:lead:submitter-supplement`, `zsjos:lead:urge`, `zsjos:lead-complaint:create`, `zsjos:lead:appeal:create`, `zsjos:cashback:my-query`, `zsjos:withdrawal:my-query`, `zsjos:withdrawal:apply` |
+| `part_time_partner` | （V247 已退役该 System 角色）其权限现由兼职端常量 `PORTAL_PERMISSIONS` 提供：`zsjos:partner:self-query`, `zsjos:lead:submit`, `zsjos:lead:query-submitted`, `zsjos:lead:submitter-supplement`, `zsjos:lead:urge`, `zsjos:lead-complaint:create`, `zsjos:lead:appeal:create`, `zsjos:cashback:my-query`, `zsjos:withdrawal:my-query`, `zsjos:withdrawal:apply` |
 | `finance_manager` | `zsjos:sales-order:query`, `zsjos:sales-order:review`, `zsjos:cashback:finance-query`, `zsjos:withdrawal:finance-query`, `zsjos:withdrawal:review`, `zsjos:withdrawal:payout`, `zsjos:export:query`, `zsjos:export:order`, `zsjos:export:finance-order`, `zsjos:export:cashback`, `zsjos:export:withdrawal` |
 | `finance_specialist` | 与 `finance_manager` 完全相同的 11 项；不得拥有 `zsjos:export:lead` |
 | `enrollment_manager` | `zsjos:sales-order:query`, `zsjos:sales-order:review` |
@@ -108,9 +109,143 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 | 31 | `boss` | V071 精确 2 项申诉查询/最终裁决权限；每租户恰好一个有效角色 |
 | 32 | `super_admin` | 保持框架超级管理员行为和全部 ZSJOS 管理能力；维护模式开关仅此角色 |
 | 33 | `normal_user` | 保持已有明确能力，不按角色显示名扩权 |
-| 34 | `part_time_partner` | V071 精确 10 项本人范围权限；明确禁止 `zsjos:lead:query` |
+| 34 | `part_time_partner` | **V247 已退役**：兼职使用独立账号体系不通过 System 角色授权；权限由 `PORTAL_PERMISSIONS` 常量提供 |
 
-零菜单组实际为 18 个角色，不是 17 个。未来教务、交付、考务、职业、教学、招聘、人力或行政模块落地时，必须按对应业务权限另行评审和前向迁移，不得从岗位名称自动生成授权。
+零菜单组实际为 18 个角色，不是 17 个（退役兼职角色后为 17 个）。未来教务、交付、考务、职业、教学、招聘、人力或行政模块落地时，必须按对应业务权限另行评审和前向迁移，不得从岗位名称自动生成授权。
+
+**注**：上表的「零 ZSJOS 菜单」描述的是迁移当时的状态。V246 之后这些角色已获得工作台菜单
+（首页、需求与反馈、我的资产、采购申请等基线页面，以及各自业务域的只读或操作页面）；
+V248 之后客资详情的 5 个页签权限也已恢复。上表保留为各角色**业务职责**的评审记录，
+实际菜单授权以 `system_role_menu` 与 `verify-role-menu-coverage.sql` 为准。
+
+## V246 全角色菜单覆盖配置
+
+上表是各角色**在其业务模块落地时**的目标能力，V071 之后多数角色事实上没有工作台菜单。
+V246（`script/sql/mysql/migrations/V246__role_menu_permission_coverage.sql`）把当前**已落地**的
+工作台页面与按钮按职责配置到全部 34 个角色，并关闭了"只建菜单、不授角色"造成的覆盖缺口：
+
+- 新增覆盖的菜单域：素材库/内容审核/内容生产（`80010`–`80042`、`602153`–`602155`）、礼品配置与采购
+  （`8900`–`8911`）、支付主体与产品支付配置（`602200`–`602212`）、学员信息收集表配置与操作
+  （`602136`–`602146`）、销售提交人反馈（`602133`/`602134`）、个人日历、考期/课程日历、
+  H5 排行榜配置（`602151`/`602152`）、爆款账号/内容拆解（`80041`/`80042`）。
+- 授权仍只按 `system_menu.permission` 解析，父目录按各角色分别补齐；**自带页面权限的父节点仅在该角色已
+  持有该权限时才继承**，避免为一个按钮放开范围外的页面。
+- 迁移是**纯增量**：不撤销任何既有授权，全部为 not-exists 保护的插入，可重复执行。
+- V246 只覆盖此时已落地的菜单；上表中尚未落地的模块（教务、考务存档、招聘、人力流程等）仍按"另行评审"
+  处理，不因本迁移而自动扩权。
+
+`system_administrator` 在 V071 allowlist 之外补入新落地的配置页。
+
+### 兼职端身份边界（V247）
+
+**兼职不使用 System 用户体系。** 自 V072 起兼职具备完全独立的身份与鉴权链路：
+
+| 维度 | 系统用户（Admin / Workbench） | 兼职（H5） |
+|---|---|---|
+| 账号表 | `system_user` | `zsjos_partner_account` |
+| 认证接口 | `/admin-api/system/auth/login` | `/part-api/zsjos/auth/login` |
+| API 前缀 | `/admin-api` → `UserTypeEnum.ADMIN(2)` | `/part-api` → `UserTypeEnum.PARTNER(3)` |
+| 令牌主体 | `system_user.id` | `zsjos_partner_account.id` |
+| 权限来源 | `system_role_menu` | `PartnerAuthServiceImpl.PORTAL_PERMISSIONS`（编译期常量） |
+
+`TokenAuthenticationFilter` 按请求前缀解析出期望的 userType，并与令牌的 `userType` 比对，不一致即拒绝。
+因此**兼职令牌无法访问 `/admin-api`，系统用户令牌也无法访问 `/part-api`**，双向隔离在框架层成立。
+
+V063 引入的同名 System 角色 `part_time_partner` 从未被兼职端消费（它的权限来自常量集合），
+长期作为影子角色出现在 System 角色权限管理里，容易误导配置。**V247 已将其实体退役**：
+清空其全部菜单与用户关系后逻辑删除该角色，使 `system_role` 中不再存在兼职角色。
+兼职端权限当前仍由 `PORTAL_PERMISSIONS` 决定，如需可配置化需另行评审。
+
+### 悬空授权修复（V249 / V250）
+
+V246 的覆盖扫描看不见一类缺陷：**按钮被授权、但其父目录未被授权**。系统只返回被直接授权的
+菜单集合，前端建树时父节点缺失的子节点会被丢弃，因此这些按钮**权限有效但界面不可达**。
+
+| 角色 | 悬空按钮 | 缺失父级 | 来源 |
+|---|---|---|---|
+| `dept_manager` | `1195`/`1197`/`1199`/`602117`、`2715`/`2716` | `1186` 流程管理、`1193` 流程模型、`2714` 流程分类 | V109 |
+| `system_administrator` | `6786`-`6789`、`602131`/`602132` | `2144` 站内信管理 | V071 |
+
+V249 按各角色**所需路径**精确补授（对照 `normal_user` 只持有 `1185 工作流程` + `1200 审批中心`
+的既有惯例，不扩散到同级页面）。补授后 `dept_manager` 可进入流程模型/流程分类页面并使用 V109
+已授予的按钮；`system_administrator` 可在消息中心看到业务通知规则与通知渠道。
+
+V250 修复了另三行缺陷：`V179` 与一次手工修复把 `system_role_menu` 写成了 `tenant_id=0`，
+而角色属于租户 1，导致 `system_administrator` 的通知渠道授权**实际不生效**。V250 把关系租户更正为
+角色自身租户（保留原 creator 与时间线），并清理更正后产生的重复行。
+
+`verify-role-menu-coverage.sql` 现同时校验悬空授权、跨租户授权与重复授权，三者预期均为 0 行。
+
+### 存量待确认项
+
+- 工作计划模块（`6900` 及 16 项权限）整块 `status=1`，为**有意待上线**状态，未纳入权限配置。
+- `zsjos-db test-fresh` 的 145 项失败为既有测试缺陷，见下文。
+
+### test-fresh 已按真实安装路径修复
+
+`zsjos-db test-fresh` 原先只加载 `bootstrap.sql` + `V071` 就运行完整的 `verify/core.sql`，
+导致所有「断言迁移产物」的检查必然失败——**145 项**（`handoff/main-delivery-task-closure.md`
+与 `handoff/20260817-wecom-user-id.md` 已记录为长期已知）。
+
+现已改为与 `migrate` 在空库上的行为一致：**应用基线 → 应用基线未登记的迁移 → 验证**。
+
+这次修复暴露了一个此前测不出的**真实安装故障**：基线 DDL 已含
+`zsjos_content_review_batch.student_person_id` 与 `account_ids_json`，但基线版本清单未登记 V225，
+而 V225 是 15 个同类迁移中**唯一没有 `information_schema` 守卫**的，全新安装会直接
+`ERROR 1060 Duplicate column name` 中止。V225 已按 V244 的写法补上守卫，并同步更新台账校验和。
+
+V246 也不再让同一角色同时持有页面与同名按钮（`73610`+`73612`、`73630`+`73631`、
+`73624`+`73629`、`6811`+`6849`）。真正由两个页面共享一个权限的
+（`可接工单` 与 `我的工单` 共用 `zsjos:work-order:query`；两个爆款拆解页共用
+`zsjos:material:create`）**仍然都授**，否则会有一个页面不可达。
+
+失败数由 145 降至 16，且这 16 项**在线上开发库同样 FAIL**——全部是既有验证器漂移，无一是本次回归：
+
+- **台账校验和口径已定**：权威口径为运行器写入的 `sha256(文件字节)`。117 个迁移自登记的
+  `SHA2(文件名)`/字面量在下次应用时被运行器覆盖；基线以 `legacy`/`baseline` 种入的行保留
+  种子值（种子 SQL 与若干断言以之为准）。`pending_migrations` 校验除种子行外的全部行，
+  `record_migration` 一律写文件字节哈希，新增 `zsjos-db reconcile <env> [--apply]` 核对/纠正，
+  `migrate` 在待办检查前自动执行（不含种子行）。相应的断言改为同时接受文件字节哈希与自登记值。
+  开发库 194 条偏离行已按此口径纠正，种子行已还原为种子值。
+- **V131/V150/V178**：违规授权由 `creator='1'`/`creator='39'` 在本次工作之前建立。例如 V178
+  断言无人持有菜单 6820，而 `super_admin`、`new_media_operator`、`content_director` 都持有。
+- 部分断言要求 `zsjos_schema_version` 中存在基线从未种入的版本行。
+
+修复后的 `test-fresh` 已能执行真实安装路径，因此剩余 16 项是**可度量的**具体清单，
+不再被 145 项噪声掩盖。
+
+## V248 菜单 ID 复用事故与修复
+
+V086 在 `6920`-`6923` 建立客资详情 4 个页签权限（父节点 `6770`），V091 在 `6924` 建立
+`zsjos:lead-detail:flow-read`。V224 随后把 `6920`-`6927` 整段复用为「学员账号交付」，
+其 `ON DUPLICATE KEY UPDATE` 覆盖了 `permission` 列：**5 个页签权限全部消失**，而 V086 遗留的
+`system_role_menu` 仍指向被复用的 ID。结果是客资详情的跟进/申诉/投诉/订单/流转 5 个页签
+对**所有角色**不可用，且因菜单行不存在而无法通过界面恢复。
+
+V248 在空闲号段 `602300`-`602304` 重建这 5 个权限行，并按 **V086 自己声明的「源权限 → 详情权限」
+继承表**恢复授权（不按角色名推断）：
+
+| 详情权限 | 继承自 |
+|---|---|
+| `lead-detail:follow-up-read` | `lead-follow-up:query`、`subordinate-sales:query`、`student:query-my`、`lead:query-all` |
+| `lead-detail:appeal-read` | `lead:appeal:create`、`lead:appeal:query`、`subordinate-sales:query`、`lead:query-all` |
+| `lead-detail:complaint-read` | `lead-complaint:create`、`lead-complaint:handle`、`subordinate-sales:query`、`lead:query-all` |
+| `lead-detail:order-read` | `sales-order:query`、`sales-order:create`、`subordinate-sales:query`、`student:query-my`、`lead:query-all` |
+| `lead-detail:flow-read` | 仅 `sales_manager`（V091 原始归属）|
+
+`normal_user` 与 `teaching_assistant` **显式排除**：它们在 V246 才获得 `zsjos:student:query-my`，
+而该权限是 V086 继承表的源，纳入会凭空扩权。
+
+V248 同时补建了后端自 V023/V024 起就在校验、但从未定义菜单行的三组权限：
+`sales-order:query-own`、`sales-order:query-team`、`sales-order:refund-apply`、
+`payment-refund:read/refresh/direct`、`student:exam-date-update`。
+其中 `payment-refund:direct` 是资金出账动作，**仅 `finance_manager` 与 `super_admin`**。
+
+### 防复发
+
+`zsjos-db check` 新增菜单 ID 复用检查：后续迁移若用不同 permission 重新插入已被使用的
+`system_menu.id`，检查直接失败。已应用到线上、无法回改的历史冲突（`6850`、V063 的兼职端段、
+`6913`、`6920`-`6923`）在 `FROZEN_LEGACY_COLLISIONS` 中冻结，仅新增冲突会被拦截。
 
 ## 审计规则
 

@@ -5946,10 +5946,12 @@
 - HEAD commit: $head（未创建提交）。
 - User goal: 工单模板动态表单支持附件字段。
 - Key decisions: 新增 ttachment 字段类型；动态字段保存文件 ID 数组并与顶层请求附件去重合并；服务端统一校验上传人和工单文件命名空间并保存单份附件快照；字段值保留字段到文件 ID 的关系；详情与运行审计按快照文件名展示；不新增表、迁移或依赖。
-- Execution or analysis result: Admin 模板设计器可配置附件及必填；Workbench 使用现有附件选择器上传，每字段最多 20 个，提交时序列化为 ID；后端支持定义校验、必填空数组拒绝、重复/非正 ID 拒绝、文件归属校验、最多 100 个合并请求附件和历史快照；详情响应新增 equestAttachments 快照元数据，两端详情按字段显示。
+- Execution or analysis result: Admin 模板设计器可配置附件及必填；Workbench 使用现有附件选择器上传，每字段最多 20 个，提交时序列化为 ID；后端支持定义校验、必填空数组拒绝、重复/非正 ID 拒绝、文件归属校验、最多 100 个合并请求附件和历史快照；详情响应新增 
+equestAttachments 快照元数据，两端详情按字段显示。
 - Changed files: ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImpl.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderAttachmentMapper.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderRespVO.java; ackend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImplTest.java; rontend/admin/src/api/zsjos/workOrder/index.ts; rontend/admin/src/views/zsjos/workOrderTemplate/index.vue; rontend/admin/src/views/zsjos/workOrderAudit/index.vue; rontend/workbench/src/services/workOrderApi.ts; rontend/workbench/src/services/workOrderForm.ts; rontend/workbench/src/services/workOrderForm.test.ts; rontend/workbench/src/pages/WorkOrderCenterPage.tsx; docs/api/generic-work-order-center.md; 本 handoff 记录。
 - Verification evidence: ZSJOS WorkOrderServiceImplTest 20/20 通过，依赖 reactor 全部成功；ZSJOS reactor compile 成功；Workbench 聚焦测试 18/18、typecheck、生产 build 通过；Workbench 全量 440/446 通过，本次附件测试通过，6 个失败来自既有公告路径、定位卡 API、主管动作契约漂移；Admin 本次文件 scoped ESLint 通过，uild:local 通过（仅既有 lightningcss *zoom 警告）；Admin 全量 typecheck 被既有 BPM/EAM/MES/System 等无关错误阻塞，未出现本次文件错误；scoped git diff --check 通过。浏览器可连接本地 Workbench，但无登录态，仅到登录页，未完成授权后的桌面/移动交互验收。
-- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；WorkOrderRespVO 增加兼容字段 equestAttachments。
+- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；WorkOrderRespVO 增加兼容字段 
+equestAttachments。
 - Remaining work: 在有效登录态下补做模板创建/发布、动态附件上传、必填校验、工单详情和 Admin 审计的桌面/移动真实交互验收；仓库既有 6 个 Workbench 守卫测试及 Admin 全量 typecheck 错误需由对应工作流修复。
 
 ## Delivery Entry Correction - 2026-08-28 12:13:23 +08:00
@@ -24818,3 +24820,87 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` BUILD SUCCESS。
 - Dependency/integration impact: 需重启后端使新注解生效；未修改数据库、未新增依赖。
 - Remaining work: 重启后用管理员请求 `/admin-api/zsjos/gift-purchase/page` 做真实接口验证。
+
+### 2026-09-15 19:05:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 完整梳理 handoff 与业务口径文件，为全部角色完整配置各菜单权限。
+- Key decisions: 采用「全量落地到 34 个角色 + 新增编号迁移并应用到开发库」。授权只按 `system_menu.permission` 稳定标识解析；每个角色的祖先目录单独补齐，自带页面权限的父节点仅在该角色已持有该权限时才继承。迁移为纯增量，不撤销任何既有授权。
+- Result: 新增 `V246__role_menu_permission_coverage.sql`（1889 条新增关系，覆盖 34 个角色、关闭 61 个零授权 ZSJOS 权限菜单）与 `verify-role-menu-coverage.sql`；更新 `docs/architecture/zsjos-role-permission-matrix.md` 与 `script/sql/mysql/migrations/README.md`。应用后 `zsjos` 零授权菜单数为 0，34 个角色全部获得 ZSJOS 菜单。
+- Changed files: `script/sql/mysql/migrations/V246__role_menu_permission_coverage.sql`、`script/sql/mysql/verify-role-menu-coverage.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: 备份 `system_role_menu` 后应用；dry-run 命中并修复了排序规则冲突与祖先越权；比对确认原有 1870 条关系一条未删；幂等复跑新增 0；`verify-role-menu-coverage.sql` 确认无 V246 引入的悬空节点。
+- Dependency / integration impact: 需随 backend 同步部署。租户 1 package_id=0（系统租户），菜单不受 `system_tenant_package` 过滤，无需同步套餐。**直接执行 SQL 绕过了 `assignRoleMenu` 的 `@CacheEvict`**，已手工清理 Redis db1 中 17 个 `menu_role_ids:*` 键；`permission_menu_ids` 未变无需清理。经 System 角色权限管理界面操作时框架会自动失效这两类缓存。
+- Remaining work: 详见下方 V247 条目与遗留项清单。
+
+### 2026-09-15 19:40:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 明确兼职端不属系统用户体系（只能登录 H5，系统用户也不得使用 H5），并梳理讨论剩余遗留项。
+- Key decisions: 兼职端自 V072 起已用独立身份（`zsjos_partner_account` + `/part-api` + `UserTypeEnum.PARTNER` + `PORTAL_PERMISSIONS` 常量），同名 System 角色 `part_time_partner` 属影子角色，予以退役；兼职 H5 权限**维持**常量实现，暂不改造为可配置。
+- Result: 新增 `V247__retire_partner_system_role.sql`（删除角色菜单/用户关系后逻辑删除该角色，并退役孤儿菜单 6909）；V246 移除 `part_time_partner` 目标关系（1889→1886 条）；`verify-bootstrap.sql` 的兼职断言改为"角色应不存在"；权限矩阵新增「兼职端身份边界」章节。有效 System 角色 34→33。
+- Changed files: `script/sql/mysql/migrations/V247__retire_partner_system_role.sql`、`script/sql/mysql/migrations/V246__role_menu_permission_coverage.sql`、`script/sql/mysql/verify-bootstrap.sql`、`script/sql/mysql/verify-role-menu-coverage.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: V246/V247 均重复执行新增 0；`verify-role-menu-coverage.sql` 确认兼职 `active_role=0 / grants=0`、零授权菜单为 0、无 V246 引入的悬空节点；兼职独立身份链路完好（partner 6、partner_account 6）。`zsjos-db check` PASS。
+- Dependency / integration impact: 需随 backend 同步部署。`TokenAuthenticationFilter` 按 `/admin-api`→ADMIN、`/part-api`→PARTNER 比对令牌 userType，双向隔离在框架层成立，无需额外改动。
+- Remaining work: `zsjos-db test-fresh` 在**未包含本次改动**的基线上同样报 145 项 `verify/core.sql` 断言失败（对比确认与 V246/V247 无关，为既有问题）；dept_manager 等 BPM 按钮与 system_administrator 的通知规则按钮存在未授权父目录（悬空节点，非本次引入）；12 项后端强校验但无菜单行权限（`zsjos:lead-detail:*` 5 项、`zsjos:payment-refund:*` 3 项、`zsjos:sales-order:query-own/query-team/refund-apply` 3 项、`zsjos:student:exam-date-update`）；工作计划模块整块 `status=1` 停用（16 项权限仅 super_admin 持有）。
+
+### 2026-09-15 20:20:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 落实第 1 类遗留项（12 项后端强校验但无菜单行的权限），并加防复发检查。
+- Key decisions: 追加发现菜单 ID 复用事故的真实根因；沿用 V086 声明的「源权限→详情权限」继承表恢复授权，不按角色名推断；显式排除 normal_user 与 teaching_assistant；payment-refund:direct 仅金融主管与超管；新菜单用空闲号段 602300+。
+- Result: 新增 `V248__restore_lead_detail_and_order_permissions.sql`。根因：V086 建的 4 个客资详情页签权限（id 6920-6923）与 V091 的 flow-read（id 6924）被 V224 的学员交付菜单（6920-6927）覆盖，导致 5 个页签对全部角色不可用且无法经界面恢复。V248 在 602300-602304 重建并恢复授权，另补建 7 项从未定义菜单的后端权限。`zsjos_db.py` 新增菜单 ID 复用检查（`check_menu_id_reuse`），冻结 4 组已上线历史冲突，新增冲突直接失败。
+- Changed files: `script/sql/mysql/migrations/V248__restore_lead_detail_and_order_permissions.sql`、`script/sql/mysql/migrations/V246__role_menu_permission_coverage.sql`、`script/sql/mysql/tools/zsjos_db.py`、`script/sql/mysql/verify-bootstrap.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: V246/V248 从干净状态顺序重放收敛（1886 + 77 条）；两者重复执行新增 0；零授权 zsjos 菜单 0；12 项权限菜单行齐全；payment-refund:direct 仅 finance_manager/super_admin；normal_user 与 teaching_assistant 无任何 lead-detail 权限；`zsjos-db check` PASS；守卫经探针验证对新增冲突报错。
+- Dependency / integration impact: 需随 backend 同步部署。数据库直改绕过缓存失效，已清理 Redis db1 的 menu_role_ids 键。
+- Remaining work: 工作计划模块仍整块 status=1（有意待上线，16 项权限仅 super_admin）；dept_manager 的 BPM 按钮与 system_administrator 的通知规则按钮指向未授权父目录（历史悬空，非本次引入）；`zsjos-db test-fresh` 145 项 `verify/core.sql` 失败为既有问题（A/B 对照确认与本次改动无关）。
+
+### 2026-09-15 21:30:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 继续处理遗留项第 2 项（悬空授权）与第 3 项（test-fresh 失败）。
+- Key decisions: 悬空授权按"所需路径精确补授"，对照 normal_user 只持有 1185+1200 的既有惯例；发现并修复 V246 自身的越权（system_administrator 不应持有 payment-refund:read，V242 把支付面限定给 finance_manager/super_admin）；test-fresh 只排查不改（属既有测试缺陷，且用户未授权修改测试语义）。
+- Result: 新增 `V249__repair_orphan_ancestor_grants.sql`（补 dept_manager 的 BPM 路径 1185/1186/1193/2714 与 system_administrator 的 2739/2144/6785/602130，7 条）与 `V250__repair_cross_tenant_grants.sql`（更正 3 条 tenant_id=0 的跨租户关系并去重）。V246 移除 system_administrator 的 602308。test-fresh 根因定位：基线已是全量最终结构（与 schema/core.sql 字节一致）但只登记 39 条版本，verify 却断言迁移产物。
+- Changed files: `script/sql/mysql/migrations/V249__repair_orphan_ancestor_grants.sql`、`V250__repair_cross_tenant_grants.sql`、`V246__role_menu_permission_coverage.sql`、`V248__restore_lead_detail_and_order_permissions.sql`、`script/sql/mysql/verify-role-menu-coverage.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: 悬空授权 0、跨租户授权 0、重复授权 0、零授权 zsjos 菜单 0；V250 重复执行新增 0；`zsjos-db check` PASS；清理 Redis db1 的 3 个陈旧 menu_role_ids 键；临时测试容器已清理。
+- Dependency / integration impact: 需随 backend 同步部署。V250 更正租户后 system_administrator 的通知渠道授权才真正生效。
+- Remaining work: `test-fresh` 的 145 项失败未修复（属测试设计缺陷：基线路径不重放迁移，verify 却断言迁移产物；`handoff/main-delivery-task-closure.md` 与 `handoff/20260817-wecom-user-id.md` 已记录为长期已知）。修复需单独评审——让 test-fresh 在基线后应用完整迁移链，或让 verify 区分基线态与迁移后态。另：迁移链在全新基线上重放时，V061 被其自身守卫拦截（基线 6856 已是 type=3，V061 期望 type=2），V225 遇重复列；均为基线已含迁移产物的同类现象。
+
+### 2026-09-15 22:40:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 修复 test-fresh 的 145 项验证失败。
+- Key decisions: 让 test-fresh 复刻 migrate 在空库上的真实语义（基线 → 未登记迁移 → 验证）；V225 按 V244 写法补 information_schema 守卫并同步台账校验和（用户确认）；剩余台账漂移不在本次范围。
+- Result: 新增 test-fresh 迁移应用逻辑；`V225__content_review_student_context.sql` 改为幂等并对齐 checksum；V246 去除页面/按钮同名重复授权（保留真正共享权限的多页面）；verify-bootstrap 修正三条因 V246 而过时的断言（zero-ZSJOS、finance exact、duplicate permission）。失败数 145 → 33。
+- Changed files: `script/sql/mysql/tools/zsjos_db.py`、`script/sql/mysql/migrations/V225__content_review_student_context.sql`、`V246__role_menu_permission_coverage.sql`、`V248__restore_lead_detail_and_order_permissions.sql`、`script/sql/mysql/verify-bootstrap.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: 独立验证到 V225 未加守卫时全新安装报 `ERROR 1060`（真实故障）；修复后 test-fresh 剩余 33 项；`zsjos-db check` PASS；开发库零授权菜单/悬空/跨租户/同菜单重复均为 0；临时测试容器与 Redis 陈旧键已清理。
+- Dependency / integration impact: V225 的 checksum 已在开发库更新；其他环境部署前需同步更新台账，或由 migrate 在首次运行时按新文件哈希登记。
+- Remaining work: 33 项剩余失败为既有台账漂移（131 baseline + 65 legacy 的 checksum 既非文件哈希也非断言期望值；部分断言要求基线未种入的 zsjos_schema_version 行）。修正台账需独立评审。
+
+### 2026-09-15 23:30:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 继续修复 test-fresh 的剩余验证失败。
+- Key decisions: 先以 A/B 对照区分「我引入」与「既有」；不盲目对齐所有 checksum（口径三方不一），只修 5 条与迁移实际写入值不符的断言；发现 V246 去重破坏了 V187 要求的"页面与按钮必须同时授权"，改回全授；query-own/query-team 不再新建菜单行（V195 断言要求其不存在）。
+- Result: test-fresh 失败数 145 → 26，且 26 项在线上开发库同样 FAIL（既有漂移，非回归）。修复 5 条 checksum 断言（V155/V156/V149/V192/V196 对齐文件名哈希）；V246 恢复全授语义；V248 移除 602305/602306，保留 6813/73510 软删态；V225 幂等守卫与台账校验和同步。
+- Changed files: `script/sql/mysql/tools/zsjos_db.py`、`script/sql/mysql/migrations/V225/V246/V248`、`script/sql/mysql/verify-bootstrap.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: A/B 对照（含/不含本次改动各跑 test-fresh）确认失败集差异；逐条在线上开发库执行 26 项断言，全部同样 FAIL；`zsjos-db check` PASS；开发库零授权菜单/悬空/同菜单重复均为 0，有效关系 3817；临时容器与 Redis 键已清理。
+- Dependency / integration impact: 需随 backend 同步部署。V225 校验和在开发库已更新。
+- Remaining work: 26 项既有验证器漂移（台账口径三方不一：运行器 sha256(文件字节) vs 117 个迁移 SHA2(文件名) vs 95 条更早行两者都不匹配；V131/V150/V178 的违规授权由 creator=1/39 在本轮之前建立；部分断言要求基线未种入的版本行）。修正需先决定权威口径，属独立较大的改动。
+
+### 2026-09-16 13:50:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 确定台账校验和权威口径为「文件字节哈希」并完成修复。
+- Key decisions: `zsjos_module_schema_version.checksum` 的权威值 = `sha256(迁移文件字节)`；运行器写入的行按此校验，`legacy`/`baseline` 种子行保留种子值（种子 SQL 与多处断言以其为准）；自登记 `SHA2(文件名)` 的行由运行器在下次应用时覆盖。
+- Result: `zsjos_db.py` 的 `record_migration` 一律写文件字节哈希；新增 `reconcile_checksums`/`reconcile_database` 与 `zsjos-db reconcile <env> [--apply] [--include-seed-rows]`；`migrate` 与 `test-fresh` 在待办检查前执行 `reconcile --apply`（排除种子行）；`test-guardrails` 新增文件字节口径与「种子行不被改写」断言。`verify-bootstrap.sql` 的模块台账断言改为 `checksum IN (文件字节哈希, 自登记值, 历史字面量)`。开发库 194 条偏离行已纠正、186 条种子行已还原。
+- Changed files: `script/sql/mysql/tools/zsjos_db.py`、`script/sql/mysql/verify-bootstrap.sql`、`script/sql/mysql/migrations/README.md`、`docs/operations/database-migrations.md`、`docs/architecture/zsjos-role-permission-matrix.md`。
+- Verification: `zsjos-db check` PASS；`test-guardrails` PASS（含新增断言）；`test-fresh` 145 → 16，剩余 16 项在开发库同样 FAIL（既有非校验和漂移）；`reconcile development` → PASS（运行器行全部等于文件字节哈希）；`verify-bootstrap.sql` 在开发库无任何校验和断言失败。
+- Dependency / integration impact: 无需 backend 改动。开发库台账已收敛到新口径；其他环境部署时 `migrate` 会自动执行同等归一化。种子行保持原值，不影响既有部署。
+- Remaining work: `test-fresh` 剩余 16 项为既有非校验和漂移（V131/V150/V178 的历史越权授权；部分断言要求基线未种入的 `zsjos_schema_version` 行），属独立修复。`core/migrations` 中 V239-V241 自登记为不存在的 `payment` 模块（惰性孤儿行，无读取方）。`kz_cleanup_backup_20260916`、`pms_work_item_work_log` 等表由并行进程创建，当前使 `plan` 报 unexpected table 而 BLOCKED；需确认归属后处理。

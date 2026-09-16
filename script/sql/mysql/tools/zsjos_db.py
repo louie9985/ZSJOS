@@ -508,6 +508,18 @@ def installed_versions(client: MysqlClient) -> dict[tuple[str, str], tuple[str, 
     return installed
 
 
+def _migrations_not_installed(
+    manifests: dict[str, dict], installed: dict[tuple[str, str], tuple[str, str]]
+) -> list[Migration]:
+    """Every migration with no ledger row, ignoring checksum validation."""
+    return [
+        migration
+        for code in module_order(manifests)
+        for migration in migrations_for(code, manifests[code])
+        if (code, migration.version) not in installed
+    ]
+
+
 def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, str], tuple[str, str]]) -> list[Migration]:
     pending: list[Migration] = []
     for code in module_order(manifests):
@@ -516,6 +528,11 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             if record:
                 recorded_checksum, release = record
                 skip_checksum = os.environ.get("ZSJOS_DB_SKIP_CHECKSUM", "false").lower() in ("1", "true", "yes")
+                # `zsjos_module_schema_version` rows the runner wrote are validated against
+                # the file-bytes hash. Rows carrying release `legacy`/`baseline` are exempt:
+                # they are provenance records from the bootstrap and older migrations, whose
+                # seeds and verifiers agree on a filename or literal tag rather than the file
+                # bytes. `reconcile --include-seed-rows` rewrites them only on request.
                 if (not skip_checksum and release not in ("legacy", "baseline")
                         and recorded_checksum != migration.checksum):
                     fail(
@@ -666,6 +683,72 @@ def drift_explained_by_pending(message: str, pending: Iterable[Migration]) -> bo
     return False
 
 
+def check_menu_id_reuse(manifests: dict[str, dict]) -> None:
+    """Reject a *new* migration that re-seeds a ``system_menu.id`` another migration already used.
+
+    Menu IDs are global across modules while permissions are the only stable authorization
+    identity. When a later migration re-inserts an ID another migration already used, its
+    ``ON DUPLICATE KEY UPDATE`` silently rewrites that row's name/permission and hijacks every
+    existing ``system_role_menu`` grant pointing at the ID. ``INSERT IGNORE`` (as in V063 vs
+    V022) is not safer: it drops the new row just as silently. V224 overwrote the V086
+    lead-detail permissions this way, which made all five Lead-detail tabs unusable until V248.
+
+    The collisions below were already applied to live environments before this guard existed.
+    They cannot be corrected in their own files, so they are frozen here; any collision that is
+    not on this list is a new defect and fails the check.
+    """
+    # later_migration_basename -> menu ids it re-seeds. Each entry must reference an applied
+    # migration and a menu id that the migration itself documents or that V248 already repaired.
+    FROZEN_LEGACY_COLLISIONS: dict[str, set[int]] = {
+        # V055 re-seeded 6850 as 主管确认; the live row kept V048's 人员业务状态 because V048
+        # ran first with ON DUPLICATE KEY UPDATE. V055's menu was replaced by 6856.
+        "V055__sales_order_supervisor_confirmation.sql": {6850},
+        # V063 re-seeded the 6900-6913 work-plan block as partner-portal buttons. V063 used
+        # INSERT IGNORE, so the V022/V033 work-plan rows survived and the partner rows were
+        # dropped. V069 then retired the partner-portal route entirely.
+        "V063__partner_portal_app_api_role.sql": {6900, 6901, 6902, 6903, 6904, 6905, 6906,
+                                                  6907, 6908, 6910, 6911, 6912, 6913},
+        # V064 re-seeded 6913 as bpm:model:import; blocked by the existing work-plan row.
+        "V064__bpm_model_import_permission.sql": {6913},
+        # V224 overwrote V086's four lead-detail permissions and V091's flow-read. V248 restored
+        # them on fresh ids 602300-602304.
+        "V224__student_delivery_permissions.sql": {6920, 6921, 6922, 6923},
+    }
+    insert_menu = re.compile(
+        r"INSERT\s+(?:IGNORE\s+)?INTO\s+`?system_menu`?\s*\(([^)]*)\)\s*VALUES\s*(.*?);",
+        re.IGNORECASE | re.DOTALL,
+    )
+    values_row = re.compile(r"\(\s*(\d+)\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'")
+    # menu id -> (migration name, permission read from the third VALUES column)
+    first_seen: dict[int, tuple[str, str]] = {}
+    conflicts: list[str] = []
+    for code in module_order(manifests):
+        for migration in migrations_for(code, manifests[code]):
+            text = migration.path.read_text(encoding="utf-8")
+            frozen = FROZEN_LEGACY_COLLISIONS.get(migration.path.name, set())
+            for statement in insert_menu.finditer(text):
+                columns = [column.strip().strip("`").lower() for column in statement.group(1).split(",")]
+                if "id" not in columns:
+                    continue
+                has_permission = "permission" in columns
+                for row in values_row.finditer(statement.group(2)):
+                    menu_id = int(row.group(1))
+                    permission = row.group(3) if has_permission else ""
+                    previous = first_seen.get(menu_id)
+                    if previous is None:
+                        first_seen[menu_id] = (migration.path.name, permission)
+                    elif previous[1] != permission and menu_id not in frozen:
+                        conflicts.append(
+                            f"system_menu id {menu_id} defined as '{previous[1]}' by {previous[0]} "
+                            f"but as '{permission}' by {migration.path.name}"
+                        )
+    if conflicts:
+        fail(
+            "Newly reused system_menu ids with conflicting permissions were found; allocate "
+            "unused ids instead of re-inserting an existing one:\n  " + "\n  ".join(conflicts)
+        )
+
+
 def static_check() -> None:
     manifests = load_manifests()
     module_order(manifests)
@@ -693,6 +776,8 @@ def static_check() -> None:
                     f"Migration {migration.path.name} dynamically prepares SIGNAL; "
                     "use IF ... SIGNAL inside a stored procedure"
                 )
+
+    check_menu_id_reuse(manifests)
 
     core = manifests["core"]
     schema_text = resolve_sql_path(core["schema"]).read_text(encoding="utf-8")
@@ -794,7 +879,13 @@ def print_plan(environment: str, *, allow_pending_drift: bool = True) -> tuple[M
     manifests = enabled_manifests(environment)
     client = MysqlClient(db_config(environment))
     installed = installed_versions(client)
-    pending = pending_migrations(manifests, installed)
+    try:
+        pending = pending_migrations(manifests, installed)
+    except CommandError as error:
+        # A checksum mismatch is reported by the caller (migrate/verify) as a hard
+        # failure; `plan` stays readable so an operator can see the full picture.
+        info(f"Checksum guard: {error}")
+        pending = _migrations_not_installed(manifests, installed)
     info("Current module versions:")
     for code in module_order(manifests):
         versions = sorted(version for module, version in installed if module == code)
@@ -823,6 +914,14 @@ def print_plan(environment: str, *, allow_pending_drift: bool = True) -> tuple[M
 
 
 def record_migration(client: MysqlClient, migration: Migration) -> None:
+    """Record a migration, with the file-bytes hash always authoritative.
+
+    `migration.checksum` is `sha256(file contents)` computed by the runner. That
+    value wins on every write, including over rows a migration self-registered
+    (many `V*.sql` files insert their own `zsjos_module_schema_version` row with
+    `SHA2(file_name)` or a literal tag). Only `release_version` is sticky for the
+    `legacy`/`baseline` rows, so the historical provenance of those rows is kept.
+    """
     values = [
         migration.module,
         migration.version,
@@ -835,10 +934,50 @@ def record_migration(client: MysqlClient, migration: Migration) -> None:
         "(module_code,version,description,checksum,release_version) VALUES ("
         + ",".join(sql_literal(value) for value in values)
         + ") ON DUPLICATE KEY UPDATE "
-          "description=VALUES(description),"
-          "checksum=IF(release_version IN ('legacy','baseline'),VALUES(checksum),checksum),"
-          "release_version=IF(release_version IN ('legacy','baseline'),VALUES(release_version),release_version)"
+          "checksum=VALUES(checksum),"
+          "release_version=IF(release_version IN ('legacy','baseline'),release_version,VALUES(release_version))"
     )
+
+
+def reconcile_checksums(
+    client: MysqlClient,
+    manifests: dict[str, dict],
+    apply: bool,
+    *,
+    include_seed_rows: bool = False,
+) -> list[tuple[str, str, str, str]]:
+    """Compare recorded checksums against `sha256(file bytes)`.
+
+    Returns the list of `(module, version, recorded, expected)` rows whose stored
+    checksum is not the file-bytes hash. With `apply=True` the drifted rows are
+    corrected in place (description and release_version are left alone).
+
+    `release in ('legacy','baseline')` rows are seed/provenance records: the baseline
+    seed SQL, the migrations that self-register them, and several verifier assertions
+    all agree on a filename or literal tag rather than the file bytes. Rewriting them
+    would break those assertions, so they are skipped unless the caller opts in with
+    `include_seed_rows=True` (the `reconcile --include-seed-rows` flag).
+    """
+    installed = installed_versions(client)
+    drifted: list[tuple[str, str, str, str]] = []
+    for code in module_order(manifests):
+        for migration in migrations_for(code, manifests[code]):
+            record = installed.get((code, migration.version))
+            if record is None:
+                continue
+            recorded_checksum, release = record
+            if not include_seed_rows and release in ("legacy", "baseline"):
+                continue
+            if recorded_checksum != migration.checksum:
+                drifted.append((code, migration.version, recorded_checksum, migration.checksum))
+    if apply and drifted:
+        for code, version, _recorded, expected in drifted:
+            client.query(
+                "UPDATE zsjos_module_schema_version SET checksum=" + sql_literal(expected)
+                + " WHERE module_code=" + sql_literal(code)
+                + " AND version=" + sql_literal(version)
+            )
+    return drifted
 
 
 class MigrationLock:
@@ -901,8 +1040,33 @@ def verify_database(environment: str, client: MysqlClient | None = None) -> None
     info("PASS: database verification (data-grade verifiers warn-only) and schema drift checks completed.")
 
 
+def reconcile_database(environment: str, apply: bool, include_seed_rows: bool = False) -> None:
+    """Realign recorded checksums with the migration file-bytes hash.
+
+    Every runner-recorded row must equal `sha256(file bytes)`. Seed rows
+    (`legacy`/`baseline`), whose value the bootstrap SQL and several verifiers are
+    written against, are left alone unless `--include-seed-rows` is passed. Safe to
+    re-run; a second pass with no edits reports zero drift.
+    """
+    manifests = enabled_manifests(environment)
+    client = MysqlClient(db_config(environment))
+    drifted = reconcile_checksums(client, manifests, apply, include_seed_rows=include_seed_rows)
+    if not drifted:
+        scope = "every" if include_seed_rows else "every runner-recorded"
+        info(f"PASS: {scope} checksum matches the migration file-bytes hash.")
+        return
+    for code, version, recorded, expected in drifted:
+        info(f"{'FIXED' if apply else 'DRIFT'}: {code}/{version} "
+             f"recorded={recorded[:16]}... expected={expected[:16]}...")
+    if apply:
+        info(f"PASS: corrected {len(drifted)} checksum(s) to the file-bytes hash.")
+    else:
+        info(f"{len(drifted)} checksum(s) drift from the file-bytes hash; re-run with --apply to correct.")
+
+
 def migrate_database(environment: str) -> None:
     static_check()
+    manifests = enabled_manifests(environment)
     client, pending, unexplained = print_plan(environment)
     if unexplained:
         fail("Migration is blocked by unexpected schema drift")
@@ -912,7 +1076,14 @@ def migrate_database(environment: str) -> None:
         if client.table_count() == 0:
             info("Empty database detected; applying the reviewed fresh bootstrap.")
             client.execute_file(SQL_ROOT / "bootstrap.sql")
-            pending = pending_migrations(enabled_manifests(environment), installed_versions(client))
+        # The bootstrap seed and older migrations register their own checksum rows
+        # (filename hash or literal). Rewrite every row to the file-bytes hash before
+        # the guard runs, so the ledger always carries one authoritative value and a
+        # genuine edit to an applied migration is still caught by pending_migrations.
+        fixed = reconcile_checksums(client, manifests, apply=True)
+        if fixed:
+            info(f"Normalized {len(fixed)} recorded checksum(s) to the file-bytes hash.")
+        pending = pending_migrations(manifests, installed_versions(client))
         for migration in pending:
             info(f"Applying {migration.module}/{migration.path.name}")
             client.execute_file(migration.path)
@@ -997,9 +1168,29 @@ def test_fresh() -> None:
     static_check()
 
     def execute(container: str) -> None:
+        # Mirror the real fresh-install path: the baseline first, then every migration the
+        # baseline did not register, then verification. Verifying after only the baseline
+        # reports a false failure for every check that asserts a migration's artifact, because
+        # those migrations have not run yet. `migrate` has always applied them on an empty
+        # database; this test must exercise the same sequence.
         docker_mysql_file(container, SQL_ROOT / "bootstrap.sql")
         docker_mysql_query(container, "ALTER DATABASE zsjos_test COLLATE utf8mb4_0900_ai_ci")
-        docker_mysql_file(container, SQL_ROOT / "migrations" / "V071__repair_h5_and_role_permissions.sql")
+
+        manifests = load_manifests()
+        client = DockerTestClient(container)
+        # `migrate` realigns the runner-recorded checksums to the file-bytes hash after the
+        # baseline; mirror that here so the guard sees the same terminal ledger state.
+        reconcile_checksums(client, manifests, apply=True, include_seed_rows=False)
+        pending = pending_migrations(manifests, installed_versions(client))
+        if not pending:
+            fail(
+                "Fresh bootstrap registered every migration; the baseline must not list the "
+                "whole migration history, or this test cannot exercise the upgrade path"
+            )
+        info(f"Fresh database: applying {len(pending)} unregistered migration(s) after the baseline")
+        for migration in pending:
+            docker_mysql_file(container, migration.path)
+
         output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
         if failure_lines:
@@ -1007,7 +1198,7 @@ def test_fresh() -> None:
         second = docker_mysql_file(container, SQL_ROOT / "bootstrap.sql", expect_success=False)
         if second.returncode == 0:
             fail("Fresh bootstrap unexpectedly allowed execution against a non-empty database")
-        info("PASS: fresh bootstrap, verification, and non-empty guard completed.")
+        info("PASS: fresh bootstrap, unregistered migrations, verification, and non-empty guard completed.")
 
     with_test_mysql(execute)
 
@@ -1096,7 +1287,38 @@ def test_guardrails() -> None:
                 raise
         else:
             fail("Checksum guard accepted a changed applied migration")
-        info("PASS: schema drift and applied-checksum guardrails blocked unsafe state.")
+
+        manifests = load_manifests()
+        migration = next(m for m in migrations_for("core", manifests["core"]) if m.version == "V020")
+        docker_mysql_query(
+            container,
+            "UPDATE zsjos_module_schema_version SET checksum=SHA2('V020__unified_schema_migration_and_crm_tables.sql',256) "
+            "WHERE module_code='core' AND version='V020'",
+        )
+        drifted = reconcile_checksums(client, manifests, apply=False)
+        if not any(version == "V020" for _, version, _, _ in drifted):
+            fail("Checksum reconciliation did not detect a name-based checksum")
+        reconcile_checksums(client, manifests, apply=True)
+        if installed_versions(client)[("core", "V020")][0] != migration.checksum:
+            fail("Checksum reconciliation did not restore the file-bytes hash")
+        if reconcile_checksums(client, manifests, apply=False):
+            fail("Checksum reconciliation did not converge after --apply")
+
+        # Seed rows (legacy/baseline) must be left alone by default: the bootstrap SQL and
+        # several verifier assertions are written against their filename/literal values.
+        # The baseline seeds core/V061 with SHA2(filename) and release 'baseline'.
+        docker_mysql_query(
+            container,
+            "UPDATE zsjos_module_schema_version SET checksum=REPEAT('b',64) "
+            "WHERE module_code='core' AND version='V061' AND release_version='baseline'",
+        )
+        if any(version == "V061" for _, version, _, _ in reconcile_checksums(client, manifests, apply=True)):
+            fail("Checksum reconciliation rewrote a baseline seed row without --include-seed-rows")
+        if installed_versions(client)[("core", "V061")][0] != "b" * 64:
+            fail("Checksum reconciliation changed a baseline seed row without --include-seed-rows")
+        if not reconcile_checksums(client, manifests, apply=False, include_seed_rows=True):
+            fail("Checksum reconciliation ignored seed rows even with include_seed_rows=True")
+        info("PASS: schema drift, applied-checksum guards, and file-bytes reconciliation are enforced.")
 
     with_test_mysql(execute)
 
@@ -1111,6 +1333,13 @@ def build_parser() -> argparse.ArgumentParser:
     for command in ("plan", "migrate", "verify"):
         command_parser = subparsers.add_parser(command)
         command_parser.add_argument("environment")
+    reconcile_parser = subparsers.add_parser(
+        "reconcile", help="Compare stored checksums against file-bytes hashes; --apply corrects drift")
+    reconcile_parser.add_argument("environment")
+    reconcile_parser.add_argument("--apply", action="store_true", help="Write corrected checksums to the ledger")
+    reconcile_parser.add_argument(
+        "--include-seed-rows", action="store_true",
+        help="Also rewrite legacy/baseline seed rows (breaks their seeded assertions; for diagnosis only)")
     subparsers.add_parser("test-fresh")
     subparsers.add_parser("test-upgrade")
     subparsers.add_parser("test-guardrails")
@@ -1131,6 +1360,8 @@ def main() -> int:
         migrate_database(args.environment)
     elif args.command == "verify":
         verify_database(args.environment)
+    elif args.command == "reconcile":
+        reconcile_database(args.environment, args.apply, args.include_seed_rows)
     elif args.command == "test-fresh":
         test_fresh()
     elif args.command == "test-upgrade":

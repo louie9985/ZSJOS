@@ -70,7 +70,7 @@ docker compose --env-file deploy/production/.env \
 
 For a real release, set `ZSJOS_DB_MIGRATOR_IMAGE` and
 `ZSJOS_DB_RELEASE_VERSION` to the immutable image tag and release identifier.
-Set `ZSJOS_DB_MODULES=core,hrm,fms,eam` for the current production application,
+Set `ZSJOS_DB_MODULES=core,hrm,fms,eam,pms` for the current production application,
 matching the Java modules packaged in `yudao-server`. Adding an optional module's
 files does not enable it.
 The application must use `ZSJOS_DB_APP_USER`; only the migrator receives the DDL
@@ -111,6 +111,14 @@ logical backup, validates applied checksums, executes pending migrations in modu
 order, records each successful version, and runs verification. Any unexplained
 schema drift, checksum mismatch, SQL failure, or verification failure blocks the
 application release.
+
+The authoritative `checksum` value is the SHA-256 of the migration file's bytes. Many
+older migrations self-register `SHA2(file name)` or a literal, and the runner corrects
+those on the next apply; rows seeded by the bootstrap with release `legacy`/`baseline`
+are exempt and keep their seeded values, which the verifiers assert against. To audit a
+database against the convention without changing it, run `zsjos-db reconcile <env>`;
+add `--apply` to correct the runner-written rows. See
+`script/sql/mysql/migrations/README.md` for the full rule.
 
 Database DDL is not automatically rolled back. If application startup fails after
 a compatible migration, roll back the application image and keep the schema.

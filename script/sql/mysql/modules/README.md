@@ -12,7 +12,7 @@ business data.
 
 The release explicitly enables modules through the comma-separated
 `ZSJOS_DB_MODULES` setting. The current application release uses
-`core,hrm,fms,eam`; merely adding an optional manifest does not install that module.
+`core,hrm,fms,eam,pms`; merely adding an optional manifest does not install that module.
 The command rejects an enabled module when any declared dependency is absent. On a
 fresh database, Core Bootstrap runs first and enabled optional modules then install
 through their own migrations starting at `V001`.
