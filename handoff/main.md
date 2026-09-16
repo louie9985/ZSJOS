@@ -25113,3 +25113,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Dependency or integration impact: 未新增依赖；未执行 V256、数据库写入、服务重启、提交或推送；保护 stash `codex-pre-pull-20260917-main` 保留。
 - Remaining work: 本地业务改动及本次 handoff 记录仍未提交；真实支付接口/浏览器环境未执行；保护 stash 可在确认无需回退后另行删除。
 - Status: `pulled-and-resolved`。
+
+## Delivery Entry - 2026-09-17 00:11:01 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `00f05e2d69fd5a31e18593a7a124c4dc986c29ef`。
+- User goal: 将当前有效本地代码提交并推送到远程 `main` 分支。
+- Key decisions: 提交 EAM 序列号与附件、支付商品快照与取消提示、工单查询、规则、测试、SQL、模板和文档；排除探针、缓存、截图、构建输出及 `tmp/output` 临时产物。
+- Execution or analysis result: 已创建业务提交 `00f05e2d69`，包含 60 个文件、1563 行新增和 405 行删除；准备追加本交付记录后推送两个提交。
+- Changed files: 业务提交详见 `00f05e2d69`；本条仅修改 `handoff/main.md`。
+- Verification evidence: 提交前 `git diff --cached --check` 通过；EAM、工单、支付和 H5 的既有本轮验证证据均记录在本文件前序交付条目；最近支付后端测试 14/14、H5 支付测试 6/6、H5 build 通过；提交前 `HEAD...origin/main` 为 `0 0`。
+- Dependency or integration impact: 未新增依赖；未执行数据库迁移、服务重启或临时文件清理；保护 stash 保留。
+- Remaining work: 提交本交付记录、推送 `origin/main` 并核对远程提交一致性。
+- Status: `ready-to-push`。
