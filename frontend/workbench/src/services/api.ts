@@ -1759,6 +1759,9 @@ export type PurchaseIntent = {
   paymentIntentNo?: string;
   paymentUrl?: string;
   paymentStatus?: "created" | "waiting" | "paid" | "expired" | "closed";
+  /** 已发起取消但关单结果未确认；为 true 时金额仍锁定、不可生成新链接 */
+  paymentCancelPending?: boolean;
+  paymentCancelMessage?: string;
   paymentExpiresAt?: Timestamp;
   displayStatus:
     | "order_draft"

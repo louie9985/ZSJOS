@@ -12,7 +12,8 @@ export default function IrreversiblePopconfirm({
   onConfirm,
   open,
   onOpenChange,
-  disabled = false
+  disabled = false,
+  description = IRREVERSIBLE_CONFIRM_DESCRIPTION
 }: {
   action: string
   danger?: boolean
@@ -21,10 +22,12 @@ export default function IrreversiblePopconfirm({
   open?: boolean
   onOpenChange?: (open: boolean) => void
   disabled?: boolean
+  /** 覆盖默认的「该操作无法撤回」说明，用于可恢复的不可逆动作（如取消支付链接后可重新生成）。 */
+  description?: string
 }) {
   return <Popconfirm
     title={irreversibleConfirmTitle(action)}
-    description={IRREVERSIBLE_CONFIRM_DESCRIPTION}
+    description={description}
     okText="确认执行"
     cancelText="取消"
     okButtonProps={{ danger }}

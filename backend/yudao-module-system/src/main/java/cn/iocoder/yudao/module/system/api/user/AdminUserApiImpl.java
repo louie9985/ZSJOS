@@ -143,6 +143,7 @@ public class AdminUserApiImpl implements AdminUserApi {
     }
 
     @Override
+    @DataPermission(enable = false) // 跨模块组织花名册查询必须完整，不能被调用方的数据范围裁剪成空集
     public List<AdminUserRespDTO> getUserListByStatus(Integer status) {
         List<AdminUserDO> users = userService.getUserListByStatus(status);
         return BeanUtils.toBean(users, AdminUserRespDTO.class);
@@ -156,6 +157,7 @@ public class AdminUserApiImpl implements AdminUserApi {
     }
 
     @Override
+    @DataPermission(enable = false) // 按岗位的跨部门花名册查询必须完整，不能被调用方的数据范围裁剪成空集
     public List<AdminUserRespDTO> getUserListByPostIds(Collection<Long> postIds) {
         List<AdminUserDO> users = userService.getUserListByPostIds(postIds);
         return BeanUtils.toBean(users, AdminUserRespDTO.class);

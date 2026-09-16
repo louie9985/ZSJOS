@@ -55,6 +55,7 @@ public class PurchaseIntentService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private PaymentSubjectService paymentSubjectService;
     @Resource private ProductPaymentSubjectService productPaymentSubjectService;
+    @Resource private PaymentClosePendingRecorder closePendingRecorder;
 
     public PurchaseIntentRespVO current(PurchaseIntentSaveDraftReqVO request, Long userId) {
         resolvePerson(request, false);
@@ -161,19 +162,88 @@ public class PurchaseIntentService {
         return convert(intent);
     }
 
+    /**
+     * 取消支付链接：在「链接生成后、确认到账前」整段流程中都允许发起。
+     * 客户是否打开链接、是否点击支付都不影响销售发起取消；只有确认旧支付已关闭才解除金额锁定。
+     * 结果不确定时保持等待与锁定，由 <code>refreshPayment</code> 或下次取消重试收敛。
+     */
     @Transactional(rollbackFor = Exception.class)
     public PurchaseIntentRespVO cancelPayment(Long id, Long userId) {
         PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(id);
         if (intent == null) throw exception(PURCHASE_INTENT_NOT_EXISTS);
         if (!userId.equals(intent.getOwnerUserId()) && !userId.equals(intent.getInitiatorUserId())) throw exception(PURCHASE_INTENT_PERMISSION_DENIED);
         PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(id);
-        if (payment == null || !List.of("created", "expired", "closed").contains(payment.getStatus()))
-            throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
-        if (!"closed".equals(payment.getStatus())) payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason("销售取消支付链接");
-        paymentIntentMapper.updateById(payment);
-        intent.setSnapshotLocked(false).setCollectionMode("offline_paid");
+        if (payment == null) throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        if ("paid".equals(payment.getStatus())) throw exception(PAYMENT_ALREADY_PAID);
+
+        if ("created".equals(payment.getStatus())) {
+            // 从未向通联下单，直接作废即可
+            payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason("销售取消支付链接");
+            paymentIntentMapper.updateById(payment);
+        } else if (!"closed".equals(payment.getStatus())) {
+            // waiting / expired：已可能向通联下单，先查单确认真实状态，再尝试关单
+            if ("waiting".equals(payment.getStatus()) && StrUtil.isBlank(payment.getReqsn()))
+                throw exception(PAYMENT_GATEWAY_UNAVAILABLE);
+            if (payment.getReqsn() != null && !payment.getReqsn().isBlank()) {
+                int fen = payment.getExpectedAmount().movePointRight(2).intValueExact();
+                AllinpayClient.GatewayResponse query = createAllinpayClient(payment).query(payment.getReqsn());
+                recordGatewayEvent(payment, "payment_query", query);
+                payment.setQueriedAt(LocalDateTime.now());
+                if (isPaid(query, fen)) {
+                    // 客户付款与销售取消并发：以支付平台结果为准，已到账则取消不成立
+                    confirmPaid(payment, query, "query");
+                    throw exception(PAYMENT_ALREADY_PAID);
+                }
+                if (!query.isSignatureValid()) {
+                    // 查单结果不可信 → 保持锁定，不改状态
+                    paymentIntentMapper.updateById(payment);
+                    throw exception(PAYMENT_GATEWAY_UNAVAILABLE);
+                }
+                String closeFailure = closeAtGateway(payment, "销售取消支付链接");
+                if (closeFailure != null) {
+                    paymentIntentMapper.updateById(payment);
+                    throw exception(PAYMENT_CANCEL_PENDING);
+                }
+            } else {
+                payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason("销售取消支付链接");
+            }
+            payment.setCloseRequestedAt(null).setCloseLastError(null);
+            paymentIntentMapper.updateById(payment);
+        }
+        // 取消成功：解除金额锁定；保持 online_link 收款路径，改价后由销售重新生成链接
+        intent.setSnapshotLocked(false);
         purchaseIntentMapper.updateById(intent);
         return convert(intent);
+    }
+
+    /**
+     * 向通联申请关单。
+     * 返回 null 仅表示通联明确受理且交易未支付（retcode=SUCCESS 且 trxstatus 为空或 0000）。
+     * 其余情况一律返回失败原因，由调用方保留「取消待确认」并等查单收敛——注意
+     * 「原交易不存在」「交易已关闭」都不足以证明关闭：前者也可能是下单后 5 分钟内过早调用，
+     * 后者可能对应「超时未支付」等终态，必须由查单结果确认。
+     */
+    private String closeAtGateway(PaymentIntentDO payment, String reason) {
+        AllinpayClient.GatewayResponse result;
+        try {
+            result = createAllinpayClient(payment).close(payment.getReqsn());
+        } catch (RuntimeException ex) {
+            return markClosePending(payment, reason, ex.getMessage());
+        }
+        recordGatewayEvent(payment, "payment_close", result);
+        if (result.isSignatureValid() && "SUCCESS".equals(result.getRetcode())
+                && (StrUtil.isBlank(result.getTrxstatus()) || "0000".equals(result.getTrxstatus()))) {
+            payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason(reason);
+            return null;
+        }
+        // 下单后通联要求至少间隔 5 分钟才允许关单，过早调用会失败；保留待确认状态供销售重试
+        return markClosePending(payment, reason, StrUtil.blankToDefault(result.getErrmsg(), result.getRetcode()));
+    }
+
+    private String markClosePending(PaymentIntentDO payment, String reason, String error) {
+        // 必须走独立事务：本方法调用方随后会抛业务异常，同事务写入会被回滚
+        closePendingRecorder.record(payment, reason, error);
+        return StrUtil.blankToDefault(error, "关单结果未知");
     }
 
     public PublicPaymentDetailRespVO publicDetail(String no, String token) {
@@ -253,13 +323,10 @@ public class PurchaseIntentService {
     }
 
     private void closeExpired(PaymentIntentDO payment) {
-        AllinpayClient.GatewayResponse result = createAllinpayClient(payment).close(payment.getReqsn());
-        recordGatewayEvent(payment, "payment_close", result);
-        if (result.isSignatureValid() && "SUCCESS".equals(result.getRetcode())
-                && (StrUtil.isBlank(result.getTrxstatus()) || "0000".equals(result.getTrxstatus()))) {
-            payment.setStatus("closed").setClosedAt(LocalDateTime.now()).setCloseReason("支付链接到期关单");
-            paymentIntentMapper.updateById(payment);
-        }
+        String failure = closeAtGateway(payment, "支付链接到期关单");
+        // 到期关单失败同样保留待确认事实，供对账与后续重试
+        if (failure != null) closePendingRecorder.record(payment, "支付链接到期关单", failure);
+        paymentIntentMapper.updateById(payment);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -306,8 +373,11 @@ public class PurchaseIntentService {
                 .setTotalAmount(intent.getTotalAmount()).setCurrency(intent.getCurrency()).setVersion(intent.getVersion()).setPaymentLocked(intent.getSnapshotLocked());
         PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
         if (payment != null) { response.setPaymentIntentId(payment.getId()).setPaymentIntentNo(payment.getPaymentOrderNo()).setPaymentUrl(payment.getLinkUrl())
-                .setPaymentStatus(payment.getStatus()).setPaymentExpiresAt(payment.getExpiresAt()); response.setDisplayStatus("paid".equals(payment.getStatus()) ? "paid_pending_submission" : "waiting".equals(payment.getStatus()) || "created".equals(payment.getStatus()) ? "pending_payment" : "invalid"); }
-        else response.setDisplayStatus("order_draft"); return response;
+                .setPaymentStatus(payment.getStatus()).setPaymentExpiresAt(payment.getExpiresAt());
+            boolean cancelPending = payment.getCloseRequestedAt() != null && !"closed".equals(payment.getStatus()) && !"paid".equals(payment.getStatus());
+            response.setPaymentCancelPending(cancelPending).setPaymentCancelMessage(cancelPending ? payment.getCloseLastError() : null);
+            response.setDisplayStatus(cancelPending ? "cancel_pending" : "paid".equals(payment.getStatus()) ? "paid_pending_submission" : "waiting".equals(payment.getStatus()) || "created".equals(payment.getStatus()) ? "pending_payment" : "invalid"); }
+        else response.setDisplayStatus("order_draft").setPaymentCancelPending(false); return response;
     }
 
     /**
@@ -351,10 +421,10 @@ public class PurchaseIntentService {
     }
 
     /**
-     * 根据支付订单中的主体快照创建 AllinpayClient
-     * 如果快照为空或配置不完整，使用配置文件中的默认配置
+     * 根据支付订单中的主体快照创建 AllinpayClient。
+     * 包级可见：单元测试通过 spy 覆盖此方法注入模拟网关，避免真实调用通联。
      */
-    private AllinpayClient createAllinpayClient(PaymentIntentDO payment) {
+    AllinpayClient createAllinpayClient(PaymentIntentDO payment) {
         if (payment.getSubjectSnapshotJson() == null || payment.getSubjectSnapshotJson().isBlank()) {
             return new AllinpayClient(allinpayProperties);
         }

@@ -1575,10 +1575,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return result;
     }
 
+    /**
+     * 批量取当前审批轮次。
+     * <p>
+     * 注意：必须始终返回 {@link HashMap}。历史导入单的 current_approval_round_id 为空，
+     * 调用方统一写成 {@code rounds.get(order.getCurrentApprovalRoundId())}，而
+     * {@code Map.of()} 返回的不可变 Map 对 null key 是「抛 NPE」而不是「返回 null」，
+     * 只要当前页没有一条带轮次的订单就会整页 500。
+     */
     private Map<Long, SalesOrderApprovalRoundDO> getCurrentRounds(List<SalesOrderDO> orders) {
         List<Long> roundIds = orders.stream().map(SalesOrderDO::getCurrentApprovalRoundId).filter(Objects::nonNull).distinct().toList();
-        if (roundIds.isEmpty()) return Map.of();
         Map<Long, SalesOrderApprovalRoundDO> result = new HashMap<>();
+        if (roundIds.isEmpty()) return result;
         roundMapper.selectBatchIds(roundIds).forEach(round -> result.put(round.getId(), round));
         return result;
     }

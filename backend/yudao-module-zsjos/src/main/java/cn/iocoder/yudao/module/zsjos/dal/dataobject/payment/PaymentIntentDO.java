@@ -41,5 +41,9 @@ public class PaymentIntentDO extends TenantBaseDO {
     private LocalDateTime closedAt;
     private String closeReason;
     private LocalDateTime queriedAt;
+    /** 取消发起时间；非空且 status 仍为 waiting/expired 时表示取消结果待确认 */
+    private LocalDateTime closeRequestedAt;
+    private Integer closeAttempts;
+    private String closeLastError;
     private Integer version;
 }

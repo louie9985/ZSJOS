@@ -36,6 +36,22 @@ export function getPaymentLinkActionLabel(
   return purchaseIntent?.paymentUrl ? null : '生成支付链接'
 }
 
+export const paymentAlertType = (intent: Pick<PurchaseIntent, 'paymentStatus' | 'paymentCancelPending'>) => {
+  if (intent.paymentCancelPending) return 'warning' as const
+  if (intent.paymentStatus === 'paid') return 'success' as const
+  if (intent.paymentStatus === 'expired' || intent.paymentStatus === 'closed') return 'warning' as const
+  return 'info' as const
+}
+
+export const paymentAlertMessage = (intent: Pick<PurchaseIntent, 'paymentStatus' | 'paymentCancelPending' | 'paymentCancelMessage'>) => {
+  if (intent.paymentCancelPending) {
+    return `取消结果待确认${intent.paymentCancelMessage ? `：${intent.paymentCancelMessage}` : '，请稍后重试或刷新状态'}`
+  }
+  if (intent.paymentStatus === 'paid') return '通联已确认到账'
+  if (intent.paymentStatus === 'expired' || intent.paymentStatus === 'closed') return '支付链接已失效，可重新生成'
+  return '支付链接已生成'
+}
+
 function findRegion(areas: AreaNode[], path: string[]) {
   const province = areas.find(item => item.selectionCode === path[0])
   const city = province?.children?.find(item => item.selectionCode === path[1])
@@ -162,6 +178,20 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     } catch (error) { message.error(errorText(error)); return undefined }
     finally { setDraftSaving(false) }
   }
+  const cancelPaymentLink = async () => {
+    if (!purchaseIntent) return
+    setDraftSaving(true)
+    try {
+      const updated = await api.cancelPurchasePayment(purchaseIntent.id)
+      setPurchaseIntent(updated); setCollectionMode(updated.collectionMode)
+      message.success(updated.paymentCancelPending ? '取消结果待确认，请稍后重试或刷新状态' : '支付链接已取消，可修改金额后重新生成')
+    } catch (error) {
+      // 失败分两类：确定性拒绝（已到账/渠道不可用）与「取消结果待确认」。
+      // 两者都保持金额锁定；是否进入待确认态以后端 close_requested_at 为准，刷新一次即可。
+      message.error(errorText(error))
+      try { setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id)) } catch { /* 刷新失败不影响锁定状态 */ }
+    } finally { setDraftSaving(false) }
+  }
   const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
     ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const prepareSubmit = async () => {
@@ -242,13 +272,16 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Segmented block value={collectionMode} disabled={Boolean(purchaseIntent?.paymentLocked)} onChange={value => setCollectionMode(value as CollectionMode)}
             options={[{ label: '线上支付链接', value: 'online_link' }, { label: '线下已支付', value: 'offline_paid' }]}/>
           {collectionMode === 'online_link' && purchaseIntent?.paymentUrl && <Alert style={{ marginTop: 12 }} showIcon
-            type={purchaseIntent.paymentStatus === 'paid' ? 'success' : purchaseIntent.paymentStatus === 'expired' || purchaseIntent.paymentStatus === 'closed' ? 'warning' : 'info'}
-            message={purchaseIntent.paymentStatus === 'paid' ? '通联已确认到账' : purchaseIntent.paymentStatus === 'expired' || purchaseIntent.paymentStatus === 'closed' ? '支付链接已失效，可重新生成' : '支付链接已生成'}
+            type={paymentAlertType(purchaseIntent)}
+            message={paymentAlertMessage(purchaseIntent)}
             description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
               <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
               <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
-                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button>
-                {purchaseIntent.paymentStatus !== 'paid' && <Button danger size="small" onClick={async () => { const updated = await api.cancelPurchasePayment(purchaseIntent.id); setPurchaseIntent(updated); setCollectionMode(updated.collectionMode) }}>取消支付链接</Button>}</Space>
+                <Button size="small" icon={<ReloadOutlined/>} loading={draftSaving} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button>
+                {purchaseIntent.paymentStatus !== 'paid' && <IrreversiblePopconfirm danger
+                  action="取消支付链接并作废原链接"
+                  description="取消后原链接将无法继续支付，录单草稿保留。确认未到账并关闭支付后，可修改金额、重新生成链接。"
+                  onConfirm={cancelPaymentLink}><Button danger size="small" loading={draftSaving}>取消支付链接</Button></IrreversiblePopconfirm>}</Space>
             </Space>}/>}</>}
          {repurchase && <Form.Item name="repurchaseReason" label="复购说明"
            rules={[{ required: true, whitespace: true, message: '请填写复购说明' }, { max: 1000 }]}>

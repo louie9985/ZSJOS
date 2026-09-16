@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderDecisionReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyCursorReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderRepurchaseReqVO;
@@ -375,6 +376,29 @@ class SalesOrderServiceImplTest {
         verify(orderMapper, times(2)).selectByIdempotencyKey("key-1");
         verify(orderMapper, never()).selectActiveByLeadId(anyLong(), any());
         verify(orderMapper, never()).insert(any(SalesOrderDO.class));
+    }
+
+    @Test
+    void managementCursorToleratesOrdersWithoutApprovalRound() {
+        // 历史导入单的 current_approval_round_id 为空：整页都没有轮次时不能用 Map.of() 接收 null key，
+        // 否则 rounds.get(null) 抛 NPE，销售打开「我的订单」整页 500。
+        SalesOrderMyCursorReqVO reqVO = new SalesOrderMyCursorReqVO();
+        reqVO.setLimit(20);
+        SalesOrderDO legacy = new SalesOrderDO();
+        legacy.setId(100L); legacy.setCurrentApprovalRoundId(null); legacy.setOrderNo("OR202606080001");
+        legacy.setStatus(STATUS_EFFECTIVE); legacy.setStudentName("历史学员"); legacy.setTotalAmount(BigDecimal.TEN);
+        legacy.setUpdateTime(LocalDateTime.of(2026, 6, 8, 10, 0));
+        when(permissionService.resolveManagementScope(20L)).thenReturn(new SalesOrderManagementScope(true, false, Set.of(), Set.of()));
+        when(orderMapper.selectManagementCursor(any(), eq(null), eq(null), eq(null), eq(null), eq(null), eq(21)))
+                .thenReturn(List.of(legacy));
+        when(itemMapper.selectListByOrderIds(List.of(100L))).thenReturn(List.of());
+
+        var result = service.getManagementCursorPage(reqVO, 20L);
+
+        assertEquals(1, result.getList().size());
+        assertEquals("OR202606080001", result.getList().getFirst().getOrderNo());
+        assertNull(result.getList().getFirst().getApprovalRoundNo());
+        verify(roundMapper, never()).selectBatchIds(any());
     }
 
     @Test

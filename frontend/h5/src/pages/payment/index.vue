@@ -14,7 +14,10 @@ const paying = ref(false)
 const error = ref('')
 const inWechat = /MicroMessenger/i.test(navigator.userAgent)
 const expired = computed(() => ['expired', 'closed'].includes(detail.value?.status || ''))
-
+// 销售主动取消后旧链接作废，客户再打开时给出明确指引，避免反复尝试支付
+const invalidNotice = computed(() => detail.value?.status === 'closed'
+  ? '该支付链接已取消，请联系销售获取新链接'
+  : '该支付链接已失效，请联系销售重新生成')
 onMounted(async () => {
   if (!no || !token) { error.value = '支付链接无效'; loading.value = false; return }
   try {
@@ -43,7 +46,7 @@ const payAlipay = async () => {
       <div class="merchant">中世健</div>
       <div class="amount"><span>¥</span>{{ Number(detail.amount).toFixed(2) }}</div>
       <div class="description">{{ detail.description }}</div>
-      <van-notice-bar v-if="expired" color="#8a3d12" background="#fff2e8" text="该支付链接已失效，请联系销售重新生成" />
+      <van-notice-bar v-if="expired" color="#8a3d12" background="#fff2e8" :text="invalidNotice" />
       <div v-else class="payment-actions">
         <form v-if="inWechat" :action="wechatOrderAction(no)" method="post">
           <input type="hidden" name="token" :value="token" />

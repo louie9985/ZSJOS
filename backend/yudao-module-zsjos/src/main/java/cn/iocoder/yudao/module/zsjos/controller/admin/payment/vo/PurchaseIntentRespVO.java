@@ -28,4 +28,7 @@ public class PurchaseIntentRespVO {
     private String paymentStatus;
     private LocalDateTime paymentExpiresAt;
     private Boolean paymentLocked;
+    /** 已发起取消但通联关单结果未确认；为 true 时金额仍锁定且不允许生成新链接 */
+    private Boolean paymentCancelPending;
+    private String paymentCancelMessage;
 }

@@ -108,6 +108,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_SUBJECT_CODE_DUPLICATE = new ErrorCode(1_900_017_016, "支付主体编码已存在");
     ErrorCode PAYMENT_SUBJECT_DISABLED = new ErrorCode(1_900_017_017, "支付主体已停用");
     ErrorCode PAYMENT_SUBJECT_NOT_CONFIGURED = new ErrorCode(1_900_017_018, "产品未配置支付主体，无法使用线上支付");
+    ErrorCode PAYMENT_CANCEL_PENDING = new ErrorCode(1_900_017_019, "取消结果待确认，请稍后重试或刷新状态");
+    ErrorCode PAYMENT_ALREADY_PAID = new ErrorCode(1_900_017_020, "该笔支付已到账，无法取消支付链接");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
