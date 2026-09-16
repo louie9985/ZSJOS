@@ -110,7 +110,8 @@ const FIELD_TYPE_NAMES: Record<number, string> = {
   [FieldType.TEXTAREA]: '多行文本',
   [FieldType.NUMBER]: '数字',
   [FieldType.DATE]: '日期',
-  [FieldType.SELECT]: '下拉选择'
+  [FieldType.SELECT]: '下拉选择',
+  [FieldType.FILE]: '图片/附件'
 }
 const fieldTypeName = (type: number) => FIELD_TYPE_NAMES[type] ?? '未知'
 

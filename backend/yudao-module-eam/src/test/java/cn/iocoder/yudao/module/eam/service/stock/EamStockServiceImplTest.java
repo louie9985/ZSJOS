@@ -61,6 +61,19 @@ class EamStockServiceImplTest {
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void candidates_shouldIgnoreDeviceIdentityButMatchOtherAttributes() {
+        EamDemandItemDO item = batchItem();
+        item.setManagementMode(EamManagementModeEnum.SERIALIZED.getMode());
+        item.setExtFields(Map.of("memory", "16G"));
+        EamAssetDO matching = new EamAssetDO().setId(50L).setExtFields(Map.of("memory", "16G", "sn", "SN-1"));
+        EamAssetDO other = new EamAssetDO().setId(51L).setExtFields(Map.of("memory", "8G", "sn", "SN-2"));
+        when(assetMapper.selectIdleListByCategoryId(item.getCategoryId())).thenReturn(List.of(matching, other));
+        var candidates = stockService.getCandidates(item);
+        assertEquals(1, candidates.size());
+        assertEquals(50L, candidates.get(0).getAssetId());
+    }
+
+    @Test
     void reserveBatch_shouldFailWhenAtomicAvailabilityUpdateLosesRace() {
         EamDemandItemDO item = batchItem();
         EamStockBalanceDO balance = matchingBalance(item);

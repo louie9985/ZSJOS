@@ -95,7 +95,7 @@ class EamCategoryImportServiceImplTest {
 
         assertEquals(38, result.getCategoryCount());
         assertEquals(31, result.getLeafCategoryCount());
-        assertEquals(69, result.getFieldCount());
+        assertEquals(70, result.getFieldCount());
         assertEquals(0, result.getConflictCount());
         assertTrue(result.getAllManagementFieldsOptional());
     }

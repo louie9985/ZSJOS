@@ -60,11 +60,19 @@ class EamAssetLedgerParserTest {
     }
 
     @Test
-    void parse_shouldReportInvalidStandardFieldTypes() throws Exception {
+    void parse_shouldRejectPopulatedRetiredColumns() throws Exception {
         EamAssetLedgerParser.LedgerRow actual = parser.parse(workbook(Map.of(
                 "分类编码", "BOOK", "资产名称", "教材", "原值", "十二元",
                 "预计使用年限（月）", "1.5", "保修到期日", "待确认"))).get(0);
         assertEquals(3, actual.errors().size());
+    }
+
+    @Test
+    void parse_shouldReadCustomSerialWithoutFixedField() throws Exception {
+        EamAssetLedgerParser.LedgerRow row = parser.parse(workbook(Map.of(
+                "分类编码", "IT-COMPUTER", "资产名称", "电脑", "sn:序列号", "SN-001"))).get(0);
+        assertTrue(row.errors().isEmpty());
+        assertEquals("SN-001", row.extFields().get("sn"));
     }
 
     @Test

@@ -41,9 +41,9 @@ export const useUpload = (directory?: string, isAvatar = false) => {
           },
           onUploadProgress: uploadProgressHandler
         })
-        .then(() => {
-          // 1.4. 记录文件信息到后端（异步）
-          createFile(presignedInfo, options.file, fileName)
+        .then(async () => {
+          // 文件登记成功后才能回写业务表单，避免生成没有文件记录的附件。
+          await createFile(presignedInfo, options.file, fileName)
           // 通知成功，数据格式保持与后端上传的返回结果一致
           return { data: presignedInfo.url }
         })
@@ -88,8 +88,7 @@ function createFile(vo: FileApi.FilePresignedUrlRespVO, file: UploadRawFile, fil
     type: file.type || 'application/octet-stream',
     size: file.size
   }
-  FileApi.createFile(fileVo)
-  return fileVo
+  return FileApi.createFile(fileVo)
 }
 
 /**

@@ -59,7 +59,8 @@ public class EamStockServiceImpl implements EamStockService {
 
     @Override
     public List<EamStockCandidateRespVO> getCandidates(EamDemandItemDO demandItem) {
-        String signature = signature(demandItem.getExtFields());
+        String signature = EamManagementModeEnum.SERIALIZED.getMode().equals(demandItem.getManagementMode())
+                ? serializedSignature(demandItem.getExtFields()) : signature(demandItem.getExtFields());
         List<EamStockCandidateRespVO> result = new ArrayList<>();
         if (EamManagementModeEnum.BATCH.getMode().equals(demandItem.getManagementMode())) {
             for (EamStockBalanceDO balance : balanceMapper.selectAvailableCandidates(demandItem.getCategoryId(),
@@ -76,7 +77,7 @@ public class EamStockServiceImpl implements EamStockService {
             }
         } else if (EamManagementModeEnum.SERIALIZED.getMode().equals(demandItem.getManagementMode())) {
             for (EamAssetDO asset : assetMapper.selectIdleListByCategoryId(demandItem.getCategoryId())) {
-                if (!Objects.equals(signature(asset.getExtFields()), signature)
+                if (!Objects.equals(serializedSignature(asset.getExtFields()), signature)
                         || reservationMapper.selectActiveByAssetId(asset.getId()) != null
                         || holdingMapper.selectOpenByAssetId(asset.getId()) != null) {
                     continue;
@@ -167,7 +168,7 @@ public class EamStockServiceImpl implements EamStockService {
             EamAssetDO asset = assetMapper.selectByIdForUpdate(reqVO.getAssetId());
             if (asset == null || !EamAssetStatusEnum.IDLE.getStatus().equals(asset.getStatus())
                     || !item.getCategoryId().equals(asset.getCategoryId())
-                    || !signature(item.getExtFields()).equals(signature(asset.getExtFields()))
+                    || !serializedSignature(item.getExtFields()).equals(serializedSignature(asset.getExtFields()))
                     || reservationMapper.selectActiveByAssetId(asset.getId()) != null
                     || holdingMapper.selectOpenByAssetId(asset.getId()) != null) {
                 throw exception(STOCK_CANDIDATE_INVALID);
@@ -361,6 +362,13 @@ public class EamStockServiceImpl implements EamStockService {
         movement.setOperateTime(LocalDateTime.now());
         movement.setRemark(remark);
         movementMapper.insert(movement);
+    }
+
+    private String serializedSignature(Map<String, Object> extFields) {
+        Map<String, Object> attributes = new TreeMap<>(extFields == null ? Map.of() : extFields);
+        // 序列号标识单台设备，不属于单件库存规格；批量库存仍匹配完整属性。
+        attributes.remove("sn");
+        return signature(attributes);
     }
 
     private String signature(Map<String, Object> extFields) {

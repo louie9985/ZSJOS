@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.framework.allinpay.AllinpayClient;
 import cn.iocoder.yudao.module.zsjos.framework.allinpay.AllinpayProperties;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
+import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class PurchaseIntentService {
     @Resource private PaymentSubjectService paymentSubjectService;
     @Resource private ProductPaymentSubjectService productPaymentSubjectService;
     @Resource private PaymentClosePendingRecorder closePendingRecorder;
+    @Resource private ZsjosProductSkuService productSkuService;
 
     public PurchaseIntentRespVO current(PurchaseIntentSaveDraftReqVO request, Long userId) {
         resolvePerson(request, false);
@@ -122,13 +124,21 @@ public class PurchaseIntentService {
         // 选择支付主体：多个产品走学校主体，单个产品走配置的主体（未配置则走默认）
         PaymentSubjectDO paymentSubject = selectPaymentSubject(request.getItems());
 
+        // Freeze display labels from the owning product service, not client-supplied names.
+        List<PaymentProductSnapshot> productItems = JsonUtils.parseArray(intent.getItemSnapshotJson(),
+                PurchaseIntentSaveDraftReqVO.Item.class).stream().map(item -> {
+            var product = productSkuService.validateLeadProduct(item.getSpuRef(), false, item.getSkuRef(), false);
+            return new PaymentProductSnapshot(item.getSpuRef(), item.getSkuRef(), item.getActualAmount(),
+                    product.skuName(), product.name(), product.displaySpecs());
+        }).toList();
+
         String token = randomToken();
         String no = "PAY" + LocalDateTime.now().toString().replaceAll("\\D", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         LocalDateTime expires = LocalDateTime.now().plusHours(Math.max(1, allinpayProperties.getLinkTtlHours()));
         PaymentIntentDO payment = new PaymentIntentDO();
         payment.setPaymentOrderNo(no).setPurchaseIntentId(intent.getId()).setLeadId(intent.getLeadId()).setPersonId(intent.getPersonId())
                 .setOpportunityId(intent.getOpportunityId()).setStatus("created").setExpectedAmount(intent.getTotalAmount()).setCurrency("CNY")
-                .setProductItemsSnapshot(intent.getItemSnapshotJson()).setInitiatorUserId(userId).setLinkTokenHash(SecureUtil.sha256(token))
+                .setProductItemsSnapshot(JsonUtils.toJsonString(productItems)).setInitiatorUserId(userId).setLinkTokenHash(SecureUtil.sha256(token))
                 .setExpiresAt(expires).setProvider("allinpay").setVersion(0)
                 .setSubjectSnapshotJson(JsonUtils.toJsonString(paymentSubject));
         String base = allinpayProperties.getPublicBaseUrl();
@@ -257,6 +267,10 @@ public class PurchaseIntentService {
                 .setCurrency(payment.getCurrency()).setStatus(payment.getStatus()).setExpiresAt(payment.getExpiresAt());
         List<PurchaseIntentSaveDraftReqVO.Item> items = JsonUtils.parseArray(payment.getProductItemsSnapshot(), PurchaseIntentSaveDraftReqVO.Item.class);
         response.setDescription(items.isEmpty() ? "课程服务" : StrUtil.blankToDefault(items.get(0).getSkuName(), items.get(0).getSkuRef()));
+        List<PaymentProductSnapshot> snapshots = StrUtil.isBlank(payment.getProductItemsSnapshot()) ? List.of()
+                : JsonUtils.parseArray(payment.getProductItemsSnapshot(), PaymentProductSnapshot.class);
+        response.setItems(snapshots.stream().map(item -> new PublicPaymentDetailRespVO.Item(
+                item.productName(), item.skuName(), item.actualAmount(), item.specs())).toList());
         return response;
     }
 

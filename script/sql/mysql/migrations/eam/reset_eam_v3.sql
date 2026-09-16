@@ -103,7 +103,8 @@ INSERT INTO eam_category(parent_id,name,code,sort,status,management_mode,unit,re
 (@eam_category_other_id,'其他资产','OTHER-ASSET',1,0,1,'个','V3','eam-v3','eam-v3',1);
 
 INSERT INTO eam_category_field(category_id,field_key,field_name,field_type,option_source,dict_type,required,admin_visible,collection_visible,collection_required,sort,creator,updater,tenant_id)
-SELECT id,'device_model','机型',5,'SYSTEM_DICT','eam_device_model',b'0',b'1',b'1',b'0',10,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'
+SELECT id,'sn','序列号',1,NULL,NULL,b'0',b'1',b'1',b'0',5,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT' AND parent_id=0 AND tenant_id=1
+UNION ALL SELECT id,'device_model','机型',5,'SYSTEM_DICT','eam_device_model',b'0',b'1',b'1',b'0',10,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'
 UNION ALL SELECT id,'cpu','CPU',1,NULL,NULL,b'0',b'1',b'1',b'0',20,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'
 UNION ALL SELECT id,'memory','内存',1,NULL,NULL,b'0',b'1',b'1',b'0',30,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'
 UNION ALL SELECT id,'disk','硬盘',1,NULL,NULL,b'0',b'1',b'1',b'0',40,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'

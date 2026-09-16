@@ -54,12 +54,12 @@ ZSJOS business operations **MUST** enforce three independent and cumulative laye
 ## Database and SQL
 
 - Schema and initialization changes **MUST** preserve tenant rules, logical deletion conventions, audit columns, indexes, and established naming patterns.
-- Do not modify an applied historical migration. Add a new migration or confirmed initialization script as appropriate to the repository's current mechanism.
+- Follow root AGENTS.md section 4 for migration compatibility: when work is development-only and no deployed upgrade compatibility is required, correct the original script and synchronize the development database. When deployed environments require upgrade compatibility, preserve historical scripts and add an upgrade migration. Execution in the development database alone does not make a script immutable.
 - Initialization scripts **MUST** define deletion scope, dependency order, key relationships, repeatability, and recovery expectations before execution.
 
 ## Verification commands
 
-For module behavior, run from the repository root:
+For module behavior, select focused tests and applicable compile checks under root AGENTS.md section 6. The following is a module-wide entry point from the repository root, not a mandatory full reactor test run for every edit; use existing test filters when the affected scope is narrower:
 
 ```powershell
 mvn -f backend/pom.xml -pl yudao-module-zsjos -am test
@@ -71,5 +71,5 @@ When changes affect application assembly, scanning, configuration, or runtime wi
 mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package
 ```
 
-- Add focused tests for changed service behavior, authorization, error mapping, and persistence relationships. Permission changes **MUST** cover feature allowed/denied, list in-scope/out-of-scope, object read/write/owner or action checks, batch mixed authorization, tenant isolation, and applicable administrator behavior.
-- Report environment-dependent checks such as MySQL, Redis, tenant data, or real HTTP requests separately.
+- Use or add focused tests for changed service behavior, authorization, error mapping, and persistence relationships. Permission changes **MUST** cover the affected feature allowed/denied, list in-scope/out-of-scope, object read/write/owner or action checks, batch mixed authorization, tenant isolation, and administrator behavior as applicable. A shared authorization change requires all affected paths, not just the edited caller.
+- Report environment-dependent checks such as MySQL, Redis, tenant data, or real HTTP requests separately. Distinguish necessary checks blocked by the environment from inapplicable checks. Reuse valid results; rerun or broaden checks only for new changes, failures or unresolved risks.

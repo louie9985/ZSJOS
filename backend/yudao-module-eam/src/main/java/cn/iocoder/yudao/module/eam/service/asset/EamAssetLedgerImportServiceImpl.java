@@ -226,16 +226,9 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
         asset.setManagementMode(managementMode);
         asset.setQuantity(EamManagementModeEnum.isBatch(managementMode) ? row.quantity() : 1);
         asset.setUnit(StrUtil.blankToDefault(category.getUnit(), "个"));
-        asset.setBrand(StrUtil.emptyToNull(row.brand()));
-        asset.setBarcode(StrUtil.emptyToNull(row.barcode()));
-        asset.setSn(StrUtil.emptyToNull(row.sn()));
         asset.setPurchaseDate(row.purchaseDate());
-        asset.setOriginalValue(parseDecimal(row.mappedFields().get("原值")));
-        asset.setNetValue(parseDecimal(row.mappedFields().get("净值")));
         asset.setSource(item.sourceSelection().value());
         asset.setSourceLabelSnapshot(item.sourceSelection().label());
-        asset.setWarrantyDate(EamAssetLedgerParser.parseDate(String.valueOf(row.mappedFields().getOrDefault("保修到期日", ""))));
-        asset.setExpectedLife(parseInteger(row.mappedFields().get("预计使用年限（月）")));
         asset.setLocation(StrUtil.emptyToNull(row.location()));
         asset.setRemark(StrUtil.emptyToNull(row.remark()));
         asset.setUseEmployeeNameSnapshot(StrUtil.emptyToNull(row.useUserName()));
@@ -252,16 +245,6 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
         asset.setExtFieldLabels(normalized.labels());
         asset.setExtFieldDictTypes(normalized.dictTypes());
         return asset;
-    }
-
-    private static java.math.BigDecimal parseDecimal(Object value) {
-        if (value == null || StrUtil.isBlank(String.valueOf(value))) return null;
-        try { return new java.math.BigDecimal(String.valueOf(value)); } catch (NumberFormatException e) { return null; }
-    }
-
-    private static Integer parseInteger(Object value) {
-        if (value == null || StrUtil.isBlank(String.valueOf(value))) return null;
-        try { return new java.math.BigDecimal(String.valueOf(value)).intValueExact(); } catch (Exception e) { return null; }
     }
 
     private SourceSelection resolveSource(Object raw, List<String> errors) {

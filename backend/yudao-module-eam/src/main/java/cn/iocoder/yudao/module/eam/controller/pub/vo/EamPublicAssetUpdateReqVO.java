@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -22,19 +21,11 @@ public class EamPublicAssetUpdateReqVO {
     private Long categoryId;
 
     private Integer quantity;
-    private String brand;
-    private String specification;
-    private String sn;
-    private String barcode;
-    private BigDecimal originalValue;
-    private BigDecimal netValue;
     private LocalDate purchaseDate;
     private Integer source;
-    private LocalDate warrantyDate;
     private Long useDeptId;
     private Long useEmployeeId;
     private String location;
-    private Integer expectedLife;
     private String remark;
     private Map<String, Object> extFields;
 

@@ -46,7 +46,7 @@ Lead / Person 跟进 -> PurchaseIntent 草稿
 
 | 方法 | 路径 | 返回 |
 |---|---|---|
-| GET | `/public-api/zsjos/payment/{no}?token=...` | 金额、摘要、状态、有效期 |
+| GET | `/public-api/zsjos/payment/{no}?token=...` | 金额、摘要、状态、有效期及商品展示快照 `items` |
 | POST JSON | `/public-api/zsjos/payment/{no}/order` | 支付宝返回验签后的 `payinfo` |
 | POST FORM | `/public-api/zsjos/payment/{no}/order` | 微信返回自动 POST 到通联的 HTML |
 | POST | `/public-api/zsjos/payment/{no}/status` | 查单后返回是否已确认到账 |
@@ -93,6 +93,31 @@ paytype=A01, notify_url, signtype=RSA, randomstr, sign
 Workbench `SalesOrderEntryModal` 使用分段控件选择线上链接或线下已支付，共用原表单。提供保存草稿、生成支付链接、失效后重新生成支付链接、刷新状态、复制链接和提交审批。线上链接生成后禁用主体、SKU、金额；未到账禁止提交；到账后仍需补齐正式字段并上传凭证。successor 只补正订单。
 
 H5 提供 `/pay/:paymentIntentNo` 和 `/payment-result`。微信支付只在微信内展示并以 FORM 发起；支付宝在微信内提示外部浏览器打开。结果页使用 sessionStorage 的短期会话轮询后端；超时或查询异常只显示“结果待确认”，不显示支付失败。
+
+公开支付页采用方案 B：公司 Logo → 本次应付金额 → 成交产品明细 → 支付按钮。
+Logo 使用 `https://www.zsjedc.com/logo.png`，不可用时显示中世健文字。明细显示产品名称、
+SKU 名称和规格标签、成交价格，不显示“SKU：”前缀。应付金额直接使用支付单 `amount`，
+不从目录标价或前端明细合计推导。加载失败保留错误原因并支持重试，失效链接隐藏支付按钮。
+
+公开详情新增 `items: [{ productName, skuName, actualAmount, specs }]`，`specs` 沿用
+`ProductSpecVO` 的 `attrKey/attrName/value/label/labelMissing` 快照契约。
+新支付单生成时通过 `ZsjosProductSkuService.validateLeadProduct` 获取服务端产品与规格标签，
+连同已保存草稿的商品引用和成交金额写入现有 `product_items_snapshot` JSON；不采用客户端
+提交的展示名称，不改草稿请求、锁定快照比较或付款金额。有效支付链接复用时不刷新展示快照。
+公开明细只投影展示字段，不返回商品内部引用或支付主体配置。
+
+旧支付单不补写、不查询当前目录重新贴标签；保留已有 SKU 名称与成交金额，缺失产品名称或
+规格时明确显示“未记录”。`description` 保留原语义兼容旧前端，新 H5 不把它作为产品名称，
+避免展示内部 SKU 引用。旧后端没有 `items` 时显示明细未记录提示；发布顺序为后端后 H5。
+本次不涉及数据库迁移、Admin/Workbench 命令变更或支付宝通道修复。
+
+支付页定向验证：后端执行
+`mvn -f backend/pom.xml -pl yudao-module-zsjos -am -Dtest=PublicPaymentDetailTest -Dsurefire.failIfNoSpecifiedTests=false test`；
+H5 执行 `node --test tests/payment-page.test.mjs` 和 `npm run build`。
+构建后可运行 `node tests/payment-browser-server.mjs`，使用
+`http://localhost:5187/pay/multi?token=fixture` 检查实际产物；路径中的 `multi` 可换为
+`single/legacy/empty/error/retry/expired/loading`。此服务仅绑定本机，返回明确的测试数据，
+任何支付 POST 都被拒绝，不代表真实支付联调通过。
 
 ## 7. 配置示例
 

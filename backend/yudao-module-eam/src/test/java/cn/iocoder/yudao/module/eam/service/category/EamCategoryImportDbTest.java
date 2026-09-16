@@ -47,10 +47,10 @@ class EamCategoryImportDbTest extends BaseDbUnitTest {
         EamCategoryImportRespVO result = importService.commit(content);
 
         assertEquals(38, result.getCategoryCount());
-        assertEquals(107, result.getCreateCount());
-        assertEquals(69, result.getFieldCount());
+        assertEquals(108, result.getCreateCount());
+        assertEquals(70, result.getFieldCount());
         assertEquals(38, categoryMapper.selectList().size());
-        assertEquals(69, fieldMapper.selectCount());
+        assertEquals(70, fieldMapper.selectCount());
         Set<Long> categoryIds = categoryMapper.selectList().stream().map(category -> category.getId()).collect(Collectors.toSet());
         assertEquals(7, categoryMapper.selectList().stream().filter(category -> category.getParentId() == 0L).count());
         assertEquals(31, categoryMapper.selectList().stream().filter(category -> category.getParentId() != 0L).count());
@@ -64,9 +64,9 @@ class EamCategoryImportDbTest extends BaseDbUnitTest {
         EamCategoryImportRespVO repeated = importService.commit(content);
         assertEquals(0, repeated.getCreateCount());
         assertEquals(0, repeated.getUpdateCount());
-        assertEquals(107, repeated.getSkipCount());
+        assertEquals(108, repeated.getSkipCount());
         assertEquals(38, categoryMapper.selectList().size());
-        assertEquals(69, fieldMapper.selectCount());
+        assertEquals(70, fieldMapper.selectCount());
     }
 
     @Test
@@ -84,7 +84,7 @@ class EamCategoryImportDbTest extends BaseDbUnitTest {
 
         assertEquals(0, result.getConflictCount());
         assertEquals(38, categoryMapper.selectList().size());
-        assertEquals(69, fieldMapper.selectCount());
+        assertEquals(70, fieldMapper.selectCount());
     }
 
     private byte[] templateContent() throws Exception {

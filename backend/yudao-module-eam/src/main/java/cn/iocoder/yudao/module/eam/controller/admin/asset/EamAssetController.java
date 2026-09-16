@@ -6,7 +6,6 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetChangeLogRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportPreviewRespVO;
@@ -18,6 +17,7 @@ import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetChangeLogService;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
+import cn.iocoder.yudao.module.eam.service.asset.EamAssetExportService;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetLedgerImportService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.publicedit.EamPublicEditService;
@@ -70,6 +70,8 @@ public class EamAssetController {
 
     @Resource
     private EamAssetService assetService;
+    @Resource
+    private EamAssetExportService assetExportService;
     @Resource
     private EamAssetLedgerImportService ledgerImportService;
     @Resource
@@ -158,8 +160,7 @@ public class EamAssetController {
         reqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         List<EamAssetDO> list = assetService.getAssetPage(reqVO,
                 cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getList();
-        ExcelUtils.write(response, "资产台账.xlsx", "资产列表",
-                EamAssetRespVO.class, buildAssetVOList(list));
+        assetExportService.write(response, buildAssetVOList(list));
     }
 
     @GetMapping("/qrcode")

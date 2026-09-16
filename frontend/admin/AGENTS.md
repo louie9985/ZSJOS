@@ -21,7 +21,7 @@ instructions.
 
 ## Verification commands
 
-Run checks appropriate to the change from this directory:
+Select checks under root AGENTS.md section 6 from this directory. These are entry points, not a requirement to run all commands for every edit; file-rewriting lint/format operations remain scoped under the change rules above:
 
 ```powershell
 pnpm ts:check
@@ -30,6 +30,6 @@ pnpm build:local
 ```
 
 - Use the build mode required by the task when it is not `local`.
-- Visual or interaction changes **MUST** be verified in a real browser at relevant desktop and mobile widths.
-- Report any skipped check and why it could not run.
-
+- Visual or interaction changes **MUST** be verified in a real browser on the affected flows and widths. Shared layout or responsive changes require both desktop and mobile widths; bundling, dependencies, routes, assets, build configuration or release acceptance require a production build.
+- Permission/authentication/tenant changes require the affected allowed/denied and isolation cases. Verify every affected consumer of a shared contract under the root rules.
+- Report necessary checks blocked by the environment and their residual risks separately from checks that do not apply. Reuse valid results; rerun or broaden checks only for new changes, failures or unresolved risks.

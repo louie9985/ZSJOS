@@ -25,6 +25,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
     default WorkOrderDO selectByOrderNo(String orderNo) { return selectOne(generic().eq(WorkOrderDO::getOrderNo, orderNo)); }
     default WorkOrderDO selectByIdempotencyKey(String key) { return selectOne(generic().eq(WorkOrderDO::getIdempotencyKey, key)); }
     default PageResult<WorkOrderDO> selectPool(PageParam page, String sceneCode) { return selectPage(page, generic().eq(sceneCode != null, WorkOrderDO::getSceneCode, sceneCode).in(WorkOrderDO::getStatus, "POOL", "AVAILABLE").orderByAsc(WorkOrderDO::getCreateTime)); }
+    // JSON_TABLE is not supported by the tenant SQL parser; match numeric scope IDs without expanding rows.
     @Select("""
             SELECT wo.* FROM zsjos_work_order wo
             JOIN system_users u ON u.id=#{userId} AND u.deleted=0 AND u.status=0
@@ -33,16 +34,18 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
               AND (wo.target_dept_id IS NULL OR wo.target_dept_id=u.dept_id)
               AND (
                 (wo.candidate_qualification_mode='ROLE' AND EXISTS (
-                  SELECT 1 FROM JSON_TABLE(wo.candidate_role_scopes_json, '$[*]' COLUMNS(scope_id BIGINT PATH '$.id')) s
-                  JOIN system_user_role ur ON ur.role_id=s.scope_id AND ur.user_id=u.id AND ur.deleted=0
-                  JOIN system_role r ON r.id=ur.role_id AND r.deleted=0 AND r.status=0))
-                OR (wo.candidate_qualification_mode='DEPARTMENT' AND EXISTS (
-                  SELECT 1 FROM JSON_TABLE(wo.candidate_dept_scopes_json, '$[*]' COLUMNS(scope_id BIGINT PATH '$.id')) s WHERE s.scope_id=u.dept_id))
-                OR (wo.candidate_qualification_mode='ROLE_AND_DEPARTMENT' AND EXISTS (
-                  SELECT 1 FROM JSON_TABLE(wo.candidate_dept_scopes_json, '$[*]' COLUMNS(scope_id BIGINT PATH '$.id')) d WHERE d.scope_id=u.dept_id)
-                  AND EXISTS (SELECT 1 FROM JSON_TABLE(wo.candidate_role_scopes_json, '$[*]' COLUMNS(scope_id BIGINT PATH '$.id')) s
-                  JOIN system_user_role ur ON ur.role_id=s.scope_id AND ur.user_id=u.id AND ur.deleted=0
-                  JOIN system_role r ON r.id=ur.role_id AND r.deleted=0 AND r.status=0))
+                  SELECT 1 FROM system_user_role ur
+                  JOIN system_role r ON r.id=ur.role_id AND r.deleted=0 AND r.status=0
+                  WHERE ur.user_id=u.id AND ur.deleted=0
+                    AND JSON_CONTAINS(wo.candidate_role_scopes_json, JSON_OBJECT('id', ur.role_id))))
+                OR (wo.candidate_qualification_mode='DEPARTMENT'
+                    AND JSON_CONTAINS(wo.candidate_dept_scopes_json, JSON_OBJECT('id', u.dept_id)))
+                OR (wo.candidate_qualification_mode='ROLE_AND_DEPARTMENT'
+                    AND JSON_CONTAINS(wo.candidate_dept_scopes_json, JSON_OBJECT('id', u.dept_id))
+                  AND EXISTS (SELECT 1 FROM system_user_role ur
+                  JOIN system_role r ON r.id=ur.role_id AND r.deleted=0 AND r.status=0
+                  WHERE ur.user_id=u.id AND ur.deleted=0
+                    AND JSON_CONTAINS(wo.candidate_role_scopes_json, JSON_OBJECT('id', ur.role_id))))
               ) ORDER BY wo.create_time ASC
             """)
     IPage<WorkOrderDO> selectEligiblePool(IPage<WorkOrderDO> page, @Param("sceneCode") String sceneCode, @Param("userId") Long userId);

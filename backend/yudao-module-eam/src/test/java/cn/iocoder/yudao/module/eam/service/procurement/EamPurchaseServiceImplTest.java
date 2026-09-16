@@ -179,7 +179,7 @@ class EamPurchaseServiceImplTest {
 
         ArgumentCaptor<EamAssetSaveReqVO> assetCaptor = ArgumentCaptor.forClass(EamAssetSaveReqVO.class);
         verify(assetService).createAsset(assetCaptor.capture());
-        assertEquals(null, assetCaptor.getValue().getSn());
+        assertEquals(null, assetCaptor.getValue().getExtFields().get("sn"));
         assertEquals(item.getExtFields(), assetCaptor.getValue().getExtFields());
         ArgumentCaptor<EamReceiptItemDO> receiptCaptor = ArgumentCaptor.forClass(EamReceiptItemDO.class);
         verify(receiptItemMapper).insert(receiptCaptor.capture());
@@ -263,6 +263,39 @@ class EamPurchaseServiceImplTest {
 
         verify(assetService).applyChange(eq(60L), eq(EamAssetStatusEnum.RETURNED_TO_SUPPLIER.getStatus()),
                 eq(null), eq(null), anyInt(), any(), eq("供应商退货"));
+    }
+
+    @Test
+    void receiveSerialized_shouldStoreEachSerialInCustomFields() {
+        EamPurchaseDO purchase = purchase(2);
+        EamPurchaseItemDO item = item(EamManagementModeEnum.SERIALIZED.getMode(), 2);
+        var field = new cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryFieldDO();
+        field.setFieldKey("sn");
+        when(categoryFieldService.getEffectiveFieldList(item.getCategoryId())).thenReturn(List.of(field));
+        when(purchaseMapper.selectByIdForUpdate(1L)).thenReturn(purchase);
+        when(purchaseItemMapper.selectByIdForUpdate(10L)).thenReturn(item);
+        when(assetService.createAsset(any(EamAssetSaveReqVO.class))).thenReturn(60L, 61L);
+        when(assetMapper.selectById(60L)).thenReturn(new EamAssetDO().setAssetCode("EAM-60"));
+        when(assetMapper.selectById(61L)).thenReturn(new EamAssetDO().setAssetCode("EAM-61"));
+        when(purchaseItemMapper.selectListByPurchaseId(1L)).thenReturn(List.of(item));
+        service.receive(1L, receiptRequest(10L, 2, null, List.of(" SN-1 ", "SN-2")));
+        ArgumentCaptor<EamAssetSaveReqVO> captor = ArgumentCaptor.forClass(EamAssetSaveReqVO.class);
+        verify(assetService, times(2)).createAsset(captor.capture());
+        assertEquals(Map.of("sn", "SN-1"), captor.getAllValues().get(0).getExtFields());
+        assertEquals(Map.of("sn", "SN-2"), captor.getAllValues().get(1).getExtFields());
+        verify(assetMapper).selectBySnAndCategoryId("SN-1", item.getCategoryId());
+        verify(assetMapper).selectBySnAndCategoryId("SN-2", item.getCategoryId());
+    }
+
+    @Test
+    void receiveSerialized_shouldRejectSerialForUnconfiguredCategory() {
+        EamPurchaseItemDO item = item(EamManagementModeEnum.SERIALIZED.getMode(), 1);
+        when(purchaseMapper.selectByIdForUpdate(1L)).thenReturn(purchase(2));
+        when(purchaseItemMapper.selectByIdForUpdate(10L)).thenReturn(item);
+        org.junit.jupiter.api.Assertions.assertThrows(
+                cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.receive(1L, receiptRequest(10L, 1, null, List.of("SN-1"))));
+        org.mockito.Mockito.verifyNoInteractions(assetService);
     }
 
     private EamPurchaseDO purchase(int status) {

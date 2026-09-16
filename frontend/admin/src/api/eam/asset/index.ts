@@ -10,23 +10,15 @@ export interface AssetVO {
   quantity?: number
   unit?: string
   status?: number
-  brand?: string
-  specification?: string
-  sn?: string
-  barcode?: string
-  originalValue?: number
-  netValue?: number
   purchaseDate?: string
   source?: number
   sourceLabelSnapshot?: string
-  warrantyDate?: string
   useDeptId?: number
   useDeptName?: string
   useEmployeeId?: number
   useEmployeeName?: string
   useEmployeeNameSnapshot?: string
   location?: string
-  expectedLife?: number
   remark?: string
   fileUrls?: string[]
   extFields?: Record<string, any>

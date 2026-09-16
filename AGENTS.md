@@ -14,18 +14,20 @@ Use this order when repository guidance conflicts:
 5. Module documentation.
 6. The current implementation, which is evidence of behavior but not automatically the desired design.
 
-- **MUST** report a concrete conflict before changing behavior or documentation.
-- **MUST** follow the direction confirmed by the user and synchronize directly affected documentation.
+- **MUST** report a concrete conflict before changing behavior or documentation. When the priority above or an existing explicit user decision resolves it, state that basis and continue; otherwise pause only the changes that depend on the unresolved business or contract decision.
+- **MUST** follow the applicable direction, including existing user confirmation, and synchronize directly affected documentation.
 - **MUST NOT** silently choose whichever source is easiest to implement.
 
 ## 2. Read before acting
 
-- Requests to discuss, analyze, diagnose, inspect, review, or explain are read-only. **MUST NOT** edit files unless the user subsequently authorizes implementation.
-- Before any behavior change, **MUST** state the known facts, assumptions, non-goals, affected scope, and verification plan, then wait for confirmation.
-- A purely mechanical correction with no behavior change may be made directly only when the user explicitly asks for that correction.
-- Before editing, **MUST** inspect the relevant implementation, public interfaces, database or configuration sources, similar repository patterns, and current Git changes.
+- Requests to discuss, analyze, diagnose, inspect, review, or explain are read-only by default. If the user also explicitly requests a fix or implementation, execute that authorized part; otherwise **MUST NOT** edit files.
+- Clearly requested, scoped and reversible local changes may proceed after a brief statement of scope and verification. Wait only for a material business ambiguity, an unresolved contract conflict, a required scope expansion, or an explicit repository approval boundary, including the contract exceptions in section 3 and controlled operations in sections 4 and 5. Continue independent authorized work while a decision is pending.
+- User confirmation remains valid for the same goal, scope and operation throughout the task. Ask again only when the target, risk or impact materially changes; approval of a general task does not authorize the separately controlled operations in sections 4 or 5.
+- For complex changes, explain known facts, material assumptions, non-goals, affected scope and verification. For a small change, one or two sentences suffice; do not require a design document or empty template fields.
+- Before editing, **MUST** inspect the target implementation, applicable rules and current Git changes. Inspect public interfaces, database/configuration sources and cross-module contracts only when affected; consult similar implementations when the pattern is unclear. Reuse material already read in the current context unless it changed or is no longer available.
 - **MUST** preserve user changes. Do not reset, overwrite, reformat, stage, commit, push, switch branches, or clean unrelated work unless explicitly requested.
 - **SHOULD** keep changes limited to the requested behavior and its tests or directly affected documentation.
+- Continue through the authorized implementation, directly affected documentation, necessary verification and delivery record. Stop when these completion conditions are met; report unrelated issues without automatically fixing them or expanding the task.
 
 ## 3. Sources of truth
 
@@ -96,7 +98,7 @@ Read only the architecture documents relevant to the task:
 - Migration files that seed or repair Chinese labels **MUST** set `SET NAMES utf8mb4`, document the exact data scope and repeatability, and avoid copying text from a garbled terminal rendering.
 - Java/Spring services **MUST** keep HTTP, servlet, JSON, JDBC, and resource encodings aligned to UTF-8. Frontend builds and browser checks should verify the response bytes and rendered text when a user-visible label changed.
 
-The following require separate, explicit confirmation even when related to the task:
+The following require explicit authorization for the operation and its target/impact, even when related to the task. Reuse an existing authorization covering those details; do not ask for the same approval again unless they materially change:
 
 - Clearing or deleting database data, accounts, roles, permissions, or files in bulk.
 - Rewriting a migration that has been applied to an already-deployed environment whose upgrade compatibility must be preserved, or performing an irreversible schema change.
@@ -118,8 +120,8 @@ Database initialization and synchronization rules:
 - Applying a correction directly to the development database does not replace correcting its SQL source. Correcting only the database or only the script is incomplete.
 - Before directly changing a development database, the AI **MUST** inspect the current database state, identify the exact target objects or rows and expected impact, preserve unrelated data, and obtain any confirmation required by this section for shared external state. The development database correction **MUST** be scoped, repeatable or otherwise safely controlled, and recoverable where practical.
 - Numbered migrations under `script/sql/mysql/migrations/` remain required when an already-deployed environment must be upgraded without rebuilding its baseline. Such migrations must be repeatable and record their version in `zsjos_schema_version` where applicable. In this case, historical scripts already used by those environments **MUST NOT** be edited as a substitute for an upgrade migration.
-- Before delivery, the corrected SQL must be executed from its documented prerequisite state in a controlled database. Its resulting schema, data, constraints, version records, and migration order **MUST** match the intended development database state after the direct correction. A successful direct database edit alone is not verification that the SQL can reproduce the result.
-- The final bootstrap and SQL scripts MUST initialize a fresh production database successfully from the baseline through the latest version. The result MUST be checked against the development database with read-only schema and scoped data-difference checks; checking only SQL text, version markers, or command exit status is insufficient.
+- Before delivery, execute the changed SQL from its documented prerequisite state in a controlled database and verify the affected schema, data, constraints, version records, migration dependencies and applicable repeatability. Compare the affected result with the intended development database state after the direct correction. A successful direct database edit alone is not verification that the SQL can reproduce the result.
+- Changes to the baseline, bootstrap chain, migration order or cross-version dependencies, and release acceptance, require the complete applicable fresh/upgrade verification and read-only schema/scoped-data comparison with the development database. Fresh-production initialization must succeed from the baseline through the latest version in a controlled database; this does not authorize execution against production. A local SQL correction does not require unrelated full-chain checks. Reuse evidence only for unchanged code and prerequisite state; rerun checks invalidated by the change. SQL text, version markers or exit status alone are insufficient evidence.
 - Any intentionally edited baseline or compatibility migration **MUST** document its deployment scope, prerequisites, execution order, repeatability, exact data scope, and rollback limitations.
 - Dictionary types and dictionary data are separate concerns. The bootstrap may include system-owned dictionary data, but ZSJOS business dictionary data requires a separately reviewed file and explicit confirmation before synchronization.
 - The bootstrap must create empty `zsjos_lead_category` and `zsjos_lead_source_channel` types without inventing business options.
@@ -130,7 +132,7 @@ Database initialization and synchronization rules:
 
 ## 5. Dependencies, code, and documentation
 
-- Before adding an npm or Maven dependency, **MUST** show why existing dependencies are insufficient and explain maintenance, size, and security impact; add it only after confirmation.
+- Before adding an npm or Maven dependency, **MUST** show why existing dependencies are insufficient and explain maintenance, size, and security impact; add it only with explicit confirmation covering that dependency and impact. Reuse an existing confirmation under section 2.
 - **SHOULD** follow existing framework and module patterns before introducing an abstraction.
 - **SHOULD** keep one clear responsibility per file and avoid unrelated refactors or speculative shared utilities.
 - Comments **MUST** explain non-obvious business reasons, boundaries, invariants, authorization, transaction behavior, or compatibility. **MUST NOT** narrate self-explanatory code.
@@ -141,19 +143,23 @@ Database initialization and synchronization rules:
 
 ## 6. Verification and delivery
 
-Verification is proportional to risk, but evidence is mandatory:
+Verification is proportional to the affected behavior and risk, with evidence mandatory. Commands below and in subtree instructions are entry points, not a checklist to run in full for every edit:
 
-- Pure logic: focused unit tests plus type or compile checks.
+- Documentation, comments and mechanical text corrections: scoped diff/content checks and relevant link checks. Add runtime or visual checks only if executable examples, build inputs or rendered product layout are affected.
+- Pure logic and service behavior: focused tests and applicable type or compile checks. Broaden coverage when shared behavior or multiple callers are affected.
 - API behavior: focused tests plus a real request or contract verification when an environment is available.
-- Permission behavior: authorized and unauthorized cases, including empty and failure states.
-- UI behavior: tests, typecheck, production build, and browser checks at desktop and mobile widths.
-- SQL or initialization: syntax, relationship/order review, repeatability, and a controlled execution plan; destructive execution still requires confirmation.
-- Runtime wiring: module build and, when relevant, application startup or endpoint discovery.
+- Permission, authentication and tenant behavior: affected allowed/denied and isolation cases, including applicable empty/failure states. Shared contracts require verification of every affected consumer, including both frontends where applicable.
+- UI interaction: affected flow tests, applicable static checks and real-browser verification. Visual changes require browser inspection at affected widths; shared layout or responsive changes require desktop and mobile widths. Run a production build when bundling, dependencies, routes, assets, build configuration or release acceptance are affected.
+- SQL or initialization: controlled execution and result verification under section 4, including scope, relationships/order and applicable repeatability; destructive execution still requires explicit authorization.
+- Runtime wiring: related module build and, when relevant, application startup or endpoint discovery.
+
+- Do not introduce new test facilities or dependencies for low-risk mechanical edits. Reuse a check that covers multiple requirements instead of running it repeatedly.
+- After relevant checks pass, broaden or repeat them only for a new change, new failure or unresolved risk. Report unrelated existing failures without automatically fixing them or blocking a verified local delivery.
 
 - Remote-data views **MUST** handle loading, success, empty, error, retry, and unauthorized states as applicable.
 - Distinct actionable failures **MUST NOT** be collapsed into one generic error when the backend exposes a stable distinction.
 - **MUST NOT** claim a fix is complete without the corresponding verification evidence.
-- If a check cannot run, **MUST** report it as unverified, explain why, and state the remaining risk.
+- If a necessary check cannot run, **MUST** report it as unverified, explain why, and state the remaining risk. Distinguish an environment-blocked check from a check that does not apply to this change.
 - Long tasks **SHOULD** report milestones as: diagnosis, change scope, then verification result. Repeated failure requires a root-cause update before another attempt.
 
 ## 7. Environment-specific workstream records and optional isolation
@@ -166,7 +172,8 @@ Verification is proportional to risk, but evidence is mandatory:
 - Unless the user explicitly requests otherwise, new AI file-changing work **MUST** use the currently checked-out local branch and worktree. In the primary repository, the default development location is the existing local `main` worktree.
 - The AI **MUST NOT** create, delete, or switch Git branches or worktrees for new work unless the user explicitly requests that operation. Branch and worktree operations remain subject to the separate explicit-confirmation requirements in sections 2 and 4.
 - File-changing tasks in the same worktree **MUST** be serialized. Concurrent AI tasks may inspect or analyze the repository, but they **MUST NOT** modify files in a shared worktree.
-- Before changing files, the active workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`. Work performed directly on the shared `main` worktree **MUST** use the environment-designated record above.
+- Before its first file change, the active workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, ownership scope, owner, dependencies and verification plan in `handoff/<workstream-id>.md`. Record target branch and integration order when branch integration is planned; otherwise use `None`. Work performed directly on the shared `main` worktree **MUST** use the environment-designated record above.
+- Reuse the active registration for subsequent turns. Append a registration update only when scope, owner, dependencies, verification plan or execution context changes; fixed metadata may reference the existing registration. Do not repeat registration merely because a new turn starts.
 - Each file **MUST** have one active workstream owner. A workstream **MUST NOT** modify files outside its recorded scope without first updating its handoff record and coordinating any affected workstream.
 - Only when the user explicitly requests isolated or parallel development, each file-changing workstream **MUST** use its own branch and worktree, start from a committed base, and avoid dependencies on another workstream's uncommitted changes. AI-owned branches **MUST** use the `codex/<workstream-id>` naming convention unless the user specifies otherwise.
 - For an explicitly requested isolated workstream, the worktree **MUST** belong to exactly one workstream. Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`; affected checks **MUST** be rerun on the integration branch before it is marked `merged`.
@@ -178,7 +185,7 @@ Verification is proportional to risk, but evidence is mandatory:
 - Every completed AI task turn that adds, deletes, or modifies any repository file **MUST** append one structured delivery entry to the active workstream's handoff file before sending the final response. Shared-main work uses the environment-designated record from section 7; isolated work uses `handoff/<workstream-id>.md`. Only that workstream's owner may append to the file.
 - A file-changing task turn means one user request and its final AI response that changes any repository file, including source code, tests, scripts, SQL, configuration, documentation, or repository rules. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
 - Turns that make no repository file changes **MUST NOT** append a handoff entry. This includes discussion, analysis, diagnosis, inspection, review, and explanation requests that remain read-only under section 2.
-- Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Use `None` when a field has no applicable content.
+- Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Unchanged branch/worktree/base metadata may reference the workstream registration; record the current HEAD or explicitly state it is unchanged. Use `None` for inapplicable fields without requiring additional integration analysis for a single-worktree task.
 - Entries **MUST** be appended in chronological order. Existing entries **MUST NOT** be rewritten or deleted; corrections must be recorded in a new entry.
 - Handoff files **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.
 
@@ -186,9 +193,9 @@ Verification is proportional to risk, but evidence is mandatory:
 
 ### 默认执行原则
 
-- 当前仓库、当前工作树和当前分支是默认工作范围。只读检查、代码搜索、局部测试、编译、日志诊断和开发服务状态检查可直接执行。
+- 当前仓库、当前工作树和当前分支是默认工作范围。只读检查、代码搜索、局部测试、编译、日志诊断和开发服务状态检查可直接执行；明确要求的局部修改按第 2 节授权与完成边界执行。
 - 已由本文件、仓库脚本、配置或模块文档明确的事实不得重复询问。命令失败时先检查路径、参数、依赖、环境变量和脚本帮助，再报告具体阻断原因。
-- 新增依赖、分支/工作树操作、提交、推送、发布，以及生产或共享外部状态变更仍需单独确认。
+- 新增依赖、分支/工作树操作、提交、推送、发布，以及生产或共享外部状态变更遵循第 4、5 节；已经明确授权的同一操作、目标和影响不重复确认。
 
 ### 本地开发默认上下文
 
@@ -198,13 +205,15 @@ Verification is proportional to risk, but evidence is mandatory:
 
 ### 本地数据库操作
 
-- 本地开发数据库允许 AI 直接执行查询、结构检查、备份、可重复迁移、验证脚本和指定范围的数据修复，无需重复询问是否有权限。
-- 本地开发库允许删除或重建指定表、指定租户或指定业务数据，但执行前必须说明目标范围、备份位置、执行顺序、幂等性、恢复方式和预期影响；SQL 必须保留租户条件或明确说明系统表例外。
-- 生产、共享测试和远程数据库，以及批量删除、全库操作、无范围 `TRUNCATE`、`DROP DATABASE` 和不可逆结构变更，必须在执行前获得明确确认。
+- 本地开发数据库的查询、结构检查和备份可直接执行。在已授权任务内，检查目标和影响后可执行非破坏、可重复迁移、非破坏验证脚本和明确范围的非删除数据修复，无需重复询问权限。
+- 删除或重建指定表、指定租户或指定业务数据仍属于需明确授权的操作；指定范围不豁免批量删除审批。执行前必须说明目标范围、备份位置、执行顺序、幂等性、恢复方式和预期影响；SQL 必须保留租户条件或明确说明系统表例外。
+- 生产、共享测试和远程数据库写入，以及批量删除、全库操作、无范围 `TRUNCATE`、`DROP DATABASE` 和不可逆结构变更，必须取得涵盖具体操作、目标和影响的明确授权。只读检查可直接执行；已有有效授权不重复索取。
 - MySQL 写入中文前使用 `mysql --default-character-set=utf8mb4` 并执行 `SET NAMES utf8mb4`；完成后检查代表性文本的 `HEX()`。
 - 数据库初始化、迁移、备份、回滚限制和校验规则详见 [`docs/operations/database-migrations.md`](docs/operations/database-migrations.md)。
 
 ### 标准命令入口
+
+以下命令按第 6 节及目标目录规则选择，不是每轮全部执行的清单。使用已有脚本支持的过滤参数运行相关测试；扩大检查须与实际影响相符。
 
 - Windows 数据库工具：`./zsjos-db.ps1 check`、`test-fresh`、`test-upgrade`、`test-guardrails`；类 Unix 使用 `./zsjos-db`。
 - 后端：`mvn -f backend/pom.xml -pl yudao-module-zsjos -am test`；编译使用 `-DskipTests compile`。

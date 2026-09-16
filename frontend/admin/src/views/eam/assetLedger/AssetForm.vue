@@ -92,18 +92,15 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="上传附件">
-            <el-upload
-              action="/admin-api/infra/file/upload"
-              :file-list="
-                (formData.fileUrls || []).map((url) => ({ name: url.split('/').pop() || url, url }))
+            <UploadFile
+              :model-value="formData.fileUrls || []"
+              @update:model-value="
+                formData.fileUrls = Array.isArray($event) ? $event : $event ? [$event] : []
               "
-              :on-success="(res) => (formData.fileUrls = [...(formData.fileUrls || []), res.data])"
-              :on-remove="
-                (_file, files) => (formData.fileUrls = files.map((item) => item.url || ''))
-              "
-            >
-              <el-button>选择文件</el-button>
-            </el-upload>
+              :file-type="[]"
+              :is-show-tip="false"
+              @uploading-change="attachmentsUploading = $event"
+            />
           </el-form-item>
         </el-col>
         <el-col :span="24">
@@ -131,11 +128,17 @@
         :model-value="formData.extFields || {}"
         :category-id="formData.categoryId"
         @update:model-value="formData.extFields = $event"
+        @uploading-change="customFilesUploading = $event"
       />
     </el-form>
 
     <template #footer>
-      <el-button :disabled="formLoading" type="primary" @click="submitForm">确 定</el-button>
+      <el-button
+        :disabled="formLoading || attachmentsUploading || customFilesUploading"
+        type="primary"
+        @click="submitForm"
+        >确 定</el-button
+      >
       <el-button @click="dialogVisible = false">取 消</el-button>
     </template>
   </Dialog>
@@ -148,6 +151,7 @@ import * as AssetApi from '@/api/eam/asset'
 import * as DeptApi from '@/api/system/dept'
 import HrmEmployeeSelect from '@/views/hrm/employee/components/HrmEmployeeSelect.vue'
 import DynamicFields from './DynamicFields.vue'
+import { UploadFile } from '@/components/UploadFile'
 
 defineOptions({ name: 'EamAssetForm' })
 
@@ -161,6 +165,8 @@ const treeSelectProps: any = { label: 'name', children: 'children', value: 'id' 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formLoading = ref(false)
+const attachmentsUploading = ref(false)
+const customFilesUploading = ref(false)
 const formType = ref('')
 const formData = ref<AssetApi.AssetVO>(buildEmptyForm())
 const formRef = ref()
@@ -199,15 +205,7 @@ function buildEmptyForm(): AssetApi.AssetVO {
     name: '',
     categoryId: undefined as any,
     quantity: 1,
-    brand: '',
-    specification: '',
-    sn: '',
-    barcode: '',
-    originalValue: undefined,
-    netValue: undefined,
     source: undefined,
-    warrantyDate: undefined,
-    expectedLife: undefined,
     purchaseDate: undefined,
     useDeptId: undefined,
     useEmployeeId: undefined,
@@ -238,6 +236,10 @@ const open = async (type: string, id?: number) => {
 defineExpose({ open })
 
 const submitForm = async () => {
+  if (attachmentsUploading.value || customFilesUploading.value) {
+    message.warning('请等待附件上传完成')
+    return
+  }
   await formRef.value.validate()
   // 清空部门后不允许残留员工 ID；后端会按员工所属部门自动补回部门。
   if (formData.value.useDeptId == null) formData.value.useEmployeeId = undefined

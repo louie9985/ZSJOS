@@ -104,19 +104,11 @@ public class EamPublicEditService {
         add(fields, "name", "资产名称", asset.getName(), "text", true, List.of());
         add(fields, "categoryId", "资产分类", categoryName, "select", true, categoryOptions);
         add(fields, "quantity", "数量", asset.getQuantity(), "number", true, List.of());
-        add(fields, "brand", "品牌", asset.getBrand(), "text", true, List.of());
-        add(fields, "specification", "规格型号", asset.getSpecification(), "text", true, List.of());
-        add(fields, "sn", "序列号", asset.getSn(), "text", true, List.of());
-        add(fields, "barcode", "条码", asset.getBarcode(), "text", true, List.of());
-        add(fields, "originalValue", "资产原值", asset.getOriginalValue(), "number", true, List.of());
-        add(fields, "netValue", "资产净值", asset.getNetValue(), "number", true, List.of());
         add(fields, "purchaseDate", "购入日期", asset.getPurchaseDate(), "date", true, List.of());
         add(fields, "source", "资产来源", asset.getSourceLabelSnapshot(), "select", true, sourceOptions);
-        add(fields, "warrantyDate", "保修到期日", asset.getWarrantyDate(), "date", true, List.of());
         add(fields, "useDeptId", "使用部门", deptName, "select", true, deptOptions);
         add(fields, "useEmployeeId", "使用员工", employeeName, "select", true, employeeOptions);
         add(fields, "location", "存放地点", asset.getLocation(), "text", true, List.of());
-        add(fields, "expectedLife", "预计使用年限（月）", asset.getExpectedLife(), "number", true, List.of());
         add(fields, "remark", "备注", asset.getRemark(), "textarea", true, List.of());
         Map<String, Object> extValues = asset.getExtFields() == null ? Map.of() : asset.getExtFields();
         Map<String, String> extLabels = asset.getExtFieldLabels() == null ? Map.of() : asset.getExtFieldLabels();
@@ -130,11 +122,9 @@ public class EamPublicEditService {
         }
         Map<String,Object> editFields = new LinkedHashMap<>();
         editFields.put("version", asset.getVersion()); editFields.put("name", asset.getName()); editFields.put("categoryId", asset.getCategoryId());
-        editFields.put("quantity", asset.getQuantity()); editFields.put("brand", asset.getBrand()); editFields.put("specification", asset.getSpecification());
-        editFields.put("sn", asset.getSn()); editFields.put("barcode", asset.getBarcode()); editFields.put("originalValue", asset.getOriginalValue());
-        editFields.put("netValue", asset.getNetValue()); editFields.put("purchaseDate", asset.getPurchaseDate()); editFields.put("source", asset.getSource());
-        editFields.put("warrantyDate", asset.getWarrantyDate()); editFields.put("useDeptId", asset.getUseDeptId()); editFields.put("useEmployeeId", asset.getUseEmployeeId());
-        editFields.put("location", asset.getLocation()); editFields.put("expectedLife", asset.getExpectedLife()); editFields.put("remark", asset.getRemark());
+        editFields.put("quantity", asset.getQuantity()); editFields.put("purchaseDate", asset.getPurchaseDate()); editFields.put("source", asset.getSource());
+        editFields.put("useDeptId", asset.getUseDeptId()); editFields.put("useEmployeeId", asset.getUseEmployeeId());
+        editFields.put("location", asset.getLocation()); editFields.put("remark", asset.getRemark());
         editFields.put("extFields", new LinkedHashMap<>(extValues));
         return new PublicAsset(asset.getVersion() == null ? 0L : asset.getVersion(), fields, editFields, asset.getFileUrls(),
                 buildCategoryTree(categories), buildDeptTree(allDepts), employeeDeptOptions);

@@ -1,4 +1,12 @@
 import axios from 'axios'
+import type { ProductSpec } from '@/utils/productSpecs'
+
+export interface PublicPaymentItem {
+  productName?: string | null
+  skuName?: string | null
+  actualAmount: number
+  specs?: ProductSpec[] | null
+}
 
 export interface PublicPaymentDetail {
   paymentIntentNo: string
@@ -7,6 +15,7 @@ export interface PublicPaymentDetail {
   description: string
   status: 'created' | 'waiting' | 'paid' | 'expired' | 'closed'
   expiresAt?: number
+  items?: PublicPaymentItem[]
 }
 
 const publicRequest = axios.create({ baseURL: '/public-api', timeout: 15000 })

@@ -83,8 +83,7 @@ class EamAssetLedgerImportServiceImplTest {
     }
 
     private static EamAssetLedgerParser.LedgerRow row(int rowNum, String code, String userName) {
-        return new EamAssetLedgerParser.LedgerRow(rowNum, "IT-COMPUTER", "电脑", code, "",
-                "品牌", "SN", "C栋", 1, 0, null, null, userName, null, null, null, null,
+        return new EamAssetLedgerParser.LedgerRow(rowNum, "IT-COMPUTER", "电脑", code, "C栋", 1, 0, null, null, userName, null, null, null, null,
                 new LinkedHashMap<>(), Map.of("使用人", userName), List.of(), List.of(), List.of());
     }
 

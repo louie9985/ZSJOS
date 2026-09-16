@@ -16,7 +16,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.time.LocalDate;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -69,26 +68,6 @@ public class EamAssetDO extends TenantBaseDO {
      */
     private Integer status;
     /**
-     * 品牌型号
-     */
-    private String brand;
-    /**
-     * 规格参数
-     */
-    private String specification;
-    /**
-     * 序列号
-     */
-    private String sn;
-    /**
-     * 条码
-     */
-    private String barcode;
-    /** 原值 */
-    private BigDecimal originalValue;
-    /** 净值 */
-    private BigDecimal netValue;
-    /**
      * 购入日期
      */
     private LocalDate purchaseDate;
@@ -96,8 +75,6 @@ public class EamAssetDO extends TenantBaseDO {
     private Integer source;
     /** 资产来源标签快照 */
     private String sourceLabelSnapshot;
-    /** 保修到期日 */
-    private LocalDate warrantyDate;
     /**
      * 使用部门
      */
@@ -137,8 +114,6 @@ public class EamAssetDO extends TenantBaseDO {
      * 存放地点
      */
     private String location;
-    /** 预计使用年限，单位月 */
-    private Integer expectedLife;
     /**
      * 备注
      */

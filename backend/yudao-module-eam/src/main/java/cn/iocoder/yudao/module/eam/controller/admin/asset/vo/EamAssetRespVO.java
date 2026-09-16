@@ -5,7 +5,6 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -40,24 +39,6 @@ public class EamAssetRespVO {
     @Schema(description = "资产状态", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
     private Integer status;
 
-    @Schema(description = "品牌型号", example = "Apple M3 Pro")
-    private String brand;
-
-    @Schema(description = "规格参数", example = "18G/512G")
-    private String specification;
-
-    @Schema(description = "序列号", example = "C02XY1234")
-    private String sn;
-
-    @Schema(description = "条码", example = "6901234567890")
-    private String barcode;
-
-    @Schema(description = "原值")
-    private BigDecimal originalValue;
-
-    @Schema(description = "净值")
-    private BigDecimal netValue;
-
     @Schema(description = "购入日期", example = "2026-01-15")
     private LocalDate purchaseDate;
 
@@ -66,9 +47,6 @@ public class EamAssetRespVO {
 
     @Schema(description = "资产来源标签快照")
     private String sourceLabelSnapshot;
-
-    @Schema(description = "保修到期日")
-    private LocalDate warrantyDate;
 
     @Schema(description = "使用部门编号", example = "100")
     private Long useDeptId;
@@ -87,9 +65,6 @@ public class EamAssetRespVO {
 
     @Schema(description = "存放地点", example = "总部三楼研发区")
     private String location;
-
-    @Schema(description = "预计使用年限，单位月")
-    private Integer expectedLife;
 
     @Schema(description = "备注", example = "研发部专用")
     private String remark;

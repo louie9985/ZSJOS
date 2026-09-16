@@ -1,3 +1,8 @@
+-- UTF-8. Development baseline correction (2026-09-16): IT root serial number is inherited.
+-- Scope: tenant 1 IT root and descendants only; preserve retired fixed columns and all historical values.
+-- Prerequisites: V005; execute in existing V006 position. Repeatable insert and fill-only copy.
+-- Rollback: restore application/configuration from backup; copied extFields are not automatically removed.
+SET NAMES utf8mb4;
 -- V006: baseline categories and non-credential custom fields.
 -- Depends on V005. Inserts only missing rows; repeatable and non-destructive.
 -- The complete Excel-derived leaf list is delivered by eam-category-config-template.xlsx
@@ -47,6 +52,20 @@ BEGIN
   INSERT INTO eam_category_field(category_id,field_key,field_name,field_type,options,required,admin_visible,collection_visible,collection_required,sort,creator,updater,tenant_id)
   SELECT c.id,'other_description','其他说明',2,NULL,b'0',b'1',b'1',b'0',10,'migration-eam-V006','migration-eam-V006',1 FROM eam_category c WHERE c.code='OTHER' AND c.parent_id=0 AND c.deleted=b'0'
     AND NOT EXISTS (SELECT 1 FROM eam_category_field f WHERE f.category_id=c.id AND f.field_key='other_description' AND f.deleted=b'0');
+  INSERT INTO eam_category_field(category_id,field_key,field_name,field_type,options,required,admin_visible,collection_visible,collection_required,sort,creator,updater,tenant_id)
+  SELECT c.id,'sn','序列号',1,NULL,b'0',b'1',b'1',b'0',5,'migration-eam-V006','migration-eam-V006',1
+  FROM eam_category c WHERE c.code='IT' AND c.parent_id=0 AND c.tenant_id=1 AND c.deleted=b'0'
+    AND NOT EXISTS (SELECT 1 FROM eam_category_field f WHERE f.category_id=c.id AND f.tenant_id=c.tenant_id AND f.field_key='sn' AND f.deleted=b'0');
+  WITH RECURSIVE it_categories AS (
+    SELECT id FROM eam_category WHERE code='IT' AND parent_id=0 AND tenant_id=1 AND deleted=b'0'
+    UNION ALL
+    SELECT c.id FROM eam_category c JOIN it_categories p ON c.parent_id=p.id WHERE c.tenant_id=1 AND c.deleted=b'0'
+  )
+  UPDATE eam_asset a JOIN it_categories c ON c.id=a.category_id
+  SET a.ext_fields=JSON_SET(COALESCE(a.ext_fields,JSON_OBJECT()),'$.sn',a.sn)
+  WHERE a.tenant_id=1 AND a.deleted=b'0' AND NULLIF(TRIM(a.sn),'') IS NOT NULL
+    AND (JSON_EXTRACT(a.ext_fields,'$.sn') IS NULL OR JSON_TYPE(JSON_EXTRACT(a.ext_fields,'$.sn'))='NULL'
+         OR JSON_UNQUOTE(JSON_EXTRACT(a.ext_fields,'$.sn'))='');
   COMMIT;
   DO RELEASE_LOCK('eam:migration:V006');
 END$$

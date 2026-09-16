@@ -19,32 +19,35 @@
           />
           <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="品牌型号">{{ detail.brand || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="规格参数">
-          {{ detail.specification || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="序列号">{{ detail.sn || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="条码">{{ detail.barcode || '-' }}</el-descriptions-item>
         <el-descriptions-item label="购入日期">
           {{ detail.purchaseDate || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="使用部门">
           {{ detail.useDeptName || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="使用员工">{{ detail.useEmployeeName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="使用员工姓名快照">{{ detail.useEmployeeNameSnapshot || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="资产来源">{{ detail.sourceLabelSnapshot || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="原值">{{ detail.originalValue ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="净值">{{ detail.netValue ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="保修到期日">{{ detail.warrantyDate || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="预计寿命（月）">{{ detail.expectedLife ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="使用员工">{{
+          detail.useEmployeeName || '-'
+        }}</el-descriptions-item>
+        <el-descriptions-item label="使用员工姓名快照">{{
+          detail.useEmployeeNameSnapshot || '-'
+        }}</el-descriptions-item>
+        <el-descriptions-item label="资产来源">{{
+          detail.sourceLabelSnapshot || '-'
+        }}</el-descriptions-item>
         <el-descriptions-item label="存放地点" :span="2">
           {{ detail.location || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{
           detail.remark || '-'
         }}</el-descriptions-item>
-        <el-descriptions-item label="附件" :span="2"><el-link v-for="url in detail.fileUrls || []" :key="url" :href="url" target="_blank" class="mr-3">{{ url.split('/').pop() || url }}</el-link><span v-if="!(detail.fileUrls || []).length">-</span></el-descriptions-item>
+        <el-descriptions-item label="附件" :span="2">
+          <AttachmentItem
+            v-for="url in (detail.fileUrls || []).filter(Boolean)"
+            :key="url"
+            :url="url"
+          />
+          <span v-if="!(detail.fileUrls || []).length">-</span>
+        </el-descriptions-item>
       </el-descriptions>
 
       <!-- 分类自定义字段 -->
@@ -54,7 +57,8 @@
         </el-divider>
         <el-descriptions :column="2" border>
           <el-descriptions-item v-for="item in extFieldEntries" :key="item.key" :label="item.label">
-            {{ item.value }}
+            <AttachmentItem v-if="item.fileUrl" :url="item.fileUrl" />
+            <span v-else>{{ item.value }}</span>
           </el-descriptions-item>
         </el-descriptions>
       </template>
@@ -92,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import AttachmentItem from '@/components/UploadFile/src/AttachmentItem.vue'
 import { formatDate } from '@/utils/formatTime'
 import { getDictLabel } from '@/utils/dict'
 import * as AssetApi from '@/api/eam/asset'
@@ -135,7 +140,16 @@ const extFieldEntries = computed(() => {
   return Object.entries(values).map(([key, value]) => ({
     key,
     label: labelMap.get(key) ?? key,
-    value: snapshots[key] || (value === null || value === undefined || value === '' ? '-' : String(value))
+    fileUrl:
+      fieldDefs.value.find((field) => field.fieldKey === key)?.fieldType ===
+        CategoryFieldApi.FieldType.FILE &&
+      typeof value === 'string' &&
+      value.trim()
+        ? value
+        : undefined,
+    value:
+      snapshots[key] ||
+      (value === null || value === undefined || value === '' ? '-' : String(value))
   }))
 })
 

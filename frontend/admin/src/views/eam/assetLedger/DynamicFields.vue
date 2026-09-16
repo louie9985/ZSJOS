@@ -54,6 +54,7 @@
         :limit="1"
         :file-type="['doc', 'docx', 'xls', 'xlsx', 'pdf', 'png', 'jpg', 'jpeg', 'zip']"
         @update:model-value="(value) => setFile(field.fieldKey, String(value || ''))"
+        @uploading-change="(value) => setUploading(field.fieldKey, value)"
       />
     </el-form-item>
   </template>
@@ -80,11 +81,22 @@ const props = defineProps<{
   modelValue: Record<string, any>
   /** collection 用于需求/入库采集，admin 用于资产管理表单。 */
   context?: 'admin' | 'collection'
+  excludeKeys?: string[]
 }>()
-const emit = defineEmits<{ (e: 'update:modelValue', value: Record<string, any>): void }>()
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: Record<string, any>): void
+  (e: 'fields-loaded', value: CategoryFieldApi.CategoryFieldVO[]): void
+  (e: 'uploading-change', value: boolean): void
+}>()
 
 const fields = ref<CategoryFieldApi.CategoryFieldVO[]>([])
 const loading = ref(false)
+const uploadingFields = new Set<string>()
+const setUploading = (key: string, uploading: boolean) => {
+  if (uploading) uploadingFields.add(key)
+  else uploadingFields.delete(key)
+  emit('uploading-change', uploadingFields.size > 0)
+}
 
 const model = computed({
   get: () => props.modelValue || {},
@@ -113,11 +125,14 @@ const loadFields = async (categoryId?: number) => {
   loading.value = true
   try {
     const definitions = await CategoryFieldApi.getEffectiveFieldList(categoryId)
-    fields.value = definitions.filter((field) =>
-      props.context === 'collection'
-        ? field.collectionVisible !== false
-        : field.adminVisible !== false
-    )
+    emit('fields-loaded', definitions)
+    fields.value = definitions
+      .filter((field) => !props.excludeKeys?.includes(field.fieldKey))
+      .filter((field) =>
+        props.context === 'collection'
+          ? field.collectionVisible !== false
+          : field.adminVisible !== false
+      )
     const allowed = new Set(fields.value.map((f) => f.fieldKey))
     const next: Record<string, any> = {}
     Object.entries(model.value).forEach(([key, value]) => {

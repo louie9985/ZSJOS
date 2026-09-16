@@ -24904,3 +24904,212 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Verification: `zsjos-db check` PASS；`test-guardrails` PASS（含新增断言）；`test-fresh` 145 → 16，剩余 16 项在开发库同样 FAIL（既有非校验和漂移）；`reconcile development` → PASS（运行器行全部等于文件字节哈希）；`verify-bootstrap.sql` 在开发库无任何校验和断言失败。
 - Dependency / integration impact: 无需 backend 改动。开发库台账已收敛到新口径；其他环境部署时 `migrate` 会自动执行同等归一化。种子行保持原值，不影响既有部署。
 - Remaining work: `test-fresh` 剩余 16 项为既有非校验和漂移（V131/V150/V178 的历史越权授权；部分断言要求基线未种入的 `zsjos_schema_version` 行），属独立修复。`core/migrations` 中 V239-V241 自登记为不存在的 `payment` 模块（惰性孤儿行，无读取方）。`kz_cleanup_backup_20260916`、`pms_work_item_work_log` 等表由并行进程创建，当前使 `plan` 报 unexpected table 而 BLOCKED；需确认归属后处理。
+
+## Delivery Entry - 2026-09-16 15:15:51 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5`。
+- User goal: 拉取远程 `main` 最新代码并合并到本地，发生冲突时先向用户确认。
+- Key decisions: 保留全部本地未跟踪临时文件；使用 `git merge --ff-only origin/main`，不创建额外合并提交；未执行数据库迁移、服务启动或部署操作。
+- Execution or analysis result: 本地 `main` 从 `4419f295f3` 快进到 `94c577ecad`，合入远程提交“修改迁移sql”，未发生冲突。
+- Changed files: 远程提交涉及 37 个文件，主要为迁移 SQL、PMS schema、数据库工具与校验脚本、部署配置及交接文档；本条记录追加至 `handoff/main.md`。
+- Verification evidence: `git diff --name-only --diff-filter=U` 无输出；`git rev-list --left-right --count HEAD...origin/main` 为 `0 0`。
+- Dependency or integration impact: 新增 PMS schema 与 V243-V250 迁移资源，但本轮未执行；工作区原有未跟踪探针、缓存、截图和临时输出保持不变。
+- Remaining work: 本次 handoff 记录尚未提交；数据库迁移和运行环境验证需在后续明确任务中执行。
+- Status: `pulled`。
+
+## Workstream Registration - 2026-09-16 17:20:14 +08:00
+
+- Workstream ID: `main-payment-page-b-20260916`; Environment: `local`; Owner: Codex current thread.
+- Goal: Implement the confirmed public payment page option B with company logo, payable amount, product names, concrete SKU content without a SKU prefix, and transaction prices.
+- Non-goals: Alipay incident repair, gateway behavior, payment subjects, permissions, database changes, deployment, commits and branch operations.
+- Branch / target branch: `main` / `main`; Worktree: `D:\ZSJ-OS`; Base commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5`.
+- Ownership scope: PurchaseIntentService.java; new payment product snapshot model and focused payment tests; PublicPaymentDetailRespVO.java; frontend/h5/src/api/payment.ts, src/pages/payment/index.vue and focused payment tests; docs/business/payment-module-development.md; docs/superpowers/specs/2026-09-16-payment-page-b-design.md; handoff/main.md.
+- Dependencies: Existing ZSJOS product SKU service and snapshot labels, Vue/Vant and existing build/test tooling; no new dependencies. Preserve all pre-existing dirty/untracked files.
+- Integration order: Payment snapshot and response extension, H5 rendering, focused verification and delivery entry. Single owner; serialized changes in current worktree.
+- Verification plan: Backend snapshot/legacy/token tests and module compile; H5 render tests/typecheck/production build; desktop/mobile browser inspection of success, multiple products, errors/retry and expired states. No real payment or shared-service mutation.
+- Status: active.
+
+## Delivery Entry - 2026-09-16 17:34:00 +08:00
+
+- Workstream ID: `main-payment-page-b-20260916`; Environment: `local`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5`.
+- User goal: 用户确认支付页面方案 B，显示公司 Logo、应付金额、具体产品/规格与成交价格，不显示“SKU：”前缀。
+- Key decisions: 新支付单在生成时调用既有 ZSJOS 产品 SKU 服务保存名称与规格标签，成交金额保留草稿值；使用现有 JSON 快照列，不改数据库；公开接口只投影展示字段；旧链接缺失历史标签明确显示未记录，不按当前目录补写；保留 description 兼容旧页面、有效链接复用、微信/支付宝支付流程。
+- Execution result: 实现方案 B 的品牌蓝布局、Logo 回退、多商品列表和加载失败重试；品牌色仅限定公开支付页。无真实支付、权限或共享服务变更。使用现有 pnpm 锁文件恢复依赖后执行 npm build 脚本，没有修改依赖或锁文件。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/payment/PurchaseIntentService.java`、`PaymentProductSnapshot.java`；`controller/pub/payment/vo/PublicPaymentDetailRespVO.java`；`src/test/java/cn/iocoder/yudao/module/zsjos/service/payment/PublicPaymentDetailTest.java`；`frontend/h5/src/api/payment.ts`、`src/pages/payment/index.vue`、`tests/payment-page.test.mjs`、`tests/payment-browser-server.mjs`；`docs/business/payment-module-development.md`、`docs/superpowers/specs/2026-09-16-payment-page-b-design.md`；`handoff/main.md`。
+- Verification evidence: Maven 21 模块 reactor BUILD SUCCESS，`PublicPaymentDetailTest` 7/7 通过（新快照/成交价/多商品、历史标签、空快照、无效 token、有效链接复用、无效产品）；H5 实际 SFC 渲染测试 6/6 通过；`npm run build`（vue-tsc + Vite）通过；实际生产产物在 320px、390px、1280px 浏览器检查，Logo 加载正常，单/多商品、空明细、旧标签、错误重试恢复、失效无按钮均符合预期，窄屏无横向溢出；`git diff --check` 通过。
+- Dependency / integration impact: 无新增依赖或 SQL。Admin/Workbench 请求 DTO 和草稿比较不变；新支付单生成增加既有产品服务校验，失效/不匹配 SKU 不创建链接。公开详情新增 items，兼容旧前端；部署建议先后端再 H5。
+- Remaining work: 未启动完整应用、未部署、未提交；浏览器接口为测试 fixture，真实支付及支付宝线上失败的运行配置/网关记录核对仍未验证，本轮没有宣称修复。历史支付单没有记录的产品名称不会自动出现。
+- Status: completed locally; deployment and real gateway verification pending.
+
+## Workstream Registration - 2026-09-16 18:14:45 +0800
+
+- Workstream ID: `main-work-order-pool-optional-scene-20260916`; Environment: `local`; Status: active.
+- Goal: 按用户确认，将可接工单 sceneCode 改为可选，默认查询当前用户有资格接收的全部类型。
+- Non-goals: 不修改工单发起、模板资格模式、数据库、权限、前端和运行服务。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit / HEAD: `94c577ecad33663f3b90f655408f5a77e01a6fb5`; Target branch: `main`.
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderPoolPageReqVO.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/WorkOrderPoolControllerTest.java`; `docs/api/generic-work-order-center.md`; `handoff/main.md` (append only).
+- Owner: Codex current thread; Dependencies: None; Integration order: 请求校验、HTTP 回归测试、接口文档。
+- Verification plan: MockMvc 验证不传类型、指定类型、超长类型和非法分页；模块编译及既有工单服务测试；检查差异。保留其他工作流已有改动。
+
+## Delivery Entry - 2026-09-16 18:16:22 +0800
+
+- Workstream ID: `main-work-order-pool-optional-scene-20260916`; Environment: `local`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5`.
+- User goal: 修复可接工单页面“请求参数不正确:不能为空”，保留不传类型时查询当前用户有资格接收的全部工单。
+- Key decisions: 移除 pool 请求 sceneCode 的 NotBlank；保留 Size(64) 和继承分页校验；不修改候选 SQL、租户和权限机制。用户已确认可选类型契约。
+- Execution result: 可接工单现有请求可以通过 MVC 参数校验；指定类型按原参数传递；同步接口及 OpenAPI 说明。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderPoolPageReqVO.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/WorkOrderPoolControllerTest.java`; `docs/api/generic-work-order-center.md`; `handoff/main.md`.
+- Verification evidence: Maven reactor BUILD SUCCESS；WorkOrderPoolControllerTest 4/4（MockMvc：省略类型、指定类型、超长拒绝、非法分页拒绝）；WorkOrderServiceImplTest 20/20；git diff --check 通过。消费者检索仅 Workbench 调用 pool，Admin 没有该接口调用；前端请求无需修改。
+- Dependency / integration impact: 无新增依赖、数据库修改、权限变更、提交或服务重启；保留已有支付任务改动。运行服务需加载更新后的类。
+- Remaining work: 未做真实已登录请求或浏览器验证；MockMvc 使用模拟服务，不代表数据库候选资格或运行部署验证。此前定位的模板 PERMISSION 配置、外勤缺少账号、剪拍定位前置条件和自由派单问题不在本次修复范围。
+- Status: completed locally; live runtime verification pending.
+
+## Workstream Registration - 2026-09-16 18:19:37 +08:00
+
+- Workstream ID: `main-instruction-audit-20260916`; Environment: `local`; Owner: Codex instruction-audit thread; Status: active.
+- Goal: Implement the user-approved AGENTS.md and Skills cleanup for authorization, contextual reading, bounded verification and precise skill selection.
+- Non-goals: Business code, database/service mutations, dependency installation, Git branch operations/commits/pushes, historical handoff rewriting and managed-cache-only edits.
+- Branch / target branch: `main` / `main`; Worktree: `D:\ZSJ-OS`; Base commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5`.
+- Ownership scope: root AGENTS.md; frontend/admin/AGENTS.md; frontend/workbench/AGENTS.md; backend/yudao-module-zsjos/AGENTS.md; handoff/main.md (append only); personal SKILL.md files for brainstorming (both .codex and .agents copies), wecom-unified, find-skills, open-code-review, heroui-pro-design-taste, heroui-react-pro and ruoyi-vue-pro. Managed openai-docs/documents/PDF/spreadsheet/presentation skills are inspection-only unless a supported persistent maintenance source is found and this registration is extended.
+- Dependencies: Existing skill-creator validator and Python; no new packages. Previous payment and work-order turns have delivery entries; preserve their dirty/untracked files. This workstream exclusively owns the listed rule edits during this turn.
+- Integration order: Root decision boundaries, subtree alignment, personal skills, static/scenario verification, append delivery entry. Serialized in current worktree.
+- Verification plan: Scoped diff and UTF-8 checks; skill frontmatter/Markdown/reference validation; consistency review against the ten approved scenarios; duplicate brainstorming hashes; pre-existing dirty-file hash and handoff-prefix preservation. No application build or database tests for instruction-only changes.
+
+## Delivery Entry - 2026-09-16 18:28:40 +08:00
+
+- Workstream ID: `main-instruction-audit-20260916`; Environment: `local`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `94c577ecad33663f3b90f655408f5a77e01a6fb5` (unchanged).
+- User goal: 执行已确认的 AGENTS.md 与 Skills 修改方案，减少过度工作、指令冲突和不必要等待。
+- Key decisions: 明确局部可逆修改可执行、同范围授权持续有效、只读分析不修改；保留第 3 节业务契约例外及第 4/5 节危险操作与依赖审批。检查按影响选择且通过后有停止条件；开发期与已部署迁移分流；指定范围不豁免批量删除审批。工作流登记复用，交付仍逐轮追加。个人技能保持原名称和自动发现机制，只收窄触发条件；OCR compatibility 前置条件移至正文以兼容本地技能校验器，保留许可证及作者元数据。
+- Execution result: 修改四份仓库规则和八份个人 SKILL.md（七种技能，brainstorming 双副本）；brainstorming 164→38 行、find-skills 142→21 行，去除固定审批/方案数量/自动提交/缺失技能硬依赖。企业微信限定平台上下文并复用 CLI/授权检查；OCR 不再自动安装、索取聊天凭证、扩大审查范围或在只读审查时修复；HeroUI 限定设计体系并复用版本对应的 API 资料；RuoYi 技能补充已读资料复用。
+- Changed files: `D:\ZSJ-OS\AGENTS.md`; `D:\ZSJ-OS\frontend\admin\AGENTS.md`; `D:\ZSJ-OS\frontend\workbench\AGENTS.md`; `D:\ZSJ-OS\backend\yudao-module-zsjos\AGENTS.md`; `D:\ZSJ-OS\handoff\main.md` (append only); `C:\Users\EDY\.codex\skills\brainstorming\SKILL.md`; `C:\Users\EDY\.agents\skills\brainstorming\SKILL.md`; `C:\Users\EDY\.agents\skills\wecom-unified\SKILL.md`; `C:\Users\EDY\.codex\skills\find-skills\SKILL.md`; `C:\Users\EDY\.agents\skills\open-code-review\SKILL.md`; `C:\Users\EDY\.codex\skills\heroui-pro-design-taste\SKILL.md`; `C:\Users\EDY\.codex\skills\heroui-react-pro\SKILL.md`; `C:\Users\EDY\.codex\skills\ruoyi-vue-pro\SKILL.md`.
+- Verification evidence: skill-creator quick_validate 8/8 通过；12 份规则/技能 UTF-8、Markdown 围栏及 25 个本地引用检查通过；两份 brainstorming 字节一致；根第 3 节业务约束和完整编码约束与修改前逐字一致；原有 7 个业务修改文件 SHA-256 未变化；历史 handoff 字节前缀完整保留；git diff --check 通过，无未解决 Git 冲突。纯规则修改不适用应用构建、数据库测试或浏览器业务验收。
+- Scenario review: 静态逐项核对九个可修改规则场景：只读报错分析、明确校验修复、未定审批设计、已批准按钮间距、指定提交审查、本地 Excel、开发期迁移修正、租户批量清理、相关检查通过且无关历史失败，均与方案边界一致。第十个“官方链接直接读取”场景依赖受管 openai-docs，未实施；这些结果是文本一致性审查，不是新会话模型行为实测。
+- Dependency / integration impact: 无新增依赖、数据库/服务操作、分支/提交/推送。个人技能位于仓库之外，不随仓库提交分发。原文备份与静态验证报告保存在 `C:\Users\EDY\AppData\Local\Temp\zsjos-instruction-audit-20260916`；回退应按文件差异恢复，不覆盖后续改动。
+- Remaining work: 按批准方案未直接改受管缓存。openai-docs 位于带 `.codex-system-skills.marker` 的系统目录；Documents README 明确由 `lib/artifacts/artifacts_skills` 经 mapping 生成，当前仅发现版本缓存，未发现可持久维护源入口。官方文档先搜索规则和 Documents/PDF 的排版停止条件仍保留，需维护源或受支持入口可用后处理；未创建同名覆盖技能或修改全局设置。表格根技能已有局部范围和不重复渲染规则，演示根技能已有保留用户设计的边界，本轮未改其缓存。新会话自动技能选择及实际执行延迟未实测，不保证当前会话已加载的描述立即刷新。
+- Status: completed for repository and personal-skill scope; managed-source changes deferred with the limitation above.
+
+## Workstream Registration - 2026-09-16 18:44:00 +0800
+
+- Workstream ID: `main-work-order-pool-parser-20260916`; Environment: `local`; Owner: Codex current thread; Status: active.
+- Goal: 继续修复已授权的可接工单查询，解决用户提供日志中的 TenantLineInnerInterceptor SQL 解析失败。
+- Non-goals: 不修改候选资格业务规则、模板配置、数据库数据、认证或运行服务。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base / HEAD: `94c577ecad33663f3b90f655408f5a77e01a6fb5`; Target branch / integration order: None.
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderMapper.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderMapperSqlTest.java`; `docs/api/generic-work-order-center.md`; `handoff/main.md` (append only).
+- Dependencies: 已完成 sceneCode 可选修复；保留所有其他未提交改动。
+- Verification plan: 复现 JSON_TABLE 解析失败；验证改写 SQL 经过真实租户拦截器与分页；在 MySQL 中只读比较角色、部门、交集、无资格、指定部门、租户和类型过滤；相关 Maven 回归测试。
+
+## Delivery Entry - 2026-09-16 18:47:17 +0800
+
+- Workstream ID: `main-work-order-pool-parser-20260916`; Environment: `local`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `94c577ecad33663f3b90f655408f5a77e01a6fb5` (unchanged).
+- User goal: 继续解决可接工单页故障；用户提供 pool 请求进入 Mapper 后的 SQL 解析异常日志。
+- Key decisions: 确认 sceneCode 可选修复已通过运行时参数校验；新阻断为 JSQLParser 无法解析 JSON_TABLE。用 JSON_CONTAINS + JSON_OBJECT 匹配发布快照的数值 ID，保留原角色、部门、交集、有效角色/用户、部门定向及工单类型条件；未禁用租户拦截器。
+- Execution result: 改写 WorkOrderMapper.selectEligiblePool 并增加真实租户拦截器和分页计数解析回归测试；更新接口文档。上一轮模拟查询未覆盖 SQL 解析，本轮补齐。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderMapper.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderMapperSqlTest.java`; `docs/api/generic-work-order-center.md`; `handoff/main.md`.
+- Verification evidence: Maven reactor BUILD SUCCESS；WorkOrderMapperSqlTest 3/3、WorkOrderPoolControllerTest 4/4、WorkOrderServiceImplTest 20/20。MySQL 使用只读 CTE 构造 17 条工单和多租户用户/角色数据：原 SQL 与改写 SQL 在 8 个用户/租户/类型组合下等价；实际 TenantLineInnerInterceptor 生成 SQL 的同 8 个组合全部通过，另验证分页和计数。覆盖无/空候选、禁用/删除角色、删除关系、停用/删除用户、指定部门、角色和部门交集、其他租户、类型筛选。连接当前配置数据库执行改写后分页与计数，省略类型及两个模板类型均成功返回空列表。git diff --check 通过。
+- Dependency / integration impact: 无新增依赖、数据库写入、服务重启、权限配置修改或 Git 提交。前端接口不变，Admin 无 pool 调用。只读复现和验证辅助文件位于系统临时目录 `zsjos-pool-parser`，未放入业务目录。
+- Remaining work: 未执行真实已登录 HTTP/浏览器请求，当前服务需加载新 Mapper 后验证；未处理此前模板 PERMISSION 模式导致全员无资格及其他发起阻断。数据库查询通过不代表当前用户一定有可接工单。
+- Status: completed locally; live authenticated endpoint verification pending.
+
+## Workstream Registration - 2026-09-16 EAM custom serial number
+
+- Workstream ID: `main-eam-custom-serial-20260916`; Environment: `local`; Owner: Codex current thread; Status: active.
+- Goal: Retire eight fixed asset fields; add inherited IT hardware custom serial number and adapt procurement, import/export, public editing and asset views.
+- Non-goals: Other category field configuration, account permissions, physical column deletion, historical record deletion, service restarts, Git operations.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base / HEAD: `94c577ecad33663f3b90f655408f5a77e01a6fb5`; Target branch / integration order: None.
+- Ownership scope: backend/yudao-module-eam; frontend/admin/src/api/eam and src/views/eam; EAM consumers under frontend/workbench and frontend/h5 if affected; script/sql/mysql/migrations/eam and EAM verification tools; docs/api/eam-import.md and eam-office-procurement-assets.md; handoff/main.md (append only).
+- Dependencies: Existing category inheritance and extFields contracts; local database configuration. Preserve existing unrelated dirty files. No new dependencies.
+- Verification plan: Focused backend tests and compile, frontend static/browser checks, controlled repeatable SQL execution and scoped database/UTF-8 verification. Preserve historical fixed columns while removing runtime usage.
+
+## Delivery Entry - 2026-09-16 20:37:16 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `78bf7651e2fa0496e45cffe63f9a9ea1f72087e6`。
+- User goal: 拉取远程 `main` 最新代码并合并到本地，发生冲突时先向用户确认。
+- Key decisions: 使用保护性 stash 保存全部已跟踪及未跟踪本地改动，快进合并 `origin/main` 后恢复；保留 stash 作为备份；未执行迁移、构建、服务或数据库操作。
+- Execution or analysis result: 本地 `main` 从 `94c577ecad` 快进到 `78bf7651e2`，合入远程 2 个提交；全部本地改动成功恢复，无冲突。
+- Changed files: 远程提交涉及高级筛选与账号资料前端、V251-V255 迁移、数据库校验脚本及交接记录；本地原有支付页、工单、规则与文档改动保持不变；本条记录追加至 `handoff/main.md`。
+- Verification evidence: `git diff --name-only --diff-filter=U` 无输出；`git rev-list --left-right --count HEAD...origin/main` 为 `0 0`；保护 stash 为 `codex-pre-pull-20260916-main`。
+- Dependency or integration impact: 新增数据库迁移资源但未执行；未提交、未推送、未清理本地临时文件。
+- Remaining work: 本地业务改动与本次 handoff 记录仍未提交；保护性 stash 可在确认无需回退后另行删除。
+- Status: `pulled`。
+
+
+## Delivery Entry - 2026-09-16 22:21:00 +08:00
+
+- Workstream ID: `main-eam-custom-serial-20260916`; Environment: `local`; Owner: Codex current thread; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `94c577ecad33663f3b90f655408f5a77e01a6fb5` (unchanged).
+- User goal: 删除资产八项固定字段及对应逻辑，仅给 IT 硬件设备及全部子分类配置自定义序列号，并适配后续流程。用户明确选择全部八项退役。
+- Key decisions: IT 根分类配置选填文本 `sn`，复用分类继承；不改其他自定义字段。固定字段从 DO、VO、页面、公开编辑和导入中移除，历史物理列保留。采购单价/金额保留在采购领域；单台序列号保存到 extFields.sn，单件规格匹配排除 sn，批量完整属性匹配不变。旧固定 Excel 列有值明确拒绝，空列忽略；新列为 sn:序列号。导出展开服务端配置的自定义字段并使用历史字典标签。
+- Execution result: 本地租户 1 IT 根分类新增一条序列号配置，覆盖 8 个子分类。当前租户无资产，无历史业务数据被重写。V006 新片段重复执行安全，旧 sn 仅补入 IT 范围空自定义值；已有自定义值不覆盖。同步开发原始 V006、V3 重置源、两个下载模板及接口文档，未执行破坏性重置。
+- Changed files:
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/EamAssetController.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/vo/EamAssetImportExcelVO.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/vo/EamAssetRespVO.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/vo/EamAssetSaveReqVO.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/pub/vo/EamPublicAssetUpdateReqVO.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/dataobject/asset/EamAssetDO.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/mysql/asset/EamAssetMapper.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetLedgerImportServiceImpl.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetLedgerParser.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/procurement/EamPurchaseServiceImpl.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/publicedit/EamPublicEditService.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/statistics/EamStatisticsService.java`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/stock/EamStockServiceImpl.java`
+  - `backend/yudao-module-eam/src/main/resources/eam/eam-asset-ledger-template.xlsx`
+  - `backend/yudao-module-eam/src/main/resources/eam/eam-category-config-template.xlsx`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetLedgerImportServiceImplTest.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetLedgerParserTest.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportDbTest.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImplTest.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/procurement/EamPurchaseServiceImplTest.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/stock/EamStockServiceImplTest.java`
+  - `docs/api/eam-import.md`
+  - `docs/api/eam-office-procurement-assets.md`
+  - `frontend/admin/src/api/eam/asset/index.ts`
+  - `frontend/admin/src/views/eam/assetLedger/AssetDetail.vue`
+  - `frontend/admin/src/views/eam/assetLedger/AssetForm.vue`
+  - `frontend/admin/src/views/eam/assetLedger/DynamicFields.vue`
+  - `frontend/admin/src/views/eam/assetLedger/index.vue`
+  - `frontend/admin/src/views/eam/purchase/PurchaseActionDialog.vue`
+  - `script/sql/mysql/migrations/eam/V006__eam_category_baseline.sql`
+  - `script/sql/mysql/migrations/eam/reset_eam_v3.sql`
+  - `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetExportService.java`
+  - `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetExportServiceTest.java`
+  - `script/sql/mysql/verify/eam-it-serial.sql`
+  - `handoff/main.md` (append only).
+- Verification evidence: EAM suite 84 tests, 81 passed / 3 existing disabled legacy-workbook fixtures; no failures. New Excel export test 1/1 passed; final stock suite 9/9 passed after restricting serial exclusion to serialized assets. Maven reactor compilation passed. Scoped ESLint passed for six changed frontend files. Full Admin typecheck found 11 pre-existing errors in advancedFilterTemplate/gift/material/materialType, none in changed EAM files. git diff --check passed.
+- Database verification: Existing local MySQL used with utf8mb4 and SET NAMES utf8mb4. Controlled database `eam_serial_verify_20260916220633` constructed from EAM desired schema (V006 prerequisites satisfied), executed full changed V006 and repeated twice; tested legacy copy, blank fill, existing-value preservation and one root field. Source-identical new SQL block applied twice to development database. Chinese HEX verified as E5BA8FE58897E58FB7. Read-only tree query confirmed root + 8 descendants; no sn added to other roots. JSON serial lookup and asset-code fallback tested on fixtures. EAM module version registry has no rows; legacy V006 is Core and untouched. No schema/order/dependency change or release acceptance; unrelated full Core fresh/upgrade chain not rerun for this scoped data correction.
+- Browser/template verification: Authenticated localhost asset ledger no longer shows brand column. IT root and Computer form visibly display inherited serial number; Book category shows its original fields without serial. Inspected actual form screenshot; no test asset submitted. Both XLSX files imported/read by artifact tooling, ledger header rendered and visually inspected, template import DB tests passed with 70 fields (previously 69). Workbench EAM API types have none of the retired fixed fields and continue through existing typed extFields/embedded Admin behavior; H5 has no EAM fixed-field consumer.
+- Dependency / integration impact: No new dependencies, permission edits, physical column drops, bulk deletion, service restart, branch/commit/push. Controlled verification database retained with synthetic fixtures; temporary builders/logs are in the user temp directory. Existing unrelated dirty files preserved.
+- Remaining work / limitations: Backend process not restarted; real procurement receive/return, persisted asset edit and public-password edit with newly compiled code not exercised over HTTP. Browser verification covers new form and category switching, not those persisted flows. Full frontend typecheck remains blocked by unrelated existing errors. Three old workbook fixtures remain disabled. New backend behavior must be loaded through the normal development restart before runtime acceptance.
+- Status: local implementation and scoped verification complete; runtime backend flow acceptance pending reload.
+
+## Workstream Registration - 2026-09-16 EAM attachment repair
+
+- Workstream ID: `main-eam-attachments-20260916`; Environment: `local`; Owner: Codex current thread; Status: active.
+- Goal: Fix EAM attachment upload/disappearance, previews and FILE type labels.
+- Non-goals: Storage provider changes, database schema migration, unrelated asset behavior, service restart or Git operations.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD/base: `94c577ecad33663f3b90f655408f5a77e01a6fb5`; Target branch/integration order: None.
+- Ownership scope: frontend/admin/src/components/UploadFile, src/components/FilePreview, src/views/eam/assetLedger, src/views/eam/category/FieldConfig.vue, EAM attachment tests under frontend/admin/tests, docs/api/eam-import.md, handoff/main.md (append only).
+- Dependencies: Existing useUpload request/auth/tenant plumbing, Element Plus and FilePreview. Preserve previous EAM changes and all unrelated dirty files; no new packages.
+- Verification plan: Shared upload lifecycle regression checks; scoped ESLint/type checking; authenticated browser upload/preview and type label checks with synthetic files; verify failure/limit/remove/reopen behavior where environment permits.
+
+## Delivery - 2026-09-16 23:05 Beijing - EAM attachment repair
+
+- Workstream: `main-eam-attachments-20260916`; owner/environment/branch/worktree/base as registered above; HEAD unchanged (`94c577ecad33663f3b90f655408f5a77e01a6fb5`).
+- User goal: Repair disappearing attachments, preview supported files and show filenames otherwise, and replace unknown custom FILE label.
+- Decisions/results: Ordinary EAM attachments now use existing authenticated upload transport. Fix first-file limit rejection, validate business responses, retain concurrent upload queues and original names by UID, await direct-upload file registration, submit pasted files, and guard asset save while uploads are pending. External resets permit reloading the same saved URL. Shared attachment renderer provides thumbnails, previews and filename/download fallbacks; FILE label is 图片/附件. Existing URL persistence remains unchanged; no metadata migration or signed-link renewal introduced.
+- Changed files: `frontend/admin/src/components/UploadFile/src/{UploadFile.vue,AttachmentItem.vue,useUpload.ts}`, `frontend/admin/src/components/FilePreview/src/FilePreview.vue`, `frontend/admin/src/views/eam/assetLedger/{AssetForm.vue,AssetDetail.vue,DynamicFields.vue}`, `frontend/admin/src/views/eam/category/FieldConfig.vue`, `frontend/admin/tests/eamAttachmentUpload.test.mjs`, `docs/api/eam-import.md`, `handoff/main.md`.
+- Verification: Six focused upload lifecycle tests passed, including failure/concurrency/reset/reload/clipboard cases; scoped ESLint passed. Full vue-tsc initially exhausted default heap; rerun with 8 GB completed with the same 11 existing errors in advancedFilterTemplate/gift/material/materialType and none in changed files. git diff --check passed. Authenticated browser verified ordinary PNG upload/preview, ZIP filename/download display, custom account-screenshot first upload at limit 1, retained field after success, and save disabled during upload then enabled. Custom image preview visually verified at 390px width; desktop verification at 1280px. Temporary viewport reset, test form cancelled, no asset submitted. FILE type mapping verified in source; its configuration screen was not browser-verified.
+- Dependencies/integration: None; no packages, database/schema writes, service restarts, commits or branch operations. Synthetic uploads went through existing configured storage; unrelated dirty files preserved.
+- Remaining limitations: Persisted asset save/detail/reopen not exercised in browser; saved URL rehydration is covered by component logic test. Original names on reopen derive from URL. Existing fixed-width asset form is not mobile responsive; new preview fits narrow viewport. PDF/audio/video previews depend on browser/server support and were not individually exercised. Full project typecheck remains affected by unrelated errors.
+- Status: Scoped repair implemented and verified with the limitations above.
+
+## Delivery Entry - 2026-09-17 00:06:39 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `74f9b458f924fa3a25ac2a6621fcc73df6685d40`。
+- User goal: 拉取远程 `main` 最新代码并合并到本地；冲突经确认后合并双方内容。
+- Key decisions: 使用保护性 stash 保存全部本地改动；快进合入远程提交后恢复本地内容；后端同时保留 `PaymentClosePendingRecorder` 与 `ZsjosProductSkuService`；H5 以本地新版支付页为主体并合入远程关闭/过期差异化提示。
+- Execution or analysis result: 本地 `main` 从 `78bf7651e2` 快进到 `74f9b458f9`；解决 `PurchaseIntentService.java` 与 `frontend/h5/src/pages/payment/index.vue` 两处内容冲突；本地其他改动完整保留。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/payment/PurchaseIntentService.java`; `frontend/h5/src/pages/payment/index.vue`; `frontend/h5/tests/payment-page.test.mjs`; `handoff/main.md`。远程提交自身涉及支付取消待处理、V256 迁移、销售订单与支付前后端等 24 个文件。
+- Verification evidence: 无未解决 Git 冲突或冲突标记；后端 `PurchaseIntentCancelPaymentTest` 与 `PublicPaymentDetailTest` 共 14/14 通过且 reactor BUILD SUCCESS；H5 支付页测试 6/6 通过；`npm run build` 成功（626 modules）；`HEAD...origin/main` 为 `0 0`。
+- Dependency or integration impact: 未新增依赖；未执行 V256、数据库写入、服务重启、提交或推送；保护 stash `codex-pre-pull-20260917-main` 保留。
+- Remaining work: 本地业务改动及本次 handoff 记录仍未提交；真实支付接口/浏览器环境未执行；保护 stash 可在确认无需回退后另行删除。
+- Status: `pulled-and-resolved`。

@@ -99,7 +99,6 @@
           <dict-tag :type="'eam_asset_status'" :value="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="品牌型号" prop="brand" min-width="130" show-overflow-tooltip />
       <el-table-column label="使用员工" prop="useEmployeeName" min-width="100" />
       <el-table-column label="使用部门" prop="useDeptName" min-width="120" />
       <el-table-column label="存放地点" prop="location" min-width="140" show-overflow-tooltip />

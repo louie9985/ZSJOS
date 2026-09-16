@@ -23,14 +23,6 @@ public class EamAssetImportExcelVO {
 
     private String categoryCode;
 
-    private String brand;
-
-    private String specification;
-
-    private String sn;
-
-    private String barcode;
-
     private LocalDate purchaseDate;
 
     private String location;

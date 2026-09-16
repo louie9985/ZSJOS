@@ -122,13 +122,13 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
 
     default EamAssetDO selectBySnAndCategoryId(String sn, Long categoryId) {
         return selectOne(new LambdaQueryWrapperX<EamAssetDO>()
-                .eq(EamAssetDO::getSn, sn).eq(EamAssetDO::getCategoryId, categoryId));
+                .apply("JSON_UNQUOTE(JSON_EXTRACT(ext_fields, '$.sn')) = {0}", sn).eq(EamAssetDO::getCategoryId, categoryId));
     }
 
     default EamAssetDO selectByIdentityAndCategoryId(String identity, Long categoryId) {
         return selectOne(new LambdaQueryWrapperX<EamAssetDO>()
                 .eq(EamAssetDO::getCategoryId, categoryId)
-                .and(wrapper -> wrapper.eq(EamAssetDO::getSn, identity)
+                .and(wrapper -> wrapper.apply("JSON_UNQUOTE(JSON_EXTRACT(ext_fields, '$.sn')) = {0}", identity)
                         .or().eq(EamAssetDO::getAssetCode, identity)));
     }
 

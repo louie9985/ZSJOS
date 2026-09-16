@@ -25,11 +25,11 @@ public class EamAssetLedgerParser {
     private static final String CATEGORY_CODE = "分类编码";
     private static final Map<String, Boolean> STANDARD_COLUMNS = Map.ofEntries(
             Map.entry("资产名称", true), Map.entry("资产编号", true), Map.entry("数量", true),
-            Map.entry("资产状态", true), Map.entry("品牌型号", true), Map.entry("规格参数", true),
-            Map.entry("序列号", true), Map.entry("条码", true), Map.entry("原值", true),
-            Map.entry("净值", true), Map.entry("购入日期", true), Map.entry("资产来源", true),
-            Map.entry("保修到期日", true), Map.entry("使用人", true), Map.entry("存放地点", true),
-            Map.entry("预计使用年限（月）", true), Map.entry("备注", true), Map.entry("分类编码", true));
+            Map.entry("资产状态", true), Map.entry("购入日期", true), Map.entry("资产来源", true),
+            Map.entry("使用人", true), Map.entry("存放地点", true),
+            Map.entry("备注", true), Map.entry("分类编码", true));
+    private static final java.util.Set<String> RETIRED_COLUMNS = java.util.Set.of(
+            "品牌型号", "规格参数", "序列号", "条码", "原值", "净值", "保修到期日", "预计使用年限（月）");
 
     public List<LedgerRow> parse(byte[] content) {
         try {
@@ -67,6 +67,12 @@ public class EamAssetLedgerParser {
         Map<String, Object> ext = new LinkedHashMap<>();
         Map<String, Object> mapped = new LinkedHashMap<>();
         headers.forEach((name, index) -> {
+            if (RETIRED_COLUMNS.contains(name)) {
+                if (StrUtil.isNotBlank(cell(row, headers, name))) {
+                    errors.add("固定列“" + name + "”已停用；序列号请使用 sn:序列号 自定义列");
+                }
+                return;
+            }
             String value = cell(row, headers, name);
             if (!name.equals("微信密码") && StrUtil.isNotBlank(value)) mapped.put(name, value);
             if (!STANDARD_COLUMNS.containsKey(name) && !name.equals("微信密码") && StrUtil.isNotBlank(value)) {
@@ -78,13 +84,8 @@ public class EamAssetLedgerParser {
         if (StrUtil.isBlank(categoryCode)) errors.add("分类编码为空");
         String assetName = cell(row, headers, "资产名称");
         if (StrUtil.isBlank(assetName)) errors.add("资产名称为空");
-        validateDecimal(mapped.get("原值"), "原值", errors);
-        validateDecimal(mapped.get("净值"), "净值", errors);
-        validatePositiveInteger(mapped.get("预计使用年限（月）"), "预计使用年限（月）", errors);
-        validateDate(mapped.get("保修到期日"), "保修到期日", errors);
         return new LedgerRow(rowNum, categoryCode, assetName,
-                cell(row, headers, "资产编号"), cell(row, headers, "条码"), cell(row, headers, "品牌型号"),
-                cell(row, headers, "序列号"), cell(row, headers, "存放地点"), quantity, status, purchaseDate,
+                cell(row, headers, "资产编号"), cell(row, headers, "存放地点"), quantity, status, purchaseDate,
                 cell(row, headers, "备注"), cell(row, headers, "使用人"), null, null, null, null, ext, mapped, defaults, warnings, errors);
     }
 
@@ -103,21 +104,6 @@ public class EamAssetLedgerParser {
         catch (Exception ignored) { return null; }
     }
 
-    private static void validateDecimal(Object value, String label, List<String> errors) {
-        if (value == null || StrUtil.isBlank(String.valueOf(value))) return;
-        try { new java.math.BigDecimal(String.valueOf(value)); }
-        catch (NumberFormatException e) { errors.add(label + "必须为数字"); }
-    }
-
-    private static void validatePositiveInteger(Object value, String label, List<String> errors) {
-        if (value == null || StrUtil.isBlank(String.valueOf(value))) return;
-        if (parsePositiveInteger(String.valueOf(value)) == null) errors.add(label + "必须为正整数");
-    }
-
-    private static void validateDate(Object value, String label, List<String> errors) {
-        if (value == null || StrUtil.isBlank(String.valueOf(value))) return;
-        if (parseDate(String.valueOf(value)) == null) errors.add(label + "日期格式无效");
-    }
     private static int parseStatus(String value, List<String> warnings) {
         if (StrUtil.isBlank(value)) return EamAssetStatusEnum.IDLE.getStatus();
         return switch (value) {
@@ -140,8 +126,7 @@ public class EamAssetLedgerParser {
         return null;
     }
 
-    public record LedgerRow(Integer rowNum, String categoryCode, String assetName, String assetCode, String barcode,
-                            String brand, String sn, String location, Integer quantity, Integer status,
+    public record LedgerRow(Integer rowNum, String categoryCode, String assetName, String assetCode, String location, Integer quantity, Integer status,
                             LocalDate purchaseDate, String remark, String useUserName, String supervisorName,
                             LocalDate joinDate, Boolean commitmentAccepted, LocalDate commitmentDate,
                             Map<String, Object> extFields, Map<String, Object> mappedFields,

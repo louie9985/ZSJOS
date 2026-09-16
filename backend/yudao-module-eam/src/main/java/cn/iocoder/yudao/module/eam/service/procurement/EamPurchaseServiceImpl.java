@@ -205,6 +205,16 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     private void receiveSerialized(EamReceiptDO receipt, EamPurchaseItemDO item, EamReceiptItemReqVO input,
                                    EamCategoryFieldService.NormalizedExtFields actualExtFields) {
         List<String> serials = normalizeSerials(item, input);
+        boolean supportsSerial = categoryFieldService.getEffectiveFieldList(item.getCategoryId()).stream()
+                .anyMatch(field -> "sn".equals(field.getFieldKey()));
+        if (!serials.isEmpty() && !supportsSerial) {
+            throw exception(FIELD_VALUE_INVALID, "当前分类未配置序列号");
+        }
+        Object customSerial = actualExtFields.values().get("sn");
+        if (serials.isEmpty() && customSerial != null && StrUtil.isNotBlank(String.valueOf(customSerial))) {
+            if (input.getQuantity() != 1) throw exception(PURCHASE_SERIAL_NUMBER_INVALID);
+            serials = List.of(String.valueOf(customSerial).trim());
+        }
         List<String> receivedIdentities = new ArrayList<>();
         List<EamPurchaseSourceDO> sources = sourceMapper.selectListByPurchaseItemId(item.getId());
         for (int i = 0; i < input.getQuantity(); i++) {
@@ -216,10 +226,12 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             assetReq.setName(item.getName());
             assetReq.setCategoryId(item.getCategoryId());
             assetReq.setQuantity(1);
-            assetReq.setSn(sn);
-            assetReq.setOriginalValue(input.getUnitPrice() == null ? item.getUnitPrice() : input.getUnitPrice());
             assetReq.setPurchaseDate(LocalDate.now());
-            assetReq.setExtFields(actualExtFields.values());
+            // 每台设备独立保存序列号，不能把一个共享字段值复制给整批设备。
+            Map<String, Object> assetFields = new LinkedHashMap<>(actualExtFields.values());
+            assetFields.remove("sn");
+            if (sn != null) assetFields.put("sn", sn);
+            assetReq.setExtFields(assetFields);
             Long assetId = assetService.createAsset(assetReq);
             EamAssetDO createdAsset = assetMapper.selectById(assetId);
             receivedIdentities.add(sn == null ? createdAsset.getAssetCode() : sn);

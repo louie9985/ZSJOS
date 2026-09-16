@@ -29,7 +29,7 @@ extend the repository root instructions.
 
 ## UI implementation
 
-- Before changing shared layout, themes, navigation, or component styling, **MUST** read `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions.
+- When changing shared layout, themes, navigation, or component styling, **MUST** consult the relevant parts of `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions. Reuse material already read in the current context unless it changed or is no longer available.
 - Visual decisions (dimensions, tokens, hierarchy, icons, interaction) **MUST** be grounded in the documented design system and existing page implementations. **MUST NOT** approximate from memory.
 - Prefer existing Ant Design, Pro Components, icon, and theme primitives over new custom controls.
 - HRM tabular views **MUST** use the shared `HrmProTable`; management lists enable its advanced toolbar, while detail and editable child tables use its compact mode.
@@ -39,7 +39,7 @@ extend the repository root instructions.
 
 ## Verification commands
 
-Run checks appropriate to the change from `frontend/workbench/`:
+Select checks under root AGENTS.md section 6 from `frontend/workbench/`. These are entry points, not a requirement to run all commands for every edit; use existing test filters for focused coverage:
 
 ```powershell
 npm test
@@ -47,6 +47,7 @@ npm run typecheck
 npm run build
 ```
 
-- UI behavior changes **MUST** also be checked in a real browser at desktop and mobile widths.
+- Visual or interaction changes **MUST** be checked in a real browser on the affected flows and widths. Shared layout or responsive changes require both desktop and mobile widths; bundling, dependencies, routes, assets, build configuration or release acceptance require a production build.
 - Menu, permission, dictionary, authentication, and business API changes **MUST** be checked with real response shapes when the backend is available.
-- If a command or backend is unavailable, report the exact unverified behavior and residual risk.
+- Permission/authentication/tenant changes require the affected allowed/denied and isolation cases. Verify every affected consumer of a shared contract under the root rules.
+- If a necessary command or backend is unavailable, report the exact unverified behavior and residual risk separately from checks that do not apply. Reuse valid results; rerun or broaden checks only for new changes, failures or unresolved risks.

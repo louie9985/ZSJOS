@@ -35,7 +35,7 @@
         <el-form-item label="实际单价"
           ><el-input-number v-model="formData.unitPrice" :min="0" :precision="2" class="!w-full"
         /></el-form-item>
-        <el-form-item v-if="selectedItem?.managementMode === 1" label="序列号/标识">
+        <el-form-item v-if="selectedItem?.managementMode === 1 && supportsSerial" label="序列号">
           <el-input
             v-model="formData.serialText"
             type="textarea"
@@ -48,6 +48,8 @@
           :category-id="selectedItem.categoryId"
           :model-value="formData.actualExtFields"
           context="collection"
+          :exclude-keys="selectedItem.managementMode === 1 ? ['sn'] : []"
+          @fields-loaded="(fields) => (supportsSerial = fields.some((field) => field.fieldKey === 'sn'))"
           @update:model-value="formData.actualExtFields = $event"
         />
       </template>
@@ -136,6 +138,7 @@ const visible = ref(false)
 const submitting = ref(false)
 const action = ref<ActionType>('receive')
 const purchase = ref<ProcurementApi.PurchaseVO>()
+const supportsSerial = ref(false)
 const balances = ref<ProcurementApi.StockBalanceVO[]>([])
 const formRef = ref()
 const formData = reactive({
@@ -188,6 +191,7 @@ const matchingBalances = computed(() =>
 )
 
 const changeItem = () => {
+  supportsSerial.value = false
   formData.quantity = 1
   formData.stockBalanceId = undefined
   formData.serialText = ''
