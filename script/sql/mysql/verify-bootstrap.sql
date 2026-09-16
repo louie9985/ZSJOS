@@ -1765,6 +1765,29 @@ SELECT 'V141 media screen daily snapshot' AS check_name,
             AND table_name='zsjos_media_screen_daily_snapshot' AND column_name='contribution_type')
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_media_screen_daily_snapshot' AND column_name='partner_details_json'), 'PASS','FAIL') AS result;
+-- The media screen joins `zsjos_lead.contribution_user_id_snapshot` against the current staff
+-- roster; an unresolvable id silently drops the lead from every department and member counter.
+-- V255 repaired the ids that the legacy import left pointing at deleted accounts. Any new orphan
+-- means a future import or account cleanup reintroduced the same defect.
+SELECT 'media_screen_contributor_snapshot_resolvable' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM zsjos_lead lead_row
+             WHERE lead_row.deleted=b'0'
+               AND lead_row.contribution_user_id_snapshot IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM system_users user_row
+                               WHERE user_row.id=lead_row.contribution_user_id_snapshot
+                                 AND user_row.deleted=b'0')
+          ), 'PASS', 'FAIL') AS result;
+-- The same join reads contribution_supervisor_user_id_snapshot for the department subtitle.
+SELECT 'media_screen_supervisor_snapshot_resolvable' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM zsjos_lead lead_row
+             WHERE lead_row.deleted=b'0'
+               AND lead_row.contribution_supervisor_user_id_snapshot IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM system_users user_row
+                               WHERE user_row.id=lead_row.contribution_supervisor_user_id_snapshot
+                                 AND user_row.deleted=b'0')
+          ), 'PASS', 'FAIL') AS result;
 SELECT 'V142 partial V139 V140 execution repair' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V142')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
