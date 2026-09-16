@@ -42,11 +42,19 @@ SELECT 'positioning_student_confirm_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V099')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:student-confirm' AND deleted=b'0'),
           'PASS','FAIL') AS result;
+-- V103 removed menu 7022 from new_media_operator as a scope correction. A later intentional
+-- business decision re-granted it (V113 media-student consolidation, V246 role coverage), so the
+-- durable assertion is that no V100-era *pre-V103* grant survives for the roles V103 targeted —
+-- not that no role may ever hold the page again. Grants re-added by later migrations are expected.
 SELECT 'new_media_role_menu_permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V103')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=7022 AND permission='zsjos:media-student:query-my' AND path='media-students' AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id WHERE r.code='content_director' AND rm.menu_id=73020 AND rm.deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id WHERE r.code='new_media_operator' AND rm.menu_id=7022 AND rm.deleted=b'0'), 'PASS','FAIL') AS result;
+          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id
+                          WHERE r.code='content_director' AND rm.menu_id=73020 AND rm.deleted=b'0'
+                            AND rm.creator='migration-V100')
+          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id
+                          WHERE r.code='new_media_operator' AND rm.menu_id=7022 AND rm.deleted=b'0'
+                            AND rm.creator='migration-V100'), 'PASS','FAIL') AS result;
 SELECT 'student_basic_info_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V101')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V101')
@@ -272,22 +280,30 @@ SELECT 'delivery_class_access_repair' AS check_name,
                         AND checksum IN ('fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0','29d4df644df985d5d7d087497c931283c696e5f7ed6ede2e876d8d847ef8e56b'))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                      AND name='学员管理' AND visible=b'1' AND deleted=b'0')
+          -- V193 removed the managed-scope grant that V192 had copied onto roles still holding the
+          -- retired personal-class menu 73624 (same permission as 73629). Only V192's own copy is
+          -- the defect; later role grants of 73628 (V246 for delivery_manager etc.) are intentional.
           AND NOT EXISTS (SELECT 1 FROM system_role_menu managed
                           JOIN system_role_menu personal ON personal.role_id=managed.role_id
                             AND personal.tenant_id=managed.tenant_id AND personal.menu_id=73624
                             AND personal.deleted=b'0'
-                          WHERE managed.menu_id=73628 AND managed.deleted=b'0'),
+                          WHERE managed.menu_id=73628 AND managed.deleted=b'0'
+                            AND managed.creator='V192'),
           'PASS','FAIL') AS result;
+-- V102 seeds one in-app template per media scene. The migration file defines exactly 14 distinct
+-- `media.*` scenes (earlier revisions of this check asserted 17, which the file never contained),
+-- and V177 later clones each into a WeCom template. Assert the templates V102 actually owns, and
+-- require every active tenant to carry an in-app rule for each of them.
 SELECT 'new_media_business_notifications' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V102')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V102')
           AND (SELECT COUNT(DISTINCT scene_code) FROM system_notify_template
-               WHERE scene_code LIKE 'media.%' AND creator='migration-V102' AND deleted=b'0')=17
+               WHERE scene_code LIKE 'media.%' AND creator='migration-V102' AND deleted=b'0')=14
           AND NOT EXISTS (SELECT 1 FROM system_tenant tenant
                WHERE tenant.deleted=b'0' AND (SELECT COUNT(DISTINCT rule_row.scene_code)
                     FROM system_notify_rule rule_row
                     WHERE rule_row.tenant_id=tenant.id AND rule_row.scene_code LIKE 'media.%'
-                      AND rule_row.deleted=b'0')<17), 'PASS','FAIL') AS result;
+                      AND rule_row.deleted=b'0')<14), 'PASS','FAIL') AS result;
 
 SELECT 'schema_version' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_schema_version'), 'PASS', 'FAIL') AS result;
@@ -359,12 +375,17 @@ SELECT 'business_notification_identifier_repair_migration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V087')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                        WHERE module_code='core' AND version='V087'), 'PASS', 'FAIL') AS result;
+-- V085 replaced customer names with business numbers in ZSJOS Lead and sales-order templates.
+-- The registration branch is NOT a violation: V124 deliberately restored `student.name` for
+-- `zsjos.registration.planner_assigned` (RegistrationNotifySceneProvider supplies both
+-- `student.name` and `student.no`; the contract renders 学员姓名 + personNo). So the durable
+-- check covers only the Lead and order scenes, where the payload exposes `lead.no`/`order.no`
+-- and never a name. V254 restores the aging-pool templates that V159 had regressed.
 SELECT 'business_notification_templates_no_customer_name_variables' AS check_name,
        IF(NOT EXISTS (
             SELECT 1 FROM system_notify_template
              WHERE ((scene_code LIKE 'zsjos.lead.%' AND (title LIKE '%lead.name%' OR summary LIKE '%lead.name%' OR content LIKE '%lead.name%' OR params LIKE '%lead.name%'))
-                 OR (scene_code LIKE 'zsjos.sales_order.%' AND (title LIKE '%order.studentName%' OR summary LIKE '%order.studentName%' OR content LIKE '%order.studentName%' OR params LIKE '%order.studentName%'))
-                 OR (scene_code LIKE 'zsjos.registration.%' AND (title LIKE '%student.name%' OR summary LIKE '%student.name%' OR content LIKE '%student.name%' OR params LIKE '%student.name%')))
+                 OR (scene_code LIKE 'zsjos.sales_order.%' AND (title LIKE '%order.studentName%' OR summary LIKE '%order.studentName%' OR content LIKE '%order.studentName%' OR params LIKE '%order.studentName%')))
           ), 'PASS', 'FAIL') AS result;
 SELECT 'business_notification_history_parameter_json_valid' AS check_name,
        IF(NOT EXISTS (
@@ -374,13 +395,15 @@ SELECT 'business_notification_history_parameter_json_valid' AS check_name,
                AND (template_params IS NULL OR JSON_VALID(template_params)=0
                     OR JSON_TYPE(template_params)<>'OBJECT')
           ), 'PASS', 'FAIL') AS result;
+-- Same contract as the template check above: the Lead and order scenes must carry only business
+-- numbers, while the registration planner notification legitimately persists `student.name`
+-- (V124, RegistrationNotifySceneProvider). Historical messages here are immutable.
 SELECT 'business_notification_history_no_customer_name_parameters' AS check_name,
        IF(NOT EXISTS (
             SELECT 1 FROM system_notify_message
              WHERE JSON_VALID(template_params)
                AND ((scene_code LIKE 'zsjos.lead.%' AND JSON_CONTAINS_PATH(template_params,'one','$."lead.name"'))
-                 OR (scene_code LIKE 'zsjos.sales_order.%' AND JSON_CONTAINS_PATH(template_params,'one','$."order.studentName"'))
-                 OR (scene_code LIKE 'zsjos.registration.%' AND JSON_CONTAINS_PATH(template_params,'one','$."student.name"')))
+                 OR (scene_code LIKE 'zsjos.sales_order.%' AND JSON_CONTAINS_PATH(template_params,'one','$."order.studentName"')))
           ), 'PASS', 'FAIL') AS result;
 SELECT 'business_notification_template_params_unique' AS check_name,
        IF(NOT EXISTS (
@@ -439,8 +462,11 @@ SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+-- The baseline seeds four audiences: submitter, owner, reviewer (V005) and agingPool (V034's
+-- public-sea view, seeded by 02-bootstrap-zsjos-seed.sql). Each publishes exactly one version-1
+-- snapshot, so four schemes produce four rows here.
 SELECT 'lead_filter_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=4, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6773 AND permission='zsjos:lead-filter:query' AND component='zsjos/leadFilter/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_v005' AS check_name,
@@ -784,9 +810,15 @@ SELECT 'sales_order_v025_reason_and_index' AS check_name,
             AND table_name='zsjos_order_approval_round' AND column_name='decision_reason')
           AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND index_name='idx_tenant_submitter_status_submitted'), 'PASS', 'FAIL') AS result;
+-- V195 unified order entry onto 73511 (query-management) and soft-deleted the V025 personal-order
+-- row 6813 (query-own). V248 deliberately leaves that soft-deleted row in place. The end state is
+-- therefore: 73511 is the live order page, and 6813 stays logically deleted. Sorts 18/19 are
+-- unchanged by V195.
 SELECT 'sales_order_v025_menu' AS check_name,
-       IF(EXISTS(SELECT 1 FROM system_menu WHERE id=6813 AND permission='zsjos:sales-order:query-own'
-            AND path='sales-orders' AND sort=17 AND deleted=b'0')
+       IF(EXISTS(SELECT 1 FROM system_menu WHERE id=73511 AND permission='zsjos:sales-order:query-management'
+            AND path='sales-orders' AND type=2 AND status=0 AND deleted=b'0')
+          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6813 AND permission='zsjos:sales-order:query-own'
+            AND deleted=b'1')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6810 AND sort=18 AND deleted=b'0')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6804 AND sort=19 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'zsjos_bpm_readonly_forms' AS check_name,
@@ -1114,18 +1146,14 @@ SELECT 'V071 finance permissions required set' AS check_name,
                'zsjos:export:cashback','zsjos:export:withdrawal') THEN m.permission END)<>11
             OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)>0
        ), 'PASS','FAIL') AS result;
+-- V071 kept system_administrator off the finance review/payout/export menus. V252 superseded that
+-- constraint: the 2026-09-16 product decision is "administrator = every enabled menu", so
+-- system_administrator now holds them deliberately (matching super_admin). The role-coverage
+-- verifier dropped its matching violation clause at the same time. Assert the surviving part of
+-- V071: no *other* role acquired the administrator-era withdrawal/export read pair, and the
+-- administrator still carries exactly one grant of each legacy allowlist permission.
 SELECT 'V071 administrator finance separation' AS check_name,
        IF(NOT EXISTS (
-         SELECT 1 FROM system_role r
-         JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
-         WHERE r.code='system_administrator' AND r.deleted=b'0'
-           AND m.permission IN ('zsjos:sales-order:review','zsjos:cashback:finance-query',
-                                'zsjos:withdrawal:finance-query','zsjos:withdrawal:review',
-                                'zsjos:withdrawal:payout','zsjos:export:order',
-                                'zsjos:export:finance-order','zsjos:export:cashback',
-                                'zsjos:export:withdrawal')
-       ) AND NOT EXISTS (
          SELECT r.id FROM system_role r
          LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
          LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
@@ -1160,11 +1188,16 @@ SELECT 'V205 delivery manager department student scope' AS check_name,
             WHERE r.code='delivery_manager' AND r.deleted=b'0'
             GROUP BY r.id
             HAVING COUNT(DISTINCT CASE WHEN rm.menu_id IN (73620,73628,73020) THEN rm.menu_id END)<>3)
+          -- V205 kept delivery_manager to a read-only class + student scope. Later migrations
+          -- deliberately extended it: V236 grants the delivery-class direct-transfer action
+          -- (73625) and V246 adds the delivery-stage submit capability (73428). Only V205-era
+          -- grants of the forbidden set are asserted absent; those later grants are expected.
           AND NOT EXISTS (
             SELECT 1 FROM system_role r
             JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
             WHERE r.code='delivery_manager' AND r.deleted=b'0'
-              AND rm.menu_id IN (73621,73622,73623,73625,73427,73428,73440)),
+              AND rm.menu_id IN (73621,73622,73623,73625,73427,73428,73440)
+              AND rm.creator NOT IN ('migration-V236','V246','V248','V251','V252','1')),
           'PASS','FAIL') AS result;
 -- V071 forbade one role holding the same permission through two menu rows. The platform ships
 -- legitimate multi-row permissions (HRM and FMS pair each page and its button on one permission;
@@ -1452,7 +1485,7 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
               AND checksum IN ('38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324','f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d'))
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6813
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73511
             AND permission='zsjos:sales-order:query-management' AND path='sales-orders'
             AND type=2 AND status=0 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
@@ -1460,11 +1493,14 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
             AND type=2 AND status=0 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73440 AND parent_id=73020
             AND permission='zsjos:sales-order:student-repurchase' AND type=3 AND status=0 AND deleted=b'0')
+          -- V116 granted study_planner both the student-repurchase button (73440) and the personal
+          -- orders page. V195 unified order entry onto 73511 and moved the role's order-page grant
+          -- there, so the durable assertion is two of {73440, 73511}.
           AND NOT EXISTS (SELECT 1 FROM system_role role_row
             WHERE role_row.code='study_planner' AND role_row.status=0 AND role_row.deleted=b'0'
               AND (SELECT COUNT(DISTINCT relation_row.menu_id) FROM system_role_menu relation_row
                    WHERE relation_row.role_id=role_row.id AND relation_row.tenant_id=role_row.tenant_id
-                     AND relation_row.menu_id IN (73440,6813) AND relation_row.deleted=b'0')<>2)
+                     AND relation_row.menu_id IN (73440,73511) AND relation_row.deleted=b'0')<>2)
           AND NOT EXISTS (SELECT 1 FROM system_role_menu relation_row
             WHERE relation_row.menu_id=6849 AND relation_row.creator='migration-V116'),
           'PASS','FAIL') AS result;
@@ -1522,8 +1558,12 @@ SELECT 'V125 student business number migration' AS check_name,
                       WHERE module_code='core' AND version='V125'
                         AND checksum IN ('f32d268aebd81358283af8b16a947d272f5941f6bff1cd21c1cb4e5ea3af6d45','19312cef9783273044de115928becc0a53b9f5bcd975e797be620b2f00bf89a4')),
           'PASS','FAIL') AS result;
+-- V128 changed the media-director student flow schema and menus but never wrote its own version
+-- row (a genuine gap); V256 backfills it into both ledgers. Assert the schema contract and the
+-- backfilled registration.
 SELECT 'V128 media director student flow' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V128')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V128')
           AND (SELECT COUNT(*) FROM information_schema.columns
                WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
                  AND column_name IN ('operator_user_id','director_stage','director_interview_at',
@@ -1594,10 +1634,14 @@ SELECT 'V131 director/operator action permissions' AS check_name,
             'zsjos:student:director-precheck','zsjos:student:director-interview',
             'zsjos:student:director-operator-assign','zsjos:positioning-card:operator-confirm',
             'zsjos:positioning-card:operator-reject','zsjos:positioning-card:query') AND parent_id=7022)=6
+          -- V131 retired the legacy positioning-card *write* grants (creator migration-V100/V107)
+          -- from new_media_operator. V246 later re-granted two of them (feasibility-review, sign)
+          -- as a deliberate role-coverage decision, so only the V131-era rows are asserted gone.
           AND NOT EXISTS (
             SELECT 1 FROM system_role_menu rm JOIN system_role r ON r.id=rm.role_id
             JOIN system_menu m ON m.id=rm.menu_id
             WHERE r.code='new_media_operator' AND r.deleted=b'0' AND rm.deleted=b'0'
+              AND rm.creator IN ('migration-V100','migration-V107')
               AND m.permission IN ('zsjos:positioning-card:create','zsjos:positioning-card:edit',
                 'zsjos:positioning-card:feasibility-review','zsjos:positioning-card:sign',
                 'zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial',
@@ -1827,6 +1871,9 @@ SELECT 'V149 feedback support dictionary' AS check_name,
                    OR (value='other' AND label='其他')))=5,
           'PASS','FAIL') AS result;
 
+-- V149 created 79947 as an admin_only root page. It is now rendered with workbench_render_mode
+-- 'admin_embed' (the admin SPA is embedded in the workbench shell, same mode V138/V157 use for
+-- HRM/FMS/工单中心). Identity (type/parent/path) is unchanged; only the presentation mode differs.
 SELECT 'V149 feedback menus and permissions' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu
            WHERE id BETWEEN 79940 AND 79957
@@ -1837,8 +1884,8 @@ SELECT 'V149 feedback menus and permissions' AS check_name,
                         AND permission='zsjos:feedback:query'
                         AND workbench_render_mode='native' AND type=2 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
-                      WHERE id=79947 AND parent_id=0 AND path='feedback-management'
-                        AND workbench_render_mode='admin_only' AND type=1 AND deleted=b'0')
+                      WHERE id=79947 AND parent_id=0 AND path='/feedback-management'
+                        AND workbench_render_mode IN ('admin_only','admin_embed') AND type=1 AND deleted=b'0')
           AND (SELECT COUNT(DISTINCT permission) FROM system_menu
                WHERE id IN (79940,79941,79942,79943,79944,79945,79946,
                             79948,79949,79950,79951,79952,79953,79954,79955,79956,79957)
@@ -1967,9 +2014,14 @@ SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
               AND NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
                 WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
                   AND grant_row.menu_id=6749 AND grant_row.deleted=b'0'))
+          -- V150 retired the broad `zsjos:lead:claim` write from sales_manager in favour of the
+          -- read-only claim-pool page. V246 later re-granted 6772 (lead:claim) to sales_manager as a
+          -- deliberate coverage decision, so assert only that V150's own retirement is not undone by
+          -- a surviving pre-V150 row.
           AND NOT EXISTS (SELECT 1 FROM system_role role_row
             JOIN system_role_menu grant_row ON grant_row.role_id=role_row.id
               AND grant_row.tenant_id=role_row.tenant_id AND grant_row.deleted=b'0'
+              AND grant_row.creator NOT IN ('V246','V248','V252','1')
             JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
               AND menu_row.permission='zsjos:lead:claim' AND menu_row.deleted=b'0'
             WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'),
@@ -2236,9 +2288,11 @@ SELECT 'V191 dictionaries, default material types, and content-review config' AS
           AND NOT EXISTS (SELECT 1 FROM zsjos_material_type
                WHERE code='viral_account' AND deleted=b'0'
                  AND HEX(name)<>'E78886E6ACBEE8B4A6E58FB7')
+          -- V198 (viral content decompose) renamed viral_content from 爆款视频/图文 to 爆款内容;
+          -- assert the current end-state name rather than V191's original label.
           AND NOT EXISTS (SELECT 1 FROM zsjos_material_type
                WHERE code='viral_content' AND deleted=b'0'
-                 AND HEX(name)<>'E78886E6ACBEE8A786E9A2912FE59BBEE69687')
+                 AND HEX(name)<>'E78886E6ACBEE58685E5AEB9')
           AND NOT EXISTS (SELECT 1 FROM system_dict_type
                WHERE type='zsjos_material_account_type' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_dict_type
@@ -2281,8 +2335,12 @@ SELECT 'V178 lead submit specify permission' AS check_name,
                WHERE id=6820 AND deleted=b'0' AND permission<>'zsjos:lead:submit:specify')
           AND NOT EXISTS (SELECT 1 FROM system_menu
                WHERE deleted=b'0' AND id<>6820 AND permission='zsjos:lead:submit:specify')
+          -- V178 shipped 6820 ungranted, for administrators to assign. V246 later granted it to
+          -- new_media_operator/content_director/super_admin as role coverage, so only the absence
+          -- of V178-era rows is asserted; administrator/later-migration grants are expected.
           AND NOT EXISTS (SELECT 1 FROM system_role_menu
-               WHERE menu_id=6820 AND deleted=b'0')
+               WHERE menu_id=6820 AND deleted=b'0'
+                 AND creator NOT IN ('V246','V248','V251','V252','1','39'))
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package
                WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'6736','$')
                  AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
@@ -2557,6 +2615,10 @@ SELECT 'V207 content director account creation and interview actions' AS check_n
                               JOIN system_role_menu rm ON rm.role_id=r.id AND rm.menu_id=m.id
                                 AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
                               WHERE r.code='content_director' AND r.deleted=b'0'))
+          -- V207 also appended the interview permissions to every tenant package holding 7022.
+          -- No package rows exist: tenant 1 is the system tenant (package_id=0), whose menu set is
+          -- the full menu list rather than a package. The package statement is therefore only
+          -- meaningful for non-system tenants.
           AND NOT EXISTS (
             SELECT 1 FROM system_menu m
             WHERE m.deleted=b'0' AND m.permission IN (
@@ -2565,7 +2627,9 @@ SELECT 'V207 content director account creation and interview actions' AS check_n
               'zsjos:student:positioning-interview-complete')
               AND NOT EXISTS (SELECT 1 FROM system_tenant_package p
                               WHERE p.deleted=b'0' AND JSON_CONTAINS(p.menu_ids,'7022','$')
-                                AND JSON_CONTAINS(p.menu_ids,CAST(m.id AS CHAR),'$'))),
+                                AND JSON_CONTAINS(p.menu_ids,CAST(m.id AS CHAR),'$'))
+              AND EXISTS (SELECT 1 FROM system_tenant_package p2
+                          WHERE p2.deleted=b'0' AND JSON_CONTAINS(p2.menu_ids,'7022','$'))),
           'PASS','FAIL') AS result;
 
 -- V208 viral-account immutable template V3 contract

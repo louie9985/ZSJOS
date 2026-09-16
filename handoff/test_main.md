@@ -189,3 +189,27 @@
 - Verification evidence: 测试库只读审计确认 `price_unit` NULL 行数为 0；V245 一次性 MySQL 重复执行和字段元数据验证已通过；`cmp`、`git diff --check`、静态 manifest/migration/mapping 检查通过；未执行共享数据库 migrate。
 - Dependency or integration impact: 本地 migrator 镜像已刷新；测试库仍停在 Core V244，V245 尚未执行；V211 删除范围仍需单独确认。
 - Remaining work: 在确认备份、删除范围和执行窗口后再运行正式 migrate；迁移后运行完整 `verify`，并关注 V245 字段与历史数据快照行为。
+
+### 2026-09-16 15:40:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 抽离通用菜单权限给普通员工角色——业务角色只保留岗位专属业务功能，人人需要的（首页等）归 normal_user。
+- Key decisions: 授权是并集语义，通用集移交给 `normal_user` 后账号可见范围不变，故不新建角色而是复用既有 normal_user（tenant 1 有角色账号中 41/42 已持有）；通用集运行时计算（"tenant 1 全部启用角色的共同持有菜单"=45 项）而非写死 ID；`super_admin` 不撤销（超管不受菜单授权限制）；撤销前预检"持有业务角色但无 normal_user"的账号，存在则整批中止；撤销后必须**回补祖先目录**（6735 工作台 / 73600 日历是纯容器，缺父节点会让子页面"有权限但界面不可达"，且并集比对看不出）。
+- Result: `script/sql/mysql/migrations/V251__universal_menu_baseline.sql` 已应用开发库。通用集 45 项仅 `normal_user`/`super_admin` 持有（各 45），32 个业务角色通用授权归零，`normal_user` 共 103 项；逐账号并集比对 0 变化；悬空授权 0；有效关系 3817 → 2464（撤销 1395 + 回补 42）。`verify-role-menu-coverage.sql` 新增业务角色持有通用菜单 / 账号覆盖两组检查。
+- Changed files: `script/sql/mysql/migrations/V251__universal_menu_baseline.sql`、`script/sql/mysql/verify-role-menu-coverage.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: 事务内 dry-run 先行（union_changed_users=0、universal=45）；应用后 C1/C2/C3/C4 全绿；`verify-role-menu-coverage.sql` 全 7 组检查 0 行（含 V246/V251 版本登记）；`reconcile production --apply` 校正 V251 台账校验和为文件字节哈希；`plan production` = READY。
+- Dependency / integration impact: 需随 backend 同步部署。**部署前置**：任何持有业务角色但未持有 `normal_user` 的账号必须先补授该角色（当前 tenant 1 仅账号 1/super_admin 例外）。后端 `PermissionServiceImpl.getRoleMenuListByRoleId` 的并集语义是本次收敛成立的前提，若改为"取交集"或"按角色取第一个"会立即缩减可见范围。
+- Remaining work: `system_administrator` 持有 6741/79980/79990 三个 `parent_id=1` 的页面但未持有菜单 1，前端会丢弃这三个节点（超管不受影响）；需补授菜单 1 或改挂父节点。tenant 1 有 49 个账号无任何角色（历史销售/运营/离职账号），是否补授 `normal_user` 未决——若补授，其可见范围将从 0 变为 45 项通用基线。
+
+### 2026-09-16 16:20:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 产品口径修正——「管理员拥有所有菜单权限」；并明确角色分配不由我调整，只整理角色的菜单权限。
+- Key decisions: 把 `system_administrator` 从 V071 的按需 allowlist 改为持有**全部启用菜单**（2245 项，与 `super_admin` 可见范围一致）。V246 以来"新增业务页需人工判断补授"的做法作废；今后授权规则只有三条——通用菜单给 `normal_user`、全量菜单给 `system_administrator`/`super_admin`、岗位专属菜单给对应业务角色单独特评。禁用菜单（`status=1`：工作计划模块 + 框架自带支付/公众号/商城/CRM/ERP/AI/IoT/MES/WMS）不授予，与超管的框架行为一致（`getPermissionInfo` 会 `filterDisableMenus`）。**放弃**此前"禁止管理员持有财务复核与资金导出权限"的约束（全量与该约束不可兼得），并在文档中显式记录该代价。不改动任何用户-角色分配。
+- Result: `script/sql/mysql/migrations/V252__system_administrator_full_menu.sql` 已应用开发库；`system_administrator` 232 → 2245 项，C1 缺失 0、C2 总数 2245。`verify-role-menu-coverage.sql` 移除管理员财务 violation 条款，4) 悬空检查改为只统计"父节点本身启用"的授权行（新增 4a) 单独列出 88 行"父停用/子启用"历史数据，属提示非缺陷），新增 V252 版本登记检查。授权关系总数 2464 → 4477。
+- Changed files: `script/sql/mysql/migrations/V252__system_administrator_full_menu.sql`、`script/sql/mysql/verify-role-menu-coverage.sql`、`docs/architecture/zsjos-role-permission-matrix.md`、`script/sql/mysql/migrations/README.md`。
+- Verification: 事务内 dry-run 先行（grants 2245 = 启用菜单数）；应用后 C1=0、C2=2245/2245；`verify-role-menu-coverage.sql` 全组通过（orphan-grant 0 行）；`reconcile production --apply` 已对齐 V252 台账校验和为文件字节哈希；`plan production` = READY。
+- Dependency / integration impact: 需随 backend 同步部署。**职责分离影响**：`system_administrator` 现在可执行成交订单审批、返现查询、提现审核/打款与全部资金导出；若产品要求保留职责分离，需改为"全量菜单 − 财务黑名单"并恢复 verifier 的 violation 条款。管理员角色授权行数较大（2245），后续新增菜单需同时补 `system_administrator` 与 `super_admin`（或改为角色继承机制）。
+- Remaining work: 停用模块下 88 行"父停用、子启用"的菜单数据为历史遗留，是否清理或补授父级未决。其余同上一节。

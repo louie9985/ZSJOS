@@ -13,7 +13,7 @@
     <div v-if="catalogLoading" class="catalog-state"><el-icon class="is-loading"><Loading /></el-icon><span>正在加载可筛选字段</span></div>
     <el-alert v-else-if="catalogError" type="error" title="筛选字段加载失败" show-icon :closable="false"><template #default><el-button link type="primary" @click="loadCatalog">重试</el-button></template></el-alert>
     <el-empty v-else-if="!fields.length" description="当前场景没有可用筛选字段" />
-    <ZsjosAdvancedFilterGroup v-else :model-value="draft" :fields="fields" :depth="0" :total="draftCount" @update:model-value="updateDraft" @retry-options="retryOptions" />
+    <ZsjosAdvancedFilterGroup v-else :model-value="draft" :fields="fields" :relative-date-options="relativeDateOptions" :depth="0" :total="draftCount" @update:model-value="updateDraft" @retry-options="retryOptions" />
     <template #footer><el-button @click="clear">清空全部</el-button><el-button type="primary" @click="visible = false">关闭</el-button></template>
   </el-drawer>
 </template>
@@ -29,6 +29,7 @@ import ZsjosAdvancedFilterGroup from './ZsjosAdvancedFilterGroup.vue'
 const props = defineProps<{ scene: Api.AdvancedFilterScene; placeholder: string; keyword?: string }>()
 const emit = defineEmits<{ change: [value?: Api.AdvancedFilterGroup]; search: [value: string] }>()
 const visible = ref(false), fields = ref<Api.AdvancedFilterField[]>([]), searchText = ref(props.keyword || '')
+const relativeDateOptions = ref<Array<{ value: string; label: string }>>([])
 const catalogLoading = ref(true), catalogError = ref(false)
 const blank = (): Api.AdvancedFilterGroup => ({ logic: 'AND', conditions: [], groups: [] })
 const draft = ref(blank())
@@ -61,15 +62,20 @@ const removeTag = (item: { groupIndex: number; index: number }) => {
   if (item.groupIndex < 0) updateDraft({ ...draft.value, conditions: draft.value.conditions.filter((_, index) => index !== item.index) }, true)
   else updateDraft({ ...draft.value, groups: draft.value.groups.map((group, index) => index === item.groupIndex ? { ...group, conditions: group.conditions.filter((_, conditionIndex) => conditionIndex !== item.index) } : group) }, true)
 }
-const summarize = (condition: Api.AdvancedFilterCondition) => {
+const durationSummary = (condition: Api.AdvancedFilterCondition) => {
   const field = fieldMap.value[condition.fieldKey]
-  if (condition.fieldKey !== 'duration.diff') return `${field?.group || ''} · ${field?.label || '筛选字段'} ${operatorLabels[condition.operator] || condition.operator}`
   const options = field?.options?.length ? field.options : fields.value.filter((item) => item.valueType === 'date').map((item) => ({ value: item.fieldKey, label: item.label }))
   const start = options.find((option) => option.value === condition.startFieldKey)?.label || '开始时间'
   const end = options.find((option) => option.value === condition.endFieldKey)?.label || '结束时间'
   const unit = durationUnitLabels[condition.unit || 'hour'] || condition.unit || ''
   if (condition.operator === 'between') return `${end} - ${start} ${durationOperatorLabels.between} ${condition.valueFrom ?? ''} - ${condition.valueTo ?? ''} ${unit}`
   return `${end} - ${start} ${durationOperatorLabels[condition.operator] || condition.operator} ${condition.value ?? ''} ${unit}`
+}
+const summarize = (condition: Api.AdvancedFilterCondition) => {
+  const field = fieldMap.value[condition.fieldKey]
+  if (condition.fieldKey === 'duration.diff') return durationSummary(condition)
+  const value = condition.operator !== 'relative' ? '' : ` ${relativeDateOptions.value.find((item) => item.value === condition.value)?.label || condition.value || ''}`
+  return `${field?.group || ''} · ${field?.label || '筛选字段'} ${operatorLabels[condition.operator] || condition.operator}${value}`
 }
 const sourceOptions = async (source?: string): Promise<Api.AdvancedFilterOption[]> => {
   if (!source) return []
@@ -92,6 +98,7 @@ const loadCatalog = async () => {
   catalogLoading.value = true; catalogError.value = false
   try {
     const catalog = await Api.getCatalog(props.scene)
+    relativeDateOptions.value = catalog.relativeDateOptions || []
     fields.value = catalog.fields.map((field) => field.optionSource && !field.options.length ? { ...field, optionsLoading: true } : field)
     await Promise.all(catalog.fields.map(async (field) => {
       if (!field.optionSource || field.options.length) return

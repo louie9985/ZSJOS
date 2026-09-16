@@ -465,10 +465,9 @@ export default function AccountProfilePanel({
     if (f.type === "image")
       return (
         <Space direction="vertical">
-          {files[f.key] && (
-            <>
-              <Image width={90} src={safeLink(files[f.key].previewUrl)} />
-            </>
+          {/* 主页图只在左栏展示一次，字段控制区不再重复预览。 */}
+          {f.key !== "cover" && files[f.key] && (
+            <Image width={90} src={safeLink(files[f.key].previewUrl)} />
           )}
           <Space>
             <Upload
@@ -925,32 +924,34 @@ export default function AccountProfilePanel({
             }
           />
         )}
-        {/* 定高版式：左栏封面固定在顶部、操作按钮贴在其下；右栏表单区各自滚动。 */}
+        {/* 定高版式：与账号主页同构 —— 左栏主页图 + 右侧三列字段卡片，各列内部滚动。 */}
         <div className="account-profile-editor" ref={body}>
           <aside className="account-profile-editor-aside">
-            <div className="account-profile-cover" data-profile-key="cover">
-              {files.cover && safeLink(files.cover.previewUrl) ? (
-                <Image src={safeLink(files.cover.previewUrl)} />
-              ) : (
-                <>
-                  <FileImageOutlined />
-                  <span>主页图尚未上传</span>
-                </>
-              )}
-            </div>
-            <div className="account-profile-editor-actions">
-              {fields
-                .filter((f) => f.key === "cover")
-                .map((f) => (
-                  <div key={f.key}>{control(f)}</div>
-                ))}
-            </div>
-            <div className="account-profile-legend">
-              {fields
-                .filter((f) => f.key === "cover")
-                .map((f) => (
-                  <span key={f.key}>{tag(f)}</span>
-                ))}
+            <div className="account-profile-editor-cover" data-profile-key="cover">
+              <div className="account-profile-cover">
+                {files.cover && safeLink(files.cover.previewUrl) ? (
+                  <Image src={safeLink(files.cover.previewUrl)} />
+                ) : (
+                  <>
+                    <FileImageOutlined />
+                    <span>主页图尚未上传</span>
+                  </>
+                )}
+              </div>
+              <div className="account-profile-editor-actions">
+                {fields
+                  .filter((f) => f.key === "cover")
+                  .map((f) => (
+                    <div key={f.key}>{control(f)}</div>
+                  ))}
+              </div>
+              <div className="account-profile-legend">
+                {fields
+                  .filter((f) => f.key === "cover")
+                  .map((f) => (
+                    <span key={f.key}>{tag(f)}</span>
+                  ))}
+              </div>
             </div>
             <p>学员：{profile.studentName || "未记录"}</p>
             <p>{account.accountNo}</p>

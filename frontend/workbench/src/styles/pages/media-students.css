@@ -563,16 +563,18 @@
 .account-profile-row > div:first-child .anticon + .anticon { margin-inline-start: var(--crm-sp-1); }
 .account-profile-history { margin-top: var(--crm-sp-5); }
 .account-profile-history article { padding-block: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 编辑弹窗：与只读展示区同构 —— 左栏主页图，右侧三组各一列卡片，卡片内部各自滚动。 */
+/* 编辑弹窗：与账号主页同构 —— 左栏主页图，右侧三组各一列卡片，卡片内部各自滚动。 */
 .account-profile-editor { display: grid; height: 65vh; min-height: 0; grid-template-columns: 230px minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1.2fr); gap: var(--crm-gap); padding: var(--crm-pane-pad); }
 .account-profile-editor-aside { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
 .account-profile-editor-aside p { margin: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+/* 主页图是左栏里居中的小卡片，与只读展示区版式一致；上传/移除按钮贴在其下。 */
+.account-profile-editor-cover { display: flex; flex: none; flex-direction: column; gap: var(--crm-sp-2); }
 .account-profile-editor-aside .account-profile-cover { flex: none; min-height: 180px; margin-bottom: 0; }
 .account-profile-editor-actions { display: grid; flex: none; gap: var(--crm-sp-2); }
-.account-profile-editor-actions .ant-space { display: flex; width: 100%; }
-.account-profile-editor-actions .ant-space-item,
-.account-profile-editor-actions .ant-btn,
-.account-profile-editor-actions .ant-upload { width: 100%; }
+.account-profile-editor-actions > .ant-space { display: flex; width: 100%; flex-wrap: wrap; }
+/* 只有顶层按钮撑满左栏宽度；“移除”等联排按钮保持自身宽度。 */
+.account-profile-editor-actions > .ant-space > .ant-space-item > .ant-btn,
+.account-profile-editor-actions > .ant-space > .ant-space-item > .ant-upload { width: 100%; }
 .account-profile-editor-main { display: contents; }
 .account-profile-editor-toolbar { display: flex; grid-column: 2 / -1; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; }
 /* 三列卡片复用 .account-profile-section / .account-profile-section-body 的定高内滚规则。 */

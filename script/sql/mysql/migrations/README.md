@@ -1315,6 +1315,64 @@ grants, all expected to return zero rows. V246 no longer grants `system_administ
 `super_admin`, and the permission matrix forbids the administrator from holding financial review
 or fund-movement permissions.
 
+### V251 universal menu baseline
+
+V246 granted the same 45 "everyone needs this" workbench menus (home, calendars, work-order
+center, feedback, delivery plan, my-assets/purchase request) to all 33 roles — 1485 duplicated
+rows, and a maintenance burden where one new shared menu meant editing 33 roles. V251 moves that
+set to a single role, `normal_user`, which is already the de-facto base role: V246 gave it every
+employee self-service capability (leads, students, work orders, assets, notices, HR portal, BPM,
+messaging, material browsing). Authorization is a union over the user's roles
+(`PermissionServiceImpl.getRoleMenuListByRoleId`), so as long as an account keeps `normal_user`,
+its visible menu set is unchanged — V251 verifies this per user and reports 0 changes.
+
+Two subtleties the migration has to handle:
+
+- **Ancestor backfill.** The universal set contains two pure container directories, `6735 工作台`
+  and `73600 日历`, which business pages hang under (lead management, order management, class
+  management, material library, exam calendar…). `get-permission-info` returns only directly
+  granted menus and the frontend drops a child whose parent is missing, so revoking the container
+  would leave those pages authorized but unreachable — and a union comparison cannot see that
+  degradation. V251 iterates a "grant the parent of every granted menu" closure (5 passes) after
+  the revoke, and reports orphan grants as a check.
+- **Coverage precondition.** If an account holds a business role but not `normal_user`, the move
+  would shrink its visible set. V251 aborts the whole script if any such account exists (account 1,
+  the `super_admin`, excepted).
+
+The set is computed at runtime as "menus held by every enabled role in tenant 1" rather than a
+hard-coded 45 ids. `normal_user` and `super_admin` are not revoked from (`super_admin` is not
+constrained by menu grants anyway). After V251 the universal set is still 45, held only by
+`normal_user` and `super_admin`; `normal_user` holds 103 grants total and every business role's
+own permission count and union visibility are unchanged.
+
+### V252 administrator holds the full menu tree
+
+Product decision (2026-09-16): **an administrator holds every menu permission.** V252 grants
+`system_administrator` all 2245 enabled menus, matching `super_admin`'s visible set.
+
+The previous "curated allowlist" approach (V071 onward) failed in two ways: new pages were added
+without a corresponding grant — 2013 of 2245 menus were missing when measured — and the role held
+`6741`/`79980`/`79990`, whose parent is menu 1 (系统管理), without holding menu 1 itself, so the
+frontend dropped those three nodes. Permission present, screen absent.
+
+With the rule unified, new menus need only three decisions: shared workbench menus go to
+`normal_user` (V251); everything goes to `system_administrator` and `super_admin`; role-specific
+business menus go to the owning role after review.
+
+**Trade-off, for the product owner:** full-menu access is incompatible with the older rule that
+forbade this role financial review and fund-movement permissions. V252 therefore drops that rule —
+`system_administrator` now holds `zsjos:sales-order:review`, `zsjos:cashback:finance-query`, the
+withdrawal review/payout permissions, and the five export permissions. The corresponding clause
+was removed from `verify-role-menu-coverage.sql`. If separation of duties must be preserved, switch
+to "all menus minus a finance denylist" and restore the verifier clause.
+
+Disabled menus (`status=1`: the work-plan module and the framework's pay/mp/mall/CRM/ERP/AI/IoT/
+MES/WMS modules) are not granted, matching `super_admin`'s framework behaviour
+(`getPermissionInfo` runs `filterDisableMenus`). 104 rows grant an enabled child under a disabled
+parent; V252 does not backfill those parents, and `verify-role-menu-coverage.sql` check 4a) lists
+them as informational. Check 4) now only counts a grant as orphaned when the parent is itself an
+enabled menu.
+
 ### test-fresh now follows the real install path
 
 `zsjos-db test-fresh` loaded only `bootstrap.sql` plus `V071` and then ran the full
@@ -1374,3 +1432,47 @@ Concretely:
 The backlog is now closed: `verify-bootstrap.sql` carries no checksum assertion that fails on the
 development database, and `test-fresh` exercises the real install path (baseline, then every
 unregistered migration, then verification) rather than the baseline plus `V071` only.
+
+## Verifier assertions must hold at end-state, not at migration time
+
+`verify-bootstrap.sql` runs once, after every enabled migration, so each of its rows is an
+assertion about the **final** database — not about the state the owning migration left behind.
+Those two differ whenever a later migration or an administrator changes the same rows, and the
+difference is the single largest source of false FAILs in this file (16 at the time of writing).
+
+Three rules keep the assertions honest without turning them into noise:
+
+1. **Scope a negative grant assertion to the writer that caused it.** "Role X must not hold menu Y"
+   is only meaningful against the rows the migration actually wrote. Later migrations and the
+   System role UI legitimately add grants. Filter on `creator` (or `updater`) — e.g.
+   `AND rm.creator NOT IN ('V246','V248','V251','V252','1')` — so the migration's own revoke is
+   still asserted while intentional later grants are not reported. `system_role_menu.creator`
+   records the migration id (`V246`, `migration-V100`, …) or the acting admin user id (`1`, `39`).
+
+2. **Re-point a superseded fact at the current end-state.** When a later migration legitimately
+   changes an identity (menu renumbered, dictionary label renamed, render mode switched, page
+   unified onto a new id), update the predicate to the new fact and say in a comment which
+   migration changed it and why. Do not delete the check — the identity contract is still worth
+   asserting, just against the value that is now correct.
+
+3. **A data gap is not a stale assertion — fix the data.** If the assertion encodes a real
+   contract that the database violates (missing cashback defaults, a page granted without its
+   query leaf, a privacy contract regressed), write a forward migration. Two traps to watch for:
+   - **Seed-order gaps.** A migration that backfills rows inserted by a *later* migration does
+     nothing on a fresh install. V063/V122 filled first-level category defaults before V219
+     inserted the first-level categories; nothing ever went back. Prefer filling defaults at the
+     point of insert, or add the backfill to the migration that creates the rows.
+   - **Order-sensitive negative assertions.** "No role holds X" is only durable if no later
+     migration grants X. When adding such a grant deliberately, update the assertion in the same
+     change.
+
+Also: keep a version-registration write in **every** migration. V128 changed schema and menus
+without recording itself in either ledger, and V131 recorded only the legacy table; both left
+assertions permanently red until the V254 backfill. Assertions that gate on
+`EXISTS (… zsjos_schema_version WHERE version='Vnnn')` cannot pass otherwise.
+
+A migration that stops mid-file also stops every later migration (the MySQL client aborts the
+batch on the first error). V251 shipped a precheck that referenced a `TEMPORARY` table twice in one
+statement, which MySQL rejects with `Can't reopen table`; on a fresh database nothing after it ran.
+Keep `TEMPORARY` tables referenced once per statement, and re-run `test-fresh` after editing an
+unapplied migration.

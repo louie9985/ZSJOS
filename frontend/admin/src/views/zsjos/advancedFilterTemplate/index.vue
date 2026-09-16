@@ -185,6 +185,7 @@
             v-else
             :model-value="form.filter"
             :fields="fields"
+            :relative-date-options="relativeDateOptions"
             :depth="0"
             :total="countGroup(form.filter)"
             @update:model-value="updateFilter"
@@ -262,6 +263,8 @@ const query = reactive({
 })
 const templates = ref<AdvancedFilterApi.AdvancedFilterTemplate[]>([])
 const fields = ref<AdvancedFilterApi.AdvancedFilterField[]>([])
+const relativeDateOptions = ref<Array<{ value: string; label: string }>>([])
+const catalogScene = ref<AdvancedFilterApi.AdvancedFilterScene>()
 const loading = ref(false)
 const catalogLoading = ref(false)
 const saving = ref(false)
@@ -340,11 +343,13 @@ const retryOptions = async (fieldKey: string) => {
     )
   }
 }
-const loadCatalog = async () => {
+const loadCatalog = async (scene: AdvancedFilterApi.AdvancedFilterScene = query.scene) => {
   catalogLoading.value = true
   catalogError.value = false
   try {
-    const catalog = await AdvancedFilterApi.getCatalog(query.scene)
+    const catalog = await AdvancedFilterApi.getCatalog(scene)
+    relativeDateOptions.value = catalog.relativeDateOptions || []
+    catalogScene.value = scene
     fields.value = catalog.fields.map((field) =>
       field.optionSource && !field.options.length ? { ...field, optionsLoading: true } : field
     )
@@ -367,6 +372,7 @@ const loadCatalog = async () => {
     )
   } catch (loadError: any) {
     catalogError.value = true
+    catalogScene.value = undefined
     fields.value = []
     error.value = loadError?.msg || loadError?.message || ''
   } finally {
@@ -408,11 +414,12 @@ const changeFormPage = async () => {
     await loadAll()
   }
 }
-const openCreate = () => {
+const openCreate = async () => {
   resetForm()
+  await loadCatalog(form.scene)
   dialogVisible.value = true
 }
-const openEdit = (row: AdvancedFilterApi.AdvancedFilterTemplate) => {
+const openEdit = async (row: AdvancedFilterApi.AdvancedFilterTemplate) => {
   form.id = row.id
   form.scene = row.scene
   form.pageKey = row.pageKey
@@ -422,6 +429,10 @@ const openEdit = (row: AdvancedFilterApi.AdvancedFilterTemplate) => {
   form.enabled = row.enabled
   form.defaultTemplate = row.defaultTemplate
   form.version = row.version
+  selectedPageKey.value = row.pageKey
+  query.scene = row.scene
+  query.pageKey = row.pageKey
+  if (!fields.value.length || catalogScene.value !== row.scene) await loadCatalog(row.scene)
   dialogVisible.value = true
 }
 const save = async () => {
@@ -432,8 +443,13 @@ const save = async () => {
   }
   saving.value = true
   try {
-    if (form.id) await TemplateApi.updateSystemTemplate(clone(form))
-    else await TemplateApi.createSystemTemplate(clone(form))
+    try {
+      if (form.id) await TemplateApi.updateSystemTemplate(clone(form))
+      else await TemplateApi.createSystemTemplate(clone(form))
+    } catch (saveError: any) {
+      message.error(saveError?.msg || saveError?.message || '系统预置保存失败')
+      return
+    }
     message.success('系统预置已保存')
     dialogVisible.value = false
     selectedPageKey.value = form.pageKey

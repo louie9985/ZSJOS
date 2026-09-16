@@ -29,7 +29,9 @@
 | `quality_specialist` | `zsjos:lead:appeal:query`, `zsjos:lead:appeal:review-quality` |
 | `boss` | `zsjos:lead:appeal:query`, `zsjos:lead:appeal:review-chairman` |
 
-`system_administrator` 的精确 allowlist 由 V071 声明，分为：业务审计和只读借视图、导出任务查询与客资导出、客资全局管理/派单/重复复核/筛选/跟进规则、人员与兼职主体、产品和 SKU、用户关系、通知规则，以及 `zsjos:withdrawal:admin-query`。明确禁止 `zsjos:sales-order:review`、`zsjos:cashback:finance-query`、`zsjos:withdrawal:finance-query/review/payout` 和订单/财务订单/返现/提现导出。迁移文件是该长 allowlist 的可执行事实源。
+`system_administrator` 的精确 allowlist 原由 V071 声明（业务审计和只读借视图、导出任务查询与客资导出、客资全局管理/派单/重复复核/筛选/跟进规则、人员与兼职主体、产品和 SKU、用户关系、通知规则，以及 `zsjos:withdrawal:admin-query`），并曾明确禁止 `zsjos:sales-order:review`、`zsjos:cashback:finance-query`、`zsjos:withdrawal:finance-query/review/payout` 和订单/财务订单/返现/提现导出。
+
+**V252 起该约束被取代**：产品口径（2026-09-16）为「**管理员拥有所有菜单权限**」。`system_administrator` 现在持有全部 2245 个启用菜单（与 `super_admin` 可见范围一致），上述财务禁止条款不再适用，`verify-role-menu-coverage.sql` 的对应 violation 条款已移除。新增菜单的授权规则简化为：**通用菜单 → `normal_user`；全量菜单 → `system_administrator` / `super_admin`；业务角色按职责单独特评**。
 
 V143 adds `zsjos:subordinate-partner:query` as an administrator-configured employee read permission and
 `zsjos:partner:assign-owner` for Partner ownership maintenance. The latter is initially granted only to
@@ -104,7 +106,7 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 | 26 | `hr_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 27 | `admin_manager` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 28 | `admin_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 29 | `system_administrator` | V071 管理员 allowlist；提现只读，不得审核或打款 |
+| 29 | `system_administrator` | **V252 起为「管理员 = 全部启用菜单」**（2245 项，与 `super_admin` 可见范围一致）；取代 V071 allowlist 与财务禁止条款 |
 | 30 | `application_developer` | 保持已有明确能力，不按岗位名称扩权 |
 | 31 | `boss` | V071 精确 2 项申诉查询/最终裁决权限；每租户恰好一个有效角色 |
 | 32 | `super_admin` | 保持框架超级管理员行为和全部 ZSJOS 管理能力；维护模式开关仅此角色 |
@@ -115,8 +117,11 @@ backend and Workbench runtime behavior checks permission identifiers and never r
 
 **注**：上表的「零 ZSJOS 菜单」描述的是迁移当时的状态。V246 之后这些角色已获得工作台菜单
 （首页、需求与反馈、我的资产、采购申请等基线页面，以及各自业务域的只读或操作页面）；
-V248 之后客资详情的 5 个页签权限也已恢复。上表保留为各角色**业务职责**的评审记录，
-实际菜单授权以 `system_role_menu` 与 `verify-role-menu-coverage.sql` 为准。
+V248 之后客资详情的 5 个页签权限也已恢复。**V251 起通用工作台菜单（首页、日历、工单中心、
+需求与反馈、学员账号交付、我的资产/采购申请等 45 项）统一由 `normal_user` 持有，
+业务角色只保留岗位专属业务功能**——业务角色的最终可见范围由其全部角色授权的并集决定。
+上表保留为各角色**业务职责**的评审记录，实际菜单授权以 `system_role_menu` 与
+`verify-role-menu-coverage.sql` 为准。
 
 ## V246 全角色菜单覆盖配置
 
@@ -156,6 +161,35 @@ V063 引入的同名 System 角色 `part_time_partner` 从未被兼职端消费�
 清空其全部菜单与用户关系后逻辑删除该角色，使 `system_role` 中不再存在兼职角色。
 兼职端权限当前仍由 `PORTAL_PERMISSIONS` 决定，如需可配置化需另行评审。
 
+### 管理员全量菜单（V252）
+
+产品口径（2026-09-16）：**管理员拥有所有菜单权限**。V252
+（`script/sql/mysql/migrations/V252__system_administrator_full_menu.sql`）给
+`system_administrator` 授予全部 2245 个启用菜单，与 `super_admin` 的可见范围一致。
+
+此前的问题是"按需 allowlist"完全靠人工判断：V071 之后新增的页面多数没补授，实测缺 2013 项；
+更隐蔽的是它持有 `6741`/`79980`/`79990`（父节点是菜单 1「系统管理」）却不持有菜单 1，
+前端建树丢弃这三个节点，**权限有、界面无**。
+
+口径统一后，新增菜单的授权规则简化为三条：
+
+| 菜单性质 | 授予角色 |
+|---|---|
+| 人人需要的通用工作台菜单 | `normal_user`（见 V251） |
+| 全部菜单 | `system_administrator`、`super_admin` |
+| 岗位专属业务功能 | 对应业务角色，单独特评 |
+
+**代价（需产品知晓）**：全量授权与此前"禁止管理员持有财务复核与资金导出权限"的约束不可兼得。
+V252 因此**取消了该约束**——`system_administrator` 现在持有 `zsjos:sales-order:review`、
+`zsjos:cashback:finance-query`、`zsjos:withdrawal:finance-query/review/payout` 与五项
+导出（客资/订单/财务订单/返现/提现）。若需保留职责分离，应改为"全量菜单 − 财务权限黑名单"，
+届时需同步恢复 `verify-role-menu-coverage.sql` 的 violation 条款。
+
+禁用菜单（`status=1`，如工作计划模块、框架自带的支付/公众号/商城/CRM/ERP/AI/IoT/MES/WMS 模块）
+不授予，与 `super_admin` 的框架行为一致（`getPermissionInfo` 会 `filterDisableMenus`）。
+这些停用模块下有 104 行"父停用、子启用"的历史数据，迁移不再为其补授父级；
+`verify-role-menu-coverage.sql` 新增 4a) 检查单独列出（提示，非缺陷）。
+
 ### 悬空授权修复（V249 / V250）
 
 V246 的覆盖扫描看不见一类缺陷：**按钮被授权、但其父目录未被授权**。系统只返回被直接授权的
@@ -175,6 +209,37 @@ V250 修复了另三行缺陷：`V179` 与一次手工修复把 `system_role_men
 角色自身租户（保留原 creator 与时间线），并清理更正后产生的重复行。
 
 `verify-role-menu-coverage.sql` 现同时校验悬空授权、跨租户授权与重复授权，三者预期均为 0 行。
+
+### 通用菜单基线收敛（V251）
+
+V246 把通用工作台菜单授给了**每一个**角色，结果是 tenant 1 的 33 个角色各自持有一组
+完全相同的 45 个菜单（3 目录 + 10 页面 + 32 按钮：工作台首页、日历、工单中心、
+需求与反馈、学员账号交付、我的资产/采购申请等），合计 1485 行重复授权。新增一个通用菜单
+需要改 33 个角色，既是维护负担，也不符合"角色 = 岗位所需业务功能"的建模意图。
+
+V251（`script/sql/mysql/migrations/V251__universal_menu_baseline.sql`）把这组菜单收敛到
+**普通员工 `normal_user`** 一个角色：
+
+- 授权是**并集语义**——用户可见菜单 = 其全部角色授权的并集
+  （`PermissionServiceImpl.getRoleMenuListByRoleId`）。把通用菜单从业务角色移到 `normal_user`，
+  只要账号同时持有 `normal_user`，最终可见菜单**完全不变**（V251 执行时逐账号比对并集，
+  结果 0 个账号发生变化）。
+- 选 `normal_user` 而非新建基础角色的原因：它已是既有的"普通员工"角色，V246 已授予其客资/
+  学员/工单/资产/公告/HR 员工端/BPM/消息中心/素材浏览等**全部员工自助能力**，本身就是事实上的
+  基础角色；tenant 1 的 42 个有角色账号中 41 个已持有它。
+- 通用集不写死 ID，而是运行时取"tenant 1 全部启用角色的共同持有菜单"，并在撤销前校验
+  **不存在"持有业务角色但未持有 normal_user"的账号**（`super_admin` 账号除外），
+  存在则整批中止不生效。
+- `super_admin` 的行**不撤销**（超管不受菜单授权限制，保留行以维持既有全量状态一致）。
+- **必须回补祖先目录**：通用集含两个纯容器目录 `6735 工作台` 与 `73600 日历`，
+  业务角色的业务页面（客资管理、订单管理、班级管理、素材库、考期日历…）都挂在其下。
+  系统只返回直接授权的菜单，父节点缺失时前端建树会丢弃子节点——若不回补，
+  这些页面会**权限仍在但界面不可达**，且并集比对看不出这种退化。V251 在撤销后自底向上
+  补回"仍有被授权子孙"的祖先（迭代 5 层），并以悬空授权检查兜底。
+
+收敛后通用集仍为 45 项，仅 `normal_user` 与 `super_admin` 持有；`normal_user` 共 103 项授权
+（45 项通用基线 + 58 项既有的员工自助能力，含框架/BPM/HR 等非 `zsjos:` 命名空间），
+全部业务角色的业务权限数量与并集可见范围不变。
 
 ### 存量待确认项
 
@@ -251,7 +316,7 @@ V248 同时补建了后端自 V023/V024 起就在校验、但从未定义菜单�
 
 - 每个租户的兼职角色必须恰好拥有上述 10 个有效权限，两个财务角色必须各自恰好拥有相同 11 项。
 - 同一租户、角色和 permission 最多一个有效 `system_role_menu` 关系；权限按钮不得指向已删除父菜单。
-- `system_administrator` 必须有提现只读和客资导出，且不得有常规财务审核、提现审核/打款或资金导出。
+- `system_administrator` 必须有提现只读和客资导出。**V252 起此前的「不得有常规财务审核、提现审核/打款或资金导出」约束被取消**：管理员改为持有全部启用菜单。
 - V073 后 `study_planner` 使用 `zsjos:student:query-my`。V113 后 `content_director` 与 `new_media_operator` 共用 `zsjos:media-student:query-my` 和 `/zsjos/media-students`，但服务端分别按服务关系、账号责任关系和本人任务收敛数据范围。第三方账号、内容生产和账号定位的独立页面菜单退役，原稳定按钮权限移到学员菜单下。所有菜单按钮授权都不替代对象权限、数据范围和状态校验。
 - V086 增加 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read` 四个独立只读权限。迁移只按原有效可见权限做兼容授权，后续由 System 角色权限管理分别配置；任何一个标签权限都不能替代 Lead 对象关系校验。
 - V071 只改变菜单元数据和角色菜单关系，不改变真实账号、用户角色关系、BPM 或业务数据；应用现有数据库需要单独确认。
