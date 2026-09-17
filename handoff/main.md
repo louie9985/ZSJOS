@@ -25312,3 +25312,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - SQL evidence: V258 replay retained controlled DB positioning_apply_verify_20260917185626; nonempty synthetic confirmed/pending/legacy history, same service ID across tenants, absent-only master/app backfill, preserved original card fingerprint, repeatability, no move after a newer confirmation, two initial audit rows, nullable account and single apply menu all passed. Chinese menu HEX verified E5BA94E794A8E68896E69BB4E68DA2E5AE9AE4BD8DE58DA1. No live development DB sync or role grants; controlled DB retained for audit. Root baseline-sync default is deferred by user's explicit no database/service-change boundary in approved plan.
 - Browser evidence: actual React page with isolated HTTP adapter at desktop 1280x720 and mobile 390x844: no account selector, visible hints/four buttons, required failure writes=0, explicit save+submit writes=2 and shows pending operator review. Account fixture kept old version with newer notice, selection/preview writes=0, confirmation writes=1 and changes displayed version; mobile modal readable. Actual Vue confirmation component fixture on task-private localhost10087 displayed service/card/material/attachment snapshots and agreed successfully without account; desktop/mobile screenshots inspected and error logs empty. Task-private Vite stopped, temporary tabs closed, viewport reset. These fixtures do not substitute for authenticated live API acceptance.
 - Remaining/activation: live ruoyi-vue-pro has three co_creating cards for one service, no submissions; no master was chosen on user's behalf. New backend must not start before V258 is applied. Await explicit authorization to back up scoped local tables, apply non-delete V258 to local ruoyi-vue-pro, build/restart local backend48080 and perform real authenticated integration. Permission metadata does not grant apply to any role; administrator assignment remains separate. Live allowed/denied tenant API checks, real unbound approval/confirmation, concurrent windows and migrated application-to-ticket acceptance remain unverified until activation; do not claim deployed completion.
+
+## Delivery Entry - 2026-09-17 19:33:08 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `2402fe0c7d5629df1a01c8cc46feecb1872f4807`。
+- User goal: 将当前有效本地代码提交并推送到远程 `main` 分支。
+- Key decisions: 提交定位服务申请、教育自拓客资、Lead/订单/交付班级、多端页面、权限迁移清理、测试与文档；排除缓存、探针、截图、验证临时文件及 `tmp/output` 生成物。
+- Execution or analysis result: 已创建业务提交 `2402fe0c7d`，包含 276 个文件、3711 行新增和 13337 行删除；大部分删除来自移除迁移、种子和多数据库基线中的 `system_role_menu` 自动授权语句。
+- Changed files: 业务提交详见 `2402fe0c7d`；本条记录追加至 `handoff/main.md`。
+- Verification evidence: 无未解决冲突；`git diff --cached --check` 通过；权限迁移静态策略测试 4/4 通过；数据库回放测试要求显式 MySQL 容器参数，未执行。
+- Dependency or integration impact: 未新增依赖；未执行数据库迁移、数据库写入或服务重启；临时产物与保护 stash 保留。
+- Remaining work: 提交本交付记录、推送 `origin/main` 并核对远程一致性；发布前应在指定 MySQL 容器执行权限迁移回放测试。
+- Status: `ready-to-push`。
