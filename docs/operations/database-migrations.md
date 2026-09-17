@@ -1,5 +1,26 @@
 # Database migration operations
 
+## Role-menu assignment policy (2026-09-17)
+
+Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer
+write `system_role_menu`: no default grants, role-name mappings, inherited grants,
+ancestor repair, reassignment or automatic revocation. System role management owns
+these assignments. Menu/button definitions and backend permission checks remain.
+A fresh database starts without role-menu rows; assign ordinary roles explicitly.
+Existing grants are neither reset nor restored by this source cleanup.
+
+Historical grant descriptions below record earlier behavior, not current executable
+migration guarantees. Versions for retired authorization-only migrations remain as
+ledger placeholders so ordering and dependencies stay stable (including V251/V252).
+
+This user-approved historical source cleanup changes file-byte checksums. Already
+installed environments must retain their recorded checksums and use a separately
+reviewed rollout; do not replay the entire chain or run checksum reconciliation just
+to bypass drift protection. This change does not authorize database grant changes.
+Rollback of source does not roll back grants previously written by an old release.
+Read-only grant audits are optional administrator reports, not fresh-install defaults.
+
+
 ## V182 Lead Submitter Feedback
 
 Apply `V182__lead_submitter_feedback.sql` after V181 using an utf8mb4 client.
@@ -649,3 +670,8 @@ V193 修复 V192 后交付班级访问范围和学员管理深链菜单：将已
 ### V195 订单管理统一
 
 V195 将“我的订单”和“团队订单”菜单授权合并到“订单管理”，逻辑删除旧菜单及角色关系，并把订单高级筛选模板迁移到 `sales_order_management`。迁移前通过临时表保存原始 pageKey 和名称，在同一批次处理同名模板来源后缀；每个作用域/所有者按更新时间、ID 选择唯一默认模板。迁移不修改订单业务数据，需在 UTF-8 连接的受控数据库执行并保留菜单、角色关系和模板备份以支持恢复。
+
+
+## V258 定位卡独立与账号应用
+
+`V258__positioning_service_application.sql`：前置 V257 表结构，新增主卡/账号应用/应用记录，允许提交账号为空，保留历史并仅回填缺失关系；无删除、无角色授权，重复运行不换版。先 SQL 后新后端，回退保留关系表，存在无账号提交后不能恢复 NOT NULL。验证工具：`script/sql/mysql/tools/test_positioning_application.py`，使用独立保留的验证库，覆盖历史回填和重复执行；正在使用的开发数据库尚未同步，待启用授权。

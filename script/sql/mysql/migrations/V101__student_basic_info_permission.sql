@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V101: add the planner-owned student basic-information update permission.
 -- Dependencies/order: apply after V100; My Students menu 73020 must exist.
 -- Data scope: one System button permission and initial role-menu relations for
@@ -40,17 +46,6 @@ UPDATE `system_menu`
 SET `name`='修改学员基础信息',`type`=3,`sort`=7,`parent_id`=73020,`status`=0,`deleted`=b'0',
     `updater`='migration-V101',`update_time`=NOW()
 WHERE `id`=73427 AND `permission`='zsjos:student:update-basic-info';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role_row.id,73427,'migration-V101',NOW(),'migration-V101',NOW(),b'0',role_row.tenant_id
-FROM `system_role` role_row
-WHERE role_row.code IN ('system_administrator','study_planner')
-  AND role_row.status=0 AND role_row.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V101')
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=role_row.id AND existing.menu_id=73427
-                    AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V101','Student basic information update permission','V101__student_basic_info_permission.sql',NOW())

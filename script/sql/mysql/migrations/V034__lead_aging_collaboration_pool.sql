@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Adds the overdue collaboration pool without changing the existing claim pool.
 -- Dependencies: V032, ZSJOS lead/opportunity/order/assignment history, System users/departments/posts,
 -- notification rules and tenant metadata.
@@ -136,15 +142,6 @@ VALUES
 (6794,'超期公海','zsjos:lead-aging-pool:query',2,88,6735,'lead-aging-pool','ep:management','zsjos/leadAgingPool/index','ZsjosLeadAgingPool',0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0'),
 (6795,'管理部门超期公海','zsjos:lead-aging-pool:manage',3,1,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0'),
 (6796,'管理全部超期公海','zsjos:lead-aging-pool:manage-all',3,2,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT grant_row.role_id, menu.id, 'migration-V034',NOW(),'migration-V034',NOW(),b'0',grant_row.tenant_id
-FROM `system_role_menu` grant_row
-JOIN `system_menu` source_menu ON source_menu.id=grant_row.menu_id AND source_menu.permission='zsjos:lead:query-owned' AND source_menu.deleted=b'0'
-JOIN `system_menu` menu ON menu.permission='zsjos:lead-aging-pool:query' AND menu.deleted=b'0'
-WHERE grant_row.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existing WHERE existing.tenant_id=grant_row.tenant_id
-  AND existing.role_id=grant_row.role_id AND existing.menu_id=menu.id AND existing.deleted=b'0');
 
 INSERT INTO `system_notify_template`
 (`name`,`code`,`nickname`,`scene_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)

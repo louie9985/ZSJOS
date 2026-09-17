@@ -240,7 +240,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setSuspendedAt(null);
-        lead.setOwnerUserId(reqVO.getSalesUserId());
+        lead.setOwnerUserId(reqVO.getSalesUserId()); lead.setOwnerIdentity(OWNER_SALES);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);
@@ -276,7 +276,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
         lead.setRecycleSourceOwnerUserId(fromOwner);
-        lead.setOwnerUserId(null);
+        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
         leadMapper.updateAfterOwnershipCleared(lead);
@@ -305,7 +305,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 userId, reqVO.getReason(), now);
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
-        lead.setOwnerUserId(null);
+        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
@@ -339,7 +339,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 userId, reqVO.getReason(), now);
         lead.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
         lead.setRecycleSourceOwnerUserId(fromOwner);
-        lead.setOwnerUserId(null);
+        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
         clearCurrentAssignment(lead);
         LeadMapper.advanceActivity(lead, now);
         leadMapper.updateAfterOwnershipCleared(lead);
@@ -368,7 +368,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_RELEASE, fromOwner, null,
                 userId, reqVO.getReason(), now);
         lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
-        lead.setOwnerUserId(null);
+        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
@@ -485,6 +485,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         history.setActionType(action);
         history.setFromOwnerUserId(fromOwner);
         history.setToOwnerUserId(toOwner);
+        if (ACTION_TRANSFER.equals(action)) history.setOwnerIdentitySnapshot(OWNER_SALES);
         history.setOperatorUserId(operatorUserId);
         history.setReason(reason.trim());
         history.setOccurredAt(occurredAt);

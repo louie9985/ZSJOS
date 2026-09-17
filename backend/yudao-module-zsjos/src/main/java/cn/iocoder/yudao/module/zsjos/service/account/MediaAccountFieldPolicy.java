@@ -13,9 +13,13 @@ public final class MediaAccountFieldPolicy {
     private MediaAccountFieldPolicy() {}
     public static boolean canWrite(FieldVO field, MediaAccountDO account, Long userId) {
         if (userId == null || !Boolean.TRUE.equals(field.getEnabled())) return false;
-        if (POSITIONING_SYNC_FIELDS.contains(field.getKey())) return false;
+        if (POSITIONING_SYNC_FIELDS.contains(field.getKey()) || isRetiredPositioning(field)) return false;
         return "DIRECTOR".equals(field.getOwnerType()) && userId.equals(account.getDirectorUserId())
                 || "OPERATOR".equals(field.getOwnerType()) && userId.equals(account.getOwnerOperatorUserId());
+    }
+    public static boolean isRetiredPositioning(FieldVO field) {
+        return "POSITIONING".equals(field.getGroup()) || field.getKey().startsWith("pc_")
+                || Set.of("positioning_history", "positioning_snapshot").contains(field.getKey());
     }
     public static void validate(List<FieldVO> fields, Map<String, Object> changes, MediaAccountDO account, Long userId) {
         for (String key : changes.keySet()) {

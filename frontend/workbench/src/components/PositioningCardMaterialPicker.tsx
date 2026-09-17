@@ -3,10 +3,11 @@ import { Alert, Button, Empty, Input, Modal, Select, Space, Spin, Table, Typogra
 import { useEffect, useRef, useState } from 'react'
 import { api, type DictData, type StudentContactFormField } from '../services/api'
 import { materialApi, type Material, type MaterialVersion } from '../services/materialApi'
-import { MaterialFields } from '../pages/MaterialLibraryPage'
+import PositioningMaterialPreview from './PositioningMaterialPreview'
 import { DICT_TYPE } from '../constants'
 
 type Filters = { keyword?: string; platform?: string; accountStage?: string; accountType?: string; profession?: string }
+const EMPTY_SELECTION: number[] = []
 const filterDefinitions = [
   { key: 'platform', title: '平台', dict: 'zsjos_account_platform' },
   { key: 'accountStage', title: '适用阶段', dict: DICT_TYPE.MEDIA_ACCOUNT_STAGE },
@@ -14,7 +15,7 @@ const filterDefinitions = [
   { key: 'profession', title: '专业定位', dict: DICT_TYPE.MATERIAL_PROFESSION },
 ] as const
 
-export default function PositioningCardMaterialPicker({ field, value = [], onChange, disabled = false, canQuery }: {
+export default function PositioningCardMaterialPicker({ field, value = EMPTY_SELECTION, onChange, disabled = false, canQuery }: {
   field: StudentContactFormField; value?: number[]; onChange?: (value: number[]) => void; disabled?: boolean; canQuery: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -58,9 +59,9 @@ export default function PositioningCardMaterialPicker({ field, value = [], onCha
     catch (cause) { setPreviewError(cause instanceof Error ? cause.message : '预览加载失败') }
   }
   const begin = () => {
+    // Selection is a modal-local draft; refresh it on open so cancel never changes the form value.
     setSelected([...value]); setFilters({ platform: field.defaultPlatform, accountStage: field.defaultStage }); setPage(1); setOpen(true)
   }
-  useEffect(() => { if (!open) setSelected([...value]) }, [value, open])
   return <Space orientation="vertical" style={{ width: '100%', minWidth: 0 }}>
     {value.map(id => <Space key={id} wrap>
       <Typography.Text>{versions[id]?.title || '已关联素材版本'}</Typography.Text>
@@ -70,7 +71,7 @@ export default function PositioningCardMaterialPicker({ field, value = [], onCha
     {!disabled && <Button icon={<PlusOutlined />} disabled={!canQuery} onClick={begin}>选择素材</Button>}
     {!canQuery && <Typography.Text type="secondary">无素材查询权限</Typography.Text>}
     {field.recommendedCount && <Typography.Text type="secondary">建议 {field.recommendedCount} 份，已选 {value.length} 份</Typography.Text>}
-    <Modal title={field.title} open={open} width="min(1000px, calc(100vw - 24px))" onCancel={() => setOpen(false)} onOk={() => { onChange?.(selected); setOpen(false) }} okText={`确认选择（${selected.length}）`}>
+    <Modal title={field.title} open={open} width="min(1280px, calc(100vw - 32px))" styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }} onCancel={() => setOpen(false)} onOk={() => { onChange?.(selected); setOpen(false) }} okText={`确认选择（${selected.length}）`}>
       <Space wrap style={{ marginBottom: 16 }}>
         <Input.Search aria-label="搜索素材" placeholder="搜索素材" allowClear onSearch={keyword => { setFilters(current => ({ ...current, keyword })); setPage(1) }} />
         {filterDefinitions.map(f => <Select key={f.key} aria-label={f.title} placeholder={f.title} allowClear showSearch optionFilterProp="label" style={{ width: 170, maxWidth: '100%' }}
@@ -86,8 +87,8 @@ export default function PositioningCardMaterialPicker({ field, value = [], onCha
           { title: '预览', width: 64, render: (_, row) => <Button aria-label="预览完整素材" icon={<EyeOutlined />} onClick={() => void showPreview(row.currentEffectiveVersionId!)} /> }]}
         pagination={{ current: page, total, pageSize: 10, showSizeChanger: false, onChange: setPage, simple: true }} />}
     </Modal>
-    <Modal title={preview ? versions[preview]?.title || '素材预览' : '素材预览'} open={preview !== undefined} footer={null} onCancel={() => setPreview(undefined)} width="min(960px, calc(100vw - 24px))">
-      {previewError ? <Alert type="error" message={previewError} action={<Button onClick={() => preview && void showPreview(preview)}>重试</Button>} /> : preview && versions[preview] ? <MaterialFields version={versions[preview]} /> : <Spin />}
+    <Modal title={preview ? versions[preview]?.title || '素材预览' : '素材预览'} open={preview !== undefined} footer={null} onCancel={() => setPreview(undefined)} width="min(1480px, calc(100vw - 32px))" styles={{ body: { maxHeight: '78vh', overflowY: 'auto' } }}>
+      {previewError ? <Alert type="error" message={previewError} action={<Button onClick={() => preview && void showPreview(preview)}>重试</Button>} /> : preview && versions[preview] ? <><Button icon={<ReloadOutlined />} onClick={() => void showPreview(preview)}>刷新预览</Button><PositioningMaterialPreview key={`${preview}-${versions[preview].coverPreviewUrl || ''}`} version={versions[preview]} /></> : <Spin />}
     </Modal>
   </Space>
 }

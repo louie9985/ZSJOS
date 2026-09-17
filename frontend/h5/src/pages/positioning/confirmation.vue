@@ -11,9 +11,9 @@ const token=()=>new URLSearchParams(window.location.hash.slice(1)).get('token')|
 const fields=computed(()=>confirmation.value?.fields?.filter(field=>field.enabled!==false)||[])
 const legacySections=computed(()=>Object.entries(confirmation.value?.legacySections||{}).filter(([,value])=>Object.keys(value||{}).length))
 const displayValue=(key:string)=>{
-  const snapshot=confirmation.value?.dictSnapshots?.[key] as {labelSnapshot?:string}|Array<{labelSnapshot?:string}>|undefined
+  const snapshot=confirmation.value?.dictSnapshots?.[key] as {labelSnapshot?:string}|Array<{labelSnapshot?:string;titleSnapshot?:string;name?:string}>|undefined
   if(Array.isArray(snapshot)){
-    const labels=snapshot.map(item=>item.labelSnapshot).filter(Boolean)
+    const labels=snapshot.map(item=>item.labelSnapshot||item.titleSnapshot||item.name).filter(Boolean)
     if(labels.length)return labels.join('、')
   }else if(snapshot?.labelSnapshot)return snapshot.labelSnapshot
   const value=confirmation.value?.values?.[key]
@@ -22,19 +22,19 @@ const displayValue=(key:string)=>{
   return value==null||value===''?'未填写':String(value)
 }
 const load=async()=>{loading.value=true;error.value='';try{if(!token())throw new Error('确认链接无效或已失效');confirmation.value=await getPositioningCard(token())}catch(cause){error.value=cause instanceof Error?cause.message:'定位卡加载失败'}finally{loading.value=false}}
-const decide=async(decision:'agree'|'request_changes')=>{if(decision==='request_changes'&&!comment.value.trim()){showToast('请填写修改意见');return}submitting.value=true;try{await decidePositioning(token(),decision,decision==='request_changes'?comment.value.trim():undefined);completed.value=decision;revisionOpen.value=false}catch(cause){showToast(cause instanceof Error?cause.message:'提交失败')}finally{submitting.value=false}}
+const decide=async(decision:'agree'|'request_changes')=>{if(submitting.value)return;if(decision==='request_changes'&&!comment.value.trim()){showToast('请填写修改意见');return}submitting.value=true;try{await decidePositioning(token(),decision,decision==='request_changes'?comment.value.trim():undefined);completed.value=decision;revisionOpen.value=false}catch(cause){showToast(cause instanceof Error?cause.message:'提交失败')}finally{submitting.value=false}}
 onMounted(load)
 </script>
 <template>
   <main class="positioning-share-page">
-    <van-nav-bar title="账号定位卡确认" />
+    <van-nav-bar title="定位卡确认" />
     <van-loading v-if="loading" class="positioning-share-state" vertical>正在加载定位卡</van-loading>
     <van-empty v-else-if="error" :description="error"><van-button size="small" type="primary" @click="load">重试</van-button></van-empty>
     <van-empty v-else-if="completed||confirmation?.state==='processed'" :description="completed==='request_changes'?'修改意见已提交':'该定位卡已完成确认'" />
     <template v-else-if="confirmation?.state==='ready'">
       <section class="positioning-share-heading">
-        <h1>{{ confirmation.accountName || '账号定位卡' }}</h1>
-        <p>{{ confirmation.platformLabel || '账号平台' }} · 提交于 {{ confirmation.submittedAt ? dayjs(confirmation.submittedAt).format('YYYY-MM-DD HH:mm') : '历史时间未记录' }}</p>
+        <h1>{{ confirmation.serviceLabel || '课程服务定位卡' }}</h1>
+        <p>{{ confirmation.cardNo || '定位卡' }} · 提交于 {{ confirmation.submittedAt ? dayjs(confirmation.submittedAt).format('YYYY-MM-DD HH:mm') : '历史时间未记录' }}</p>
       </section>
       <van-cell-group inset title="定位内容">
         <van-cell v-for="field in fields" :key="field.key" :title="field.title" :label="displayValue(field.key)" />

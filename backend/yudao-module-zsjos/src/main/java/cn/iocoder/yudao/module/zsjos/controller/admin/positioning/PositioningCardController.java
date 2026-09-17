@@ -34,6 +34,29 @@ import java.util.List;
 public class PositioningCardController {
     @Resource private PositioningCardService service;
     @Resource private PositioningConfirmationService confirmationService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.positioning.PositioningAssignmentService assignmentService;
+    @GetMapping("/service-overview") @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO> serviceOverview(@RequestParam Long serviceRelationId) {
+        return success(service.serviceOverview(serviceRelationId, getLoginUserId()));
+    }
+    @PostMapping("/select-master") @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
+    public CommonResult<Boolean> selectMaster(@RequestParam Long serviceRelationId, @RequestParam Long cardId) {
+        assignmentService.selectMaster(serviceRelationId, cardId, getLoginUserId()); return success(true);
+    }
+    @GetMapping("/application-options") @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningApplicationRespVO> applicationOptions(@RequestParam Long accountId) {
+        return success(service.applicationOptions(accountId, getLoginUserId()));
+    }
+    @PostMapping("/apply") @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:apply')")
+    public CommonResult<Boolean> apply(@Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningApplyReqVO req) {
+        assignmentService.apply(req, getLoginUserId()); return success(true);
+    }
+    @GetMapping("/account-overview")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO> accountOverview(
+            @RequestParam Long accountId) {
+        return success(service.accountOverview(accountId, getLoginUserId()));
+    }
     @PostMapping("/{id}/attachments")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<PositioningCardService.CardFile> uploadAttachment(@PathVariable Long id,
@@ -63,7 +86,7 @@ public class PositioningCardController {
     @GetMapping("/import-sources") @Operation(summary = "获得可导入的已提交定位卡")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create') && @ss.hasPermission('zsjos:positioning-card:query')")
     public CommonResult<List<PositioningCardImportSourceRespVO>> importSources(
-            @RequestParam Long studentPersonId, @RequestParam Long accountId,
+            @RequestParam Long studentPersonId, @RequestParam(required=false) Long accountId,
             @RequestParam Long serviceRelationId) {
         return success(service.getImportSources(studentPersonId, accountId, serviceRelationId, getLoginUserId()));
     }

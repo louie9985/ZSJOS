@@ -59,7 +59,7 @@ describe('SalesOrderDetailCards Lead profile', () => {
     expect(html).toContain('审批流程')
     expect(html).toContain('报名履约中心')
     expect(html).toContain('财务结算中心')
-    expect(html).toContain('销售主管会签')
+    expect(html).toContain('负责人主管会签')
     expect(html).toContain('当前节点')
     expect(html).toContain('ant-timeline')
     expect(html).toContain('sales-order-approval-sidebar')
@@ -121,4 +121,16 @@ describe('SalesOrderDetailCards Lead profile', () => {
     expect(html).not.toContain('客户档案')
     expect(html).not.toContain('客资编号')
   })
+})
+
+it('shows education conversion identity from the order snapshot', () => {
+  const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
+    formalOwnerIdentity: 'education', formalOwnerIdentityLabel: '教务',
+    leadProfile: { submittedName: '测试学员', leadNo: 'KZ-test', sourceLabel: '教务自拓录', ownerUserName: '测试负责人',
+      ownerIdentity: 'education', ownerIdentityLabel: '教务' } as SalesOrder['leadProfile']
+  })} />)
+  expect(html).toContain('成交归属身份')
+  expect(html).toContain('教务自拓录')
+  expect(html).toContain('教务')
+  expect(html).not.toContain('所属销售')
 })

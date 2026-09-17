@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V073: registration fulfillment public pool and student service relationships.
 -- Dependencies/order: apply after V072 and the sales-order/person/System role schemas.
 -- Data scope: additive tables, menu metadata, reviewed role grants, and one default template for each active tenant.
@@ -165,14 +171,6 @@ VALUES
 (73020,'我的学员','zsjos:student:query-my',2,62,@v073_workbench_menu_id,'/zsjos/my-students','ant-design:team-outlined','zsjos/my-students','ZsjosMyStudents',0,b'1',b'1',b'0','migration-V073',NOW(),'migration-V073',NOW(),b'0')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),`path`=VALUES(`path`),
  `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`deleted`=b'0',`update_time`=NOW();
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,m.id,'migration-V073',NOW(),'migration-V073',NOW(),b'0',r.tenant_id
-FROM `system_role` r JOIN `system_menu` m ON m.deleted=b'0'
-WHERE r.deleted=b'0' AND ((r.code='system_administrator' AND m.id IN (73010,73011,73012))
-  OR (r.code='study_planner' AND m.id=73020))
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` rm WHERE rm.role_id=r.id AND rm.menu_id=m.id
-    AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V073','Registration fulfillment and student relationships','registration-fulfillment-students-v1')

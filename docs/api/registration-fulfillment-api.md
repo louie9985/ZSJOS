@@ -55,11 +55,18 @@ are stored as completion-time snapshots on the case routes.
 New cases use `assignmentMode=class_per_item`. The detail response returns one `classAssignments` projection
 for every order item, including product/category facts, the saved class and homeroom snapshots, and a stable
 per-item error when the current selection is no longer usable. `PUT .../class-assignments` replaces the complete
-set in one versioned, idempotent command: every order item must occur exactly once and select either a same-category
-`SERVING` formal class or the explicit tenant pending class. Save and completion both revalidate the order item,
-product category, tenant class, class state and homeroom eligibility; a formal homeroom must remain enabled and hold
-both `zsjos:delivery-class:query-my` and `zsjos:student:query-my`. The pending selection snapshots the real order
-product category name/path even though the system class itself has no category or homeroom.
+set in one versioned, idempotent command: every order item must occur exactly once and select a tenant-owned
+`SERVING` class, including the system pending class. Registration requests options without `categoryId` and
+both frontends show a flat searchable list of all serving classes, with loading, empty and retryable error states.
+Product/category/SKU/exam metadata does not filter candidates or block saving/completion, even when absent.
+Save and completion revalidate the order-item set, tenant class, serving state and formal homeroom eligibility
+(enabled account with the enabled `study_planner` role). Pending classes have no owner.
+Category fields on assignments are optional product metadata, not the chosen class's category; missing labels
+remain null rather than being invented. Existing historical snapshots are not rewritten by schema correction.
+Unsaved class selections must be saved before completion. The optional category column is introduced by the
+V188 development correction; deployed environments with protected historical checksums require a separately
+reviewed rollout, never silent checksum reconciliation.
+
 
 Attachment validation requires the detected MIME type to exactly match the file extension; unknown
 `application/octet-stream` values and raw `application/zip` are not accepted as Office documents.
@@ -241,17 +248,17 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 定位卡继续使用 `/admin-api/zsjos/positioning-template/**`，编导时效配置仍使用
 `/admin-api/zsjos/director-config`。定位卡业务端通过
 `GET /admin-api/zsjos/positioning-card/published-template` 获取当前发布模板，创建草稿时保存
-`personId + accountId + serviceRelationId + templateVersionId` 及完整快照。
+`studentPersonId + serviceRelationId + templateVersionId`（不再选择或绑定账号） 及完整快照。
 模板字段的可选 `description`（最多 500 字）作为填写指导随版本保存；历史字典选项保留
 选择时的标签，发布新模板不会迁移已有草稿或重写历史记录。
 
 定位卡复用导入使用以下接口，并同时要求 `zsjos:positioning-card:create` 与
 `zsjos:positioning-card:query`：
 
-- `GET /admin-api/zsjos/positioning-card/import-sources?studentPersonId=...&accountId=...&serviceRelationId=...`
-  返回当前编导对目标学员可读的全部已提交定位卡版本，包含当前账号和该学员其他账号；未提交草稿不进入候选。
-- `POST /admin-api/zsjos/positioning-card/import` 将指定 `sourceSubmissionId` 导入目标账号草稿。
-  目标已有草稿时必须携带 `targetDraftId + version`，并继续使用乐观锁；没有草稿时创建新的账号定位卡草稿。
+- `GET /admin-api/zsjos/positioning-card/import-sources?studentPersonId=...&serviceRelationId=...`
+  返回当前编导对同学员、同课程服务可读的已提交定位卡版本；未提交草稿不进入候选。
+- `POST /admin-api/zsjos/positioning-card/import` 将指定 `sourceSubmissionId` 导入课程服务主卡草稿。
+  必须先保存主卡草稿并携带 `targetDraftId + version`，继续使用乐观锁；导入不另建第二张卡。
 
 导入始终使用当前发布模板，按稳定字段 `key` 复制类型兼容的值。新增字段留空，已删除、类型不兼容或
 字典类型改变的字段跳过；未改变的字典选择沿用来源提交中的 value 与 label 快照。来源提交只读，导入
@@ -274,3 +281,6 @@ UTF-8 `.json` 文件或粘贴文本，原始文件不会上传。JSON 顶层必�
 字段；未提供、未知、附件、类型不符、字典无效或违反模板约束的字段不会覆盖当前值。界面先按
 “可导入 / 将清空 / 已跳过”预览，确认后仅合并合法字段并立即调用现有定位卡草稿创建或更新
 接口。后端仍按冻结模板版本重新校验完整草稿、解析字典 label 快照并执行对象权限与乐观锁检查。
+
+
+定位卡独立提交、历史主卡选择与账号应用版本见 [独立定位卡契约](positioning-service-application.md)。创建账号不再绑定草稿，运营及学员确认不依赖账号，最新确认版本不会自动应用。

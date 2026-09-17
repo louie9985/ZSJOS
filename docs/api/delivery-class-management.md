@@ -12,8 +12,9 @@
   服务分页；调用方必须传递并消费 `pageNo`、`pageSize` 和响应 `total`，不得截断为固定前 50 条。
   学员行以 `serviceRelationId` 为操作边界，并返回订单商品所属 `categoryId`。Workbench 从“班级管理”
   进入学员管理时通过路由 state 传递该 ID；主管管理视图不因此获得 owner 专属的学员服务操作权。
-- `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回服务中的正式班，可按
-  `categoryId` 过滤；只有显式 `includePending=true` 时附加租户待分班班级。
+- `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回服务中的正式班，按
+  可选 `categoryId` 过滤；不传时返回当前租户全部服务中班级。`includePending` 默认 true，包含并置顶服务中的租户待分班班级。报名分班不传分类参数，也不以产品、SKU、考期或分类匹配作为保存/完成前置条件；双端平铺展示。
+  无分类请求仅按服务状态查询，不拼接系统班/正式班互斥条件。显式分类筛选使用“系统班或该分类”条件；MySQL 回归通过实际 Mapper 与租户拦截器核对结果，避免仅验证前端样本或未执行的 SQL。
 - `GET /zsjos/delivery-class/homeroom-candidates`：返回主管部门范围内启用且同时持有
 `zsjos:delivery-class:query-my`、`zsjos:student:query-my` 的用户。
 - `GET /zsjos/delivery-class/product-options`：返回教务端同源的启用产品、规格和 SKU。

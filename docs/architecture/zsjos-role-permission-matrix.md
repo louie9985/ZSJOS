@@ -1,5 +1,26 @@
 # ZSJOS 全角色目标权限矩阵
 
+## Role-menu assignment policy (2026-09-17)
+
+Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer
+write `system_role_menu`: no default grants, role-name mappings, inherited grants,
+ancestor repair, reassignment or automatic revocation. System role management owns
+these assignments. Menu/button definitions and backend permission checks remain.
+A fresh database starts without role-menu rows; assign ordinary roles explicitly.
+Existing grants are neither reset nor restored by this source cleanup.
+
+Historical grant descriptions below record earlier behavior, not current executable
+migration guarantees. Versions for retired authorization-only migrations remain as
+ledger placeholders so ordering and dependencies stay stable (including V251/V252).
+
+This user-approved historical source cleanup changes file-byte checksums. Already
+installed environments must retain their recorded checksums and use a separately
+reviewed rollout; do not replay the entire chain or run checksum reconciliation just
+to bypass drift protection. This change does not authorize database grant changes.
+Rollback of source does not roll back grants previously written by an old release.
+Read-only grant audits are optional administrator reports, not fresh-install defaults.
+
+
 ## 考期查看与管理
 
 “日历 → 考期日历”保留独立可勾选的查看（73612，`zsjos:exam-calendar:query`）与管理（73611，`zsjos:exam-calendar:manage`）叶子。

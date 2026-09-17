@@ -19,6 +19,7 @@ public class OpportunityFollowUpRecordDO extends TenantBaseDO {
     private Long leadId;
     private Long operatorUserId;
     private Long ownerUserIdSnapshot;
+    private String ownerIdentitySnapshot;
     private Long ownerDeptIdSnapshot;
     private String methodValue;
     private String methodLabelSnapshot;

@@ -19,6 +19,7 @@ public class FinanceOrderExportRowRespVO {
     private LocalDateTime customerPaidAt;
     private String paymentMethod;
     private String formalSalesName;
+    private String formalOwnerIdentityLabel;
     private String submitterName;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;

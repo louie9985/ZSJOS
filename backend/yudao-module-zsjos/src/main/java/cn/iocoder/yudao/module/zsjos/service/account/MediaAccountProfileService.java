@@ -238,10 +238,14 @@ public class MediaAccountProfileService {
         source.forEach((key, value) -> { values.remove(key); if (value != null) values.put(key, value); });
         List<MediaAccountDetailSnapshotVO> snapshots = new ArrayList<>(readSnapshots(account));
         snapshots.removeIf(s -> source.containsKey(s.getKey()));
+        Map<String, String> snapshotKeys = Map.of("account_position", "pc_account_position",
+                "professional_position", "pc_profession", "content_format", "pc_content_form",
+                "student_commitments", "pc_student_duties", "company_commitments", "pc_company_duties",
+                "delivery_goals", "pc_internal_goal");
         source.forEach((key, value) -> {
             if (value == null) return;
             MediaAccountDetailSnapshotVO snapshot = new MediaAccountDetailSnapshotVO();
-            snapshot.setKey(key).setValue(value).setDisplayValue(displaySnapshotValue(value, dictSnapshots.get(key)));
+            snapshot.setKey(key).setValue(value).setDisplayValue(displaySnapshotValue(value, dictSnapshots.get(snapshotKeys.get(key))));
             snapshots.add(snapshot);
         });
         account.setDetailValuesJson(JsonUtils.toJsonString(values));
@@ -258,10 +262,12 @@ public class MediaAccountProfileService {
     }
 
     private String displaySnapshotValue(Object value, Object dictSnapshot) {
+        if (dictSnapshot instanceof Map<?, ?> map && map.get("labelSnapshot") != null)
+            return String.valueOf(map.get("labelSnapshot"));
         if (dictSnapshot instanceof Map<?, ?> map && map.get("displayValue") != null)
             return String.valueOf(map.get("displayValue"));
         if (dictSnapshot instanceof Collection<?> list)
-            return list.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("、"));
+            return list.stream().map(item -> displaySnapshotValue(item, item)).collect(java.util.stream.Collectors.joining("、"));
         return String.valueOf(value);
     }
 

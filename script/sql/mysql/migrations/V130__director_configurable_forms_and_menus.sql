@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Configurable director interview/positioning forms and menu wiring.
 -- Depends on V129 dictionaries. Repeatable; only adds missing schema/data and does not rewrite published business snapshots.
 SET @schema_name = DATABASE();
@@ -69,9 +75,5 @@ INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`p
 SELECT seed.id,seed.name,seed.permission,3,seed.sort,seed.parent_id,'','','','',0,b'1',b'1',b'1','V130',NOW(),'V130',NOW(),b'0' FROM (
  SELECT 73490 id,'保存采访模板' name,'zsjos:director-interview-template:update' permission,10 sort,73460 parent_id UNION ALL SELECT 73491,'发布采访模板','zsjos:director-interview-template:publish',20,73460 UNION ALL SELECT 73492,'创建定位模板','zsjos:positioning-template:create',10,73481 UNION ALL SELECT 73493,'保存定位模板','zsjos:positioning-template:update',20,73481 UNION ALL SELECT 73494,'发布定位模板','zsjos:positioning-template:publish',30,73481 UNION ALL SELECT 73495,'删除定位模板','zsjos:positioning-template:delete',40,73481 UNION ALL SELECT 73496,'保存编导时效','zsjos:director-config:update',10,73482
 ) seed WHERE NOT EXISTS (SELECT 1 FROM system_menu m WHERE m.permission=seed.permission AND m.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V130',NOW(),'V130',NOW(),b'0' FROM system_role r JOIN system_menu m ON (m.id IN (73480,73460,73481,73482) OR m.parent_id IN (73460,73481,73482)) AND m.deleted=b'0'
-WHERE r.code IN ('system_administrator','super_admin') AND r.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`) SELECT 'V130','director configurable forms and menus',SHA2('V130__director_configurable_forms_and_menus.sql',256),NOW() WHERE NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V130');

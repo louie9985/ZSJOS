@@ -77,9 +77,7 @@ def check_permission():
         else:
             print(f"❌ 管理员（角色 ID: {admin_role_id}）未绑定支付主体菜单！")
             print(f"\n需要执行绑定 SQL：")
-            print(f"INSERT INTO system_role_menu (role_id, menu_id, creator, create_time)")
-            print(f"VALUES ({admin_role_id}, 6850, 'admin', NOW()),")
-            print(f"       ({admin_role_id}, 6851, 'admin', NOW());")
+            print("请通过系统角色管理配置所需菜单权限。")
 
         print("\n" + "=" * 80)
         print("【4】检查财务主管角色")

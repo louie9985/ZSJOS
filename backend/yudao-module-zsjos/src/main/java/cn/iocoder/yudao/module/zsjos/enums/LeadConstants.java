@@ -33,6 +33,17 @@ public interface LeadConstants {
     String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
     String SOURCE_PARTNER = "partner";
     String SOURCE_SALES_SELF = "sales_self_sourced";
+    String SOURCE_EDUCATION_SELF = "education_self_sourced";
+    String OWNER_SALES = "sales";
+    String OWNER_EDUCATION = "education";
+
+    static boolean isSelfSourced(String sourceType) {
+        return SOURCE_SALES_SELF.equals(sourceType) || SOURCE_EDUCATION_SELF.equals(sourceType);
+    }
+
+    static String ownerIdentityLabel(String identity) {
+        return OWNER_EDUCATION.equals(identity) ? "教务" : OWNER_SALES.equals(identity) ? "销售" : "未记录";
+    }
     String PROVIDER_OWNER_SYSTEM_USER = "system_user";
     String PROVIDER_OWNER_PARTNER = "partner";
     String STATUS_SUBMITTED = "submitted";

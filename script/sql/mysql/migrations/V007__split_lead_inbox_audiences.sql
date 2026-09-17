@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Splits the employee lead inbox into fixed submitter and owner routes.
 -- Dependencies: V006, workbench menu 6735, lead query menu 6770, and current role-menu grants.
 -- Execution order: hide the legacy mixed route, add fixed routes, derive grants from existing
@@ -23,45 +29,6 @@ INSERT IGNORE INTO `system_menu`
 VALUES
 (6778,'我提交的','zsjos:lead:query-submitted',2,15,6735,'leads/submitted','ep:upload-filled','zsjos-workbench','LeadSubmittedInboxPage',0,b'1',b'1',b'1','migration-V007',NOW(),'migration-V007',NOW(),b'0'),
 (6779,'我负责的','zsjos:lead:query-owned',2,16,6735,'leads/owned','ep:user-filled','zsjos-workbench','LeadOwnedInboxPage',0,b'1',b'1',b'1','migration-V007',NOW(),'migration-V007',NOW(),b'0');
-
--- Submit-capable roles receive only the submitted inbox plus the shared query capability.
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, 'migration-V007', NOW(), 'migration-V007', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead:submit' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6778) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
--- Sales access is derived from existing claim or acceptance permissions, never from role or post names.
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, 'migration-V007', NOW(), 'migration-V007', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission IN ('zsjos:lead:claim','zsjos:lead:accept') AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6779) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
--- Query-all administrators can enter either fixed view while both remain user-scoped.
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, 'migration-V007', NOW(), 'migration-V007', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead:query-all' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6778 UNION ALL SELECT 6779) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V007','Split lead inbox into fixed submitter and owner routes','lead-inbox-fixed-audiences-v1');

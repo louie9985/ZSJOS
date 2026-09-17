@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V176: employee contract-expiry and entry-anniversary reminder metadata.
 -- Additive, repeatable metadata only; no business rows are seeded.
 INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
@@ -9,9 +15,7 @@ FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE id=602111);
 INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT 602112,'员工提醒修改','hrm:employee-reminder-config:update',3,2,602110,'','','',NULL,0,b'1',b'1',b'1','migration-V176',NOW(),'migration-V176',NOW(),b'0'
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE id=602112);
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,m.id,'migration-V176',NOW(),'migration-V176',NOW(),b'0',r.tenant_id FROM system_role r JOIN system_menu m ON m.id IN (602110,602111,602112)
-WHERE r.code='super_admin' AND r.status=0 AND r.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
+
 INSERT INTO `system_notify_template` (`name`,`code`,`nickname`,`scene_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT '员工合同到期提醒','ZSJOS_HRM_CONTRACT_EXPIRY','中世健人力资源中心','hrm.employee.contract_expiry','员工合同到期提醒','{{employee.name}}的合同即将到期','{{employee.department}}员工{{employee.name}}的合同将于{{employee.contractEndDate}}到期，请及时跟进。',2,'["employee.name","employee.department","employee.contractEndDate"]',0,'V176 员工合同到期提醒','migration-V176',NOW(),'migration-V176',NOW(),b'0'
 WHERE NOT EXISTS (SELECT 1 FROM system_notify_template WHERE code='ZSJOS_HRM_CONTRACT_EXPIRY' AND deleted=b'0');

@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- V192: expose one 班级管理 menu while retaining independent data-scope permissions.
 SET NAMES utf8mb4;
 START TRANSACTION;
@@ -26,27 +31,6 @@ ON DUPLICATE KEY UPDATE name=VALUES(name),permission=VALUES(permission),parent_i
 UPDATE system_menu
 SET name='班级管理（旧路径）', visible=b'0', updater='V192', update_time=NOW()
 WHERE id=73624 AND deleted=b'0';
-
-INSERT INTO system_role_menu (role_id,menu_id,creator,create_time,updater,update_time,deleted,tenant_id)
-SELECT source.role_id,73620,'V192',NOW(),'V192',NOW(),b'0',source.tenant_id
-FROM system_role_menu source
-WHERE source.menu_id=73624 AND source.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu existing
-                  WHERE existing.role_id=source.role_id AND existing.menu_id=73620
-                    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-INSERT INTO system_role_menu (role_id,menu_id,creator,create_time,updater,update_time,deleted,tenant_id)
-SELECT source.role_id,73628,'V192',NOW(),'V192',NOW(),b'0',source.tenant_id
-FROM system_role_menu source
-WHERE source.menu_id=73620 AND source.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu existing WHERE existing.role_id=source.role_id
-                  AND existing.menu_id=73628 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-INSERT INTO system_role_menu (role_id,menu_id,creator,create_time,updater,update_time,deleted,tenant_id)
-SELECT source.role_id,73629,'V192',NOW(),'V192',NOW(),b'0',source.tenant_id
-FROM system_role_menu source
-WHERE source.menu_id=73624 AND source.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu existing WHERE existing.role_id=source.role_id
-                  AND existing.menu_id=73629 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 UPDATE system_tenant_package
 SET menu_ids=JSON_ARRAY_APPEND(menu_ids,'$',73620), updater='V192', update_time=NOW()

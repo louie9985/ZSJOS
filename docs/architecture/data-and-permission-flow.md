@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## 角色菜单授权来源（2026-09-17）
+
+角色菜单关系仅由 System 角色管理配置。迁移、初始化种子、独立部署 SQL 及生成器不得自动授予、继承、回补、重分配或撤销角色菜单权限。SQL 继续维护菜单/按钮定义，双端继续消费服务端授权，后端继续独立校验权限。清理脚本不重置既有数据库授权；新环境普通角色须由管理员配置。
+
 ## Account and personal calendars
 
 The account calendar is a projection of media-account maintenance dates. Page permission, account relationship
@@ -699,7 +703,7 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
 - `lead_first_follow_up` and `lead_follow_up_reminder` are completed or replaced only by the lead follow-up transaction. The employee today-task APIs are assignee-scoped and expose stable action codes rather than a generic completion endpoint.
 - 跟进备注和下次跟进时间均为必填，下次时间必须晚于当前时间。无效客资不再允许新增跟进；判无效及成交订单最终生效会取消未完成的首次跟进、下次跟进和适用的判定任务，并清空 Lead/Opportunity 当前下次跟进投影，历史跟进记录保持不变。
 - 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 内部阶段值。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中按内部阶段值做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。消息展示边界将三个阶段转换为“即将到期/已到期/已逾期”，系统默认规则分别使用阶段化中文标题、摘要和正文，不向用户暴露内部英文值；管理员自定义模板仍由 System 配置管理。直属主管只取销售当前部门负责人，不向上级部门递归。
-- “客资新建”是默认站内信场景。新租户初始化使用两条独立规则：`operator` 接收通用提交成功消息，`new_media_provider` 只在销售自拓明确选择了不同于操作人的新媒体提供方时解析。提供方消息固定为“`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`”；未选择提供方和普通新媒体提交不解析该角色。V080 仅拆分未经编辑且启用的 V075 系统默认，管理员已有的启用、停用或已编辑规则保持权威，迁移不覆盖，也不补发历史消息。
+- “客资新建”是默认站内信场景。新租户初始化使用两条独立规则：`operator` 接收通用提交成功消息，`new_media_provider` 在销售/教务自拓明确选择了不同于操作人的新媒体提供方时解析。V257 对未经编辑的 V080 默认提供方消息增加 `lead.submitterIdentityLabel`（销售/教务）；已编辑模板保留；未选择提供方和普通新媒体提交不解析该角色。V080 仅拆分未经编辑且启用的 V075 系统默认，管理员已有的启用、停用或已编辑规则保持权威，迁移不覆盖，也不补发历史消息。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
 
 ### Subordinate-sales management
@@ -908,3 +912,8 @@ headers, or a user-selected tenant cannot grant access independently.
 
 ## H5 排行榜租户配置（2026-09-14）
 ZSJOS 将 H5 排行榜开关、榜单类型、默认周期及员工提交者统计规则保存在租户隔离的 `zsjos_partner_leaderboard_config` 中。Admin 与 Partner H5 共同读取该服务端来源；缺少记录时使用安全默认值，默认榜单被关闭时按启用榜单顺序回退。员工角色候选通过 System 角色公共 API 获取，ZSJOS 不复制角色表。
+
+
+### 教务自拓与成交身份
+
+教务自拓通过独立配置权限直接归属当前员工，由本人完成跟进、判定和成交，复用原审批/超时机制。客资来源、当前负责人身份与订单成交身份分别持久化；历史空身份不通过当前角色补造。接单、抢单和销售候选资格不扩大。接口、快照、迁移和授权范围见 [教务自拓与直接成交](../api/zsjos-education-self-sourced.md)。

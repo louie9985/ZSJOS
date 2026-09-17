@@ -27,7 +27,7 @@ const legacyResultLabels: Record<string, string> = {
   new_person: '旧记录：新建客户',
   reuse_person: '旧记录：复用客户',
   reactivate_lead: '旧记录：激活客资',
-  notify_owner: '旧记录：提醒所属销售'
+  notify_owner: '旧记录：提醒负责人'
 }
 const duplicateFlagLabels: Record<string, string> = {
   none: '未发现重复', strong_duplicate: '强重复', suspected_duplicate: '疑似重复'
@@ -250,7 +250,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       <Form form={form} layout="vertical">
         <Form.Item name="resultType" label="复核结论" rules={[{ required: true }]}><Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))}/></Form.Item>
         {resultType === 'close_duplicate' && processingCandidates.length > 0 && <Alert type="warning" showIcon message="确认关闭后不会创建客资，也不会进入分配或业绩统计" />}
-        {resultType === 'allow_flow' && <Alert type="info" showIcon message="放行后将按原提交快照创建正式客资，并继续进入分配或销售跟进流程" />}
+        {resultType === 'allow_flow' && <Alert type="info" showIcon message="放行后将按原提交快照创建正式客资，并继续进入分配或负责人跟进流程" />}
         <Form.Item name="opinion" label="复核意见" rules={[{ required: true, whitespace: true }, { max: 2000 }]}><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
         <Form.Item label="复核附件"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" disabled={saving}/></Form.Item>
       </Form>

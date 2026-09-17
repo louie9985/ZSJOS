@@ -250,7 +250,7 @@ export default function SalesOrderSupervisorInbox({
       message.success(
         action === "confirm"
           ? "主管审批已通过"
-          : "主管审批已驳回，订单退回销售补正",
+          : "主管审批已驳回，订单退回提交人补正",
       );
       await load();
     }).catch((saveError) =>
@@ -473,7 +473,7 @@ export default function SalesOrderSupervisorInbox({
         {detailContent}
       </ResizableDetailDrawer>
       <Modal
-        title={decision === "confirm" ? "通过主管审批" : "驳回并退回销售"}
+        title={decision === "confirm" ? "通过主管审批" : "驳回并退回提交人"}
         open={Boolean(decision)}
         onCancel={() => {
           setDecision(undefined);

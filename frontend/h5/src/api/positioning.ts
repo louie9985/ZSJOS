@@ -3,6 +3,8 @@ import axios from 'axios'
 export interface PositioningField { key:string; title:string; enabled?:boolean; type?:string }
 export interface PositioningConfirmation {
   state:'ready'|'processed'
+  cardNo?:string
+  serviceLabel?:string
   accountName?:string
   platformLabel?:string
   submittedAt?:string|number

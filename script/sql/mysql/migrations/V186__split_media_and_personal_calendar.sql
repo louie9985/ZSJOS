@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V186 拆分账号维护排期与个人手工日程。
 -- Dependencies: V161 media calendar view and V185 partner permission split.
 -- Scope: creates one empty tenant business table; updates calendar menu metadata, packages and role-menu grants.
@@ -91,10 +97,6 @@ CREATE TABLE IF NOT EXISTS `zsjos_personal_calendar_event` (
 UPDATE `system_menu`
 SET `status`=1,`visible`=b'0',`updater`='migration-V186',`update_time`=NOW()
 WHERE `id`=73604 AND `deleted`=b'0';
-
-UPDATE `system_role_menu`
-SET `deleted`=b'1',`updater`='migration-V186',`update_time`=NOW()
-WHERE `menu_id`=73604 AND `deleted`=b'0' AND `creator`='migration-V161';
 
 INSERT INTO `system_menu`
  (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,

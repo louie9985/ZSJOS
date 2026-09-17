@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V078: unify employee Lead management and align department-leader visibility.
 -- Dependency/order: apply after V077.
 -- Data scope: menu metadata and role-menu relations only; no Lead, user, role, task, or history row changes.
@@ -43,63 +49,6 @@ WHERE `id` IN (6778,6779) AND `deleted`=b'0';
 UPDATE `system_menu`
 SET `parent_id`=6770,`updater`='migration-V078',`update_time`=NOW()
 WHERE `id` IN (6845,6846,6847) AND `deleted`=b'0';
-
--- Every Lead query permission holder needs the single routable page.
-UPDATE `system_role_menu` target
-JOIN (
-  SELECT DISTINCT rm.role_id,rm.tenant_id
-  FROM `system_role_menu` rm
-  JOIN `system_menu` menu ON menu.id=rm.menu_id
-    AND menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
-                            'zsjos:lead:query-submitted','zsjos:lead:query-owned')
-    AND menu.deleted=b'0'
-  WHERE rm.deleted=b'0'
-) holder ON holder.role_id=target.role_id AND holder.tenant_id=target.tenant_id
-SET target.deleted=b'0',target.updater='migration-V078',target.update_time=NOW()
-WHERE target.menu_id=6770 AND target.deleted=b'1';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT holder.role_id,6770,'migration-V078',NOW(),'migration-V078',NOW(),b'0',holder.tenant_id
-FROM (
-  SELECT DISTINCT rm.role_id,rm.tenant_id
-  FROM `system_role_menu` rm
-  JOIN `system_menu` menu ON menu.id=rm.menu_id
-    AND menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
-                            'zsjos:lead:query-submitted','zsjos:lead:query-owned')
-    AND menu.deleted=b'0'
-  WHERE rm.deleted=b'0'
-) holder
-WHERE NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=holder.role_id AND existing.menu_id=6770 AND existing.tenant_id=holder.tenant_id
-);
-
--- Sales team visibility is department-scoped, so these two role codes must not retain tenant-wide query-all.
-UPDATE `system_role_menu` rm
-JOIN `system_role` role ON role.id=rm.role_id AND role.tenant_id=rm.tenant_id AND role.deleted=b'0'
-JOIN `system_menu` menu ON menu.id=rm.menu_id AND menu.permission='zsjos:lead:query-all' AND menu.deleted=b'0'
-SET rm.deleted=b'1',rm.updater='migration-V078',rm.update_time=NOW()
-WHERE rm.deleted=b'0' AND role.code IN ('sales_manager','sales_specialist');
-
--- Sales managers need the feature permission in addition to the object-level department scope.
-UPDATE `system_role_menu` target
-JOIN `system_role` role ON role.id=target.role_id AND role.tenant_id=target.tenant_id
-JOIN `system_menu` menu ON menu.id=target.menu_id AND menu.permission='zsjos:lead-follow-up:query'
-SET target.deleted=b'0',target.updater='migration-V078',target.update_time=NOW()
-WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-  AND menu.deleted=b'0' AND target.deleted=b'1';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V078',NOW(),'migration-V078',NOW(),b'0',role.tenant_id
-FROM `system_role` role
-JOIN `system_menu` menu ON menu.permission='zsjos:lead-follow-up:query' AND menu.deleted=b'0'
-WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.role_id=role.id AND existing.menu_id=menu.id AND existing.tenant_id=role.tenant_id
-  );
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V078','Unify Lead management relation scopes','V078__unified_lead_management_scope.sql',NOW())

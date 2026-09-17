@@ -7,7 +7,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('positioning card API contract', () => {
   it('creates and updates server-backed drafts', async () => {
-    const createRequest: PositioningCardDraftRequest = { accountId: 7, values: { platform: 'douyin' } }
+    const createRequest: PositioningCardDraftRequest = { studentPersonId: 29, serviceRelationId: 11, values: { platform: 'douyin' } }
     const updateRequest: PositioningCardDraftRequest & { version: number } = { ...createRequest, version: 3 }
     const post = vi.spyOn(http, 'post').mockResolvedValue(response({ id: 41, version: 1 }))
     const put = vi.spyOn(http, 'put').mockResolvedValue(response({ id: 41, version: 4 }))
@@ -19,7 +19,7 @@ describe('positioning card API contract', () => {
   })
 
   it('loads import sources and imports the selected submission', async () => {
-    const params = { studentPersonId: 29, accountId: 7, serviceRelationId: 11 }
+    const params = { studentPersonId: 29, serviceRelationId: 11 }
     const importRequest = { sourceSubmissionId: 31, ...params, targetDraftId: 41, version: 3 }
     const sources = [{ submissionId: 31 }]
     const imported = { id: 41, version: 4, skippedFieldKeys: ['legacy-field'] }

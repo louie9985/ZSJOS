@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- ZSJOS baseline seed. No products, SKUs, leads, orders or other business rows.
 SET NAMES utf8mb4;
 
@@ -83,54 +88,6 @@ INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
 SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
 FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'agingPool' AND s.deleted = b'0';
 
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead-rule:update' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6773 menu_id UNION ALL SELECT 6774 UNION ALL SELECT 6775) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead:submit' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6778) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission IN ('zsjos:lead:claim','zsjos:lead:accept') AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6779) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead:query-all' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6770 menu_id UNION ALL SELECT 6778 UNION ALL SELECT 6779) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V000_BASELINE', 'ZSJOS empty database baseline', 'bootstrap-v1');
 
@@ -154,23 +111,6 @@ VALUES ('V006', 'Add lead acceptance tasks and follow-up rule', 'lead-acceptance
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V007', 'Split lead inbox into fixed submitter and owner routes', 'lead-inbox-fixed-audiences-v1');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6781,'1',NOW(),'1',NOW(),b'0',source.tenant_id FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead:query' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6781 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6780,'1',NOW(),'1',NOW(),b'0',source.tenant_id FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission IN ('zsjos:lead:submit','zsjos:lead:query-submitted','zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:accept') AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6780 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,target.menu_id,'1',NOW(),'1',NOW(),b'0',source.tenant_id FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission IN ('zsjos:lead:claim','zsjos:lead:accept') AND m.deleted=b'0'
-CROSS JOIN (SELECT 6781 menu_id UNION ALL SELECT 6782) target WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=target.menu_id AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6809,'1',NOW(),'1',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead-follow-up:create' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6809 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V008', 'Add lead follow-up records and today tasks', 'lead-follow-up-today-tasks-v1');
@@ -302,13 +242,6 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 UPDATE `system_menu` SET `sort`=18 WHERE `id`=6810 AND `deleted`=b'0';
 UPDATE `system_menu` SET `sort`=19 WHERE `id`=6804 AND `deleted`=b'0';
 
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6813,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source
-WHERE source.menu_id=6811 AND source.deleted=b'0'
-  AND NOT EXISTS(SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
-    AND existing.menu_id=6813 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-order-workbench-views-v1');
 
@@ -320,15 +253,6 @@ INSERT IGNORE INTO `system_menu`
 (6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6819,'一键下班','zsjos:subordinate-sales:pause-all',3,5,6814,'','','',NULL,0,b'1',b'1',b'0','quick-init',NOW(),'quick-init',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,target.id,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
-FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead:appeal:review-sales-manager' AND source_menu.deleted=b'0'
-JOIN system_menu target ON target.id BETWEEN 6814 AND 6818 AND target.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existing
- WHERE existing.tenant_id=source.tenant_id AND existing.role_id=source.role_id
- AND existing.menu_id=target.id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V034','Lead aging collaboration pool','lead-aging-collaboration-pool-v1'),

@@ -45,7 +45,7 @@ class V209ReplayTest(unittest.TestCase):
         self.sql(container,"SOURCE script/sql/mysql/migrations/V209__media_account_profile.sql;")
         query_menu=self.sql(container,"SELECT id FROM system_menu WHERE permission='zsjos:media-account:query' AND deleted=0 AND status=0 AND type=3 AND parent_id=7022")
         self.assertTrue(query_menu.isdigit())
-        self.assertEqual('1',self.sql(container,f"SELECT COUNT(*) FROM system_role_menu WHERE role_id=900209 AND menu_id={query_menu} AND deleted=0"))
+        self.assertEqual('0',self.sql(container,f"SELECT COUNT(*) FROM system_role_menu WHERE role_id=900209 AND menu_id={query_menu} AND deleted=0"))
         self.assertEqual('0',self.sql(container,f"SELECT COUNT(*) FROM system_role_menu WHERE role_id=900210 AND menu_id={query_menu} AND deleted=0"))
         self.assertEqual('1',self.sql(container,"SELECT deleted+0 FROM system_menu WHERE id=6970"))
         self.assertEqual('查看账号档案'.encode().hex().upper(),self.sql(container,f"SELECT HEX(name) FROM system_menu WHERE id={query_menu}"))

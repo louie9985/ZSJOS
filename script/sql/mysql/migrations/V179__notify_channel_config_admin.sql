@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V179: expose tenant notification-channel enablement in Admin.
 -- Additive and repeatable. Does not seed credentials or enable any tenant.
 SET NAMES utf8mb4;
@@ -22,11 +28,6 @@ SELECT '通知渠道更新', 'system:notify-channel:update', 3, 2, p.id, 0, b'1'
        'migration-V179', NOW(), 'migration-V179', NOW(), b'0'
 FROM system_menu p WHERE p.path='notify-channel' AND p.deleted=b'0'
   AND NOT EXISTS (SELECT 1 FROM system_menu x WHERE x.permission='system:notify-channel:update' AND x.deleted=b'0');
-
-INSERT IGNORE INTO system_role_menu (role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT r.id, m.id, 'migration-V179', NOW(), 'migration-V179', NOW(), b'0', 0
-FROM system_role r JOIN system_menu m ON m.permission IN ('system:notify-channel:query','system:notify-channel:update')
-WHERE r.code='system_administrator' AND r.deleted=b'0' AND m.deleted=b'0';
 
 INSERT IGNORE INTO zsjos_schema_version (version, description, checksum)
 VALUES ('V179','Notification channel administration','notify-channel-admin-v1');

@@ -45,6 +45,9 @@ import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationClassAssignmentsSaveReqVO;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.InOrder;
@@ -416,14 +419,11 @@ class RegistrationServiceImplTest {
         when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(formalItem, pendingItem));
         when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L))
                 .thenReturn(List.of(formalAssignment, pendingAssignment));
-        when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(81L));
-        when(productMapper.selectById(402L)).thenReturn(new ZsjosProductDO().setCategoryId(82L));
+        when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(999L));
         when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(pendingClass);
         when(deliveryClassMapper.selectByIdForUpdate(202L, 1L)).thenReturn(formalClass);
         when(deliveryClassService.validateHomeroom(31L))
                 .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
-        when(productCategoryMapper.selectById(82L))
-                .thenReturn(new ZsjosProductCategoryDO().setId(82L).setName("职业资格").setParentId(0L));
         when(personMapper.selectByIdForUpdate(501L, 1L)).thenReturn(person);
         RegistrationVersionReqVO request = new RegistrationVersionReqVO();
         request.setVersion(0); request.setIdempotencyKey("complete-class-mode");
@@ -465,7 +465,7 @@ class RegistrationServiceImplTest {
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(checklist));
         when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(orderItem));
         when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L)).thenReturn(List.of(assignment(301L, 201L)));
-        when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(81L));
+        when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(999L));
         when(deliveryClassMapper.selectByIdForUpdate(201L, 1L))
                 .thenReturn(deliveryClass(201L, false, 81L, 31L));
         when(deliveryClassService.validateHomeroom(31L)).thenThrow(new ServiceException(DELIVERY_CLASS_USER_INVALID));
@@ -525,6 +525,38 @@ class RegistrationServiceImplTest {
         registrationCase.setId(1L); registrationCase.setOrderId(10L);
         registrationCase.setStatus(STATUS_PENDING); registrationCase.setVersion(0);
         return registrationCase;
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void saveWithoutProductCategoryAcceptsFormalAndPendingAndClearsOldOwner(boolean pending) {
+        RegistrationCaseDO registrationCase = editableCase();
+        registrationCase.setAssignmentMode("class_per_item");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_EFFECTIVE);
+        SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(301L);
+        DeliveryClassDO target = deliveryClass(201L, pending, 88L, pending ? null : 31L);
+        RegistrationClassAssignmentDO existing = assignment(301L, 200L);
+        existing.setId(71L); existing.setVersion(0); existing.setHomeroomUserId(99L);
+        existing.setHomeroomUserNameSnapshot("旧班主任"); existing.setCategoryId(77L);
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        when(orderMapper.selectById(10L)).thenReturn(order);
+        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(item));
+        when(deliveryClassMapper.selectById(201L)).thenReturn(target);
+        when(classAssignmentMapper.selectByCaseAndItem(1L, 301L)).thenReturn(existing);
+        if (!pending) when(deliveryClassService.validateHomeroom(31L))
+                .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
+        RegistrationClassAssignmentsSaveReqVO req = new RegistrationClassAssignmentsSaveReqVO();
+        req.setVersion(0); req.setIdempotencyKey("save-no-category-" + pending);
+        RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO value = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO();
+        value.setOrderItemId(301L); value.setClassId(201L); req.setAssignments(List.of(value));
+        TenantContextHolder.setTenantId(1L);
+        try { service.updateClassAssignments(1L, 9L, req); }
+        finally { TenantContextHolder.clear(); }
+        verify(classAssignmentMapper).updateById(existing);
+        assertEquals(201L, existing.getClassId());
+        assertNull(existing.getCategoryId());
+        assertEquals(pending ? null : 31L, existing.getHomeroomUserId());
+        if (pending) assertNull(existing.getHomeroomUserNameSnapshot());
     }
 
     private static RegistrationClassAssignmentDO assignment(Long orderItemId, Long classId) {

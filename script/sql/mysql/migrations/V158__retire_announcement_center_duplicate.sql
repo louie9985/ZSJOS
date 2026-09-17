@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V158: retire the duplicate announcement-center menu and keep the original System notice menu as the
 -- single source of truth for both Vue Admin and React Workbench.
 -- Dependencies: V157 and the existing System menu/package tables.
@@ -49,25 +55,6 @@ BEGIN
       `deleted`=b'0',`updater`='V158',`update_time`=NOW()
   WHERE `id`=79913 AND `permission`='system:notice:read';
 
-  INSERT INTO `system_role_menu`
-    (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT source.`role_id`, target.`menu_id`, 'V158', NOW(), 'V158', NOW(), b'0', source.`tenant_id`
-  FROM `system_role_menu` source
-  CROSS JOIN (SELECT 107 AS `menu_id` UNION ALL SELECT 79913 AS `menu_id`) target
-  WHERE source.`menu_id`=79910 AND (source.`deleted`=b'0' OR source.`updater`='V158')
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.`role_id`=source.`role_id` AND existing.`menu_id`=target.`menu_id`
-        AND existing.`tenant_id`=source.`tenant_id` AND existing.`deleted`=b'0');
-
-  INSERT INTO `system_role_menu`
-    (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT source.`role_id`, 79913, 'V158', NOW(), 'V158', NOW(), b'0', source.`tenant_id`
-  FROM `system_role_menu` source
-  WHERE source.`menu_id`=107 AND source.`deleted`=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.`role_id`=source.`role_id` AND existing.`menu_id`=79913
-        AND existing.`tenant_id`=source.`tenant_id` AND existing.`deleted`=b'0');
-
   UPDATE `system_tenant_package`
   SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',107),`updater`='V158',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'79910','$') AND NOT JSON_CONTAINS(`menu_ids`,'107','$');
@@ -81,10 +68,6 @@ BEGIN
   UPDATE `system_menu`
   SET `deleted`=b'1',`updater`='V158',`update_time`=NOW()
   WHERE `id`=79910 AND `deleted`=b'0';
-
-  UPDATE `system_role_menu`
-  SET `deleted`=b'1',`updater`='V158',`update_time`=NOW()
-  WHERE `menu_id`=79910 AND `deleted`=b'0';
 
   UPDATE `system_tenant_package`
   SET `menu_ids`=JSON_REMOVE(`menu_ids`, (

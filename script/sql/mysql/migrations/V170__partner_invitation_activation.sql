@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V170: Partner H5 first-login invitation activation.
 -- Depends on V169 and the independent Partner identity/ownership tables.
 -- Scope: creates an empty Partner invitation table and server-owned admin button permissions.
@@ -83,26 +89,6 @@ BEGIN
   SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79995),`updater`='V170',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6852','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'79995','$');
-
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT source.role_id, target.menu_id, 'V170', NOW(), 'V170', NOW(), b'0', source.tenant_id
-  FROM `system_role_menu` source
-  JOIN (SELECT 79993 AS menu_id UNION ALL SELECT 79994 UNION ALL SELECT 79995) target
-  WHERE source.menu_id=79920 AND source.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-                      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role.id, target.menu_id, 'V170', NOW(), 'V170', NOW(), b'0', role.tenant_id
-  FROM `system_role` role
-  JOIN (SELECT 79993 AS menu_id UNION ALL SELECT 79994 UNION ALL SELECT 79995) target
-  WHERE role.code='system_administrator' AND role.status=0 AND role.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=role.id AND existing.menu_id=target.menu_id
-                      AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
   INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
   VALUES ('V170','Partner H5 invitation activation',

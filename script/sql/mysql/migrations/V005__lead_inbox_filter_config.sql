@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Adds tenant-owned, versioned lead-inbox filter schemes and their administration menu.
 -- Dependencies: zsjos_lead, system_tenant, system_menu and system_role_menu must already exist; V004 must be applied first.
 -- Execution order: create scheme/version tables, seed two published schemes per active tenant, register menu permissions,
@@ -70,18 +76,6 @@ VALUES
 (6773,'客资筛选方案','zsjos:lead-filter:query',2,95,6735,'lead-filter','ep:filter','zsjos/leadFilter/index','ZsjosLeadFilter',0,b'1',b'1',b'1','migration-V005',NOW(),'migration-V005',NOW(),b'0'),
 (6774,'修改客资筛选方案','zsjos:lead-filter:update',3,1,6773,'','','',NULL,0,b'1',b'1',b'1','migration-V005',NOW(),'migration-V005',NOW(),b'0'),
 (6775,'发布客资筛选方案','zsjos:lead-filter:publish',3,2,6773,'','','',NULL,0,b'1',b'1',b'1','migration-V005',NOW(),'migration-V005',NOW(),b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT source.role_id, target.menu_id, 'migration-V005', NOW(), 'migration-V005', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-JOIN `system_menu` source_menu ON source_menu.id=source.menu_id
-  AND source_menu.permission='zsjos:lead-rule:update' AND source_menu.deleted=b'0'
-CROSS JOIN (SELECT 6773 menu_id UNION ALL SELECT 6774 UNION ALL SELECT 6775) target
-WHERE source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V005','Add configurable lead inbox filter schemes','lead-inbox-filter-config-v1');

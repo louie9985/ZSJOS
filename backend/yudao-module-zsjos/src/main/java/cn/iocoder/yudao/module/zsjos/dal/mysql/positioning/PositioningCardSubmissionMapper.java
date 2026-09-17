@@ -20,12 +20,20 @@ public interface PositioningCardSubmissionMapper extends BaseMapperX<Positioning
                 .orderByDesc(PositioningCardSubmissionDO::getSubmissionNo).last("LIMIT 1"));
     }
 
-    @Select("SELECT s.* FROM zsjos_positioning_card_submission s "
-            + "JOIN zsjos_positioning_card c ON c.id=s.card_id AND c.tenant_id=s.tenant_id "
-            + "AND c.deleted=b'0' WHERE s.account_id=#{accountId} AND s.deleted=b'0' "
-            + "AND (s.status='confirmed' OR (s.status='student_agreed' AND c.status<>'archived')) "
-            + "ORDER BY s.submitted_at DESC,s.id DESC LIMIT 1")
+    @Select("SELECT s.* FROM zsjos_positioning_application a JOIN zsjos_positioning_card_submission s "
+            + "ON s.id=a.submission_id AND s.tenant_id=a.tenant_id AND s.deleted=b'0' "
+            + "WHERE a.account_id=#{accountId} AND a.deleted=b'0'")
     PositioningCardSubmissionDO selectCurrentConfirmedByAccount(@Param("accountId") Long accountId);
+
+    default List<PositioningCardSubmissionDO> selectByService(Long relationId) {
+        return selectList(new LambdaQueryWrapperX<PositioningCardSubmissionDO>().eq(PositioningCardSubmissionDO::getServiceRelationId, relationId)
+                .orderByDesc(PositioningCardSubmissionDO::getSubmittedAt).orderByDesc(PositioningCardSubmissionDO::getId));
+    }
+    default PositioningCardSubmissionDO selectLatestConfirmedByCard(Long cardId) {
+        return selectList(new LambdaQueryWrapperX<PositioningCardSubmissionDO>().eq(PositioningCardSubmissionDO::getCardId, cardId)
+                .in(PositioningCardSubmissionDO::getStatus, java.util.List.of("confirmed", "superseded", "student_agreed"))
+                .orderByDesc(PositioningCardSubmissionDO::getSubmissionNo).last("LIMIT 1")).stream().findFirst().orElse(null);
+    }
 
     default List<PositioningCardSubmissionDO> selectByStudentAndAccountIds(Long personId,
                                                                             Collection<Long> accountIds) {

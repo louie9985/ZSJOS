@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Adds sales acceptance permission, first-follow-up rules and administration metadata.
 -- Dependencies: V005, system menu/role grants, business task/event tables and active tenants.
 -- Execution order: create the rule table, seed one enabled rule per tenant, register menus,
@@ -35,30 +41,6 @@ INSERT IGNORE INTO `system_menu`
 VALUES
 (6776,'客资跟进规则','zsjos:lead-follow-up-rule:query',2,92,6735,'lead-follow-up-rule','ep:timer','zsjos/leadFollowUpRule/index','ZsjosLeadFollowUpRule',0,b'1',b'1',b'1','migration-V006',NOW(),'migration-V006',NOW(),b'0'),
 (6777,'修改客资跟进规则','zsjos:lead-follow-up-rule:update',3,1,6776,'','','',NULL,0,b'1',b'1',b'1','migration-V006',NOW(),'migration-V006',NOW(),b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT claim_grant.role_id, accept_menu.id, 'migration-V006', NOW(), 'migration-V006', NOW(), b'0', claim_grant.tenant_id
-FROM `system_role_menu` claim_grant
-JOIN `system_menu` claim_menu ON claim_menu.id=claim_grant.menu_id
-  AND claim_menu.permission='zsjos:lead:claim' AND claim_menu.deleted=b'0'
-JOIN `system_menu` accept_menu ON accept_menu.permission='zsjos:lead:accept' AND accept_menu.deleted=b'0'
-WHERE claim_grant.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=claim_grant.role_id AND existing.menu_id=accept_menu.id
-    AND existing.tenant_id=claim_grant.tenant_id AND existing.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT manager_grant.role_id, target.menu_id, 'migration-V006', NOW(), 'migration-V006', NOW(), b'0', manager_grant.tenant_id
-FROM `system_role_menu` manager_grant
-JOIN `system_menu` manager_menu ON manager_menu.id=manager_grant.menu_id
-  AND manager_menu.permission='zsjos:lead-rule:update' AND manager_menu.deleted=b'0'
-CROSS JOIN (SELECT 6776 menu_id UNION ALL SELECT 6777) target
-WHERE manager_grant.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=manager_grant.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=manager_grant.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V006','Add lead acceptance tasks and follow-up rule','lead-acceptance-follow-up-v1');

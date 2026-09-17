@@ -172,6 +172,44 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void educationOwnerDirectlyCreatesOrderAndApprovalWithoutSalesTransfer() {
+        mockEligibleLeadAndOpportunity();
+        LeadDO educationLead = leadMapper.selectByIdForUpdate(1L, 1L);
+        educationLead.setOwnerIdentity("education");
+        educationLead.setSourceType("education_self_sourced");
+        SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
+        when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L, 302L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
+        doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
+        when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+
+        assertEquals(100L, id);
+        ArgumentCaptor<SalesOrderDO> orderCaptor = ArgumentCaptor.forClass(SalesOrderDO.class);
+        verify(orderMapper).insert(orderCaptor.capture());
+        assertEquals("education", orderCaptor.getValue().getFormalOwnerIdentity());
+        assertEquals(20L, orderCaptor.getValue().getFormalSalesUserId());
+        assertEquals("测试学员", orderCaptor.getValue().getBuyerName());
+        assertEquals("天津市", orderCaptor.getValue().getProvinceName());
+        assertEquals(new BigDecimal("0.00"), orderCaptor.getValue().getTotalAmount());
+        ArgumentCaptor<SalesOrderApprovalRoundDO> roundCaptor = ArgumentCaptor.forClass(SalesOrderApprovalRoundDO.class);
+        verify(roundMapper).insert(roundCaptor.capture());
+        assertTrue(roundCaptor.getValue().getOrderSnapshot().contains("education"));
+        assertEquals("process-1", roundCaptor.getValue().getProcessInstanceId());
+        assertEquals("key-1", roundCaptor.getValue().getSubmissionIdempotencyKey());
+        verify(processInstanceApi).createProcessInstance(eq(20L), argThat(req ->
+                "education".equals(req.getVariables().get("formalOwnerIdentity"))
+                        && req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
+                        && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
+                        && "KZ202608160000000001".equals(req.getVariables().get("leadNo"))));
+    }
+
+    @Test
     void createRejectsWhenAnApprovalCenterHasNoEnabledUsers() {
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();

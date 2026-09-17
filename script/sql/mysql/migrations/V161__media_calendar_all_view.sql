@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V161 日历日程入口与独立页面权限。
 -- Dependencies: V146 media account calendar menus and V132+ workbench_render_mode column.
 -- Scope: server-owned System menu metadata, tenant packages, and role-menu grants only.
@@ -22,16 +28,6 @@ ON DUPLICATE KEY UPDATE
 UPDATE `system_tenant_package`
 SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',73604),`updater`='migration-V161',`update_time`=NOW()
 WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'73600','$') AND NOT JSON_CONTAINS(`menu_ids`,'73604','$');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT grant_row.`role_id`,73604,'migration-V161',NOW(),'migration-V161',NOW(),b'0',grant_row.`tenant_id`
-FROM `system_role_menu` grant_row
-WHERE grant_row.`deleted`=b'0' AND grant_row.`menu_id` IN (73600,73601)
-  AND NOT EXISTS (
-    SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.`role_id`=grant_row.`role_id` AND existing.`tenant_id`=grant_row.`tenant_id`
-      AND existing.`menu_id`=73604 AND existing.`deleted`=b'0'
-  );
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V161','Media calendar schedule view','V161__media_calendar_all_view.sql',NOW())

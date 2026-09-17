@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V144: remove the retired new-media Student Operations domains.
 -- Dependencies: apply after the rewritten development baseline.
 -- Deletion scope: Student Operations role grants and menu nodes; graduation notification
@@ -14,8 +20,7 @@ DELETE template FROM `system_notify_template` template
 WHERE template.`code` = 'ZSJOS_MEDIA_GRADUATION_RESULT' OR template.`scene_code` = 'media.graduation.result';
 DELETE event_row FROM `zsjos_business_event` event_row
 WHERE event_row.`aggregate_type` = 'media-graduation' OR event_row.`idempotency_key` LIKE 'media-graduation:%';
-DELETE role_menu FROM `system_role_menu` role_menu JOIN `system_menu` menu_row ON menu_row.`id` = role_menu.`menu_id`
-WHERE menu_row.`permission` LIKE 'zsjos:student-ops:%' OR menu_row.`id` IN (6984, 7013, 7014, 7015, 7021);
+
 DELETE menu_row FROM `system_menu` menu_row
 WHERE menu_row.`permission` LIKE 'zsjos:student-ops:%' OR menu_row.`id` IN (6984, 7013, 7014, 7015, 7021);
 DROP TABLE IF EXISTS `zsjos_exception_ticket`;

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V173: permanent Lead submitter-assistance request action.
 -- Dependencies/order: apply after V172; requires Lead, BusinessTask and configurable notifications.
 -- Data scope: creates one empty request snapshot table, one button permission, initial sales role grants,
@@ -27,13 +33,6 @@ SELECT '请求提交人协助','zsjos:lead:request-submitter-assist',3,32,parent
 FROM `system_menu` parent WHERE parent.permission='zsjos:lead:query' AND parent.type=2 AND parent.deleted=b'0'
   AND NOT EXISTS (SELECT 1 FROM `system_menu` existing WHERE existing.permission='zsjos:lead:request-submitter-assist' AND existing.deleted=b'0')
 ORDER BY parent.id LIMIT 1;
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V173',NOW(),'migration-V173',NOW(),b'0',role.tenant_id
-FROM `system_role` role JOIN `system_menu` menu ON menu.permission='zsjos:lead:request-submitter-assist' AND menu.deleted=b'0'
-WHERE role.code IN ('sales_specialist','sales_manager') AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=role.id AND existing.menu_id=menu.id AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `system_notify_template`
 (`name`,`code`,`nickname`,`scene_code`,`channel_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. V187: tenant-scoped exam schedules and Workbench permissions.
 -- Dependencies/order: apply after V186; product categories and Calendar menu 73600 must exist.
 -- Data scope: creates an empty schedule table, one global Infra parameter, menu metadata, package coverage,
@@ -106,41 +112,6 @@ BEGIN
   SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',73612),`updater`='V187',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'73610','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'73612','$');
-
-  -- Every enabled internal role in a tenant package that exposes the page receives query access.
-  -- Runtime authorization still consumes configured permissions; role codes are not used for decisions.
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role_row.id,73610,'V187',NOW(),'V187',NOW(),b'0',role_row.tenant_id
-  FROM `system_role` role_row
-  JOIN `system_tenant` tenant_row ON tenant_row.id=role_row.tenant_id
-    AND tenant_row.status=0 AND tenant_row.deleted=b'0'
-  JOIN `system_tenant_package` package_row ON package_row.id=tenant_row.package_id
-    AND package_row.status=0 AND package_row.deleted=b'0'
-    AND JSON_CONTAINS(package_row.menu_ids,'73610','$')
-  WHERE role_row.status=0 AND role_row.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=role_row.id AND existing.menu_id=73610
-                      AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
-
-  -- Query must be a selectable leaf; selecting the page alone cannot express read-only access in the role tree.
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT source.role_id,73612,'V187',NOW(),'V187',NOW(),b'0',source.tenant_id
-  FROM `system_role_menu` source
-  WHERE source.menu_id=73610 AND source.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=source.role_id AND existing.menu_id=73612
-                      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role_row.id,73611,'V187',NOW(),'V187',NOW(),b'0',role_row.tenant_id
-  FROM `system_role` role_row
-  WHERE role_row.code IN ('exam_manager','exam_specialist') AND role_row.status=0 AND role_row.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=role_row.id AND existing.menu_id=73611
-                      AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
 
   INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
   VALUES ('V187','Exam calendar',SHA2('V187__exam_calendar.sql',256),NOW())

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. V205: grant the delivery manager role department-scoped class and student read access.
 -- Dependencies/order: apply after V204. Requires the V192 unified class menu (73620/73628) and the
 -- V193/V195 student-management route repair (73020).
@@ -49,17 +55,6 @@ BEGIN
   UPDATE `system_role`
   SET `data_scope`=4, `updater`='V205', `update_time`=NOW()
   WHERE `code`='delivery_manager' AND `deleted`=b'0' AND `data_scope`=3;
-
-  -- Read-only grants, one active relation per role and tenant.
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role_row.id, target.menu_id, 'V205', NOW(), 'V205', NOW(), b'0', role_row.tenant_id
-  FROM `system_role` role_row
-  JOIN (SELECT 73620 AS menu_id UNION ALL SELECT 73628 UNION ALL SELECT 73020) target
-  WHERE role_row.code='delivery_manager' AND role_row.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=role_row.id AND existing.menu_id=target.menu_id
-                      AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
 
   -- Tenant packages must expose the granted menus, otherwise the route guard rejects navigation.
   UPDATE `system_tenant_package`

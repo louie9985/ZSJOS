@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Adds configurable, tenant-scoped business notification rules and durable message snapshots.
 -- Dependencies: V010, system_notify_template, system_notify_message and existing tenant users.
 -- Execution order: additive columns/table/indexes, legacy snapshot backfill, default global template,
@@ -113,16 +119,6 @@ VALUES
 (6787,'业务通知规则创建','system:notify-rule:create',3,2,6785,'','','',NULL,0,b'1',b'1',b'1','migration-V011',NOW(),'migration-V011',NOW(),b'0'),
 (6788,'业务通知规则更新','system:notify-rule:update',3,3,6785,'','','',NULL,0,b'1',b'1',b'1','migration-V011',NOW(),'migration-V011',NOW(),b'0'),
 (6789,'业务通知规则删除','system:notify-rule:delete',3,4,6785,'','','',NULL,0,b'1',b'1',b'1','migration-V011',NOW(),'migration-V011',NOW(),b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,target.menu_id,'migration-V011',NOW(),'migration-V011',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source
-CROSS JOIN (SELECT 6785 menu_id UNION ALL SELECT 6786 UNION ALL SELECT 6787 UNION ALL SELECT 6788 UNION ALL SELECT 6789) target
-WHERE source.menu_id=2145 AND source.deleted=b'0' AND NOT EXISTS (
-  SELECT 1 FROM `system_role_menu` existing
-  WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-    AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V011','Add configurable business notifications and durable message snapshots','configurable-business-notifications-v1');

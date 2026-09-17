@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V094: student acceptance and continuous contact task chain.
 -- Dependencies/order: apply after V093, registration/service relations, generic business tasks,
 -- System dictionaries/user relations/notification rules, and BPM infrastructure.
@@ -221,16 +227,6 @@ ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),
  `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`status`=VALUES(`status`),
  `visible`=VALUES(`visible`),`keep_alive`=VALUES(`keep_alive`),`always_show`=VALUES(`always_show`),
  `deleted`=b'0',`updater`='migration-V094',`update_time`=NOW();
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role_row.id,menu_row.id,'migration-V094',NOW(),'migration-V094',NOW(),b'0',role_row.tenant_id
-FROM `system_role` role_row JOIN `system_menu` menu_row ON menu_row.deleted=b'0'
-WHERE role_row.deleted=b'0'
-  AND ((role_row.code='system_administrator' AND menu_row.id IN (73400,73401,73402,73410,73420,73421,73422,73423,73424,73425,73426))
-    OR (role_row.code='study_planner' AND menu_row.id IN (73420,73421,73422,73423,73424,73425)))
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` grant_row
-    WHERE grant_row.role_id=role_row.id AND grant_row.menu_id=menu_row.id
-      AND grant_row.tenant_id=role_row.tenant_id AND grant_row.deleted=b'0');
 
 INSERT INTO `system_notify_template`
 (`name`,`code`,`nickname`,`scene_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,

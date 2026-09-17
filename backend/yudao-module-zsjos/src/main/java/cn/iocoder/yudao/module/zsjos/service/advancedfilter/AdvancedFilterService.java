@@ -442,6 +442,9 @@ public class AdvancedFilterService {
         add(result, text("lead.wechatId", IDENTITY, "提交微信号", leadBind("submitted_wechat_id", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, select("lead.status", STATUS, "客资状态", options("submitted", "已提交", "suspended", "已挂起", "valid", "有效", "invalid", "无效", "won", "已成交", "closed", "已关闭"), leadBind("status", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, select("lead.assignmentStatus", STATUS, "分配状态", options("unassigned", "未分配", "pending_acceptance", "待接单", "owned", "已归属", "public_pool", "抢单池", "recycle_pending", "回收待处理", "closed", "已关闭"), leadBind("assignment_status", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
+        add(result, select("lead.sourceType", EXTRA, "客资来源", options("internal_new_media", "新媒体提交", "partner", "兼职提交", "sales_self_sourced", "销售自拓录", "education_self_sourced", "教务自拓录"), leadBind("source_type", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
+        add(result, select("lead.ownerIdentity", EXTRA, "负责人身份", options("sales", "销售", "education", "教务"), leadBind("owner_identity", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
+        add(result, select("order.formalOwnerIdentity", EXTRA, "成交归属身份", options("sales", "销售", "education", "教务"), orderBind("formal_owner_identity", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, selectSource("lead.sourceChannel", EXTRA, "来源渠道", "dict:zsjos_lead_source_channel", leadBind("source_channel_id", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, selectSource("lead.category", EXTRA, "客资分类", "dict:zsjos_lead_category", leadBind("lead_category", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, selectSource("lead.sourceUserId", PEOPLE, "提交人", "visible-users",
@@ -465,7 +468,7 @@ public class AdvancedFilterService {
         add(result, text("order.studentMobile", IDENTITY, "学员手机号", orderBind("student_mobile", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, text("order.studentWechatId", IDENTITY, "学员微信号", orderBind("student_wechat_id", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, selectSource("order.submitterUserId", PEOPLE, "订单提交人", "visible-users", orderBind("submitter_user_id", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
-        add(result, selectSource("order.formalSalesUserId", PEOPLE, "正式销售", "visible-users", orderBind("formal_sales_user_id", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
+        add(result, selectSource("order.formalSalesUserId", PEOPLE, "成交负责人", "visible-users", orderBind("formal_sales_user_id", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, number("order.totalAmount", MONEY, "订单总金额", orderBind("total_amount", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, selectSource("order.studentNature", IDENTITY, "学员性质", "dict:zsjos_order_student_nature", orderBind("student_nature", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, text("order.region", IDENTITY, "所在地区", orderExpression("CONCAT_WS('/', %s.province_name, %s.city_name)", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
@@ -568,8 +571,8 @@ public class AdvancedFilterService {
         return bind("lead", "l." + column, null, "order", "rl." + column, order, "lead_appeal", "rl." + column, appeal, "registration", "rl." + column, registration, "student", "rl." + column, student);
     }
     private static Map<String, Binding> leadSubmitterFilterBind(String order, String appeal, String registration, String student) {
-        String leadExpression = "CASE WHEN l.source_provider_recorded = b'1' AND l.source_type = 'sales_self_sourced' THEN l.source_provider_user_id ELSE l.source_user_id END";
-        String orderExpression = "CASE WHEN rl.source_provider_recorded = b'1' AND rl.source_type = 'sales_self_sourced' THEN rl.source_provider_user_id ELSE rl.source_user_id END";
+        String leadExpression = "CASE WHEN l.source_provider_recorded = b'1' AND l.source_type IN ('sales_self_sourced','education_self_sourced') THEN l.source_provider_user_id ELSE l.source_user_id END";
+        String orderExpression = "CASE WHEN rl.source_provider_recorded = b'1' AND rl.source_type IN ('sales_self_sourced','education_self_sourced') THEN rl.source_provider_user_id ELSE rl.source_user_id END";
         return bind("lead", leadExpression, null, "order", orderExpression, order,
                 "lead_appeal", orderExpression, appeal, "registration", orderExpression, registration,
                 "student", orderExpression, student);

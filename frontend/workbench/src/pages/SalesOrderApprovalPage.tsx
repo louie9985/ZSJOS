@@ -176,7 +176,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim(),
         approvalRoundId: detail.currentApprovalRoundId, orderVersion: detail.version,
         roundVersion: detail.approvalRoundVersion, idempotencyKey })
-      complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正');
+      complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回提交人补正');
       setConfirmOpen(false); setDecision(undefined); setReason(''); reload()
     }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
   }

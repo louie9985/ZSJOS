@@ -70,6 +70,7 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("order.id", order.getId()); values.put("order.no", order.getOrderNo());
         values.put("order.amount", order.getTotalAmount());
+        values.put("order.ownerIdentityLabel", cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ownerIdentityLabel(order.getFormalOwnerIdentity()));
         values.put("order.status", order.getStatus()); values.put("order.submittedAt", order.getSubmittedAt());
         values.put("order.approvalDepartments", payload.get("approvalDepartments"));
         values.put("order.decisionReason", payload.get("decisionReason"));
@@ -92,6 +93,7 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("order.id", "订单编号", false),
                 new NotifySceneVariableRespDTO("order.no", "订单号", false),
                 new NotifySceneVariableRespDTO("order.amount", "成交金额", false),
+                new NotifySceneVariableRespDTO("order.ownerIdentityLabel", "成交归属身份", false),
                 new NotifySceneVariableRespDTO("order.status", "订单状态", false),
                 new NotifySceneVariableRespDTO("order.submittedAt", "提交时间", false),
                 new NotifySceneVariableRespDTO("order.approvalDepartments", "审批部门", false),
@@ -115,9 +117,9 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
             case ROLE_REVIEWERS -> "本轮实际审批人";
             case ROLE_SUPERVISOR -> "直属部门负责人";
             case ROLE_REQUESTER -> "主管确认申请人";
-            case ROLE_RESULT_ACTORS -> "正式销售和实际录单人";
+            case ROLE_RESULT_ACTORS -> "成交负责人和实际录单人";
             case ROLE_LEAD_SUBMITTER -> "客资提交人";
-            default -> "订单提交销售";
+            default -> "订单提交人";
         };
     }
 

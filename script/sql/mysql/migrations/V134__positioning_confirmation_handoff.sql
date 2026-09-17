@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Positioning-card immutable submission history and public student confirmation handoff.
 -- Scope: creates two ZSJOS-owned tables, adds one operator button permission, and converts only
 -- active positioning cards waiting on the retired Partner-H5 confirmation entry.
@@ -71,14 +77,6 @@ WHERE NOT EXISTS (SELECT 1 FROM `system_menu` WHERE permission='zsjos:positionin
 UPDATE `system_tenant_package`
 SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`, '$', 73477),`updater`='V134',`update_time`=NOW()
 WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`, '7022', '$') AND NOT JSON_CONTAINS(`menu_ids`, '73477', '$');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V134',NOW(),'V134',NOW(),b'0'
-FROM `system_role` r JOIN `system_menu` m
-  ON m.permission='zsjos:positioning-card:student-link-generate' AND m.deleted=b'0'
-WHERE r.code='new_media_operator' AND r.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-    AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 -- Only in-flight legacy cards require a compatibility snapshot. The old schema did not retain an exact
 -- submission timestamp, so submitted_at remains NULL instead of inventing historical time.

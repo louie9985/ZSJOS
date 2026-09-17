@@ -252,6 +252,11 @@ public class MediaAccountFieldConfigService {
                 throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
             }
             field.setKey(field.getKey().trim()); field.setLabel(field.getLabel().trim());
+            // Positioning has one authoring template; old profile definitions remain only for history.
+            if (MediaAccountFieldPolicy.isRetiredPositioning(field)) {
+                field.setEnabled(false);
+                field.setRequiredForComplete(false);
+            }
             if (field.getDescription()!=null && field.getDescription().length()>2000) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
             if (field.getDictType() != null) field.setDictType(field.getDictType().trim());
             if (field.getOwnerType() == null || field.getOwnerType().isBlank()) field.setOwnerType("UNASSIGNED");

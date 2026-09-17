@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V025 sales-order workbench personal inbox and approval list support.
 -- Dependencies: V023 and V024 must be integrated; do not execute while the V022/V023/V024 ordering gap remains unresolved.
 -- Data scope: one approval-round reason column, one order query index, one menu, menu ordering, and copied role grants. No business rows are deleted.
@@ -27,15 +33,6 @@ UPDATE `system_menu` SET `sort`=18,`updater`='migration-V025',`update_time`=NOW(
 WHERE `id`=6810 AND `deleted`=b'0' AND `sort`<>18;
 UPDATE `system_menu` SET `sort`=19,`updater`='migration-V025',`update_time`=NOW()
 WHERE `id`=6804 AND `deleted`=b'0' AND `sort`<>19;
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6813,'migration-V025',NOW(),'migration-V025',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source
-WHERE source.menu_id=6811 AND source.deleted=b'0'
-  AND NOT EXISTS(SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.role_id=source.role_id AND existing.menu_id=6813
-      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V025','Add sales-order workbench personal and approval views','sales-order-workbench-views-v1');

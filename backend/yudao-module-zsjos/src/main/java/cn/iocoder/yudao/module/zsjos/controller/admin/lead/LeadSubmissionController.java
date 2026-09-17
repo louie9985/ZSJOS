@@ -32,21 +32,21 @@ public class LeadSubmissionController {
 
     @GetMapping("/product/simple-list")
     @Operation(summary = "获得启用课程列表")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:submitter-supplement')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:submitter-supplement')")
     public CommonResult<List<LeadProductSimpleRespVO>> getProductSimpleList() {
         return success(productService.getEnabledProducts());
     }
 
     @GetMapping("/product/catalog")
     @Operation(summary = "获得课程 SPU/SKU 目录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:update', 'zsjos:lead:submitter-supplement')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:update', 'zsjos:lead:submitter-supplement')")
     public CommonResult<LeadProductCatalogRespVO> getProductCatalog() {
         return success(skuService.getLeadCatalog());
     }
 
     @PostMapping("/attachment/upload")
     @Operation(summary = "上传客资图片")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:submitter-supplement', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle', 'zsjos:lead:request-submitter-assist')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:submitter-supplement', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle', 'zsjos:lead:request-submitter-assist')")
     public CommonResult<LeadAttachmentUploadRespVO> uploadAttachment(@RequestParam("file") MultipartFile file)
             throws IOException {
         return success(attachmentService.upload(file));
@@ -66,9 +66,16 @@ public class LeadSubmissionController {
         return success(submissionService.createSelfSourced(reqVO, getLoginUserId()));
     }
 
+    @PostMapping("/education-self-sourced/create")
+    @Operation(summary = "教务提交自拓客资并直接归属本人")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
+    public CommonResult<LeadCreateRespVO> createEducationSelfSourced(@Valid @RequestBody LeadCreateReqVO reqVO) {
+        return success(submissionService.createEducationSelfSourced(reqVO, getLoginUserId()));
+    }
+
     @GetMapping("/self-sourced/new-media-providers")
-    @Operation(summary = "获得销售自拓可选的新媒体提供方")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
+    @Operation(summary = "获得自拓可选的新媒体提供方")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')")
     public CommonResult<List<LeadAssignmentUserRespVO>> getNewMediaProviders() {
         return success(submissionService.getNewMediaProviders());
     }

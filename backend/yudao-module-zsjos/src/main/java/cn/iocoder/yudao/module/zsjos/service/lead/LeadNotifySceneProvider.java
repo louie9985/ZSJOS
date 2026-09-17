@@ -181,7 +181,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     }
 
     private Long resolveNewMediaProvider(LeadDO lead, Long operatorUserId) {
-        if (lead == null || !SOURCE_SALES_SELF.equals(lead.getSourceType())
+        if (lead == null || !cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 || !Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 || lead.getSourceProviderUserId() == null
                 || !PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
@@ -210,6 +210,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("lead.mobile", fullContact ? lead.getSubmittedMobile() : DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
         values.put("lead.sourceType", lead.getSourceType());
+        values.put("lead.submitterIdentityLabel", SOURCE_EDUCATION_SELF.equals(lead.getSourceType()) ? "教务" : SOURCE_SALES_SELF.equals(lead.getSourceType()) ? "销售" : "提交人");
+        values.put("owner.identityLabel", ownerIdentityLabel(lead.getOwnerIdentity()));
         values.put("lead.sourceChannel", lead.getSourceChannelLabelSnapshot());
         values.put("lead.province", lead.getProvinceName());
         values.put("lead.city", lead.getCityName());
@@ -292,7 +294,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 variable("product.primaryName", "主要意向产品"), variable("product.count", "意向产品数量"),
                 variable("attachment.names", "附件名称"), variable("attachment.count", "附件数量"),
                 variable("submitter.id", "提交人编号"), variable("submitter.name", "提交人"),
-                variable("owner.id", "销售编号"), variable("owner.name", "销售专员"),
+                variable("owner.id", "负责人内部ID"), variable("owner.name", "负责人"),
+                variable("owner.identityLabel", "负责人身份"), variable("lead.submitterIdentityLabel", "提交业务身份"),
                 variable("pendingSales.id", "待接销售编号"), variable("pendingSales.name", "待接销售"),
                 variable("operator.id", "操作人编号"), variable("operator.name", "操作人"),
                 variable("event.time", "事件时间"), variable("event.scene", "事件场景")));

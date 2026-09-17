@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.LeadClaim
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.LeadPendingRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
@@ -394,4 +395,21 @@ class LeadDispatchServiceImplTest {
         user.setId(id);
         return user;
     }
+    @Test
+    void educationSelfSourcedIsOwnedImmediatelyAndCreatesLifecycleTasksWithoutDispatch() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setStatus("submitted");
+        lead.setSourceType("education_self_sourced"); lead.setDispatchMode("self");
+        doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(90L); return 1; })
+                .when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+        service.start(lead, 999L, 42L);
+        assertEquals(42L, lead.getOwnerUserId());
+        assertEquals("education", lead.getOwnerIdentity());
+        assertEquals("owned", lead.getAssignmentStatus());
+        verify(assignmentService, never()).getEligibleSalesUsers();
+        verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(42L), eq(90L), any(), any(), any());
+        verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(42L), any());
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.argThat((LeadAssignmentHistoryDO history) ->
+                "education".equals(history.getOwnerIdentitySnapshot()) && history.getReason().contains("教务")));
+    }
+
 }

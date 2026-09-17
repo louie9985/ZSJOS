@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V195: unify personal/team sales-order menus, permissions and filter templates.
 -- Data scope: menu/role-menu metadata and advanced-filter templates only; no order rows.
 -- Repeatability: all writes are guarded by stable permission/page keys.
@@ -8,23 +14,6 @@ INSERT INTO system_menu
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT 73511,'订单管理','zsjos:sales-order:query-management',2,17,6735,'sales-orders','ep:tickets','zsjos/mySalesOrder/index','ZsjosSalesOrderManagement',0,b'1',b'1',b'1','migration-V195',NOW(),'migration-V195',NOW(),b'0'
 WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management' AND deleted=b'0');
-
-INSERT INTO system_role_menu
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT rm.role_id, menu.id, 'migration-V195', NOW(), 'migration-V195', NOW(), b'0', rm.tenant_id
-FROM system_role_menu rm
-JOIN system_menu old_menu ON old_menu.id=rm.menu_id
-JOIN system_menu menu ON menu.permission='zsjos:sales-order:query-management' AND menu.deleted=b'0'
-WHERE old_menu.permission IN ('zsjos:sales-order:query-own','zsjos:sales-order:query-team')
-  AND old_menu.deleted=b'0' AND rm.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu existing
-                  WHERE existing.role_id=rm.role_id AND existing.menu_id=menu.id
-                    AND existing.tenant_id=rm.tenant_id AND existing.deleted=b'0');
-
-UPDATE system_role_menu rm JOIN system_menu old_menu ON old_menu.id=rm.menu_id
-SET rm.deleted=b'1', rm.updater='migration-V195', rm.update_time=NOW()
-WHERE old_menu.permission IN ('zsjos:sales-order:query-own','zsjos:sales-order:query-team')
-  AND rm.deleted=b'0';
 
 UPDATE system_menu
 SET deleted=b'1', status=1, visible=b'0', updater='migration-V195', update_time=NOW()

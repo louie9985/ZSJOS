@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- ZSJOS 课程 SPU/SKU 与客资价格快照增量脚本。
 -- 依赖：zsjos_product_configuration.sql、zsjos_product_hierarchy.sql。
 -- 本脚本不初始化业务课程，不删除历史数据，可重复执行；上线前需先备份并在测试库验证。
@@ -88,10 +93,3 @@ FROM (
   SELECT '属性查询', 'zsjos:product:attr-query', 25 UNION ALL SELECT '属性编辑', 'zsjos:product:attr-update', 26
 ) permission_seed
 WHERE @menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission = permission_seed.permission_code AND deleted = b'0');
-
-INSERT INTO system_role_menu (role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT role.id, menu.id, '1', NOW(), '1', NOW(), b'0', role.tenant_id
-FROM system_role role JOIN system_menu menu ON menu.permission IN ('zsjos:product:sku-query','zsjos:product:sku-create','zsjos:product:sku-update','zsjos:product:sku-delete','zsjos:product:sku-status','zsjos:product:attr-query','zsjos:product:attr-update') AND menu.deleted = b'0'
-WHERE role.code = 'super_admin' AND role.deleted = b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu rm WHERE rm.role_id = role.id AND rm.menu_id = menu.id AND rm.deleted = b'0');
-

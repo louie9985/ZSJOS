@@ -134,6 +134,9 @@ public class LeadFlowHistoryService {
             vo.setAssignmentStatusBefore(assignmentBefore(assignment.getActionType()));
             vo.setAssignmentStatusAfter(assignmentAfter(assignment.getActionType()));
         }
+        if (assignment != null && assignment.getOwnerIdentitySnapshot() != null && vo.getToOwner() != null) {
+            vo.setToOwner(vo.getToOwner() + " · " + cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ownerIdentityLabel(assignment.getOwnerIdentitySnapshot()));
+        }
         vo.setAttachments(attachments(event.getEvidenceRefs()));
         return vo;
     }
@@ -145,6 +148,9 @@ public class LeadFlowHistoryService {
                 leadIdentityMaskingService.employeeName(context, users, item.getOperatorUserId(), LeadIdentityRole.OPERATOR), item.getReason());
         vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, item.getFromOwnerUserId(), LeadIdentityRole.OWNER));
         vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, item.getToOwnerUserId() != null ? item.getToOwnerUserId() : item.getCandidateUserId(), LeadIdentityRole.OWNER));
+        if (item.getOwnerIdentitySnapshot() != null && vo.getToOwner() != null) {
+            vo.setToOwner(vo.getToOwner() + " · " + cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ownerIdentityLabel(item.getOwnerIdentitySnapshot()));
+        }
         vo.setAssignmentStatusBefore(assignmentBefore(item.getActionType()));
         vo.setAssignmentStatusAfter(assignmentAfter(item.getActionType()));
         return vo;

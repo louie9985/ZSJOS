@@ -103,9 +103,15 @@
 
         <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? '逐商品分班' : '历史学习规划师分配' }}</div>
         <div v-if="detail.assignmentMode === 'class_per_item'" class="checklist">
+          <el-alert v-if="classOptionsError" type="error" :closable="false" title="班级加载失败" :description="classOptionsError" show-icon />
+          <el-button v-if="classOptionsError" :loading="classOptionsLoading" @click="loadClassOptions">重试加载班级</el-button>
+          <el-alert v-if="classesDirty" type="info" :closable="false" title="分班选择尚未保存，请先保存分班再完成履约" />
           <div v-for="assignment in detail.classAssignments" :key="assignment.orderItemId" class="checklist-item">
             <div><strong>{{ assignment.productName || '历史产品信息缺失' }}</strong><ProductSpecs :product="assignment" /><div class="checklist-meta">{{ assignment.categoryName || '产品分类' }}<span v-if="assignment.errorReason"> · {{ assignment.errorReason }}</span></div></div>
-            <el-tree-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" placeholder="选择班级" :disabled="!canUpdate || !isEditable(detail.status) || classSaving" :data="classTree[assignment.orderItemId] || []" @visible-change="(visible) => visible && loadClassOptions(assignment)" />
+            <el-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" filterable placeholder="选择班级（含待分班）" :disabled="!canUpdate || !isEditable(detail.status) || classSaving" :loading="classOptionsLoading" :no-data-text="classOptionsError ? '班级加载失败，请重试' : '暂无未结课班级，请联系班级管理员'" @visible-change="(visible) => visible && loadClassOptions()">
+              <el-option v-for="option in classOptions" :key="option.id" :value="option.id" :label="option.systemClass ? '待分班' : `${option.className} · ${option.homeroomUserName || '未配置班主任'}`" />
+              <el-option v-if="assignment.classId && !classOptions.some(option => option.id === assignment.classId)" :value="assignment.classId" :label="assignment.className || '已选班级'" disabled />
+            </el-select>
           </div>
           <el-button v-if="canUpdate && isEditable(detail.status)" type="primary" :loading="classSaving" @click="saveClasses">保存分班</el-button>
         </div>
@@ -208,7 +214,7 @@
         v-if="canComplete && detail && isEditable(detail.status)"
         type="primary"
         :loading="completing"
-        :disabled="!detail.completable"
+        :disabled="!detail.completable || classesDirty || classSaving"
         @click="complete"
         >完成报名履约</el-button
       >
@@ -242,7 +248,10 @@ const routeCandidates = ref<Record<number, RegistrationApi.StudyPlanner[]>>({})
 const routeSaving = ref(false)
 const classSaving = ref(false)
 const classDraft = reactive<Record<number, number | undefined>>({})
-const classTree = reactive<Record<number, Array<{ label: string; value: string | number; disabled?: boolean; children?: Array<{ label: string; value: number }> }>>>({})
+const classOptions = ref<DeliveryClassApi.DeliveryClassOption[]>([])
+const classOptionsLoading = ref(false)
+const classOptionsError = ref('')
+const classesDirty = computed(() => detail.value?.assignmentMode === 'class_per_item' && detail.value.classAssignments?.some(item => (classDraft[item.orderItemId] ?? null) !== (item.classId ?? null)))
 const savingItemId = ref<number>()
 const completing = ref(false)
 import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
@@ -375,12 +384,18 @@ const saveRoutes = async (
     routeSaving.value = false
   }
 }
-const loadClassOptions = async (assignment: RegistrationApi.RegistrationClassAssignment) => {
-  if (classTree[assignment.orderItemId]) return
+const loadClassOptions = async () => {
+  if (classOptionsLoading.value) return
+  classOptionsLoading.value = true
+  classOptionsError.value = ''
   try {
-    const options = await DeliveryClassApi.getDeliveryClassOptions(assignment.categoryId, true)
-    classTree[assignment.orderItemId] = [{ label: assignment.categoryName || '已购产品', value: `category-${assignment.orderItemId}`, disabled: true, children: options.map((item) => ({ label: item.systemClass ? '待分班' : `${item.className} · ${item.homeroomUserName || '未配置班主任'}`, value: item.id })) }]
-  } catch (cause: any) { message.error(cause?.msg || cause?.message || '可选班级加载失败') }
+    classOptions.value = await DeliveryClassApi.getDeliveryClassOptions()
+  } catch (cause: any) {
+    classOptions.value = []
+    classOptionsError.value = cause?.msg || cause?.message || '可选班级加载失败'
+  } finally {
+    classOptionsLoading.value = false
+  }
 }
 const saveClasses = async () => {
   if (!detail.value?.classAssignments) return

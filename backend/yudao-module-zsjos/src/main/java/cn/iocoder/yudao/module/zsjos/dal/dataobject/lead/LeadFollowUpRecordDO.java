@@ -19,6 +19,7 @@ public class LeadFollowUpRecordDO extends TenantBaseDO {
     private Long assignmentHistoryId;
     private Long operatorUserId;
     private Long ownerUserIdSnapshot;
+    private String ownerIdentitySnapshot;
     private Long ownerDeptIdSnapshot;
     private String methodValue;
     private String methodLabelSnapshot;

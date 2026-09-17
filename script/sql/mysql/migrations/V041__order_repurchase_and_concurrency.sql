@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Phase five: customer repurchase orders and dual-center concurrency guards.
 -- Additive and repeatable. Run after V040; it does not modify business rows or start workflows.
 SET @ddl = (SELECT IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_order' AND column_name='formal_sales_user_id'), 'SELECT 1', 'ALTER TABLE `zsjos_order` ADD COLUMN `formal_sales_user_id` bigint DEFAULT NULL COMMENT ''正式销售归属'' AFTER `submitter_user_id`'));
@@ -16,13 +22,6 @@ PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 VALUES (6849,'历史客户复购','zsjos:sales-order:create',2,20,6735,'orders/external-repurchase','ep:refresh','zsjos-workbench','ExternalRepurchasePage',0,b'1',b'0',b'1','migration-V041',NOW(),'migration-V041',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT source.role_id,6849,'migration-V041',NOW(),'migration-V041',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source
-WHERE source.menu_id=6811 AND source.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
-    AND existing.menu_id=6849 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`) VALUES ('V041','Order repurchase and approval concurrency','order-repurchase-concurrency-v1') ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
 INSERT INTO `zsjos_module_schema_version` (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`) VALUES ('core','V041','Order repurchase and approval concurrency',SHA2('order-repurchase-concurrency-v1',256),'legacy',NOW()) ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);

@@ -1,14 +1,13 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V068: repair partner permissions after the V063 fixed-ID collision.
 -- Additive and repeatable. It resolves menus by permission identity, never by the
 -- historical IDs 6901-6912, and removes only the accidental work-plan grants
 -- owned by the part_time_partner role.
-
-UPDATE `system_role_menu` rm
-JOIN `system_role` r ON r.id=rm.role_id AND r.tenant_id=rm.tenant_id
-JOIN `system_menu` m ON m.id=rm.menu_id
-SET rm.deleted=b'1', rm.updater='migration-V068', rm.update_time=NOW()
-WHERE r.code='part_time_partner' AND r.deleted=b'0' AND rm.deleted=b'0'
-  AND m.permission LIKE 'zsjos:work-plan%';
 
 INSERT INTO `system_menu`
 (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,
@@ -39,17 +38,6 @@ FROM (
 JOIN `system_menu` parent ON parent.path='partner-portal' AND parent.component_name='ZsjosPartnerPortal'
   AND parent.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` m WHERE m.permission=src.permission AND m.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,m.id,'migration-V068',NOW(),'migration-V068',NOW(),b'0',r.tenant_id
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN
- ('zsjos:partner:self-query','zsjos:lead:submit','zsjos:lead:query','zsjos:lead:query-submitted',
-  'zsjos:lead:submitter-supplement','zsjos:lead:urge','zsjos:lead-complaint:create',
-  'zsjos:lead:appeal:create','zsjos:cashback:my-query','zsjos:withdrawal:my-query',
-  'zsjos:withdrawal:apply') AND m.deleted=b'0'
-WHERE r.code='part_time_partner' AND r.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-                  AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V068','Repair partner permission menu collision','V068__repair_partner_permissions.sql',NOW())

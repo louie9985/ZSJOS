@@ -10,6 +10,9 @@ import java.util.Map;
 @Data
 public class PositioningCardRespVO {
     private Long id;
+    private Long submissionId;
+    private LocalDateTime studentDecidedAt;
+    private String studentDecisionComment;
     private String cardNo;
     private Long accountId;
     private Long studentPersonId;

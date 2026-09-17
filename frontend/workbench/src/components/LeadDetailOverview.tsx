@@ -372,7 +372,7 @@ function AsideAlerts({ lead }: { lead: ManagedLead }) {
       tone: 'warning',
       icon: <PauseCircleOutlined />,
       title: '客资已挂起',
-      detail: '当前只能查看，需由销售主管恢复、转派、回收或释放。'
+      detail: '当前只能查看，需由负责人主管恢复、转派、回收或释放。'
     })
   }
   if (lead.assignmentStatus === 'recycle_pending') {
@@ -380,7 +380,7 @@ function AsideAlerts({ lead }: { lead: ManagedLead }) {
       tone: 'warning',
       icon: <PauseCircleOutlined />,
       title: '客资待回收处理',
-      detail: '当前等待销售主管恢复、转派、回收或释放。'
+      detail: '当前等待负责人主管恢复、转派、回收或释放。'
     })
   }
   if (lead.status === 'invalid') {
@@ -660,8 +660,8 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     <span className="lead-field-value">{lead.providerOwnerNameSnapshot || '-'}</span>
                   </div>}
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">所属销售</span>
-                    <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}</span>
+                    <span className="lead-field-label">负责人</span>
+                    <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}{lead.ownerIdentity && ` · ${lead.ownerIdentityLabel}`}</span>
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">分类</span>

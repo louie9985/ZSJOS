@@ -1,3 +1,10 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
+SET NAMES utf8mb4;
 -- V142: forward repair for V139/V140 executions that continued after statement failures.
 -- Dependencies/order: apply after V141; legacy and module V139/V140 markers must already exist.
 -- Data scope: V140 additive schema objects, System menu metadata, and affected role-menu grants only.
@@ -106,23 +113,9 @@ BEGIN
                          'zsjos:director-interview-template:publish')
     AND `deleted`=b'0';
 
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT source_grant.role_id,73483,'V142',NOW(),'V142',NOW(),b'0',source_grant.tenant_id
-  FROM `system_role_menu` source_grant
-  WHERE source_grant.menu_id=73460 AND source_grant.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V142')
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` target_grant
-      WHERE target_grant.role_id=source_grant.role_id AND target_grant.menu_id=73483
-        AND target_grant.tenant_id=source_grant.tenant_id AND target_grant.deleted=b'0');
 
-  UPDATE `system_role_menu` source_grant
-  LEFT JOIN `system_role` role_row
-    ON role_row.id=source_grant.role_id AND role_row.tenant_id=source_grant.tenant_id
-  SET source_grant.deleted=b'1',source_grant.updater='V142',source_grant.update_time=NOW()
-  WHERE source_grant.menu_id=73460 AND source_grant.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V142')
-    AND COALESCE(role_row.code,'') NOT IN ('system_administrator','super_admin');
+
+
 
   INSERT INTO `system_menu`
   (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,
@@ -136,15 +129,7 @@ BEGIN
     `visible`=VALUES(`visible`),`keep_alive`=VALUES(`keep_alive`),`always_show`=VALUES(`always_show`),
     `deleted`=b'0',`updater`='V142',`update_time`=NOW();
 
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role_row.id,73460,'V142',NOW(),'V142',NOW(),b'0',role_row.tenant_id
-  FROM `system_role` role_row
-  WHERE role_row.code IN ('system_administrator','super_admin') AND role_row.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V142')
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.role_id=role_row.id AND existing.menu_id=73460
-        AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
+
 
   DROP TEMPORARY TABLE IF EXISTS `tmp_v142_supervisor_permission`;
   CREATE TEMPORARY TABLE `tmp_v142_supervisor_permission` (
@@ -197,24 +182,9 @@ BEGIN
   WHERE menu_row.deleted=b'0'
   GROUP BY menu_row.permission;
 
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT grant_row.role_id,keep_row.menu_id,'V142',NOW(),'V142',NOW(),b'0',grant_row.tenant_id
-  FROM `system_role_menu` grant_row
-  JOIN `system_menu` duplicate_row
-    ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-  JOIN `tmp_v142_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-  WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.role_id=grant_row.role_id AND existing.menu_id=keep_row.menu_id
-        AND existing.tenant_id=grant_row.tenant_id AND existing.deleted=b'0');
 
-  UPDATE `system_role_menu` grant_row
-  JOIN `system_menu` duplicate_row
-    ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-  JOIN `tmp_v142_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-  SET grant_row.deleted=b'1',grant_row.updater='V142',grant_row.update_time=NOW()
-  WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id;
+
+
 
   UPDATE `system_menu` menu_row
   JOIN `tmp_v142_keep_menu` keep_row ON keep_row.permission=menu_row.permission
@@ -230,21 +200,7 @@ BEGIN
       menu_row.status=0,menu_row.visible=b'1',menu_row.keep_alive=b'1',menu_row.always_show=b'0',
       menu_row.deleted=b'0',menu_row.updater='V142',menu_row.update_time=NOW();
 
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role_row.id,menu_row.id,'V142',NOW(),'V142',NOW(),b'0',role_row.tenant_id
-  FROM `system_role` role_row
-  JOIN `system_menu` menu_row
-    ON menu_row.permission IN (
-      'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
-      'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-      'zsjos:subordinate-sales:lead-release-public-sea')
-   AND menu_row.deleted=b'0'
-  WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V142')
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.role_id=role_row.id AND existing.menu_id=menu_row.id
-        AND existing.tenant_id=role_row.tenant_id AND existing.deleted=b'0');
+
 
   DROP TEMPORARY TABLE IF EXISTS `tmp_v142_keep_menu`;
   DROP TEMPORARY TABLE IF EXISTS `tmp_v142_restore_menu`;

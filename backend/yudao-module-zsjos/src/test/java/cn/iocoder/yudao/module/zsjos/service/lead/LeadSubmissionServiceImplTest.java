@@ -45,6 +45,9 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_R
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_SOURCE_CHANNEL;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_INTERNAL_NEW_MEDIA;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_EDUCATION_SELF;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_SALES_SELF;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_SELF;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,6 +66,8 @@ import static org.mockito.Mockito.verify;
 class LeadSubmissionServiceImplTest {
     @InjectMocks private LeadSubmissionServiceImpl service;
     @Mock private PersonMapper personMapper;
+    @Mock private PersonIdentityWriteService personIdentityWriteService;
+    @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private LeadMapper leadMapper;
     @Mock private LeadActivationMapper activationMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
@@ -496,4 +501,46 @@ class LeadSubmissionServiceImplTest {
         user.setStatus(CommonStatusEnum.ENABLE.getStatus());
         return user;
     }
+    @Test
+    void educationCreateForcesSelfOwnershipAndDoesNotRequireSalesPost() {
+        LeadCreateReqVO req = baseRequest();
+        req.setDispatchMode("specified"); req.setSpecifiedSalesUserId(999L);
+        LeadDO existing = new LeadDO(); existing.setId(20L); existing.setLeadNo("KZ-test");
+        existing.setSourceType(SOURCE_EDUCATION_SELF);
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
+        service.createEducationSelfSourced(req, 42L);
+        assertEquals(DISPATCH_SELF, req.getDispatchMode());
+        assertEquals(42L, req.getSpecifiedSalesUserId());
+        verify(identityService).requireEducationSubmitter(42L);
+        verify(identityService, never()).requireSales(any());
+        verify(dispatchService, never()).start(any(), any(), any());
+    }
+
+    @Test
+    void educationCannotReplaySalesSubmissionKey() {
+        LeadCreateReqVO req = baseRequest();
+        LeadDO existing = new LeadDO(); existing.setId(20L); existing.setSourceType(SOURCE_SALES_SELF);
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
+        assertThrows(ServiceException.class, () -> service.createEducationSelfSourced(req, 42L));
+    }
+
+    @Test
+    void approvedDuplicateReviewPreservesEducationSourceAndSelfDispatch() {
+        LeadCreateReqVO req = validDuplicateRequest(); req.setDispatchMode(DISPATCH_SELF); req.setSpecifiedSalesUserId(1L);
+        prepareDuplicateValidation(req);
+        when(identityService.resolveHistoricalSubmission(1L, SOURCE_EDUCATION_SELF, null)).thenReturn(
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.EDUCATION, null));
+        when(personIdentityWriteService.createNew(any(), any(), any(), any())).thenReturn(new PersonDO().setId(50L));
+        java.util.concurrent.atomic.AtomicReference<LeadDO> saved = new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(call -> { LeadDO lead = call.getArgument(0); lead.setId(90L); saved.set(lead); return 1; })
+                .when(leadMapper).insert(any(LeadDO.class));
+        when(leadMapper.selectById(90L)).thenAnswer(call -> saved.get());
+        service.createApprovedFromReview(req, 1L, null, SOURCE_EDUCATION_SELF, null, "分类快照", "渠道快照");
+        assertEquals(SOURCE_EDUCATION_SELF, saved.get().getSourceType());
+        assertEquals(DISPATCH_SELF, saved.get().getDispatchMode());
+        assertEquals(1L, saved.get().getSourceUserId());
+        verify(dispatchService).start(saved.get(), 1L, 1L);
+        verify(identityService, never()).requireSales(any());
+    }
+
 }

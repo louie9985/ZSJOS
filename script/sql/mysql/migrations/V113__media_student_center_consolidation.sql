@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V113: consolidate third-party account, content and positioning work into the media-student center.
 -- Dependencies/order: apply after V112 and the V096 media schema.
 -- Scope: additive configuration/talk persistence plus menu metadata and role grants; no business rows are deleted.
@@ -96,10 +102,6 @@ WHERE `parent_id` IN (6970,6974,6980) AND `type`=3 AND `deleted`=b'0';
 UPDATE `system_menu` SET `status`=1,`visible`=b'0',`deleted`=b'1',`updater`='migration-V113',`update_time`=NOW()
 WHERE `id` IN (6970,6974,6980) AND `deleted`=b'0';
 
-INSERT IGNORE INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,7022,'migration-V113',NOW(),'migration-V113',NOW(),b'0',r.tenant_id
-FROM `system_role` r WHERE r.code='new_media_operator' AND r.status=0 AND r.deleted=b'0';
 INSERT INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,
  `keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
@@ -114,16 +116,6 @@ ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),
  `type`=VALUES(`type`),`sort`=VALUES(`sort`),`path`=VALUES(`path`),`icon`=VALUES(`icon`),
  `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`status`=VALUES(`status`),
  `visible`=VALUES(`visible`),`deleted`=b'0',`updater`='migration-V113',`update_time`=NOW();
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,m.id,'migration-V113',NOW(),'migration-V113',NOW(),b'0',r.tenant_id
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN (
-  'zsjos:media-account-field-config:query','zsjos:media-account-field-config:update',
-  'zsjos:media-account-field-config:publish') AND m.deleted=b'0'
-WHERE r.code='system_administrator' AND r.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` rm WHERE rm.role_id=r.id AND rm.menu_id=m.id
-    AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0');
 
 UPDATE `system_dict_type` SET `name`='第三方账号平台',`remark`='第三方账号所属平台',`updater`='migration-V113',`update_time`=NOW()
 WHERE `type`='zsjos_account_platform' AND `deleted`=b'0';

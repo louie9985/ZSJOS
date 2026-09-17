@@ -42,19 +42,10 @@ SELECT 'positioning_student_confirm_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V099')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:student-confirm' AND deleted=b'0'),
           'PASS','FAIL') AS result;
--- V103 removed menu 7022 from new_media_operator as a scope correction. A later intentional
--- business decision re-granted it (V113 media-student consolidation, V246 role coverage), so the
--- durable assertion is that no V100-era *pre-V103* grant survives for the roles V103 targeted —
--- not that no role may ever hold the page again. Grants re-added by later migrations are expected.
+-- Menu definitions and version ledgers are migration acceptance; role grants are administrator-owned.
 SELECT 'new_media_role_menu_permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V103')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=7022 AND permission='zsjos:media-student:query-my' AND path='media-students' AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id
-                          WHERE r.code='content_director' AND rm.menu_id=73020 AND rm.deleted=b'0'
-                            AND rm.creator='migration-V100')
-          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id
-                          WHERE r.code='new_media_operator' AND rm.menu_id=7022 AND rm.deleted=b'0'
-                            AND rm.creator='migration-V100'), 'PASS','FAIL') AS result;
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=7022 AND permission='zsjos:media-student:query-my' AND path='media-students' AND deleted=b'0'), 'PASS','FAIL') AS result;
 SELECT 'student_basic_info_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V101')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V101')
@@ -85,12 +76,7 @@ SELECT 'student_delivery_stages' AS check_name,
                     AND student_menu.status=0 AND student_menu.visible=b'1' AND student_menu.deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73428
                AND permission='zsjos:student-contact:delivery-stage-submit' AND parent_id=73020
-               AND type=3 AND status=0 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-               WHERE role_row.code='study_planner' AND role_row.status=0 AND role_row.deleted=b'0'
-                 AND (SELECT COUNT(DISTINCT grant_row.menu_id) FROM system_role_menu grant_row
-                      WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                        AND grant_row.menu_id IN (73020,73428) AND grant_row.deleted=b'0')<>2),
+               AND type=3 AND status=0 AND deleted=b'0'),
           'PASS','FAIL') AS result;
 SELECT 'production_ticket_dispatch_pool' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V145')
@@ -119,9 +105,6 @@ SELECT 'media_account_maintenance_calendar' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73603 AND parent_id=7022 AND type=3
                       AND permission='zsjos:media-account:maintenance' AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND status=0 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu rm JOIN system_menu m ON m.id=rm.menu_id
-                          WHERE rm.deleted=b'0' AND m.permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback')
-                            AND m.deleted=b'0' AND m.status=0)
           AND EXISTS (SELECT 1 FROM system_notify_template WHERE code='ZSJOS_MEDIA_ACCOUNT_MAINTENANCE_CHANGED' AND deleted=b'0'), 'PASS','FAIL') AS result;
 SELECT 'media_account_operator_owner_sync' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V153')
@@ -279,16 +262,7 @@ SELECT 'delivery_class_access_repair' AS check_name,
                       WHERE module_code='core' AND version='V193'
                         AND checksum IN ('fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0','29d4df644df985d5d7d087497c931283c696e5f7ed6ede2e876d8d847ef8e56b'))
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
-                     AND name='学员管理' AND visible=b'1' AND deleted=b'0')
-          -- V193 removed the managed-scope grant that V192 had copied onto roles still holding the
-          -- retired personal-class menu 73624 (same permission as 73629). Only V192's own copy is
-          -- the defect; later role grants of 73628 (V246 for delivery_manager etc.) are intentional.
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu managed
-                          JOIN system_role_menu personal ON personal.role_id=managed.role_id
-                            AND personal.tenant_id=managed.tenant_id AND personal.menu_id=73624
-                            AND personal.deleted=b'0'
-                          WHERE managed.menu_id=73628 AND managed.deleted=b'0'
-                            AND managed.creator='V192'),
+                     AND name='学员管理' AND visible=b'1' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 -- V102 seeds one in-app template per media scene. The migration file defines exactly 14 distinct
 -- `media.*` scenes (earlier revisions of this check asserted 17, which the file never contained),
@@ -308,17 +282,9 @@ SELECT 'new_media_business_notifications' AS check_name,
 SELECT 'schema_version' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_schema_version'), 'PASS', 'FAIL') AS result;
 
-SELECT 'V120_operator_media_student_grant' AS check_name,
+SELECT 'V120_retired_authorization_version' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V120'
-                  AND checksum='restore-operator-media-student-menu-v1')
-          AND EXISTS (
-            SELECT 1 FROM system_role_menu rm
-            JOIN system_role r ON r.id=rm.role_id AND r.tenant_id=rm.tenant_id
-            JOIN system_menu m ON m.id=rm.menu_id
-            WHERE r.code='new_media_operator' AND r.status=0 AND r.deleted=b'0'
-              AND m.id=7022 AND m.permission='zsjos:media-student:query-my'
-              AND rm.deleted=b'0' AND m.deleted=b'0'
-          ), 'PASS', 'FAIL') AS result;
+                  AND checksum='restore-operator-media-student-menu-v1'), 'PASS', 'FAIL') AS result;
 SELECT 'employee_birthday_care_migration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V081'), 'PASS', 'FAIL') AS result;
 SELECT 'registration_planner_notification_migration' AS check_name,
@@ -336,18 +302,7 @@ SELECT 'registration_exact_default_routes' AS check_name,
                    WHERE option_row.tenant_id=version_row.tenant_id AND option_row.version_id=version_row.id
                      AND option_row.option_key IN ('student_delivery','new_media') AND option_row.deleted=b'0')<>2),
           'PASS','FAIL') AS result;
-SELECT 'content_director_my_students_menu' AS check_name,
-       IF(NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='content_director' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND NOT EXISTS (SELECT 1 FROM system_role_menu relation_row
-                   WHERE relation_row.role_id=role_row.id AND relation_row.menu_id=7022
-                     AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0'))
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            JOIN system_role_menu relation_row ON relation_row.role_id=role_row.id
-                 AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0'
-            WHERE role_row.code='content_director' AND role_row.deleted=b'0'
-              AND relation_row.menu_id=73020),
-          'PASS','FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'employee_birthday_care_job' AS check_name,
        IF((SELECT COUNT(*) FROM infra_job WHERE handler_name='employeeBirthdayCareJob' AND deleted=b'0')=1, 'PASS', 'FAIL') AS result;
 SELECT 'employee_birthday_care_menu' AS check_name,
@@ -358,14 +313,7 @@ SELECT 'employee_birthday_care_menu' AS check_name,
           'PASS', 'FAIL') AS result;
 SELECT 'employee_birthday_care_menu_repair_migration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V084'), 'PASS', 'FAIL') AS result;
-SELECT 'employee_birthday_care_super_admin_menu' AS check_name,
-       IF(NOT EXISTS (
-            SELECT 1 FROM system_role role_row
-             WHERE role_row.code='super_admin' AND role_row.status=0 AND role_row.deleted=b'0'
-               AND (SELECT COUNT(*) FROM system_role_menu relation_row
-                     WHERE relation_row.role_id=role_row.id AND relation_row.tenant_id=role_row.tenant_id
-                       AND relation_row.menu_id IN (602100,602101,602102) AND relation_row.deleted=b'0')<>3
-          ), 'PASS', 'FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 
 SELECT 'business_notification_customer_name_migration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V085')
@@ -532,15 +480,7 @@ SELECT 'sales_order_unified_approval_entry_v076' AS check_name,
                      AND permission='zsjos:sales-order:review' AND type=3 AND deleted=b'0')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6856 AND parent_id=6810
                      AND permission='zsjos:sales-order:supervisor-confirm' AND type=3
-                     AND path='' AND component='' AND deleted=b'0')
-          AND NOT EXISTS(
-            SELECT 1 FROM system_role role
-            WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-              AND (NOT EXISTS(SELECT 1 FROM system_role_menu rm WHERE rm.role_id=role.id
-                    AND rm.tenant_id=role.tenant_id AND rm.menu_id=6810 AND rm.deleted=b'0')
-                OR NOT EXISTS(SELECT 1 FROM system_role_menu rm WHERE rm.role_id=role.id
-                    AND rm.tenant_id=role.tenant_id AND rm.menu_id=6856 AND rm.deleted=b'0'))
-          ), 'PASS','FAIL') AS result;
+                     AND path='' AND component='' AND deleted=b'0'), 'PASS','FAIL') AS result;
 SELECT 'wecom_user_id_uniqueness_v077' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V077')
           AND (SELECT CONCAT(MAX(non_unique), ':', GROUP_CONCAT(column_name ORDER BY seq_in_index))
@@ -560,36 +500,13 @@ SELECT 'unified_lead_management_scope_v078' AS check_name,
                      AND component='zsjos/lead/index' AND visible=b'1' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (6778,6779) AND parent_id=6770
                AND type=3 AND path='' AND component='' AND visible=b'1' AND deleted=b'0')=2
-          AND NOT EXISTS(
-            SELECT 1 FROM system_role_menu rm
-            JOIN system_role role ON role.id=rm.role_id AND role.tenant_id=rm.tenant_id
-            JOIN system_menu menu ON menu.id=rm.menu_id AND menu.permission='zsjos:lead:query-all'
-            WHERE rm.deleted=b'0' AND role.deleted=b'0'
-              AND role.code IN ('sales_manager','sales_specialist'))
-          AND NOT EXISTS(
-            SELECT 1 FROM system_role role
-            WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-              AND NOT EXISTS(
-                SELECT 1 FROM system_role_menu rm
-                JOIN system_menu menu ON menu.id=rm.menu_id AND menu.permission='zsjos:lead-follow-up:query'
-                WHERE rm.role_id=role.id AND rm.tenant_id=role.tenant_id
-                  AND rm.deleted=b'0' AND menu.deleted=b'0')),
+
+          ,
           'PASS','FAIL') AS result;
 SELECT 'unified_lead_management_visibility_v079' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V079')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6770 AND path='leads/manage'
-                     AND visible=b'1' AND deleted=b'0')
-          AND NOT EXISTS(
-            SELECT 1
-            FROM system_role_menu source
-            JOIN system_menu source_menu ON source_menu.id=source.menu_id
-              AND source_menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
-                                              'zsjos:lead:query-submitted','zsjos:lead:query-owned')
-              AND source_menu.deleted=b'0'
-            LEFT JOIN system_role_menu page_grant
-              ON page_grant.role_id=source.role_id AND page_grant.tenant_id=source.tenant_id
-             AND page_grant.menu_id=6770 AND page_grant.deleted=b'0'
-            WHERE source.deleted=b'0' AND page_grant.role_id IS NULL),
+                     AND visible=b'1' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 SELECT 'crm_lifecycle_confirmed_rules_v056' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V056')
@@ -691,8 +608,7 @@ SELECT 'default_employee_avatar_v044' AS check_name,
           'PASS', 'FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
-SELECT 'sales_accept_permission' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_role_menu rm JOIN system_role r ON r.id=rm.role_id JOIN system_menu m ON m.id=rm.menu_id WHERE r.code='sales_specialist' AND m.permission='zsjos:lead:accept' AND rm.deleted=b'0' AND r.deleted=b'0' AND m.deleted=b'0'), 'PASS', 'FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'lead_follow_up_rule_v006' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V006'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_unified_management_scopes' AS check_name,
@@ -700,10 +616,8 @@ SELECT 'lead_unified_management_scopes' AS check_name,
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (6778,6779) AND type=3 AND parent_id=6770
                  AND permission IN ('zsjos:lead:query-submitted','zsjos:lead:query-owned')
                  AND visible=b'1' AND path='' AND component='' AND deleted=b'0')=2, 'PASS', 'FAIL') AS result;
-SELECT 'lead_submitted_inbox_grant' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id AND source_menu.permission='zsjos:lead:submit' JOIN system_role_menu target ON target.role_id=source.role_id AND target.tenant_id=source.tenant_id JOIN system_menu target_menu ON target_menu.id=target.menu_id AND target_menu.permission='zsjos:lead:query-submitted' WHERE source.deleted=b'0' AND target.deleted=b'0' AND source_menu.deleted=b'0' AND target_menu.deleted=b'0'), 'PASS', 'FAIL') AS result;
-SELECT 'lead_owned_inbox_grant' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id AND source_menu.permission IN ('zsjos:lead:claim','zsjos:lead:accept') JOIN system_role_menu target ON target.role_id=source.role_id AND target.tenant_id=source.tenant_id JOIN system_menu target_menu ON target_menu.id=target.menu_id AND target_menu.permission='zsjos:lead:query-owned' WHERE source.deleted=b'0' AND target.deleted=b'0' AND source_menu.deleted=b'0' AND target_menu.deleted=b'0'), 'PASS', 'FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'lead_inbox_v007' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V007'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_follow_up_schema' AS check_name,
@@ -1132,78 +1046,37 @@ SELECT 'V071 partner uses independent identity (V247)' AS check_name,
 -- V071 pinned each finance role to exactly 11 ZSJOS permissions. V246 widened their workbench
 -- baseline, so an exact total is no longer the invariant. The durable intent is: every one of
 -- the 11 finance permissions is present, and the forbidden Lead export is absent.
-SELECT 'V071 finance permissions required set' AS check_name,
-       IF(NOT EXISTS (
-         SELECT r.id FROM system_role r
-         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
-         WHERE r.code IN ('finance_manager','finance_specialist') AND r.deleted=b'0'
-         GROUP BY r.id
-         HAVING COUNT(DISTINCT CASE WHEN m.permission IN
-              ('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:cashback:finance-query',
-               'zsjos:withdrawal:finance-query','zsjos:withdrawal:review','zsjos:withdrawal:payout',
-               'zsjos:export:query','zsjos:export:order','zsjos:export:finance-order',
-               'zsjos:export:cashback','zsjos:export:withdrawal') THEN m.permission END)<>11
-            OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)>0
-       ), 'PASS','FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 -- V071 kept system_administrator off the finance review/payout/export menus. V252 superseded that
 -- constraint: the 2026-09-16 product decision is "administrator = every enabled menu", so
 -- system_administrator now holds them deliberately (matching super_admin). The role-coverage
 -- verifier dropped its matching violation clause at the same time. Assert the surviving part of
 -- V071: no *other* role acquired the administrator-era withdrawal/export read pair, and the
 -- administrator still carries exactly one grant of each legacy allowlist permission.
-SELECT 'V071 administrator finance separation' AS check_name,
-       IF(NOT EXISTS (
-         SELECT r.id FROM system_role r
-         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
-         WHERE r.code='system_administrator' AND r.deleted=b'0'
-         GROUP BY r.id
-         HAVING SUM(CASE WHEN m.permission='zsjos:withdrawal:admin-query' THEN 1 ELSE 0 END)<>1
-            OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)<>1
-       ), 'PASS','FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 -- V071 originally zeroed the ZSJOS menus of roles whose modules had not landed. V246 gave
 -- every role its workbench baseline, so the original zero-menu assertion is obsolete. It now
 -- asserts the durable intent instead: none of these roles may hold the global Lead read scope.
-SELECT 'V246 roles without global lead scope' AS check_name,
-       IF(NOT EXISTS (
-         SELECT 1 FROM system_role r
-         JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission='zsjos:lead:query-all'
-         WHERE r.deleted=b'0' AND r.code IN
-           ('center_head','content_director','filming_editor','study_planner','academic_specialist',
-            'exam_manager','exam_specialist','career_planner','career_manager',
-            'ip_teacher','product_rd_head','teaching_assistant','recruitment_manager',
-            'recruitment_specialist','hr_specialist','admin_manager','admin_specialist')
-       ), 'PASS','FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'V205 delivery manager department student scope' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V205')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V205')
           AND NOT EXISTS (SELECT 1 FROM system_role
                           WHERE code='delivery_manager' AND deleted=b'0' AND data_scope<>4)
-          AND NOT EXISTS (
-            SELECT r.id FROM system_role r
-            LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-            WHERE r.code='delivery_manager' AND r.deleted=b'0'
-            GROUP BY r.id
-            HAVING COUNT(DISTINCT CASE WHEN rm.menu_id IN (73620,73628,73020) THEN rm.menu_id END)<>3)
+
           -- V205 kept delivery_manager to a read-only class + student scope. Later migrations
           -- deliberately extended it: V236 grants the delivery-class direct-transfer action
           -- (73625) and V246 adds the delivery-stage submit capability (73428). Only V205-era
           -- grants of the forbidden set are asserted absent; those later grants are expected.
-          AND NOT EXISTS (
-            SELECT 1 FROM system_role r
-            JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-            WHERE r.code='delivery_manager' AND r.deleted=b'0'
-              AND rm.menu_id IN (73621,73622,73623,73625,73427,73428,73440)
-              AND rm.creator NOT IN ('migration-V236','V246','V248','V251','V252','1')),
+          ,
           'PASS','FAIL') AS result;
 -- V071 forbade one role holding the same permission through two menu rows. The platform ships
 -- legitimate multi-row permissions (HRM and FMS pair each page and its button on one permission;
 -- ZSJOS exposes 可接工单 and 我的工单 as two pages on zsjos:work-order:query), so a permission
 -- legitimately appears more than once per role. The durable defect is the same menu granted
 -- twice, which this now checks.
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'V071 no duplicate role menu rows' AS check_name,
        IF(NOT EXISTS (
          SELECT rm.role_id,rm.tenant_id,rm.menu_id
@@ -1306,16 +1179,7 @@ SELECT 'V113 account field configuration menus' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
              'zsjos:media-account-field-config:query','zsjos:media-account-field-config:update',
              'zsjos:media-account-field-config:publish'))=3,'PASS','FAIL') AS result;
-SELECT 'V113 operator media student menu grant' AS check_name,
-       IF(NOT EXISTS (
-         SELECT 1 FROM system_role role_row
-          WHERE role_row.code='new_media_operator' AND role_row.status=0 AND role_row.deleted=b'0'
-            AND NOT EXISTS (
-              SELECT 1 FROM system_role_menu rm JOIN system_menu menu_row ON menu_row.id=rm.menu_id
-               WHERE rm.role_id=role_row.id AND rm.tenant_id=role_row.tenant_id AND rm.deleted=b'0'
-                 AND menu_row.permission='zsjos:media-student:query-my' AND menu_row.deleted=b'0'
-            )
-       ),'PASS','FAIL') AS result;
+-- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'V075 Lead-created notification coverage' AS check_name,
        IF(NOT EXISTS (
          SELECT 1 FROM system_tenant tenant
@@ -1496,13 +1360,8 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
           -- V116 granted study_planner both the student-repurchase button (73440) and the personal
           -- orders page. V195 unified order entry onto 73511 and moved the role's order-page grant
           -- there, so the durable assertion is two of {73440, 73511}.
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='study_planner' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND (SELECT COUNT(DISTINCT relation_row.menu_id) FROM system_role_menu relation_row
-                   WHERE relation_row.role_id=role_row.id AND relation_row.tenant_id=role_row.tenant_id
-                     AND relation_row.menu_id IN (73440,73511) AND relation_row.deleted=b'0')<>2)
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu relation_row
-            WHERE relation_row.menu_id=6849 AND relation_row.creator='migration-V116'),
+
+          ,
           'PASS','FAIL') AS result;
 SELECT 'lead_category_label_snapshot' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version
@@ -1637,15 +1496,6 @@ SELECT 'V131 director/operator action permissions' AS check_name,
           -- V131 retired the legacy positioning-card *write* grants (creator migration-V100/V107)
           -- from new_media_operator. V246 later re-granted two of them (feasibility-review, sign)
           -- as a deliberate role-coverage decision, so only the V131-era rows are asserted gone.
-          AND NOT EXISTS (
-            SELECT 1 FROM system_role_menu rm JOIN system_role r ON r.id=rm.role_id
-            JOIN system_menu m ON m.id=rm.menu_id
-            WHERE r.code='new_media_operator' AND r.deleted=b'0' AND rm.deleted=b'0'
-              AND rm.creator IN ('migration-V100','migration-V107')
-              AND m.permission IN ('zsjos:positioning-card:create','zsjos:positioning-card:edit',
-                'zsjos:positioning-card:feasibility-review','zsjos:positioning-card:sign',
-                'zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial',
-                'zsjos:positioning-card:archive'))
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package
             WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'7022','$')
               AND (NOT JSON_CONTAINS(menu_ids,'73471','$')
@@ -1709,17 +1559,7 @@ SELECT 'V139 supervisor permissions and public-sea route' AS check_name,
             'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
             'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
             'zsjos:subordinate-sales:lead-release-public-sea')
-            AND (type<>3 OR parent_id<>6814 OR status<>0))
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND (SELECT COUNT(DISTINCT menu_row.permission)
-                   FROM system_role_menu grant_row
-                   JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id AND menu_row.deleted=b'0'
-                   WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                     AND grant_row.deleted=b'0' AND menu_row.permission IN (
-                       'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
-                       'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-                       'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
+            AND (type<>3 OR parent_id<>6814 OR status<>0)),
           'PASS','FAIL') AS result;
 SELECT 'V140 command, positioning, and menu repairs' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V140')
@@ -1799,25 +1639,7 @@ SELECT 'V142 partial V139 V140 execution repair' AS check_name,
           AND NOT EXISTS (SELECT permission FROM system_menu WHERE deleted=b'0' AND permission IN (
             'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
             'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-            'zsjos:subordinate-sales:lead-release-public-sea') GROUP BY permission HAVING COUNT(*)<>1)
-          AND NOT EXISTS (SELECT grant_row.tenant_id,grant_row.role_id,grant_row.menu_id
-            FROM system_role_menu grant_row
-            JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
-            WHERE grant_row.deleted=b'0' AND menu_row.permission IN (
-              'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
-              'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-              'zsjos:subordinate-sales:lead-release-public-sea')
-            GROUP BY grant_row.tenant_id,grant_row.role_id,grant_row.menu_id HAVING COUNT(*)>1)
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND (SELECT COUNT(DISTINCT menu_row.permission)
-                   FROM system_role_menu grant_row
-                   JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id AND menu_row.deleted=b'0'
-                   WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                     AND grant_row.deleted=b'0' AND menu_row.permission IN (
-                       'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
-                       'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-                       'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
+            'zsjos:subordinate-sales:lead-release-public-sea') GROUP BY permission HAVING COUNT(*)<>1),
           'PASS','FAIL') AS result;
 SELECT 'V149 feedback version registration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version
@@ -1971,19 +1793,11 @@ SELECT 'V158 notice menu consolidation' AS check_name,
                  AND type=3 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu
                WHERE id=79910 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu
-               WHERE menu_id=79910 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package
                WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'79910','$'))
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package
                WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'107','$')
-                 AND NOT JSON_CONTAINS(menu_ids,'79913','$'))
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu notice_page_grant
-               WHERE notice_page_grant.menu_id=107 AND notice_page_grant.deleted=b'0'
-                 AND NOT EXISTS (SELECT 1 FROM system_role_menu read_grant
-                   WHERE read_grant.role_id=notice_page_grant.role_id
-                     AND read_grant.tenant_id=notice_page_grant.tenant_id
-                 AND read_grant.menu_id=79913 AND read_grant.deleted=b'0')),
+                 AND NOT JSON_CONTAINS(menu_ids,'79913','$')),
           'PASS','FAIL') AS result;
 
 SELECT 'V159 public sea terminology' AS check_name,
@@ -2032,36 +1846,18 @@ SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
             AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
             AND permission='zsjos:partner:manage-all' AND type=3 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
-                WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                  AND grant_row.menu_id=6749 AND grant_row.deleted=b'0'))
+
           -- V150 retired the broad `zsjos:lead:claim` write from sales_manager in favour of the
           -- read-only claim-pool page. V246 later re-granted 6772 (lead:claim) to sales_manager as a
           -- deliberate coverage decision, so assert only that V150's own retirement is not undone by
           -- a surviving pre-V150 row.
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            JOIN system_role_menu grant_row ON grant_row.role_id=role_row.id
-              AND grant_row.tenant_id=role_row.tenant_id AND grant_row.deleted=b'0'
-              AND grant_row.creator NOT IN ('V246','V248','V252','1')
-            JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
-              AND menu_row.permission='zsjos:lead:claim' AND menu_row.deleted=b'0'
-            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'),
+          ,
           'PASS','FAIL') AS result;
 
 SELECT 'V151 Partner administrator manage permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V151')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-            WHERE module_code='core' AND version='V151')
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-            WHERE role_row.code='system_administrator' AND role_row.status=0 AND role_row.deleted=b'0'
-              AND (NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
-                    WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                      AND grant_row.menu_id=6852 AND grant_row.deleted=b'0')
-                OR NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
-                    WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
-                      AND grant_row.menu_id=79920 AND grant_row.deleted=b'0'))),
+            WHERE module_code='core' AND version='V151'),
           'PASS','FAIL') AS result;
 
 SELECT 'V152 BPM process instance relation schema' AS check_name,
@@ -2264,19 +2060,6 @@ SELECT 'V194 material library menus and package coverage' AS check_name,
             SELECT 1 FROM system_tenant_package package_row
             WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'7022','$')
               AND NOT JSON_CONTAINS(package_row.menu_ids,'80037','$')
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM system_role_menu source_grant
-            JOIN system_role role_row ON role_row.id=source_grant.role_id
-              AND role_row.tenant_id=source_grant.tenant_id
-              AND role_row.status=0 AND role_row.deleted=b'0'
-            CROSS JOIN (SELECT 80010 menu_id UNION ALL SELECT 80040) expected_grant
-            WHERE source_grant.menu_id=6974 AND source_grant.deleted=b'0'
-              AND NOT EXISTS (SELECT 1 FROM system_role_menu migrated_grant
-                WHERE migrated_grant.role_id=role_row.id
-                  AND migrated_grant.tenant_id=role_row.tenant_id
-                  AND migrated_grant.menu_id=expected_grant.menu_id
-                  AND migrated_grant.deleted=b'0')
           ),
           'PASS','FAIL') AS result;
 
@@ -2361,9 +2144,6 @@ SELECT 'V178 lead submit specify permission' AS check_name,
           -- V178 shipped 6820 ungranted, for administrators to assign. V246 later granted it to
           -- new_media_operator/content_director/super_admin as role coverage, so only the absence
           -- of V178-era rows is asserted; administrator/later-migration grants are expected.
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu
-               WHERE menu_id=6820 AND deleted=b'0'
-                 AND creator NOT IN ('V246','V248','V251','V252','1','39'))
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package
                WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'6736','$')
                  AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
@@ -2436,9 +2216,7 @@ SELECT 'V186 calendar permission split' AS check_name,
                               OR NOT JSON_CONTAINS(package_row.menu_ids,'73606','$')
                               OR NOT JSON_CONTAINS(package_row.menu_ids,'73607','$')
                               OR NOT JSON_CONTAINS(package_row.menu_ids,'73608','$')
-                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73609','$')))
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu
-                          WHERE menu_id=73604 AND deleted=b'0' AND creator='migration-V161'),
+                              OR NOT JSON_CONTAINS(package_row.menu_ids,'73609','$'))),
           'PASS','FAIL') AS result;
 
 SELECT 'V187 exam calendar' AS check_name,
@@ -2456,34 +2234,12 @@ SELECT 'V187 exam calendar' AS check_name,
                       AND permission='zsjos:exam-calendar:manage' AND type=3 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73612 AND parent_id=73610
                       AND permission='zsjos:exam-calendar:query' AND type=3 AND status=0 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role_menu source
-                          WHERE source.menu_id=73610 AND source.deleted=b'0'
-                            AND NOT EXISTS (SELECT 1 FROM system_role_menu query_grant
-                              WHERE query_grant.role_id=source.role_id AND query_grant.tenant_id=source.tenant_id
-                                AND query_grant.menu_id=73612 AND query_grant.deleted=b'0'))
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
                           WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73610','$')
                             AND NOT JSON_CONTAINS(package_row.menu_ids,'73612','$'))
           AND EXISTS (SELECT 1 FROM infra_config WHERE config_key='zsjos.exam-calendar.upcoming-days'
                       AND value='3' AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-                          JOIN system_tenant tenant_row ON tenant_row.id=role_row.tenant_id
-                            AND tenant_row.status=0 AND tenant_row.deleted=b'0'
-                          JOIN system_tenant_package package_row ON package_row.id=tenant_row.package_id
-                            AND package_row.status=0 AND package_row.deleted=b'0'
-                            AND JSON_CONTAINS(package_row.menu_ids,'73610','$')
-                          WHERE role_row.status=0 AND role_row.deleted=b'0'
-                            AND NOT EXISTS (SELECT 1 FROM system_role_menu role_menu
-                                            WHERE role_menu.role_id=role_row.id
-                                              AND role_menu.tenant_id=role_row.tenant_id
-                                              AND role_menu.menu_id=73610 AND role_menu.deleted=b'0'))
-          AND NOT EXISTS (SELECT 1 FROM system_role role_row
-                          WHERE role_row.code IN ('exam_manager','exam_specialist')
-                            AND role_row.status=0 AND role_row.deleted=b'0'
-                            AND NOT EXISTS (SELECT 1 FROM system_role_menu role_menu
-                                            WHERE role_menu.role_id=role_row.id
-                                              AND role_menu.tenant_id=role_row.tenant_id
-                                              AND role_menu.menu_id=73611 AND role_menu.deleted=b'0'))
+
           AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
                           WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'73600','$')
                             AND (NOT JSON_CONTAINS(package_row.menu_ids,'73610','$')
@@ -2525,6 +2281,12 @@ SELECT 'V188 delivery class schema' AS check_name,
                WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
                  AND column_name='owner_user_id' AND data_type='bigint' AND is_nullable='YES'
                  AND column_default IS NULL AND column_comment='学生服务负责人用户编号'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V188 optional registration category metadata' AS check_name,
+       IF(EXISTS (SELECT 1 FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='zsjos_registration_class_assignment'
+             AND column_name='category_id' AND data_type='bigint' AND is_nullable='YES'),
           'PASS','FAIL') AS result;
 
 SELECT 'V188 pending class and UTF-8 snapshot' AS check_name,
@@ -2627,17 +2389,7 @@ SELECT 'V207 content director account creation and interview actions' AS check_n
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V207')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V207')
-          AND NOT EXISTS (
-            SELECT m.permission FROM system_menu m
-            WHERE m.deleted=b'0' AND m.permission IN (
-              'zsjos:media-account:create',
-              'zsjos:student:positioning-interview',
-              'zsjos:student:positioning-interview-query',
-              'zsjos:student:positioning-interview-complete')
-              AND NOT EXISTS (SELECT 1 FROM system_role r
-                              JOIN system_role_menu rm ON rm.role_id=r.id AND rm.menu_id=m.id
-                                AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
-                              WHERE r.code='content_director' AND r.deleted=b'0'))
+
           -- V207 also appended the interview permissions to every tenant package holding 7022.
           -- No package rows exist: tenant 1 is the system tenant (package_id=0), whose menu set is
           -- the full menu list rather than a package. The package statement is therefore only

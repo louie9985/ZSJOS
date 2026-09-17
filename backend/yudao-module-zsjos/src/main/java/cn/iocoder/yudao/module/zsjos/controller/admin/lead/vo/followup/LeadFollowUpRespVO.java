@@ -14,6 +14,8 @@ public class LeadFollowUpRespVO {
     private String recordScope;
     private Long operatorUserId;
     private String operatorName;
+    private String ownerIdentitySnapshot;
+    private String ownerIdentityLabel;
     private LocalDateTime occurredAt;
     private Boolean firstInAssignment;
     private String method;

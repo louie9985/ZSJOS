@@ -38,8 +38,9 @@ const DISPATCH_MODE_HINTS: Record<string, string> = {
 
 export default function LeadSubmissionPage({
   selfSourced = false,
+  educationSelfSourced = false,
   permissions = []
-}: { selfSourced?: boolean; permissions?: string[] }) {
+}: { selfSourced?: boolean; educationSelfSourced?: boolean; permissions?: string[] }) {
   const [form] = Form.useForm<FormValues>()
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
@@ -235,7 +236,7 @@ export default function LeadSubmissionPage({
         return
       }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
-      const result = await (selfSourced ? api.createSelfSourcedLead : api.createLead)({
+      const result = await (educationSelfSourced ? api.createEducationSelfSourcedLead : selfSourced ? api.createSelfSourcedLead : api.createLead)({
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode,
         intendedProducts: intentions.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown, skuUnknown: item.skuUnknown, primary: item.key === primaryKey })),

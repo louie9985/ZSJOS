@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- ZSJOS 产品三级选择链增量脚本。
 -- 上一版 zsjos_product_configuration.sql 已执行；本脚本只补充分类和快照字段，不迁移产品数据。
 
@@ -69,13 +74,3 @@ INSERT INTO system_menu
 (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT @button_id, '分类状态', 'zsjos:product-category:status', 3, 14, @menu_id, '', '', '', NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
 WHERE @menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission = 'zsjos:product-category:status' AND deleted = b'0');
-
-INSERT INTO system_role_menu (role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT role.id, menu.id, '1', NOW(), '1', NOW(), b'0', role.tenant_id
-FROM system_role role JOIN system_menu menu
-  ON menu.permission IN ('zsjos:product-category:query', 'zsjos:product-category:create',
-                         'zsjos:product-category:update', 'zsjos:product-category:delete', 'zsjos:product-category:status')
- AND menu.deleted = b'0'
-WHERE role.code = 'super_admin' AND role.deleted = b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu rm
-                  WHERE rm.role_id = role.id AND rm.menu_id = menu.id AND rm.deleted = b'0');

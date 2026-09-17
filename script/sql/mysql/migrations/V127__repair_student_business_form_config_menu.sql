@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V127: repair business-form configuration menu visibility and component metadata.
 -- Additive and repeatable. Apply after V126; no business rows are changed.
 
@@ -10,22 +16,6 @@ SET `component_name` = 'ZsjosBusinessFormConfig',
     `deleted` = b'0'
 WHERE `id` = 73460
   AND `permission` = 'zsjos:student-contact-config:forms';
-
-INSERT INTO `system_role_menu`
-  (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
-SELECT role_row.id, menu_row.id, 'migration-V127', NOW(), 'migration-V127', NOW(), b'0', role_row.tenant_id
-FROM `system_role` role_row
-JOIN `system_menu` menu_row ON menu_row.id IN (73400, 73401, 73402, 73460)
-WHERE role_row.code IN ('system_administrator', 'super_admin')
-  AND role_row.deleted = b'0'
-  AND menu_row.deleted = b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.role_id = role_row.id
-      AND existing.menu_id = menu_row.id
-      AND existing.tenant_id = role_row.tenant_id
-      AND existing.deleted = b'0'
-  );
 
 INSERT INTO `zsjos_schema_version` (`version`, `description`, `checksum`, `installed_at`)
 VALUES ('V127', 'Repair student business form configuration menu grant', 'V127__repair_student_business_form_config_menu.sql', NOW())

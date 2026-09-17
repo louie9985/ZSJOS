@@ -9,9 +9,9 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import { invalidReasonSnapshotLabel } from '../services/leadManagement'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
-const STAGE_LABELS = { sales_manager: '销售主管复核', quality: '质控复核', chairman: '董事长终审' }
+const STAGE_LABELS = { sales_manager: '负责人主管复核', quality: '质控复核', chairman: '董事长终审' }
 const STATUS_LABELS = {
-  sales_manager_reviewing: '销售主管复核中', quality_reviewing: '质控复核中', chairman_reviewing: '董事长终审中',
+  sales_manager_reviewing: '负责人主管复核中', quality_reviewing: '质控复核中', chairman_reviewing: '董事长终审中',
   overturned: '已改判有效', upheld: '维持无效', withdrawn: '已撤回'
 }
 

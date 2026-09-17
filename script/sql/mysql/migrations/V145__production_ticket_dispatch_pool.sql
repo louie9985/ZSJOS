@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V145: account-scoped production-ticket dispatch, rejection and public claim pool.
 -- Dependencies/order: apply after V144; requires user relations, positioning submissions and V102 notifications.
 -- Data scope: additive columns/command ledger/permissions/scenes; only unassigned pending_accept tickets become public_pool.
@@ -112,15 +118,6 @@ INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`p
 (73521,'查看拍剪公共池','zsjos:production-ticket:pool-query',3,12,6977,'','','',NULL,0,b'1',b'1',b'0','migration-V145',NOW(),'migration-V145',NOW(),b'0'),
 (73522,'抢拍剪公共池工单','zsjos:production-ticket:claim',3,13,6977,'','','',NULL,0,b'1',b'1',b'0','migration-V145',NOW(),'migration-V145',NOW(),b'0')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),`parent_id`=VALUES(`parent_id`),`updater`='migration-V145',`update_time`=NOW(),`deleted`=b'0';
-
-UPDATE `system_role_menu` rm JOIN `system_role` role ON role.id=rm.role_id JOIN `system_menu` menu ON menu.id=rm.menu_id
-SET rm.deleted=b'1',rm.updater='migration-V145',rm.update_time=NOW()
-WHERE role.code='new_media_operator' AND role.deleted=b'0' AND rm.deleted=b'0' AND menu.permission IN ('zsjos:production-ticket:accept','zsjos:production-ticket:reject-assignment','zsjos:production-ticket:produce','zsjos:production-ticket:submit','zsjos:production-ticket:edit','zsjos:production-ticket:over-entitlement','zsjos:production-ticket:pool-query','zsjos:production-ticket:claim');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V145',NOW(),'migration-V145',NOW(),b'0',role.tenant_id FROM `system_role` role JOIN `system_menu` menu ON menu.deleted=b'0'
-WHERE role.deleted=b'0' AND role.status=0 AND ((role.code='new_media_operator' AND menu.permission IN ('zsjos:production-ticket:query','zsjos:production-ticket:create','zsjos:production-ticket:check')) OR (role.code='filming_editor' AND menu.permission IN ('zsjos:production-ticket:query','zsjos:production-ticket:accept','zsjos:production-ticket:reject-assignment','zsjos:production-ticket:produce','zsjos:production-ticket:submit','zsjos:production-ticket:pool-query','zsjos:production-ticket:claim')))
-AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=role.id AND existing.menu_id=menu.id AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `system_notify_template` (`name`,`code`,`nickname`,`scene_code`,`channel_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT seed.name,seed.code,'中世健消息中心',seed.scene,'in_app',seed.title,seed.summary,seed.content,2,'["bizNo"]',0,'V145 拍剪派单结果通知','migration-V145',NOW(),'migration-V145',NOW(),b'0' FROM (

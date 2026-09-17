@@ -613,6 +613,7 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
             case SOURCE_PARTNER -> "兼职提交";
             case SOURCE_INTERNAL_NEW_MEDIA -> "新媒体提交";
             case SOURCE_SALES_SELF -> "销售自拓录";
+            case cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_EDUCATION_SELF -> "教务自拓录";
             default -> "来源未配置";
         };
     }

@@ -25,6 +25,14 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaAccountProfileServiceTest {
+    @Test void retiredPositioningCannotBeEditedThroughProfileEvenIfConfiguredEnabled() {
+        var legacy = field("pc_account_name", "DIRECTOR", "text");
+        var group = field("custom_position", "DIRECTOR", "text"); group.setGroup("POSITIONING");
+        for (var f : List.of(legacy, group)) {
+            assertFalse(MediaAccountFieldPolicy.canWrite(f, account, 10L));
+            assertThrows(ServiceException.class, () -> MediaAccountFieldPolicy.validate(List.of(f), Map.of(f.getKey(), "override"), account, 10L));
+        }
+    }
     @InjectMocks MediaAccountProfileService service;
     @Mock MediaAccountMapper mapper;
     @Mock MediaAccountProfileEntryMapper entries;

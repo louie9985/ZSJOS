@@ -463,7 +463,15 @@ export type ProductionTicketCreateContext = ProductionTicketDispatchContext & {
   unavailableReason?: string;
   assigneeCandidates: AssignmentUser[];
 };
+export type PositioningServiceOverview = {
+  serviceRelationId: number; masterCardId?: number; canSelectMaster: boolean; canCreate: boolean; canSubmit: boolean;
+  candidates: PositioningCard[]; current?: PositioningCard; effective?: PositioningCard; history: PositioningCard[];
+}
+export type PositioningApplicationOptions = { version: number; submissionId?: number; canApply: boolean; newerAvailable: boolean; candidates: PositioningCard[] }
 export type PositioningCard = {
+  submissionId?: number; operatorReviewComment?: string; studentDecidedAt?: Timestamp; studentDecisionComment?: string;
+  submissionNo?: number;
+  submittedAt?: Timestamp;
   id: number;
   cardNo: string;
   accountId?: number;
@@ -656,7 +664,7 @@ export type RegistrationCase = {
   classAssignments?: RegistrationClassAssignment[];
 };
 export type RegistrationClassAssignment = {
-  orderItemId: number; productId: number; productName?: string; categoryId: number;
+  orderItemId: number; productId?: number; productName?: string; categoryId?: number | null;
   specs?: import('./productSpecs').ProductSpec[];
   categoryName?: string; categoryPath?: string; classId?: number; classNo?: string;
   className?: string; systemClass?: boolean; homeroomUserId?: number;
@@ -793,7 +801,7 @@ export type MediaStudentDetail = {
   }>;
   positioningDrafts: Array<{
     id: number;
-    accountId: number;
+    accountId?: number | null;
     cardNo: string;
     status: string;
     versionNo?: number;
@@ -1339,6 +1347,8 @@ export type ManagedLeadAttachment = {
 export type ManagedLeadRemarkAttachment = Omit<ManagedLeadAttachment, 'id'> & { infraFileId: number };
 export type ManagedLeadRemark = { id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: ManagedLeadRemarkAttachment[] };
 export type ManagedLead = {
+  ownerIdentity?: string;
+  ownerIdentityLabel?: string;
   version?: number;
   id: number;
   leadNo: string;
@@ -1470,6 +1480,8 @@ export type LeadSubmitterAssistRequest = {
   idempotencyKey: string;
 };
 export type LeadComplaint = {
+  ownerIdentitySnapshot?: string;
+  ownerIdentityLabel?: string;
   id: number;
   leadId: number;
   leadNo: string;
@@ -1612,6 +1624,8 @@ export type LeadFollowUpImage = {
   url?: string;
 };
 export type LeadFollowUp = {
+  ownerIdentitySnapshot?: string;
+  ownerIdentityLabel?: string;
   id: number;
   leadId: number;
   assignmentHistoryId?: number;
@@ -1805,6 +1819,8 @@ export type SalesOrder = {
     | "terminated";
   submitterUserId: number;
   formalSalesUserId?: number;
+  formalOwnerIdentity?: string;
+  formalOwnerIdentityLabel?: string;
   buyerName: string;
   studentName: string;
   studentNature: string;
@@ -1879,6 +1895,8 @@ export type SalesOrder = {
     leadCategoryLabelSnapshot?: string;
     dispatchMode?: string;
     ownerUserName?: string;
+    ownerIdentity?: string;
+    ownerIdentityLabel?: string;
   };
   registrationApproval?: SalesOrderApprovalStatus;
   financeApproval?: SalesOrderApprovalStatus;
@@ -1942,6 +1960,8 @@ export type SalesOrderListItem = Pick<
   leadSourceLabel?: string;
   leadSourceUserName?: string;
   leadOwnerUserName?: string;
+  formalOwnerIdentity?: string;
+  formalOwnerIdentityLabel?: string;
   leadCategoryLabelSnapshot?: string;
   leadSourceChannelLabelSnapshot?: string;
   leadProvinceName?: string;
@@ -3253,7 +3273,7 @@ export const api = {
     page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number }, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
     get: async (id: number) => unwrap<DeliveryClass>(await http.get(`/zsjos/delivery-class/${id}`)),
     students: async (id: number, pageNo = 1, pageSize = 50) => unwrap<PageResult<DeliveryClassStudent>>(await http.get(`/zsjos/delivery-class/${id}/students`, { params: { pageNo, pageSize } })),
-    options: async (categoryId: number, includePending = true) => unwrap<DeliveryClassOption[]>(await http.get('/zsjos/delivery-class/options', { params: { categoryId, includePending } })),
+    options: async (categoryId?: number, includePending = true) => unwrap<DeliveryClassOption[]>(await http.get('/zsjos/delivery-class/options', { params: { categoryId, includePending } })),
     candidates: async () => unwrap<HomeroomCandidate[]>(await http.get('/zsjos/delivery-class/homeroom-candidates')),
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
@@ -3424,6 +3444,8 @@ export const api = {
   },
   createLead: async (data: LeadCreateRequest) =>
     unwrap<LeadCreateResult>(await http.post("/zsjos/lead/create", data)),
+  createEducationSelfSourcedLead: async (data: LeadCreateRequest) =>
+    unwrap<LeadCreateResult>(await http.post("/zsjos/lead/education-self-sourced/create", data)),
   createSelfSourcedLead: async (data: LeadCreateRequest) =>
     unwrap<LeadCreateResult>(
       await http.post("/zsjos/lead/self-sourced/create", data),
@@ -3825,6 +3847,13 @@ export const api = {
       ),
   },
   positioningCard: {
+    serviceOverview: async (serviceRelationId: number) => unwrap<PositioningServiceOverview>(await http.get('/zsjos/positioning-card/service-overview', { params: { serviceRelationId } })),
+    selectMaster: async (serviceRelationId: number, cardId: number) => unwrap<boolean>(await http.post('/zsjos/positioning-card/select-master', null, { params: { serviceRelationId, cardId } })),
+    applicationOptions: async (accountId: number) => unwrap<PositioningApplicationOptions>(await http.get('/zsjos/positioning-card/application-options', { params: { accountId } })),
+    apply: async (data: { accountId: number; submissionId: number; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post('/zsjos/positioning-card/apply', data)),
+
+    accountOverview: async (accountId: number) => unwrap<{ current?: PositioningCard; effective?: PositioningCard; history: PositioningCard[] }>(
+      await http.get('/zsjos/positioning-card/account-overview', { params: { accountId } })),
     uploadAttachment: async (id: number, fieldKey: string, file: File) => {
       const data = new FormData(); data.append('fieldKey', fieldKey); data.append('file', file)
       return unwrap<{ id: number; name: string; type: string; size: number; url?: string }>(await http.post(`/zsjos/positioning-card/${id}/attachments`, data))
@@ -3851,7 +3880,7 @@ export const api = {
       ),
     importSources: async (params: {
       studentPersonId: number;
-      accountId: number;
+      accountId?: number;
       serviceRelationId: number;
     }) =>
       unwrap<PositioningCardImportSource[]>(
@@ -3859,7 +3888,7 @@ export const api = {
       ),
     importSubmission: async (data: {
       sourceSubmissionId: number;
-      accountId: number;
+      accountId?: number;
       studentPersonId: number;
       serviceRelationId: number;
       targetDraftId?: number;

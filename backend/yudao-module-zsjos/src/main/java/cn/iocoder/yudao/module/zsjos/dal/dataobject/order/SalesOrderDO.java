@@ -26,6 +26,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private String status;
     private Long submitterUserId;
     private Long formalSalesUserId;
+    // Business identity at conversion time; never re-resolve it from the employee's current roles.
+    private String formalOwnerIdentity;
     private String submitterCenterType;
     private String buyerName;
     private String studentName;

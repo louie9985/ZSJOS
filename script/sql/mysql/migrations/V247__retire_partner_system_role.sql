@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V247: 退役兼职端 System 角色 part_time_partner，并清除其残留菜单授权
 --
 -- 背景
@@ -36,11 +42,6 @@
 
 SET NAMES utf8mb4;
 
--- 1) 清除该角色的全部菜单授权（含 V246 在本迁移定稿前误加的三条）。
-DELETE rm FROM `system_role_menu` rm
-JOIN `system_role` r ON r.`id`=rm.`role_id`
-WHERE r.`code`='part_time_partner';
-
 -- 2) 清除该角色的系统用户绑定（V072 之后应为空，此处幂等兜底）。
 DELETE ur FROM `system_user_role` ur
 JOIN `system_role` r ON r.`id`=ur.`role_id`
@@ -59,13 +60,6 @@ WHERE r.`code`='part_time_partner' AND r.`deleted`=b'0'
       SELECT ur.`role_id` FROM `system_user_role` ur
       WHERE ur.`deleted`=b'0'
     ) bound WHERE bound.`role_id`=r.`id`);
-
--- 4) 退役孤儿菜单 6909「返现查询」(zsjos:cashback:my-query)。
---    V063 创建它为兼职端按钮，V069/V070 删除其原父节点 6900 后未同步清理，
---    现挂在「工作计划」下且语义重复。持有者仅有已退役的 part_time_partner 与 super_admin；
---    super_admin 的该条关系由第 1 步之外单独处理，避免悬空按钮。
-DELETE rm FROM `system_role_menu` rm
-WHERE rm.`menu_id`=6909;
 
 UPDATE `system_menu` m
 SET m.`deleted`=b'1', m.`status`=1, m.`updater`='V247', m.`update_time`=NOW()

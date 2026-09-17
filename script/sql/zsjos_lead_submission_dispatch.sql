@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- ZSJOS 客资提交、派单与抢单增量结构
 -- MySQL 8.x；不删除或重建业务表，不清理任何业务数据。
 -- 执行顺序：扩展主表 -> 创建子表/规则表 -> 扩展历史 -> 迁移字典 -> 初始化规则与权限菜单。
@@ -207,14 +212,3 @@ SELECT @button_id, '客资异常转派', 'zsjos:lead:transfer', 3, 2, @rule_menu
        0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
 WHERE @rule_menu_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission = 'zsjos:lead:transfer' AND deleted = b'0');
-
--- 仅为超级管理员补齐新管理权限；销售与提交员工由管理员按岗位实际授权。
-INSERT INTO system_role_menu
-(role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT role.id, menu.id, '1', NOW(), '1', NOW(), b'0', role.tenant_id
-FROM system_role role
-JOIN system_menu menu ON menu.permission IN ('zsjos:lead-rule:query', 'zsjos:lead-rule:update', 'zsjos:lead:transfer')
-  AND menu.deleted = b'0'
-WHERE role.code = 'super_admin' AND role.deleted = b'0'
-  AND NOT EXISTS (SELECT 1 FROM system_role_menu rm
-    WHERE rm.role_id = role.id AND rm.menu_id = menu.id AND rm.deleted = b'0');

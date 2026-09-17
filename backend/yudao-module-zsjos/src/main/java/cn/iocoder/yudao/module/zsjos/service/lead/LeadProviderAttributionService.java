@@ -31,7 +31,7 @@ public class LeadProviderAttributionService {
         lead.setCountedAt(countedAt);
         switch (identity) {
             case NEW_MEDIA -> applySystemUser(lead, lead.getSourceUserId());
-            case SALES -> {
+            case SALES, EDUCATION -> {
                 if (selectedProviderUserId != null) applySystemUser(lead, selectedProviderUserId);
             }
             case PARTNER -> applyPartner(lead, lead.getPartnerId());

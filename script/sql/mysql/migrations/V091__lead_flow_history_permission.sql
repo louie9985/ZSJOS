@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V091: add the Lead flow-history detail permission for enabled sales managers.
 -- Dependencies/order: apply after V090; Lead management menu 6770 and V086 detail permissions must exist.
 -- Data scope: one System button permission and sales_manager role-menu relations only.
@@ -19,17 +25,6 @@ UPDATE `system_menu`
 SET `name`='查看流转记录',`type`=3,`sort`=34,`parent_id`=6770,`status`=0,`deleted`=b'0',
     `updater`='migration-V091',`update_time`=NOW()
 WHERE `id`=6924 AND `permission`='zsjos:lead-detail:flow-read';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V091',NOW(),'migration-V091',NOW(),b'0',role.tenant_id
-FROM `system_role` role
-JOIN `system_menu` menu ON menu.permission='zsjos:lead-detail:flow-read' AND menu.deleted=b'0'
-WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V091')
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=role.id AND existing.menu_id=menu.id
-                    AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V091','Lead flow history permission','V091__lead_flow_history_permission.sql',NOW())

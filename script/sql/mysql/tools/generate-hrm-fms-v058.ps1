@@ -198,7 +198,7 @@ $lines.Add('-- Source: Yudao upstream MySQL baseline at commit 2bbe79b34ab8c9c7b
 $lines.Add('-- Dependencies/order: apply after V057 and after the HRM/FMS business tables are installed.')
 $lines.Add('-- Destructive scope: physically deletes HRM rows for tenants 0, 1, and 121, except the explicit global salary-slip template; physically deletes FMS rows for tenants 1 and 121.')
 $lines.Add('-- Preserved scope: System users/departments/posts/roles/tenants, ZSJOS rows, fms_subject_template, fms_report_template, hrm_salary_option_template, and hrm_salary_slip_template id 1 for tenant 0.')
-$lines.Add('-- Metadata scope: installs 294 remapped menu nodes, 60 dictionary types, 244 dictionary entries, and grants those menus only to tenant 1 super_admin.')
+$lines.Add('-- Metadata scope: installs 294 remapped menu nodes, 60 dictionary types, 244 dictionary entries, without assigning menus to roles.')
 $lines.Add('-- Repeatability: destructive and metadata statements run only while V058 is absent; the version rows are recorded in the same transaction.')
 $lines.Add('-- Rollback: restore the pre-migration logical backup. Deleted business/demo rows cannot be reconstructed from this migration.')
 $lines.Add('-- Execution requirement: take and verify an external backup before applying this file.')
@@ -255,9 +255,7 @@ foreach ($row in $selectedMenus) {
 }
 $menuIdSql = $mappedIds -join ', '
 $lines.Add('')
-$lines.Add('-- Remove any pre-existing grants for this exact remapped menu set, then grant only tenant 1 super_admin.')
-$lines.Add("DELETE FROM ``system_role_menu`` WHERE @v058_apply = 1 AND ``menu_id`` IN ($menuIdSql);")
-$lines.Add("INSERT INTO ``system_role_menu`` (``role_id``, ``menu_id``, ``creator``, ``create_time``, ``updater``, ``update_time``, ``deleted``, ``tenant_id``) SELECT r.``id``, m.``id``, 'v058', NOW(), 'v058', NOW(), b'0', 1 FROM ``system_role`` r JOIN ``system_menu`` m ON m.``id`` IN ($menuIdSql) AND m.``creator`` = 'v058' AND m.``deleted`` = b'0' WHERE @v058_apply = 1 AND r.``tenant_id`` = 1 AND r.``code`` = 'super_admin' AND r.``deleted`` = b'0' AND NOT EXISTS (SELECT 1 FROM ``system_role_menu`` rm WHERE rm.``role_id`` = r.``id`` AND rm.``menu_id`` = m.``id`` AND rm.``tenant_id`` = 1 AND rm.``deleted`` = b'0');")
+$lines.Add('-- Menu assignments remain administrator-owned; this generator never writes role-menu relations.')
 $lines.Add('')
 $lines.Add("INSERT INTO ``zsjos_schema_version`` (``version``, ``description``, ``checksum``, ``installed_at``) SELECT 'V058', 'HRM/FMS metadata and imported data cleanup', 'V058__hrm_fms_metadata_and_data_cleanup.sql', NOW() FROM DUAL WHERE @v058_apply = 1;")
 $lines.Add("INSERT INTO ``zsjos_module_schema_version`` (``module_code``, ``version``, ``description``, ``checksum``, ``release_version``, ``installed_at``) SELECT 'core', 'V058', 'HRM/FMS metadata and imported data cleanup', SHA2('V058__hrm_fms_metadata_and_data_cleanup.sql', 256), 'baseline', NOW() FROM DUAL WHERE @v058_apply = 1;")

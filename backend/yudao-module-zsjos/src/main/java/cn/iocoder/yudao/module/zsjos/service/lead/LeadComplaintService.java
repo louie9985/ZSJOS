@@ -87,7 +87,7 @@ public class LeadComplaintService {
         row.setLeadId(leadId);
         row.setComplainantUserId(userId);
         row.setPartnerId(partnerId);
-        row.setSalesUserId(lead.getOwnerUserId());
+        row.setSalesUserId(lead.getOwnerUserId()); row.setOwnerIdentitySnapshot(lead.getOwnerIdentity());
         row.setReason(req.getReason().trim());
         row.setEvidenceRefs(evidenceJson(evidence));
         row.setStatus("pending");
@@ -199,6 +199,8 @@ public class LeadComplaintService {
         result.setComplainantUserName(nameOf(userNames, row.getComplainantUserId()));
         result.setSalesUserId(row.getSalesUserId());
         result.setSalesUserName(nameOf(userNames, row.getSalesUserId()));
+        result.setOwnerIdentitySnapshot(row.getOwnerIdentitySnapshot());
+        result.setOwnerIdentityLabel(cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ownerIdentityLabel(row.getOwnerIdentitySnapshot()));
         result.setReason(row.getReason());
         result.setEvidenceRefs(row.getEvidenceRefs());
         result.setEvidence(toEvidence(row.getEvidenceRefs()));

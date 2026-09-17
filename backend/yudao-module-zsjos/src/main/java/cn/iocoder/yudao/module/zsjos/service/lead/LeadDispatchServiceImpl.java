@@ -67,9 +67,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LocalDateTime now = LocalDateTime.now();
         if (DISPATCH_SELF.equals(lead.getDispatchMode())) {
             lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(submitterUserId);
+            lead.setOwnerIdentity(SOURCE_EDUCATION_SELF.equals(lead.getSourceType()) ? OWNER_EDUCATION : OWNER_SALES);
             lead.setOwnershipStartedAt(now); LeadMapper.advanceActivity(lead, now); leadMapper.updateById(lead);
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, submitterUserId,
-                    submitterUserId, null, 1, null, "销售自拓直接归属", now);
+                    submitterUserId, null, 1, null, ownerIdentityLabel(lead.getOwnerIdentity()) + "自拓直接归属", now);
             lead.setCurrentAssignmentHistoryId(history.getId());
             lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                     lead.getId(), submitterUserId, history.getId(), now, EVENT_LEAD_ACCEPTED, ASSIGNMENT_UNASSIGNED));
@@ -205,7 +206,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, userId, userId,
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-        lead.setOwnerUserId(userId);
+        lead.setOwnerUserId(userId); lead.setOwnerIdentity(OWNER_SALES);
         lead.setOwnershipStartedAt(acceptedAt);
         LeadMapper.advanceActivity(lead, acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
@@ -266,7 +267,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, claimedAt, "客资重新归属");
         lifecycleTaskService.cancelFollowUpReminders(leadId, claimedAt, "客资重新归属");
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-        lead.setOwnerUserId(userId);
+        lead.setOwnerUserId(userId); lead.setOwnerIdentity(OWNER_SALES);
         lead.setOwnershipStartedAt(claimedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setCurrentAssignmentHistoryId(history.getId());
@@ -375,7 +376,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();
-        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId);
+        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId); lead.setOwnerIdentity(OWNER_SALES);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
         lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
@@ -384,7 +385,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
-        history.setToOwnerUserId(salesUserId); history.setOperatorUserId(operatorUserId);
+        history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(OWNER_SALES); history.setOperatorUserId(operatorUserId);
         history.setReason(reason);
         history.setOccurredAt(transferredAt); historyMapper.insert(history);
         lead.setCurrentAssignmentHistoryId(history.getId());
@@ -581,6 +582,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                                                Long ruleId, Integer attempt, LocalDateTime expiresAt,
                                                String reason, LocalDateTime occurredAt) {
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
+        history.setOwnerIdentitySnapshot(ACTION_ACCEPT.equals(action) || ACTION_CLAIM.equals(action)
+                ? (DISPATCH_SELF.equals(lead.getDispatchMode()) && Objects.equals(candidate, lead.getOwnerUserId())
+                    ? lead.getOwnerIdentity() : OWNER_SALES) : lead.getOwnerIdentity());
         history.setLeadId(lead.getId()); history.setActionType(action); history.setCandidateUserId(candidate);
         history.setToOwnerUserId(ACTION_ACCEPT.equals(action) || ACTION_CLAIM.equals(action) ? candidate : null);
         history.setOperatorUserId(operator == null ? 0L : operator); history.setReason(reason);

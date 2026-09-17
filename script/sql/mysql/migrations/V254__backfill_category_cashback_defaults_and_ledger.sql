@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V254: 补齐三处真实数据缺口（一级品类返现默认值 / V128 版本登记 / 考期日历查询叶）
 --
 -- 缺口一：一级商品品类缺少返现默认值
@@ -54,16 +60,6 @@ SET `default_valid_cashback_amount`=COALESCE(`default_valid_cashback_amount`,10.
 WHERE `deleted`=b'0'
   AND `parent_id`=0
   AND (`default_valid_cashback_amount` IS NULL OR `default_deal_cashback_rate` IS NULL);
-
--- 缺口三：考期日历查询叶（口径同 V187：持有 73610 者补 73612）
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.`role_id`,73612,'V254',NOW(),'V254',NOW(),b'0',source.`tenant_id`
-FROM `system_role_menu` source
-WHERE source.`menu_id`=73610 AND source.`deleted`=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.`role_id`=source.`role_id` AND existing.`menu_id`=73612
-                    AND existing.`tenant_id`=source.`tenant_id` AND existing.`deleted`=b'0');
 
 -- 缺口二：补 V128 / V131 的版本登记（只补缺失行）
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)

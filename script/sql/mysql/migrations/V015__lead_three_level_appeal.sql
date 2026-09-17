@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V015 客资三级申诉。
 -- Dependencies: V014、System 用户/部门/角色/菜单、BPM 模块表、zsjos_schema_version。
 -- Data scope: additive lead/appeal columns, appeal status dictionary, appeal menus and role-menu grants.
@@ -72,21 +78,6 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 (6806,'销售主管处理申诉','zsjos:lead:appeal:review-sales-manager',3,1,6804,'','','',NULL,0,b'1',b'1',b'1','migration-V015',NOW(),'migration-V015',NOW(),b'0'),
 (6807,'质控处理申诉','zsjos:lead:appeal:review-quality',3,2,6804,'','','',NULL,0,b'1',b'1',b'1','migration-V015',NOW(),'migration-V015',NOW(),b'0'),
 (6808,'董事长终审申诉','zsjos:lead:appeal:review-chairman',3,3,6804,'','','',NULL,0,b'1',b'1',b'1','migration-V015',NOW(),'migration-V015',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6805,'migration-V015',NOW(),'migration-V015',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead:submit' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6805 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id, grants.menu_id,'migration-V015',NOW(),'migration-V015',NOW(),b'0',r.tenant_id
-FROM `system_role` r JOIN (
- SELECT 'sales_manager' code,6804 menu_id UNION ALL SELECT 'sales_manager',6806 UNION ALL
- SELECT 'quality_manager',6804 UNION ALL SELECT 'quality_manager',6807 UNION ALL
- SELECT 'quality_specialist',6804 UNION ALL SELECT 'quality_specialist',6807 UNION ALL
- SELECT 'boss',6804 UNION ALL SELECT 'boss',6808
-) grants ON grants.code=r.code
-WHERE r.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=grants.menu_id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V015','Add three-level lead appeal workflow','lead-three-level-appeal-v1');

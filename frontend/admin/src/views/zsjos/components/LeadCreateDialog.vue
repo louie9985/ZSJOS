@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="selfSourced ? '新增销售自拓客资' : '提交客资'"
+    :title="educationSelfSourced ? '新增教务自拓客资' : selfSourced ? '新增销售自拓客资' : '提交客资'"
     width="760px"
     destroy-on-close
   >
@@ -70,6 +70,11 @@
                 :label="skuLabel(item)"
                 :value="item.skuRef" /></el-select></el-form-item></el-col
       ></el-row>
+      <el-form-item v-if="selfSourced" label="新媒体提供方">
+        <el-select v-model="form.newMediaProviderUserId" clearable filterable placeholder="可选，不选则本人自拓">
+          <el-option v-for="item in providers" :key="item.id" :label="item.nickname" :value="item.id" />
+        </el-select>
+      </el-form-item>
       <el-form-item v-if="!selfSourced" label="派单方式" prop="dispatchMode"
         ><el-radio-group v-model="form.dispatchMode"
           ><el-radio value="auto">自动分配</el-radio
@@ -106,7 +111,7 @@ import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
 import { getSimpleDictDataList, type DictDataVO } from '@/api/system/dict/dict.data'
 import { useUserStoreWithOut } from '@/store/modules/user'
-const props = defineProps<{ selfSourced?: boolean }>()
+const props = defineProps<{ selfSourced?: boolean; educationSelfSourced?: boolean }>()
 const emit = defineEmits<{ success: [] }>()
 const message = useMessage()
 const userStore = useUserStoreWithOut()
@@ -118,6 +123,7 @@ const formRef = ref<FormInstance>()
 const areaOptions = ref<any[]>([])
 const sourceOptions = ref<DictDataVO[]>([])
 const categoryOptions = ref<DictDataVO[]>([])
+const providers = ref<Array<{ id: number; nickname: string }>>([])
 const sales = ref<Array<{ id: number; nickname: string }>>([])
 const catalog = reactive<{ spus: any[]; skus: any[] }>({ spus: [], skus: [] })
 const skuLabel = (sku: { spuRef: string; skuName: string; attrValues: Record<string, string>; specs?: import('@/utils/productSpecs').ProductSpec[] }) =>
@@ -125,6 +131,7 @@ const skuLabel = (sku: { spuRef: string; skuName: string; attrValues: Record<str
 const canSpecifySales = computed(() => userStore.getPermissions.has('zsjos:lead:submit:specify'))
 const emptyForm = () => ({
   name: '',
+  newMediaProviderUserId: undefined as number | undefined,
   mobile: '',
   wechatId: '',
   region: [] as string[],
@@ -178,6 +185,7 @@ const loadOptions = async () => {
     )
     catalog.spus = products.spus || []
     catalog.skus = products.skus || []
+    if (props.selfSourced) providers.value = await MenuApi.leadNewMediaProviders()
     if (!props.selfSourced && canSpecifySales.value) sales.value = await MenuApi.leadSalesCandidates()
   } catch (e: any) {
     optionError.value = e?.msg || e?.message || '表单配置加载失败'
@@ -217,10 +225,11 @@ const submit = async () => {
         remark: form.remark.trim() || undefined,
         attachments: [],
         dispatchMode: props.selfSourced ? 'auto' : form.dispatchMode,
+        newMediaProviderUserId: props.selfSourced ? form.newMediaProviderUserId : undefined,
         specifiedSalesUserId: props.selfSourced ? undefined : form.specifiedSalesUserId,
         idempotencyKey: crypto.randomUUID()
       },
-      !!props.selfSourced
+      !!props.selfSourced, !!props.educationSelfSourced
     )
     message.success('客资已提交')
     visible.value = false

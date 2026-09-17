@@ -24,13 +24,15 @@ export const page = (
 ): Promise<WorkbenchListResult> => request.get({ url: endpoint, params })
 export const detail = (endpoint: string, id: number) =>
   request.get({ url: endpoint, params: { id } })
+export const leadNewMediaProviders = (): Promise<Array<{ id: number; nickname: string }>> =>
+  request.get({ url: '/zsjos/lead/self-sourced/new-media-providers' })
 export const leadCatalog = () => request.get({ url: '/zsjos/lead/product/catalog' })
 export const leadSalesCandidates = (): Promise<Array<{ id: number; nickname: string }>> =>
   request.get({ url: '/zsjos/lead/sales-user/simple-list' })
 export const salesOrderCatalog = () => request.get({ url: '/zsjos/sales-order/product/catalog' })
-export const createLead = (data: Record<string, unknown>, selfSourced = false) =>
+export const createLead = (data: Record<string, unknown>, selfSourced = false, educationSelfSourced = false) =>
   request.post({
-    url: selfSourced ? '/zsjos/lead/self-sourced/create' : '/zsjos/lead/create',
+    url: educationSelfSourced ? '/zsjos/lead/education-self-sourced/create' : selfSourced ? '/zsjos/lead/self-sourced/create' : '/zsjos/lead/create',
     data
   })
 export const createExternalRepurchase = (data: Record<string, unknown>) =>

@@ -32,14 +32,14 @@ import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const statusLabel: Record<string, string> = {
-  sales_manager_reviewing: '销售主管复核中',
+  sales_manager_reviewing: '负责人主管复核中',
   quality_reviewing: '质控复核中',
   chairman_reviewing: '董事长终审中',
   overturned: '已改判有效',
   upheld: '维持无效',
   withdrawn: '已撤回'
 }
-const stageLabel: Record<string, string> = { sales_manager: '销售主管', quality: '质控部门', chairman: '董事长' }
+const stageLabel: Record<string, string> = { sales_manager: '负责人主管', quality: '质控部门', chairman: '董事长' }
 
 type LeadAppealLocationState = {
   appealId?: number

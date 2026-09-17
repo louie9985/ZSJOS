@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. V188: delivery classes, per-order-item registration assignment and class transfer requests.
 -- Dependencies/order: apply after V187; registration, order/product, service-relation, exam-calendar,
 -- System tenant/menu/organization/permission and BPM facilities must exist.
@@ -87,7 +93,7 @@ BEGIN
     `class_name_snapshot` varchar(100) NOT NULL,
     `homeroom_user_id` bigint DEFAULT NULL,
     `homeroom_user_name_snapshot` varchar(100) DEFAULT NULL,
-    `category_id` bigint NOT NULL,
+    `category_id` bigint DEFAULT NULL,
     `category_name_snapshot` varchar(255) DEFAULT NULL,
     `category_path_snapshot` json DEFAULT NULL,
     `updated_by_user_id` bigint NOT NULL,
@@ -99,6 +105,14 @@ BEGIN
     UNIQUE KEY `uk_registration_class_item` (`tenant_id`,`registration_case_id`,`order_item_id`,`deleted`),
     KEY `idx_registration_class_target` (`tenant_id`,`class_id`,`deleted`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报名逐商品分班草稿';
+
+  -- Development correction: category is optional display metadata, never an assignment gate.
+  -- No rows or grants are changed. Reapply safely; rollback to NOT NULL requires resolving new nulls.
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_registration_class_assignment' AND column_name='category_id'
+             AND is_nullable='NO') THEN
+    ALTER TABLE `zsjos_registration_class_assignment` MODIFY COLUMN `category_id` bigint DEFAULT NULL;
+  END IF;
 
   CREATE TABLE IF NOT EXISTS `zsjos_class_transfer_request` (
     `id` bigint NOT NULL AUTO_INCREMENT,
@@ -202,21 +216,6 @@ BEGIN
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'73020','$') AND NOT JSON_CONTAINS(`menu_ids`,'73626','$');
   UPDATE `system_tenant_package` SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',73627),`updater`='V188',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'73020','$') AND NOT JSON_CONTAINS(`menu_ids`,'73627','$');
-
-  -- Initial grants inherit existing configured capability relationships; runtime never checks role names.
-  INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT source.role_id,target.menu_id,'V188',NOW(),'V188',NOW(),b'0',source.tenant_id
-  FROM `system_role_menu` source JOIN (SELECT 73620 menu_id UNION ALL SELECT 73621 UNION ALL SELECT 73622
-    UNION ALL SELECT 73623 UNION ALL SELECT 73625) target
-  WHERE source.menu_id=73001 AND source.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
-      AND existing.menu_id=target.menu_id AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
-  INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT source.role_id,target.menu_id,'V188',NOW(),'V188',NOW(),b'0',source.tenant_id
-  FROM `system_role_menu` source JOIN (SELECT 73624 menu_id UNION ALL SELECT 73626 UNION ALL SELECT 73627) target
-  WHERE source.menu_id=73020 AND source.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
-      AND existing.menu_id=target.menu_id AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
   INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
   VALUES ('V188','Delivery class closure',SHA2('V188__delivery_class_management.sql',256),NOW())

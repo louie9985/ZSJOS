@@ -62,7 +62,8 @@ public class PositioningCardService {
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "submit-review")
     public CardFile uploadAttachment(Long id, String fieldKey, byte[] bytes, String name, String mimeType, Long userId) {
         var card = require(id); requireStatus(card, POSITIONING_CO_CREATING);
-        if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_PERMISSION_DENIED);
+        assignmentService.requireMaster(card);
         var fields = JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
         if (fields.stream().noneMatch(f -> f.getKey().equals(fieldKey) && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))
                 || bytes.length == 0 || bytes.length > 20 * 1024 * 1024) throw exception(DIRECTOR_FORM_VALUE_INVALID);
@@ -95,6 +96,7 @@ public class PositioningCardService {
             snapshot.getDictSnapshots().put(field.getKey(), files);
         }
     }
+    @Resource private PositioningAssignmentService assignmentService;
     @Resource private PositioningCardMapper mapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
     @Resource private PermissionApi permissionApi;
@@ -120,100 +122,46 @@ public class PositioningCardService {
                 DirectorFormTemplateService.SCENE_POSITIONING, templateId, Map.of(), false);
     }
 
-    public List<PositioningCardImportSourceRespVO> getImportSources(Long studentPersonId, Long accountId,
-                                                                    Long serviceRelationId, Long userId) {
-        requireImportTarget(studentPersonId, accountId, serviceRelationId, userId, false);
-        List<cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO> accounts =
-                accountMapper.selectByStudent(studentPersonId).stream()
-                        .filter(account -> Objects.equals(account.getCreateServiceRelationId(),serviceRelationId)).toList();
-        Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO> accountById = accounts.stream()
-                .collect(Collectors.toMap(cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO::getId,
-                        Function.identity()));
-        return submissionMapper.selectByStudentAndAccountIds(studentPersonId, accountById.keySet()).stream()
-                .map(submission -> {
-                    PositioningCardDO sourceCard = mapper.selectById(submission.getCardId());
-                    if (sourceCard == null || !Objects.equals(sourceCard.getStudentPersonId(), studentPersonId)
-                            || !Objects.equals(sourceCard.getServiceRelationId(),serviceRelationId)
-                            || !Objects.equals(submission.getServiceRelationId(),serviceRelationId)
-                            || !Objects.equals(sourceCard.getAccountId(), submission.getAccountId())
-                            || !objectPermissionProvider.hasPermission(sourceCard.getId(), "read", userId)) {
-                        return null;
-                    }
-                    var sourceAccount = accountById.get(submission.getAccountId());
-                    if (sourceAccount == null) return null;
-                    PositioningCardImportSourceRespVO response = new PositioningCardImportSourceRespVO();
-                    response.setSubmissionId(submission.getId());
-                    response.setCardId(sourceCard.getId());
-                    response.setCardNo(sourceCard.getCardNo());
-                    response.setAccountId(sourceAccount.getId());
-                    response.setAccountLabel(StrUtil.blankToDefault(sourceAccount.getNickname(),
-                            sourceAccount.getAccountNo()));
-                    response.setSubmissionNo(submission.getSubmissionNo());
-                    response.setStatus(submission.getStatus());
-                    response.setSubmittedAt(submission.getSubmittedAt());
-                    response.setSameAccount(Objects.equals(sourceAccount.getId(), accountId));
-                    return response;
-                })
-                .filter(Objects::nonNull)
-                .toList();
+    public List<PositioningCardImportSourceRespVO> getImportSources(Long studentPersonId, Long accountId, Long serviceRelationId, Long userId) {
+        requireDraftTarget(studentPersonId, null, serviceRelationId, userId);
+        return submissionMapper.selectByService(serviceRelationId).stream()
+                .filter(row -> Objects.equals(row.getStudentPersonId(), studentPersonId) && objectPermissionProvider.hasPermission(row.getCardId(), "read", userId))
+                .map(row -> {
+                    var response = new PositioningCardImportSourceRespVO();
+                    response.setSubmissionId(row.getId()); response.setCardId(row.getCardId());
+                    var card = mapper.selectById(row.getCardId());
+                    response.setCardNo(card.getCardNo()); response.setAccountLabel(card.getCardNo());
+                    response.setSubmissionNo(row.getSubmissionNo()); response.setStatus(row.getStatus());
+                    response.setSubmittedAt(row.getSubmittedAt()); response.setSameAccount(false); return response;
+                }).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public PositioningCardImportRespVO importSubmission(PositioningCardImportReqVO req, Long userId) {
-        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
-        ImportTarget target = requireImportTarget(req.getStudentPersonId(), req.getAccountId(),
-                req.getServiceRelationId(), userId, true);
-        PositioningCardSubmissionDO source = submissionMapper.selectById(req.getSourceSubmissionId());
-        PositioningCardDO sourceCard = source == null ? null : mapper.selectById(source.getCardId());
-        var sourceAccount = source == null ? null : accountMapper.selectById(source.getAccountId());
-        if (source == null || sourceCard == null || sourceAccount == null
-                || !Objects.equals(source.getServiceRelationId(),req.getServiceRelationId())
-                || !Objects.equals(sourceCard.getServiceRelationId(),req.getServiceRelationId())
-                || !Objects.equals(sourceAccount.getCreateServiceRelationId(),req.getServiceRelationId())
-                || !Objects.equals(sourceCard.getStudentPersonId(),req.getStudentPersonId())
+        var relation = requireDraftTarget(req.getStudentPersonId(), null, req.getServiceRelationId(), userId);
+        var source = submissionMapper.selectById(req.getSourceSubmissionId());
+        var sourceCard = source == null ? null : mapper.selectById(source.getCardId());
+        if (source == null || sourceCard == null || !Objects.equals(source.getServiceRelationId(), req.getServiceRelationId())
+                || !Objects.equals(sourceCard.getServiceRelationId(), req.getServiceRelationId())
                 || !Objects.equals(source.getStudentPersonId(), req.getStudentPersonId())
-                || !Objects.equals(sourceAccount.getStudentPersonId(), req.getStudentPersonId())
-                || !Objects.equals(source.getCardId(), sourceCard.getId())
-                || !Objects.equals(source.getAccountId(), sourceCard.getAccountId())) {
-            throw exception(POSITIONING_IMPORT_SOURCE_INVALID);
-        }
+                || !Objects.equals(sourceCard.getStudentPersonId(), req.getStudentPersonId())) throw exception(POSITIONING_IMPORT_SOURCE_INVALID);
         objectPermissionProvider.check(sourceCard.getId(), "read", userId);
-
-        DirectorFormTemplateVO.Snapshot published = directorFormTemplateService.validateAndSnapshot(
-                DirectorFormTemplateService.SCENE_POSITIONING, null, Map.of(), false);
-        ImportValues imported = mapImportValues(source, published.getFields());
-        DirectorFormTemplateVO.Snapshot snapshot = directorFormTemplateService.validateAndSnapshotVersion(
-                DirectorFormTemplateService.SCENE_POSITIONING, published.getTemplateVersionId(), imported.values(),
-                false, imported.dictSnapshots());
-
-        PositioningCardDO draft = mapper.selectLatestCreatingDraft(target.relation().getId(),
-                target.account().getId(), tenantId);
-        if (draft == null && req.getTargetDraftId() != null
-                || draft != null && (!Objects.equals(draft.getId(), req.getTargetDraftId())
-                || !Objects.equals(draft.getVersion(), req.getVersion()))) {
+        Long masterId = assignmentService.masterId(relation.getId());
+        if (masterId == null) throw exception(POSITIONING_MASTER_REQUIRED);
+        var draft = mapper.selectById(masterId);
+        assignmentService.requireMaster(draft);
+        requireStatus(draft, POSITIONING_CO_CREATING);
+        if (!Objects.equals(draft.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_PERMISSION_DENIED);
+        if (!Objects.equals(draft.getId(), req.getTargetDraftId()) || !Objects.equals(draft.getVersion(), req.getVersion()))
             throw exception(POSITIONING_CARD_VERSION_CONFLICT);
-        }
-        if (draft == null) {
-            draft = new PositioningCardDO()
-                    .setCardNo("PC-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16))
-                    .setAccountId(target.account().getId()).setStudentPersonId(req.getStudentPersonId())
-                    .setDirectorUserId(userId).setServiceRelationId(target.relation().getId())
-                    .setVersionNo(1).setStatus(POSITIONING_CO_CREATING).setVersion(0);
-            applyImportedSnapshot(draft, source, snapshot, req.getTrialEndDate(), target.relation().getOperatorUserId());
-            mapper.insert(draft);
-        } else {
-            if (!Objects.equals(draft.getDirectorUserId(), userId)
-                    || !Objects.equals(draft.getStudentPersonId(), req.getStudentPersonId())
-                    || !Objects.equals(draft.getServiceRelationId(), target.relation().getId())) {
-                throw exception(POSITIONING_CARD_PERMISSION_DENIED);
-            }
-            Integer expectedVersion = draft.getVersion();
-            applyImportedSnapshot(draft, source, snapshot, req.getTrialEndDate(), target.relation().getOperatorUserId());
-            if (mapper.overwriteDraftFromImport(draft, expectedVersion) == 0) {
-                throw exception(POSITIONING_CARD_VERSION_CONFLICT);
-            }
-            draft.setVersion(expectedVersion + 1);
-        }
+        var published = directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_POSITIONING, draft.getTemplateId(), Map.of(), false);
+        ImportValues imported = mapImportValues(source, published.getFields());
+        var snapshot = directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_POSITIONING,
+                published.getTemplateVersionId(), imported.values(), false, imported.dictSnapshots());
+        Integer expectedVersion = draft.getVersion();
+        applyImportedSnapshot(draft, source, snapshot, req.getTrialEndDate(), relation.getOperatorUserId());
+        if (mapper.overwriteDraftFromImport(draft, expectedVersion) == 0) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        draft.setVersion(expectedVersion + 1);
         return toImportResp(draft, snapshot, imported.skippedFieldKeys());
     }
 
@@ -322,9 +270,19 @@ public class PositioningCardService {
 
     @Transactional(rollbackFor = Exception.class)
     public PositioningCardDraftRespVO create(PositioningCardSaveReqVO req, Long userId) {
-        var relation = requireDraftTarget(req.getStudentPersonId(), req.getAccountId(), req.getServiceRelationId(), userId);
+        req.setAccountId(null);
+        var relation = requireDraftTarget(req.getStudentPersonId(), null, req.getServiceRelationId(), userId);
         var snapshot = directorFormTemplateService.validateAndSnapshot(
                 DirectorFormTemplateService.SCENE_POSITIONING, req.getTemplateId(), req.getValues(), false);
+        var serviceCards = mapper.selectByService(relation.getId());
+        if (!serviceCards.isEmpty()) {
+            Long masterId = assignmentService.masterId(relation.getId());
+            if (masterId == null) throw exception(POSITIONING_MASTER_REQUIRED);
+            var master = mapper.selectById(masterId);
+            if (!POSITIONING_CO_CREATING.equals(master.getStatus())) throw exception(POSITIONING_CARD_STATE_INVALID);
+            if (!sameDraft(master, snapshot, req.getTrialEndDate(), req)) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+            return new PositioningCardDraftRespVO(master.getId(), master.getVersion());
+        }
         java.time.LocalDate trialEndDate = req.getTrialEndDate();
         PositioningCardDO existing = mapper.selectLatestCreatingDraft(relation.getId(), req.getAccountId(),
                 cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
@@ -348,6 +306,7 @@ public class PositioningCardService {
                 .setProfessionalRisk(Boolean.TRUE.equals(req.getProfessionalRisk()))
                 .setStatus(POSITIONING_CO_CREATING).setVersion(0);
         mapper.insert(card);
+        assignmentService.register(relation.getId(), relation.getPersonId(), card.getId());
         return new PositioningCardDraftRespVO(card.getId(), card.getVersion());
     }
 
@@ -376,15 +335,27 @@ public class PositioningCardService {
     @Transactional(rollbackFor = Exception.class)
     public PositioningCardDraftRespVO updateDraft(Long id, PositioningCardSaveReqVO req, Long userId) {
         PositioningCardDO card = require(id);
+        assignmentService.requireMaster(card);
         requireStatus(card, POSITIONING_CO_CREATING);
-        if (!Objects.equals(card.getDirectorUserId(), userId) || !Objects.equals(card.getAccountId(), req.getAccountId())) {
-            throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        if (!Objects.equals(card.getDirectorUserId(), userId)) {
+            throw exception(POSITIONING_CARD_PERMISSION_DENIED);
         }
         Map<String, Object> previousDictSnapshots = StrUtil.isBlank(card.getDictSnapshotJson()) ? Map.of()
                 : JsonUtils.parseObject(card.getDictSnapshotJson(), Map.class);
+        var published = directorFormTemplateService.requirePublished(
+                DirectorFormTemplateService.SCENE_POSITIONING, card.getTemplateId());
         var snapshot = directorFormTemplateService.validateAndSnapshotVersion(
-                DirectorFormTemplateService.SCENE_POSITIONING, card.getTemplateVersionId(), req.getValues(), false,
+                DirectorFormTemplateService.SCENE_POSITIONING, published.getId(), req.getValues(), false,
                 previousDictSnapshots);
+        // Keep retired values recoverable; only current fields participate in new edits and submissions.
+        var currentKeys = snapshot.getFields().stream().map(DirectorFormTemplateVO.Field::getKey)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<String, Object> retained = StrUtil.isBlank(card.getValuesSnapshotJson()) ? Map.of()
+                : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
+        snapshot.setValues(new java.util.LinkedHashMap<>(snapshot.getValues()));
+        snapshot.setDictSnapshots(new java.util.LinkedHashMap<>(snapshot.getDictSnapshots()));
+        retained.forEach((key, value) -> { if (!currentKeys.contains(key)) snapshot.getValues().put(key, value); });
+        previousDictSnapshots.forEach((key, value) -> { if (!currentKeys.contains(key)) snapshot.getDictSnapshots().put(key, value); });
         freezeAttachments(id, snapshot);
         java.time.LocalDate trialEndDate = req.getTrialEndDate();
         String layer1Json = draftJson(req.getLayer1Json(), card.getLayer1Json());
@@ -402,6 +373,7 @@ public class PositioningCardService {
             }
             throw exception(POSITIONING_CARD_VERSION_CONFLICT);
         }
+        card.setTemplateVersionId(published.getId());
         card.setFieldsSnapshotJson(JsonUtils.toJsonString(snapshot.getFields()))
                 .setValuesSnapshotJson(JsonUtils.toJsonString(snapshot.getValues()))
                 .setDictSnapshotJson(JsonUtils.toJsonString(snapshot.getDictSnapshots()))
@@ -462,9 +434,10 @@ public class PositioningCardService {
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
         PositioningCardDO card = tenantId == null ? mapper.selectById(id) : mapper.selectByIdForUpdate(id, tenantId);
         if (card == null) throw exception(POSITIONING_CARD_NOT_EXISTS);
+        if (POSITIONING_OPERATOR_FEASIBILITY.equals(card.getStatus()) && Objects.equals(card.getVersion(), version + 1)) return;
         if (!POSITIONING_CO_CREATING.equals(card.getStatus())) throw exception(POSITIONING_CARD_STATE_INVALID);
         if (!Objects.equals(card.getVersion(), version)) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
-        if (card.getAccountId() == null) throw exception(POSITIONING_REFERENCE_INVALID);
+        assignmentService.requireMaster(card);
         var relation = tenantId == null ? relationMapper.selectById(card.getServiceRelationId())
                 : relationMapper.selectByIdForUpdate(card.getServiceRelationId(), tenantId);
         if (relation == null || !"active".equals(relation.getStatus())
@@ -489,8 +462,12 @@ public class PositioningCardService {
                     .filter(f -> emptyPositioningValue(values.get(f.getKey()), f.getType()))
                     .map(DirectorFormTemplateVO.Field::getKey).toList();
             if (!missing.isEmpty()) throw exception(POSITIONING_CARD_FIELD_REQUIRED);
+            var activeKeys = templateFields.stream().filter(f -> Boolean.TRUE.equals(f.getEnabled()))
+                    .map(DirectorFormTemplateVO.Field::getKey).collect(java.util.stream.Collectors.toSet());
+            var activeValues = values.entrySet().stream().filter(entry -> activeKeys.contains(entry.getKey()))
+                    .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
             directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_POSITIONING,
-                    card.getTemplateVersionId(), values, true, dictSnapshots);
+                    card.getTemplateVersionId(), activeValues, true, dictSnapshots);
         }
         createSubmission(card, userId, POSITIONING_OPERATOR_FEASIBILITY);
         if (mapper.transitionWithOperator(card.getId(), version, POSITIONING_CO_CREATING,
@@ -585,9 +562,6 @@ public class PositioningCardService {
                 ? Map.of() : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
         if (positioningValues.isEmpty()) throw exception(POSITIONING_CARD_STATE_INVALID);
         transition(card, version, POSITIONING_CONFIRMED);
-        mediaAccountProfileService.syncLatestPositioning(card.getAccountId(), positioningValues,
-                StrUtil.isBlank(card.getDictSnapshotJson()) ? Map.of()
-                        : JsonUtils.parseObject(card.getDictSnapshotJson(), Map.class));
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, null, POSITIONING_STUDENT_CONFIRM,
                 POSITIONING_CONFIRMED, null, transitionKey(card, version, POSITIONING_CONFIRMED));
         notifyEmployeeResult(card, "media.positioning.student_confirmed", version, POSITIONING_CONFIRMED);
@@ -624,7 +598,8 @@ public class PositioningCardService {
                 || !Objects.equals(card.getDirectorUserId(), userId)) {
             throw exception(POSITIONING_CARD_STATE_INVALID);
         }
-        PositioningCardSubmissionDO effective = submissionMapper.selectCurrentConfirmedByAccount(card.getAccountId());
+        assignmentService.requireMaster(card);
+        PositioningCardSubmissionDO effective = submissionMapper.selectLatestConfirmedByCard(card.getId());
         PositioningCardSubmissionDO latest = submissionMapper.selectLatestByCard(card.getId());
         if (effective == null || latest == null || !Objects.equals(effective.getId(), latest.getId())
                 || !Objects.equals(effective.getCardId(), card.getId())) {
@@ -687,11 +662,7 @@ public class PositioningCardService {
     }
 
     private void notifyOperatorReview(PositioningCardDO card, Long operator, Integer version, String branch) {
-        var account = accountMapper.selectById(card.getAccountId());
-        if (account == null) return;
-        Long operatorUserId = relationMapper.selectActiveByPersonIds(List.of(card.getStudentPersonId())).stream()
-                .map(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO::getOperatorUserId)
-                .filter(java.util.Objects::nonNull).findFirst().orElse(account.getOwnerOperatorUserId());
+        Long operatorUserId = card.getOperatorUserId();
         if (operatorUserId == null) return;
         workflowEventService.notify("media.positioning.operator_review", BIZ_TYPE_POSITIONING_CARD, card.getId(),
                 operatorUserId, operator,
@@ -702,11 +673,10 @@ public class PositioningCardService {
         workflowEventService.notify(scene, BIZ_TYPE_POSITIONING_CARD, card.getId(), card.getDirectorUserId(), null,
                 "positioning-student-result:" + card.getId() + ":" + version + ":director:" + target,
                 payload(card));
-        var account = accountMapper.selectById(card.getAccountId());
-        if (account != null && account.getOwnerOperatorUserId() != null
-                && !account.getOwnerOperatorUserId().equals(card.getDirectorUserId())) {
+        Long operatorUserId = card.getOperatorUserId();
+        if (operatorUserId != null && !operatorUserId.equals(card.getDirectorUserId())) {
             workflowEventService.notify(scene, BIZ_TYPE_POSITIONING_CARD, card.getId(),
-                    account.getOwnerOperatorUserId(), null,
+                    operatorUserId, null,
                     "positioning-student-result:" + card.getId() + ":" + version + ":operator:" + target,
                     payload(card));
         }
@@ -717,7 +687,7 @@ public class PositioningCardService {
         values.put("bizNo", card.getCardNo());
         if (card.getStudentPersonId() != null) {
             values.put("deepLink", "/zsjos/media-students?personId=" + card.getStudentPersonId()
-                    + "&tab=positioning&positioningCardId=" + card.getId());
+                    + "&serviceRelationId=" + card.getServiceRelationId() + "&tab=positioning&positioningCardId=" + card.getId());
         }
         return values;
     }
@@ -755,6 +725,67 @@ public class PositioningCardService {
         }
     }
 
+    @ZsjosPermission(bizType = "media-account", bizId = "#accountId", action = "read")
+    public cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO accountOverview(
+            Long accountId, Long userId) {
+        var account = accountMapper.selectById(accountId);
+        if (account == null) throw exception(POSITIONING_REFERENCE_INVALID);
+        var confirmed = submissionMapper.selectCurrentConfirmedByAccount(accountId);
+        var effective = confirmed == null ? null : submissionResponse(confirmed, userId);
+        return new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO(null, effective, List.of());
+    }
+
+    @ZsjosPermission(bizType="student-service", bizId="#serviceRelationId", action="read")
+    public cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO serviceOverview(Long serviceRelationId, Long userId) {
+        var relation = relationMapper.selectById(serviceRelationId);
+        if (relation == null) throw exception(POSITIONING_REFERENCE_INVALID);
+        var cards = mapper.selectByService(serviceRelationId);
+        Long masterId = assignmentService.masterId(serviceRelationId);
+        var master = cards.stream().filter(row -> Objects.equals(row.getId(), masterId)).findFirst().orElse(null);
+        boolean director = Objects.equals(relation.getContentDirectorUserId(), userId);
+        boolean createPermission = permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:create");
+        var history = submissionMapper.selectByService(serviceRelationId).stream()
+                .filter(row -> objectPermissionProvider.hasPermission(row.getCardId(), "read", userId))
+                .map(row -> submissionResponse(row, userId)).toList();
+        var effective = masterId == null ? null : submissionMapper.selectLatestConfirmedByCard(masterId);
+        return new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO(serviceRelationId, masterId,
+                masterId == null && !cards.isEmpty() && director && createPermission && "active".equals(relation.getStatus())
+                        && "accepted".equals(relation.getAcceptanceStatus()) && isPositioningComplete(relation.getDirectorStage()),
+                cards.isEmpty() && director && createPermission && "active".equals(relation.getStatus())
+                        && "accepted".equals(relation.getAcceptanceStatus()) && isPositioningComplete(relation.getDirectorStage()),
+                director && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:submit-review") && relation.getOperatorUserId() != null,
+                cards.stream().filter(row -> objectPermissionProvider.hasPermission(row.getId(), "read", userId)).map(row -> toResp(row, userId)).toList(),
+                master == null || !objectPermissionProvider.hasPermission(master.getId(), "read", userId) ? null : toResp(master, userId),
+                effective == null || !objectPermissionProvider.hasPermission(effective.getCardId(), "read", userId) ? null : submissionResponse(effective, userId), history);
+    }
+
+    @ZsjosPermission(bizType="media-account", bizId="#accountId", action="read")
+    public cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningApplicationRespVO applicationOptions(Long accountId, Long userId) {
+        var current = assignmentService.application(accountId);
+        var candidates = assignmentService.candidates(accountId).stream()
+                .filter(row -> objectPermissionProvider.hasPermission(row.getCardId(), "read", userId))
+                .map(row -> submissionResponse(row, userId)).toList();
+        boolean newer = current != null && !candidates.isEmpty() && !Objects.equals(candidates.getFirst().getSubmissionId(), current.getSubmissionId());
+        return new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningApplicationRespVO(current == null ? 0 : current.getVersion(),
+                current == null ? null : current.getSubmissionId(), assignmentService.canApply(accountId, userId), newer, candidates);
+    }
+
+    public PositioningCardRespVO submissionResponse(PositioningCardSubmissionDO row, Long userId) {
+        objectPermissionProvider.check(row.getCardId(), "read", userId);
+        var response = BeanUtils.toBean(row, PositioningCardRespVO.class);
+        response.setId(row.getCardId()); response.setSubmissionId(row.getId());
+        var sourceCard = mapper.selectById(row.getCardId());
+        if (sourceCard != null) response.setCardNo(sourceCard.getCardNo());
+        response.setFieldsSnapshot(StrUtil.isBlank(row.getFieldsSnapshotJson()) ? List.of()
+                : JsonUtils.parseArray(row.getFieldsSnapshotJson(), Object.class));
+        response.setValuesSnapshot(StrUtil.isBlank(row.getValuesSnapshotJson()) ? Map.of()
+                : JsonUtils.parseObject(row.getValuesSnapshotJson(), Map.class));
+        response.setDictSnapshot(StrUtil.isBlank(row.getDictSnapshotJson()) ? Map.of()
+                : JsonUtils.parseObject(row.getDictSnapshotJson(), Map.class));
+        response.setAvailableActions(List.of());
+        return response;
+    }
+
     private PositioningCardRespVO toResp(PositioningCardDO card, Long userId) {
         objectPermissionProvider.check(card.getId(), "read", userId);
         PositioningCardRespVO response = BeanUtils.toBean(card, PositioningCardRespVO.class);
@@ -768,6 +799,7 @@ public class PositioningCardService {
         if (submission != null) {
             response.setSubmissionNo(submission.getSubmissionNo());
             response.setSubmittedAt(submission.getSubmittedAt());
+            response.setStudentDecisionComment(submission.getStudentDecisionComment());
         }
         response.setAvailableActions(availableActionsForVisible(card, userId));
         return response;
@@ -775,6 +807,10 @@ public class PositioningCardService {
 
     public List<String> availableActionsForVisible(PositioningCardDO card, Long userId) {
         List<String> actions = new java.util.ArrayList<>();
+        if (!Objects.equals(assignmentService.masterId(card.getServiceRelationId()), card.getId())) return actions;
+        if (POSITIONING_CO_CREATING.equals(card.getStatus())
+                && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:create")
+                && objectPermissionProvider.hasPermission(card.getId(), "submit-review", userId)) actions.add("EDIT_POSITIONING_DRAFT");
         if (POSITIONING_CO_CREATING.equals(card.getStatus())
                 && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:submit-review")
                 && objectPermissionProvider.hasPermission(card.getId(), "submit-review", userId)) {

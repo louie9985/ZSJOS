@@ -49,6 +49,10 @@
       >
       <el-table-column label="状态" prop="status" width="140" />
       <el-table-column label="负责人" prop="ownerUserName" width="140" />
+      <el-table-column v-if="numberField === 'leadNo'" label="负责人身份" prop="ownerIdentityLabel" width="110" />
+      <el-table-column v-if="showOrderIdentity" label="成交归属身份" width="120">
+        <template #default="{ row }">{{ row.formalOwnerIdentityLabel || '未记录' }}</template>
+      </el-table-column>
       <el-table-column label="时间" width="180"
         ><template #default="{ row }">{{
           formatTime(row.submittedAt || row.createTime)
@@ -96,6 +100,7 @@ const props = withDefaults(
     query?: Record<string, unknown>
     numberField?: string
     numberLabel?: string
+    showOrderIdentity?: boolean
     advancedScene?: AdvancedFilterScene
     advancedSearchEndpoint?: string
     advancedPlaceholder?: string

@@ -80,7 +80,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
     const status: ApprovalStatus = node.approval?.status || (node.active ? 'pending' : 'not_started')
     const supervisorStatus = node.supervisorApproval?.status || node.supervisorConfirmation?.status
     const supervisorReviewer = node.supervisorApproval?.supervisorUserName
-      || (node.supervisorConfirmation?.status === 'confirmed' ? '销售主管' : undefined)
+      || (node.supervisorConfirmation?.status === 'confirmed' ? '负责人主管' : undefined)
     return {
       color: approvalTimelineColor(status),
       content: <article className={`sales-order-approval-node${node.active ? ' active' : ''}`}>
@@ -96,7 +96,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
         </div>
         {supervisorStatus && <div className="sales-order-supervisor-signoff">
           <div className="sales-order-supervisor-signoff-heading">
-            <Typography.Text strong>销售主管会签</Typography.Text>
+            <Typography.Text strong>负责人主管会签</Typography.Text>
             <ApprovalStatusTag status={supervisorStatus} supervisor/>
           </div>
           <div className="sales-order-approval-node-meta">
@@ -192,9 +192,9 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       description: order.effectiveAt ? `通过时间：${formatTimestamp(order.effectiveAt)}` : '双中心审批已完成'
     }
     return {
-      type: 'info' as const, title: supervisorPending ? '销售主管会签中' : '订单待审核',
+      type: 'info' as const, title: supervisorPending ? '负责人主管会签中' : '订单待审核',
       description: supervisorPending
-        ? supervisorConfirmation.requestReason || '等待销售主管确认'
+        ? supervisorConfirmation.requestReason || '等待负责人主管确认'
         : `等待${SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''] || '审批中心'}处理`
     }
   })()
@@ -223,9 +223,10 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
             : <span className="lead-field-value lead-field-empty">未填写</span>}</div>
         </div>
         <div className="lead-profile-meta">
+          <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">提交人</span><span className="lead-field-value">{leadProfile.sourceUserName || '-'}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">所属销售</span><span className="lead-field-value">{leadProfile.ownerUserName || '暂未分配'}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '暂未分配'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">地区</span><span className="lead-field-value">{[leadProfile.provinceName, leadProfile.cityName].filter(Boolean).join(' / ') || '-'}</span></div>

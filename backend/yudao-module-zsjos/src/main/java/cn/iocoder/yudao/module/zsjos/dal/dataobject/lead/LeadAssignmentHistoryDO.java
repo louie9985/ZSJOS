@@ -19,6 +19,7 @@ public class LeadAssignmentHistoryDO extends TenantBaseDO {
     private String actionType;
     private Long fromOwnerUserId;
     private Long toOwnerUserId;
+    private String ownerIdentitySnapshot;
     private Long operatorUserId;
     private String reason;
     private LocalDateTime occurredAt;

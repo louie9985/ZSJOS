@@ -115,6 +115,19 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public LeadCreateRespVO createEducationSelfSourced(LeadCreateReqVO reqVO, Long userId) {
+        identityService.requireEducationSubmitter(userId);
+        if (reqVO.getNewMediaProviderUserId() != null) {
+            identityService.requireNewMediaProvider(reqVO.getNewMediaProviderUserId());
+        }
+        reqVO.setDispatchMode(DISPATCH_SELF);
+        reqVO.setSpecifiedSalesUserId(userId);
+        return create(reqVO, userId, selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), userId),
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.EDUCATION, null), true);
+    }
+
+    @Override
     public List<LeadAssignmentUserRespVO> getNewMediaProviders() {
         List<AdminUserRespDTO> users = identityService.getEnabledNewMediaProviders();
         Set<Long> deptIds = users.stream().map(AdminUserRespDTO::getDeptId)
@@ -159,6 +172,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
         if (existingReview != null) {
             requireSamePartnerIdentity(existingReview.getSubmissionPartnerId(), identity);
+            requireSameEducationSource(existingReview.getSubmissionSourceType(), identity);
             return duplicateReviewResponse(existingReview);
         }
         LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
@@ -213,7 +227,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         Map<Long, FileInfoRespDTO> attachments = identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER
                 ? attachmentService.validatePartnerReferences(reqVO.getAttachments(), submitterUserId)
                 : attachmentService.validateReferences(reqVO.getAttachments(), submitterUserId);
-        boolean selfSourced = identity.identity() == LeadSubmissionIdentityService.Identity.SALES;
+        boolean selfSourced = isSelfSourced(sourceType(identity));
         if (!selfSourced) {
             validateOrdinaryDispatch(reqVO, submitterUserId, identity.identity());
         }
@@ -318,6 +332,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         LeadDO lead = leadMapper.selectByIdempotencyKey(key);
         if (lead != null) {
             requireSamePartnerIdentity(lead.getPartnerId(), identity);
+            requireSameEducationSource(lead.getSourceType(), identity);
             return response(lead, "created");
         }
         LeadActivationDO activation = activationMapper.selectByIdempotencyKey(key);
@@ -325,6 +340,14 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         requireSamePartnerIdentity(activation.getPartnerId(), identity);
         LeadDO activatedLead = leadMapper.selectById(activation.getLeadId());
         return response(activatedLead, "activated");
+    }
+
+    private void requireSameEducationSource(String existingSource, LeadSubmissionIdentityService.Resolution identity) {
+        String requestedSource = sourceType(identity);
+        if ((SOURCE_EDUCATION_SELF.equals(existingSource) || SOURCE_EDUCATION_SELF.equals(requestedSource))
+                && !Objects.equals(existingSource, requestedSource)) {
+            throw exception(LEAD_SUBMISSION_DUPLICATE);
+        }
     }
 
     private void requireSamePartnerIdentity(Long existingPartnerId,
@@ -445,7 +468,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 lead.setPartnerOwnerNameSnapshot(ownership.getEmployeeNameSnapshot());
             }
         }
-        if (identity.identity() == LeadSubmissionIdentityService.Identity.SALES) {
+        if (isSelfSourced(sourceType(identity))) {
             lead.setSourceProviderUserId(reqVO.getNewMediaProviderUserId());
             lead.setSourceProviderRecorded(true);
         }
@@ -465,6 +488,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     private static String sourceType(LeadSubmissionIdentityService.Resolution identity) {
         return identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER ? SOURCE_PARTNER
+                : identity.identity() == LeadSubmissionIdentityService.Identity.EDUCATION ? SOURCE_EDUCATION_SELF
                 : identity.identity() == LeadSubmissionIdentityService.Identity.SALES ? SOURCE_SALES_SELF
                 : SOURCE_INTERNAL_NEW_MEDIA;
     }
@@ -524,7 +548,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         context.put("submitterUserId", lead.getSourceUserId());
         context.put("ownerUserId", lead.getOwnerUserId());
         context.put("pendingSalesUserId", lead.getPendingAssigneeUserId());
-        if (SOURCE_SALES_SELF.equals(lead.getSourceType())
+        if (cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 && !Objects.equals(lead.getSourceUserId(), actorUserId)) {
             context.put("newMediaProviderUserId", lead.getSourceUserId());
         }

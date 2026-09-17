@@ -40,6 +40,7 @@ public class PositioningConfirmationService {
     @Resource private PositioningCardSubmissionMapper submissionMapper;
     @Resource private PositioningConfirmationLinkMapper linkMapper;
     @Resource private MediaAccountMapper accountMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
     @Value("${zsjos.positioning.public-base-url:}") private String publicBaseUrl;
     @Value("${zsjos.positioning.confirmation-link-ttl-hours:168}") private long confirmationLinkTtlHours;
@@ -128,9 +129,16 @@ public class PositioningConfirmationService {
                 || !POSITIONING_STUDENT_CONFIRM.equals(submission.getStatus())) {
             throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         }
-        var account = accountMapper.selectById(submission.getAccountId());
+        var account = submission.getAccountId() == null ? null : accountMapper.selectById(submission.getAccountId());
         PublicPositioningConfirmationRespVO response = new PublicPositioningConfirmationRespVO();
         response.setState("ready");
+        response.setCardNo(card.getCardNo());
+        response.setServiceRelationId(card.getServiceRelationId());
+        var relation = card.getServiceRelationId() == null ? null : relationMapper.selectById(card.getServiceRelationId());
+        if (relation != null && relation.getServiceSnapshot() != null) {
+            var serviceSnapshot = JsonUtils.parseObject(relation.getServiceSnapshot(), Map.class);
+            if (serviceSnapshot != null && serviceSnapshot.get("name") instanceof String label) response.setServiceLabel(label);
+        }
         response.setAccountName(account == null ? null
                 : account.getNickname() == null ? account.getAccountNo() : account.getNickname());
         response.setPlatformLabel(account == null ? null : account.getPlatformLabelSnapshot());
@@ -167,15 +175,9 @@ public class PositioningConfirmationService {
                 || !POSITIONING_STUDENT_CONFIRM.equals(submission.getStatus())) {
             throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         }
-        if (accountMapper.selectByIdForUpdate(submission.getAccountId(), link.getTenantId()) == null) {
-            throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
-        }
         LocalDateTime now = LocalDateTime.now();
         boolean agreed = "agree".equals(request.getDecision());
         String submissionStatus = agreed ? POSITIONING_CONFIRMED : "change_requested";
-        if (agreed) {
-            submissionMapper.supersedeConfirmedByAccount(submission.getAccountId(), submission.getId());
-        }
         if (submissionMapper.markStudentDecision(submission.getId(), submission.getVersion(),
                 POSITIONING_STUDENT_CONFIRM, submissionStatus, request.getDecision(),
                 agreed ? null : request.getComment().trim(), now) == 0

@@ -31,7 +31,7 @@
 - 选择项来自 System 字典，未变化的选择保留历史快照，不重新解析已改名/停用的标签。新选择验证当前字典。实体字段后续通过所属业务 API 接入，不能以本地选项代替。
 - 图片上传 PNG/JPEG/WebP，记录附件另支持 PDF；单个 20 MB、每条记录最多 20 个。上传验证类型头与对象权限，绑定验证当前租户/账号/上传人命名空间；历史展示文件 ID 与上传时名称，访问使用 Infra 短期签名。
 - `cover`（主页截图）默认 OPERATOR，由当前责任运营上传、替换和删除，仍须通过菜单权限及账号对象权限校验。头像和背景属于运营。运营 `work_format` 和编导 `content_format` 独立保存。
-- 系统来源 `sourceType` 为 ACCOUNT、STUDENT 或 PENDING；人工为 MANUAL。当前已接入账号编号、姓名、联系方式和现存状态/定位标签快照。陪跑天数、期段计算、经营指标等待后续来源和统计口径；不伪造零值或自动同步定位卡。
+- 系统来源 `sourceType` 为 ACCOUNT、STUDENT 或 PENDING；人工为 MANUAL。当前已接入账号编号、姓名、联系方式和现存状态/定位标签快照。陪跑天数、期段计算、经营指标等待后续来源和统计口径；不伪造零值；定位内容按下述单一来源契约展示。
 - 更新仅合并 changes；null 清除本字段；未提交字段不覆盖。保留已禁用历史数据和快照。账号行锁加版本 CAS、租户拦截与幂等记录保障一致性；旧版本冲突时必须刷新后重试，不自动覆盖另一人的修改。
 - 历史和复盘只提供追加与读取，不提供编辑/删除 API。S0—S6、7/14/28 诊断都是独立记录类型。账号创建后按第 1 天起算，在第 7、14、28 天及其倍数生成对应编导任务；同一天的模板任务独立存在，当天未完成次日进入逾期提醒。维护暂停区间不计入周期，责任编导变更时未完成任务转给当前编导；诊断不经过审批。
 
@@ -59,11 +59,9 @@ V209 先执行，再部署后端与两端代码。新增账号历史表并将平
 
 V113 已逻辑删除旧账号页面 6970，连带移除了 `zsjos:media-account:query` 的唯一有效菜单；V209 档案 GET 仍需要该标识。修复创建独立按钮，不恢复旧页面，不以 edit/maintenance 替代 Controller 的 query 校验，对象 read 校验不变。Workbench 在缺少 query 时显示无权限状态且不请求档案/历史；管理员维护菜单后需刷新服务端权限响应。
 
-当前为未发布开发基线，修正原 V209 并 SOURCE `script/sql/mysql/permissions/media-account-profile-query.sql`，不另加版本。已执行 V209 的开发库从仓库根目录单独执行该文件即可，避免重跑其他业务升级。执行前审查该脚本目标角色/套餐；真实授权同步必须单独确认。重复执行不新增重复按钮或授权，但仍保留写权限的角色如被手工撤销 query，重放会重新补齐，因此上线后不应把此脚本用作周期同步。
+V209 通过 SOURCE `script/sql/mysql/permissions/media-account-profile-query.sql` 维护查询按钮和相关租户套餐项。2026-09-17 起该文件不再新增、继承或恢复角色映射；角色权限统一通过 System 角色管理配置。已有数据库的执行仍须遵循迁移兼容性和环境审批要求，不重放其他业务升级。
 
-SQL 只新增按钮、缺失角色映射及相关套餐项，不修改学员、账号或旧菜单。撤销时只撤销本次新建映射/套餐项，保留被后续配置引用的菜单。SQL 直写后需精确失效 `permission_menu_ids:{tenant}:zsjos:media-account:query` 以及新增菜单的 `menu_role_ids` 缓存；不清空 Redis。Admin 继续通过 System 菜单/角色配置消费此按钮，不增加员工档案页面。
-
-验证入口：`python script/sql/mysql/tools/test_v209_replay.py` 和 `script/sql/mysql/verify-media-account-profile.sql`；完整重放当前阻断于既有 V076（缺少菜单 6856），不能声称新库全链路通过。独立检查 `python script/sql/mysql/tools/test_profile_query_permission.py` 覆盖任意角色代码按既有能力迁移、无关角色/套餐不授权、旧页面保持退役、重放去重和中文 HEX。真实开发库授权同步与真实 HTTP 验证的状态以本次 handoff 交付记录为准；上文首次交付的部署状态仅为当时记录。
+SQL 不修改学员、账号、旧菜单或角色授权，重复执行不会重新补回被管理员撤销的 query 权限。回退通过审核后的菜单/套餐配置变更完成，保留历史引用。管理员在 System 配置权限后由既有权限管理机制更新缓存；Admin 与 Workbench 继续消费同一服务端授权。
 
 ### 本次开发库验收结果
 
@@ -75,13 +73,19 @@ SQL 只新增按钮、缺失角色映射及相关套餐项，不修改学员、�
 
 这是 Workbench 的展示投影：PROFILE/METRICS 归入 STATUS，positioning_history 归入 POSITIONING，cover 独立在主页区；保留服务端字段、责任、版本和快照协议。账号页移除旧维护历史、独立定位卡/内容/拍剪区块及其入口，不删除持久化记录；Admin 配置界面及其他业务页面不在本次布局改动范围。
 
-定位卡最终确认后，`pc_account_position`、`pc_profession`、`pc_content_form`、`pc_student_duties`、`pc_company_duties`、`pc_internal_goal` 在同一事务内写入账号档案；任何同步失败都会回滚定位卡确认。账号状态和当前瓶颈改用字典 `zsjos_media_account_current_status`、`zsjos_media_account_primary_problem`，暂时责任待配置并允许为空。V211 按用户授权清理全部账号运营旧数据，保留账号主体、学员、服务关系和兼职数据。
+旧版确认后同步 pc_* 字段的规则已由下节单一来源及手动应用契约取代，确认不再向账号档案复制定位内容。账号状态和当前瓶颈改用字典 `zsjos_media_account_current_status`、`zsjos_media_account_primary_problem`，暂时责任待配置并允许为空。V211 按用户授权清理全部账号运营旧数据，保留账号主体、学员、服务关系和兼职数据。
 
-### 编导定位卡正式提交
+### 编导定位卡单一来源（2026-09-17）
 
-定位卡正式提交使用独立 POSITIONING 记录类型；资料草稿保存不会生成该记录。每次正式提交冻结当时的定位字段配置、字典标签、附件元数据及素材版本，旧记录只读。materials 字段引用完整有效的爆款账号或爆款内容版本；平台和适用阶段为可调整的默认筛选，推荐数量仅作提示。
+定位访谈完成后，编导只通过学员概览的“填写定位卡”录入。唯一模板为 `positioning_card` 场景；初始新版包含 37 个项目和 10 个参考素材字段。账号档案配置不再承载 POSITIONING、pc_*、positioning_history、positioning_snapshot 字段；旧配置归档、管理员旧草稿和业务值保留。后端字段责任策略同时拒绝这些旧字段的维护、追加及上传，不能通过直接调用档案 API 绕过。
 
+账号概览的定位卡栏目调用 `GET /zsjos/positioning-card/account-overview?accountId=`，需要定位卡 query、账号 read 和卡 read 权限。`effective` 仅返回账号当前应用关系对应的不可变提交快照；兼容字段 `current=null`、`history=[]`。草稿、审核与历史提交移至课程服务的 `service-overview`。账号使用 `application-options` 和 `apply` 选择已确认版本，新版确认不自动换版。未应用时显示空状态，不从旧账号档案字段拼造内容。参见 [独立定位卡与账号应用契约](positioning-service-application.md)。
 
+保存草稿使用该卡所属模板的最新发布版本；旧模板独有值留在原草稿值 JSON 中供追溯，不展示为新字段，不参与新提交必填校验。模板 ID 不随默认模板切换；提交历史不改写。最终确认时的六字段摘要同步仅用于账号状态摘要，不作为完整定位卡来源。
+
+开发基线 V210 改为调用 `script/sql/mysql/positioning-single-source.sql`。已执行 V210 的本地开发库仅执行该修正脚本；按租户发布新定位模板和清理后的账号配置版本，保留全部旧版本，重跑不新增版本。不得自动重算部署环境迁移校验和；已部署环境另行审查升级方式。回退通过配置管理重新发布旧版本，不删除业务历史。
+
+2026-09-17 本地开发库：定位模板 2 发布版本 2（47 字段），账号配置发布版本 7（42 字段）。备份 `backups/mysql/positioning-config-20260917160628.sql`；原有两张卡草稿及提交记录指纹未变化。受控数据库重放、重复执行、与开发库配置比较、中文 HEX 验证通过。代码专项测试和浏览器合成数据验收不代替运行后端重启后的真实账号验收。
 
 V211 已于 2026-09-12 在开发库执行。执行前备份位于 `backups/mysql/v211-media-account-operation-backup-20260912.sql`；受影响账号运营记录已清理，账号主体和学员-兼职绑定保留。该操作不可逆，生产环境需另行备份与审批。
 

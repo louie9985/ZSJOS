@@ -191,6 +191,7 @@ class LeadMapperSqlTest {
         lead.setId(42L);
         lead.setStatus("submitted");
         lead.setAssignmentStatus("public_pool");
+        lead.setOwnerIdentity("education");
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(LocalDateTime.of(2026, 9, 9, 11, 30));
         lead.setLastActivityAt(LocalDateTime.of(2026, 9, 9, 11, 30));
@@ -202,6 +203,11 @@ class LeadMapperSqlTest {
         verify(mapper).update(org.mockito.ArgumentMatchers.isNull(), wrapper.capture());
         String sql = wrapper.getValue().getSqlSet().replaceAll("\\s+", " ");
         assertTrue(sql.contains("owner_user_id="), sql);
+        java.util.regex.Matcher identityBinding = java.util.regex.Pattern
+                .compile("owner_identity=#\\{ew\\.paramNameValuePairs\\.(\\w+)\\}").matcher(sql);
+        assertTrue(identityBinding.find(), sql);
+        assertTrue(wrapper.getValue().getParamNameValuePairs().containsKey(identityBinding.group(1)));
+        org.junit.jupiter.api.Assertions.assertNull(wrapper.getValue().getParamNameValuePairs().get(identityBinding.group(1)));
         assertTrue(sql.contains("recycle_source_owner_user_id="), sql);
         assertTrue(sql.contains("current_assignment_history_id="), sql);
         assertTrue(sql.contains("current_assignment_first_follow_up_at="), sql);

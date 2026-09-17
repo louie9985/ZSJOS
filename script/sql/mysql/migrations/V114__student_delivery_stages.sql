@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V114: normal student delivery stages and structured stage facts.
 -- Additive and repeatable. Apply after V113; historical stage is derived only from owned service facts.
 -- Stage payloads are planner-entered snapshots, not replacements for owning domains.
@@ -96,28 +102,6 @@ ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),
  `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`status`=VALUES(`status`),
  `visible`=VALUES(`visible`),`keep_alive`=VALUES(`keep_alive`),`always_show`=VALUES(`always_show`),
  `deleted`=b'0',`updater`='migration-V114',`update_time`=NOW();
-UPDATE `system_role_menu` grant_row
-JOIN (SELECT `tenant_id`,`role_id`,`menu_id`,MIN(`id`) AS `restore_id`
-      FROM `system_role_menu` WHERE `deleted`=b'1'
-      GROUP BY `tenant_id`,`role_id`,`menu_id`) tombstone ON tombstone.restore_id=grant_row.id
-JOIN `system_role` role_row
-  ON role_row.id=grant_row.role_id AND role_row.tenant_id=grant_row.tenant_id
-LEFT JOIN (SELECT `tenant_id`,`role_id`,`menu_id` FROM `system_role_menu`
-           WHERE `deleted`=b'0' GROUP BY `tenant_id`,`role_id`,`menu_id`) active_grant
-  ON active_grant.role_id=grant_row.role_id AND active_grant.menu_id=grant_row.menu_id
- AND active_grant.tenant_id=grant_row.tenant_id
-SET grant_row.`deleted`=b'0',grant_row.`updater`='migration-V114',grant_row.`update_time`=NOW()
-WHERE role_row.code='study_planner' AND role_row.status=0 AND role_row.deleted=b'0'
-  AND grant_row.menu_id IN (73020,73428) AND grant_row.deleted=b'1'
-  AND active_grant.role_id IS NULL;
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role_row.id,menu_row.id,'migration-V114',NOW(),'migration-V114',NOW(),b'0',role_row.tenant_id
-FROM `system_role` role_row CROSS JOIN `system_menu` menu_row
-WHERE role_row.code='study_planner' AND role_row.status=0 AND role_row.deleted=b'0'
-  AND menu_row.id IN (73020,73428) AND menu_row.status=0 AND menu_row.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` grant_row
-    WHERE grant_row.role_id=role_row.id AND grant_row.menu_id=menu_row.id
-      AND grant_row.tenant_id=role_row.tenant_id AND grant_row.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V114','Student delivery stages','student-delivery-stages-v6')

@@ -1,3 +1,5 @@
+-- Optional read-only administrator audit, not migration acceptance.
+-- Historical role expectations below are review guidance only; migrations assign no roles.
 SET NAMES utf8mb4;
 SELECT r.code,m.permission,COUNT(*) active_grants
 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'

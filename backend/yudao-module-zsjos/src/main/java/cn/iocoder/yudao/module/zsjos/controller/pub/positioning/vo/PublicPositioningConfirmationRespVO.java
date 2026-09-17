@@ -9,6 +9,9 @@ import java.util.Map;
 @Data
 public class PublicPositioningConfirmationRespVO {
     private String state;
+    private String cardNo;
+    private String serviceLabel;
+    private Long serviceRelationId;
     private String accountName;
     private String platformLabel;
     private LocalDateTime submittedAt;

@@ -68,7 +68,7 @@ export default function LeadComplaintPage() {
     <header className="business-inbox-detail-hero">
       <div className="business-inbox-detail-heading">
         <Avatar>{(selected.complainantUserName || '投').slice(0, 1)}</Avatar>
-        <div><Typography.Title level={4}>{selected.leadNo}</Typography.Title><Typography.Text type="secondary">销售投诉</Typography.Text></div>
+        <div><Typography.Title level={4}>{selected.leadNo}</Typography.Title><Typography.Text type="secondary">客资投诉</Typography.Text></div>
       </div>
       <Space wrap className="business-inbox-detail-actions">
         <Tag color={selected.status === 'pending' ? 'processing' : 'success'}>{selected.status === 'pending' ? '待处理' : '已处理'}</Tag>
@@ -80,7 +80,7 @@ export default function LeadComplaintPage() {
       <DetailFieldGrid items={[
         { key: 'leadNo', label: '客资编号', value: selected.leadNo },
         { key: 'complainant', label: '投诉人', value: selected.complainantUserName },
-        { key: 'sales', label: '被投诉销售', value: selected.salesUserName },
+        { key: 'sales', label: '被投诉负责人', value: [selected.salesUserName, selected.ownerIdentitySnapshot ? selected.ownerIdentityLabel : undefined].filter(Boolean).join(' · ') },
         { key: 'created', label: '提交时间', value: formatTimestamp(selected.createTime) },
         { key: 'reason', label: '投诉原因', value: selected.reason, span: 2 }
       ]}/>
@@ -103,7 +103,7 @@ export default function LeadComplaintPage() {
   const tableColumns = [
     { title: '客资编号', dataIndex: 'leadNo', width: 160 },
     { title: '投诉人', dataIndex: 'complainantUserName', width: 140 },
-    { title: '被投诉销售', dataIndex: 'salesUserName', width: 140 },
+    { title: '被投诉负责人', dataIndex: 'salesUserName', width: 140 },
     { title: '投诉原因', dataIndex: 'reason', ellipsis: true },
     { title: '状态', dataIndex: 'status', width: 100, render: (_: unknown, row: LeadComplaint) => <Tag color={row.status === 'pending' ? 'processing' : 'success'}>{row.status === 'pending' ? '待处理' : '已处理'}</Tag> },
     { title: '提交时间', dataIndex: 'createTime', width: 180, render: (_: unknown, row: LeadComplaint) => formatTimestamp(row.createTime) }
@@ -115,7 +115,7 @@ export default function LeadComplaintPage() {
         {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
         <div className="business-inbox-scroll">
           {loading ? <Spin/> : !items.length && !error ? <Empty description="暂无投诉"/> : items.map(item => <button key={item.id} type="button" className={`business-inbox-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
-            <div className="business-inbox-item-main"><Avatar>{(item.complainantUserName || '投').slice(0, 1)}</Avatar><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.leadNo}</strong><Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag></div><span>{item.complainantUserName || '未知投诉人'} → {item.salesUserName || '未知销售'}</span><span>{item.reason}</span></div></div>
+            <div className="business-inbox-item-main"><Avatar>{(item.complainantUserName || '投').slice(0, 1)}</Avatar><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.leadNo}</strong><Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag></div><span>{item.complainantUserName || '未知投诉人'} → {item.salesUserName || '未知负责人'}</span><span>{item.reason}</span></div></div>
             <div className="business-inbox-item-meta"><span>{formatTimestamp(item.createTime)}</span></div>
           </button>)}
         </div>
@@ -124,7 +124,7 @@ export default function LeadComplaintPage() {
       <main className="business-inbox-detail-pane">{detailContent}</main>
     </div>}
     {useTableLayout ? <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="投诉详情" placement="right" width="720px">{detailContent}</ResizableDetailDrawer> : <Drawer className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="投诉详情" width="100%">{detailContent}</Drawer>}
-    <Modal title="处理销售投诉" open={Boolean(current)} confirmLoading={saving} onCancel={() => setCurrent(undefined)} onOk={() => void decide()}>
+    <Modal title="处理客资投诉" open={Boolean(current)} confirmLoading={saving} onCancel={() => setCurrent(undefined)} onOk={() => void decide()}>
       <Form form={form} layout="vertical"><Form.Item name="result" label="处理结论" rules={[{ required: true }]}><Segmented block options={[{ label: '成立', value: 'founded' }, { label: '不成立', value: 'unfounded' }]}/></Form.Item><Form.Item name="opinion" label="处理意见" rules={[{ required: true }, { max: 1000 }]}><Input.TextArea rows={5} showCount maxLength={1000}/></Form.Item></Form>
     </Modal>
   </section>

@@ -30,6 +30,7 @@ function TimelineNode({ record }: { record: LeadFollowUp }) {
         <div className="fu-node-time">{formatTimestamp(record.occurredAt)}</div>
         <div className="fu-node-card">
           <div className="fu-node-tags">
+            {record.ownerIdentitySnapshot && <Tag>负责人身份：{record.ownerIdentityLabel}</Tag>}
             <Tag>联系方式：{snapshotDisplayLabel(record.methodLabel, record.method)}</Tag>
             <Tag color="blue">跟进结果：{snapshotDisplayLabel(record.resultLabel, record.result)}</Tag>
             {record.firstInAssignment && <Tag color="green">本轮首次</Tag>}

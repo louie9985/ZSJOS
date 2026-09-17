@@ -616,12 +616,33 @@
 
 .media-students-positioning-fields { display: flex; flex-direction: column; gap: 4px; }
 .media-students-positioning-fields .ant-form-item { margin-bottom: 12px; }
-.positioning-card-fields { display: flex; flex-direction: column; gap: 0; width: 100%; }
-.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(260px, 2fr) minmax(260px, 2fr); gap: 12px; padding: 12px; border-bottom: 1px solid var(--crm-border); }
-.positioning-card-field-head { font-weight: 600; background: var(--crm-bg-sunken); }
-.positioning-card-field-hint { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--crm-text-secondary); }
+/* Positioning is one row per project; hints remain visible while composing the plan. */
+.positioning-card-fields { display: flex; flex-direction: column; width: 100%; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); }
+.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(130px, .85fr) minmax(180px, 1.3fr) minmax(280px, 2fr) minmax(230px, 1.5fr); gap: var(--crm-sp-4); padding: var(--crm-sp-4); }
+.positioning-card-field-head { position: sticky; top: 0; z-index: 2; font-weight: 600; background: var(--crm-bg-sunken); border-bottom: 1px solid var(--crm-border); }
+.positioning-card-field-row { align-items: start; border-bottom: 1px solid var(--crm-border); background: var(--crm-bg-container); }
+.positioning-card-field-row:last-child { border-bottom: 0; }
+.positioning-card-field-row:nth-child(odd) { background: var(--crm-bg-sunken); }
+.positioning-card-field-title { line-height: 1.7; overflow-wrap: anywhere; }
+.positioning-card-field-hint { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--crm-text-secondary); line-height: 1.7; }
 .positioning-card-field-control { min-width: 0; }
-@media (max-width: 768px) { .positioning-card-field-head { display: none; } .positioning-card-field-row { display: flex; flex-direction: column; gap: 6px; } .positioning-card-field-row > strong::before { content: '定位卡项目：'; color: var(--crm-text-secondary); font-weight: 400; } }
+.positioning-card-field-control .ant-form-item { margin-bottom: 0; }
+/* The row title is visual; retain each control's linked label for assistive technology. */
+.positioning-card-field-control .ant-form-item-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.positioning-card-field-references { display: flex; flex-direction: column; gap: var(--crm-sp-3); }
+.positioning-card-no-reference { color: var(--crm-text-secondary); }
+.positioning-material-preview { margin-top: var(--crm-sp-4); }
+.positioning-material-preview-cover { padding: var(--crm-sp-4); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); }
+.positioning-material-preview-cover .ant-image { display: block; width: 100%; }
+.positioning-material-preview-cover .ant-image-img { display: block; width: 100%; max-height: 420px; object-fit: contain; }
+@media (max-width: 960px) {
+  .positioning-card-field-head { display: none; }
+  .positioning-card-field-row { display: flex; flex-direction: column; gap: var(--crm-sp-3); }
+  .positioning-card-field-row > * { width: 100%; }
+  .positioning-card-field-control::before, .positioning-card-field-hint::before { content: attr(data-label); display: block; margin-bottom: var(--crm-sp-2); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+  .positioning-card-field-references:has(.positioning-card-no-reference) { display: none; }
+}
+
 
 .account-profile-editor-columns > [data-profile-section="POSITIONING"] { min-width: 0; }
 .account-positioning-table { width: 100%; table-layout: fixed; border-collapse: collapse; }

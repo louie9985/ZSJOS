@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. V194: material library, content review batches, and student-scoped partner invitations.
 -- Migration-Owner: ai
 -- Dependencies/order: apply after V185. This migration owns the material-library schema and metadata.
@@ -773,21 +779,6 @@ BEGIN
   SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',80040),`updater`='V194',`update_time`=NOW()
   WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$')
     AND NOT JSON_CONTAINS(`menu_ids`,'80040','$');
-
-  -- Preserve access held through the retired standalone content page without inferring role names.
-  INSERT INTO `system_role_menu`
-    (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT DISTINCT role_row.id,target_menu.id,'V194',NOW(),'V194',NOW(),b'0',role_row.tenant_id
-  FROM `system_role_menu` source_grant
-  JOIN `system_role` role_row ON role_row.id=source_grant.role_id
-    AND role_row.tenant_id=source_grant.tenant_id AND role_row.status=0 AND role_row.deleted=b'0'
-  CROSS JOIN (SELECT 80010 id UNION ALL SELECT 80040) target_id
-  JOIN `system_menu` target_menu ON target_menu.id=target_id.id
-    AND target_menu.status=0 AND target_menu.deleted=b'0'
-  WHERE source_grant.menu_id=6974 AND source_grant.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing_grant
-      WHERE existing_grant.role_id=role_row.id AND existing_grant.menu_id=target_menu.id
-        AND existing_grant.tenant_id=role_row.tenant_id AND existing_grant.deleted=b'0');
 
   INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
   VALUES ('V194','Material library, content review, and student partner invitation',

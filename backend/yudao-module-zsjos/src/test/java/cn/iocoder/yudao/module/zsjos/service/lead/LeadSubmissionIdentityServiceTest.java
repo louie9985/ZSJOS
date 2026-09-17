@@ -130,4 +130,24 @@ class LeadSubmissionIdentityServiceTest {
         AdminUserRespDTO user = new AdminUserRespDTO(); user.setId(id); user.setDeptId(deptId);
         user.setPostIds(postIds); user.setStatus(CommonStatusEnum.ENABLE.getStatus()); return user;
     }
+    @Test
+    void educationSubmitterUsesEnabledEmployeeWithoutSalesPost() {
+        allowEnabledPersonnel(1L);
+        when(adminUserApi.getUser(1L)).thenReturn(user(1L, 10L, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(0);
+        when(deptApi.getDept(10L)).thenReturn(dept);
+        assertDoesNotThrow(() -> service.requireEducationSubmitter(1L));
+        assertEquals(LeadSubmissionIdentityService.Identity.EDUCATION,
+                service.resolveHistoricalSubmission(1L, SOURCE_EDUCATION_SELF, null).identity());
+    }
+
+    @Test
+    void educationSubmitterRejectsDisabledPersonnel() {
+        when(adminUserApi.getUser(1L)).thenReturn(user(1L, 10L, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(0);
+        when(deptApi.getDept(10L)).thenReturn(dept);
+        when(personnelStateService.isEnabled(1L)).thenReturn(false);
+        assertThrows(ServiceException.class, () -> service.requireEducationSubmitter(1L));
+    }
+
 }

@@ -660,9 +660,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     /**
-     * Resolves the product category for an order item. Orders only persist {@code product_ref}, so the live product
-     * has to be looked up by ref rather than id; the order-time snapshot is the fallback when that product has since
-     * been deleted or re-categorised. Either source gives分班 the category it needs to list candidate classes.
+     * Category is descriptive metadata only. Missing or changed product metadata must not restrict class selection.
      */
     private Long resolveOrderItemCategoryId(SalesOrderItemDO orderItem) {
         ZsjosProductDO product = orderItem.getProductId() != null
@@ -677,7 +675,6 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, Long classId, boolean lock) {
         Long categoryId = resolveOrderItemCategoryId(orderItem);
-        if (categoryId == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         DeliveryClassDO deliveryClass = lock
                 ? deliveryClassMapper.selectByIdForUpdate(classId, TenantContextHolder.getRequiredTenantId())
                 : deliveryClassMapper.selectById(classId);
@@ -686,14 +683,15 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     private AssignmentSnapshot validateClassAssignment(SalesOrderItemDO orderItem, DeliveryClassDO deliveryClass) {
         Long categoryId = resolveOrderItemCategoryId(orderItem);
-        if (categoryId == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         return validateClassAssignment(categoryId, deliveryClass);
     }
 
     private AssignmentSnapshot validateClassAssignment(Long productCategoryId, DeliveryClassDO deliveryClass) {
-        if (deliveryClass == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        if (deliveryClass == null || !"SERVING".equals(deliveryClass.getStatus())) {
+            throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        }
+        CategorySnapshot category = categorySnapshot(productCategoryId);
         if (Boolean.TRUE.equals(deliveryClass.getSystemClass())) {
-            CategorySnapshot category = categorySnapshot(productCategoryId);
             return new AssignmentSnapshot(deliveryClass, productCategoryId, category.name(), category.path(), null);
         }
         AdminUserRespDTO homeroom = null;
@@ -704,18 +702,16 @@ public class RegistrationServiceImpl implements RegistrationService {
                 throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
             }
         }
-        if (!"SERVING".equals(deliveryClass.getStatus())
-                || !Objects.equals(deliveryClass.getCategoryId(), productCategoryId)
-                || homeroom == null || !Objects.equals(homeroom.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
+        if (homeroom == null || !Objects.equals(homeroom.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
             throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         }
-        return new AssignmentSnapshot(deliveryClass, deliveryClass.getCategoryId(),
-                deliveryClass.getCategoryNameSnapshot(), deliveryClass.getCategoryPathSnapshot(), homeroom.getId());
+        return new AssignmentSnapshot(deliveryClass, productCategoryId, category.name(), category.path(), homeroom.getId());
     }
 
     private CategorySnapshot categorySnapshot(Long categoryId) {
+        if (categoryId == null) return new CategorySnapshot(null, null);
         ZsjosProductCategoryDO category = zsjosProductCategoryMapper.selectById(categoryId);
-        if (category == null) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
+        if (category == null) return new CategorySnapshot(null, null);
         List<String> path = new ArrayList<>();
         Set<Long> visited = new HashSet<>();
         ZsjosProductCategoryDO cursor = category;

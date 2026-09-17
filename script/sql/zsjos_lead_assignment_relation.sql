@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- 客资指定派单：用户对用户关系、审计日志与菜单权限
 
 CREATE TABLE IF NOT EXISTS `zsjos_user_relation` (
@@ -88,20 +93,3 @@ SELECT @all_menu_id, '管理全部派单关系', 'zsjos:lead-assignment:manage-a
 WHERE NOT EXISTS (
   SELECT 1 FROM system_menu WHERE permission = 'zsjos:lead-assignment:manage-all' AND deleted = b'0'
 );
-
--- 超级管理员默认拥有页面及全部按钮；部门负责人由管理员按需授权页面、配置和日志权限。
-INSERT INTO system_role_menu
-  (role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT role.id, menu.id, @operator, NOW(), @operator, NOW(), b'0', role.tenant_id
-FROM system_role role
-JOIN system_menu menu ON menu.permission IN (
-  'zsjos:lead-assignment:query',
-  'zsjos:lead-assignment:update',
-  'zsjos:lead-assignment:log-query',
-  'zsjos:lead-assignment:manage-all'
-) AND menu.deleted = b'0'
-WHERE role.code = 'super_admin' AND role.deleted = b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM system_role_menu rm
-    WHERE rm.role_id = role.id AND rm.menu_id = menu.id AND rm.deleted = b'0'
-  );

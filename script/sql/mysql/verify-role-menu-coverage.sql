@@ -1,3 +1,5 @@
+-- Optional read-only administrator audit, not migration acceptance.
+-- Historical role expectations below are review guidance only; migrations assign no roles.
 -- V246 只读验证脚本。可在应用 V246 之后随时重复执行，不修改任何数据。
 -- 用法:
 --   mysql --default-character-set=utf8mb4 -u USER -p DATABASE < verify-role-menu-coverage.sql

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V083: configurable registration routes, assignees and checklist attachments.
 -- Dependencies/order: apply after V082 and before V084; requires V073 plus System department/role/post/user and Infra file schemas.
 -- Data scope: additive structures, exact-name default route mappings, active-case snapshots, and content-director My Students grants.
@@ -76,14 +82,6 @@ WHERE case_row.status IN ('pending','processing') AND case_row.deleted=b'0'
  AND NOT EXISTS (SELECT 1 FROM `zsjos_registration_case_route` existing_row
    WHERE existing_row.tenant_id=case_row.tenant_id AND existing_row.registration_case_id=case_row.id
     AND existing_row.route_option_id=option_row.id AND existing_row.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role_row.id,menu_row.id,'migration-V083',NOW(),'migration-V083',NOW(),b'0',role_row.tenant_id
-FROM `system_role` role_row JOIN `system_menu` menu_row ON menu_row.id=73020 AND menu_row.deleted=b'0'
-WHERE role_row.code='content_director' AND role_row.status=0 AND role_row.deleted=b'0'
- AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing_row WHERE existing_row.role_id=role_row.id
-  AND existing_row.menu_id=menu_row.id AND existing_row.tenant_id=role_row.tenant_id AND existing_row.deleted=b'0');
 
 INSERT INTO `system_notify_template`
 (`name`,`code`,`nickname`,`scene_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)

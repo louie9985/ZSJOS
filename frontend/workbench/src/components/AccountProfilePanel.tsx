@@ -41,6 +41,7 @@ import {
   type DiagnosisRequest,
 } from "../services/mediaAccountProfile";
 import { formatTimestamp } from "../services/time";
+import AccountPositioningCard from './AccountPositioningCard';
 
 type Account = MediaStudentDetail["accounts"][number];
 const owners = {
@@ -71,6 +72,7 @@ const safeLink = (url?: string) => {
 export default function AccountProfilePanel({
   account,
   canQuery,
+  canQueryPositioning = false,
   initiallyEditing = false,
   onEditingFinished,
   onSaved,
@@ -80,6 +82,7 @@ export default function AccountProfilePanel({
   account?: Account;
   deliveryActions?: ReactNode;
   canQuery: boolean;
+  canQueryPositioning?: boolean;
   canMaintain: boolean;
   initiallyEditing?: boolean;
   onEditingFinished?: () => void;
@@ -115,7 +118,7 @@ export default function AccountProfilePanel({
     ),
     generation = useRef(0),
     body = useRef<HTMLDivElement>(null);
-  const fields = profile?.config.fields.filter((f) => f.enabled) || [],
+  const fields = profile?.config.fields.filter((f) => f.enabled && f.group !== 'POSITIONING' && !f.key.startsWith('pc_') && !['positioning_history', 'positioning_snapshot'].includes(f.key)) || [],
     editable = profile?.editableFields || [];
   const missing = profileMissing(fields, open ? values : profile?.values || {});
   const required = fields.filter(
@@ -773,7 +776,7 @@ export default function AccountProfilePanel({
                 )}
               </div>
               <div className="account-profile-section-body">
-                {k === "STATUS" ? (
+                {k === "POSITIONING" ? <AccountPositioningCard key={`${account.id}-${account.version}`} accountId={account.id} canQuery={canQueryPositioning} /> : k === "STATUS" ? (
                   <div className="account-profile-status-columns">
                     <div data-profile-status="identity">
                       {fields
@@ -972,7 +975,7 @@ export default function AccountProfilePanel({
             </div>
             {/* 与只读展示区同构：三组各一列卡片，卡片内部各自滚动。 */}
             <div className="account-profile-editor-columns">
-              {groups.map(([k, name]) => {
+              {groups.filter(([key]) => key !== "POSITIONING").map(([k, name]) => {
                 const visible = fields.filter(
                   (f) =>
                     profileSection(f) === k &&
@@ -1036,41 +1039,7 @@ export default function AccountProfilePanel({
                       </Typography.Text>
                     </div>
                     <div className="account-profile-section-body">
-                      {k === "POSITIONING" ? (
-                        <table className="account-positioning-table">
-                          <thead>
-                            <tr>
-                              <th>定位卡项目</th>
-                              <th>填写提示</th>
-                              <th>计划交付内容确定</th>
-                              <th>参考账号与爆款</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {visible
-                              .filter((f) => !f.referenceFor)
-                              .map((f) => (
-                                <tr key={f.key} data-profile-key={f.key}>
-                                  <th scope="row">
-                                    {f.label}
-                                    {tag(f)}
-                                  </th>
-                                  <td>{f.description || "—"}</td>
-                                  <td>{control(f)}</td>
-                                  <td>
-                                    {fields
-                                      .filter(
-                                        (ref) => ref.referenceFor === f.key,
-                                      )
-                                      .map((ref) => (
-                                        <div key={ref.key}>{control(ref)}</div>
-                                      ))}
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      ) : k === "STATUS" ? (
+                      {k === "STATUS" ? (
                         <div className="account-profile-status-columns">
                           <div data-profile-status="identity">
                             {visible

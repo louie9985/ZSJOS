@@ -82,7 +82,7 @@
 - `POST /zsjos/positioning-card/create`、`GET /zsjos/positioning-card/get`、`GET /zsjos/positioning-card/page`：定位卡查询；命令使用 `submit-review`、`operator-confirm`、`operator-reject`、`student-link`、`start-revision`。运营确认和退回分别受独立功能权限控制，`query-all` 只扩大读取范围。
 - `GET /zsjos/positioning-card/import-sources` 由服务端返回同一学员当前账号和其他账号的可读已提交版本；`POST /zsjos/positioning-card/import` 按当前发布模板把选中提交映射到目标草稿。Workbench 不从详情投影自行拼来源，不导入其他账号草稿；覆盖已有草稿前确认并提交当前 `draftId + version`。
 
-所有详情和分页响应均为 RespVO，并返回服务端计算的 `availableActions`。定位卡统一路径为 `co_creating -> operator_feasibility -> student_link_pending -> student_confirm -> confirmed`；`professionalRisk` 仅保留为业务快照，不再改变审核路径。运营退回或学员提出修改均回到 `co_creating`，由原 `content_director` 修改后重新提交。确认后的再次修改使用 `start-revision`，修订审核期间旧 `effective` 提交继续供下游使用，新提交经学员确认后原子替换旧版。历史 `trial_14d/student_agreed` 数据不迁移，通过运行时兼容为有效版本；历史 IP BPM 监听器仅处理发布前已在途实例。定位岗位统一使用 `content_director`。所有写操作同时受菜单/按钮权限、对象权限和乐观锁版本约束；分页额外受责任人和部门数据范围约束。
+所有详情和分页响应均为 RespVO，并返回服务端计算的 `availableActions`。定位卡统一路径为 `co_creating -> operator_feasibility -> student_link_pending -> student_confirm -> confirmed`；`professionalRisk` 仅保留为业务快照，不再改变审核路径。运营退回或学员提出修改均回到 `co_creating`，由原 `content_director` 修改后重新提交。确认后的再次修改使用 `start-revision`，修订审核期间旧 `effective` 提交继续供下游使用，新提交经学员确认后成为可应用候选，账号由编导或运营手动换版。历史 `trial_14d/student_agreed` 数据不迁移，通过运行时兼容为有效版本；历史 IP BPM 监听器仅处理发布前已在途实例。定位岗位统一使用 `content_director`。所有写操作同时受菜单/按钮权限、对象权限和乐观锁版本约束；分页额外受责任人和部门数据范围约束。
 
 `/zsjos/accounts`、`/zsjos/content` 和 `/zsjos/positioning` 不再注册为页面入口。第三方账号档案从 `/zsjos/media-students` 的具体学员标签维护；该账号页不再发起旧定位卡、内容生产和拍剪流程，相关后端能力保留，拍剪工单独立页面不变。按钮只在服务端下发对应权限且对象 `availableActions` 允许时显示。
 
@@ -178,3 +178,22 @@ Workbench 只把未查看客资和通知深链目标等特殊集合移到顶部�
 详见 [完整字段、接口与操作说明](../../../docs/api/media-account-profile.md)。空账号点击即创建；业务资料可空，未分配运营时不回退为编导。Workbench 使用 profile 接口服务端下发的 editableFields；Admin 维护字段责任与完成提醒。红色只读、蓝色编导、黄色运营。保存为字段补丁，记录为追加；旧全量更新与手工状态维护写入口停止接受数据。
 
 账号档案读取需要服务端 `zsjos:media-account:query`；无此权限时显示无权限提示且不请求 profile/历史。编辑/维护权限不替代读取权限。V209 开发基线补齐新媒体学员下的独立查询按钮，详见账号档案契约。
+
+
+### 定位卡来源统一（2026-09-17）
+
+学员详情 `positioningDrafts` 包含当前编导自己的未绑定账号草稿（`accountId: null`）；已绑定草稿仍受账号可见范围限制，不因学员可见而放宽。Workbench 按账号（将 null/undefined 统一为空）及课程服务关系恢复草稿，并读取其完整值与素材版本 ID；不同课程服务的草稿不能互相覆盖。Admin 未消费该详情投影。
+
+填写定位卡使用四列表格直接显示完整填写提示，窄屏改为逐项堆叠；填写和素材预览弹窗最大宽度为 1480px。素材预览除配置字段外单独渲染版本 `coverPreviewUrl`（兼容 `files` 中 `__cover__` 的 `previewUrl`），提供加载失败提示与刷新预览。
+
+`GET /zsjos/positioning-card/account-overview?accountId=` 返回 `{current:null,effective,history:[]}`，effective 仅为账号当前应用的提交快照。课程服务的 `service-overview` 管理草稿、主卡、历史与审核操作；账号通过 `application-options` 获取同课程服务已确认候选，用 `apply` 显式应用。新版确认不替换已应用版本，新工单冻结应用版本，已有工单保持不变。接口和迁移详情见 [独立定位卡契约](../../../docs/api/positioning-service-application.md)。
+
+填写入口使用模板最新发布字段；保存同步升级同一模板的草稿版本，保留旧字段业务值供追溯；已提交快照不变。新发布模板有 37 个主项目和 10 个参考素材字段。
+
+### 定位卡手动保存（2026-09-17）
+
+定位卡不再随输入、素材选择、附件选择、下载或关闭自动保存；资料预审维持原自动保存行为。底部提供“取消 / 保存草稿 / 保存并关闭 / 保存并提交审核”，JSON 导入仅填入表单，历史版本导入明确标为“导入并保存”。保存与历史导入互斥，保存期间禁用编辑和关闭。主表单和导入弹窗点击遮罩及 Escape 均不关闭；未保存的取消、关闭或重新加载须确认放弃修改。
+
+附件先作为本地 File 暂存，不进入草稿请求。显式保存新卡时先创建草稿取得 ID，再逐个上传，最后保存附件 ID；已有卡直接上传并保存关联。上传成功即将本地待上传项替换为 ID，失败重试不重复上传已成功项，每次草稿写入使用上次响应版本。该多请求过程不是原子事务：部分失败可能已创建草稿或上传文件，但未完成关联，必须保留现场并重试；不自动删除存储文件。
+
+真实版本冲突保留输入，不自动覆盖或重新加载；复制内容会以文件名标识待上传附件，不包含文件字节。重新加载经放弃确认后读取最新草稿。附件下载仅调用 GET，不写草稿。后端附件上传的非责任编导错误使用 POSITIONING_CARD_PERMISSION_DENIED（1900014004），不再误报版本冲突；手动保存阶段沿用既有接口和租户权限；后续独立定位卡功能的数据库变更见 V258 契约。

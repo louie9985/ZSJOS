@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V086: independent Lead-detail tab permissions with compatibility grants.
 -- Dependency/order: apply after V085; Lead management menu 6770 must already exist.
 -- Data scope: four System menu permission rows and role-menu relations only.
@@ -41,70 +47,6 @@ VALUES
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),`type`=VALUES(`type`),
   `sort`=VALUES(`sort`),`parent_id`=VALUES(`parent_id`),`status`=0,`deleted`=b'0',
   `updater`='migration-V086',`update_time`=NOW();
-
-UPDATE `system_role_menu` target
-JOIN `system_menu` target_menu ON target_menu.id=target.menu_id AND target_menu.id BETWEEN 6920 AND 6923
-JOIN (
-  SELECT DISTINCT source_rm.role_id,source_rm.tenant_id,target_permission.permission
-  FROM `system_role_menu` source_rm
-  JOIN `system_menu` source_menu ON source_menu.id=source_rm.menu_id AND source_menu.deleted=b'0'
-  JOIN (
-    SELECT 'zsjos:lead-detail:follow-up-read' permission,'zsjos:lead-follow-up:query' source_permission UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:student:query-my' UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:appeal:create' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:appeal:query' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead-complaint:create' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead-complaint:handle' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:sales-order:query' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:sales-order:create' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:student:query-my' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:lead:query-all'
-  ) target_permission ON target_permission.source_permission=source_menu.permission
-  WHERE source_rm.deleted=b'0'
-) holder ON holder.role_id=target.role_id AND holder.tenant_id=target.tenant_id
-  AND holder.permission=target_menu.permission
-SET target.deleted=b'0',target.updater='migration-V086',target.update_time=NOW()
-WHERE target.deleted=b'1';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT holder.role_id,target_menu.id,'migration-V086',NOW(),'migration-V086',NOW(),b'0',holder.tenant_id
-FROM (
-  SELECT DISTINCT source_rm.role_id,source_rm.tenant_id,target_permission.permission
-  FROM `system_role_menu` source_rm
-  JOIN `system_menu` source_menu ON source_menu.id=source_rm.menu_id AND source_menu.deleted=b'0'
-  JOIN (
-    SELECT 'zsjos:lead-detail:follow-up-read' permission,'zsjos:lead-follow-up:query' source_permission UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:student:query-my' UNION ALL
-    SELECT 'zsjos:lead-detail:follow-up-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:appeal:create' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:appeal:query' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:appeal-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead-complaint:create' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead-complaint:handle' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:complaint-read','zsjos:lead:query-all' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:sales-order:query' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:sales-order:create' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:subordinate-sales:query' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:student:query-my' UNION ALL
-    SELECT 'zsjos:lead-detail:order-read','zsjos:lead:query-all'
-  ) target_permission ON target_permission.source_permission=source_menu.permission
-  WHERE source_rm.deleted=b'0'
-) holder
-JOIN `system_menu` target_menu ON target_menu.permission=holder.permission AND target_menu.deleted=b'0'
-WHERE NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=holder.role_id AND existing.menu_id=target_menu.id
-                    AND existing.tenant_id=holder.tenant_id);
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V086','Add configurable Lead detail tab permissions','V086__lead_detail_tab_permissions.sql',NOW())

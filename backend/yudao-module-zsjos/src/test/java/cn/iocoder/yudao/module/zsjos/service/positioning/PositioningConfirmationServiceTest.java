@@ -36,6 +36,7 @@ class PositioningConfirmationServiceTest {
     @Mock private PositioningCardSubmissionMapper submissionMapper;
     @Mock private PositioningConfirmationLinkMapper linkMapper;
     @Mock private MediaAccountMapper accountMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;
     @Mock private MediaWorkflowEventService workflowEventService;
     @InjectMocks private PositioningConfirmationService service;
 
@@ -141,14 +142,13 @@ class PositioningConfirmationServiceTest {
     void agreeConsumesLinkAndMakesSubmissionEffective() {
         PositioningConfirmationLinkDO link = link("active");
         link.setTenantId(7L);
-        PositioningCardDO card = card(POSITIONING_STUDENT_CONFIRM, 4);
-        PositioningCardSubmissionDO submission = submission(POSITIONING_STUDENT_CONFIRM, 2);
+        PositioningCardDO card = card(POSITIONING_STUDENT_CONFIRM, 4).setAccountId(null);
+        PositioningCardSubmissionDO submission = submission(POSITIONING_STUDENT_CONFIRM, 2).setAccountId(null);
         when(linkMapper.selectByTokenHash(anyString())).thenReturn(link);
         when(linkMapper.selectByTokenHashForUpdate(anyString())).thenReturn(link);
         when(cardMapper.selectByIdForUpdate(1L, 7L)).thenReturn(card);
         when(submissionMapper.selectByIdForUpdate(11L, 7L)).thenReturn(submission);
         when(submissionMapper.selectLatestByCard(1L)).thenReturn(submission);
-        when(accountMapper.selectByIdForUpdate(10L, 7L)).thenReturn(new MediaAccountDO().setId(10L));
         when(submissionMapper.markStudentDecision(eq(11L), eq(2), eq(POSITIONING_STUDENT_CONFIRM),
                 eq(POSITIONING_CONFIRMED), eq("agree"), isNull(), any())).thenReturn(1);
         when(linkMapper.consume(eq(21L), eq(0), any())).thenReturn(1);
@@ -157,7 +157,8 @@ class PositioningConfirmationServiceTest {
 
         service.decide("raw-token", request);
 
-        verify(submissionMapper).supersedeConfirmedByAccount(10L, 11L);
+        verify(submissionMapper, never()).supersedeConfirmedByAccount(any(), any());
+        verifyNoInteractions(accountMapper);
         verify(cardService).studentConfirmFromLink(1L, 4);
         verify(cardService, never()).studentRejectFromLink(any(), any(), any());
     }

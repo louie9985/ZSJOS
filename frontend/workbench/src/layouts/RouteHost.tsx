@@ -93,6 +93,7 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.LEAD_EDUCATION_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced educationSelfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}

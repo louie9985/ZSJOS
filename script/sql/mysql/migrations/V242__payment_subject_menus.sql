@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V242: Payment subject management menus, permissions and finance-manager grants.
 -- UTF-8. Scope: system_menu and system_role_menu rows for payment subject configuration only.
 -- Prerequisites: workbench root menu 6735 (path='/zsjos'); V239/V241 payment tables.
@@ -145,49 +151,6 @@ BEGIN
         'zsjos:product-payment-subject:batch-update',
         'zsjos:product-payment-subject:export'
       );
-
-  -- Soft-disabling a menu does not remove its grants, and the admin role tree lists
-  -- system_role_menu rows regardless of menu.deleted, so those stale grants would still show up.
-  -- Retire grants pointing at dead payment menus: either a retired permission code, or the
-  -- fixed IDs the earlier V242-V249 attempts used (page nodes carry an empty permission).
-  UPDATE `system_role_menu` grant_row
-  INNER JOIN `system_menu` menu ON menu.`id` = grant_row.`menu_id`
-    SET grant_row.`deleted` = b'1', grant_row.`updater` = 'V242', grant_row.`update_time` = NOW()
-    WHERE grant_row.`deleted` = b'0' AND menu.`deleted` = b'1'
-      AND (
-        menu.`permission` LIKE 'zsjos:payment-subject:%'
-        OR menu.`permission` LIKE 'zsjos:product-payment-subject:%'
-        OR menu.`id` IN (601960, 601961, 602180, 602181, 602190, 602191, 6850, 6851)
-      );
-
-  -- Grants go to the tenant that owns the role. finance_manager is seeded per tenant.
-  INSERT INTO `system_role_menu`
-    (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role.`id`, menu.`id`, 'V242', NOW(), 'V242', NOW(), b'0', role.`tenant_id`
-  FROM `system_role` role
-  CROSS JOIN `system_menu` menu
-  WHERE role.`code` = 'finance_manager' AND role.`deleted` = b'0'
-    AND menu.`deleted` = b'0'
-    AND menu.`id` IN (602200, 602201, 602202, 602203, 602204, 602210, 602211, 602212)
-    AND NOT EXISTS (
-      SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.`role_id` = role.`id` AND existing.`menu_id` = menu.`id`
-        AND existing.`tenant_id` = role.`tenant_id` AND existing.`deleted` = b'0'
-    );
-
-  INSERT INTO `system_role_menu`
-    (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT role.`id`, menu.`id`, 'V242', NOW(), 'V242', NOW(), b'0', role.`tenant_id`
-  FROM `system_role` role
-  CROSS JOIN `system_menu` menu
-  WHERE role.`code` = 'super_admin' AND role.`deleted` = b'0'
-    AND menu.`deleted` = b'0'
-    AND menu.`id` IN (602200, 602201, 602202, 602203, 602204, 602210, 602211, 602212)
-    AND NOT EXISTS (
-      SELECT 1 FROM `system_role_menu` existing
-      WHERE existing.`role_id` = role.`id` AND existing.`menu_id` = menu.`id`
-        AND existing.`tenant_id` = role.`tenant_id` AND existing.`deleted` = b'0'
-    );
 
   -- Drop the stale registry rows the retired V242-V249 files wrote. Their checksums were literal
   -- placeholder strings rather than file hashes, so the runner would report "applied migration

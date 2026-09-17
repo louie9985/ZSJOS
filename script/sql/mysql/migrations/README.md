@@ -1,5 +1,26 @@
 # Versioned migrations
 
+## Role-menu assignment policy (2026-09-17)
+
+Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer
+write `system_role_menu`: no default grants, role-name mappings, inherited grants,
+ancestor repair, reassignment or automatic revocation. System role management owns
+these assignments. Menu/button definitions and backend permission checks remain.
+A fresh database starts without role-menu rows; assign ordinary roles explicitly.
+Existing grants are neither reset nor restored by this source cleanup.
+
+Historical grant descriptions below record earlier behavior, not current executable
+migration guarantees. Versions for retired authorization-only migrations remain as
+ledger placeholders so ordering and dependencies stay stable (including V251/V252).
+
+This user-approved historical source cleanup changes file-byte checksums. Already
+installed environments must retain their recorded checksums and use a separately
+reviewed rollout; do not replay the entire chain or run checksum reconciliation just
+to bypass drift protection. This change does not authorize database grant changes.
+Rollback of source does not roll back grants previously written by an old release.
+Read-only grant audits are optional administrator reports, not fresh-install defaults.
+
+
 ## Current development exam product scope correction
 
 The current fresh bootstrap sources `../exam-calendar-product-scope.sql` after V188.
@@ -1476,3 +1497,13 @@ batch on the first error). V251 shipped a precheck that referenced a `TEMPORARY`
 statement, which MySQL rejects with `Can't reopen table`; on a fresh database nothing after it ran.
 Keep `TEMPORARY` tables referenced once per statement, and re-run `test-fresh` after editing an
 unapplied migration.
+
+
+### V257 — 教务自拓
+
+依赖 V256 前置状态；新增六个可空业务身份快照字段与教务自拓菜单，更新未编辑的 V080 默认提供方消息。无角色授权、历史业务回填或删除。可重复执行；回滚保留字段和历史快照。参见 `docs/api/zsjos-education-self-sourced.md` 和 `tools/test_education_self_sourced.py`。
+
+
+## V258 定位卡独立与账号应用
+
+`V258__positioning_service_application.sql`：前置 V257 表结构，新增主卡/账号应用/应用记录，允许提交账号为空，保留历史并仅回填缺失关系；无删除、无角色授权，重复运行不换版。先 SQL 后新后端，回退保留关系表，存在无账号提交后不能恢复 NOT NULL。验证工具：`script/sql/mysql/tools/test_positioning_application.py`，使用独立保留的验证库，覆盖历史回填和重复执行；正在使用的开发数据库尚未同步，待启用授权。

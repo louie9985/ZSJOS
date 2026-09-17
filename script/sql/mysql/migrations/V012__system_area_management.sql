@@ -1,4 +1,10 @@
-﻿-- Moves the bundled administrative-area snapshot into a system-owned editable tree.
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
+-- Moves the bundled administrative-area snapshot into a system-owned editable tree.
 -- Dependencies: the System module schema, menu 2083, and zsjos_schema_version.
 -- Execution order: create table, insert missing snapshot rows, add permissions, inherit grants, record version.
 -- Repeatability: CREATE IF NOT EXISTS and INSERT IGNORE preserve all administrator changes on rerun.
@@ -3908,7 +3914,5 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 (6790,'地区查询','system:area:query',3,1,2083,'','','',NULL,0,b'1',b'1',b'1','migration-V012',NOW(),'migration-V012',NOW(),b'0'),
 (6791,'地区创建','system:area:create',3,2,2083,'','','',NULL,0,b'1',b'1',b'1','migration-V012',NOW(),'migration-V012',NOW(),b'0'),
 (6792,'地区更新','system:area:update',3,3,2083,'','','',NULL,0,b'1',b'1',b'1','migration-V012',NOW(),'migration-V012',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`) SELECT DISTINCT source.role_id,target.menu_id,'migration-V012',NOW(),'migration-V012',NOW(),b'0',source.tenant_id FROM `system_role_menu` source CROSS JOIN (SELECT 6790 menu_id UNION ALL SELECT 6791 UNION ALL SELECT 6792) target WHERE source.menu_id=2083 AND source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`) VALUES ('V012','Move system areas to an editable database tree','system-area-management-v1');

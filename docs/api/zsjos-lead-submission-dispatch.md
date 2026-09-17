@@ -1,5 +1,7 @@
 # 客资提交与派单 API
 
+教务自拓直接归属及成交身份规则见 [教务自拓与直接成交](zsjos-education-self-sourced.md)。
+
 ## 运行边界
 
 - 接口统一位于管理端 `/admin-api/zsjos/lead`，使用当前登录用户和租户上下文。
@@ -54,9 +56,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 提交接口先执行统一查重。同字段手机号或同字段微信号命中任何历史客资时为强重复，创建 `duplicate_flag=strong_duplicate`、`duplicate_result=strong_rejected` 的查重审计记录，并返回稳定业务错误 `LEAD_DUPLICATE_STRONG_CONFLICT`；本次不创建 `Person`、`Lead`、派单或指定销售任务。交叉联系方式、姓名+明确省市+明确主意向课程、姓名+手机号后四位命中时为疑似重复，保存提交快照、候选快照、命中规则和 `reviewFingerprint`，返回 `outcome=review_pending + reviewId`；相同 fingerprint 已有待处理任务时复用最早任务，不追加可见复核项。`duplicateAutoResolutionEnabled` 仅用于交叉联系方式疑似重复：开启时自动关闭本次复核并返回 `duplicate_auto_closed`，不创建 Lead、不改动历史客资。完全无命中返回 `created + leadId + leadNo`。
 
-自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到“`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`”。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
+自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售或教务自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到关联提醒。V257 对未编辑的 V080 默认模板使用 `lead.submitterIdentityLabel` 区分销售/教务。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
 
-详情响应投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。来源标签固定为兼职提交、新媒体提交、销售自拓录；兼职提交人从 Partner 主体解析姓名，不返回内部 ID。提交人与正式销售互看时沿用中文姓名脱敏，其他有权业务关系人看完整姓名。四个历史标签分别要求 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read`，前端不得按 mode 或角色名补齐标签。详情顶层 `nextFollowUpAt` 只来自当前 `zsjos_business_task` 中 `task_type=lead_follow_up_reminder` 且 `status=pending` 的 `dueAt`，仅在 `visibleTabs` 包含 `follow-ups` 时查询；任务已完成或取消时返回空。Workbench 在详情标题栏展示该值，不得通过 Lead 历史时间、跟进记录或 Opportunity 摘要绕过任务状态。
+详情响应投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。来源标签为兼职提交、新媒体提交、销售自拓录、教务自拓录；兼职提交人从 Partner 主体解析姓名，不返回内部 ID。提交人与负责人互看时沿用中文姓名脱敏，其他有权业务关系人看完整姓名。四个历史标签分别要求 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read`，前端不得按 mode 或角色名补齐标签。详情顶层 `nextFollowUpAt` 只来自当前 `zsjos_business_task` 中 `task_type=lead_follow_up_reminder` 且 `status=pending` 的 `dueAt`，仅在 `visibleTabs` 包含 `follow-ups` 时查询；任务已完成或取消时返回空。Workbench 在详情标题栏展示该值，不得通过 Lead 历史时间、跟进记录或 Opportunity 摘要绕过任务状态。
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
@@ -66,7 +68,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 `lastActivityAt` 只表示已成功提交的客资业务变化，并在同一事务中按事件实际发生时间单调推进。基本资料、归属与分配、跟进、资格判定、申诉/投诉、公海协作、正式销售反馈及直接改变非复购 Lead 的订单结果属于业务变化；查看、选中、已读、临时附件上传和提醒发送不属于。较早事件、失败请求、权限拒绝、幂等重放和版本冲突不得覆盖较新的活动时间。
 
-复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核。决定事务对任务加行锁，第一位提交者成功。结论固定为 `allow_flow` 和 `close_duplicate`，意见必填、附件可选。`allow_flow` 按首次待复核提交的快照创建正式 Lead，后续进入普通自动分配、指定销售或销售自拓归属流程；`close_duplicate` 只关闭本次复核，永久不创建 Lead、不分配、不计入业绩。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
+复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核。决定事务对任务加行锁，第一位提交者成功。结论固定为 `allow_flow` 和 `close_duplicate`，意见必填、附件可选。`allow_flow` 按首次待复核提交的快照创建正式 Lead，后续进入普通自动分配、指定销售或销售/教务自拓归属流程；`close_duplicate` 只关闭本次复核，永久不创建 Lead、不分配、不计入业绩。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 
 ## 管理接口与权限
 

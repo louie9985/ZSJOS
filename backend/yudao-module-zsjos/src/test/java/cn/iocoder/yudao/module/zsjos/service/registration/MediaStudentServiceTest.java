@@ -54,6 +54,37 @@ class MediaStudentServiceTest {
     @Mock private PermissionApi permissionApi;
 
     @Test
+    void detailRestoresOwnUnboundDraftWithoutExposingOtherCards() {
+        MyStudentRespVO student = new MyStudentRespVO();
+        student.setPersonId(2L); student.setServices(List.of());
+        when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
+        PositioningCardDO own = new PositioningCardDO().setId(19L).setStudentPersonId(2L)
+                .setDirectorUserId(1L).setStatus("co_creating");
+        PositioningCardDO otherDirector = new PositioningCardDO().setId(20L).setStudentPersonId(2L)
+                .setDirectorUserId(9L).setStatus("co_creating");
+        PositioningCardDO bound = new PositioningCardDO().setId(21L).setStudentPersonId(2L)
+                .setDirectorUserId(1L).setAccountId(99L).setStatus("co_creating");
+        PositioningCardDO submitted = new PositioningCardDO().setId(22L).setStudentPersonId(2L)
+                .setDirectorUserId(1L).setStatus("confirmed");
+        PositioningCardDO otherStudent = new PositioningCardDO().setId(23L).setStudentPersonId(8L)
+                .setDirectorUserId(1L).setStatus("co_creating");
+        when(positioningMapper.selectByDirectorAndStudent(1L, 2L))
+                .thenReturn(List.of(own, otherDirector, bound, submitted, otherStudent));
+        when(positioningService.availableActionsForVisible(own, 1L)).thenReturn(List.of("update"));
+
+        var detail = service.getDetail(1L, 2L);
+
+        assertEquals(List.of(19L), detail.getPositioningDrafts().stream()
+                .map(MediaStudentDetailRespVO.PositioningVO::getId).toList());
+        assertEquals(List.of("update"), detail.getPositioningDrafts().getFirst().getAvailableActions());
+        assertTrue(detail.getAccounts().isEmpty());
+        assertTrue(detail.getPositioningCards().isEmpty());
+        verify(positioningMapper).selectByStudentAndAccountIds(2L, List.of());
+        verify(positioningService, never()).availableActionsForVisible(otherDirector, 1L);
+        verify(positioningService, never()).availableActionsForVisible(bound, 1L);
+    }
+
+    @Test
     void detailFiltersForeignAccountBeforeLoadingItsBusinessDataAndTimeline() {
         MyStudentRespVO student = new MyStudentRespVO();
         student.setPersonId(2L); student.setServices(List.of());
@@ -154,6 +185,7 @@ class MediaStudentServiceTest {
         when(positioningMapper.selectByStudentAndAccountIds(2L, List.of(3L))).thenReturn(List.of(card));
         when(positioningSubmissionMapper.selectByStudentAndAccountIds(2L, List.of(3L)))
                 .thenReturn(List.of(latest, effective));
+        when(positioningSubmissionMapper.selectCurrentConfirmedByAccount(3L)).thenReturn(effective);
         when(contentMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of());
         when(ticketMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of());
         when(talkRecordMapper.selectRecentByStudent(2L)).thenReturn(List.of());

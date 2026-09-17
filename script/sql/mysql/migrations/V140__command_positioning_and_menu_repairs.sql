@@ -1,3 +1,10 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
+SET NAMES utf8mb4;
 -- V140: persistent supervisor command idempotency, positioning-link expiry, and menu identity repair.
 -- Dependencies/order: apply after V139. This migration is repeatable and does not revoke tenant permissions.
 -- Data scope: schema metadata, active confirmation-link expiry, and system menu identity/authorization wiring.
@@ -69,18 +76,9 @@ UPDATE `system_menu` SET `parent_id`=73483,`updater`='V140',`update_time`=NOW()
 WHERE `parent_id`=73460 AND `permission` IN ('zsjos:director-interview-template:update','zsjos:director-interview-template:publish')
   AND `deleted`=b'0';
 
-UPDATE `system_role_menu` source_grant
-JOIN `system_role_menu` target_grant
-  ON target_grant.role_id=source_grant.role_id AND target_grant.menu_id=73483
- AND target_grant.tenant_id=source_grant.tenant_id AND target_grant.deleted=b'0'
-SET source_grant.deleted=b'1',source_grant.updater='V140',source_grant.update_time=NOW()
-WHERE source_grant.menu_id=73460 AND source_grant.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V140');
 
-UPDATE `system_role_menu` SET `menu_id`=73483,`updater`='V140',`update_time`=NOW()
-WHERE `menu_id`=73460 AND `deleted`=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V140')
-  AND EXISTS (SELECT 1 FROM `system_menu` m WHERE m.id=73483 AND m.deleted=b'0');
+
+
 
 UPDATE `system_menu`
 SET `name`='业务表单配置',`permission`='zsjos:student-contact-config:forms',`type`=2,`sort`=64,
@@ -90,13 +88,7 @@ SET `name`='业务表单配置',`permission`='zsjos:student-contact-config:forms
     `updater`='V140',`update_time`=NOW()
 WHERE `id`=73460;
 
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,73460,'V140',NOW(),'V140',NOW(),b'0',r.tenant_id
-FROM `system_role` r WHERE r.code IN ('system_administrator','super_admin') AND r.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V140')
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=73460
-    AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
+
 
 -- Forward-repair V139 installations that created a second active definition instead of restoring
 -- a compatible soft-deleted supervisor permission row.
@@ -129,22 +121,9 @@ SET menu_row.name=permission_row.name,menu_row.type=3,menu_row.sort=permission_r
     menu_row.status=0,menu_row.visible=b'1',menu_row.keep_alive=b'1',menu_row.always_show=b'0',
     menu_row.deleted=b'0',menu_row.updater='V140',menu_row.update_time=NOW();
 
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT grant_row.role_id,keep_row.menu_id,'V140',NOW(),'V140',NOW(),b'0',grant_row.tenant_id
-FROM `system_role_menu` grant_row
-JOIN `system_menu` duplicate_row ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-JOIN `tmp_v140_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=grant_row.role_id AND existing.menu_id=keep_row.menu_id
-                    AND existing.tenant_id=grant_row.tenant_id AND existing.deleted=b'0');
 
-UPDATE `system_role_menu` grant_row
-JOIN `system_menu` duplicate_row ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-JOIN `tmp_v140_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-SET grant_row.deleted=b'1',grant_row.updater='V140',grant_row.update_time=NOW()
-WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id;
+
+
 
 UPDATE `system_menu` menu_row
 JOIN `tmp_v140_keep_menu` keep_row ON keep_row.permission=menu_row.permission

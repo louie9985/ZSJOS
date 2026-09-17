@@ -17,6 +17,8 @@ public class SalesOrderRespVO {
     private String orderType;
     private Long personId;
     private Long formalSalesUserId;
+    private String formalOwnerIdentity;
+    private String formalOwnerIdentityLabel;
     private Long submitterUserId;
     private Long supersedesOrderId;
     private Long supersededByOrderId;
@@ -93,6 +95,8 @@ public class SalesOrderRespVO {
         private String leadCategoryLabelSnapshot;
         private String dispatchMode;
         private String ownerUserName;
+        private String ownerIdentity;
+        private String ownerIdentityLabel;
     }
 
     @Data

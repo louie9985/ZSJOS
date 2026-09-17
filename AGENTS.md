@@ -48,6 +48,8 @@ Use this order when repository guidance conflicts:
 
 ### Configurable permission contract
 
+- Migrations, bootstrap seeds, standalone deployment SQL and their generators **MUST NOT** insert, inherit, restore, reassign, revoke or reconcile `system_role_menu` assignments. They may define menu/button permission metadata; administrators assign permissions through System role management. Read-only authorization audits and isolated test fixtures are allowed. Existing database grants are not reset by source cleanup. Applied-file checksum differences require a separately reviewed rollout and must not be silently reconciled.
+
 - User-visible page or view access **MUST** be represented by server-owned menu permission configuration, and user-visible operations such as create, edit, delete, export, submit, approve, or audit **MUST** be represented by server-owned menu/button permission configuration by default.
 - Page menus whose parent is the Workbench `/zsjos` root **MUST** store a relative child `path` such as `my-students`; they **MUST NOT** repeat the parent prefix as `/zsjos/my-students`. Frontend route constants and delivery documentation may use the resolved public URL `/zsjos/my-students`.
 - Frontends **MUST** consume the server-returned menu and permission state to control routes and action entry points. Backends **MUST** independently enforce the corresponding permission identifiers; hiding a frontend control is not authorization.

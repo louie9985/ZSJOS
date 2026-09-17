@@ -746,6 +746,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .set(LeadDO::getStatus, lead.getStatus())
                 .set(LeadDO::getAssignmentStatus, lead.getAssignmentStatus())
                 .set(LeadDO::getOwnerUserId, null)
+                .set(LeadDO::getOwnerIdentity, null)
                 .set(LeadDO::getRecycleSourceOwnerUserId, lead.getRecycleSourceOwnerUserId())
                 .set(LeadDO::getCurrentAssignmentHistoryId, null)
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)

@@ -8,7 +8,7 @@ import java.time.LocalDate;
 @Data
 public class PositioningCardImportReqVO {
     @NotNull private Long sourceSubmissionId;
-    @NotNull private Long accountId;
+    private Long accountId;
     @NotNull private Long studentPersonId;
     @NotNull private Long serviceRelationId;
     private Long targetDraftId;

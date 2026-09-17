@@ -107,7 +107,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setLeadId(leadId);
         record.setAssignmentHistoryId(lead.getCurrentAssignmentHistoryId());
         record.setOperatorUserId(operatorUserId);
-        record.setOwnerUserIdSnapshot(lead.getOwnerUserId());
+        record.setOwnerUserIdSnapshot(lead.getOwnerUserId()); record.setOwnerIdentitySnapshot(lead.getOwnerIdentity());
         record.setOwnerDeptIdSnapshot(operator == null ? null : operator.getDeptId());
         record.setMethodValue(method.getValue());
         record.setMethodLabelSnapshot(method.getLabel());
@@ -251,6 +251,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         OpportunityFollowUpRecordDO record = new OpportunityFollowUpRecordDO();
         record.setOpportunityId(opportunity.getId()); record.setLeadId(lead.getId());
         record.setOperatorUserId(operatorUserId); record.setOwnerUserIdSnapshot(operatorUserId);
+        record.setOwnerIdentitySnapshot(Objects.equals(operatorUserId, lead.getOwnerUserId()) ? lead.getOwnerIdentity() : OWNER_SALES);
         record.setOwnerDeptIdSnapshot(operator == null ? null : operator.getDeptId());
         record.setMethodValue(method.getValue()); record.setMethodLabelSnapshot(method.getLabel());
         record.setResultValue(result.getValue()); record.setResultLabelSnapshot(result.getLabel());
@@ -332,6 +333,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     private LeadFollowUpRespVO convert(LeadFollowUpRecordDO record, List<LeadFollowUpImageDO> images,
                                        Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
+        result.setOwnerIdentitySnapshot(record.getOwnerIdentitySnapshot());
+        result.setOwnerIdentityLabel(ownerIdentityLabel(record.getOwnerIdentitySnapshot()));
         result.setId(record.getId()); result.setLeadId(record.getLeadId());
         result.setRecordScope(FOLLOW_UP_RECORD_SCOPE_LEAD);
         result.setAssignmentHistoryId(record.getAssignmentHistoryId());
@@ -359,6 +362,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     private LeadFollowUpRespVO convertOpportunity(OpportunityFollowUpRecordDO record,
             List<OpportunityFollowUpImageDO> images, Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
+        result.setOwnerIdentitySnapshot(record.getOwnerIdentitySnapshot());
+        result.setOwnerIdentityLabel(ownerIdentityLabel(record.getOwnerIdentitySnapshot()));
         result.setId(record.getId()); result.setLeadId(record.getLeadId()); result.setOpportunityId(record.getOpportunityId());
         result.setRecordScope(FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY); result.setOperatorUserId(record.getOperatorUserId());
         AdminUserRespDTO user = users.get(record.getOperatorUserId());

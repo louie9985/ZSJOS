@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V063: independent partner portal contract. Apply after V062.
 -- Additive/repeatable. Source/category options remain administrator-maintained dictionaries.
 INSERT INTO `system_role` (`name`,`code`,`sort`,`data_scope`,`data_scope_dept_ids`,`status`,`type`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
@@ -18,9 +24,7 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 (6910,'提现查询','zsjos:withdrawal:my-query',3,10,6900,'','','',NULL,0,b'1',b'1',b'1','migration-V063',NOW(),'migration-V063',NOW(),b'0'),
 (6911,'申请提现','zsjos:withdrawal:apply',3,11,6900,'','','',NULL,0,b'1',b'1',b'1','migration-V063',NOW(),'migration-V063',NOW(),b'0'),
 (6912,'提现审核','zsjos:withdrawal:review',3,12,6900,'','','',NULL,0,b'1',b'1',b'1','migration-V063',NOW(),'migration-V063',NOW(),b'0');
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT r.id,m.id,'migration-V063',NOW(),'migration-V063',NOW(),b'0',r.tenant_id FROM `system_role` r JOIN `system_menu` m ON m.id BETWEEN 6901 AND 6911 AND m.deleted=b'0'
-WHERE r.code='part_time_partner' AND r.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
+
 INSERT INTO `system_user_role` (`user_id`,`role_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT p.bound_system_user_id,r.id,'migration-V063',NOW(),'migration-V063',NOW(),b'0',p.tenant_id FROM `zsjos_partner` p JOIN `system_role` r ON r.tenant_id=p.tenant_id AND r.code='part_time_partner' AND r.deleted=b'0'
 WHERE p.bound_system_user_id IS NOT NULL AND p.status IN ('enabled','disabled') AND NOT EXISTS (SELECT 1 FROM `system_user_role` x WHERE x.user_id=p.bound_system_user_id AND x.role_id=r.id AND x.tenant_id=p.tenant_id AND x.deleted=b'0');

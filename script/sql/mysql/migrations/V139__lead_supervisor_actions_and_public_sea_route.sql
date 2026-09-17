@@ -1,3 +1,10 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
+SET NAMES utf8mb4;
 -- V139: restore the canonical Lead public-sea route and add supervisor Lead action permissions.
 -- Dependencies/order: apply after V138; subordinate-sales menu and Lead aging-pool menu must exist.
 -- Data scope: System menu metadata and initial sales_manager role-menu grants only.
@@ -69,22 +76,9 @@ JOIN `tmp_v139_supervisor_permission` permission_row ON permission_row.permissio
 WHERE menu_row.deleted=b'0'
 GROUP BY menu_row.permission;
 
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT grant_row.role_id,keep_row.menu_id,'migration-V139',NOW(),'migration-V139',NOW(),b'0',grant_row.tenant_id
-FROM `system_role_menu` grant_row
-JOIN `system_menu` duplicate_row ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-JOIN `tmp_v139_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=grant_row.role_id AND existing.menu_id=keep_row.menu_id
-                    AND existing.tenant_id=grant_row.tenant_id AND existing.deleted=b'0');
 
-UPDATE `system_role_menu` grant_row
-JOIN `system_menu` duplicate_row ON duplicate_row.id=grant_row.menu_id AND duplicate_row.deleted=b'0'
-JOIN `tmp_v139_keep_menu` keep_row ON keep_row.permission=duplicate_row.permission
-SET grant_row.deleted=b'1',grant_row.updater='migration-V139',grant_row.update_time=NOW()
-WHERE grant_row.deleted=b'0' AND duplicate_row.id<>keep_row.menu_id;
+
+
 
 UPDATE `system_menu` menu_row
 JOIN `tmp_v139_keep_menu` keep_row ON keep_row.permission=menu_row.permission
@@ -99,19 +93,7 @@ SET menu_row.name=permission_row.name,menu_row.type=3,menu_row.sort=permission_r
     menu_row.status=0,menu_row.visible=b'1',menu_row.keep_alive=b'1',menu_row.always_show=b'0',
     menu_row.updater='migration-V139',menu_row.update_time=NOW();
 
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V139',NOW(),'migration-V139',NOW(),b'0',role.tenant_id
-FROM `system_role` role
-JOIN `system_menu` menu ON menu.permission IN (
-  'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
-  'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
-  'zsjos:subordinate-sales:lead-release-public-sea') AND menu.deleted=b'0'
-WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V139')
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=role.id AND existing.menu_id=menu.id
-                    AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
+
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V139','Lead supervisor actions and canonical public-sea route',

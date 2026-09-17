@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- ZSJOS 用户关系场景管理
 -- 变更范围：新增场景定义表、初始化派单场景、修正工作台路由、新增通用管理菜单。
 -- 可重复执行；不删除或重建 zsjos_user_relation / zsjos_user_relation_log 数据。
@@ -158,25 +163,3 @@ WHERE NOT EXISTS (
   SELECT 1 FROM system_menu
   WHERE permission = 'zsjos:user-relation:log-query' AND deleted = b'0'
 );
-
--- 超级管理员默认拥有通用管理菜单和全部按钮。
-INSERT INTO system_role_menu
-  (role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
-SELECT role.id, menu.id, @operator, NOW(), @operator, NOW(), b'0', role.tenant_id
-FROM system_role role
-JOIN system_menu menu ON menu.permission IN (
-  'zsjos:user-relation-scene:query',
-  'zsjos:user-relation-scene:create',
-  'zsjos:user-relation-scene:update',
-  'zsjos:user-relation-scene:delete',
-  'zsjos:user-relation:query',
-  'zsjos:user-relation:update',
-  'zsjos:user-relation:log-query'
-) AND menu.deleted = b'0'
-WHERE role.code = 'super_admin' AND role.deleted = b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM system_role_menu relation
-    WHERE relation.role_id = role.id
-      AND relation.menu_id = menu.id
-      AND relation.deleted = b'0'
-  );

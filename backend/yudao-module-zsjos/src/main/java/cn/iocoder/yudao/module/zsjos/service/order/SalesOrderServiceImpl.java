@@ -155,7 +155,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setPurchaseIntentId(reqVO.getPurchaseIntentId());
         order.setSourcePaymentOrderId(paymentIntent == null ? null : paymentIntent.getId());
         order.setOrderType(ORDER_TYPE_FIRST_PURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
-        order.setSubmitterUserId(userId); order.setFormalSalesUserId(lead.getOwnerUserId());
+        order.setSubmitterUserId(userId); order.setFormalSalesUserId(lead.getOwnerUserId()); order.setFormalOwnerIdentity(lead.getOwnerIdentity());
         order.setSubmitterCenterType(SUBMITTER_CENTER_SALES);
         applySubmission(order, reqVO, validated, now);
         order.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); order.setVersion(0);
@@ -175,7 +175,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
         LeadDO lead = requireRepurchaseLead(leadId, userId);
         return createRepurchase(lead.getPersonId(), null, lead.getOwnerUserId(), userId,
-                reqVO.getRepurchaseReason(), reqVO.getOrder(), true);
+                reqVO.getRepurchaseReason(), reqVO.getOrder(), true, SUBMITTER_CENTER_SALES, lead.getOwnerIdentity());
     }
 
     @Override
@@ -216,6 +216,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder,
                                   String submitterCenterType) {
+        return createRepurchase(personId, sourceLeadId, formalSalesUserId, userId, reason, submission,
+                requireEffectiveOrder, submitterCenterType, null);
+    }
+
+    private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
+                                  SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder,
+                                  String submitterCenterType, String formalOwnerIdentity) {
         String requestFingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(
                 personId, userId, submitterCenterType, StrUtil.trim(reason), submission)));
         Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey(),
@@ -240,6 +247,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setPersonId(personId); order.setLeadId(null); order.setOpportunityId(null);
         order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(formalSalesUserId);
+        order.setFormalOwnerIdentity(formalOwnerIdentity);
         order.setSubmitterCenterType(submitterCenterType); order.setRepurchaseReason(reason.trim());
         order.setPurchaseIntentId(submission.getPurchaseIntentId());
         order.setSourcePaymentOrderId(paymentIntent == null ? null : paymentIntent.getId());
@@ -351,7 +359,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         target.setLeadId(source.getLeadId()); target.setOpportunityId(source.getOpportunityId()); target.setPersonId(source.getPersonId());
         target.setPurchaseIntentId(source.getPurchaseIntentId()); target.setSourcePaymentOrderId(source.getSourcePaymentOrderId());
         target.setOrderType(source.getOrderType()); target.setStatus(STATUS_PENDING_APPROVAL);
-        target.setSubmitterUserId(userId); target.setFormalSalesUserId(source.getFormalSalesUserId());
+        target.setSubmitterUserId(userId); target.setFormalSalesUserId(source.getFormalSalesUserId()); target.setFormalOwnerIdentity(source.getFormalOwnerIdentity());
         target.setSubmitterCenterType(source.getSubmitterCenterType()); target.setRepurchaseReason(source.getRepurchaseReason());
         target.setVersion(0); target.setSubmittedAt(now); target.setEffectiveAt(null);
         return target;
@@ -1024,6 +1032,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LeadDO processLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         variables.put("orderId", order.getId()); variables.put("leadId", order.getLeadId());
         variables.put("leadNo", processLead == null ? null : processLead.getLeadNo());
+        variables.put("formalOwnerIdentity", order.getFormalOwnerIdentity());
+        variables.put("formalOwnerIdentityLabel", ownerIdentityLabel(order.getFormalOwnerIdentity()));
         variables.put("personId", order.getPersonId()); variables.put("roundNo", roundNo);
         variables.put("registrationUsers", registrationUsers); variables.put("financeUsers", financeUsers);
         processReq.setVariables(variables);
@@ -1069,6 +1079,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reviewerUserIds", reviewers); payload.put("submitterUserId", order.getSubmitterUserId());
         payload.put("resultUserIds", resultUserIds); payload.put("leadSubmitterUserId", leadSubmitterUserId);
+        payload.put("formalOwnerIdentity", order.getFormalOwnerIdentity());
+        payload.put("formalOwnerIdentityLabel", ownerIdentityLabel(order.getFormalOwnerIdentity()));
         payload.put("partnerId", partnerId);
         payload.put("approvalDepartments", String.join("、", departments));
         payload.put("decisionReason", StrUtil.blankToDefault(reason, ""));
@@ -1433,6 +1445,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setOpportunityId(order.getOpportunityId()); result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType());
         result.setPersonId(order.getPersonId()); result.setFormalSalesUserId(order.getFormalSalesUserId());
+        result.setFormalOwnerIdentity(order.getFormalOwnerIdentity());
+        result.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
         result.setSubmitterUserId(order.getSubmitterUserId()); result.setVersion(order.getVersion());
         result.setCurrentApprovalRoundId(order.getCurrentApprovalRoundId()); result.setRepurchaseReason(order.getRepurchaseReason());
         result.setTerminationReason(order.getTerminationReason());
@@ -1495,6 +1509,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 SalesOrderRespVO.LeadProfileVO profile = new SalesOrderRespVO.LeadProfileVO();
                 profile.setLeadNo(text(lead.get("leadNo"))); profile.setSubmittedName(text(lead.get("submittedName")));
                 profile.setSubmittedMobile(text(lead.get("submittedMobile"))); profile.setSubmittedWechatId(text(lead.get("submittedWechatId")));
+                profile.setOwnerIdentity(text(lead.get("ownerIdentity")));
+                profile.setOwnerIdentityLabel(ownerIdentityLabel(profile.getOwnerIdentity()));
                 profile.setSourceType(text(lead.get("sourceType"))); profile.setSourceLabel(text(lead.get("sourceLabel")));
                 profile.setSourceUserName(text(lead.get("sourceUserName"))); profile.setSourceChannel(text(lead.get("sourceChannel")));
                 profile.setSourceChannelLabelSnapshot(text(lead.get("sourceChannelLabelSnapshot")));
@@ -1532,10 +1548,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmittedMobile(lead.getSubmittedMobile());
         result.setSubmittedWechatId(lead.getSubmittedWechatId());
         result.setSourceType(lead.getSourceType());
+        result.setOwnerIdentity(lead.getOwnerIdentity());
+        result.setOwnerIdentityLabel(ownerIdentityLabel(lead.getOwnerIdentity()));
         result.setSourceLabel(SOURCE_PARTNER.equals(lead.getSourceType()) ? "兼职提交"
                 : SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType()) ? "新媒体提交"
+                : SOURCE_EDUCATION_SELF.equals(lead.getSourceType()) ? "教务自拓录"
                 : SOURCE_SALES_SELF.equals(lead.getSourceType()) ? "销售自拓录" : "来源未配置");
-        boolean selfSourcedWithoutProvider = SOURCE_SALES_SELF.equals(lead.getSourceType())
+        boolean selfSourcedWithoutProvider = cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 && lead.getSourceProviderUserId() == null;
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
@@ -1595,6 +1614,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private SalesOrderListItemRespVO convertListItem(SalesOrderDO order, SalesOrderApprovalRoundDO round,
                                                      BpmTaskRespDTO task, List<SalesOrderItemDO> items) {
         SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
+        result.setFormalOwnerIdentity(order.getFormalOwnerIdentity());
+        result.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType()); result.setPersonId(order.getPersonId());
         result.setSubmitterUserId(order.getSubmitterUserId());
@@ -1700,6 +1721,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             List<SalesOrderItemDO> items, Map<String, List<BpmProcessNodeStatusRespDTO>> statuses,
             Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
         FinanceOrderExportRowRespVO row = new FinanceOrderExportRowRespVO();
+        row.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
         row.setOrderNo(order.getOrderNo()); row.setOrderType(order.getOrderType()); row.setStatus(order.getStatus());
         row.setBuyerName(order.getBuyerName()); row.setStudentName(order.getStudentName());
         row.setStudentMobile(order.getStudentMobile()); row.setStudentWechatId(order.getStudentWechatId());

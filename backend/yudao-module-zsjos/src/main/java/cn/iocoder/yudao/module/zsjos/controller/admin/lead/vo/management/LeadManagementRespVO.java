@@ -18,6 +18,8 @@ public class LeadManagementRespVO {
     private String submittedWechatId;
     private String sourceType;
     private String sourceLabel;
+    private String ownerIdentity;
+    private String ownerIdentityLabel;
     private Long sourceUserId;
     private String sourceUserName;
     private String partnerOwnerNameSnapshot;

@@ -63,9 +63,11 @@ public class MediaStudentService {
         Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> positioningById
                 = positioningCards.stream().collect(java.util.stream.Collectors.toMap(
                 cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO::getId, row -> row));
-        Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> latestCardByAccount
-                = new java.util.LinkedHashMap<>();
-        positioningCards.forEach(card -> latestCardByAccount.putIfAbsent(card.getAccountId(), card));
+        Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO> appliedByAccount = new java.util.LinkedHashMap<>();
+        for (Long accountId : accountIds) {
+            var applied = positioningSubmissionMapper.selectCurrentConfirmedByAccount(accountId);
+            if (applied != null) appliedByAccount.put(accountId, applied);
+        }
         result.setAccounts(accounts.stream().map(account -> {
             MediaStudentDetailRespVO.AccountVO row = BeanUtils.toBean(account, MediaStudentDetailRespVO.AccountVO.class);
             row.setPlatformLabel(account.getPlatformLabelSnapshot());
@@ -80,12 +82,16 @@ public class MediaStudentService {
                     ? List.of() : accountDetail.getDetailSnapshots());
             row.setPrimaryProblems(accountDetail == null || accountDetail.getPrimaryProblems() == null
                     ? List.of() : accountDetail.getPrimaryProblems());
-            var latestCard = latestCardByAccount.get(account.getId());
+            var latestCard = appliedByAccount.get(account.getId());
             row.setTaskLine(buildAccountTaskLine(latestCard == null ? null : latestCard.getStatus()));
             row.setLastActivityAt(account.getUpdateTime());
             return row;
         }).toList());
-        result.setPositioningDrafts(positioningCards.stream()
+        // Interview drafts can exist before an account. Only the current director's
+        // unbound cards supplement the account-authorized collection.
+        var unboundDrafts = positioningMapper.selectByDirectorAndStudent(userId, personId).stream()
+                .filter(row -> row.getAccountId() == null && personId.equals(row.getStudentPersonId()));
+        result.setPositioningDrafts(java.util.stream.Stream.concat(positioningCards.stream(), unboundDrafts)
                 .filter(row -> "co_creating".equals(row.getStatus()) && userId.equals(row.getDirectorUserId()))
                 .map(row -> {
                     MediaStudentDetailRespVO.PositioningVO value = BeanUtils.toBean(row,
@@ -105,14 +111,8 @@ public class MediaStudentService {
                         cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO::getAccountId,
                         cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO::getId,
                         (first, ignored) -> first, java.util.LinkedHashMap::new));
-        Map<Long, Long> effectiveSubmissionByAccount = positioningSubmissions.stream()
-                .filter(row -> "confirmed".equals(row.getStatus()) || "student_agreed".equals(row.getStatus())
-                        && positioningById.get(row.getCardId()) != null
-                        && !"archived".equals(positioningById.get(row.getCardId()).getStatus()))
-                .collect(java.util.stream.Collectors.toMap(
-                        cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO::getAccountId,
-                        cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO::getId,
-                        (first, ignored) -> first, java.util.LinkedHashMap::new));
+        Map<Long, Long> effectiveSubmissionByAccount = appliedByAccount.entrySet().stream()
+                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getId()));
         result.setPositioningCards(positioningSubmissions.stream()
                 .map(row -> {
                     var card = positioningById.get(row.getCardId());

@@ -15,6 +15,9 @@ import java.time.LocalDateTime;
 
 @Mapper
 public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
+    default List<PositioningCardDO> selectByService(Long relationId) {
+        return selectList(new LambdaQueryWrapperX<PositioningCardDO>().eq(PositioningCardDO::getServiceRelationId, relationId).orderByDesc(PositioningCardDO::getId));
+    }
     default List<PositioningCardDO> selectByDirectorAndStudent(Long directorUserId, Long studentPersonId) {
         return selectList(new LambdaQueryWrapperX<PositioningCardDO>()
                 .eq(PositioningCardDO::getDirectorUserId, directorUserId)
@@ -49,16 +52,6 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
         return selectOne(query.orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId)
                 .last("LIMIT 1"));
     }
-    default int bindStudentDraftToAccount(Long serviceRelationId, Long studentPersonId, Long accountId,
-                                          Long tenantId) {
-        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
-                .eq(PositioningCardDO::getServiceRelationId, serviceRelationId)
-                .eq(PositioningCardDO::getStudentPersonId, studentPersonId)
-                .isNull(PositioningCardDO::getAccountId)
-                .eq(PositioningCardDO::getStatus, "co_creating")
-                .eq(PositioningCardDO::getTenantId, tenantId)
-                .set(PositioningCardDO::getAccountId, accountId));
-    }
     default PositioningCardDO selectByIpProcessId(String id) { return selectOne(PositioningCardDO::getIpProcessInstanceId, id); }
     default int updateByVersion(PositioningCardDO card, Integer version, String fromStatus) {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
@@ -74,6 +67,7 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
                 .eq(PositioningCardDO::getId, card.getId()).eq(PositioningCardDO::getVersion, version)
                 .eq(PositioningCardDO::getStatus, fromStatus)
+                .set(PositioningCardDO::getTemplateVersionId, card.getTemplateVersionId())
                 .set(PositioningCardDO::getFieldsSnapshotJson, card.getFieldsSnapshotJson())
                 .set(PositioningCardDO::getValuesSnapshotJson, card.getValuesSnapshotJson())
                 .set(PositioningCardDO::getDictSnapshotJson, card.getDictSnapshotJson())

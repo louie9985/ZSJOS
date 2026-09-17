@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V146: dictionary-backed media-account maintenance revisions and read-only calendar.
 -- Dependencies/order: apply after V145; requires media accounts, System dictionaries, menus and notifications.
 -- Data scope: additive account columns/revision table, confirmed dictionary seeds, inherited menu grants and one notify rule per tenant.
@@ -149,31 +155,8 @@ INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`p
 (73603,'维护账号状态','zsjos:media-account:maintenance',3,11,7022,'','','',NULL,0,b'1',b'1',b'0','migration-V146',NOW(),'migration-V146',NOW(),b'0')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),`type`=VALUES(`type`),`sort`=VALUES(`sort`),`parent_id`=VALUES(`parent_id`),`path`=VALUES(`path`),`icon`=VALUES(`icon`),`component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`status`=VALUES(`status`),`visible`=VALUES(`visible`),`updater`='migration-V146',`update_time`=NOW(),`deleted`=b'0';
 
-DROP TEMPORARY TABLE IF EXISTS `tmp_v146_grants`;
-CREATE TEMPORARY TABLE `tmp_v146_grants` (`role_id` bigint NOT NULL,`tenant_id` bigint NOT NULL,`grant_type` varchar(16) NOT NULL,PRIMARY KEY (`role_id`,`grant_type`));
-INSERT IGNORE INTO `tmp_v146_grants` (`role_id`,`tenant_id`,`grant_type`)
-SELECT rm.role_id,rm.tenant_id,CASE menu.permission WHEN 'zsjos:media-account:query' THEN 'query' WHEN 'zsjos:media-account:edit' THEN 'maintain' ELSE 'query-all' END
-FROM `system_role_menu` rm JOIN `system_menu` menu ON menu.id=rm.menu_id AND menu.deleted=b'0'
-WHERE rm.deleted=b'0' AND menu.permission IN ('zsjos:media-account:query','zsjos:media-account:edit','zsjos:media-account:query-all');
-INSERT IGNORE INTO `tmp_v146_grants` (`role_id`,`tenant_id`,`grant_type`)
-SELECT rm.role_id,rm.tenant_id,'query'
-FROM `system_role_menu` rm JOIN `system_menu` menu ON menu.id=rm.menu_id AND menu.deleted=b'0'
-WHERE rm.deleted=b'0' AND menu.permission='zsjos:media-account:query-all';
-
 UPDATE `system_menu` SET `status`=1,`updater`='migration-V146',`update_time`=NOW()
 WHERE `permission` IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND `deleted`=b'0';
-UPDATE `system_role_menu` rm JOIN `system_menu` menu ON menu.id=rm.menu_id
-SET rm.deleted=b'1',rm.updater='migration-V146',rm.update_time=NOW()
-WHERE menu.permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND rm.deleted=b'0';
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT grant_row.role_id,menu_id.id,'migration-V146',NOW(),'migration-V146',NOW(),b'0',grant_row.tenant_id
-FROM `tmp_v146_grants` grant_row JOIN (
-  SELECT 73600 id,'query' grant_type UNION ALL SELECT 73601,'query'
-  UNION ALL SELECT 73603,'maintain' UNION ALL SELECT 73602,'query-all'
-) menu_id ON menu_id.grant_type=grant_row.grant_type
-WHERE NOT EXISTS (SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=grant_row.role_id AND existing.menu_id=menu_id.id AND existing.tenant_id=grant_row.tenant_id AND existing.deleted=b'0');
-DROP TEMPORARY TABLE `tmp_v146_grants`;
 
 INSERT INTO `system_notify_template` (`name`,`code`,`nickname`,`scene_code`,`channel_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT '账号状态维护变更','ZSJOS_MEDIA_ACCOUNT_MAINTENANCE_CHANGED','中世健消息中心','media.account.maintenance_changed','in_app','账号状态已更新','{{operatorName}} 更新了账号 {{bizNo}}','{{operatorName}} 更新了账号 {{bizNo}}（{{accountName}}）：{{changeSummary}}',2,'["bizNo","accountName","operatorName","changeSummary"]',0,'V146 账号状态维护通知','migration-V146',NOW(),'migration-V146',NOW(),b'0'

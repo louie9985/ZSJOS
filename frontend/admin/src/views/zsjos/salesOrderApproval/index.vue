@@ -50,6 +50,7 @@ const submit = async () => {
 <template>
   <WorkbenchListPage
     title="成交审批"
+    show-order-identity
     endpoint="/zsjos/sales-order/approval/inbox-page"
     description="成交订单审批队列"
     :query="{ handled: false }"
@@ -61,6 +62,9 @@ const submit = async () => {
   ><el-dialog v-model="open" title="成交审批" width="560px"
     ><div v-loading="detailLoading">
       <OrderProductSummary v-if="detail && !detailLoading" :items="detail.items" />
+      <el-descriptions v-if="detail && !detailLoading" :column="1" border>
+        <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
+      </el-descriptions>
       <el-form label-width="90px"
         ><el-form-item label="订单"
           ><span>{{ detail?.orderNo || `#${current?.id}` }}</span></el-form-item

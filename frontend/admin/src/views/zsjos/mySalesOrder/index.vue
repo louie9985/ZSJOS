@@ -1,6 +1,7 @@
 <template>
   <WorkbenchListPage
     title="订单管理"
+    show-order-identity
     endpoint="/zsjos/sales-order/management-page"
     description="按当前用户数据权限可见的成交订单"
     :query="queryParams"
@@ -36,6 +37,7 @@
       >
       <el-descriptions v-else-if="detail" :column="1" border>
         <el-descriptions-item label="订单号">{{ detail.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
         <el-descriptions-item label="学员">{{ detail.studentName }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ detail.totalAmount }}</el-descriptions-item>

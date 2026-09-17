@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- System seed: keep structural baseline, only admin account. No business records.
 SET NAMES utf8mb4;
 
@@ -1618,17 +1623,6 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
 (6809,'修改客资基础信息','zsjos:lead:update',3,14,6770,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0');
 
-INSERT IGNORE INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`) VALUES
-(3006,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3006,6806,'quick-init',NOW(),'quick-init',NOW(),b'0',1),
-(3022,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3022,6807,'quick-init',NOW(),'quick-init',NOW(),b'0',1),
-(3023,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3023,6807,'quick-init',NOW(),'quick-init',NOW(),b'0',1),
-(3031,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3031,6808,'quick-init',NOW(),'quick-init',NOW(),b'0',1);
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6805,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead:submit' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6805 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
 INSERT INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT '客资主状态','zsjos_lead_status',0,'ZSJOS 客资生命周期协议状态','1',NOW(),'1',NOW(),b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_dict_type` WHERE `type`='zsjos_lead_status' AND `deleted`=b'0');
@@ -1756,126 +1750,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM `system_notify_template` existing
   WHERE existing.code=seed.code AND existing.deleted=b'0'
 );
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8500, 3029, 6735, '1', '2026-08-07 11:26:59', '1', '2026-08-07 11:26:59', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8501, 3029, 6736, '1', '2026-08-07 11:26:59', '1', '2026-08-07 11:26:59', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8502, 4208, 1093, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8503, 4208, 1094, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8504, 4208, 1095, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8505, 4208, 1096, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8506, 4208, 1097, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8507, 4208, 1098, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8508, 4208, 1100, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8509, 4208, 1036, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8510, 4208, 1101, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8511, 4208, 1037, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8512, 4208, 1102, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8513, 4208, 1038, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8514, 4208, 1103, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8515, 4208, 1039, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8516, 4208, 1104, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8517, 4208, 1105, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8518, 4208, 1106, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8519, 4208, 2130, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8520, 4208, 1107, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8521, 4208, 2131, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8522, 4208, 1108, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8523, 4208, 2132, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8524, 4208, 1109, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8525, 4208, 2133, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8526, 4208, 2134, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8527, 4208, 2135, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8528, 4208, 2136, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8529, 4208, 2137, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8530, 4208, 2138, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8531, 4208, 2139, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8532, 4208, 2140, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8533, 4208, 2141, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8534, 4208, 2142, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8535, 4208, 2143, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8536, 4208, 2144, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8537, 4208, 2145, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8538, 4208, 2146, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8539, 4208, 2147, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8540, 4208, 2148, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8541, 4208, 2149, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8542, 4208, 2150, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8543, 4208, 2151, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8544, 4208, 2152, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8545, 4208, 107, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8546, 4208, 2739, '1', '2026-08-07 11:51:39', '1', '2026-08-07 11:51:39', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8547, 3004, 6736, '1', '2026-08-07 11:54:51', '1', '2026-08-07 11:54:51', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8548, 3004, 6735, '1', '2026-08-07 11:54:51', '1', '2026-08-07 11:54:51', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8549, 3999, 6737, '1', '2026-08-07 06:21:22', '1', '2026-08-07 06:21:22', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8550, 3999, 6738, '1', '2026-08-07 06:21:22', '1', '2026-08-07 06:21:22', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8551, 3999, 6739, '1', '2026-08-07 06:21:22', '1', '2026-08-07 06:21:22', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8552, 3999, 6740, '1', '2026-08-07 06:21:22', '1', '2026-08-07 06:21:22', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8556, 3002, 6736, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8557, 3002, 6737, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8558, 3002, 6738, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8559, 3002, 6739, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8560, 3002, 6740, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8561, 3002, 6735, '1', '2026-08-07 14:40:25', '1', '2026-08-07 14:40:25', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8562, 3999, 6741, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8563, 3999, 6742, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8564, 3999, 6743, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8565, 3999, 6744, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8566, 3999, 6745, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8567, 3999, 6746, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8568, 3999, 6747, '1', '2026-08-07 07:09:19', '1', '2026-08-07 07:09:19', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8569, 3999, 6748, '1', '2026-08-08 02:58:26', '1', '2026-08-08 02:58:26', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8570, 3999, 6751, '1', '2026-08-08 02:58:26', '1', '2026-08-08 02:58:26', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8571, 3999, 6752, '1', '2026-08-08 02:58:26', '1', '2026-08-08 02:58:26', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8572, 3999, 6753, '1', '2026-08-08 05:49:23', '1', '2026-08-08 05:49:23', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8573, 3999, 6754, '1', '2026-08-08 05:49:23', '1', '2026-08-08 05:49:23', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8574, 3999, 6755, '1', '2026-08-08 05:49:23', '1', '2026-08-08 05:49:23', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8575, 3999, 6756, '1', '2026-08-08 05:49:23', '1', '2026-08-08 05:49:23', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8576, 3999, 6757, '1', '2026-08-08 05:49:23', '1', '2026-08-08 05:49:23', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8579, 3999, 6758, '1', '2026-08-08 09:58:58', '1', '2026-08-08 09:58:58', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8580, 3999, 6759, '1', '2026-08-08 09:58:58', '1', '2026-08-08 09:58:58', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8581, 3999, 6760, '1', '2026-08-08 09:58:58', '1', '2026-08-08 09:58:58', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8582, 3999, 6761, '1', '2026-08-08 09:58:58', '1', '2026-08-08 09:58:58', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8583, 3999, 6762, '1', '2026-08-08 09:58:58', '1', '2026-08-08 09:58:58', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8586, 3999, 6763, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8587, 3999, 6764, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8588, 3999, 6765, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8589, 3999, 6766, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8590, 3999, 6767, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8591, 3999, 6768, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8592, 3999, 6769, '1', '2026-08-08 09:59:36', '1', '2026-08-08 09:59:36', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8593, 3029, 6770, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8594, 3029, 6771, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8595, 3004, 6770, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8596, 3002, 6770, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8597, 3007, 6770, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8598, 3999, 6770, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8599, 3999, 6771, '1', '2026-08-08 19:20:00', '1', '2026-08-08 19:20:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8600, 3007, 6749, '1', '2026-08-08 20:10:00', '1', '2026-08-08 20:10:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8601, 3007, 6772, '1', '2026-08-08 20:10:00', '1', '2026-08-08 20:10:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8602, 3029, 6749, '1', '2026-08-08 20:10:00', '1', '2026-08-08 20:10:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8603, 3999, 6749, '1', '2026-08-08 20:10:00', '1', '2026-08-08 20:10:00', b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8604, 3007, 6750, '1', NOW(), '1', NOW(), b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8605, 3999, 6776, '1', NOW(), '1', NOW(), b'0', 1);
-INSERT IGNORE INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (8606, 3999, 6777, '1', NOW(), '1', NOW(), b'0', 1);
-INSERT INTO `system_role_menu` (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-CROSS JOIN (SELECT 6783 AS menu_id UNION ALL SELECT 6784) target
-WHERE source.menu_id=2739 AND source.deleted=b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0'
-  );
-INSERT INTO `system_role_menu` (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
-SELECT DISTINCT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
-FROM `system_role_menu` source
-CROSS JOIN (SELECT 6785 menu_id UNION ALL SELECT 6786 UNION ALL SELECT 6787 UNION ALL SELECT 6788 UNION ALL SELECT 6789) target
-WHERE source.menu_id=2145 AND source.deleted=b'0'
-  AND NOT EXISTS (
-    SELECT 1 FROM `system_role_menu` existing
-    WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id
-      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0'
-  );
+
 UPDATE system_dept SET leader_user_id=NULL WHERE tenant_id=1;
 UPDATE system_dept SET leader_user_id=1 WHERE id=1001 AND tenant_id=1;
 

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. V185: split Partner visibility from tenant-wide management.
 -- Dependencies/order: apply after V184 and the V150/V151 consolidated Partner permissions.
 -- Data scope: System menu metadata, role-menu grants, tenant packages and schema-version records only.
@@ -67,17 +73,6 @@ BEGIN
     `icon`=VALUES(`icon`),`component`=VALUES(`component`),`component_name`=VALUES(`component_name`),
     `status`=VALUES(`status`),`visible`=VALUES(`visible`),`keep_alive`=VALUES(`keep_alive`),
     `always_show`=VALUES(`always_show`),`deleted`=b'0',`updater`='V185',`update_time`=NOW();
-
-  -- Existing page holders retain the former query behavior through the new query button.
-  INSERT INTO `system_role_menu`
-  (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-  SELECT source.role_id,79996,'V185',NOW(),'V185',NOW(),b'0',source.tenant_id
-  FROM `system_role_menu` source
-  WHERE source.menu_id=6852 AND source.deleted=b'0'
-    AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V185')
-    AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                    WHERE existing.role_id=source.role_id AND existing.menu_id=79996
-                      AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
 
   UPDATE `system_menu`
   SET `name`='兼职管理',`permission`='',`updater`='V185',`update_time`=NOW()

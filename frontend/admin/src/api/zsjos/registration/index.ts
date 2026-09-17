@@ -63,10 +63,10 @@ export interface RegistrationCase {
 
 export interface RegistrationClassAssignment {
   orderItemId: number
-  productId: number
+  productId?: number
   productName?: string
   specs?: import('@/utils/productSpecs').ProductSpec[]
-  categoryId: number
+  categoryId?: number | null
   categoryName?: string
   categoryPath?: string
   classId?: number

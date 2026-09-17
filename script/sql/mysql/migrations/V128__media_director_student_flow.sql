@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
 -- Director student workflow foundation. Repeatable guards support partially upgraded development databases.
 SET @schema_name = DATABASE();
 
@@ -48,19 +53,3 @@ WHERE NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `permission`='zsjos:position
 INSERT INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT 73475, '运营退回定位卡', 'zsjos:positioning-card:operator-reject', 3, 75, 6980, '', '', '', '', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `permission`='zsjos:positioning-card:operator-reject' AND `deleted`=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id, m.id, r.tenant_id, 'V128', NOW(), 'V128', NOW(), b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN ('zsjos:student:director-precheck','zsjos:student:director-interview',
-  'zsjos:student:director-operator-assign','zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial','zsjos:positioning-card:archive')
-WHERE r.code='content_director' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id, m.id, r.tenant_id, 'V128', NOW(), 'V128', NOW(), b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN ('zsjos:positioning-card:operator-confirm','zsjos:positioning-card:operator-reject')
-WHERE r.code='new_media_operator' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
-UPDATE `system_role_menu` rm JOIN `system_role` r ON r.id=rm.role_id JOIN `system_menu` m ON m.id=rm.menu_id
-SET rm.deleted=b'1', rm.update_time=NOW(), rm.updater='V128'
-WHERE r.code='new_media_operator' AND m.permission IN ('zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial','zsjos:positioning-card:archive')
-  AND rm.deleted=b'0';

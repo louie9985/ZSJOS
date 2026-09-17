@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V136: add department-team sales-order read management for sales supervisors.
 -- Dependencies: V025 sales-order workbench menu and the current System role/menu tables.
 -- Data scope: one read-only menu permission, its sales_manager grant, and no business rows.
@@ -15,15 +21,6 @@ WHERE NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `permission`='zsjos:sales-or
 UPDATE `system_menu`
 SET `parent_id`=6735,`path`='sales-orders/team',`updater`='migration-V136',`update_time`=NOW()
 WHERE `permission`='zsjos:sales-order:query-team' AND `deleted`=b'0';
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V136',NOW(),'migration-V136',NOW(),b'0',role.tenant_id
-FROM `system_role` role JOIN `system_menu` menu ON menu.permission='zsjos:sales-order:query-team' AND menu.deleted=b'0'
-WHERE role.code='sales_manager' AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                 WHERE existing.role_id=role.id AND existing.menu_id=menu.id
-                   AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V136','Add sales-order team management permission','V136__sales_order_team_management.sql',NOW())

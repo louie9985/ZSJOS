@@ -24,7 +24,7 @@ public class DeliveryClassController {
     public CommonResult<PageResult<DeliveryClassRespVO>> myPage(@Valid DeliveryClassPageReqVO req){ return success(service.getMyPage(getLoginUserId(),req)); }
     @GetMapping("/options")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:registration:update','zsjos:delivery-class:direct-transfer','zsjos:class-transfer:create')")
-    public CommonResult<List<DeliveryClassOptionRespVO>> options(@RequestParam Long categoryId,
+    public CommonResult<List<DeliveryClassOptionRespVO>> options(@RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "true") boolean includePending){ return success(service.options(categoryId,includePending)); }
     @GetMapping("/homeroom-candidates")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:create','zsjos:delivery-class:update')")

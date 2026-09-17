@@ -20,6 +20,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 1 | 提交客资 | `/zsjos/leads/submit` | `LeadSubmissionPage` | `zsjos/leadSubmission/index` |
 | 2 | 客资管理 | `/zsjos/leads/manage` | `LeadManagementPage`（全部/我提交的/我负责的） | `zsjos/lead/index` |
 | 3 | 销售自拓 | `/zsjos/leads/self-sourced` | `LeadSubmissionPage(selfSourced)` | `zsjos/leadSelfSourced/index` |
+| 3 | 教务自拓 | `/zsjos/leads/education-self-sourced` | `LeadSubmissionPage(educationSelfSourced)` | `zsjos/leadEducationSelfSourced/index` |
 | 4 | 销售投诉处理 | `/zsjos/leads/complaints` | `LeadComplaintPage` | `zsjos/leadComplaint/index` |
 | 5 | 我提交的（兼容路径） | `/zsjos/leads/submitted` | 重定向至客资管理并选择提交范围 | 隐藏权限节点 |
 | 6 | 我负责的（兼容路径） | `/zsjos/leads/owned` | 重定向至客资管理并选择负责范围 | 隐藏权限节点 |

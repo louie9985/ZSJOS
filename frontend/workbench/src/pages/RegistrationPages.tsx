@@ -20,7 +20,6 @@ import {
   Switch,
   Tag,
   Tabs,
-  TreeSelect,
   Typography,
   Upload,
   message,
@@ -159,7 +158,14 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const [routeSaving, setRouteSaving] = useState(false);
   const [classSaving, setClassSaving] = useState(false);
   const [classDraft, setClassDraft] = useState<Record<number, number>>({});
-  const [classOptions, setClassOptions] = useState<Record<number, DeliveryClassOption[]>>({});
+  const [classOptions, setClassOptions] = useState<DeliveryClassOption[]>([]);
+  const [classOptionsLoading, setClassOptionsLoading] = useState(false);
+  const [classOptionsError, setClassOptionsError] = useState("");
+  const classOptionsRequest = useRef(false);
+  const canAssignClass = hasPermission(permissions, "zsjos:registration:update");
+  const classesDirty = selected?.assignmentMode === "class_per_item" && selected.classAssignments?.some(
+    row => (classDraft[row.orderItemId] ?? null) !== (row.classId ?? null),
+  );
   const [attachmentSavingIds, setAttachmentSavingIds] = useState<Set<number>>(new Set());
   const [savingItemIds, setSavingItemIds] = useState<Set<number>>(new Set());
   const [routeCandidates, setRouteCandidates] = useState<Record<number, Array<{ id: number; nickname: string }>>>({});
@@ -324,14 +330,20 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       ? { ...item, selected: true, assigneeUserId, assigneeUserName: candidate?.nickname }
       : item), selected);
   };
-  const loadClassOptions = async (orderItemId: number, categoryId: number | undefined) => {
-    if (classOptions[orderItemId]) return;
-    if (!categoryId) { message.error("该商品缺少产品分类，无法加载班级，请先补全产品信息"); return; }
+  const loadClassOptions = async () => {
+    if (classOptionsRequest.current) return;
+    classOptionsRequest.current = true;
+    setClassOptionsLoading(true);
+    setClassOptionsError("");
     try {
-      const options = await api.deliveryClasses.options(categoryId, true);
-      setClassOptions(current => ({ ...current, [orderItemId]: options }));
+      setClassOptions(await api.deliveryClasses.options());
+    } catch (requestError) {
+      setClassOptions([]);
+      setClassOptionsError(errorMessage(requestError));
+    } finally {
+      classOptionsRequest.current = false;
+      setClassOptionsLoading(false);
     }
-    catch (requestError) { message.error(errorMessage(requestError)); }
   };
   const saveClasses = async () => {
     if (!selected?.classAssignments) return;
@@ -459,13 +471,18 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         />
       )}
       <section className="registration-checklist-card">
-        <Space style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? "逐商品分班" : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && !["completed", "cancelled"].includes(selected.status) && <Button type="primary" loading={classSaving} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
+        <Space style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? "逐商品分班" : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && canAssignClass && !["completed", "cancelled"].includes(selected.status) && <Button type="primary" loading={classSaving} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
+        {selected.assignmentMode === "class_per_item" && classOptionsError && <Alert type="error" showIcon title="班级加载失败" description={classOptionsError} action={<Button size="small" loading={classOptionsLoading} onClick={() => void loadClassOptions()}>重试</Button>} />}
+        {classesDirty && <Alert type="info" showIcon title="分班选择尚未保存，请先保存分班再完成履约" />}
         <div className="registration-checklist">
           {selected.assignmentMode === "class_per_item" ? selected.classAssignments?.map(assignment => {
-            const options = classOptions[assignment.orderItemId] || [];
+            const options = classOptions.map(row => ({ value: row.id, disabled: false, label: row.systemClass ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}` }));
+            if (assignment.classId && !options.some(row => row.value === assignment.classId)) {
+              options.push({ value: assignment.classId, label: assignment.className || "已选班级", disabled: true });
+            }
             return <div className="registration-checklist-row registration-route-row" key={assignment.orderItemId}>
               <div className="registration-checklist-copy"><strong>{assignment.productName || '历史产品信息缺失'}</strong><ProductSpecs product={assignment} /><span>{assignment.categoryName || "产品分类"}{assignment.errorReason ? ` · ${assignment.errorReason}` : ""}</span></div>
-              <TreeSelect style={{ minWidth: 280 }} value={classDraft[assignment.orderItemId]} placeholder="选择班级" disabled={classSaving || ["completed", "cancelled"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions(assignment.orderItemId, assignment.categoryId)} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} treeData={[{ title: assignment.categoryName || "已购产品", value: `category-${assignment.orderItemId}`, selectable: false, children: options.map(row => ({ title: row.systemClass ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}`, value: row.id })) }]} />
+              <Select style={{ width: "100%", maxWidth: 420 }} showSearch optionFilterProp="label" value={classDraft[assignment.orderItemId]} placeholder="选择班级（含待分班）" loading={classOptionsLoading} disabled={!canAssignClass || classSaving || ["completed", "cancelled"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions()} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} options={options} notFoundContent={classOptionsLoading ? <Spin size="small" /> : classOptionsError ? "班级加载失败，请重试" : "暂无未结课班级，请联系班级管理员"} />
             </div>;
           }) : selected.routes?.map((route) => (
             <div className="registration-checklist-row registration-route-row" key={route.id}>
@@ -556,7 +573,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         {selected.status !== "completed" && selected.status !== "cancelled" ? <>
           <Button
             type="primary"
-            disabled={!selected.completable || completing}
+            disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || completing || classSaving || Boolean(classesDirty)}
             loading={completing}
             onClick={() => void complete()}
           >完成报名履约</Button>

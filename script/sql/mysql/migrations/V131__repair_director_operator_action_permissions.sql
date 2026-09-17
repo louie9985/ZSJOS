@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- Repair media-student action grants when the V128 schema exists without its menu relations.
 -- Repeatable and non-destructive for business data. It only adds missing action menus/grants and retires
 -- confirmed legacy positioning write grants from the new-media operator role. It also restores the
@@ -37,33 +43,6 @@ WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`, '7022', '$') AND NOT JSON_CON
 UPDATE `system_tenant_package`
 SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`, '$', 73476),`updater`='V131',`update_time`=NOW()
 WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`, '7022', '$') AND NOT JSON_CONTAINS(`menu_ids`, '73476', '$');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V131',NOW(),'V131',NOW(),b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN (
-  'zsjos:student:director-precheck','zsjos:student:director-interview','zsjos:student:director-operator-assign',
-  'zsjos:positioning-card:query','zsjos:positioning-card:create','zsjos:positioning-card:submit-review',
-  'zsjos:positioning-card:confirm-trial','zsjos:positioning-card:archive')
-WHERE r.code='content_director' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-    AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V131',NOW(),'V131',NOW(),b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN (
-  'zsjos:positioning-card:query','zsjos:positioning-card:operator-confirm','zsjos:positioning-card:operator-reject')
-WHERE r.code='new_media_operator' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-    AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
-
-UPDATE `system_role_menu` rm
-JOIN `system_role` r ON r.id=rm.role_id
-JOIN `system_menu` m ON m.id=rm.menu_id
-SET rm.deleted=b'1',rm.updater='V131',rm.update_time=NOW()
-WHERE r.code='new_media_operator' AND r.deleted=b'0' AND rm.deleted=b'0'
-  AND m.permission IN ('zsjos:positioning-card:create','zsjos:positioning-card:edit',
-    'zsjos:positioning-card:feasibility-review','zsjos:positioning-card:sign',
-    'zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial','zsjos:positioning-card:archive');
 
 INSERT INTO `zsjos_user_relation_scene`
 (`name`,`code`,`source_label`,`target_label`,`source_post_code`,`target_post_code`,`status`,`remark`,

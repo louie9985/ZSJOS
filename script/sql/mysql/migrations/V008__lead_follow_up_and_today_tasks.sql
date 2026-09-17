@@ -1,3 +1,8 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
  -- Adds append-only lead follow-ups and the employee today-task entry.
 -- Dependencies: V007, zsjos_lead, zsjos_business_task, Infra file metadata, system dictionaries and menus.
 -- Execution order: schema, deterministic assignment-history backfill, dictionaries, menus/grants, version record.
@@ -142,23 +147,6 @@ INSERT IGNORE INTO `system_menu`
 (6780,'今日待办','zsjos:business-task:query',2,12,6735,'tasks/today','ep:list','zsjos-workbench','TodayTasksPage',0,b'1',b'1',b'1','migration-V008',NOW(),'migration-V008',NOW(),b'0'),
 (6781,'查询客资跟进','zsjos:lead-follow-up:query',3,10,6770,'','','',NULL,0,b'1',b'1',b'1','migration-V008',NOW(),'migration-V008',NOW(),b'0'),
 (6782,'新增客资跟进','zsjos:lead-follow-up:create',3,11,6770,'','','',NULL,0,b'1',b'1',b'1','migration-V008',NOW(),'migration-V008',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6781,'migration-V008',NOW(),'migration-V008',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead:query' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6781 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6780,'migration-V008',NOW(),'migration-V008',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id
-  AND m.permission IN ('zsjos:lead:submit','zsjos:lead:query-submitted','zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:accept') AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6780 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,target.menu_id,'migration-V008',NOW(),'migration-V008',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission IN ('zsjos:lead:claim','zsjos:lead:accept') AND m.deleted=b'0'
-CROSS JOIN (SELECT 6781 menu_id UNION ALL SELECT 6782) target
-WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=target.menu_id AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V008','Add lead follow-up records and today tasks','lead-follow-up-today-tasks-v1');

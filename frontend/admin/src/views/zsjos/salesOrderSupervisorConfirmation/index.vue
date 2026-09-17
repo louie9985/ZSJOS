@@ -53,6 +53,7 @@
       <el-alert v-if="current" :title="`${current.requesterUserName || '审批人'}申请主管确认`" :description="current.requestReason" type="info" show-icon :closable="false" />
       <el-descriptions v-if="detail" :column="1" border class="detail-block">
         <el-descriptions-item label="订单号">{{ detail.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
         <el-descriptions-item label="学员">{{ detail.studentName }}</el-descriptions-item>
         <el-descriptions-item label="手机号">{{ detail.studentMobile || '-' }}</el-descriptions-item>
         <el-descriptions-item label="订单状态">{{ detail.status }}</el-descriptions-item>
@@ -68,7 +69,7 @@
     </div>
   </el-drawer>
 
-  <el-dialog v-model="decisionOpen" :title="decision === 'confirm' ? '确认订单事项' : '不确认并退回销售'" width="520px">
+  <el-dialog v-model="decisionOpen" :title="decision === 'confirm' ? '确认订单事项' : '不确认并退回提交人'" width="520px">
     <el-form label-width="90px"><el-form-item label="主管意见" required><el-input v-model="reason" type="textarea" :rows="5" maxlength="1000" show-word-limit /></el-form-item></el-form>
     <template #footer><el-button @click="decisionOpen = false">取消</el-button><el-button :type="decision === 'confirm' ? 'primary' : 'danger'" :loading="saving" :disabled="!reason.trim()" @click="submit">提交</el-button></template>
   </el-dialog>
@@ -141,7 +142,7 @@ const submit = async () => {
   saving.value = true
   try {
     await Api.decide(current.value.orderId, decision.value, { confirmationId: current.value.id, taskId: current.value.taskId, reason: reason.value.trim(), approvalRoundId: current.value.approvalRoundId, orderVersion: current.value.orderVersion, roundVersion: current.value.roundVersion, confirmationVersion: current.value.version, idempotencyKey: crypto.randomUUID() })
-    message.success(decision.value === 'confirm' ? '已确认订单事项' : '已不确认并退回销售')
+    message.success(decision.value === 'confirm' ? '已确认订单事项' : '已不确认并退回提交人')
     decisionOpen.value = false
     drawerOpen.value = false
     await load()

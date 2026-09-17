@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V143: Partner-to-employee ownership and subordinate Partner read scope.
 -- Dependencies/order: apply after V142; System menu, role and ZSJOS Partner/Lead tables must exist.
 -- Data scope: additive schema, permission metadata, and the initial system_administrator assignment-button grant.
@@ -108,17 +114,6 @@ FROM `system_menu` page
 WHERE page.permission='zsjos:partner:query' AND page.deleted=b'0'
   AND NOT EXISTS (SELECT 1 FROM `system_menu` existing
                   WHERE existing.permission='zsjos:partner:assign-owner' AND existing.deleted=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role.id,menu.id,'migration-V143',NOW(),'migration-V143',NOW(),b'0',role.tenant_id
-FROM `system_role` role
-JOIN `system_menu` menu ON menu.permission='zsjos:partner:assign-owner' AND menu.deleted=b'0'
-WHERE role.code='system_administrator' AND role.status=0 AND role.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V143')
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` existing
-                  WHERE existing.role_id=role.id AND existing.menu_id=menu.id
-                    AND existing.tenant_id=role.tenant_id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V143','Subordinate Partner ownership and Lead snapshots',

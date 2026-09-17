@@ -42,14 +42,6 @@ public class DirectorFormTemplateService {
             {"mediaTime", "radio"}, {"continuousTime", "text"}, {"appearanceWillingness", "radio"},
             {"purchaseMotivations", "checkbox_group"}, {"deliveryRisks", "checkbox_group"}
     });
-    private static final Map<String, String> POSITIONING_SYSTEM_FIELDS = orderedMap(new String[][]{
-            {"identityTags", "checkbox_group"}, {"strongStoryHook", "text"}, {"existingMaterials", "checkbox_group"},
-            {"timeInvestment", "radio"}, {"appearanceWillingness", "radio"}, {"expressionAbility", "radio"},
-            {"executionStability", "radio"}, {"riskTags", "checkbox_group"}, {"commercialPositioning", "textarea"},
-            {"personaTypes", "checkbox_group"}, {"targetAudience", "radio"}, {"contentPillars", "checkbox_group"},
-            {"videoFormats", "checkbox_group"}, {"imageTextFormats", "checkbox_group"}, {"recommendedMatchRate", "number"}
-    });
-
     @Resource private DirectorFormTemplateMapper templateMapper;
     @Resource private DirectorFormTemplateVersionMapper versionMapper;
     @Resource private DictDataApi dictDataApi;

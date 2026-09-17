@@ -750,6 +750,10 @@ def check_menu_id_reuse(manifests: dict[str, dict]) -> None:
 
 
 def static_check() -> None:
+    from role_menu_policy import check as check_role_menu_policy
+    violations = check_role_menu_policy(SQL_ROOT.parent) + check_role_menu_policy(ROOT / "sql")
+    if violations:
+        fail("Deployment SQL must not change administrator-owned role-menu grants:\n" + "\n".join(violations))
     manifests = load_manifests()
     module_order(manifests)
     for code, manifest in manifests.items():

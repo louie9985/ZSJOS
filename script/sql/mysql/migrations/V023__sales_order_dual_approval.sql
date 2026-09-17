@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V023 direct sales-order entry and dual-center BPM approval.
 -- Dependencies: V021 and V022 must be integrated first; System departments/users/roles, Infra files, ZSJOS Lead/Product, BPM.
 -- Data scope: additive order metadata, approval configuration, dictionaries, menus and permission grants. No business rows are deleted.
@@ -75,11 +81,6 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 (6810,'成交审批','zsjos:sales-order:review',2,17,6735,'sales-order-approvals','ep:finished','zsjos/salesOrderApproval/index','ZsjosSalesOrderApproval',0,b'1',b'1',b'1','migration-V023',NOW(),'migration-V023',NOW(),b'0'),
 (6811,'录入成交','zsjos:sales-order:create',3,15,6770,'','','',NULL,0,b'1',b'1',b'1','migration-V023',NOW(),'migration-V023',NOW(),b'0'),
 (6812,'查询成交订单','zsjos:sales-order:query',3,1,6810,'','','',NULL,0,b'1',b'1',b'1','migration-V023',NOW(),'migration-V023',NOW(),b'0');
-
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,6811,'migration-V023',NOW(),'migration-V023',NOW(),b'0',source.tenant_id
-FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead:qualify' AND m.deleted=b'0'
-WHERE source.deleted=b'0' AND NOT EXISTS(SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6811 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V023','Add direct sales-order entry and dual-center approval','sales-order-dual-approval-v1');

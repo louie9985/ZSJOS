@@ -326,9 +326,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
-    ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "订单正式销售或其直属部门负责人未配置");
+    ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "订单成交负责人或其直属部门负责人未配置");
     ErrorCode SALES_ORDER_SUPERVISOR_DISABLED = new ErrorCode(1_900_006_020, "订单销售直属部门负责人已停用或不存在");
-    ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "订单正式销售不能同时作为自己的直属主管");
+    ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "订单成交负责人不能同时作为自己的直属主管");
     ErrorCode SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED = new ErrorCode(1_900_006_022, "本轮已申请过主管确认");
     ErrorCode SALES_ORDER_SUPERVISOR_CONFIRMATION_NOT_EXISTS = new ErrorCode(1_900_006_024, "主管确认记录不存在");
     ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
@@ -449,6 +449,8 @@ public interface ZsjosErrorCodeConstants {
 
     ErrorCode POSITIONING_CARD_NOT_EXISTS = new ErrorCode(1_900_014_001, "定位卡不存在");
     ErrorCode POSITIONING_CARD_STATE_INVALID = new ErrorCode(1_900_014_002, "当前定位卡状态不允许该操作");
+    ErrorCode POSITIONING_MASTER_REQUIRED = new ErrorCode(1_900_014_030, "请先在课程服务下选择持续修订的主定位卡");
+    ErrorCode POSITIONING_MASTER_ALREADY_SELECTED = new ErrorCode(1_900_014_031, "该课程服务已确定主定位卡，其他历史卡仅供查看");
     ErrorCode POSITIONING_CARD_VERSION_CONFLICT = new ErrorCode(1_900_014_003, "定位卡已被其他人修改，请刷新后重试");
     ErrorCode POSITIONING_CARD_PERMISSION_DENIED = new ErrorCode(1_900_014_004, "无权查看或操作该定位卡");
     ErrorCode POSITIONING_CARD_FIELD_REQUIRED = new ErrorCode(1_900_014_010, "定位卡所有字段必须填写后才能提交");

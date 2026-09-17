@@ -99,7 +99,7 @@ export const getDeliveryClassStudents = (
     url: `/zsjos/delivery-class/${id}/students`,
     params
   })
-export const getDeliveryClassOptions = (categoryId: number, includePending = true) =>
+export const getDeliveryClassOptions = (categoryId?: number, includePending = true) =>
   request.get<DeliveryClassOption[]>({
     url: '/zsjos/delivery-class/options',
     params: { categoryId, includePending }

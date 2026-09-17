@@ -362,7 +362,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         boolean blindIdentity = identityContext.counterpartyMaskingEnabled();
         boolean viewerIsOwner = identityContext.viewerIsOwner();
         boolean viewerIsSubmitter = identityContext.viewerIsSubmitter();
-        boolean selfSourcedWithoutProvider = SOURCE_SALES_SELF.equals(lead.getSourceType())
+        boolean selfSourcedWithoutProvider = cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 && lead.getSourceProviderUserId() == null;
         result.setSourceUserId(blindIdentity && viewerIsOwner ? null : lead.getSourceUserId());
@@ -372,6 +372,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setOwnerUserName(leadIdentityMaskingService.employeeName(
                 identityContext, users, lead.getOwnerUserId(), LeadIdentityRole.OWNER));
         result.setSourceLabel(sourceLabel(lead.getSourceType()));
+        result.setOwnerIdentity(lead.getOwnerIdentity());
+        result.setOwnerIdentityLabel(ownerIdentityLabel(lead.getOwnerIdentity()));
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
             var partner = detail ? partnerMapper.selectById(lead.getPartnerId()) : partners.get(lead.getPartnerId());
             String partnerName = partner == null ? null : partner.getName();
@@ -561,6 +563,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             case SOURCE_PARTNER -> "兼职提交";
             case SOURCE_INTERNAL_NEW_MEDIA -> "新媒体提交";
             case SOURCE_SALES_SELF -> "销售自拓录";
+            case cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_EDUCATION_SELF -> "教务自拓录";
             default -> "来源未配置";
         };
     }

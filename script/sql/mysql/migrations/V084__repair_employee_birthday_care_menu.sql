@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- V084: repair the V081 employee birthday-care menu IDs that collide with V058 FMS menus.
 -- Dependencies: V081 birthday-care metadata and V058 HRM/FMS menu roots.
 -- Data scope: three System menu rows and their relations to enabled super_admin roles.
@@ -37,20 +43,6 @@ WHERE @birthday_care_menu_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM `system_menu`
                    WHERE `parent_id`=@birthday_care_menu_id AND `permission`='hrm:birthday-care-config:update'
                      AND `type`=3 AND `deleted`=b'0');
-
-INSERT INTO `system_role_menu`
-(`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT role_row.`id`, menu_row.`id`, 'migration-V084', NOW(), 'migration-V084', NOW(), b'0', role_row.`tenant_id`
-FROM `system_role` role_row
-JOIN `system_menu` menu_row
-  ON (menu_row.`id`=@birthday_care_menu_id
-      OR (menu_row.`parent_id`=@birthday_care_menu_id
-          AND menu_row.`permission` IN ('hrm:birthday-care-config:query','hrm:birthday-care-config:update')))
- AND menu_row.`deleted`=b'0'
-WHERE role_row.`code`='super_admin' AND role_row.`status`=0 AND role_row.`deleted`=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` relation_row
-                   WHERE relation_row.`role_id`=role_row.`id` AND relation_row.`menu_id`=menu_row.`id`
-                     AND relation_row.`tenant_id`=role_row.`tenant_id` AND relation_row.`deleted`=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V084','Repair employee birthday care menu IDs','repair-employee-birthday-care-menu-v1')

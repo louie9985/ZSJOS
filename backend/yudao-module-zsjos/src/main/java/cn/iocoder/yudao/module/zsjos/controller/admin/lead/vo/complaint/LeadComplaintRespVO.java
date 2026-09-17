@@ -13,6 +13,8 @@ public class LeadComplaintRespVO {
     private String complainantUserName;
     private Long salesUserId;
     private String salesUserName;
+    private String ownerIdentitySnapshot;
+    private String ownerIdentityLabel;
     private String reason;
     private String evidenceRefs;
     private List<EvidenceVO> evidence;

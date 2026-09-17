@@ -13,7 +13,7 @@ $areaUpdateName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('5
 
 $lines.Add('-- Moves the bundled administrative-area snapshot into a system-owned editable tree.')
 $lines.Add('-- Dependencies: the System module schema, menu 2083, and zsjos_schema_version.')
-$lines.Add('-- Execution order: create table, insert missing snapshot rows, add permissions, inherit grants, record version.')
+$lines.Add('-- Execution order: create table, insert missing snapshot rows, add permission metadata, record version; roles are configured by administrators.')
 $lines.Add('-- Repeatability: CREATE IF NOT EXISTS and INSERT IGNORE preserve all administrator changes on rerun.')
 $lines.Add('-- Data scope: the 3,879 rows bundled in area.csv plus three area permission buttons; no rows are deleted.')
 $lines.Add('-- Recovery: forward-only; disable manually added areas if rollback is required.')
@@ -43,7 +43,6 @@ $lines.Add("(6790,'$areaQueryName','system:area:query',3,1,2083,'','','',NULL,0,
 $lines.Add("(6791,'$areaCreateName','system:area:create',3,2,2083,'','','',NULL,0,b'1',b'1',b'1','migration-V012',NOW(),'migration-V012',NOW(),b'0'),")
 $lines.Add("(6792,'$areaUpdateName','system:area:update',3,3,2083,'','','',NULL,0,b'1',b'1',b'1','migration-V012',NOW(),'migration-V012',NOW(),b'0');")
 $lines.Add('')
-$lines.Add("INSERT INTO ``system_role_menu`` (``role_id``,``menu_id``,``creator``,``create_time``,``updater``,``update_time``,``deleted``,``tenant_id``) SELECT DISTINCT source.role_id,target.menu_id,'migration-V012',NOW(),'migration-V012',NOW(),b'0',source.tenant_id FROM ``system_role_menu`` source CROSS JOIN (SELECT 6790 menu_id UNION ALL SELECT 6791 UNION ALL SELECT 6792) target WHERE source.menu_id=2083 AND source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM ``system_role_menu`` existing WHERE existing.role_id=source.role_id AND existing.menu_id=target.menu_id AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');")
 $lines.Add('')
 $lines.Add("INSERT IGNORE INTO ``zsjos_schema_version`` (``version``,``description``,``checksum``) VALUES ('V012','Move system areas to an editable database tree','system-area-management-v1');")
 

@@ -45,7 +45,7 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
             return operator;
         }
         return related && ("read".equals(action) || "update".equals(action) || "edit".equals(action)
-                || "maintenance".equals(action)
+                || "maintenance".equals(action) || "positioning-apply".equals(action)
                 || "grade".equals(action) || "rescue".equals(action)
                 || "bind-student".equals(action) || "rebind".equals(action));
     }

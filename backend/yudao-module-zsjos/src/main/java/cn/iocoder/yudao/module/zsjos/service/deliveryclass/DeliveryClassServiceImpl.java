@@ -116,11 +116,11 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     public List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending) {
         List<DeliveryClassDO> rows = mapper.selectList(new LambdaQueryWrapperX<DeliveryClassDO>()
-                .and(q -> q.eq(DeliveryClassDO::getSystemClass, true)
-                        .or().and(formal -> formal.eq(DeliveryClassDO::getSystemClass, false)
-                                .eq(DeliveryClassDO::getCategoryId, categoryId)
-                                .eq(DeliveryClassDO::getStatus, "SERVING")))
-                .orderByAsc(DeliveryClassDO::getSystemClass).orderByAsc(DeliveryClassDO::getClassName));
+                .eq(DeliveryClassDO::getStatus, "SERVING")
+                .and(categoryId != null, q -> q.eq(DeliveryClassDO::getSystemClass, true)
+                        .or().eq(DeliveryClassDO::getCategoryId, categoryId))
+                .orderByDesc(DeliveryClassDO::getSystemClass).orderByAsc(DeliveryClassDO::getClassName)
+                .orderByAsc(DeliveryClassDO::getId));
         return rows.stream().filter(row -> includePending || !Boolean.TRUE.equals(row.getSystemClass()))
                 .map(this::toOption).toList();
     }

@@ -1,3 +1,9 @@
+-- UTF-8. 2026-09-17: role-menu assignments are administrator-owned.
+-- Automatic grants, inheritance, revocation and reconciliation have been retired.
+-- Scope/prerequisites/order: unchanged except role-menu writes; existing grants are preserved.
+-- Source cleanup only: deployed checksums require a reviewed rollout; do not auto-reconcile.
+-- Replay never assigns roles; rollback does not restore historical automatic grants.
+-- Historical rationale below predates the policy above; grant operations described there are retired.
 -- UTF-8. Requires V203 and V204; does not modify any business row.
 -- Scope: two authorization gaps confirmed on the V203/V204 baseline.
 --   (1) The media-account create endpoint enforces the button permission `zsjos:media-account:create`
@@ -14,25 +20,6 @@
 -- Rollback: forward-only. Remove the role-menu grants to revoke; do not delete the menus, because
 -- published positioning-interview template versions and menu ids are referenced by the application.
 SET NAMES utf8mb4;
-
--- 1. Grant account creation to the content director, matching the create endpoint's object check.
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V207',NOW(),'V207',NOW(),b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission='zsjos:media-account:create'
-WHERE r.code='content_director' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-                  AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
-
--- 2. Grant the positioning-interview actions to the content director, who owns the interview.
-INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`tenant_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT r.id,m.id,r.tenant_id,'V207',NOW(),'V207',NOW(),b'0'
-FROM `system_role` r JOIN `system_menu` m ON m.permission IN (
-  'zsjos:student:positioning-interview',
-  'zsjos:student:positioning-interview-query',
-  'zsjos:student:positioning-interview-complete')
-WHERE r.code='content_director' AND r.deleted=b'0' AND m.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=r.id AND x.menu_id=m.id
-                  AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 -- 3. Extend tenant packages that already expose the account page (6970) with its create action.
 UPDATE `system_tenant_package` p
