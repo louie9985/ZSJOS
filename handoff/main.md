@@ -25980,3 +25980,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Verification: focused Maven reactor passed 47 tests (reminder 15/profile 32); system temp diagnosis-advance-maven.log. Workbench typecheck passed. Actual Chrome isolated fixture passed desktop/mobile, repeated opening, early submit exact task payload, revision retaining template/cycle, generic remaining-template entry, overdue and empty/retry states. Initial revision selector missed icon-prefixed accessible name; regex selector corrected, final suite passed. Desktop/mobile screenshots visually inspected in system temp; scoped diff --check passed.
 - Dependencies/impact: no dependencies, SQL, account permissions, external service restart, commit or publication. Workbench in-app polling supplies reminders while online or on next entry; no offline notification channel introduced. Admin has no consumer of this endpoint; authentication/tenant contracts unchanged.
 - Remaining: live authenticated screenshot state not reproduced; runtime backend has not been redeployed/restarted, so advance reminders require updated backend. No real diagnosis submitted. No production build required for scoped form/reminder changes without bundling inputs.
+
+## Delivery Entry - 2026-09-19 00:32:53 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `28ebcf5e91e162ff0cc263dc8999a42845a5b27e`。
+- User goal: 将当前有效本地代码提交并推送到远程 `main` 分支。
+- Key decisions: 提交账号诊断、交付周期、定位证据、合作方资料/绑定/指定分配、支付主体、多端界面、V261-V264 迁移、测试与文档；排除缓存、探针、截图、`tmp/output` 和生成的 `tsconfig.tsbuildinfo`。
+- Execution or analysis result: 已创建业务提交 `28ebcf5`，包含 281 个文件、10099 行新增和 864 行删除；准备提交本交付记录后推送。
+- Changed files: 业务提交详见 `28ebcf5`；本条仅追加 `handoff/main.md`。
+- Verification evidence: 无未解决冲突或冲突标记；`git diff --cached --check` 在移除一个测试文件末尾多余空行后通过；提交前 `HEAD...origin/main` 为 `0 0`；各功能已有验证证据记录于本文件对应前序条目，本轮未重复全量测试。
+- Dependency or integration impact: 未新增依赖；未执行数据库迁移、数据库写入或服务重启；保护 stash 与未跟踪临时产物保留。
+- Remaining work: 提交本记录、推送 `origin/main` 并核对远程一致性；发布时仍需按各前序交付条目完成环境相关迁移与运行验收。
+- Status: `ready-to-push`。
