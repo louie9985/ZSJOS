@@ -24,6 +24,7 @@
     scene="registration"
     placeholder="订单号 / 学员姓名 / 手机号 / 客资编号"
     :keyword="query.keyword || ''"
+    page-key="registration_pool"
     @search="(value) => { query.keyword = value; handleQuery() }"
     @change="(value) => { query.advancedFilter = value; handleQuery() }"
   />

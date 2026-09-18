@@ -32,6 +32,12 @@ public interface FeedbackService {
 
     FeedbackRespVO getOwn(Long id, Long userId);
 
+    /**
+     * 审批人查看详情。与 {@link #getOwn} 的区别只在权限口径：
+     * 这里认的是「我是这条反馈某一轮的指定审批人」，不是「这是我的单子」。
+     */
+    FeedbackRespVO getForApprover(Long id, Long userId);
+
     FeedbackRespVO getPartnerOwn(Long id, Long accountId, Long partnerId);
 
     void markRead(Long id, FeedbackActionVO.VersionedCommand request, Long userId);

@@ -59,6 +59,7 @@ application-my.yaml
 !/deploy/production/.env.example
 /deploy/production/secrets/
 /backups/
+/deploy/production/backups/
 
 /yudao-ui-app/unpackage/
 .DS_Store

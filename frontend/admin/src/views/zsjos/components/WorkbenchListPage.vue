@@ -13,6 +13,7 @@
       :scene="advancedScene"
       :placeholder="advancedPlaceholder"
       :keyword="String(props.query.keyword || '')"
+      :page-key="advancedPageKey"
       @search="handleAdvancedSearch"
       @change="handleAdvancedFilter"
     />
@@ -104,6 +105,7 @@ const props = withDefaults(
     advancedScene?: AdvancedFilterScene
     advancedSearchEndpoint?: string
     advancedPlaceholder?: string
+    advancedPageKey?: string
   }>(),
   {
     description: '服务端数据列表',

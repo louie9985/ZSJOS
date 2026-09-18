@@ -100,6 +100,20 @@ public class FeedbackController {
         return success(feedbackService.getOwn(id, getLoginUserId()));
     }
 
+    /**
+     * 审批人从审批中心打开业务详情时走这里。
+     *
+     * <p>单独的端点而不是给 {@code /{id}} 放宽口径：{@code /{id}} 的语义是「我的单子」，
+     * 而审批人要看的往往是别人的单子。两者混在一起之后，前端就没法知道
+     * 当前这个人是以哪种身份在看，动作按钮的显隐也就无从判断。
+     */
+    @GetMapping("/{id}/approver-view")
+    @Operation(summary = "获得审批人视角的反馈详情")
+    @PreAuthorize("@ss.hasPermission('zsjos:feedback:read')")
+    public CommonResult<FeedbackRespVO> getForApprover(@PathVariable("id") Long id) {
+        return success(feedbackService.getForApprover(id, getLoginUserId()));
+    }
+
     @PutMapping("/{id}/read")
     @Operation(summary = "标记本人反馈已读")
     @PreAuthorize("@ss.hasPermission('zsjos:feedback:read')")

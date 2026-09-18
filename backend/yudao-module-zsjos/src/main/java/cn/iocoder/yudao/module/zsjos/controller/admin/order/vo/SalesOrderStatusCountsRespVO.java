@@ -11,4 +11,5 @@ public class SalesOrderStatusCountsRespVO {
     private Long revisionRequired;
     private Long effective;
     private Long superseded;
+    private Long terminated;
 }

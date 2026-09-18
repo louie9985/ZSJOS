@@ -879,7 +879,7 @@ export default function AccountProfilePanel({
       </div>
       <Modal
         title={`维护账号表 · ${profile.account.nickname || account.accountNo}`}
-        width="min(1440px, calc(100vw - 24px))"
+        width="min(1680px, calc(100vw - 24px))"
         open={open}
         onCancel={close}
         maskClosable={false}
@@ -916,8 +916,6 @@ export default function AccountProfilePanel({
             : 100}
           %
         </Typography.Paragraph>
-        {reminder}
-        {missingList}
         {dictError && (
           <Alert
             type="error"
@@ -927,7 +925,9 @@ export default function AccountProfilePanel({
             }
           />
         )}
-        {/* 定高版式：与账号主页同构 —— 左栏主页图 + 右侧三列字段卡片，各列内部滚动。 */}
+        {/* 第一列集中承载预览、归属、操作与待补提醒；定位卡通栏占第一行，
+            状态与复盘并排占第二行。列位置由 CSS grid-template-areas 指定，
+            不依赖 DOM 顺序 —— 曾经因此把复盘卡挤到空白列。 */}
         <div className="account-profile-editor" ref={body}>
           <aside className="account-profile-editor-aside">
             <div className="account-profile-editor-cover" data-profile-key="cover">
@@ -956,12 +956,22 @@ export default function AccountProfilePanel({
                   ))}
               </div>
             </div>
-            <p>学员：{profile.studentName || "未记录"}</p>
-            <p>{account.accountNo}</p>
-            <p>编导：{profile.directorName || "未分配"}</p>
-            <p>运营：{profile.operatorName || "未分配"}</p>
-          </aside>
-          <div className="account-profile-editor-main">
+            <div className="account-profile-editor-owner">
+              <p>学员：{profile.studentName || "未记录"}</p>
+              <p>{account.accountNo}</p>
+              <p>编导：{profile.directorName || "未分配"}</p>
+              <p>运营：{profile.operatorName || "未分配"}</p>
+            </div>
+            {reminder}
+            {missingList}
+            <Progress
+              percent={
+                required
+                  ? Math.round(((required - missing.length) / required) * 100)
+                  : 100
+              }
+              size="small"
+            />
             <div className="account-profile-editor-toolbar">
               <Typography.Text type="secondary">
                 无权限字段以只读展示；空值可保存，缺失项持续提醒
@@ -973,7 +983,9 @@ export default function AccountProfilePanel({
                 仅看待补充
               </Checkbox>
             </div>
-            {/* 与只读展示区同构：三组各一列卡片，卡片内部各自滚动。 */}
+          </aside>
+          <div className="account-profile-editor-main">
+            {/* 三张卡片各是一列网格项，内部各自滚动。 */}
             <div className="account-profile-editor-columns">
               {groups.filter(([key]) => key !== "POSITIONING").map(([k, name]) => {
                 const visible = fields.filter(
@@ -984,7 +996,7 @@ export default function AccountProfilePanel({
                 const controlCell = (f: ProfileField) => (
                   <div
                     key={f.key}
-                    className={`account-profile-control owner-${f.ownerType.toLowerCase()} ${f.type === "textarea" || f.type === "record" ? "wide" : ""}`}
+                    className={`account-profile-control owner-${f.ownerType.toLowerCase()}`}
                     data-profile-key={f.key}
                   >
                     <div>

@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS "system_area" (
   "status" tinyint NOT NULL,
   "leaf_selectable" bit NOT NULL DEFAULT FALSE,
   "creator" varchar(64) DEFAULT '',
-  "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   "updater" varchar(64) DEFAULT '',
-  "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   "deleted" bit NOT NULL DEFAULT FALSE,
   PRIMARY KEY ("id")
 );
@@ -25,9 +25,9 @@ CREATE TABLE IF NOT EXISTS "system_dept" (
     "email" varchar(50) DEFAULT NULL,
     "status" tinyint NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS "system_dict_data" (
     "css_class" varchar(100) NOT NULL DEFAULT '',
     "remark" varchar(500) DEFAULT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '字典数据表';
@@ -62,9 +62,9 @@ CREATE TABLE IF NOT EXISTS "system_role" (
     "type" tinyint NOT NULL,
     "remark" varchar(500) DEFAULT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS "system_role_menu" (
     "role_id" bigint NOT NULL,
     "menu_id" bigint NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -94,14 +94,15 @@ CREATE TABLE IF NOT EXISTS "system_menu" (
     "icon" varchar(100) DEFAULT '#',
     "component" varchar(255) DEFAULT NULL,
     "component_name" varchar(255) DEFAULT NULL,
+    "workbench_render_mode" varchar(32) NOT NULL DEFAULT 'native',
     "status" tinyint NOT NULL DEFAULT '0',
     "visible" bit NOT NULL DEFAULT TRUE,
     "keep_alive" bit NOT NULL DEFAULT TRUE,
     "always_show" bit NOT NULL DEFAULT TRUE,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '菜单权限表';
@@ -118,9 +119,9 @@ CREATE TABLE IF NOT EXISTS "system_workbench_layout" (
     "published_enabled" bit DEFAULT NULL,
     "published_priority" int DEFAULT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint NOT NULL DEFAULT 0,
     PRIMARY KEY ("id"),
@@ -142,9 +143,9 @@ CREATE TABLE IF NOT EXISTS "system_workbench_layout_version" (
     "publisher_user_id" bigint NOT NULL,
     "publish_time" timestamp NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint NOT NULL DEFAULT 0,
     PRIMARY KEY ("id"),
@@ -171,9 +172,9 @@ CREATE TABLE IF NOT EXISTS "system_dict_type" (
     "status" tinyint NOT NULL DEFAULT '0',
     "remark" varchar(500) DEFAULT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "deleted_time" timestamp NOT NULL,
     PRIMARY KEY ("id")
@@ -187,11 +188,11 @@ CREATE TABLE IF NOT EXISTS `system_user_session` (
     `username` varchar(50) NOT NULL DEFAULT '',
     `user_ip` varchar(50) DEFAULT NULL,
     `user_agent` varchar(512) DEFAULT NULL,
-    `session_timeout` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `session_timeout` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updater` varchar(64) DEFAULT '' ,
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY (`id`)
@@ -205,9 +206,9 @@ CREATE TABLE IF NOT EXISTS "system_post" (
     "status"      tinyint     NOT NULL,
     "remark"      varchar(500)         DEFAULT NULL,
     "creator"     varchar(64)          DEFAULT '',
-    "create_time" timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater"     varchar(64)          DEFAULT '',
-    "update_time" timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted"     bit         NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -218,9 +219,9 @@ CREATE TABLE IF NOT EXISTS `system_user_post`(
     "user_id"     bigint             DEFAULT NULL,
     "post_id"     bigint             DEFAULT NULL,
     "creator"     varchar(64)        DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater"     varchar(64)        DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted"     bit       NOT NULL DEFAULT FALSE,
     "tenant_id"   bigint    not null default '0',
     PRIMARY KEY (`id`)
@@ -234,13 +235,13 @@ CREATE TABLE IF NOT EXISTS "system_notice" (
 	"status" tinyint NOT NULL DEFAULT '0' COMMENT '公告状态（0正常 1关闭）',
 	"audience_type" varchar(16) DEFAULT 'ALL', "target_dept_ids" clob, "target_user_ids" clob,
 	"publish_status" varchar(16) NOT NULL DEFAULT 'DRAFT',
-	"publish_time" datetime DEFAULT NULL,
-	"offline_time" datetime DEFAULT NULL,
-	"highlight_until" datetime DEFAULT NULL,
+	"publish_time" datetime(6) DEFAULT NULL,
+	"offline_time" datetime(6) DEFAULT NULL,
+	"highlight_until" datetime(6) DEFAULT NULL,
 	"creator" varchar(64) DEFAULT '' COMMENT '创建者',
-	"create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	"create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
 	"updater" varchar(64) DEFAULT '' COMMENT '更新者',
-	"update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+	"update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间',
 	"deleted" bit NOT NULL DEFAULT 0 COMMENT '是否删除',
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY("id")
@@ -250,24 +251,24 @@ CREATE TABLE IF NOT EXISTS "system_notice_attachment" (
     "id" bigint NOT NULL GENERATED BY DEFAULT AS IDENTITY,
     "notice_id" bigint NOT NULL, "infra_file_id" bigint NOT NULL, "file_name" varchar(255) NOT NULL,
     "mime_type" varchar(128), "file_size" bigint NOT NULL, "sort" int NOT NULL DEFAULT 0,
-    "creator" varchar(64) DEFAULT '', "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updater" varchar(64) DEFAULT '', "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creator" varchar(64) DEFAULT '', "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    "updater" varchar(64) DEFAULT '', "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT 0, "tenant_id" bigint NOT NULL DEFAULT 0, PRIMARY KEY("id")
 );
 
 CREATE TABLE IF NOT EXISTS "system_notice_read" (
     "id" bigint NOT NULL GENERATED BY DEFAULT AS IDENTITY,
-    "notice_id" bigint NOT NULL, "user_id" bigint NOT NULL, "read_time" datetime NOT NULL,
-    "creator" varchar(64) DEFAULT '', "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updater" varchar(64) DEFAULT '', "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "notice_id" bigint NOT NULL, "user_id" bigint NOT NULL, "read_time" datetime(6) NOT NULL,
+    "creator" varchar(64) DEFAULT '', "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    "updater" varchar(64) DEFAULT '', "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT 0, "tenant_id" bigint NOT NULL DEFAULT 0, PRIMARY KEY("id"),
     CONSTRAINT "uk_notice_reader" UNIQUE ("tenant_id", "notice_id", "user_id")
 );
 
 CREATE TABLE IF NOT EXISTS "system_notice_recipient" (
     "id" bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, "notice_id" bigint NOT NULL, "user_id" bigint NOT NULL,
-    "creator" varchar(64) DEFAULT '', "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updater" varchar(64) DEFAULT '', "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creator" varchar(64) DEFAULT '', "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    "updater" varchar(64) DEFAULT '', "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE, "tenant_id" bigint NOT NULL DEFAULT 0,
     CONSTRAINT "uk_notice_recipient" UNIQUE ("tenant_id", "notice_id", "user_id")
 );
@@ -283,9 +284,9 @@ CREATE TABLE IF NOT EXISTS `system_login_log` (
     `user_ip`     varchar(50)  NOT NULL,
     `user_agent`  varchar(512) NOT NULL,
     `creator`   varchar(64)           DEFAULT '',
-    `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `create_time` datetime(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updater`   varchar(64)           DEFAULT '',
-    `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `update_time` datetime(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     `deleted`     bit(1)       NOT NULL DEFAULT '0',
     PRIMARY KEY (`id`)
 ) COMMENT ='系统访问记录';
@@ -305,9 +306,9 @@ CREATE TABLE IF NOT EXISTS `system_operate_log` (
     `user_ip`          varchar(50)            DEFAULT NULL,
     `user_agent`       varchar(200)           DEFAULT NULL,
     `creator`        varchar(64)            DEFAULT '',
-    `create_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `create_time`      datetime(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updater`        varchar(64)            DEFAULT '',
-    `update_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `update_time`      datetime(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     `deleted`          bit(1)        NOT NULL DEFAULT '0',
     "tenant_id"         bigint not null default  '0',
     PRIMARY KEY (`id`)
@@ -350,9 +351,9 @@ CREATE TABLE IF NOT EXISTS "system_sms_channel" (
    "api_secret" varchar(63) DEFAULT NULL,
    "callback_url" varchar(255) DEFAULT NULL,
    "creator" varchar(64) DEFAULT '',
-   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "updater" varchar(64) DEFAULT '',
-   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "deleted" bit NOT NULL DEFAULT FALSE,
    PRIMARY KEY ("id")
 ) COMMENT '短信渠道';
@@ -370,9 +371,9 @@ CREATE TABLE IF NOT EXISTS "system_sms_template" (
     "channel_id" bigint NOT NULL,
     "channel_code" varchar(63) NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '短信模板';
@@ -403,9 +404,9 @@ CREATE TABLE IF NOT EXISTS "system_sms_log" (
    "api_receive_code" varchar(63) DEFAULT NULL,
    "api_receive_msg" varchar(255) DEFAULT NULL,
    "creator" varchar(64) DEFAULT '',
-   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "updater" varchar(64) DEFAULT '',
-   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "deleted" bit NOT NULL DEFAULT FALSE,
    PRIMARY KEY ("id")
 ) COMMENT '短信日志';
@@ -421,9 +422,9 @@ CREATE TABLE IF NOT EXISTS "system_sms_code" (
     "used_time" timestamp DEFAULT NULL,
     "used_ip" varchar NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '短信日志';
@@ -439,9 +440,9 @@ CREATE TABLE IF NOT EXISTS "system_social_client" (
   "agent_id" varchar(255) NOT NULL,
   "status" int NOT NULL,
   "creator" varchar(64) DEFAULT '',
-  "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   "updater" varchar(64) DEFAULT '',
-  "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   "deleted" bit NOT NULL DEFAULT FALSE,
   "tenant_id" bigint not null default  '0',
   PRIMARY KEY ("id")
@@ -459,9 +460,9 @@ CREATE TABLE IF NOT EXISTS "system_social_user" (
    "code" varchar(64) NOT NULL,
    "state" varchar(64),
    "creator" varchar(64) DEFAULT '',
-   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "updater" varchar(64) DEFAULT '',
-   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "deleted" bit NOT NULL DEFAULT FALSE,
    PRIMARY KEY ("id")
 ) COMMENT '社交用户';
@@ -473,9 +474,9 @@ CREATE TABLE IF NOT EXISTS "system_social_user_bind" (
    "social_type" tinyint NOT NULL,
    "social_user_id" number NOT NULL,
    "creator" varchar(64) DEFAULT '',
-   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "updater" varchar(64) DEFAULT '',
-   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "deleted" bit NOT NULL DEFAULT FALSE,
    PRIMARY KEY ("id")
 ) COMMENT '社交用户的绑定';
@@ -492,9 +493,9 @@ CREATE TABLE IF NOT EXISTS "system_tenant" (
     "expire_time" timestamp NOT NULL,
     "account_count" int NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '租户';
@@ -506,9 +507,9 @@ CREATE TABLE IF NOT EXISTS "system_tenant_package" (
     "remark" varchar(256),
     "menu_ids" varchar(2048) NOT NULL,
     "creator" varchar(64) DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '租户套餐表';
@@ -531,9 +532,9 @@ CREATE TABLE IF NOT EXISTS "system_oauth2_client" (
   "resource_ids" varchar NOT NULL DEFAULT '',
   "additional_information" varchar NOT NULL DEFAULT '',
   "creator" varchar DEFAULT '',
-  "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   "updater" varchar DEFAULT '',
-  "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   "deleted" bit NOT NULL DEFAULT FALSE,
   PRIMARY KEY ("id")
 ) COMMENT 'OAuth2 客户端表';
@@ -545,11 +546,11 @@ CREATE TABLE IF NOT EXISTS "system_oauth2_approve" (
   "client_id" varchar NOT NULL,
   "scope" varchar NOT NULL,
   "approved" bit NOT NULL DEFAULT FALSE,
-  "expires_time" datetime NOT NULL,
+  "expires_time" datetime(6) NOT NULL,
   "creator" varchar DEFAULT '',
-  "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   "updater" varchar DEFAULT '',
-  "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   "deleted" bit NOT NULL DEFAULT FALSE,
   PRIMARY KEY ("id")
 ) COMMENT 'OAuth2 批准表';
@@ -564,11 +565,11 @@ CREATE TABLE IF NOT EXISTS "system_oauth2_access_token" (
    "client_id" varchar NOT NULL,
    "scopes" varchar NOT NULL,
    "approved" bit NOT NULL DEFAULT FALSE,
-   "expires_time" datetime NOT NULL,
+   "expires_time" datetime(6) NOT NULL,
    "creator" varchar DEFAULT '',
-   "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
    "updater" varchar DEFAULT '',
-   "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+   "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
    "deleted" bit NOT NULL DEFAULT FALSE,
    "tenant_id" bigint not null,
    PRIMARY KEY ("id")
@@ -582,11 +583,11 @@ CREATE TABLE IF NOT EXISTS "system_oauth2_refresh_token" (
     "client_id" varchar NOT NULL,
     "scopes" varchar NOT NULL,
     "approved" bit NOT NULL DEFAULT FALSE,
-    "expires_time" datetime NOT NULL,
+    "expires_time" datetime(6) NOT NULL,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -599,13 +600,13 @@ CREATE TABLE IF NOT EXISTS "system_oauth2_code" (
      "code" varchar NOT NULL,
      "client_id" varchar NOT NULL,
      "scopes" varchar NOT NULL,
-     "expires_time" datetime NOT NULL,
+     "expires_time" datetime(6) NOT NULL,
      "redirect_uri" varchar NOT NULL,
      "state" varchar NOT NULL,
      "creator" varchar DEFAULT '',
-     "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
      "updater" varchar DEFAULT '',
-     "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
      "deleted" bit NOT NULL DEFAULT FALSE,
      PRIMARY KEY ("id")
 ) COMMENT 'OAuth2 刷新令牌';
@@ -620,9 +621,9 @@ CREATE TABLE IF NOT EXISTS "system_mail_account" (
     "ssl_enable" bit NOT NULL,
     "starttls_enable" bit NOT NULL,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '邮箱账号表';
@@ -639,9 +640,9 @@ CREATE TABLE IF NOT EXISTS "system_mail_template" (
     "status" varchar NOT NULL,
     "remark" varchar,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '邮件模版表';
@@ -662,13 +663,13 @@ CREATE TABLE IF NOT EXISTS "system_mail_log" (
     "template_content" varchar NOT NULL,
     "template_params" varchar NOT NULL,
     "send_status" varchar NOT NULL,
-    "send_time" datetime,
+    "send_time" datetime(6),
     "send_message_id" varchar,
     "send_exception" varchar,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '邮件日志表';
@@ -690,9 +691,9 @@ CREATE TABLE IF NOT EXISTS "system_notify_template" (
     "status" varchar NOT NULL,
     "remark" varchar,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     PRIMARY KEY ("id")
 ) COMMENT '站内信模板表';
@@ -718,9 +719,9 @@ CREATE TABLE IF NOT EXISTS "system_notify_message" (
     "read_status" bit NOT NULL,
     "read_time" varchar,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY ("id")
@@ -739,9 +740,9 @@ CREATE TABLE IF NOT EXISTS "system_notify_rule" (
     "timing_offset_minutes" int,
     "status" int NOT NULL,
     "creator" varchar DEFAULT '',
-    "create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar DEFAULT '',
-    "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint NOT NULL DEFAULT 0,
     PRIMARY KEY ("id")

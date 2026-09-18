@@ -4000,6 +4000,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资主状态',
   `assignment_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资分配状态',
   `owner_user_id` bigint DEFAULT NULL COMMENT '当前主责销售用户编号',
+  `owner_identity` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '负责人业务身份：sales/education；历史空值不推断',
   `ownership_started_at` datetime DEFAULT NULL COMMENT '当前销售正式持有起点',
   `recycle_source_owner_user_id` bigint DEFAULT NULL COMMENT '回收前销售，用于主管对象范围',
   `current_assignment_history_id` bigint DEFAULT NULL COMMENT '当前归属周期分配历史编号',
@@ -4201,6 +4202,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_urge` (
 CREATE TABLE IF NOT EXISTS `zsjos_lead_complaint` (
   `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `complainant_user_id` bigint DEFAULT NULL, `partner_id` bigint DEFAULT NULL,
   `sales_user_id` bigint NOT NULL, `reason` varchar(1000) NOT NULL, `evidence_refs` json DEFAULT NULL,
+  `owner_identity_snapshot` varchar(32) DEFAULT NULL COMMENT '被投诉负责人身份快照',
   `status` varchar(32) NOT NULL, `result` varchar(32) DEFAULT NULL, `handler_user_id` bigint DEFAULT NULL,
   `handler_opinion` varchar(1000) DEFAULT NULL, `handler_evidence_refs` json DEFAULT NULL, `handled_at` datetime DEFAULT NULL,
   `create_idempotency_key` varchar(128) NOT NULL, `decision_idempotency_key` varchar(128) DEFAULT NULL,
@@ -4302,6 +4304,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_history` (
   `action_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '派单、接单、拒单、转派、回收、释放或认领',
   `from_owner_user_id` bigint DEFAULT NULL COMMENT '原负责人用户编号',
   `to_owner_user_id` bigint DEFAULT NULL COMMENT '新负责人用户编号',
+  `owner_identity_snapshot` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本次归属负责人身份快照',
   `operator_user_id` bigint NOT NULL COMMENT '操作人用户编号',
   `reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '原因',
   `occurred_at` datetime NOT NULL COMMENT '实际发生时间',
@@ -4329,6 +4332,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_record` (
   `operator_user_id` bigint NOT NULL,
   `owner_user_id_snapshot` bigint NOT NULL,
   `owner_dept_id_snapshot` bigint DEFAULT NULL,
+  `owner_identity_snapshot` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `method_value` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `method_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `result_value` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -4630,6 +4634,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_opportunity` (
 CREATE TABLE IF NOT EXISTS `zsjos_opportunity_follow_up_record` (
   `id` bigint NOT NULL AUTO_INCREMENT, `opportunity_id` bigint NOT NULL, `lead_id` bigint NOT NULL,
   `operator_user_id` bigint NOT NULL, `owner_user_id_snapshot` bigint NOT NULL, `owner_dept_id_snapshot` bigint DEFAULT NULL,
+  `owner_identity_snapshot` varchar(32) DEFAULT NULL,
   `method_value` varchar(100) NOT NULL, `method_label_snapshot` varchar(100) NOT NULL,
   `result_value` varchar(100) NOT NULL, `result_label_snapshot` varchar(100) NOT NULL,
   `category_before` varchar(100) DEFAULT NULL, `category_before_label_snapshot` varchar(100) DEFAULT NULL,
@@ -4666,6 +4671,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单状态',
   `submitter_user_id` bigint DEFAULT NULL COMMENT '本次订单提交人',
   `formal_sales_user_id` bigint DEFAULT NULL COMMENT '正式销售归属',
+  `formal_owner_identity` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '成交归属业务身份快照',
   `submitter_center_type` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交中心类型',
   `buyer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '购买方快照',
   `student_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员姓名快照',
@@ -4737,7 +4743,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   `round_no` int NOT NULL COMMENT '订单内连续轮次',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '审批轮次状态',
   `order_snapshot` json NOT NULL COMMENT '本轮订单完整快照',
-  `process_instance_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'BPM 流程实例编号',
+  `process_instance_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'BPM 流程实例编号；历史迁移订单为空表示未走本系统审批',
   `process_definition_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'BPM 流程定义 Key',
   `submitted_by_user_id` bigint NOT NULL COMMENT '本轮提交人用户编号',
   `submitted_at` datetime NOT NULL COMMENT '本轮提交时间',
@@ -6627,7 +6633,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_positioning_card` (
 CREATE TABLE IF NOT EXISTS `zsjos_positioning_card_submission` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `card_id` bigint NOT NULL,
-  `account_id` bigint NOT NULL,
+  `account_id` bigint DEFAULT NULL,
   `student_person_id` bigint NOT NULL,
   `service_relation_id` bigint NOT NULL,
   `submission_no` int NOT NULL,
@@ -6666,6 +6672,57 @@ CREATE TABLE IF NOT EXISTS `zsjos_positioning_card_submission` (
   KEY `idx_tenant_student_account_submitted` (`tenant_id`,`student_person_id`,`account_id`,`submitted_at`),
   KEY `idx_tenant_card_submitted` (`tenant_id`,`card_id`,`submitted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位卡不可变提交快照';
+
+CREATE TABLE IF NOT EXISTS `zsjos_positioning_service_card` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `service_relation_id` bigint NOT NULL,
+  `student_person_id` bigint NOT NULL,
+  `card_id` bigint NOT NULL,
+  `version` int NOT NULL DEFAULT '0',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_service` (`tenant_id`,`service_relation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `zsjos_positioning_application` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint NOT NULL,
+  `submission_id` bigint NOT NULL,
+  `applied_by` bigint DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_account` (`tenant_id`,`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `zsjos_positioning_application_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint NOT NULL,
+  `previous_submission_id` bigint DEFAULT NULL,
+  `submission_id` bigint NOT NULL,
+  `applied_by` bigint DEFAULT NULL,
+  `expected_version` int NOT NULL,
+  `idempotency_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_key` (`tenant_id`,`idempotency_key`),
+  KEY `idx_account` (`tenant_id`,`account_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `zsjos_positioning_card_version` (
   `id` bigint NOT NULL AUTO_INCREMENT,

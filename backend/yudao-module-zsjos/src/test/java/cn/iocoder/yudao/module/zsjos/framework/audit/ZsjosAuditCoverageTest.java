@@ -59,11 +59,15 @@ class ZsjosAuditCoverageTest {
                 }
             }
         }
-        assertEquals(301, getCount, "Review GET audit classification when endpoint inventory changes");
-        assertEquals(296, postCount, "Review POST audit classification when endpoint inventory changes");
+        // 314/304 = 合并前的 310/301 + 教务自拓 POST create + 定位卡 service-overview、
+        // application-options、select-master、apply + 需求反馈审批人视角 GET。
+        // 计数变动必须逐条核对过分类：GET 新增项均已由上面的 mustAudit 断言逐方法校验，
+        // POST 新增项要么被判定需审计，要么显式标了 READ_ONLY。
+        assertEquals(314, getCount, "Review GET audit classification when endpoint inventory changes");
+        assertEquals(304, postCount, "Review POST audit classification when endpoint inventory changes");
         assertEquals(34, readOnlyPostCount, "Every POST viewing endpoint must remain explicitly classified");
-        assertEquals(91, putCount, "Review PUT audit classification when endpoint inventory changes");
-        assertEquals(14, deleteCount, "Review DELETE audit classification when endpoint inventory changes");
+        assertEquals(93, putCount, "Review PUT audit classification when endpoint inventory changes");
+        assertEquals(16, deleteCount, "Review DELETE audit classification when endpoint inventory changes");
         assertTrue(auditedCount > 250, "The mutation audit inventory unexpectedly shrank");
     }
 

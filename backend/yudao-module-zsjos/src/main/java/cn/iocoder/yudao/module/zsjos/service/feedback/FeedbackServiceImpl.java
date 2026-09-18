@@ -425,6 +425,28 @@ public class FeedbackServiceImpl implements FeedbackService {
         return toDetail(require(id), userId, false);
     }
 
+    /**
+     * 审批人查看详情。
+     *
+     * <p>走独立的 {@code read-approver} 口径而不是放宽 {@code read-own}：审批人不是
+     * 单据本人，把两者合并会让 {@code read-own} 这个名字以后没法解释。
+     * 判定同样基于该单据任一轮次的 {@code approval_context_json}（提交时冻结的审批人），
+     * 与 {@code FeedbackContentProvider} 完全一致——两处口径不一致会造成
+     * 「审批中心能看到卡片、点进业务页却说无权」这种自相矛盾。
+     */
+    @Override
+    @ZsjosPermission(bizType = "feedback", bizId = "#id",
+            action = FeedbackObjectPermissionProvider.ACTION_READ_APPROVER)
+    public FeedbackRespVO getForApprover(Long id, Long userId) {
+        FeedbackRespVO result = toDetail(require(id), userId, false);
+        // 审批人看的是别人的单子，一切"以本人身份操作"的入口都要收起来：
+        // 「修改并重提」「回复」在后端都走 read-own/reply-own，放出去只会点了报错。
+        result.setCanResubmit(false);
+        result.setCanReply(false);
+        result.setCanSubmitSurvey(false);
+        return result;
+    }
+
     @Override
     public FeedbackRespVO getPartnerOwn(Long id, Long accountId, Long partnerId) {
         requireEnabledPartner(partnerId);

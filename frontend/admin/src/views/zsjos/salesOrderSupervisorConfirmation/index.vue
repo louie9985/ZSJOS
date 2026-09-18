@@ -18,6 +18,7 @@
       scene="order"
       placeholder="订单号 / 学员姓名 / 手机号"
       :keyword="keyword"
+      page-key="sales_order_supervisor_confirm"
       @search="(value) => { keyword = value; search() }"
       @change="(value) => { advancedFilter = value; search() }"
     />

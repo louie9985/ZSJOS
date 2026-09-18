@@ -48,6 +48,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.flowable.bpmn.model.*;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ManagementService;
+import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.engine.history.HistoricActivityInstance;
@@ -98,6 +99,8 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     private RuntimeService runtimeService;
     @Resource
     private ManagementService managementService;
+    @Resource
+    private RepositoryService repositoryService;
 
     @Resource
     private BpmProcessInstanceService processInstanceService;
@@ -160,12 +163,74 @@ public class BpmTaskServiceImpl implements BpmTaskService {
             taskQuery.taskCreatedAfter(DateUtils.of(pageVO.getCreateTime()[0]));
             taskQuery.taskCreatedBefore(DateUtils.of(pageVO.getCreateTime()[1]));
         }
+        // 排除已接入专属业务审批页的流程：Flowable 不支持按流程定义排除，只能翻页过滤后修正总数
+        Set<String> excludedDefinitionIds = resolveExcludedProcessDefinitionIds(pageVO);
+        if (!excludedDefinitionIds.isEmpty()) {
+            return pagedTasksExcludingProcessDefinitions(taskQuery, pageVO, excludedDefinitionIds);
+        }
         long count = taskQuery.count();
         if (count == 0) {
             return PageResult.empty();
         }
         List<Task> tasks = taskQuery.listPage(PageUtils.getStart(pageVO), pageVO.getPageSize());
         return new PageResult<>(tasks, count);
+    }
+
+    /**
+     * 把 {@link BpmTaskPageReqVO#getExcludeProcessDefinitionKeys()} 解析成流程定义编号。
+     * 同一个 key 可能有多条定义（多版本），需要全部排除。
+     */
+    private Set<String> resolveExcludedProcessDefinitionIds(BpmTaskPageReqVO pageVO) {
+        if (StrUtil.isBlank(pageVO.getExcludeProcessDefinitionKeys())) {
+            return Set.of();
+        }
+        Set<String> ids = new HashSet<>();
+        for (String key : StrUtil.split(pageVO.getExcludeProcessDefinitionKeys(), ',')) {
+            if (StrUtil.isBlank(key)) {
+                continue;
+            }
+            repositoryService.createProcessDefinitionQuery()
+                    .processDefinitionTenantId(FlowableUtils.getTenantId())
+                    .processDefinitionKey(key.trim())
+                    .list().forEach(definition -> ids.add(definition.getId()));
+        }
+        return ids;
+    }
+
+    /**
+     * 待办任务翻页过滤：count() 会把被排除的流程算进去，只能全量扫描一次，
+     * 同时得出排除后的准确总数和当前页内容，避免 total 虚高、以及某页被过滤空后
+     * 前端因此误判“没有更多数据”。
+     */
+    private PageResult<Task> pagedTasksExcludingProcessDefinitions(TaskQuery taskQuery,
+                                                                   BpmTaskPageReqVO pageVO,
+                                                                   Set<String> excludedDefinitionIds) {
+        int pageSize = pageVO.getPageSize();
+        int pageStart = (pageVO.getPageNo() - 1) * pageSize;
+        List<Task> pageList = new ArrayList<>();
+        long total = 0;
+        int scanOffset = 0;
+        final int scanBatch = Math.max(pageSize, 100);
+        while (true) {
+            List<Task> batch = taskQuery.listPage(scanOffset, scanBatch);
+            if (CollUtil.isEmpty(batch)) {
+                break;
+            }
+            scanOffset += batch.size();
+            for (Task task : batch) {
+                if (excludedDefinitionIds.contains(task.getProcessDefinitionId())) {
+                    continue;
+                }
+                if (total >= pageStart && pageList.size() < pageSize) {
+                    pageList.add(task);
+                }
+                total++;
+            }
+            if (batch.size() < scanBatch) {
+                break;
+            }
+        }
+        return new PageResult<>(pageList, total);
     }
 
     @Override
@@ -287,6 +352,10 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 //            taskQuery.taskCreatedBefore(DateUtils.of(pageVO.getCreateTime()[1]));
 //        }
         // 执行查询
+        Set<String> excludedDefinitionIds = resolveExcludedProcessDefinitionIds(pageVO);
+        if (!excludedDefinitionIds.isEmpty()) {
+            return pagedHistoricTasksExcludingProcessDefinitions(taskQuery, pageVO, excludedDefinitionIds);
+        }
         long count = taskQuery.count();
         if (count == 0) {
             return PageResult.empty();
@@ -303,6 +372,41 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                     || task.getCreateTime().after(DateUtils.of(pageVO.getCreateTime()[1])));
         }
         return new PageResult<>(tasks, count);
+    }
+
+    /**
+     * 已办任务的排除式翻页，语义与 {@link #pagedTasksExcludingProcessDefinitions} 一致。
+     * 额外保留原有的“发起人节点”内存过滤，因此这里也要一并剔除，避免占用分页名额。
+     */
+    private PageResult<HistoricTaskInstance> pagedHistoricTasksExcludingProcessDefinitions(
+            HistoricTaskInstanceQuery taskQuery, BpmTaskPageReqVO pageVO, Set<String> excludedDefinitionIds) {
+        int pageSize = pageVO.getPageSize();
+        int pageStart = (pageVO.getPageNo() - 1) * pageSize;
+        List<HistoricTaskInstance> pageList = new ArrayList<>();
+        long total = 0;
+        int scanOffset = 0;
+        final int scanBatch = Math.max(pageSize, 100);
+        while (true) {
+            List<HistoricTaskInstance> batch = taskQuery.listPage(scanOffset, scanBatch);
+            if (CollUtil.isEmpty(batch)) {
+                break;
+            }
+            scanOffset += batch.size();
+            for (HistoricTaskInstance task : batch) {
+                if (excludedDefinitionIds.contains(task.getProcessDefinitionId())
+                        || START_USER_NODE_ID.equals(task.getTaskDefinitionKey())) {
+                    continue;
+                }
+                if (total >= pageStart && pageList.size() < pageSize) {
+                    pageList.add(task);
+                }
+                total++;
+            }
+            if (batch.size() < scanBatch) {
+                break;
+            }
+        }
+        return new PageResult<>(pageList, total);
     }
 
     private boolean applyProcessVariableFilter(TaskQuery query, String variableName, List<String> values) {

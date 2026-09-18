@@ -18,6 +18,9 @@ export interface AdvancedFilterTemplate {
   sort: number
   enabled: boolean
   defaultTemplate: boolean
+  // 页面自动套用时会选中的那一条，仅 visible-list 返回时由服务端计算：
+  // 个人默认优先于系统默认，优先级规则不在前端重复实现。
+  effectiveDefault?: boolean
   version?: number
   createTime?: Timestamp
   updateTime?: Timestamp

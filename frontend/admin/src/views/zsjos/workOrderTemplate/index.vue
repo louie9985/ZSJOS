@@ -278,8 +278,9 @@ const statusLabel: Record<string, string> = {
   DISABLED: '已停用'
 }
 const qualificationOptions = [
+  { value: 'ALL', label: '全员' },
   { value: 'ROLE', label: '任一角色' },
-  { value: 'DEPARTMENT', label: '任一部门' },
+  { value: 'DEPARTMENT', label: '任一部门（含子部门）' },
   { value: 'ROLE_AND_DEPARTMENT', label: '角色且部门' }
 ]
 const fieldTypes = [

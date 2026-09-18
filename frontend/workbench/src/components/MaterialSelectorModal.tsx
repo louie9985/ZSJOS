@@ -100,7 +100,7 @@ export default function MaterialSelectorModal({
       render: (_: unknown, record: Material) => <Space align="start" size={10}>
         {record.coverPreviewUrl
           ? <Image src={record.coverPreviewUrl} width={56} height={56} style={{ objectFit: 'cover', borderRadius: 4 }} />
-          : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-surface-raised)' }} />}
+          : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-bg-sunken)' }} />}
         <span><Typography.Text strong>{record.title}</Typography.Text><br />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>{record.summary || '无摘要'}</Typography.Text></span>
       </Space>,

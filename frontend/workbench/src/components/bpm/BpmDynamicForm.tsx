@@ -59,17 +59,28 @@ export function parseBpmFormConf(formConf?: string): BpmFormConf {
   }
 }
 
-const isBlank = (value: unknown) =>
+export const isBlank = (value: unknown) =>
   value === undefined || value === null || value === ''
 
-/** 只读展示：把任意变量值渲染成可读文本，不猜测业务语义。 */
+/**
+ * 只读展示：把任意变量值渲染成可读文本，不猜测业务语义。
+ *
+ * <p>对象值取常见的展示键（label / name / title），取不到才退回 JSON——
+ * 审批人看到的应该是「程振建」，而不是 {@code {"id":21,"name":"程振建"}} 或 {@code [21]}。
+ */
 export function formatBpmVariable(value: unknown): string {
   if (isBlank(value)) return '-'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (Array.isArray(value)) {
     return value.length === 0 ? '-' : value.map(item => formatBpmVariable(item)).join('、')
   }
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    for (const key of ['label', 'name', 'nickname', 'title', 'value']) {
+      if (!isBlank(record[key])) return formatBpmVariable(record[key])
+    }
+    return JSON.stringify(value)
+  }
   return String(value)
 }
 

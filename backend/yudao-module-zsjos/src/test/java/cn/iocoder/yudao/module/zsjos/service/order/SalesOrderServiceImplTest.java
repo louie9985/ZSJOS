@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.FinanceOrderExportRowRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderDecisionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyCursorReqVO;
@@ -138,6 +139,39 @@ class SalesOrderServiceImplTest {
         String summary = ReflectionTestUtils.invokeMethod(service, "courseSummary", item);
 
         assertEquals("course-legacy / sku-legacy", summary);
+    }
+
+    @Test // 迁移订单没有轮次，财务导出台账的审批结论不能整列空白（后台任务，无人盯屏）
+    void financeExportBackfillsApprovedCentersForMigratedOrderWithoutRound() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(647L); order.setOrderNo("OR202609150011"); order.setStatus(STATUS_EFFECTIVE);
+        order.setStudentName("历史学员"); order.setOrderType(ORDER_TYPE_FIRST_PURCHASE);
+        order.setCurrentApprovalRoundId(null);
+
+        FinanceOrderExportRowRespVO row = ReflectionTestUtils.invokeMethod(service, "convertFinanceExportRow",
+                order, null, List.<SalesOrderItemDO>of(), Map.<String, List<BpmProcessNodeStatusRespDTO>>of(),
+                new java.util.HashMap<Long, AdminUserRespDTO>());
+
+        assertEquals(ROUND_APPROVED, row.getRegistrationStatus());
+        assertEquals(ROUND_APPROVED, row.getFinanceStatus());
+        // 审核人/审核时间仍留空——迁移数据里没有，不编造
+        assertNull(row.getRegistrationReviewer());
+        assertNull(row.getRegistrationReviewedAt());
+    }
+
+    @Test // 在途订单导出时保持空白，不能凭空标成已通过
+    void financeExportLeavesCentersEmptyForPendingOrderWithoutRound() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(18L); order.setOrderNo("OD202608231715100003"); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setStudentName("在途学员"); order.setOrderType(ORDER_TYPE_FIRST_PURCHASE);
+        order.setCurrentApprovalRoundId(null);
+
+        FinanceOrderExportRowRespVO row = ReflectionTestUtils.invokeMethod(service, "convertFinanceExportRow",
+                order, null, List.<SalesOrderItemDO>of(), Map.<String, List<BpmProcessNodeStatusRespDTO>>of(),
+                new java.util.HashMap<Long, AdminUserRespDTO>());
+
+        assertNull(row.getRegistrationStatus());
+        assertNull(row.getFinanceStatus());
     }
 
     @Test
@@ -499,11 +533,14 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectMyCount(20L, STATUS_PENDING_APPROVAL)).thenReturn(2L);
         when(orderMapper.selectMyCount(20L, STATUS_REVISION_REQUIRED)).thenReturn(1L);
         when(orderMapper.selectMyCount(20L, STATUS_EFFECTIVE)).thenReturn(4L);
+        when(orderMapper.selectMyCount(20L, STATUS_SUPERSEDED)).thenReturn(5L);
+        when(orderMapper.selectMyCount(20L, STATUS_TERMINATED)).thenReturn(3L);
 
         var result = service.getMyStatusCounts(20L);
 
         assertEquals(7L, result.getTotal()); assertEquals(2L, result.getPendingApproval());
         assertEquals(1L, result.getRevisionRequired()); assertEquals(4L, result.getEffective());
+        assertEquals(5L, result.getSuperseded()); assertEquals(3L, result.getTerminated());
     }
 
     @Test
@@ -529,6 +566,87 @@ class SalesOrderServiceImplTest {
         assertEquals(233L, result.getRegistrationApproval().getReviewerUserId());
         assertEquals("审核员甲", result.getRegistrationApproval().getReviewerUserName());
         assertEquals(LocalDateTime.of(2026, 8, 12, 10, 30), result.getRegistrationApproval().getEndTime());
+    }
+
+    @Test // 历史迁移订单的轮次没有 BPM 实例，时间线不能把已通过的两个中心显示成“待处理”
+    void getBackfillsApprovedCentersForMigratedRoundWithoutBpmInstance() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("OD202608161724000001"); order.setLeadId(1L);
+        order.setStatus(STATUS_EFFECTIVE); order.setCurrentApprovalRoundId(200L);
+        order.setStudentName("历史学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setRoundNo(1); round.setStatus(ROUND_APPROVED);
+        // 迁移数据把遗留订单号写成了流程实例号，Flowable 查不回任何节点
+        round.setProcessInstanceId("OD2026081617240100001");
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        when(processTaskApi.getProcessNodeStatuses("OD2026081617240100001", Set.of(TASK_REGISTRATION, TASK_FINANCE)))
+                .thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertEquals("approved", result.getRegistrationApproval().getStatus());
+        assertEquals("approved", result.getFinanceApproval().getStatus());
+        // 迁移数据里没有审批人和时间，不编造
+        assertNull(result.getRegistrationApproval().getReviewerUserId());
+        assertNull(result.getRegistrationApproval().getEndTime());
+    }
+
+    @Test // 迁移的主流形态是“只有订单状态、完全没有审批轮次”（当前 371 条生效订单如此）
+    void getBackfillsApprovedCentersForMigratedOrderWithoutAnyRound() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("OR202609150011"); order.setLeadId(1L);
+        order.setStatus(STATUS_EFFECTIVE); order.setCurrentApprovalRoundId(null);
+        order.setStudentName("历史学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(null);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertEquals("approved", result.getRegistrationApproval().getStatus());
+        assertEquals("approved", result.getFinanceApproval().getStatus());
+        assertNull(result.getRegistrationApproval().getReviewerUserName());
+        // 引擎一次都不该被问到——没有轮次就没有实例号可查
+        verify(processTaskApi, never()).getProcessNodeStatuses(anyString(), anySet());
+    }
+
+    @Test // 只有已生效订单才补齐：在途/驳回订单显示“待处理”才是对的
+    void getDoesNotBackfillCentersForPendingOrderWithoutRound() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("OD202609160001"); order.setLeadId(1L);
+        order.setStatus(STATUS_PENDING_APPROVAL); order.setCurrentApprovalRoundId(null);
+        order.setStudentName("在途学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(null);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertNull(result.getRegistrationApproval());
+        assertNull(result.getFinanceApproval());
+    }
+
+    @Test // 驳回/在途轮次无法判断是哪个中心驳回，保持原样不补齐
+    void getLeavesCentersEmptyForRejectedMigratedRound() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("OD202608191545460002"); order.setLeadId(1L);
+        order.setStatus(STATUS_REVISION_REQUIRED); order.setCurrentApprovalRoundId(200L);
+        order.setStudentName("驳回学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setRoundNo(1); round.setStatus(ROUND_REJECTED);
+        round.setProcessInstanceId("OD2026081915454600001");
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        when(processTaskApi.getProcessNodeStatuses("OD2026081915454600001", Set.of(TASK_REGISTRATION, TASK_FINANCE)))
+                .thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertNull(result.getRegistrationApproval());
+        assertNull(result.getFinanceApproval());
     }
 
     @Test

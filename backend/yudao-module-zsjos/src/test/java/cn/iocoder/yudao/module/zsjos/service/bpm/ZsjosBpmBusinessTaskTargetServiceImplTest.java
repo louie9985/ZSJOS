@@ -9,10 +9,14 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.bpm.vo.ZsjosBpmBusinessTaskTargetRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderApprovalTaskTargetRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper;
 import cn.iocoder.yudao.module.zsjos.enums.LeadConstants;
 import cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants;
+import cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants;
+import cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackObjectPermissionProvider;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderSupervisorConfirmationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,8 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private SalesOrderSupervisorConfirmationService salesOrderTargetService;
     @Mock private LeadAppealMapper leadAppealMapper;
+    @Mock private FeedbackMapper feedbackMapper;
+    @Mock private FeedbackObjectPermissionProvider permissionProvider;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
 
@@ -46,7 +52,8 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
         when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task("zsjos_viral_account_review", "material-version:3", "viralReview", "process"));
         when(permissionApi.hasAnyPermissions(USER_ID, "zsjos:material-approval:query")).thenReturn(true);
         var result = service.getTarget(TASK_ID, "todo", USER_ID);
-        assertEquals("/zsjos/material-library/approvals", result.getRoute());
+        // 素材审批没有独立页面：复用素材管理页，由 taskId/versionId 把页面切到审批态。
+        assertEquals("/zsjos/material-library/manage", result.getRoute());
         assertEquals(3L, result.getQuery().get("versionId"));
         assertEquals(TASK_ID, result.getQuery().get("taskId"));
         verify(materialApprovalService).requireTask(3L, TASK_ID, false, USER_ID);
@@ -166,6 +173,63 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
         assertEquals("该流程暂未接入员工端业务审批页，请在完整 BPM 表单中处理。", target.getMessage());
     }
 
+    /**
+     * 需求反馈的 businessKey 第二段是 workOrderId 而不是 feedbackId。
+     * 按 feedbackId 去 selectById 不会报错，只会解析到另一条无关的反馈——
+     * 因此这条测试断言的是「用 workOrderId 查询」这件事本身。
+     */
+    @Test
+    void feedbackTargetResolvesWorkOrderIdFromBusinessKey() {
+        when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task(
+                FeedbackConstants.PROCESS_DEFINITION_KEY,
+                "feedback:78:round:1",
+                "departmentLeaderReview",
+                "process-1"));
+        when(feedbackMapper.selectByWorkOrderId(78L)).thenReturn(feedback(77L));
+        when(permissionProvider.hasPermission(
+                77L, FeedbackObjectPermissionProvider.ACTION_READ_APPROVER, USER_ID)).thenReturn(true);
+
+        ZsjosBpmBusinessTaskTargetRespVO target = service.getTarget(TASK_ID, "todo", USER_ID);
+
+        assertTrue(target.getSupported());
+        assertEquals("feedback", target.getBizType());
+        assertEquals("/zsjos/feedback", target.getRoute());
+        assertEquals(77L, target.getQuery().get("feedbackId"));
+        verify(feedbackMapper).selectByWorkOrderId(78L);
+    }
+
+    /** 非本轮审批人不开入口：抛错让前端提示"无权打开"，而不是跳过去看一个空白页。 */
+    @Test
+    void feedbackTargetRejectsNonApprover() {
+        when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task(
+                FeedbackConstants.PROCESS_DEFINITION_KEY,
+                "feedback:78:round:1",
+                "departmentLeaderReview",
+                "process-1"));
+        when(feedbackMapper.selectByWorkOrderId(78L)).thenReturn(feedback(77L));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getTarget(TASK_ID, "todo", USER_ID));
+
+        assertEquals(ZsjosErrorCodeConstants.FEEDBACK_PERMISSION_DENIED.getCode(), error.getCode());
+    }
+
+    /** businessKey 段位不对时不能猜，直接按拒绝处理。 */
+    @Test
+    void feedbackTargetRejectsMalformedBusinessKey() {
+        when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task(
+                FeedbackConstants.PROCESS_DEFINITION_KEY,
+                "feedback:not-a-number:round:1",
+                "departmentLeaderReview",
+                "process-1"));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getTarget(TASK_ID, "todo", USER_ID));
+
+        assertEquals(ZsjosErrorCodeConstants.FEEDBACK_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(feedbackMapper);
+    }
+
     @Test
     void appealTaskRequiresMatchingDefinitionKey() {
         when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task(
@@ -177,6 +241,14 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.getTarget(TASK_ID, "todo", USER_ID));
 
         assertEquals(ZsjosErrorCodeConstants.LEAD_APPEAL_PERMISSION_DENIED.getCode(), error.getCode());
+    }
+
+    private FeedbackDO feedback(Long id) {
+        FeedbackDO row = new FeedbackDO();
+        row.setId(id);
+        row.setWorkOrderId(78L);
+        row.setFeedbackType(FeedbackConstants.TYPE_REQUIREMENT);
+        return row;
     }
 
     private BpmTaskRespDTO task(String processDefinitionKey, String businessKey, String taskDefinitionKey, String processInstanceId) {

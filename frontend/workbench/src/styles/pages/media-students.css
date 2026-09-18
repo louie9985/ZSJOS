@@ -549,7 +549,7 @@
 .account-profile-section { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; padding: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
 .account-profile-section-heading { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--crm-sp-2); padding: var(--crm-sp-3) var(--crm-card-pad); border-bottom: 1px solid var(--crm-border); }
 .account-profile-section-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 var(--crm-card-pad); }
-.account-profile-status-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--crm-gap); }
+.account-profile-status-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 0 var(--crm-gap); }
 .account-profile-status-columns > div { min-width: 0; }
 .account-profile-row .account-owner { font-size: var(--crm-font-sm); margin: 0; }
 .account-profile-section-heading .ant-btn { padding-inline: var(--crm-sp-1); }
@@ -563,27 +563,53 @@
 .account-profile-row > div:first-child .anticon + .anticon { margin-inline-start: var(--crm-sp-1); }
 .account-profile-history { margin-top: var(--crm-sp-5); }
 .account-profile-history article { padding-block: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 编辑弹窗：与账号主页同构 —— 左栏主页图，右侧三组各一列卡片，卡片内部各自滚动。 */
-.account-profile-editor { display: grid; height: 65vh; min-height: 0; grid-template-columns: 230px minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1.2fr); gap: var(--crm-gap); padding: var(--crm-pane-pad); }
-.account-profile-editor-aside { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
+/* 编辑弹窗：第一列（图/归属/操作/提醒）跨满两行，定位卡通栏占第一行，
+   状态与复盘并排占第二行。位置全部显式声明 —— 依赖流式顺序会让板块漂到空列，
+   历史上第四列因此整列留白、复盘卡被挤到第二行。 */
+.account-profile-editor {
+  display: grid;
+  height: min(72vh, 760px);
+  min-height: 0;
+  grid-template-columns: 248px minmax(0, 1fr) minmax(0, 1.15fr);
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1fr);
+  grid-template-areas:
+    "aside positioning positioning"
+    "aside status review";
+  gap: var(--crm-gap);
+  padding: var(--crm-pane-pad);
+}
+/* 卡片在 DOM 里嵌于 .account-profile-editor-main > .account-profile-editor-columns
+   （两层都用 display:contents 抹平），所以按后代选择器定位，不能写直接子代 `>`。 */
+.account-profile-editor [data-profile-section="POSITIONING"] { grid-area: positioning; }
+.account-profile-editor [data-profile-section="STATUS"] { grid-area: status; }
+.account-profile-editor [data-profile-section="REVIEW"] { grid-area: review; }
+.account-profile-editor-aside { grid-area: aside; display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); border-radius: var(--crm-radius-md); background: var(--crm-bg-sunken); overflow-wrap: anywhere; }
+/* 第一列内的提醒块不再吃整页宽度，缩到本列内。 */
+.account-profile-editor-aside .account-profile-reminder,
+.account-profile-editor-aside .account-profile-missing,
+.account-profile-editor-aside .account-profile-editor-toolbar { margin: 0; }
+.account-profile-editor-aside .ant-alert-description .ant-space { gap: var(--crm-sp-1) 0; flex-direction: column; }
+.account-profile-editor-owner { display: flex; flex: none; flex-direction: column; gap: 2px; }
 .account-profile-editor-aside p { margin: 0; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
 /* 主页图是左栏里居中的小卡片，与只读展示区版式一致；上传/移除按钮贴在其下。 */
 .account-profile-editor-cover { display: flex; flex: none; flex-direction: column; gap: var(--crm-sp-2); }
 .account-profile-editor-aside .account-profile-cover { flex: none; min-height: 180px; margin-bottom: 0; }
+.account-profile-editor-aside .account-profile-cover .ant-image,
+.account-profile-editor-aside .account-profile-cover img { max-height: 240px; width: auto; max-width: 100%; object-fit: contain; }
 .account-profile-editor-actions { display: grid; flex: none; gap: var(--crm-sp-2); }
 .account-profile-editor-actions > .ant-space { display: flex; width: 100%; flex-wrap: wrap; }
 /* 只有顶层按钮撑满左栏宽度；“移除”等联排按钮保持自身宽度。 */
 .account-profile-editor-actions > .ant-space > .ant-space-item > .ant-btn,
 .account-profile-editor-actions > .ant-space > .ant-space-item > .ant-upload { width: 100%; }
 .account-profile-editor-main { display: contents; }
-.account-profile-editor-toolbar { display: flex; grid-column: 2 / -1; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); flex-wrap: wrap; }
-/* 三列卡片复用 .account-profile-section / .account-profile-section-body 的定高内滚规则。 */
+/* 工具栏收在第一列底部；窄列里靠 wrap 竖排，不再横跨 2–4 列。 */
+.account-profile-editor-toolbar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--crm-sp-2); flex-wrap: wrap; }
+/* 三张卡片是网格的直接子项，各自定高内滚。 */
 .account-profile-editor-columns { display: contents; }
 /* 列内是单列字段流（不再是弹窗原来的两列栅格）。 */
 .account-profile-editor-columns .account-profile-section-body { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
 .account-profile-editor-columns .account-profile-status-columns > div { display: flex; flex-direction: column; gap: var(--crm-sp-5); }
 .account-profile-control { min-width: 0; display: flex; flex-direction: column; gap: var(--crm-sp-2); }
-.account-profile-control.wide { grid-column: 1 / -1; }
 .account-profile-control > div:first-child { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--crm-sp-2); }
 .account-profile-control .ant-select, .account-profile-control .ant-input-number { width: 100%; }
 .account-profile-readonly { padding: var(--crm-sp-3); border-radius: var(--crm-radius-sm); background: var(--crm-bg-sunken); color: var(--crm-text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -598,13 +624,10 @@
 }
 
 @media (max-width: 768px) {
- .account-profile-editor { height: auto; padding: var(--crm-sp-2); }
+ .account-profile-editor { height: auto; padding: var(--crm-sp-2); grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "aside" "positioning" "status" "review"; }
  .account-profile-editor-aside,
  .account-profile-editor-columns .account-profile-section-body { overflow: visible; }
- .account-profile-editor-toolbar { grid-column: auto; }
  .account-profile-cover { min-height: 120px; }
- .account-profile-editor,
- .account-profile-editor-columns,
  .account-profile-status-columns { grid-template-columns: minmax(0,1fr); }
 }
 
@@ -645,10 +668,13 @@
 
 
 .account-profile-editor-columns > [data-profile-section="POSITIONING"] { min-width: 0; }
-.account-positioning-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+/* 定位卡通栏后宽度充裕，改为按内容分配列宽：fixed + 固定百分比曾把后两列压到约 44px。 */
+.account-positioning-table { width: 100%; border-collapse: collapse; }
 .account-positioning-table th, .account-positioning-table td { padding: var(--crm-sp-3); border-bottom: 1px solid var(--crm-border); vertical-align: top; text-align: left; overflow-wrap: anywhere; white-space: pre-wrap; }
-.account-positioning-table th:first-child { width: 20%; }
-.account-positioning-table th:nth-child(2) { width: 30%; }
+.account-positioning-table th:first-child { width: 16%; min-width: 150px; }
+.account-positioning-table th:nth-child(2) { width: 26%; min-width: 180px; }
+.account-positioning-table th:nth-child(3) { width: 26%; min-width: 200px; }
+.account-positioning-table th:nth-child(4) { width: 32%; min-width: 200px; }
 .account-positioning-table .ant-select { width: 100%; }
 @media (max-width: 768px) {
   .account-positioning-table, .account-positioning-table tbody, .account-positioning-table tr, .account-positioning-table th, .account-positioning-table td { display: block; width: 100%; }

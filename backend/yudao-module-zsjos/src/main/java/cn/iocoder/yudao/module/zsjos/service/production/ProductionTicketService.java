@@ -124,7 +124,7 @@ public class ProductionTicketService {
                         userId, fingerprint), Long.class);
         if (!command.created()) return command.result();
         ProductionTicketCreateContextRespVO context = getCreateContext(req.getAccountId(), req.getSceneCode(), userId);
-        if (!Boolean.TRUE.equals(context.getCanCreate())) throw exception(PRODUCTION_TICKET_POSITIONING_REQUIRED);
+        // 定位卡仅作为上下文信息展示，不再阻断发起（原 canCreate 强制校验已移除）
         if ((req.getAssigneeUserId() == null) == (req.getTargetDeptId() == null)) {
             throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
         }

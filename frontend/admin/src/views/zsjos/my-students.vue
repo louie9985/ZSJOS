@@ -28,6 +28,7 @@
     scene="student"
     placeholder="姓名 / 手机号 / 客资编号"
     :keyword="query.keyword"
+    page-key="student_my"
     @search="(value) => { query.keyword = value; handleQuery() }"
     @change="(value) => { query.advancedFilter = value; handleQuery() }"
   />

@@ -100,7 +100,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public PageResult<AdminUserDO> getCandidateUserPage(AdminUserCandidatePageReqDTO reqDTO) {
         String mode = reqDTO.getQualificationMode();
-        if (!("ROLE".equals(mode) || "DEPARTMENT".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode))) {
+        // ALL = 全员：不对角色/部门做任何过滤，返回全部启用用户
+        if (!("ALL".equals(mode) || "ROLE".equals(mode) || "DEPARTMENT".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode))) {
             return PageResult.empty();
         }
         if (("ROLE".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode)) && CollUtil.isEmpty(reqDTO.getRoleIds())) {

@@ -33,7 +33,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
               AND (#{sceneCode} IS NULL OR wo.scene_code=#{sceneCode})
               AND (wo.target_dept_id IS NULL OR wo.target_dept_id=u.dept_id)
               AND (
-                (wo.candidate_qualification_mode='ROLE' AND EXISTS (
+                wo.candidate_qualification_mode='ALL'
+                OR (wo.candidate_qualification_mode='ROLE' AND EXISTS (
                   SELECT 1 FROM system_user_role ur
                   JOIN system_role r ON r.id=ur.role_id AND r.deleted=0 AND r.status=0
                   WHERE ur.user_id=u.id AND ur.deleted=0

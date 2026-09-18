@@ -105,6 +105,61 @@ class AdvancedFilterTemplateServiceImplTest {
         assertEquals("lead.status", result.getFirst().getFilter().getConditions().getFirst().getFieldKey());
     }
 
+    // 个人默认优先于系统默认：两者都设了默认时，页面自动套用的必须是个人那条。
+    @Test
+    void visibleListMarksPersonalDefaultAsEffectiveOverSystemDefault() {
+        AdvancedFilterTemplateDO system = template(1L, "system", null);
+        system.setDefaultTemplate(true);
+        AdvancedFilterTemplateDO personal = template(2L, "personal", 11L);
+        personal.setDefaultTemplate(true);
+        when(advancedFilterService.supportsScene("lead")).thenReturn(true);
+        when(mapper.selectVisibleList("lead", "lead_management", 11L)).thenReturn(List.of(system, personal));
+
+        var result = service.visibleList("lead", "lead_management", 11L);
+
+        assertEquals(List.of(false, true), result.stream().map(item -> item.getEffectiveDefault()).toList());
+        assertEquals(1, result.stream().filter(item -> item.getEffectiveDefault()).count());
+    }
+
+    // 没有个人默认时回退到系统默认，否则页面会失去自动套用能力。
+    @Test
+    void visibleListFallsBackToSystemDefaultWhenPersonalHasNoDefault() {
+        AdvancedFilterTemplateDO system = template(1L, "system", null);
+        system.setDefaultTemplate(true);
+        AdvancedFilterTemplateDO personal = template(2L, "personal", 11L);
+        when(advancedFilterService.supportsScene("lead")).thenReturn(true);
+        when(mapper.selectVisibleList("lead", "lead_management", 11L)).thenReturn(List.of(system, personal));
+
+        var result = service.visibleList("lead", "lead_management", 11L);
+
+        assertEquals(List.of(true, false), result.stream().map(item -> item.getEffectiveDefault()).toList());
+    }
+
+    @Test
+    void visibleListMarksNothingWhenNoTemplateIsDefault() {
+        AdvancedFilterTemplateDO system = template(1L, "system", null);
+        AdvancedFilterTemplateDO personal = template(2L, "personal", 11L);
+        when(advancedFilterService.supportsScene("lead")).thenReturn(true);
+        when(mapper.selectVisibleList("lead", "lead_management", 11L)).thenReturn(List.of(system, personal));
+
+        var result = service.visibleList("lead", "lead_management", 11L);
+
+        assertEquals(List.of(false, false), result.stream().map(item -> item.getEffectiveDefault()).toList());
+    }
+
+    // 管理页列出系统预置时不参与页面自动套用，不标记有效默认。
+    @Test
+    void systemListNeverMarksEffectiveDefault() {
+        AdvancedFilterTemplateDO system = template("system", null);
+        system.setDefaultTemplate(true);
+        when(advancedFilterService.supportsScene("lead")).thenReturn(true);
+        when(mapper.selectSystemList("lead", "lead_management")).thenReturn(List.of(system));
+
+        var result = service.systemList("lead", "lead_management");
+
+        assertEquals(List.of(false), result.stream().map(item -> item.getEffectiveDefault()).toList());
+    }
+
     private static AdvancedFilterTemplateSaveReqVO request(boolean defaultTemplate) {
         AdvancedFilterTemplateSaveReqVO reqVO = new AdvancedFilterTemplateSaveReqVO();
         reqVO.setScene("lead");
@@ -118,8 +173,12 @@ class AdvancedFilterTemplateServiceImplTest {
     }
 
     private static AdvancedFilterTemplateDO template(String scope, Long ownerUserId) {
+        return template(9L, scope, ownerUserId);
+    }
+
+    private static AdvancedFilterTemplateDO template(Long id, String scope, Long ownerUserId) {
         AdvancedFilterTemplateDO template = new AdvancedFilterTemplateDO();
-        template.setId(9L);
+        template.setId(id);
         template.setScene("lead");
         template.setPageKey("lead_management");
         template.setScope(scope);

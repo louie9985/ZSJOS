@@ -6,6 +6,7 @@
     advanced-scene="subordinate_sales"
     advanced-search-endpoint="/zsjos/subordinate-sales/search-page"
     advanced-placeholder="姓名 / 账号 / 手机号"
+    advanced-page-key="subordinate_sales"
   >
     <template #row-actions="{ row, reload }">
       <el-button link type="primary" @click="showLeads(row)">查看客资</el-button>

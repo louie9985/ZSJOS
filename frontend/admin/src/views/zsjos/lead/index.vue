@@ -60,7 +60,7 @@
         <el-button @click="resetQuery"><Icon icon="ep:refresh" />重置</el-button>
       </el-form-item>
     </el-form>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleAdvancedSearch" @change="handleAdvancedFilter" />
+    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" page-key="lead_management" @search="handleAdvancedSearch" @change="handleAdvancedFilter" />
   </ContentWrap>
 
   <ContentWrap>

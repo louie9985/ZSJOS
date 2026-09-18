@@ -255,16 +255,26 @@ public class MaterialTypeServiceImpl implements MaterialTypeService {
     }
 
     private void ensureDefaultSchema(MaterialTypeDO type) {
-        if (!DEFAULT_SCHEMA_TYPES.contains(type.getCode()) || type.getCurrentSchemaVersionId() != null) {
+        if (!DEFAULT_SCHEMA_TYPES.contains(type.getCode())) {
             return;
         }
-        MaterialSchemaVersionDO existing = schemaMapper.selectLatestByTypeId(type.getId());
+        if (type.getCurrentSchemaVersionId() != null
+                && schemaMapper.selectById(type.getCurrentSchemaVersionId()) != null) {
+            return;
+        }
+        // A non-null pointer can outlive its template after an incomplete data restore.
+        // Recover published definitions only: opening a page must never publish an administrator's draft.
+        List<MaterialSchemaVersionDO> versions = schemaMapper.selectListByTypeId(type.getId());
+        MaterialSchemaVersionDO existing = versions.stream()
+                .filter(schema -> SCHEMA_PUBLISHED.equals(schema.getStatus()))
+                .findFirst().orElse(null);
         if (existing != null) {
-            // Re-link a schema whose guarded publish lost the version race on an earlier attempt,
-            // otherwise the type stays unlinked forever and every create fails.
             if (typeMapper.publishSchema(type.getId(), type.getVersion(), existing.getId()) == 1) {
                 type.setCurrentSchemaVersionId(existing.getId());
             }
+            return;
+        }
+        if (!versions.isEmpty()) {
             return;
         }
         List<MaterialFieldDefinition> fields = defaultSchemaFields(type.getCode());

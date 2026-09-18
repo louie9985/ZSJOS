@@ -130,6 +130,8 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
   const [detailError, setDetailError] = useState('')
   const [detail, setDetail] = useState<FeedbackRecord>()
   const [detailId, setDetailId] = useState<number>()
+  /** 本次详情是不是"审批人视角"打开的（他审的是别人的单子）。 */
+  const [approverView, setApproverView] = useState(false)
   const [editorForm] = Form.useForm<Record<string, unknown>>()
   const [editor, setEditor] = useState<{ mode: 'create' | 'resubmit'; form: FeedbackForm; record?: FeedbackRecord }>()
   const [editorLoading, setEditorLoading] = useState(false)
@@ -170,15 +172,30 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
     await Promise.all([loadPortal(), view === 'records' ? loadRecords(1) : Promise.resolve()])
   }
 
+  /**
+   * 加载详情。先按"本人"口径取，取不到再退到"审批人"口径 —— 从审批中心跳过来的是
+   * 部门负责人/董事长，他们看的往往是别人的单子，`/{id}` 的 read-own 不放行。
+   *
+   * 用 `approver` 标记本次详情是以哪种身份打开的：审批人视角下不能标记已读，
+   * 也不该出现"修改并重提/回复"这类本人动作（后端已把这三个开关置为 false）。
+   */
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true)
     setDetailError('')
     try {
-      let next = await feedbackApi.detail(id)
-      if (next.unread && hasPermission(permissions, 'zsjos:feedback:read')) {
+      let approver = false
+      let next: FeedbackRecord
+      try {
+        next = await feedbackApi.detail(id)
+      } catch {
+        next = await feedbackApi.approverDetail(id)
+        approver = true
+      }
+      if (!approver && next.unread && hasPermission(permissions, 'zsjos:feedback:read')) {
         await feedbackApi.markRead(id, next.version)
         next = await feedbackApi.detail(id)
       }
+      setApproverView(approver)
       setDetail(next)
     } catch (cause) {
       setDetail(undefined)
@@ -337,8 +354,17 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
       {detailError && <Alert type="error" showIcon message={detailError} action={<Button onClick={() => detailId && void loadDetail(detailId)}>重试</Button>}/>}
       {detailLoading ? <Skeleton active paragraph={{ rows: 8 }}/> : detail && <div className="feedback-detail">
         <div className="feedback-detail-title"><div><Typography.Title level={4}>{detail.title}</Typography.Title><Typography.Text type="secondary">{formatTimestamp(detail.createTime)}</Typography.Text></div><Tag color={STATUS_META[detail.status].color}>{STATUS_META[detail.status].label}</Tag></div>
+        {approverView && <Alert
+          className="feedback-detail-alert"
+          type="info"
+          showIcon
+          message="审批人视角"
+          description={`这是 ${detail.submitterName || '员工'} 提交的需求，你以审批人身份查看，不能在此修改或回复。`}
+        />}
         <Descriptions bordered size="small" column={1} items={[
           { key: 'type', label: '类型', children: TYPE_META[detail.feedbackType].label },
+          { key: 'submitter', label: '提交人', children: detail.submitterName || '-' },
+          ...(detail.approvalRoundNo ? [{ key: 'round', label: '审批轮次', children: `第 ${detail.approvalRoundNo} 轮` }] : []),
           { key: 'assignee', label: '当前处理人', children: detail.assigneeName || '待分派' },
           { key: 'activity', label: '最后更新', children: formatTimestamp(detail.lastActivityAt) }
         ]}/>

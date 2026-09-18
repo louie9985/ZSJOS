@@ -1,0 +1,104 @@
+/**
+ * 审批详情里的业务内容卡。
+ *
+ * 结构与 DetailFieldGrid 一致，只是多了一层「分组」：一个业务域通常有
+ * 基础信息 / 金额 / 处理信息几组，分组之间留白比再加边框更轻。
+ */
+.business-content-card {
+  display: grid;
+  gap: var(--crm-sp-3);
+  margin-top: var(--crm-sp-2);
+}
+
+.business-content-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--crm-sp-2);
+}
+
+.business-content-card-heading .ant-typography {
+  margin: 0;
+}
+
+.business-content-group {
+  display: grid;
+  gap: var(--crm-sp-1);
+}
+
+/**
+ * 分组标题（反馈信息 / 审批 / 申请内容…）。
+ *
+ * 原先只是一行 secondary 文字，和下面的字段块没有任何层级差，几个分组连着看就是
+ * 一坨字段。用一条短竖线做锚点：不抢字段的注意力，但扫一眼就知道换组了。
+ */
+.business-content-group > .ant-typography-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  font-weight: var(--crm-weight-medium);
+}
+
+.business-content-group > .ant-typography-secondary::before {
+  content: '';
+  width: 2px;
+  height: 1em;
+  flex: none;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-border-strong);
+}
+
+/**
+ * 附件展示。与反馈详情、线索证据保持同一套观感：
+ * 图片铺缩略图网格，文档走文字链接。
+ */
+.business-content-attachment {
+  display: grid;
+  gap: var(--crm-sp-2);
+}
+
+.bpm-attachment-grid {
+  display: grid;
+  gap: var(--crm-sp-2);
+}
+
+.bpm-attachment-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+}
+
+.bpm-attachment-images .ant-image {
+  overflow: hidden;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.bpm-attachment-images .ant-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 签名失败或没有地址的图片：给出占位而不是裂图。 */
+.bpm-attachment-missing {
+  display: grid;
+  width: 112px;
+  height: 84px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-align: center;
+}
+
+.bpm-attachment-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+}

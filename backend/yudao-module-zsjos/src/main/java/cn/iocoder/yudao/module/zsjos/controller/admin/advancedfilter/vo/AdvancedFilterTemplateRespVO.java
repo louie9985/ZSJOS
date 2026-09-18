@@ -15,6 +15,11 @@ public class AdvancedFilterTemplateRespVO {
     private Integer sort;
     private Boolean enabled;
     private Boolean defaultTemplate;
+    /**
+     * 页面自动套用时会选中的那一条，仅 visible-list 返回时计算。
+     * 同一页面可能同时存在个人默认与系统默认，优先级由服务端唯一决定，前端不重复实现。
+     */
+    private Boolean effectiveDefault;
     private Integer version;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

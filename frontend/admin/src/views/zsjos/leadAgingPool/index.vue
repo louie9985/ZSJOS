@@ -6,7 +6,7 @@
       </el-select></el-form-item>
       <el-form-item><el-button @click="reset"><Icon icon="ep:refresh" />重置</el-button></el-form-item>
     </el-form>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleSearch" @change="handleFilter" />
+    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" page-key="lead_aging_pool" @search="handleSearch" @change="handleFilter" />
   </ContentWrap>
   <ContentWrap>
     <el-alert v-if="error" type="error" :title="error" show-icon :closable="false" class="mb-16px">

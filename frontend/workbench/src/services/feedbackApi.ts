@@ -138,6 +138,12 @@ export const feedbackApi = {
     status?: FeedbackStatus
   }) => unwrap<PageResult<FeedbackRecord>>(await http.get('/zsjos/feedback/my-page', { params })),
   detail: async (id: number) => unwrap<FeedbackRecord>(await http.get(`/zsjos/feedback/${id}`)),
+  /**
+   * 审批人视角的详情。审批人不是单据本人，`/zsjos/feedback/{id}` 只认提交人，
+   * 直接从审批中心跳过来会被 read-own 挡掉，因此走这个端点。
+   */
+  approverDetail: async (id: number) =>
+    unwrap<FeedbackRecord>(await http.get(`/zsjos/feedback/${id}/approver-view`)),
   markRead: async (id: number, version: number) =>
     unwrap<boolean>(
       await http.put(`/zsjos/feedback/${id}/read`, {

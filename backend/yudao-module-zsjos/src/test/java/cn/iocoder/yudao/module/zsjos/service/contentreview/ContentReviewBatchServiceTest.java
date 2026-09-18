@@ -175,13 +175,31 @@ class ContentReviewBatchServiceTest {
         verify(batchMapper, never()).markDirectorCompleted(any(), any());
     }
 
+    /**
+     * 编导有退回内容时，批次必须走驳回（needs-modify）而不是推进终审——否则运营看不到退回意见，
+     * 得等终审走完才知道。所以「通过」动作只接受全票通过，混合结论一律拒绝。
+     */
     @Test
-    void directorCompletionAcceptsMixedApprovedAndReturnedItems() {
+    void directorApprovalRejectsMixedApprovedAndReturnedItems() {
         ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
         mockLockedBatch(batch);
         when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
                 reviewItem(1L, DECISION_APPROVED, null, false),
                 reviewItem(2L, DECISION_RETURNED, null, false)));
+
+        assertServiceCode(CONTENT_REVIEW_TASK_INVALID,
+                () -> service.validateTaskAction(taskContext("director", OPERATOR_ID)));
+
+        verify(batchMapper, never()).markDirectorCompleted(any(), any());
+    }
+
+    @Test
+    void directorApprovalAcceptsBatchWhereEveryItemPassed() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        mockLockedBatch(batch);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                reviewItem(1L, DECISION_APPROVED, null, false),
+                reviewItem(2L, DECISION_APPROVED, null, false)));
         when(batchMapper.markDirectorCompleted(eq(batch), any())).thenReturn(1);
 
         assertDoesNotThrow(() -> service.validateTaskAction(taskContext("director", OPERATOR_ID)));

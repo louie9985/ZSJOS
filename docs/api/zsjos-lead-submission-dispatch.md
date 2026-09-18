@@ -76,7 +76,11 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 请求只提交目录白名单中的 `fieldKey`、运算符和值，不接受数据库列名、内部 ID、原始 JSON 或 SQL。“客资编号”只映射 `lead.leadNo`，绝不回退到 `id/leadId/personId`。文本支持包含、不包含、等于、不等于和空值；枚举支持属于、不属于和空值；数字支持比较、区间和空值；日期支持比较、区间、空值及今天、昨天、近 7 天、近 30 天、本周、本月、本季度、本年。相对日期由服务端按北京时间自然日计算，近 7 天和近 30 天包含当天。场景下至少存在两个日期字段时，目录追加虚拟字段 `duration.diff`（时间作差），其 `options` 只列出当前场景可选日期字段；条件必须提交 `startFieldKey`、`endFieldKey`、`unit=minute/hour/day` 以及比较值，语义固定为“结束时间 - 开始时间”。服务端将分钟、小时、天统一折算为分钟并编译为受控 `TIMESTAMPDIFF(MINUTE, start, end)`，同时追加两个时间字段均不为空的条件；两个日期字段必须来自当前场景字段目录，根表字段可与一个关联字段组合，同一关联关系内两个字段可组合，两个不同关联关系字段组合返回 `ADVANCED_FILTER_INVALID`。
 
-高级筛选模板只保存上述结构化条件树，字段为 `filter`，持久化为 `filter_json`；任何用户、管理员和前端都不能保存或提交 SQL 片段。SQL 只在列表查询时由后端 `AdvancedFilterService` 根据场景字段目录即时校验和编译，并且始终叠加页面固定范围、租户、当前用户对象范围、数据范围和业务池约束。模板按 `scene + pageKey` 绑定到具体页面：个人模板 `scope=personal` 仅当前用户可见，系统预置 `scope=system` 由管理员维护并对当前租户该页面可见；同一页面、同一范围最多一个 `defaultTemplate=true`，默认标记只影响模板列表排序和标识，不自动绕过用户当前查询条件。
+高级筛选模板只保存上述结构化条件树，字段为 `filter`，持久化为 `filter_json`；任何用户、管理员和前端都不能保存或提交 SQL 片段。SQL 只在列表查询时由后端 `AdvancedFilterService` 根据场景字段目录即时校验和编译，并且始终叠加页面固定范围、租户、当前用户对象范围、数据范围和业务池约束。模板按 `scene + pageKey` 绑定到具体页面：个人模板 `scope=personal` 仅当前用户可见，系统预置 `scope=system` 由管理员维护并对当前租户该页面可见；同一页面、同一范围最多一个 `defaultTemplate=true`。
+
+已接入预置标签的业务页（`lead_management`、`lead_claim_pool`、`lead_aging_pool`、`sales_order_management`、`sales_order_supervisor_confirm`、`lead_appeal`、`lead_duplicate_review`、`registration_pool`、`student_my`、`subordinate_sales`）在加载时读取 `visible-list`，把返回的模板渲染为筛选栏下方的快捷标签，点击即把模板 `filter` 树作为该页当前的完整高级条件提交。页面首次加载且用户尚未添加任何条件时自动套用默认模板；用户已输入条件时不覆盖，改为手工套用后高亮失效，标签不再代表当前条件。预置只是把条件树交给既有查询链路，不改变页面固定范围、数据权限或对象范围，也不绕过用户当前查询条件之外的服务端约束。
+
+个人模板由员工在业务页自助维护：当前高级条件非空时可「存为快捷筛选」保存为 `scope=personal`，并在「管理我的快捷筛选」中重命名、设为默认或删除，接口为 `POST/PUT/DELETE /zsjos/advanced-filter-template/personal`。重命名只改名称，不把当前条件写回该模板；`defaultTemplate` 的互斥范围是同一页面、同一 scope、同一 owner，因此个人默认与系统默认互不覆盖，可以并存。页面自动套用时的优先级为**个人默认高于系统默认**，该规则由服务端唯一实现在 `visible-list` 响应中：返回项带 `effectiveDefault=true` 的那条即页面应当套用的模板，至多一条；两者都未设默认时全部为 `false`，页面不自动套用。`system-list` 供管理页使用，不参与页面自动套用，其 `effectiveDefault` 恒为 `false`。前端不得自行按 `scope` 或 `defaultTemplate` 推断优先级。
 
 根组和一级子组支持 `AND/OR`，最多 5 个子组和 20 个条件；根组可为空并表示不追加筛选，一级子组不得为空。`in/not_in` 必须提供 1–100 个非空且类型有效的值，标量运算值不得为空，`between` 两端必须类型有效且起点不晚于终点；SQL 与内存指标筛选使用同一校验并统一返回 `ADVANCED_FILTER_INVALID`。绝对日期使用 Unix epoch 毫秒。同一关联范围内的正向 `AND` 条件合并到同一个 `EXISTS`，保证商品与金额等条件由同一张订单、服务条件由同一条服务关系满足；关联字段的“不属于、不等于、不包含”编译为单层 `NOT EXISTS`，内部保持正向谓词。租户、当前用户对象范围、部门范围、待处理/已处理页签和业务池范围始终作为条件树之外的固定约束，不能被 `OR` 绕过。
 
@@ -96,7 +100,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `POST /zsjos/lead-duplicate-review/search-page` | 租户复核队列内按结构化提交快照和复核字段筛选；不提供原始 JSON 检索 |
 | `POST /zsjos/subordinate-sales/search-page` | 当前用户可见下属范围内先聚合业务指标、再筛选和分页 |
 | `POST /zsjos/subordinate-sales/{salesUserId}/leads/search-page` | 指定可见下属的名下客资固定范围内组合关键词与高级条件 |
-| `GET /zsjos/advanced-filter-template/visible-list?scene=&pageKey=` | 已登录用户需具备对应业务页面查询类权限；返回当前页面启用的系统预置和本人个人模板 |
+| `GET /zsjos/advanced-filter-template/visible-list?scene=&pageKey=` | 按 `scene` 判定，与同场景 `GET /zsjos/advanced-filter/catalog` 的权限分支完全一致；返回当前页面启用的系统预置和本人个人模板，按默认模板、排序、编号排列 |
 | `POST/PUT/DELETE /zsjos/advanced-filter-template/personal` | 已登录用户需具备对应业务页面查询类权限；创建、修改或删除本人个人模板 |
 | `GET /zsjos/advanced-filter-template/system-list?scene=&pageKey=` | `zsjos:advanced-filter-template:query` |
 | `POST/PUT/DELETE /zsjos/advanced-filter-template/system` | `zsjos:advanced-filter-template:update` |

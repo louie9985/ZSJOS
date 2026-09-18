@@ -182,7 +182,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         AdminUserCandidatePageReqDTO query = new AdminUserCandidatePageReqDTO();
         query.setQualificationMode(version.getTargetQualificationMode());
         query.setRoleIds(new LinkedHashSet<>(scopeIds(version.getTargetRoleScopesJson())));
-        query.setDeptIds(new LinkedHashSet<>(scopeIds(version.getTargetDeptScopesJson())));
+        query.setDeptIds(candidateDeptScope(version.getTargetQualificationMode(), version.getTargetDeptScopesJson()));
         query.setKeyword(req.getKeyword()); query.setPageNo(req.getPageNo()); query.setPageSize(req.getPageSize());
         PageResult<AdminUserRespDTO> page = adminUserApi.getCandidateUserPage(query);
         return new PageResult<>(page.getList().stream().map(user -> {
@@ -906,7 +906,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             AdminUserCandidatePageReqDTO query = new AdminUserCandidatePageReqDTO();
             query.setQualificationMode(row.getCandidateQualificationMode());
             query.setRoleIds(new LinkedHashSet<>(scopeIds(row.getCandidateRoleScopesJson())));
-            query.setDeptIds(new LinkedHashSet<>(scopeIds(row.getCandidateDeptScopesJson())));
+            query.setDeptIds(candidateDeptScope(row.getCandidateQualificationMode(), row.getCandidateDeptScopesJson()));
             query.setPageNo(pageNo); query.setPageSize(100);
             PageResult<AdminUserRespDTO> candidates = adminUserApi.getCandidateUserPage(query);
             if (candidates == null || candidates.getList() == null || candidates.getList().isEmpty()) break;
@@ -1039,7 +1039,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             AdminUserCandidatePageReqDTO query = new AdminUserCandidatePageReqDTO();
             query.setQualificationMode(version.getTargetQualificationMode());
             query.setRoleIds(new LinkedHashSet<>(scopeIds(version.getTargetRoleScopesJson())));
-            query.setDeptIds(new LinkedHashSet<>(scopeIds(version.getTargetDeptScopesJson())));
+            query.setDeptIds(candidateDeptScope(version.getTargetQualificationMode(), version.getTargetDeptScopesJson()));
             query.setPageNo(pageNo); query.setPageSize(100);
             PageResult<AdminUserRespDTO> candidates = adminUserApi.getCandidateUserPage(query);
             if (candidates == null || candidates.getList() == null || candidates.getList().isEmpty()) break;
@@ -1097,7 +1097,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private AdminUserRespDTO requireQualification(Long userId, String mode, String rolesJson, String deptsJson) {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
-                || !matchesQualification(user, permissionApi.getEnabledRoleIdsByUserId(userId), mode, scopeIds(rolesJson), scopeIds(deptsJson))) {
+                || !matchesQualification(user, permissionApi.getEnabledRoleIdsByUserId(userId), mode, scopeIds(rolesJson),
+                        expandDepartmentIds(scopeIds(deptsJson)))) {
             throw exception(ZsjosErrorCodeConstants.WORK_ORDER_PERMISSION_DENIED);
         }
         return user;
@@ -1107,22 +1108,59 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         try { requireQualification(userId, mode, rolesJson, deptsJson); return true; } catch (RuntimeException ignored) { return false; }
     }
 
+    /**
+     * 构造候选查询的部门范围：部门类资格需展开子部门，使"总公司"根部门能覆盖全公司成员。
+     */
+    private Set<Long> candidateDeptScope(String mode, String deptsJson) {
+        if (!("DEPARTMENT".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode))) return new LinkedHashSet<>();
+        return new LinkedHashSet<>(expandDepartmentIds(scopeIds(deptsJson)));
+    }
+
     private static boolean matchesQualification(AdminUserRespDTO user, Set<Long> userRoles, String mode,
                                                 List<Long> roleIds, List<Long> deptIds) {
         boolean role = userRoles != null && roleIds.stream().anyMatch(userRoles::contains);
         boolean dept = user.getDeptId() != null && deptIds.contains(user.getDeptId());
-        return switch (mode == null ? "" : mode) { case "ROLE" -> role; case "DEPARTMENT" -> dept; case "ROLE_AND_DEPARTMENT" -> role && dept; default -> false; };
+        return switch (mode == null ? "" : mode) {
+            case "ALL" -> true;
+            case "ROLE" -> role;
+            case "DEPARTMENT" -> dept;
+            case "ROLE_AND_DEPARTMENT" -> role && dept;
+            default -> false;
+        };
+    }
+
+    /**
+     * 展开部门范围：配置的部门连同其全部子部门一并生效，这样把根部门配成"总公司"即可覆盖全公司成员。
+     */
+    List<Long> expandDepartmentIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        Set<Long> expanded = new LinkedHashSet<>(ids);
+        ids.stream().filter(Objects::nonNull)
+                .flatMap(id -> Optional.ofNullable(deptApi.getChildDeptList(Collections.singleton(id))).orElse(List.of()).stream())
+                .map(cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO::getId)
+                .forEach(expanded::add);
+        return List.copyOf(expanded);
     }
 
     private String scopeJson(List<Long> ids, boolean role) {
         if (ids == null || ids.isEmpty()) return "[]";
-        return JsonUtils.toJsonString((role ? roleApi.getRoleList(ids) : deptApi.getDeptList(ids)).stream()
-                .map(item -> role ? new WorkOrderScopeSnapshot(((cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO) item).getId(), ((cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO) item).getName())
-                        : new WorkOrderScopeSnapshot(((cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO) item).getId(), ((cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO) item).getName())).toList());
+        if (role) {
+            return JsonUtils.toJsonString(roleApi.getRoleList(ids).stream()
+                    .map(item -> new WorkOrderScopeSnapshot(item.getId(), item.getName())).toList());
+        }
+        // 部门范围在建档时即展开为“含子部门”的快照，保证运行期精确 JSON_CONTAINS 匹配也能覆盖子部门成员
+        return JsonUtils.toJsonString(deptApi.getDeptList(expandDepartmentIds(ids)).stream()
+                .map(item -> new WorkOrderScopeSnapshot(item.getId(), item.getName())).toList());
     }
 
     private static boolean validQualification(String mode, List<Long> roles, List<Long> depts) {
-        return switch (mode == null ? "" : mode) { case "ROLE" -> roles != null && !roles.isEmpty(); case "DEPARTMENT" -> depts != null && !depts.isEmpty(); case "ROLE_AND_DEPARTMENT" -> roles != null && !roles.isEmpty() && depts != null && !depts.isEmpty(); default -> false; };
+        return switch (mode == null ? "" : mode) {
+            case "ALL" -> true;
+            case "ROLE" -> roles != null && !roles.isEmpty();
+            case "DEPARTMENT" -> depts != null && !depts.isEmpty();
+            case "ROLE_AND_DEPARTMENT" -> roles != null && !roles.isEmpty() && depts != null && !depts.isEmpty();
+            default -> false;
+        };
     }
 
     private static List<Long> scopeIds(String json) { if (json == null || json.isBlank()) return List.of(); try { return JsonUtils.parseArray(json, WorkOrderScopeSnapshot.class).stream().map(WorkOrderScopeSnapshot::id).toList(); } catch (RuntimeException ignored) { return List.of(); } }
@@ -1138,8 +1176,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             default -> throw exception(ZsjosErrorCodeConstants.WORK_ORDER_SCENE_INVALID);
         };
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        numberCounterMapper.insertIfAbsent(tenantId, version.getNumberPrefix(), resetKey);
         numberCounterMapper.increment(tenantId, version.getNumberPrefix(), resetKey);
-        long value = numberCounterMapper.selectAllocatedValue();
+        long value = numberCounterMapper.selectAllocatedValue(tenantId, version.getNumberPrefix(), resetKey);
         long limit = (long) Math.pow(10, version.getNumberSequenceWidth());
         if (value >= limit) throw exception(ZsjosErrorCodeConstants.WORK_ORDER_NUMBER_OVERFLOW);
         String datePart = "ALL".equals(resetKey) ? "" : resetKey;

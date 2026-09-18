@@ -213,3 +213,159 @@
 - Verification: 事务内 dry-run 先行（grants 2245 = 启用菜单数）；应用后 C1=0、C2=2245/2245；`verify-role-menu-coverage.sql` 全组通过（orphan-grant 0 行）；`reconcile production --apply` 已对齐 V252 台账校验和为文件字节哈希；`plan production` = READY。
 - Dependency / integration impact: 需随 backend 同步部署。**职责分离影响**：`system_administrator` 现在可执行成交订单审批、返现查询、提现审核/打款与全部资金导出；若产品要求保留职责分离，需改为"全量菜单 − 财务黑名单"并恢复 verifier 的 violation 条款。管理员角色授权行数较大（2245），后续新增菜单需同时补 `system_administrator` 与 `super_admin`（或改为角色继承机制）。
 - Remaining work: 停用模块下 88 行"父停用、子启用"的菜单数据为历史遗留，是否清理或补授父级未决。其余同上一节。
+
+## Delivery Entry - 2026-09-17 11:37:00 +08:00
+
+- Workstream ID: `advanced-filter-preset-surfacing`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `48ecc5c383d26bb1913f1bace4b400d64e6d199e` (uncommitted)
+- User goal: 打通「高级筛选预置」到业务工作台的最后一环——让 7 个场景页能读取并一键套用管理员在「高级筛选预置」页维护的模板。此前 `visible-list` 接口、`zsjos_advanced_filter_template` 表、管理页均已存在，但没有任何业务页调用 `visible-list`，配置落库后无人消费。
+- Key decisions: (1) 把 `visible-list` 的 `@PreAuthorize` 由静态权限列表改为与 `AdvancedFilterController.catalog` 一致的按 scene 判定，因为原列表遗漏 `zsjos:sales-order:query-management`（V195 统一后订单管理页所用）与 `zsjos:media-student:query-my`，订单管理页调用即 403；(2) 预置标签渲染在共享组件 `ZsjosAdvancedFilter.vue` 内，以可选 `pageKey` prop 开关，未传时行为完全不变，避免 7 个页面各自实现；(3) 点击标签把模板 `filter` 树灌入现有 draft 并复用 `deliver()` 链路；(4) 不预置种子模板（用户明确确认保持空表）。
+- Registration: Goal 同上；Non-goals 不含个人模板「存为我的预置」UI、不改 `advancedSearchEndpoint` 链路、不预置种子数据；Ownership scope: `AdvancedFilterTemplateController`、`frontend/admin` 的 `ZsjosAdvancedFilter.vue`/`WorkbenchListPage.vue`/9 个场景页/`api/zsjos/advancedFilterTemplate`；Verification plan: ZSJOS Maven 聚焦测试（含 visible-list 允许/拒绝用例）、`pnpm ts:check`、受影响页面桌面/移动宽度浏览器检查；Dependencies: 无新增依赖；Integration order: None。
+- Status: in-progress
+
+### 2026-09-17 14:55:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 打通高级筛选预置到业务工作台，并明确快捷筛选可配置的边界。
+- Key decisions: `visible-list` 守卫由静态权限并集改为按 `scene` 判定，与 `AdvancedFilterController.catalog` 逐条对齐——原并集缺 `zsjos:sales-order:query-management` 与 `zsjos:media-student:query-my`，订单管理页与媒体学员页调用必然 403（本轮修掉）。预置标签实现在共享组件 `ZsjosAdvancedFilter.vue`，以可选 `pageKey` prop 开关，未传时行为逐字不变，避免 10 个页面各写一份。默认预置仅在页面首次加载且条件为空时套用，不覆盖用户输入；点击标签是重复点击取消语义；用户改条件后高亮清除。不预置种子模板（用户确认保持空表）。
+- Result: 后端守卫与 `/advanced-filter/catalog` 场景分支一致；前端新增 `getVisibleTemplateList`，`ZsjosAdvancedFilter.vue` 渲染「快捷」标签行并复用既有 `deliver()` 提交链路；`WorkbenchListPage.vue` 新增 `advancedPageKey` 透传；10 个业务页接入：`lead_management`、`lead_claim_pool`、`lead_aging_pool`、`sales_order_management`、`sales_order_supervisor_confirm`、`lead_appeal`、`lead_duplicate_review`、`registration_pool`、`student_my`、`subordinate_sales`。
+- Changed files: `backend/.../advancedfilter/AdvancedFilterTemplateController.java`；新增 `backend/.../test/.../advancedfilter/AdvancedFilterTemplateControllerPermissionTest.java`；`frontend/admin/src/api/zsjos/advancedFilterTemplate/index.ts`；`frontend/admin/src/views/zsjos/components/{ZsjosAdvancedFilter,WorkbenchListPage}.vue`；9 个场景页；`docs/api/zsjos-lead-submission-dispatch.md`；本 handoff。
+- Verification evidence: 新增权限测试 3 例通过（scene 分支数=7、`query-management` 与 `media-student:query-my` 在守卫内、7 个场景各一分支）；`SalesOrderServiceImplTest` 38 例通过；聚焦测试合计 41 例 0 失败（改动前已跑过，证据见上一段）。ESLint 在 `frontend/admin` 下对改动文件返回 0，并用故意语法错误的 `.vue` probe 确认 eslint 确实在解析 `.vue`（probe 返回 1）——注意 eslint 不做类型检查。定点 `tsc` 对 `advancedFilterTemplate/index.ts` 无相关错误（输出中 128 条均为既有配置噪音）。
+- **未验证（需人工执行）**: 全量 `pnpm ts:check`（`vue-tsc`）未取得结果——本机 8G 内存下该进程触发 OOM，且机器于 14:10、14:29 两次重启，均在 `vue-tsc` 运行期间；用户要求改由人工执行编译验证，本轮不再运行 mvn/ts:check。`.vue` 的类型正确性、以及预置标签的浏览器实际渲染（桌面/移动宽度）均未验证。模块全量测试中另有 3 个既有失败（`ZsjosAuditCoverageTest` 端点计数 301→311 由并发会话新增 controller 引起；`ZsjosBpmBusinessTaskTargetServiceImplTest`、`ContentReviewBatchServiceTest`），均不在本次改动范围。
+- Dependency or integration impact: 无新增依赖。`visible-list` 守卫收紧为按场景判定：原先仅凭任意一个业务查询权限即可跨场景读取模板的账号，现在只能读取自己有权限的场景。这是有意的对齐，但属于对外可见的授权变化，需随 backend 同步部署。`sales_order_approval:registration` / `:finance` 两个 pageKey 仍未接入（该页未使用 `ZsjosAdvancedFilter`）。
+- Remaining work: 执行 `pnpm ts:check` 与受影响页面的浏览器检查；个人模板「存为我的预置」UI 未实现（后端 `personal` 作用域与 `visible-list` 合并逻辑已就绪）。
+
+### 2026-09-17 15:20:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 补齐个人高级筛选模板（下称「我的快捷筛选」）的自助维护 UI，并确定默认优先级为个人默认高于系统默认。
+- Key decisions: (1) 优先级实现放在前端 `loadTemplates`——取 `defaultTemplate && scope==='personal'` 为优先候选，否则回退任意默认；数据库按 `scope + owner` 清默认，个人默认与系统默认互不覆盖，因此两者可并存，选择权在页面。(2) 「重命名」不写回当前条件：编辑态复用被编辑模板自己的 `filter` 与 `sort`，否则用户点重命名会把模板内容悄悄改成当前草稿。(3) 不新增后端接口或字段，三个 personal 接口与 `visible-list` 均已存在且可用。(4) 管理入口收敛为一个弹窗（先写重了下拉菜单 + 弹窗两套，已删除下拉）。
+- Result: `api/zsjos/advancedFilterTemplate/index.ts` 新增 `createPersonalTemplate`/`updatePersonalTemplate`/`deletePersonalTemplate`；`ZsjosAdvancedFilter.vue` 新增「存为快捷筛选」按钮（筛选栏下方与抽屉底部各一处）、保存/重命名弹窗、管理弹窗（重命名、设为默认、删除）；默认模板在标签上带「默认」角标。10 个已接入 pageKey 的页面自动获得该能力，未传 `pageKey` 的场景行为不变。
+- Changed files: `frontend/admin/src/api/zsjos/advancedFilterTemplate/index.ts`；`frontend/admin/src/views/zsjos/components/ZsjosAdvancedFilter.vue`；`docs/api/zsjos-lead-submission-dispatch.md`；本 handoff。
+- Verification evidence: 本地 `./node_modules/.bin/eslint` 对两个改动文件返回 0，并用故意语法错误的 `.vue` 探针确认 eslint 确实在解析 `.vue`（探针返回 1）。逐项静态复核：`Dialog` 非自动导入故已显式 `import { Dialog } from '@/components/Dialog'`（与 `advancedFilterTemplate/index.vue` 一致）；`AdvancedFilterTemplateSaveReq` 字段名与后端 `AdvancedFilterTemplateSaveReqVO` 逐字段核对一致；`enabled`/`defaultTemplate` 均为 `Boolean`。
+- **未验证（需人工执行）**: `pnpm ts:check` 本轮仍未运行——`vue-tsc` 在 8G 内存下 OOM，且 14:10、14:29 两次重启均发生在其运行期间，用户要求改由人工验证编译，本轮不再执行 mvn/ts:check。因此 `.vue` 类型正确性、以及个人模板增删改与「个人默认优先」的实际交互均未经运行时验证。
+- Dependency or integration impact: 无新增依赖，无后端改动。个人默认优先级是纯前端选择逻辑，后端排序（`scope DESC`）未改动；若未来有其他前端消费 `visible-list`，需各自实现同一优先级，或改为后端返回单一 `effectiveDefault` 标记。
+- Remaining work: 执行 `pnpm ts:check`；浏览器验证存/重命名/设为默认/删除四条路径与个人默认优先于系统默认的表现；`sales_order_approval:registration` / `:finance` 两个 pageKey 仍未接入。
+
+### 2026-09-17 15:45:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 补全「个人默认优先于系统默认」的实现，避免该优先级只存在于某一个前端组件里。
+- Key decisions: 优先级规则上移到服务端唯一实现——`AdvancedFilterTemplateRespVO` 新增 `effectiveDefault`，`visibleList` 计算并标记至多一条；选取规则为「个人默认优先，同范围内取 id 最小」。`systemList`（管理页）不参与页面自动套用，恒为 `false`。前端 `loadTemplates` 改为直接消费该标记，删除原先自行按 `scope` 推断的逻辑。未改动 `visible-list` 的返回顺序（仍为 `scope DESC`），因为顺序是既有既有行为，改排序会让标签重新排列。
+- Result: 后端：`AdvancedFilterTemplateRespVO` 增字段；`AdvancedFilterTemplateServiceImpl` 新增 `resolveEffectiveDefaultId`，`toResp` 改为接收 `effectiveDefaultId`；两处调用点同步更新。前端：`api/zsjos/advancedFilter/index.ts` 的 `AdvancedFilterTemplate` 增可选 `effectiveDefault`；`ZsjosAdvancedFilter.vue` 改用 `item.effectiveDefault` 挑选自动套用项。
+- Changed files: `backend/.../advancedfilter/vo/AdvancedFilterTemplateRespVO.java`；`backend/.../advancedfilter/AdvancedFilterTemplateServiceImpl.java`；`backend/.../test/.../advancedfilter/AdvancedFilterTemplateServiceImplTest.java`；`frontend/admin/src/api/zsjos/advancedFilter/index.ts`；`frontend/admin/src/views/zsjos/components/ZsjosAdvancedFilter.vue`；`docs/api/zsjos-lead-submission-dispatch.md`；本 handoff。
+- Verification evidence: 新增 4 个用例覆盖优先级（个人默认压过系统默认、无个人默认时回退系统默认、两者都无默认时不标记、`systemList` 恒不标记），并抽取 `template(id, scope, owner)` 重载以便构造不同 id；`toResp` 的 `id` 比较加空值保护。本地 `./node_modules/.bin/eslint` 对三个前端改动文件返回 0。逐项静态复核：`Comparator.comparing(...).thenComparing(getId)` 的 `min` 语义确认为「personal 映射 0 先于 system 映射 1」；`SCOPE_PERSONAL`/`SCOPE_SYSTEM` 常量已存在；`import java.util.Comparator` 已补。
+- **未验证（需人工执行）**: 按用户要求本轮不执行 mvn 与 `pnpm ts:check`，故新增的 4 个 Java 用例尚未实际运行，`effectiveDefault` 的端到端表现（保存个人默认后刷新页面是否自动套用）也未经运行时验证。`vue-tsc` 在本机 8G 内存下 OOM 的历史问题同上一条。
+- Dependency or integration impact: `effectiveDefault` 为新增响应字段，对既有消费者是纯增量，但 `frontend/workbench` 若将来消费 `visible-list` 应直接使用该字段而非自行推断。无新增依赖，无数据库改动。
+- Remaining work: 运行 `mvn -pl yudao-module-zsjos -am -Dtest=AdvancedFilterTemplateServiceImplTest test` 与 `pnpm ts:check`；浏览器验证个人默认优先的实际表现。
+
+### 2026-09-17 17:40:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 修复需求反馈审批的可视化路径——审批人（部门负责人、董事长）在审批中心应能看到自己正在审什么，包括用户填写的表单内容和附件图片预览。
+- Key decisions: (1) 可见性口径由「持有 `zsjos:feedback:requirement:manage`」改为「管理权限 ∨ 提交人 ∨ 该轮次 `approval_context_json` 记录的指定审批人」。原先审批人只看到「无权查看」，而审批按钮仍在，等于逼人盲签。(2) 审批卡不再调用 `FeedbackService.getAdmin()`——它带 `@ZsjosPermission(action="read-admin")`，切面抛异常被上层 `catch` 静默吞掉，导致申请附件与处理结果附件整块消失且不留日志。改为直接读轮次快照并自行解析。(3) 申请内容按 `round.formSnapshotJson` + `round.valueSnapshotJson` 渲染，字典标签用提交时冻结的那份，不查当前字典。(4) `brief()` 的深链只对提交人下发，审批人不给——反馈页按 `read-own` 放行，审批人点进去只会看到无权页。(5) 驳回重提仍走完整两轮审批，不做简化。
+- Result: `FeedbackContentProvider` 重写可见性、轮次解析与内容渲染；`ZsjosApprovalAttachmentSupport` 新增 `resolveAttachment(Long)`，按 infra 文件编号补齐名称/MIME/大小并签名；附件 MIME 由快照 `type` 透传到 `BpmApprovalFieldVO.Attachment.contentType`，前端 `AttachmentGrid.isImage` 据此恢复图片预览（此前恒为 false，所有图片降级成文字链接）。
+- Changed files: `backend/.../service/bpm/content/provider/FeedbackContentProvider.java`；`backend/.../service/bpm/content/ZsjosApprovalAttachmentSupport.java`；`backend/.../test/.../provider/FeedbackContentProviderTest.java`（新增）；`backend/.../test/.../provider/ApprovalContentProviderBusinessKeyTest.java`；`docs/api/feedback-management.md`；本 handoff。
+- Verification evidence: 本次改动共 19 个用例全绿（`FeedbackContentProviderTest` 14 + `ApprovalContentProviderBusinessKeyTest` 5）；连同既有 `ZsjosApprovalAttachmentSupportTest`、`ZsjosApprovalProviderWiringTest` 共 31 例 0 失败。运行方式：因约定不使用 mvn，改以 `javac` 编译到临时目录后用 JUnit Platform Launcher 直接执行，classpath 为 `~/.m2` 中已下载的依赖 jar + 各模块 `target/classes`（须把新编译产物置于 `target/classes` 之前，否则会命中陈旧 class，这一点在排查中真实踩到）。覆盖点：部门负责人/董事长/提交人/管理者四条可见路径、无关账号仍被拒、跨轮审批人不得越权、历史轮次渲染自己的快照与驳回原因、缺轮次段退回最新一轮、附件 MIME 透传、结果附件签名失败只丢单个、无附件不留空分组、反馈不存在时返回 notFound。
+- **未验证（需人工执行）**: 按用户要求未执行 mvn，故模块全量测试与打包未跑；未执行 `pnpm ts:check`。浏览器侧的审批中心实际渲染（表单字段、附件缩略图与点击放大）未验证。
+- Dependency or integration impact: `ZsjosApprovalAttachmentSupport` 新增 public 方法，属增量。`businessId` 由「仅 workOrderId」改为「workOrderId:roundNo」，但该句柄只在 Provider 内部消费（`BpmApprovalContentServiceImpl` 不透明传递），对注册表与其他 Provider 无影响。可见性放宽仅限「该轮次的指定审批人」，上游 `getTodoTask`/`getDoneTask` 仍按 userId 校验任务归属，未放宽到人人可见。
+- Remaining work: 运行 `mvn -f backend/pom.xml -pl yudao-module-zsjos -Dtest='FeedbackContentProviderTest,ApprovalContentProviderBusinessKeyTest,ZsjosApprovalAttachmentSupportTest,ZsjosApprovalProviderWiringTest' test`（注意：**不要带 `-am`**，且 `-pl` 只能用裸模块名，见下）；工作台审批中心浏览器验证。处理人（应用开发工程师）目前仍无反馈管理菜单——候选池按 `zsjos:feedback:requirement:manage` 计算，而该菜单只授予 `system_administrator`，因此岗位角色无法被指派，此项用户确认后再开。
+
+### 2026-09-17 17:55:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 修掉上一条交付里给的验证命令跑不通的问题（`Could not find the selected project in the reactor: yudao-module-zsjos`）。
+- Key decisions: (1) 命令跑不通与 pom 无关。reactor 根是 `backend/pom.xml`（仓库根 `/opt/zsjos` 下没有 pom.xml），而 `-pl` **只接受相对于 reactor 根的裸模块名**——任何路径前缀都会失败：`backend/yudao-module-zsjos`、在 `backend/` 下写 `./yudao-module-zsjos` 都报同一个错。(2) `-am` 必须去掉。它会把上游模块的测试一起编译，而 `yudao-module-bpm` 有一个**并行会话留下的未跟踪半成品** `api/approvalcontent/BpmApprovalFormatTest.java`，调用了主源码里不存在的 `BpmApprovalFormat.maskCard(...)`，直接卡死整条链，连 zsjos 都到不了。该文件非本次改动，**未修改**。(3) 上游依赖改为一次性 `-Dmaven.test.skip=true -DskipTests install` 装进本地仓库，之后不带 `-am` 单跑目标模块。
+- Result: 上一条交付的 31 个用例在 mvn 下真实跑通，无需再依赖 javac + JUnit Launcher 的手工 classpath。
+- Changed files: 无源码改动；仅本 handoff 与记忆文件。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -Dtest='FeedbackContentProviderTest,ApprovalContentProviderBusinessKeyTest,ZsjosApprovalAttachmentSupportTest,ZsjosApprovalProviderWiringTest' test` → `Tests run: 31, Failures: 0, Errors: 0, Skipped: 0` / `BUILD SUCCESS`。分项：`FeedbackContentProviderTest` 14、`ZsjosApprovalAttachmentSupportTest` 8、`ApprovalContentProviderBusinessKeyTest` 5、`ZsjosApprovalProviderWiringTest` 4。
+- **未验证（需人工执行）**: 工作台审批中心浏览器渲染仍未验证。`yudao-module-bpm` 的 `BpmApprovalFormatTest` 仍编译失败（缺 `maskCard`），因此**整仓 `mvn test` 目前是红的**——需要该半成品会话补上方法或先剔除该文件。
+- Dependency or integration impact: 上游模块已 `install` 到 `~/.m2`（`2026.07-jdk25-SNAPSHOT`），后续单模块构建可直接复用，不必每次 `-am`。副作用：本地仓库里的上游 jar 现在是当前工作树的快照，含未提交改动。
+- Remaining work: 同上一条（处理人入口待用户确认）。另：`-DfailIfNoTests=false` 是无效属性名，正确为 `-Dsurefire.failIfNoSpecifiedTests=false`，给其他会话参考。
+
+### 2026-09-17 18:40:00 +08:00
+
+- Branch: main
+- Worktree: /opt/zsjos
+- User goal: 让整仓 `mvn test` 变绿。上一条把编译/路径问题解决后，暴露出一批**长期存在的**红测试（不是本次改动引入）。
+- Key decisions: 逐个定位后按类型分别处理，不做「改断言让它过」的通用操作：
+  1. **`BpmApprovalFormat.maskCard(String)` 缺失**（`yudao-module-bpm` 编译失败，卡死整条 `-am` 链）。按测试注释指名的权威实现 `WithdrawalServiceImpl.mask` 逐字补齐语义：`null` 或长度 < 8 → `"****"`，否则首 4 + `" **** **** "` + 末 4。**注意该方法目前只被测试调用，生产代码尚未接入**——属并行会话的「统一卡号脱敏」半成品，本次只补编译。
+  2. **`system_menu.workbench_render_mode` 列在 H2 测试建表脚本里缺失**。生产库由 V137 迁移添加，`create_tables.sql` 漏了，导致 `MenuServiceImplTest` 17 个用例（14 错 + 3 败）全红。补列，位置对齐生产（`component_name` 之后）。
+  3. **H2 `datetime` 默认精度只有秒**，毫秒/纳秒往返必然丢失，`OAuth2ApproveServiceImplTest`、`PmsIterationServiceImplTest` 因此断言失败。前者把全表 datetime 提到 `datetime(6)` 并把 `CURRENT_TIMESTAMP` 同步为 `CURRENT_TIMESTAMP(6)`（差异经 diff 校验：只动精度）；后者按本仓库既有惯例在测试里 `truncatedTo(ChronoUnit.MICROS)`。
+  4. **`ZsjosAuditCoverageTest` 端点清单基线过时**（301→310 GET 等）。该测试的分类不变量全部通过，只有计数基线失败，说明新增端点审计分类正确。实测四个真值后更新基线。过程踩坑：`javap -v` 会把注解在常量池和 Code 属性里各计一次（翻倍），静态统计得 303 而运行时是 310；最终靠临时替换断言为打印语句取真值。
+  5. **两处测试断言与当前设计冲突，判定为测试过时（非实现错误）**，各附证据后修正：
+     - `ZsjosBpmBusinessTaskTargetServiceImplTest`：期望 `/zsjos/material-library/approvals`，但该路由**在整个前端不存在**（`constants.ts` 只有 `browse`/`manage`），而 `MaterialLibraryPage` 在 `manage` 路由下确实消费 `taskId`/`versionId` 并调用审批接口。改为 `manage`。
+     - `ContentReviewBatchServiceTest`：期望编导「混合通过+退回」也放行。但 `validateTaskAction` 的守卫与 `docs/content-review-optimization.md`（第 95-115 行**逐字包含该守卫代码**）以及 `completeDirector`（有退回即 `rejectTask`）三者自洽；守卫是 ea5dccd2 后加的，测试是 a9f7e2a7 先写的，当时未同步。改名为 `directorApprovalRejectsMixedApprovedAndReturnedItems` 并断言拒绝，另补 `directorApprovalAcceptsBatchWhereEveryItemPassed` 守住全票通过的正向路径。
+- Result: **整仓 `mvn -f backend/pom.xml test` → BUILD SUCCESS**。各模块：system 570、zsjos 1209、bpm 115(skip 6)、pms 236、hrm 85(skip 3)、eam 43、infra 237(skip 11)、其余 14/13/10/20/9/1。全部 0 失败 0 错误。
+- Changed files: `backend/.../bpm/api/approvalcontent/BpmApprovalFormat.java`（补 `maskCard`）；`backend/yudao-module-system/src/test/resources/sql/create_tables.sql`（补列 + datetime 精度）；`backend/.../zsjos/framework/audit/ZsjosAuditCoverageTest.java`（更新基线）；`backend/.../zsjos/service/contentreview/ContentReviewBatchServiceTest.java`；`backend/.../zsjos/service/bpm/ZsjosBpmBusinessTaskTargetServiceImplTest.java`；`backend/yudao-module-pms/src/test/.../PmsIterationServiceImplTest.java`；本 handoff。
+- Verification evidence: 全仓 `exit=0` / `BUILD SUCCESS`。zsjos 单模块 1209 例 0 失败。`grep -rn 'DBG' --include=*.java` = 0（插桩已全部清除）。
+- **未验证（需人工执行）**: 工作台审批中心浏览器渲染（表单字段、附件缩略图与点击放大）仍未验证。
+- Dependency or integration impact: `create_tables.sql` 的 datetime 精度提升是纯测试基础设施变更，不影响生产 schema。`maskCard` 为新增 public 静态方法，无生产调用方，接线上线前需确认由哪个 Provider 使用（`WithdrawalContentProvider` 目前直接取 `item.getMaskedCardNumber()`，脱敏在 `WithdrawalServiceImpl` 完成）。
+- Remaining work: 处理人（应用开发工程师）工作台入口待用户确认。`maskCard` 的统一接入未完成——属并行会话范围。
+
+## Workstream Registration - 2026-09-18 09:43:00 +08:00
+
+- Workstream ID: `test-viral-template-recovery`; Owner: Codex `/root`
+- Goal: 修复两类爆款拆解页面模板引用失效导致只显示封面的故障。
+- Non-goals: 不更改权限、字典、审批流程或历史素材；不覆盖有效/自定义模板；未经单独确认不写共享测试库、不部署或重启服务。
+- Environment: test（/etc/zsjos/agent-environment）；Branch: main；Worktree: /opt/zsjos；Base commit: 1639c6659ddc9f047934eadea32a728b87c987a7；Target branch / Integration order: None。
+- Ownership scope: MaterialTypeServiceImpl.java、对应 MaterialTypeServiceImplTest.java；ViralAccountMaterialForm.tsx 及现有测试；两个 Viral*DecomposePage.tsx；script/sql/mysql/repair-viral-template-references.sql；docs/operations/viral-material-review-deployment.md；本工作记录。
+- Dependencies: 现有默认模板、素材 Mapper、Ant Design、Vitest/JUnit；无新增依赖。保留所有已有未提交修改。
+- Verification plan: 聚焦后端/前端测试、类型检查、临时表隔离 SQL 重复执行与作用域验证；浏览器验证如环境可用；共享测试库修改需另行确认，确认后核对模板字段及中文 HEX。
+
+## Delivery Entry - 2026-09-18 09:48:21 +0800
+
+- Workstream ID: `test-viral-template-recovery`; Owner / Branch / Worktree: 同本工作流登记；HEAD unchanged: `1639c6659ddc9f047934eadea32a728b87c987a7`。
+- User goal: 修复爆款账号、爆款内容拆解页只显示封面的故障。
+- Key decisions: 默认模板引用必须检查目标存在；失效引用优先关联已发布版本，不能把管理员草稿自动发布；没有模板版本时沿用后端默认字段；前端缺字段阻断空表单并提供重新请求入口。无需新增依赖或更改接口字段。共享测试库修复单独请求明确授权。
+- Execution result: 源码、测试、恢复脚本及运维说明已完成。只读确认 tenant=1 的类型 1/2 分别指向不存在的模板 2/3，两类均无模板/素材记录（包括删除记录）；读取当前部署 jar 字节码确认现有初始化可在引用清空后重建默认模板。未执行共享库写入、部署或重启。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/material/MaterialTypeServiceImpl.java`；对应 `src/test/java/.../material/MaterialTypeServiceImplTest.java`；`frontend/workbench/src/components/ViralAccountMaterialForm.tsx` / `.test.ts`；`frontend/workbench/src/pages/ViralAccountDecomposePage.tsx`、`ViralContentDecomposePage.tsx`；`script/sql/mysql/repair-viral-template-references.sql`；`docs/operations/viral-material-review-deployment.md`；本工作记录。
+- Verification evidence: 聚焦 JUnit 6/6；Vitest 6/6（两种表单三栏正常渲染、空字段/缺模板提示与保存按钮阻断）；`npm run typecheck` passed；scoped `git diff --check` passed。首次构建因已有 root 所有缓存权限失败，随后使用 sudo 和 `/home/ubuntu/.m2/repository` 完成 Maven 检查；无权限调整。
+- SQL verification: 独立 `mysql:8` 容器，使用仓库真实建表定义和合成夹具执行完整恢复脚本；首次更新 2 行，第二次 0 行；断言其他类型/租户、已有草稿、有效引用及含已删历史素材的类型不变；UTF-8 客户端 HEX 对照通过。隔离容器已关闭回收。测试脚本 `/tmp/verify-viral-template-sql.py`，测试日志 `/tmp/viral-template-maven.log`、`/tmp/viral-template-vitest.log`。
+- Dependency or integration impact: 无新依赖、分支、提交或迁移版本；React 与 Vue 继续消费相同 currentSchema/fields 结构，已检查 Vue 素材/模板/导入入口的数据消费。修复源代码尚未发布。
+- Remaining work: 等待对测试库两条失效引用修复的明确授权；批准后备份目标行、执行恢复 SQL、通过页面触发既有默认模板初始化，检查已发布字段及中文 HEX。当前无可用浏览器或已授权登录会话，实际 API 响应、重试交互和桌面/移动页面仍未验证，不能宣称测试站已恢复。生产构建不适用本轮局部逻辑交付；若后续发布需执行对应构建和验收。
+
+## Registration Update - 2026-09-18 09:53:00 +08:00
+
+- Workstream ID: `test-viral-template-recovery`; metadata/ownership unchanged.
+- Authorization: 用户已明确确认备份并修复测试库 tenant=1 的 viral_account / viral_content 两条失效引用，使现有初始化重建默认模板；无需重启、部署、权限或字典变更。
+- Execution context: 共享测试库限定范围写入已获授权；备份存于仓库外 `/var/tmp/zsjos-viral-template-recovery-20260918-0953/`，不记录完整数据库载荷。
+- Verification plan update: 写前重新核对两行状态和模板/素材计数，执行已验证脚本，核对实际更新数及重复执行结果，再查询重建模板三栏字段和 UTF-8 HEX；真实登录请求仍取决于可用会话。
+
+## Delivery Entry - 2026-09-18 09:56:04 +0800
+
+- Workstream ID: `test-viral-template-recovery`; Branch/Worktree/Owner: 同登记；HEAD unchanged: `1639c6659ddc9f047934eadea32a728b87c987a7`。
+- User goal: 确认执行两类爆款模板引用修复。
+- Key decisions: 按已批准范围执行现有恢复 SQL；不修改其他类型、权限、字典或服务；使用现有部署后端的页面加载初始化能力重建默认模板。
+- Execution result: 写前核对 tenant=1 的类型 1/2，失效引用 2/3，模板和素材计数均为 0；备份目标两行后执行脚本，第一次更新 2 行，重复执行更新 0 行。两行引用均已置空，版本各加 1。未重启或发布代码。
+- Backup: `/var/tmp/zsjos-viral-template-recovery-20260918-0953/type-rows.sql`，目录 0700/文件 0600；确认只含两个目标类型。SHA-256 `65b529933629065b2bc6fda258c8750a4dc059add5cfd37310387fd99299b6cb`。回退限制沿用脚本说明，初始化后采用向前修复。
+- Changed files: 仅 `handoff/test_main.md`（注册授权更新及本条交付）；仓库外新增上述定向备份。共享测试数据库仅更新两条素材类型记录。
+- Verification evidence: 使用 UTF-8 MySQL 客户端执行，更新行数 2/0；两类型名称 HEX 分别为 `E78886E6ACBEE8B4A6E58FB7`、`E78886E6ACBEE58685E5AEB9`，与爆款账号/爆款内容一致。脚本未变，沿用上一轮隔离 MySQL 与代码测试证据。初次备份命令因 where 引号转义失败且未产生备份或写库，随后改为位置参数后成功；只在备份验证通过后执行修复。
+- Dependency or integration impact: 无新依赖、提交、部署或重启；上一轮防回归源码仍未部署。
+- Remaining work: 查询时尚未收到页面触发的初始化请求，两类 current_schema_version_id 当前为 NULL；已告知用户刷新页面以触发现有默认模板初始化。没有可用浏览器/授权登录会话，不能代替用户发起真实登录请求；模板生成后的三栏字段/标签 HEX、两个页面真实显示尚待刷新后核验，不宣称模板已生成或页面已实测恢复。
+
+## Workstream Registration - 2026-09-18T10:05:50+08:00
+
+- Workstream ID: `test-db-backup-cleanup`; Owner: Codex `/root`。
+- Goal: 按用户明确要求删除 /opt/zsjos 和 /opt/zsjos-runtime 内全部已识别数据库备份，释放磁盘空间。
+- Non-goals: 不操作现用数据库、SQL 源码、服务、其他目录或已有用户修改。
+- Environment: test（/etc/zsjos/agent-environment）；Branch: main；Worktree: /opt/zsjos；Base commit: 1639c6659ddc9f047934eadea32a728b87c987a7；Target branch / Integration order: None。
+- Ownership scope: backups/**、deploy/production/backups/**、/opt/zsjos-runtime/backups/** 中已核对的 40 个 SQL/TSV 备份和 MD5 校验文件；handoff/test_main.md（仅追加）。
+- Dependencies: None；批量备份删除由当前用户请求明确授权，不保留额外副本；删除后无法从这些文件恢复。
+- Verification plan: 精确文件清单删除，核对文件数量、目录残留、磁盘可用空间和受影响 Git 路径；不运行数据库写入或应用测试。
+
+## Delivery Entry - 2026-09-18T10:06:28+08:00
+
+- Workstream ID: `test-db-backup-cleanup`; Owner / Branch / Worktree: 同本轮登记；HEAD unchanged: `1639c6659ddc9f047934eadea32a728b87c987a7`。
+- User goal: 清除 zsjos 和 zsjosruntime 内的数据库备份以释放空间；实际运行目录为 /opt/zsjos-runtime。
+- Key decisions: 按已核对清单删除数据库 SQL/TSV 备份及其 MD5 文件；保留目录、现用数据库、初始化/迁移源码和非数据库备份。
+- Execution result: 删除 40 个文件，逻辑大小 7,222,908,111 字节，占用磁盘块 7,223,050,240 字节（约 6.73 GiB）。首次删除遇到 root 所有目录权限，随后用 sudo 按同一清单核对 inode/大小后完成，未更改权限。
+- Changed files: backups/ 下 4 个文件、deploy/production/backups/ 下 3 个文件（Git 跟踪）、/opt/zsjos-runtime/backups/ 下 33 个文件；handoff/test_main.md 追加登记及交付。
+- Verification evidence: 三个备份目录递归检查剩余文件数为 0；完整目录扫描未发现额外压缩 SQL/数据库 dump 候选；Git scoped diff 确认 3 个跟踪备份删除；handoff scoped diff --check 通过；df 显示磁盘可用约 37 GiB、使用率 68%。
+- Dependency or integration impact: None；未执行数据库 SQL、服务变更、提交或推送；源码测试不适用于备份清理。
+- Remaining work: None；已删除备份不可用于历史恢复，自动备份策略未变更。

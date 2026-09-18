@@ -123,11 +123,33 @@ export const positioningJsonPrompt = `你是一名专业的新媒体账号定位
 请处理以下文稿：
 【在此粘贴编导文稿】`
 export const mediaAccountTabKey = (accountId: number) => `account-${accountId}`
+
+/**
+ * 账号标签页文案。
+ *
+ * 逐级加消歧信息，够用即止 —— 标签页宽度有限，一上来就拼全字段会把真正能区分
+ * 两个账号的那一段挤到看不见。三级分别是：
+ * 昵称 → 昵称 + 平台 → 昵称 + 平台 + 账号编号；同级还撞就补内部序号兜底。
+ *
+ * 两种情况必须带上账号编号（昵称本身区分不出来的那种）：
+ * - 空昵称：显示「未命名账号 · 账号编号」，不然一排"未命名账号"没法认；
+ * - 同平台重名：账号编号是唯一能把它们分开的东西。
+ *
+ * 见 docs/ui-guidelines.md「学员名下的每个真实媒体账号以账号昵称作为与"概览"同级的标签页」。
+ */
 export const buildMediaAccountTabLabels = (accounts: MediaStudentDetail['accounts']) => {
-  return new Map(accounts.map(account => [
-    account.id,
-    [account.nickname?.trim() || '未命名账号', account.platformLabel?.trim() || '平台待填写'].join(' · '),
-  ]))
+  const base = accounts.map(account => account.nickname?.trim()
+    || ['未命名账号', account.accountNo || `账号 ${account.id}`].join(' · '))
+  const platformCandidates = accounts.map((account, index) => account.nickname?.trim()
+    ? [base[index], account.platformLabel?.trim() || '未标注平台'].join(' · ') : base[index])
+  const numberedCandidates = accounts.map((account, index) => account.nickname?.trim()
+    ? [platformCandidates[index], account.accountNo || `#${account.id}`].join(' · ') : platformCandidates[index])
+  return new Map(accounts.map((account, index) => {
+    if (base.filter(label => label === base[index]).length === 1) return [account.id, base[index]]
+    if (platformCandidates.filter(label => label === platformCandidates[index]).length === 1) return [account.id, platformCandidates[index]]
+    if (numberedCandidates.filter(label => label === numberedCandidates[index]).length === 1) return [account.id, numberedCandidates[index]]
+    return [account.id, `${numberedCandidates[index]} · #${account.id}`]
+  }))
 }
 const positioningFormValues = (values: Record<string, unknown>, fields: DirectorTemplateSnapshot['fields'], areaRows: AreaNode[]) => Object.fromEntries(
   Object.entries(values).map(([key, value]) => {

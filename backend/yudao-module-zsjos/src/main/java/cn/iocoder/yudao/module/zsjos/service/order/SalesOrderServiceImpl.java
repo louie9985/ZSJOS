@@ -451,7 +451,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 orderMapper.selectManagementCount(scope, STATUS_PENDING_APPROVAL),
                 orderMapper.selectManagementCount(scope, STATUS_REVISION_REQUIRED),
                 orderMapper.selectManagementCount(scope, STATUS_EFFECTIVE),
-                orderMapper.selectManagementCount(scope, STATUS_SUPERSEDED));
+                orderMapper.selectManagementCount(scope, STATUS_SUPERSEDED),
+                orderMapper.selectManagementCount(scope, STATUS_TERMINATED));
     }
 
     @Override
@@ -551,7 +552,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 orderMapper.selectMyCount(userId, STATUS_PENDING_APPROVAL),
                 orderMapper.selectMyCount(userId, STATUS_REVISION_REQUIRED),
                 orderMapper.selectMyCount(userId, STATUS_EFFECTIVE),
-                orderMapper.selectMyCount(userId, STATUS_SUPERSEDED));
+                orderMapper.selectMyCount(userId, STATUS_SUPERSEDED),
+                orderMapper.selectMyCount(userId, STATUS_TERMINATED));
     }
 
     @Override
@@ -561,7 +563,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 orderMapper.selectTeamCount(teamUserIds, STATUS_PENDING_APPROVAL),
                 orderMapper.selectTeamCount(teamUserIds, STATUS_REVISION_REQUIRED),
                 orderMapper.selectTeamCount(teamUserIds, STATUS_EFFECTIVE),
-                orderMapper.selectTeamCount(teamUserIds, STATUS_SUPERSEDED));
+                orderMapper.selectTeamCount(teamUserIds, STATUS_SUPERSEDED),
+                orderMapper.selectTeamCount(teamUserIds, STATUS_TERMINATED));
     }
 
     @Override
@@ -1472,6 +1475,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                     .collect(java.util.stream.Collectors.toMap(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey, item -> item, (left, right) -> right));
             result.setRegistrationApproval(convertApprovalStatus(nodeStatuses.get(TASK_REGISTRATION)));
             result.setFinanceApproval(convertApprovalStatus(nodeStatuses.get(TASK_FINANCE)));
+            // 历史迁移订单的轮次没有对应的 BPM 实例（process_instance_id 存的是遗留订单号），
+            // 引擎查不回节点，时间线会把两个中心渲染成“待处理”。轮次已通过时按已通过补齐，
+            // 只补状态、不编造审批人和时间。驳回/在途轮次不补——轮次数据无法判断是哪个中心驳回的。
+            if (ROUND_APPROVED.equals(round.getStatus())) {
+                backfillCompletedCenters(result);
+            }
             List<SalesOrderSupervisorConfirmationDO> confirmationList = supervisorConfirmationService.getByRound(round.getId());
             result.setCanRequestSupervisorConfirmation(Boolean.TRUE.equals(round.getSupervisorConfirmationEnabled())
                     && confirmationList.isEmpty());
@@ -1482,6 +1491,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setFinanceSupervisorConfirmation(convertSupervisorConfirmation(confirmations.get(TASK_FINANCE)));
             SalesOrderSupervisorConfirmationDO supervisor = confirmationList.stream().findFirst().orElse(null);
             result.setSupervisorApproval(convertSupervisorApproval(supervisor));
+        } else {
+            // 迁移进来的历史订单只有订单状态、没有审批轮次（当前 371 条生效订单一律如此）。
+            // 这类订单同样查不回节点，若不管，时间线会把两个中心显示成“待处理”。
+            // 与轮次已通过的分支走同一套补齐：只补状态，不编造审批人和时间。
+            if (STATUS_EFFECTIVE.equals(order.getStatus())) {
+                backfillCompletedCenters(result);
+            }
         }
         if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
         result.setCanRevise(Set.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED).contains(order.getStatus())
@@ -1580,6 +1596,26 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStatus(source.getStatus()); result.setReviewerUserId(source.getReviewerUserId());
         result.setReviewerUserName(source.getReviewerUserName());
         result.setCreateTime(source.getCreateTime()); result.setEndTime(source.getEndTime());
+        return result;
+    }
+
+    /**
+     * 历史迁移订单没有可用的 BPM 实例（轮次的 process_instance_id 是遗留订单号，或者根本没有轮次），
+     * 引擎查不回节点状态。用它把两个审批中心按“已通过”补齐，避免时间线显示成“待处理”。
+     * 审批人和时间留空——迁移数据里没有这两个信息，不编造。
+     */
+    private static void backfillCompletedCenters(SalesOrderRespVO result) {
+        if (result.getRegistrationApproval() == null) {
+            result.setRegistrationApproval(completedApprovalWithoutProcess());
+        }
+        if (result.getFinanceApproval() == null) {
+            result.setFinanceApproval(completedApprovalWithoutProcess());
+        }
+    }
+
+    private static SalesOrderRespVO.ApprovalStatusVO completedApprovalWithoutProcess() {
+        SalesOrderRespVO.ApprovalStatusVO result = new SalesOrderRespVO.ApprovalStatusVO();
+        result.setStatus("approved");
         return result;
     }
 
@@ -1741,6 +1777,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             applyFinanceNode(row, nodes.get(TASK_REGISTRATION), true);
             applyFinanceNode(row, nodes.get(TASK_FINANCE), false);
             row.setFinalReason(round.getDecisionReason());
+        }
+        // 历史迁移订单要么没有审批轮次，要么轮次里的流程实例号是遗留订单号，两者都查不回节点。
+        // 订单已生效即代表两个中心都已通过，否则导出台账里审批结论会整列空白——那是给财务对账用的，
+        // 静默空白比报错更危险。只补结论，审核人和审核时间仍留空。
+        if (STATUS_EFFECTIVE.equals(order.getStatus())
+                && (row.getRegistrationStatus() == null || row.getFinanceStatus() == null)) {
+            if (row.getRegistrationStatus() == null) row.setRegistrationStatus(ROUND_APPROVED);
+            if (row.getFinanceStatus() == null) row.setFinanceStatus(ROUND_APPROVED);
         }
         if (StrUtil.isBlank(row.getFinalReason())) row.setFinalReason(order.getTerminationReason());
         return row;

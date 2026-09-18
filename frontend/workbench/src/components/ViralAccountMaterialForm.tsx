@@ -153,13 +153,14 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
         onChange={event => onChange(event.target.value)} />}</label>
 }
 
-export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true }: {
+export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true }: {
   mode: Mode
   type: MaterialType
   material?: Material
   dicts: Record<string, DictOption[]>
   onClose: () => void
   onSaved: () => void
+  onRetry?: () => void
   titleFieldKey?: string
   coverLabel?: string
   coverRequiredMessage?: string
@@ -224,6 +225,9 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   const actions = readonly
     ? <Button onClick={onClose}>关闭</Button>
     : <><Button onClick={onClose}>取消</Button><Button loading={saving} onClick={() => void saveDraft()}>保存草稿</Button>{submitAllowed && <Button type="primary" loading={saving} onClick={() => void submit()}>提交审批</Button>}</>
+  if (!fields.length) return <Alert type="error" showIcon title="拆解模板不可用"
+    description="模板缺失或未配置字段，请联系管理员检查素材类型与已发布模板后重试。"
+    action={<Button onClick={onRetry || onClose}>{onRetry ? '重试' : '关闭'}</Button>} />
   return <div className="viral-account-form">
     {error && <Alert type="error" showIcon message={error} closable onClose={() => setError('')} />}
     <div className="viral-account-grid">

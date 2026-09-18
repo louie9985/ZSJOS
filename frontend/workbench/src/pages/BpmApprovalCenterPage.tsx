@@ -26,10 +26,12 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import DateTimeText from '../components/DateTimeText'
 import BpmApprovalDetail from '../components/bpm/BpmApprovalDetail'
+import { bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from '../components/bpm/bpmStatus'
 import {
   api,
   ApiError,
   AuthenticationError,
+  type BpmApprovalBrief,
   type BpmTask,
   type SimpleUser
 } from '../services/api'
@@ -43,47 +45,45 @@ const PAGE_SIZE = 20
 const SALES_ORDER_PERMISSION_DENIED = 1_900_006_011
 const LEAD_APPEAL_PERMISSION_DENIED = 1_900_003_041
 
-const TASK_STATUS_LABELS: Record<number, string> = {
-  [-2]: '已跳过',
-  [-1]: '未开始',
-  0: '待审批',
-  1: '审批中',
-  2: '已通过',
-  3: '已拒绝',
-  4: '已取消',
-  5: '已退回',
-  7: '通过中'
-}
-
-const TASK_STATUS_COLORS: Record<number, string> = {
-  [-2]: 'default',
-  [-1]: 'default',
-  0: 'processing',
-  1: 'processing',
-  2: 'success',
-  3: 'error',
-  4: 'default',
-  5: 'warning',
-  7: 'processing'
-}
-
-function taskStatusLabel(status?: number) {
-  return status === undefined ? '未知状态' : TASK_STATUS_LABELS[status] || `状态 ${status}`
-}
-
-function taskStatusColor(status?: number) {
-  return status === undefined ? 'default' : TASK_STATUS_COLORS[status] || 'default'
-}
+/** 状态文案与颜色统一来自 @/components/bpm/bpmStatus，避免两处各维护一份。 */
+const taskStatusLabel = bpmStatusLabel
+const taskStatusColor = bpmStatusColor
 
 function taskSubject(task: BpmTask) {
   return task.processInstance?.name?.trim() || task.name?.trim() || '审批任务'
 }
 
+/**
+ * 列表摘要：只有拿到中文标签才拼。
+ *
+ * <p>后端的 {@code summary} 是 KeyValue，label 恒为 null，key 又是英文流程变量名——
+ * 直接 {@code key：value} 拼出来就是「deptLeaderUsers：21」这种给审批人看的东西。
+ * 因此先用后端的中文 label，再退回通用变量名映射，仍未命中就丢弃该项。
+ * 全部丢完时返回空数组，由调用方给 '-'，而不是漏出内部字段名。
+ */
 function taskSummary(task?: BpmTask) {
   const summary = task?.processInstance?.summary || []
   return summary
-    .map(item => [item.key, item.value].filter(Boolean).join('：'))
+    .map(item => {
+      const label = item.label && hasChinese(item.label) ? item.label : bpmVariableLabel(item.key)
+      return [label, item.value].filter(Boolean).join('：')
+    })
     .filter(Boolean)
+}
+
+/** 业务摘要优先展示业务单据标题与字段；未接入业务域的流程退回流程摘要。 */
+function briefTitle(task: BpmTask, briefs: Record<string, BpmApprovalBrief>) {
+  return briefs[task.id]?.title
+}
+
+function briefSummary(task: BpmTask, briefs: Record<string, BpmApprovalBrief>) {
+  const brief = briefs[task.id]
+  if (!brief) return []
+  const fields = (brief.fields || [])
+    .map(field => [field.label, field.value].filter(Boolean).join('：'))
+    .filter(Boolean)
+  if (fields.length === 0) return []
+  return [brief.title, brief.subtitle, ...fields].filter(Boolean) as string[]
 }
 
 function formatDuration(duration?: number) {
@@ -94,6 +94,18 @@ function formatDuration(duration?: number) {
   const remainder = minutes % 60
   return [days ? `${days} 天` : '', hours ? `${hours} 小时` : '', `${remainder} 分钟`].filter(Boolean).join(' ')
 }
+
+/**
+ * 已接入专属业务审批页的流程：这些流程的待办/已办统一在各自业务页处理，
+ * 不再出现在通用审批中心，避免同一笔业务在两个入口重复展示、重复处理。
+ * 与后端 ZsjosBpmBusinessTaskTargetServiceImpl 支持的业务入口保持一致。
+ */
+const BUSINESS_APPROVAL_PROCESS_KEYS = [
+  'zsjos_sales_order_dual_approval',
+  'zsjos_lead_appeal_review',
+  'zsjos_viral_account_review',
+  'zsjos_viral_content_review'
+].join(',')
 
 /**
  * 已接入员工端业务页的流程，额外提供业务详情入口；
@@ -198,6 +210,22 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
 
   const businessEntry = useBusinessEntry(selectedTask, view)
 
+  // 业务摘要由后端 Provider 按任务批量下发：前端不做流程 Key → 业务语义的映射。
+  const [briefs, setBriefs] = useState<Record<string, BpmApprovalBrief>>({})
+  const briefKey = useMemo(() => tasks.map(item => item.id).join(','), [tasks])
+  useEffect(() => {
+    const taskIds = briefKey ? briefKey.split(',') : []
+    if (taskIds.length === 0) {
+      setBriefs({})
+      return
+    }
+    let cancelled = false
+    void api.bpmApprovalBusinessSummaryBatch(taskIds, view)
+      .then(result => { if (!cancelled) setBriefs(result || {}) })
+      .catch(() => { if (!cancelled) setBriefs({}) })
+    return () => { cancelled = true }
+  }, [briefKey, view])
+
   const loadCounts = useCallback(async () => {
     if (!canQuery) return
     const seq = ++countSeq.current
@@ -205,8 +233,8 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setCountError('')
     try {
       const [todo, done] = await Promise.all([
-        api.bpmTaskPage('todo', { pageNo: 1, pageSize: 1 }),
-        api.bpmTaskPage('done', { pageNo: 1, pageSize: 1 })
+        api.bpmTaskPage('todo', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS }),
+        api.bpmTaskPage('done', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
       ])
       if (seq !== countSeq.current) return
       setCounts({ todo: todo.total, done: done.total })
@@ -233,7 +261,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setLoadMoreError('')
     setUnauthorized(false)
     try {
-      const result = await api.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined })
+      const result = await api.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
       if (seq !== requestSeq.current) return
       setTasks(result.list)
       setTotal(result.total)
@@ -266,6 +294,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         pageNo: nextPage,
         pageSize: PAGE_SIZE,
         name: keyword.trim() || undefined,
+        excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS,
       })
       if (seq !== requestSeq.current) return
       setTasks(current => appendTasks(current, result.list))
@@ -346,6 +375,10 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     view={view}
     canUpdate={canUpdate}
     users={users}
+    businessBrief={selectedTask ? briefs[selectedTask.id] : undefined}
+    businessRoute={selectedTask ? (briefs[selectedTask.id]?.route
+      ? { route: briefs[selectedTask.id]!.route!, query: briefs[selectedTask.id]!.query }
+      : null) : undefined}
     businessEntry={businessEntry.supported
       ? { loading: businessEntry.loading, onOpen: () => void businessEntry.open() }
       : undefined}
@@ -404,23 +437,28 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         loading={loading}
         dataSource={tasks}
         pagination={{ current: tablePage, pageSize: tablePageSize, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
-        scroll={{ x: 2300 }}
+        scroll={{ x: 1560 }}
         locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
         columns={[
-          { title: '任务', render: (_, task) => taskSubject(task), width: 220 },
-          { title: '状态', dataIndex: 'status', width: 110, render: value => <Tag color={taskStatusColor(Number(value))}>{taskStatusLabel(Number(value))}</Tag> },
-          { title: '流程名称', width: 200, ellipsis: true, render: (_, task) => task.processInstance?.name || '-' },
-          { title: '流程节点', dataIndex: 'name', width: 160, ellipsis: true, render: value => value || '流程节点' },
-          { title: '流程摘要', width: 300, ellipsis: true, render: (_, task) => taskSummary(task).join('；') || '-' },
-          { title: '发起人', width: 130, render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
-          { title: view === 'todo' ? '当前处理人' : '已处理人', width: 130, render: (_, task) => task.assigneeUser?.nickname || task.ownerUser?.nickname || '-' },
-          { title: '流程发起时间', width: 170, render: (_, task) => <DateTimeText value={task.processInstance?.createTime}/> },
-          { title: '任务到达时间', dataIndex: 'createTime', width: 170, render: value => <DateTimeText value={value as BpmTask['createTime']}/> },
-          { title: '任务完成时间', dataIndex: 'endTime', width: 170, render: value => <DateTimeText value={value as BpmTask['endTime']}/> },
-          { title: '处理耗时', dataIndex: 'durationInMillis', width: 150, render: value => formatDuration(value as number | undefined) },
-          { title: '表单名称', dataIndex: 'formName', width: 180, ellipsis: true, render: value => value || '-' },
-          { title: '审批意见', dataIndex: 'reason', width: 240, ellipsis: true, render: value => value || '-' },
-          { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
+          { title: '任务', key: 'task', render: (_, task) => taskSubject(task), width: 220 },
+          { title: '状态', key: 'status', dataIndex: 'status', width: 110, render: value => <Tag color={taskStatusColor(Number(value))}>{taskStatusLabel(Number(value))}</Tag> },
+          { title: '流程名称', key: 'processName', width: 200, ellipsis: true, render: (_, task) => task.processInstance?.name || '-' },
+          { title: '流程节点', key: 'node', dataIndex: 'name', width: 160, ellipsis: true, render: value => value || '流程节点' },
+          { title: '流程摘要', key: 'summary', width: 300, ellipsis: true, render: (_, task) => {
+            const business = briefSummary(task, briefs)
+            return (business.length > 0 ? business : taskSummary(task)).join('；') || '-'
+          } },
+          { title: '发起人', key: 'startUser', width: 130, render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
+          { title: view === 'todo' ? '当前处理人' : '已处理人', key: 'assignee', width: 130, render: (_, task) => task.assigneeUser?.nickname || task.ownerUser?.nickname || '-' },
+          { title: '流程发起时间', key: 'processCreateTime', width: 170, render: (_, task) => <DateTimeText value={task.processInstance?.createTime}/> },
+          { title: '审批意见', key: 'reason', dataIndex: 'reason', width: 240, ellipsis: true, render: value => value || '-' },
+          // 以下四列只服务于排查，默认收起（用户仍可在列设置里打开），
+          // 否则表格要横向滚 2300px 才能看全，而审批人判断用的就是左边那几列。
+          { title: '任务到达时间', key: 'taskCreateTime', dataIndex: 'createTime', width: 170, hideInTable: true, render: value => <DateTimeText value={value as BpmTask['createTime']}/> },
+          { title: '任务完成时间', key: 'taskEndTime', dataIndex: 'endTime', width: 170, hideInTable: true, render: value => <DateTimeText value={value as BpmTask['endTime']}/> },
+          { title: '处理耗时', key: 'duration', dataIndex: 'durationInMillis', width: 150, hideInTable: true, render: value => formatDuration(value as number | undefined) },
+          { title: '表单名称', key: 'formName', dataIndex: 'formName', width: 180, ellipsis: true, hideInTable: true, render: value => value || '-' },
+          { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
         ]}
       /> : <div className="business-inbox-layout bpm-approval-layout">
         <aside className="business-inbox-list-pane">
@@ -439,7 +477,8 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
                 : <>
                 {tasks.map(task => {
                   const active = task.id === selectedId
-                  const summary = taskSummary(task)
+                  const business = briefSummary(task, briefs)
+                  const summary = business.length > 0 ? business : taskSummary(task)
                   return <button
                     key={task.id}
                     type="button"
@@ -450,11 +489,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
                       <Avatar icon={<FileSearchOutlined/>}/>
                       <div className="business-inbox-item-copy">
                         <div className="business-inbox-item-title">
-                          <strong>{taskSubject(task)}</strong>
+                          <strong>{briefTitle(task, briefs) || taskSubject(task)}</strong>
                           <Tag color={taskStatusColor(task.status)}>{taskStatusLabel(task.status)}</Tag>
                         </div>
                         <span>{task.name || '流程节点'} · 发起人：{task.processInstance?.startUser?.nickname || '-'}</span>
-                        <span>{summary[0] || task.formName || task.processInstanceId}</span>
+                        {/* 摘要拼不出来时给 '-'：绝不退回 processInstanceId，
+                            那是内部 UUID，对审批人没有任何意义。 */}
+                        <span>{summary[0] || task.formName || '-'}</span>
                       </div>
                     </div>
                     <div className="business-inbox-item-meta">

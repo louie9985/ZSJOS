@@ -4,6 +4,7 @@ import {
   App,
   Avatar,
   Button,
+  Collapse,
   Empty,
   Input,
   Skeleton,
@@ -13,28 +14,35 @@ import {
   Timeline,
   Typography
 } from 'antd'
-import { AuditOutlined, LinkOutlined, SendOutlined } from '@ant-design/icons'
+import { AuditOutlined, CopyOutlined, LinkOutlined, SendOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import DateTimeText from '../DateTimeText'
 import DetailFieldGrid from '../DetailFieldGrid'
 import {
   api,
   ApiError,
   AuthenticationError,
+  type BpmApprovalBrief,
   type BpmApprovalDetail as BpmApprovalDetailData,
+  type BpmApprovalDetailCard,
   type BpmComment,
   type BpmTask,
   type DictData,
   type SimpleUser
 } from '../../services/api'
 import BpmApprovalActions from './BpmApprovalActions'
+import BusinessContentCard from './BusinessContentCard'
 import BpmDynamicForm, {
   formatBpmVariable,
+  isBlank,
   parseBpmFormConf,
   parseBpmFormFields
 } from './BpmDynamicForm'
-import { bpmStatusColor, bpmStatusLabel } from './bpmStatus'
+import { BPM_VARIABLE_LABELS, bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from './bpmStatus'
 
-/** 流程表单：字段定义存于 BPM，可由前端渲染。 */
+/**
+ * 流程表单：字段定义存于 BPM，可由前端渲染。
+ */
 const FORM_TYPE_NORMAL = 10
 
 const TIMELINE_COLORS: Record<number, string> = {
@@ -43,6 +51,7 @@ const TIMELINE_COLORS: Record<number, string> = {
   4: 'gray',
   5: 'orange'
 }
+
 
 /** 审批记录时间线：节点顺序与状态均由后端 activityNodes 给出。 */
 function ApprovalTimeline({ detail }: { detail?: BpmApprovalDetailData }) {
@@ -77,6 +86,50 @@ function ApprovalTimeline({ detail }: { detail?: BpmApprovalDetailData }) {
         )}
       </div>
     }))}
+  />
+}
+
+/**
+ * 流程实例与任务编号：UUID 对审批人没有信息量，但排查问题时要拿得到。
+ * 默认折叠，展开后仍是完整值 + 一键复制，不做截断——截断的 ID 贴进日志查不到。
+ */
+function ProcessIdentifiers({ processInstanceId, taskId }: {
+  processInstanceId?: string
+  taskId?: string
+}) {
+  const { message } = App.useApp()
+  if (!processInstanceId && !taskId) return null
+
+  const copy = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      message.success(`已复制${label}`)
+    } catch {
+      message.error('复制失败，请手动选择文本复制')
+    }
+  }
+
+  return <Collapse
+    ghost
+    className="bpm-approval-ids"
+    items={[{
+      key: 'ids',
+      label: <Typography.Text type="secondary">流程标识（排查用）</Typography.Text>,
+      children: <div className="bpm-approval-id-list">
+        {processInstanceId && <div className="bpm-approval-id">
+          <Typography.Text type="secondary">流程实例</Typography.Text>
+          <Typography.Text code>{processInstanceId}</Typography.Text>
+          <Button type="text" size="small" icon={<CopyOutlined/>} title="复制流程实例"
+                  onClick={() => void copy('流程实例', processInstanceId)}/>
+        </div>}
+        {taskId && <div className="bpm-approval-id">
+          <Typography.Text type="secondary">任务编号</Typography.Text>
+          <Typography.Text code>{taskId}</Typography.Text>
+          <Button type="text" size="small" icon={<CopyOutlined/>} title="复制任务编号"
+                  onClick={() => void copy('任务编号', taskId)}/>
+        </div>}
+      </div>
+    }]}
   />
 }
 
@@ -175,8 +228,18 @@ export type BpmApprovalDetailProps = {
   canUpdate: boolean
   users: SimpleUser[]
   dictDataByType?: Record<string, DictData[]>
+  /** 列表已按任务批量取到的业务摘要，作为详情卡加载前的占位。 */
+  businessBrief?: BpmApprovalBrief
   /** 该流程已接入员工端业务页时的入口；未接入则不展示。 */
   businessEntry?: { loading: boolean; onOpen: () => void }
+  /**
+   * 业务详情卡下发的跳转信息，作为 businessEntry 的补充。
+   *
+   * <p>{@code businessEntry} 走的是后端白名单接口，目前只覆盖少数几个域；
+   * 更多域由业务内容 Provider 下发 route。两者互斥展示：白名单接口的结论
+   * 自带权限校验，更可靠，因此它可用时优先。
+   */
+  businessRoute?: { route: string; query?: Record<string, unknown> } | null
   onActionSuccess?: () => void
 }
 
@@ -193,7 +256,9 @@ export default function BpmApprovalDetail({
   canUpdate,
   users,
   dictDataByType,
+  businessBrief,
   businessEntry,
+  businessRoute,
   onActionSuccess
 }: BpmApprovalDetailProps) {
   const [detail, setDetail] = useState<BpmApprovalDetailData>()
@@ -204,8 +269,28 @@ export default function BpmApprovalDetail({
   const [comments, setComments] = useState<BpmComment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('form')
+  const navigate = useNavigate()
+  const [businessCard, setBusinessCard] = useState<BpmApprovalDetailCard | null>()
+  const [businessCardLoading, setBusinessCardLoading] = useState(false)
 
   const processInstanceId = task?.processInstanceId
+  const taskId = task?.id
+
+  const loadBusinessCard = useCallback(async () => {
+    if (!taskId) {
+      setBusinessCard(null)
+      return
+    }
+    setBusinessCardLoading(true)
+    try {
+      setBusinessCard(await api.bpmApprovalBusinessDetail(taskId, view))
+    } catch {
+      // 业务内容不是审批的必要条件，解析失败就退回流程变量展示。
+      setBusinessCard(null)
+    } finally {
+      setBusinessCardLoading(false)
+    }
+  }, [taskId, view])
 
   const loadDetail = useCallback(async () => {
     if (!processInstanceId) {
@@ -251,6 +336,7 @@ export default function BpmApprovalDetail({
   }, [processInstanceId])
 
   useEffect(() => { void loadDetail() }, [loadDetail])
+  useEffect(() => { void loadBusinessCard() }, [loadBusinessCard])
   useEffect(() => { setActiveTab('form') }, [processInstanceId])
   useEffect(() => {
     // 流转记录与评论按需加载，避免打开详情就发三个请求。
@@ -281,30 +367,59 @@ export default function BpmApprovalDetail({
 
   const isNormalForm = processDefinition?.formType === FORM_TYPE_NORMAL && formFields.length > 0
 
-  /** 业务表单等无字段定义的流程，用流程变量与摘要兜底展示。 */
+  /**
+   * 业务表单等无字段定义的流程，用流程变量与摘要兜底展示。
+   *
+   * <p>只保留**已中文化**的条目：后端摘要给出的 label（流程表单字段标题）若已是中文则直接用；
+   * 流程变量则必须先命中 {@link BPM_VARIABLE_LABELS}。两条路径都不放行英文 key——
+   * 那是流程内部的路由变量，审批人看不懂，也不该看到。全部过滤掉时整块不渲染。
+   */
   const fallbackItems = useMemo(() => {
     const summary = processInstance?.summary ?? []
     if (summary.length > 0) {
-      return summary.map((item, index) => ({
-        key: `summary-${item.key}-${index}`,
-        label: item.key,
-        value: item.value
-      }))
+      return summary
+        .map((item, index) => ({
+          key: `summary-${item.key}-${index}`,
+          label: item.label && hasChinese(item.label) ? item.label : bpmVariableLabel(item.key),
+          value: item.value
+        }))
+        .filter((item): item is { key: string; label: string; value: string } =>
+          !!item.label && !isBlank(item.value))
     }
     const variables = processInstance?.formVariables ?? {}
-    return Object.entries(variables).map(([key, value]) => ({
-      key: `variable-${key}`,
-      label: key,
-      value: formatBpmVariable(value)
-    }))
+    return Object.entries(variables)
+      .map(([key, value]) => ({ key: `variable-${key}`, label: bpmVariableLabel(key), value }))
+      .filter((item): item is { key: string; label: string; value: unknown } => !!item.label)
+      .map(item => ({
+        key: item.key,
+        label: item.label,
+        value: formatBpmVariable(item.value)
+      }))
   }, [processInstance?.formVariables, processInstance?.summary])
 
-  if (!task) return <Empty description="从左侧选择一条审批任务"/>
+  /** 该流程有没有接入业务内容卡——没有时才需要解释"为什么只有流程信息"。 */
+  const hasBusinessCard = !!(businessCard?.groups?.length || businessBrief?.fields?.length)
 
+  if (!task) return <Empty description="从左侧选择一条审批任务"/>
   const startUser = processInstance?.startUser?.nickname
     || task.processInstance?.startUser?.nickname
     || '-'
   const subject = processInstance?.name || task.processInstance?.name || task.name || '审批任务'
+
+  /**
+   * 业务详情卡下发 route 时的兜底跳转——补上白名单接口未覆盖的业务域。
+   * 白名单可用时按钮走 businessEntry（自带权限校验），否则走这里。
+   */
+  const openBusinessRoute = () => {
+    if (!businessRoute?.route) return
+    const params = new URLSearchParams()
+    Object.entries(businessRoute.query || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) params.set(key, String(value))
+    })
+    const route = businessRoute.route.startsWith('/') ? businessRoute.route : `/${businessRoute.route}`
+    navigate(params.toString() ? `${route}?${params.toString()}` : route, { state: businessRoute.query })
+  }
+  const showBusinessButton = !!businessEntry || !!businessRoute?.route
 
   return <article className="business-inbox-detail bpm-approval-detail">
     <header className="business-inbox-detail-hero bpm-approval-detail-hero">
@@ -318,10 +433,10 @@ export default function BpmApprovalDetail({
           <Typography.Text type="secondary">{task.name || '流程节点'} · 发起人：{startUser}</Typography.Text>
         </div>
       </div>
-      {businessEntry && <Button
+      {showBusinessButton && <Button
         icon={<LinkOutlined/>}
-        loading={businessEntry.loading}
-        onClick={businessEntry.onOpen}
+        loading={businessEntry?.loading}
+        onClick={businessEntry ? businessEntry.onOpen : openBusinessRoute}
       >{view === 'todo' ? '打开业务详情' : '查看业务单据'}</Button>}
     </header>
 
@@ -341,7 +456,24 @@ export default function BpmApprovalDetail({
           key: 'form',
           label: '审批详情',
           children: <div className="bpm-approval-form-pane">
-            <section className="business-inbox-card bpm-approval-card">
+            {/* 业务内容卡：由后端按 businessKey 解析业务表得出，label/value 已中文化。 */}
+            {(businessCardLoading || businessCard || businessBrief) &&
+              <section className="business-inbox-card bpm-approval-card">
+                <Typography.Text className="bpm-approval-card-title">业务信息</Typography.Text>
+                <BusinessContentCard
+                  loading={businessCardLoading && !businessBrief}
+                  card={businessCard ?? (businessBrief ? {
+                    bizType: businessBrief.bizType,
+                    title: businessBrief.title,
+                    statusText: businessBrief.subtitle,
+                    groups: businessBrief.fields?.length
+                      ? [{ title: '', fields: businessBrief.fields }]
+                      : []
+                  } : null)}
+                />
+              </section>}
+
+            <section className="business-inbox-card bpm-approval-card bpm-approval-flow-card">
               {detailLoading
                 ? <Skeleton active paragraph={{ rows: 6 }}/>
                 : isNormalForm
@@ -355,13 +487,20 @@ export default function BpmApprovalDetail({
                   />
                   : fallbackItems.length > 0
                     ? <>
-                      <Typography.Text type="secondary">流程信息</Typography.Text>
+                      <Typography.Text className="bpm-approval-card-title">流程信息</Typography.Text>
                       <DetailFieldGrid columns={2} items={fallbackItems}/>
                     </>
-                    : <Empty description="该流程没有可展示的表单信息"/>}
+                    : <Typography.Text type="secondary">
+                      {/* 兜底块为空是常态而非故障：变量全是流程内部路由用的，
+                          业务内容由上面的业务信息卡承载。有话直说，别给一个空白卡片。 */}
+                      {hasBusinessCard
+                        ? '本流程的业务内容已在上方「业务信息」中展示。'
+                        : '该流程未接入业务内容，也没有可展示的流程字段。'}
+                    </Typography.Text>}
             </section>
 
-            <section className="business-inbox-card bpm-approval-card">
+            <section className="business-inbox-card bpm-approval-card bpm-approval-meta-card">
+              <Typography.Text className="bpm-approval-card-title">流程</Typography.Text>
               <DetailFieldGrid columns={2} items={[
                 { key: 'processName', label: '流程名称', value: subject },
                 { key: 'taskName', label: '当前节点', value: task.name || '-' },
@@ -384,13 +523,12 @@ export default function BpmApprovalDetail({
                 ...(view === 'done'
                   ? [{ key: 'taskEndedAt', label: '完成时间', value: <DateTimeText value={task.endTime}/> }]
                   : []),
-                { key: 'formName', label: '表单名称', value: processDefinition?.formName || task.formName || '-' },
-                { key: 'processInstanceId', label: '流程实例', value: task.processInstanceId, span: 2 as const },
-                { key: 'taskId', label: '任务编号', value: task.id, span: 2 as const },
                 ...(task.reason
                   ? [{ key: 'reason', label: '审批意见', value: task.reason, span: 2 as const }]
                   : [])
               ]}/>
+              {/* 流程实例与任务编号只用于排查，默认收起——审批人不需要它们占屏幕。 */}
+              <ProcessIdentifiers processInstanceId={task.processInstanceId} taskId={task.id}/>
             </section>
           </div>
         },

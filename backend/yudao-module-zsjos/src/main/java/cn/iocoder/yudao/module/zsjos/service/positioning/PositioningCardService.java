@@ -632,6 +632,20 @@ public class PositioningCardService {
         return toResp(require(id), userId);
     }
 
+    /**
+     * IP（专业）审核流程的回调。
+     *
+     * <p><b>该分支已按决策退役，不是待修的缺口。</b>提交时不再因 {@code professionalRisk}
+     * 进入 {@code ip_review}，而是直接进入 {@code operator_feasibility}；本方法与
+     * {@link PositioningIpProcessStatusListener}、BPMN 资产
+     * （{@code script/bpm/zsjos_media_positioning_ip/}）一并保留，只为让**已在途的实例**
+     * 能正常跑完。决策记录见 handoff/main.md（"the IP listener and process asset remain
+     * only for already-running instances"）。
+     *
+     * <p>因此 {@code selectByIpProcessId} 查不到 card 而在此提前返回是**预期行为**：
+     * 没有新实例会写入 {@code ipProcessInstanceId}。新增提交若需要审批，应走运营审核分支，
+     * 不要在这里接线。
+     */
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "positioning-card.process-result", targetType = "positioning-card")
     @Transactional(rollbackFor = Exception.class)
     public void handleIpProcessResult(String processId, Integer status, String reason) {

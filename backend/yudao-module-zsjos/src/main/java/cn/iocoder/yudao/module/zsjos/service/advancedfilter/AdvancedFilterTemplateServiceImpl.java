@@ -10,6 +10,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -27,13 +28,28 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
     @Override
     public List<AdvancedFilterTemplateRespVO> visibleList(String scene, String pageKey, Long userId) {
         validateScenePage(scene, pageKey);
-        return mapper.selectVisibleList(scene, pageKey, userId).stream().map(this::toResp).toList();
+        List<AdvancedFilterTemplateDO> templates = mapper.selectVisibleList(scene, pageKey, userId);
+        Long effectiveId = resolveEffectiveDefaultId(templates);
+        return templates.stream().map(item -> toResp(item, effectiveId)).toList();
+    }
+
+    /**
+     * 页面自动套用的默认模板：个人默认优先于系统默认，同范围内取排序最前的一条（至多一条）。
+     * 规则只在这里实现一次，避免各前端各自判断出不同结果。
+     */
+    private Long resolveEffectiveDefaultId(List<AdvancedFilterTemplateDO> templates) {
+        return templates.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getDefaultTemplate()))
+                .min(Comparator.comparing((AdvancedFilterTemplateDO item) -> SCOPE_PERSONAL.equals(item.getScope()) ? 0 : 1)
+                        .thenComparing(AdvancedFilterTemplateDO::getId))
+                .map(AdvancedFilterTemplateDO::getId)
+                .orElse(null);
     }
 
     @Override
     public List<AdvancedFilterTemplateRespVO> systemList(String scene, String pageKey) {
         validateScenePage(scene, pageKey);
-        return mapper.selectSystemList(scene, pageKey).stream().map(this::toResp).toList();
+        return mapper.selectSystemList(scene, pageKey).stream().map(item -> toResp(item, null)).toList();
     }
 
     @Override
@@ -148,7 +164,7 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
         }
     }
 
-    private AdvancedFilterTemplateRespVO toResp(AdvancedFilterTemplateDO item) {
+    private AdvancedFilterTemplateRespVO toResp(AdvancedFilterTemplateDO item, Long effectiveDefaultId) {
         AdvancedFilterTemplateRespVO resp = new AdvancedFilterTemplateRespVO();
         resp.setId(item.getId());
         resp.setScene(item.getScene());
@@ -159,6 +175,7 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
         resp.setSort(item.getSort());
         resp.setEnabled(item.getEnabled());
         resp.setDefaultTemplate(item.getDefaultTemplate());
+        resp.setEffectiveDefault(item.getId() != null && item.getId().equals(effectiveDefaultId));
         resp.setVersion(item.getVersion());
         resp.setCreateTime(item.getCreateTime());
         resp.setUpdateTime(item.getUpdateTime());

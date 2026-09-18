@@ -7,7 +7,7 @@
       </div>
       <el-button :loading="loading" @click="getList"> <Icon icon="ep:refresh" />刷新 </el-button>
     </div>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleSearch" @change="handleFilter" />
+    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" page-key="lead_claim_pool" @search="handleSearch" @change="handleFilter" />
   </ContentWrap>
 
   <ContentWrap>

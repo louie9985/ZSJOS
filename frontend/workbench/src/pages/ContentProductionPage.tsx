@@ -331,7 +331,7 @@ function VersionEditor({ content, initial, purposeOptions, formatOptions, onSave
             <Space align="start" size={10} style={{ width: '100%' }}>
               {material.coverPreviewUrl
                 ? <img src={material.coverPreviewUrl} alt={material.title} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
-                : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-surface-raised)' }} />}
+                : <div style={{ width: 56, height: 56, borderRadius: 4, background: 'var(--crm-bg-sunken)' }} />}
               <span style={{ flex: 1 }}>
                 <Typography.Text strong>{material.title}</Typography.Text><br />
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text>

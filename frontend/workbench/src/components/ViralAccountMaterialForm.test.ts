@@ -1,6 +1,9 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { MaterialFieldDefinition } from '../services/materialApi'
-import { buildViralAccountLayout } from './ViralAccountMaterialForm'
+import type { MaterialFieldDefinition, MaterialType } from '../services/materialApi'
+import ViralContentMaterialForm from './ViralContentMaterialForm'
+import ViralAccountMaterialForm, { buildViralAccountLayout } from './ViralAccountMaterialForm'
 
 const field = (key: string, sort: number, section?: string, group?: string): MaterialFieldDefinition => ({
   key,
@@ -40,5 +43,37 @@ describe('buildViralAccountLayout', () => {
 
     expect(layout.unassignedFields.map(item => item.key)).toEqual(['missing', 'string-null', 'unknown'])
     expect(layout.sections.find(section => section.key === 'BUILD_SUGGESTION')?.runs[0].fields[0].key).toBe('known')
+  })
+})
+
+
+describe('unavailable template', () => {
+  it.each([undefined, { fields: [] }])('shows an actionable error without save controls', currentSchema => {
+    const html = renderToStaticMarkup(createElement(ViralAccountMaterialForm, {
+      mode: 'create', type: { id: 1, currentSchema } as MaterialType, dicts: {},
+      onClose: () => {}, onSaved: () => {}, onRetry: () => {}
+    }))
+    expect(html).toContain('拆解模板不可用')
+    expect(html).toContain('重试')
+    expect(html).not.toContain('保存草稿')
+    expect(html).not.toContain('提交审批')
+    expect(html).not.toContain('viral-account-screenshot')
+  })
+})
+
+
+describe('available template', () => {
+  it.each([ViralAccountMaterialForm, ViralContentMaterialForm])('renders all sections from backend fields', component => {
+    const html = renderToStaticMarkup(createElement(component, {
+      mode: 'create', type: { id: 1, currentSchema: { fields: [
+        field('account_name', 10, 'ACCOUNT_DETAIL'),
+        field('analysis', 20, 'DIRECTOR_ANALYSIS'),
+        field('advice', 30, 'BUILD_SUGGESTION')
+      ] } } as MaterialType, dicts: {}, onClose: () => {}, onSaved: () => {}
+    }))
+    expect(html.match(/class="viral-account-section"/g)).toHaveLength(3)
+    expect(html).toContain('viral-account-screenshot')
+    expect(html).toContain('保存草稿')
+    expect(html).not.toContain('拆解模板不可用')
   })
 })

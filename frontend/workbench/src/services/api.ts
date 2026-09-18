@@ -2199,9 +2199,46 @@ export type BpmTask = {
     name: string;
     createTime: Timestamp;
     processDefinitionId?: string;
-    summary?: Array<{ key: string; value: string }>;
+    summary?: Array<{ key: string; label?: string; value: string }>;
     startUser?: { id: number; nickname: string };
   };
+};
+/** 审批中心列表用的业务摘要；label/value 已由后端中文化。 */
+/** 审批内容的附件；url 由后端签发，前端不拼接。 */
+export type BpmApprovalAttachment = {
+  name?: string;
+  url?: string;
+  contentType?: string;
+  size?: number;
+};
+export type BpmApprovalField = {
+  label: string;
+  value?: string;
+  span?: number;
+  /** 非空时按附件渲染，忽略 value。 */
+  attachments?: BpmApprovalAttachment[];
+};
+export type BpmApprovalBrief = {
+  bizType?: string;
+  title: string;
+  subtitle?: string;
+  fields?: BpmApprovalField[];
+  route?: string;
+  query?: Record<string, unknown>;
+  message?: string;
+};
+export type BpmApprovalDetailCard = {
+  bizType?: string;
+  title?: string;
+  statusText?: string;
+  groups?: Array<{
+    title?: string;
+    fields?: BpmApprovalField[];
+    span?: boolean;
+  }>;
+  route?: string;
+  query?: Record<string, unknown>;
+  message?: string;
 };
 export type BpmApprovalNodeTask = {
   id: string;
@@ -2257,7 +2294,7 @@ export type BpmApprovalDetail = {
     startTime?: Timestamp;
     endTime?: Timestamp;
     formVariables?: Record<string, unknown>;
-    summary?: Array<{ key: string; value: string }>;
+    summary?: Array<{ key: string; label?: string; value: string }>;
     startUser?: { id: number; nickname: string; avatar?: string };
     processDefinitionId?: string;
   };
@@ -4655,6 +4692,18 @@ export const api = {
         params: { taskId, view },
       }),
     ),
+  // 审批中心的业务内容由各业务域的 Provider 提供，前端只认识 label + value，
+  // 因此这里不做任何流程 Key 到业务语义的映射。
+  bpmApprovalBusinessSummaryBatch: async (taskIds: string[], view: "todo" | "done") =>
+    unwrap<Record<string, BpmApprovalBrief>>(
+      await http.post("/bpm/approval-content/business-summary-batch", { taskIds, view }),
+    ),
+  bpmApprovalBusinessDetail: async (taskId: string, view: "todo" | "done") =>
+    unwrap<BpmApprovalDetailCard | null>(
+      await http.get("/bpm/approval-content/business-detail", {
+        params: { taskId, view },
+      }),
+    ),
   salesOrderApprovalNotificationTarget: async (
     orderId: number,
     sceneCode: string,
@@ -4917,16 +4966,12 @@ export const api = {
     unwrap<string>(await http.get(`/zsjos/export-task/${id}/download-url`)),
   bpmTaskPage: async (
     view: "todo" | "done",
-    params: { pageNo: number; pageSize: number; name?: string; category?: string; status?: number; createTime?: [string, string] },
+    params: { pageNo: number; pageSize: number; name?: string; category?: string; status?: number; createTime?: [string, string]; excludeProcessDefinitionKeys?: string },
   ) => {
-    console.log('[API] bpmTaskPage - view:', view, 'params:', params)
     const url = `/bpm/task/${view}-page`
-    console.log('[API] bpmTaskPage - url:', url)
     try {
       const response = await http.get(url, { params })
-      console.log('[API] bpmTaskPage - response:', response)
       const result = unwrap<PageResult<BpmTask>>(response)
-      console.log('[API] bpmTaskPage - unwrapped result:', result)
       return result
     } catch (error) {
       console.error('[API] bpmTaskPage - error:', error)

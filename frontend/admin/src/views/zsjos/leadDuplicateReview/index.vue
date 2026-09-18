@@ -46,6 +46,7 @@ const submit = async () => {
     advanced-scene="duplicate_review"
     advanced-search-endpoint="/zsjos/lead-duplicate-review/search-page"
     advanced-placeholder="客资编号 / 姓名 / 手机号"
+    advanced-page-key="lead_duplicate_review"
   ><template #row-actions="{ row, reload }"
       ><el-button
         link

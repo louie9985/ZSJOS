@@ -32,13 +32,24 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class AdvancedFilterTemplateController {
     @Resource private AdvancedFilterTemplateService service;
 
+    // 守卫按 scene 判定，与 AdvancedFilterController.catalog 保持一致：预置模板要落在页面上，前提是该页面
+    // 已经能取到同一场景的字段目录，两者的授权范围必须相同。原先的静态权限并集遗漏了场景专属权限
+    // （如订单管理的 zsjos:sales-order:query-management），会让有权访问页面的账号取不到预置。
     @GetMapping("/visible-list")
     @Operation(summary = "获得当前页面可用高级筛选模板")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
-            + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
-            + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
-            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my')")
+    @PreAuthorize("(#scene == 'lead' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted',"
+            + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:claim-pool:query',"
+            + "'zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
+            + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-own',"
+            + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create'))"
+            + " || (#scene == 'lead_appeal' && @ss.hasAnyPermissions('zsjos:lead:appeal:query',"
+            + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
+            + "'zsjos:lead:appeal:review-chairman'))"
+            + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
+            + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
+            + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
+            + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))")
     public CommonResult<List<AdvancedFilterTemplateRespVO>> visibleList(
             @RequestParam @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|subordinate_sales") String scene,
             @RequestParam @Pattern(regexp = "[a-z][a-z0-9_:-]{1,95}") String pageKey) {

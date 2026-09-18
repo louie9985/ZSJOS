@@ -46,7 +46,9 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
     default PageResult<SalesOrderSupervisorConfirmationDO> selectPageBySupervisor(
             Long userId, SalesOrderSupervisorPageReqVO reqVO, List<Long> orderIds) {
         if (orderIds != null && orderIds.isEmpty()) return PageResult.empty();
-        return new PageResult<>(selectSupervisorPageRows(reqVO, userId, orderIds),
+        // 偏移量在 Java 侧算好：MyBatis 的 #{} 占位符不能参与 LIMIT/OFFSET 的算术表达式
+        int offset = Math.max(0, (reqVO.getPageNo() - 1) * reqVO.getPageSize());
+        return new PageResult<>(selectSupervisorPageRows(reqVO, userId, orderIds, offset),
                 selectSupervisorCount(reqVO, userId, orderIds));
     }
     default List<SalesOrderSupervisorConfirmationDO> selectCursorBySupervisor(Long userId, Boolean handled,
@@ -59,7 +61,8 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
     @SelectProvider(type = SqlProvider.class, method = "supervisorPageSql")
     List<SalesOrderSupervisorConfirmationDO> selectSupervisorPageRows(SalesOrderSupervisorPageReqVO request,
                                                                       @Param("userId") Long userId,
-                                                                      @Param("orderIds") List<Long> orderIds);
+                                                                      @Param("orderIds") List<Long> orderIds,
+                                                                      @Param("offset") int offset);
 
     @SelectProvider(type = SqlProvider.class, method = "supervisorCountSql")
     Long selectSupervisorCount(SalesOrderSupervisorPageReqVO request, @Param("userId") Long userId,
@@ -80,7 +83,7 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
         public static String supervisorPageSql() {
             return "<script>" + supervisorSelectSql("request.handled")
                     + "ORDER BY c.update_time DESC, c.id DESC "
-                    + "LIMIT #{request.pageSize} OFFSET #{request.pageSize} * (#{request.pageNo} - 1)</script>";
+                    + "LIMIT #{request.pageSize} OFFSET #{offset}</script>";
         }
 
         public static String supervisorCountSql() {

@@ -43,6 +43,7 @@ const submit = async () => {
     advanced-scene="lead_appeal"
     advanced-search-endpoint="/zsjos/lead/appeal/inbox/search-page"
     advanced-placeholder="客资编号 / 姓名 / 手机号"
+    advanced-page-key="lead_appeal"
   ><template #row-actions="{ row, reload }"
       ><el-button link type="primary" :disabled="!row.taskId" @click="show(row, reload)"
         >处理</el-button

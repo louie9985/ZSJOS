@@ -24,6 +24,9 @@ public class BpmTaskPageReqVO extends PageParam {
     @Schema(description = "流程定义的标识", example = "2048")
     private String processDefinitionKey; // 精准匹配
 
+    @Schema(description = "需排除的流程定义标识，逗号分隔", example = "zsjos_sales_order_dual_approval")
+    private String excludeProcessDefinitionKeys; // 已接入专属业务审批页的流程，不在通用审批中心展示
+
     private String taskDefinitionKey;
 
     private List<String> processInstanceIds;

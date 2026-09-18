@@ -8,6 +8,7 @@
     advanced-scene="order"
     advanced-search-endpoint="/zsjos/sales-order/management-search-page"
     advanced-placeholder="订单号 / 学员姓名 / 手机号"
+    advanced-page-key="sales_order_management"
   >
     <template #actions="{ reload }">
       <el-input
@@ -22,6 +23,7 @@
         <el-option label="已驳回待修改" value="revision_required" />
         <el-option label="已通过" value="effective" />
         <el-option label="已被重提" value="superseded" />
+        <el-option label="已终止" value="terminated" />
       </el-select>
       <el-button type="primary" @click="reload">查询</el-button>
       <el-button @click="resetQuery(reload)">重置</el-button>

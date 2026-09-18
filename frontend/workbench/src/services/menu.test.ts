@@ -256,7 +256,11 @@ describe('workbench menu conversion', () => {
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(67)
+    // 69 = 67 基线 + 素材管理（/zsjos/material-library/manage，与浏览页共用页面组件，
+    // 由 RouteHost 的 management 开关区分）+ 教务自拓
+    // （APP_ROUTES.LEAD_EDUCATION_SELF_SOURCED，由 LeadSubmissionPage 的 educationSelfSourced
+    // 分支渲染），两条路由都已接线，计数随之更新。
+    expect(RENDERABLE_APP_ROUTES.size).toBe(69)
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)

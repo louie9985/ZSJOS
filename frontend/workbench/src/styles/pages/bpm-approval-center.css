@@ -77,6 +77,76 @@
   gap: var(--crm-sp-3);
 }
 
+/**
+ * 审批详情里的卡片有主次，不能三张等权平铺。
+ *
+ * 业务信息卡是审批人真正要看的东西（申请内容、附件、驳回原因），
+ * 流程卡与元数据卡只是佐证。做法是让业务卡恢复标准描边，其余两张退到凹陷底：
+ * 一样在视线上，但先看到业务内容。
+ */
+.bpm-approval-card:not(.bpm-approval-meta-card):not(.bpm-approval-flow-card) {
+  border-color: var(--crm-border-strong);
+}
+
+/* 卡片标题行：小号、字重加一档、字距微开，与下面的字段拉开层级 */
+.bpm-approval-card-title {
+  color: var(--crm-text-secondary) !important;
+  font-size: var(--crm-font-sm);
+  font-weight: var(--crm-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.bpm-approval-meta-card,
+.bpm-approval-flow-card {
+  gap: var(--crm-sp-2);
+  background: var(--crm-bg-sunken);
+  box-shadow: none;
+}
+
+/* 凹陷底上的字段块不该再浮起，否则"卡片里的小卡片"会有三层嵌套感 */
+.bpm-approval-meta-card .detail-field,
+.bpm-approval-flow-card .detail-field {
+  background: var(--crm-bg-container);
+  box-shadow: none;
+}
+
+/* 折叠的流程标识：默认收成一行次要文字，展开才占位置 */
+.bpm-approval-ids.ant-collapse {
+  border-top: 1px solid var(--crm-border);
+  padding-top: var(--crm-sp-1);
+}
+
+.bpm-approval-ids .ant-collapse-header {
+  padding: var(--crm-sp-1) 0 !important;
+}
+
+.bpm-approval-ids .ant-collapse-content-box {
+  padding: 0 !important;
+}
+
+.bpm-approval-id-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+/* 标签 / 值 / 复制按钮三列：UUID 很长，值必须能自己换行或滚动，不能把按钮挤走 */
+.bpm-approval-id {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.bpm-approval-id .ant-typography code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--crm-text-secondary);
+  font-family: var(--crm-font-mono);
+  font-size: var(--crm-font-sm);
+}
+
 .bpm-approval-summary-list {
   display: flex;
   min-width: 0;
@@ -161,17 +231,29 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* 同一节点下的多个任务（并签、加签）缩进半格，与节点名拉开主从关系 */
+  padding-left: var(--crm-sp-3);
+  border-left: 1px solid var(--crm-border);
 }
 
 .bpm-approval-timeline-reason {
   margin: 0;
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  color: var(--crm-text);
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+/* 流转记录：与审批记录同一套时间线观感（左侧一条轴 + 节点缩进），
+   不再用"每张任务一张浮动卡片"的另一套语言。 */
 .bpm-approval-records {
   display: flex;
   flex-direction: column;
   gap: var(--crm-sp-3);
+  padding-left: var(--crm-sp-3);
+  border-left: 2px solid var(--crm-border);
 }
 
 .bpm-approval-record {
@@ -181,7 +263,13 @@
   padding: var(--crm-sp-3);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-sunken);
+  box-shadow: none;
+}
+
+.bpm-approval-record .detail-field {
   background: var(--crm-bg-container);
+  box-shadow: none;
 }
 
 .bpm-approval-comments {
