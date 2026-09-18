@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class PartnerProfileRespVO {
+    private String name;
     private String nickname;
     private String mobile;
     private String email;

@@ -1,3 +1,4 @@
+import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -17,6 +18,7 @@ import {
   Space,
   Spin,
   Tag,
+  Tooltip,
   Typography
 } from 'antd'
 import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SwapOutlined } from '@ant-design/icons'
@@ -252,7 +254,8 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const activePageRequests = useRef(new Set<string>())
   const routeSelectionRef = useRef<number | undefined>(requestedLeadId)
   const unseenIdsRef = useRef(unseenIds)
-  const listScrollRef = useRef<HTMLDivElement>(null)
+  const avatarRail = useInboxAvatarRail('zsjos.lead-management.list-collapsed')
+  const { scrollRef: listScrollRef } = avatarRail
   const listSentinelRef = useRef<HTMLDivElement>(null)
   const itemIdsRef = useRef<number[]>([])
 
@@ -493,10 +496,10 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       if (entries[0]?.isIntersecting) {
         void loadPage(pageNo + 1, false, requestVersion.current)
       }
-    }, { root, rootMargin: '240px 0px', threshold: 0 })
+    }, { root, rootMargin: avatarRail.collapsed ? '240px' : '240px 0px', threshold: 0 })
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMore, initialLoading, loadMoreError, loadPage, loadingMore, pageNo])
+  }, [avatarRail.collapsed, useTableLayout, hasMore, initialLoading, loadMoreError, loadPage, loadingMore, pageNo])
 
   const selectLead = (id: number) => {
     if (shouldBlockLeadSwitch(followUpDirty) && !window.confirm('当前表单尚未提交，切换客资将丢失已填写内容。确定继续吗？')) return
@@ -683,7 +686,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       >{option.label}</button>)}
       <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
     </header>
-    <div className={useTableLayout ? 'lead-management-table-shell' : 'lead-inbox-layout'}>
+    <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
       {useTableLayout ? <>
         <ProTable<ManagedLead>
           className="lead-management-table"
@@ -729,21 +732,23 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         />
       </> : <>
       <aside className="lead-inbox-list-pane">
-        <div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
-        {initialError && <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
+        <div className="inbox-avatar-toolbar"><InboxAvatarControls label="客资" listId="lead-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+        <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div></div></div>
+        {initialError && (avatarRail.collapsed ? <InboxAvatarError message={initialError} expand={() => avatarRail.change(false)} retry={isLeadInboxUnauthorized(initialError) ? undefined : () => void loadPage(1, true, requestVersion.current)} /> : <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
           message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}
-          action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>}
-        <div ref={listScrollRef} className="lead-inbox-scroll">
+          action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>)}
+        <div id="lead-avatar-list" aria-busy={initialLoading || loadingMore} ref={listScrollRef} className="lead-inbox-scroll">
           {initialLoading ? <div className="lead-list-skeletons">
-            {Array.from({ length: 5 }, (_, index) => <div className="lead-inbox-item" key={index}><Skeleton active avatar paragraph={{ rows: 2 }}/></div>)}
-          </div> : !items.length && !initialError ? <Empty description="当前筛选下暂无客资"/> : items.map(item => {
+            {Array.from({ length: 5 }, (_, index) => <div className="lead-inbox-item" key={index}>{avatarRail.collapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active avatar paragraph={{ rows: 2 }}/>}</div>)}
+          </div> : !items.length && !initialError ? (avatarRail.collapsed ? <span className="inbox-avatar-empty" role="status">暂无客资</span> : <Empty description="当前筛选下暂无客资"/>) : items.map(item => {
             const active = item.id === selectedId
             const unseen = !active && unseenIds.includes(item.id)
-            return <button key={item.id} type="button"
+            return <Tooltip key={item.id} title={avatarRail.collapsed ? `${item.submittedName || '未填写姓名'} · ${item.leadNo || '暂无客资编号'}${unseen ? ' · 新客资' : ''}` : undefined} trigger={['hover', 'focus']}><button type="button" aria-label={`${item.submittedName || '未填写姓名'} · ${item.leadNo || '暂无客资编号'}${unseen ? ' · 新客资' : ''}`} aria-current={active ? 'true' : undefined}
               className={['lead-inbox-item', active && 'active', unseen && 'unseen'].filter(Boolean).join(' ')}
               onClick={() => selectLead(item.id)}>
               <div className="lead-inbox-item-main">
                 <NameAvatar name={item.submittedName} seed={item.leadNo} size={36} />
+                {unseen && avatarRail.collapsed && <span className="inbox-avatar-unseen" aria-hidden="true" />}
                 <div className="lead-inbox-item-copy">
                   <div className="lead-inbox-item-title">
                     {/* 标签与姓名同级：塞进 strong 会被姓名的 ellipsis 一起裁掉 */}
@@ -759,17 +764,17 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
                 </div>
               </div>
               <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{channelLabel(item.sourceChannel)} · {snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError)} · {formatTimestamp(item.submittedAt)}</span></div>
-            </button>
+            </button></Tooltip>
           })}
           {!initialLoading && items.length > 0 && <div ref={listSentinelRef} className="lead-list-sentinel">
             {loadMoreError
-              ? <Alert type="error" showIcon message="更多客资加载失败" description={loadMoreError}
+              ? avatarRail.collapsed ? <InboxAvatarError message={loadMoreError} expand={() => avatarRail.change(false)} retry={() => void loadPage(pageNo + 1, false, requestVersion.current)} /> : <Alert type="error" showIcon message="更多客资加载失败" description={loadMoreError}
                 action={<Button size="small" onClick={() => void loadPage(pageNo + 1, false, requestVersion.current)}>重试</Button>}/>
               : loadingMore
-                ? <div className="lead-list-loading"><Spin size="small"/> 加载中</div>
+                ? <div className="lead-list-loading" aria-label="加载更多客资"><Spin size="small"/>{!avatarRail.collapsed && ' 加载中'}</div>
                 : hasMore
-                  ? <Typography.Text type="secondary">继续下滑加载</Typography.Text>
-                  : <Typography.Text type="secondary" className="lead-list-end">已加载全部 {total} 条客资</Typography.Text>}
+                  ? <Typography.Text type="secondary">{avatarRail.collapsed ? '更多' : '继续下滑加载'}</Typography.Text>
+                  : <Typography.Text type="secondary" className="lead-list-end">{avatarRail.collapsed ? `共${total}条` : `已加载全部 ${total} 条客资`}</Typography.Text>}
           </div>}
         </div>
       </aside>

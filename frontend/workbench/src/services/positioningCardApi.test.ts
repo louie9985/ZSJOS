@@ -6,6 +6,26 @@ const response = <T,>(data: T) => ({ data: { code: 0, data } })
 afterEach(() => vi.restoreAllMocks())
 
 describe('positioning card API contract', () => {
+  it('reads frozen attachments through the established route with snapshot scope', async () => {
+    const file = { id: 2415, name: '访谈.png', type: 'image/png', size: 128, url: '/signed-file' }
+    const get = vi.spyOn(http, 'get').mockResolvedValue(response(file))
+    await expect(api.positioningCard.snapshotAttachment(20, 2415, 31)).resolves.toEqual(file)
+    expect(get).toHaveBeenLastCalledWith('/zsjos/positioning-card/20/snapshot/attachments/2415', {
+      params: { submissionId: 31 },
+    })
+    await api.positioningCard.snapshotAttachment(20, 2415)
+    expect(get).toHaveBeenLastCalledWith('/zsjos/positioning-card/20/snapshot/attachments/2415', {
+      params: { submissionId: undefined },
+    })
+  })
+
+  it('propagates attachment rejection without retrying a less restrictive endpoint', async () => {
+    const denied = new Error('无权访问此定位卡附件')
+    const get = vi.spyOn(http, 'get').mockRejectedValue(denied)
+    await expect(api.positioningCard.snapshotAttachment(20, 2415, 31)).rejects.toBe(denied)
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+
   it('creates and updates server-backed drafts', async () => {
     const createRequest: PositioningCardDraftRequest = { studentPersonId: 29, serviceRelationId: 11, values: { platform: 'douyin' } }
     const updateRequest: PositioningCardDraftRequest & { version: number } = { ...createRequest, version: 3 }

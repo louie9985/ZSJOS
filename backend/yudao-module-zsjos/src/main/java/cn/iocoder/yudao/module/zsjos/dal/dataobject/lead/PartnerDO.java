@@ -17,6 +17,7 @@ public class PartnerDO extends TenantBaseDO {
     @TableId private Long id;
     private String partnerNo;
     private String name;
+    private String nickname;
     private String mobile;
     private String email;
     private String avatar;

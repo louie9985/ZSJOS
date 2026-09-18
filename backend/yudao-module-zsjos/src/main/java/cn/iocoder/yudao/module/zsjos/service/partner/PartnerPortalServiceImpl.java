@@ -591,9 +591,9 @@ public class PartnerPortalServiceImpl implements PartnerPortalService {
     }
 
     private String displayName(PartnerDO partner) {
-        String name = partner == null || partner.getName() == null || partner.getName().isBlank()
-                ? "合作方" : partner.getName();
-        return name.length() <= 1 ? name : DesensitizedUtil.chineseName(name);
+        // The public leaderboard must never fall back to the business name.
+        return partner == null || partner.getNickname() == null || partner.getNickname().isBlank()
+                ? "未设置昵称" : partner.getNickname();
     }
 
     private String productName(LeadIntendedProductDO product) {

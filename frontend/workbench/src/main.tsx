@@ -1,3 +1,5 @@
+import DeliveryReminder from "./components/DeliveryReminder";
+import DiagnosisReminder from "./components/DiagnosisReminder";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
@@ -580,7 +582,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     : <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLoginRedirectPending(true); setLogged(true) }}/>
   if (error) return <div className="center-page"><Result status={error === SERVER_CONNECTION_ERROR_MESSAGE ? '500' : 'error'} title={error} subTitle={error === SERVER_CONNECTION_ERROR_MESSAGE ? '权限信息暂时无法加载，请检查网络后重试。' : '权限信息加载失败，请重试或返回登录。'} extra={<Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space>}/></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><DiagnosisReminder enabled={(info.permissions || []).some(p => ["zsjos:media-account:edit", "zsjos:media-account:maintenance"].includes(p))}/><DeliveryReminder enabled={(info.permissions || []).includes("zsjos:student-delivery:query")}/><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
     <Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)

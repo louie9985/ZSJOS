@@ -33,6 +33,15 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    @Select("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} AND status IN ('valid','converted','won') AND submitted_at >= #{from} AND submitted_at < #{to}")
+    long countDeliveryWeeklyLeads(@Param("tenantId") Long tenantId,@Param("partnerId") Long partnerId,@Param("from") LocalDateTime from,@Param("to") LocalDateTime to);
+
+    @Select("SELECT COUNT(*) AS leads, COALESCE(SUM(status='won'),0) AS deals FROM zsjos_lead "
+            + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} "
+            + "AND status IN ('valid','converted','won') "
+            + "AND (#{from} IS NULL OR submitted_at >= #{from}) AND submitted_at <= #{to}")
+    java.util.Map<String,Object> aggregatePartnerValidCohort(@Param("tenantId") Long tenantId,
+            @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
     @Select("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} AND counted_at >= #{from}")
     long countPartnerLeadsSince(@Param("tenantId") Long tenantId, @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from);
     static void advanceActivity(LeadDO lead, LocalDateTime activityAt) {

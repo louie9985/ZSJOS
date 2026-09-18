@@ -1,7 +1,8 @@
 import request from './request'
 
 export interface UserProfile {
-  nickname: string
+  name: string
+  nickname: string | null
   mobile: string
   email?: string
   avatar?: string
@@ -32,7 +33,7 @@ export function getProfile() {
 }
 
 /** 修改账号资料 */
-export function updateProfile(data: Partial<Omit<UserProfile, 'mobile'>>) {
+export function updateProfile(data: Pick<UserProfile, 'name' | 'nickname' | 'email' | 'avatar' | 'sex'>) {
   return request.put<never, void>('/zsjos/profile/update', data)
 }
 

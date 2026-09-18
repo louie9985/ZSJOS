@@ -15,4 +15,5 @@ public class StudentDeliveryPlanDO extends TenantBaseDO {
     @TableId private Long id; private Long studentPersonId; private Long accountId; private Long serviceRelationId;
     private Long directorUserId; private LocalDateTime accountOpenedAt; private Integer configVersion;
     private String status; private Integer version;
+    private Integer roundNo; private Long sourceSubmissionId; private LocalDateTime restartRequestedAt;
 }

@@ -25,3 +25,14 @@ export const getPositioningCard=async(token:string)=>unwrap<PositioningConfirmat
   await publicRequest.get('/zsjos/positioning-confirmation/detail',{headers:headers(token)}))
 export const decidePositioning=async(token:string,decision:'agree'|'request_changes',comment?:string)=>unwrap<boolean>(
   await publicRequest.post('/zsjos/positioning-confirmation/decision',{decision,comment},{headers:headers(token)}))
+
+export interface PositioningFile { id:number; name:string; type:string; size:number; url?:string }
+export interface PositioningMaterial {
+  id:number; title:string; fields:Array<{key:string;label:string;type:string}>;
+  values:Record<string,unknown>; dictSnapshot:Record<string,unknown>;
+  files:Array<{fileId:number;fieldKey:string;name:string;contentType:string;size:number;previewUrl?:string}>;
+}
+export const getPositioningAttachment=async(token:string,id:number)=>unwrap<PositioningFile>(
+  await publicRequest.get(`/zsjos/positioning-confirmation/attachments/${id}`,{headers:headers(token)}))
+export const getPositioningMaterial=async(token:string,id:number)=>unwrap<PositioningMaterial>(
+  await publicRequest.get(`/zsjos/positioning-confirmation/materials/${id}`,{headers:headers(token)}))

@@ -10,6 +10,10 @@ declare module 'axios' {
   }
 }
 
+export class ApiBusinessError extends Error {
+  constructor(public readonly code: number, message: string) { super(message); this.name = 'ApiBusinessError' }
+}
+
 /** 统一响应结构 */
 export interface ApiResponse<T = unknown> {
   code: number
@@ -123,7 +127,7 @@ request.interceptors.response.use(
 
     // 业务错误
     showToast({ message: msg || '操作失败', type: 'fail' })
-    return Promise.reject(new Error(msg || '业务错误'))
+    return Promise.reject(new ApiBusinessError(code, msg || '业务错误'))
   },
   async (error) => {
     const { response, config } = error

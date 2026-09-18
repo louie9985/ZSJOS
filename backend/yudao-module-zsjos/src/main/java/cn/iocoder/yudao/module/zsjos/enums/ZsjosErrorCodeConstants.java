@@ -3,6 +3,12 @@ package cn.iocoder.yudao.module.zsjos.enums;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
+    ErrorCode PARTNER_ASSIGNMENT_NOT_CONFIGURED = new ErrorCode(1_045_090_001, "尚未配置指定接单人，请选择自动分配或联系管理员");
+    ErrorCode PARTNER_ASSIGNMENT_MULTIPLE = new ErrorCode(1_045_090_002, "指定接单关系配置异常，请联系管理员配置唯一接单人");
+    ErrorCode PARTNER_ASSIGNMENT_UNAVAILABLE = new ErrorCode(1_045_090_003, "指定接单人暂不可用，请选择自动分配或联系管理员");
+    ErrorCode PARTNER_ASSIGNMENT_IDENTITY_INVALID = new ErrorCode(1_045_090_004, "请配置有效的销售或教务承接身份");
+    ErrorCode PARTNER_ASSIGNMENT_TARGET_FORBIDDEN = new ErrorCode(1_045_090_005, "指定接单人由系统配置，请刷新页面后重试");
+
     ErrorCode DELIVERY_CLASS_NOT_EXISTS = new ErrorCode(1_900_019_001, "班级不存在");
     ErrorCode DELIVERY_CLASS_CATEGORY_INVALID = new ErrorCode(1_900_019_002, "班级产品分类无效");
     ErrorCode DELIVERY_CLASS_SCHEDULE_INVALID = new ErrorCode(1_900_019_003, "班级考期无效或与产品分类不匹配");
@@ -110,6 +116,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_SUBJECT_NOT_CONFIGURED = new ErrorCode(1_900_017_018, "产品未配置支付主体，无法使用线上支付");
     ErrorCode PAYMENT_CANCEL_PENDING = new ErrorCode(1_900_017_019, "取消结果待确认，请稍后重试或刷新状态");
     ErrorCode PAYMENT_ALREADY_PAID = new ErrorCode(1_900_017_020, "该笔支付已到账，无法取消支付链接");
+    ErrorCode PAYMENT_DEFAULT_SUBJECT_MISSING = new ErrorCode(1_900_017_021, "未配置启用的默认支付主体，请联系管理员");
+    ErrorCode PAYMENT_SUBJECT_CONFIG_INVALID = new ErrorCode(1_900_017_022, "支付主体商户或签名配置无效，请联系管理员");
+    ErrorCode PAYMENT_SUBJECT_SNAPSHOT_INVALID = new ErrorCode(1_900_017_023, "支付主体快照缺失或异常，请核实原收款主体");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
@@ -142,6 +151,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_INVITATION_VERSION_CONFLICT = new ErrorCode(1_900_000_027, "邀请码状态已变化，请刷新后重试");
     ErrorCode PARTNER_INVITATION_CODE_CONFLICT = new ErrorCode(1_900_000_028, "邀请码生成冲突，请重试");
     ErrorCode PARTNER_INVITATION_PASSWORD_CONFIRM_MISMATCH = new ErrorCode(1_900_000_029, "两次输入的密码不一致");
+    ErrorCode PARTNER_INVITATION_EXPIRY_INVALID = new ErrorCode(1_900_000_031, "邀请码到期时间必须晚于当前时间");
     ErrorCode PARTNER_STUDENT_INVITATION_FORBIDDEN = new ErrorCode(1_900_000_030,
             "学员不存在、尚未被当前编导接收或已不在服务中");
 
@@ -417,6 +427,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_ACCOUNT_PROFILE_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_011_018, "账号资料请求标识已用于不同内容，请重新提交");
     ErrorCode MEDIA_ACCOUNT_ATTACHMENT_INVALID = new ErrorCode(1_900_011_019, "账号附件无效、超出大小限制或不属于当前账号与上传人");
     ErrorCode MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED = new ErrorCode(1_900_011_020, "请通过账号档案表单维护资料；旧资料或状态更新接口不再接受修改");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_ALREADY_STARTED = new ErrorCode(1_900_011_021, "账号已完成启动诊断，请刷新后填写周期诊断");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_POSITIONING_REQUIRED = new ErrorCode(1_900_011_022, "请先为当前账号应用有效的定位卡，再填写启动诊断");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_TASK_UNAVAILABLE = new ErrorCode(1_900_011_024, "本轮诊断任务尚未生成、已处理或轮次已结束，请刷新待办");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_INITIAL_REQUIRED = new ErrorCode(1_900_011_023, "请先完成启动诊断，再填写周期诊断");
     ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
     ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
 

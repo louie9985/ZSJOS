@@ -65,9 +65,47 @@ public class PositioningCardController {
     }
     @GetMapping("/{id}/attachments/{fileId}")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
-    public CommonResult<PositioningCardService.CardFile> attachment(@PathVariable Long id, @PathVariable Long fileId) {
+    public CommonResult<PositioningCardService.CardFile> attachment(@PathVariable Long id, @PathVariable Long fileId,
+            @RequestParam(required = false) Long submissionId,
+            @RequestParam(defaultValue = "false") boolean snapshot) {
+        if (snapshot || submissionId != null) return success(resources.attachment(id, submissionId, fileId));
         return success(service.attachment(id, fileId, getLoginUserId()));
     }
+    @Resource private cn.iocoder.yudao.module.zsjos.service.positioning.PositioningSnapshotResourceService resources;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.positioning.PositioningEvidenceService evidence;
+
+    public record EvidenceRequest(@jakarta.validation.constraints.NotNull Integer version,
+            @jakarta.validation.constraints.NotEmpty @Size(max=20) List<@jakarta.validation.constraints.NotNull Long> fileIds) {}
+
+    @GetMapping("/{id}/snapshot/materials/{versionId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<java.util.Map<String, Object>> material(@PathVariable Long id, @PathVariable Long versionId,
+            @RequestParam(required=false) Long submissionId) { return success(resources.material(id, submissionId, versionId)); }
+
+    @GetMapping("/{id}/snapshot/attachments/{fileId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<PositioningCardService.CardFile> snapshotAttachment(@PathVariable Long id, @PathVariable Long fileId,
+            @RequestParam(required=false) Long submissionId) { return success(resources.attachment(id, submissionId, fileId)); }
+
+    @PostMapping("/{id}/submissions/{submissionId}/evidence/files")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:evidence')")
+    public CommonResult<PositioningCardService.CardFile> uploadEvidence(@PathVariable Long id, @PathVariable Long submissionId,
+            @RequestParam org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return success(evidence.upload(id, submissionId, file.getBytes(), file.getOriginalFilename(), file.getContentType(), getLoginUserId()));
+    }
+
+    @PostMapping("/{id}/submissions/{submissionId}/evidence")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:evidence')")
+    public CommonResult<Boolean> submitEvidence(@PathVariable Long id, @PathVariable Long submissionId, @Valid @RequestBody EvidenceRequest request) {
+        evidence.submit(id, submissionId, request.version(), request.fileIds(), getLoginUserId()); return success(true);
+    }
+
+    @GetMapping("/{id}/submissions/{submissionId}/evidence/{fileId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<PositioningCardService.CardFile> evidenceFile(@PathVariable Long id, @PathVariable Long submissionId, @PathVariable Long fileId) {
+        return success(evidence.attachment(id, submissionId, fileId));
+    }
+
     @GetMapping("/published-template") @Operation(summary = "获得当前定位卡业务模板")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<DirectorFormTemplateVO.Snapshot> publishedTemplate(@RequestParam(required = false) Long templateId) {

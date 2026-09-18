@@ -1,3 +1,4 @@
+import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Badge, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, NotificationOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
@@ -163,7 +164,7 @@ function BusinessTaskPanel({
 
   const open = (task: BusinessTask) => {
     if (task.actionCode === 'MEDIA_ACCOUNT_DIAGNOSIS') {
-      window.location.assign(`/zsjos/media-students?accountId=${task.bizId}`)
+      void diagnosisApi.tasks(task.bizId).then(items => { const item = items.find(x => x.taskId === task.id); if (item) navigate(diagnosisTaskUrl(item)); else setError("该诊断任务已处理或不再可用"); }).catch(e => setError(errorText(e, "诊断任务加载失败")))
       return
     }
     if (task.actionCode === 'STUDENT_DELIVERY_CONFIRM') {

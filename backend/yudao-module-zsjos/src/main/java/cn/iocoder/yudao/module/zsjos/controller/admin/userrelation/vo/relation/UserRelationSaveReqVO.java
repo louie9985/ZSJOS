@@ -17,6 +17,8 @@ public class UserRelationSaveReqVO {
 
     private Set<Long> targetUserIds;
 
+    private String ownerIdentity;
+
     @NotBlank(message = "操作模式不能为空")
     private String mode;
 

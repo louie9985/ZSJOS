@@ -20,7 +20,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="所属部门" prop="deptId">
+      <el-form-item v-if="!isPartnerScene" label="所属部门" prop="deptId">
         <el-tree-select
           v-model="queryParams.deptId"
           :data="deptTree"
@@ -81,7 +81,8 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="所属部门" prop="deptName" min-width="140" />
+      <el-table-column v-if="!isPartnerScene" label="所属部门" prop="deptName" min-width="140" />
+      <el-table-column v-else label="承接身份" width="110"><template #default="{ row }">{{ row.ownerIdentity === 'education' ? '教务' : row.ownerIdentity === 'sales' ? '销售' : '未配置' }}</template></el-table-column>
       <el-table-column :label="`已绑定${targetLabel}`" min-width="300">
         <template #default="{ row }">
           <div v-if="row.salesUsers.length" class="sales-tags">
@@ -145,6 +146,12 @@
       <span class="drawer-source-label">配置对象</span>
       <strong>{{ selectedSourceLabel }}</strong>
     </div>
+    <el-form-item v-if="isPartnerScene && saveMode !== 'remove'" label="承接身份" required>
+      <el-radio-group v-model="ownerIdentity">
+        <el-radio-button value="sales">销售承接</el-radio-button>
+        <el-radio-button value="education">教务承接</el-radio-button>
+      </el-radio-group>
+    </el-form-item>
     <el-radio-group v-if="isBatch" v-model="saveMode" class="mode-switch">
       <el-radio-button value="append">追加绑定</el-radio-button>
       <el-radio-button value="replace">替换原绑定</el-radio-button>
@@ -167,7 +174,7 @@
         <el-input v-model="salesKeyword" clearable placeholder="搜索姓名、手机号或部门">
           <template #prefix><Icon icon="ep:search" /></template>
         </el-input>
-        <el-checkbox-group v-model="selectedSalesIds" class="candidate-list">
+        <el-checkbox-group v-model="selectedSalesIds" :max="isPartnerScene ? 1 : undefined" class="candidate-list">
           <el-checkbox
             v-for="sales in filteredSales"
             :key="sales.id"
@@ -280,6 +287,8 @@ const router = useRouter()
 const isAdminMode = computed(() => route.name === 'ZsjosUserRelationData')
 const sceneCode = computed(() => String(route.params.sceneCode || 'lead_specified_assignment'))
 const scene = ref<UserRelationApi.UserRelationSceneVO>()
+const isPartnerScene = computed(() => scene.value?.sourceType === 'partner')
+const ownerIdentity = ref<'sales' | 'education'>()
 const sceneName = computed(() => scene.value?.name || '派单关系')
 const sourceLabel = computed(() => scene.value?.sourceLabel || '派单员工')
 const targetLabel = computed(() => scene.value?.targetLabel || '销售专员')
@@ -395,6 +404,7 @@ const openSingleDrawer = async (row: AssignmentApi.AssignmentRelationVO) => {
   await ensureSalesLoaded()
   isBatch.value = false
   activeSource.value = row
+  ownerIdentity.value = row.ownerIdentity
   saveMode.value = 'replace'
   selectedSalesIds.value = row.salesUsers.map((sales) => sales.id)
   salesKeyword.value = ''
@@ -405,6 +415,7 @@ const openBatchDrawer = async () => {
   await ensureSalesLoaded()
   isBatch.value = true
   activeSource.value = undefined
+  ownerIdentity.value = undefined
   saveMode.value = 'append'
   selectedSalesIds.value = []
   salesKeyword.value = ''
@@ -451,6 +462,7 @@ const submitRelations = async () => {
     if (isAdminMode.value) {
       await UserRelationApi.saveRelations({
         sceneCode: sceneCode.value,
+        ownerIdentity: isPartnerScene.value ? ownerIdentity.value : undefined,
         sourceUserIds,
         targetUserIds: selectedSalesIds.value,
         mode: saveMode.value
@@ -472,6 +484,10 @@ const submitRelations = async () => {
 }
 
 const prepareSubmit = () => {
+  if (isPartnerScene.value && selectedSalesIds.value.length > 0 && saveMode.value !== 'remove' && !ownerIdentity.value) {
+    message.warning('请选择销售或教务承接身份')
+    return
+  }
   if (selectedSalesIds.value.length === 0 && saveMode.value !== 'replace') {
     message.warning(`请至少选择一名${targetLabel.value}`)
     return

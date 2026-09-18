@@ -29,8 +29,18 @@
     placeholder="姓名 / 手机号 / 客资编号"
     :keyword="query.keyword"
     page-key="student_my"
-    @search="(value) => { query.keyword = value; handleQuery() }"
-    @change="(value) => { query.advancedFilter = value; handleQuery() }"
+    @search="
+      (value) => {
+        query.keyword = value
+        handleQuery()
+      }
+    "
+    @change="
+      (value) => {
+        query.advancedFilter = value
+        handleQuery()
+      }
+    "
   />
 
   <ContentWrap>
@@ -64,7 +74,7 @@
     />
   </ContentWrap>
 
-  <el-drawer v-model="detailOpen" title="学员详情" size="720px" destroy-on-close>
+  <el-drawer v-model="detailOpen" title="学员详情" size="min(720px, 100vw)" destroy-on-close>
     <div v-loading="detailLoading">
       <el-alert
         v-if="detailError"
@@ -91,6 +101,13 @@
           }}</el-descriptions-item>
         </el-descriptions>
 
+        <StudentPartnerBinding
+          v-if="checkPermi(['zsjos:partner:manage-all'])"
+          :key="detail.personId"
+          :student-person-id="detail.personId"
+          :student-name="detail.name"
+          :student-mobile="detail.mobile"
+        />
         <div class="section-heading">课程服务</div>
         <el-table :data="detail.services" row-key="serviceRelationId" border>
           <el-table-column label="订单编号" prop="orderNo" min-width="190" />
@@ -121,6 +138,8 @@
 
 <script lang="ts" setup>
 import ProductSpecs from './components/ProductSpecs.vue'
+import StudentPartnerBinding from './components/StudentPartnerBinding.vue'
+import { checkPermi } from '@/utils/permission'
 import { productSpecText } from '@/utils/productSpecs'
 import * as RegistrationApi from '@/api/zsjos/registration'
 import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
@@ -137,6 +156,7 @@ const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<RegistrationApi.MyStudent>()
 const detailPersonId = ref<number>()
+let detailRequest = 0
 
 const serviceSummary = (services: RegistrationApi.StudentService[]) => {
   if (!services?.length) return '暂无课程服务'
@@ -146,7 +166,9 @@ const serviceSummary = (services: RegistrationApi.StudentService[]) => {
     : names.join('、')
 }
 const serviceCourseName = (service: RegistrationApi.StudentService) =>
-  [service.courseName || service.skuName || '课程服务', productSpecText(service)].filter(Boolean).join(' · ')
+  [service.courseName || service.skuName || '课程服务', productSpecText(service)]
+    .filter(Boolean)
+    .join(' · ')
 const serviceCategoryPath = (service: RegistrationApi.StudentService) =>
   service.categoryPath?.length ? service.categoryPath.join(' / ') : '课程分类暂未记录'
 const serviceStatusLabel = (status: string) =>
@@ -180,17 +202,21 @@ const resetQuery = () => {
   void load()
 }
 const openDetail = async (personId: number) => {
+  const run = ++detailRequest
+  detail.value = undefined
   detailPersonId.value = personId
   detailOpen.value = true
   detailLoading.value = true
   detailError.value = ''
   try {
-    detail.value = await RegistrationApi.getMyStudent(personId)
+    const value = await RegistrationApi.getMyStudent(personId)
+    if (run === detailRequest) detail.value = value
   } catch (cause: any) {
+    if (run !== detailRequest) return
     detail.value = undefined
     detailError.value = cause?.msg || cause?.message || '学员详情加载失败'
   } finally {
-    detailLoading.value = false
+    if (run === detailRequest) detailLoading.value = false
   }
 }
 const reloadDetail = () => detailPersonId.value && openDetail(detailPersonId.value)

@@ -591,3 +591,55 @@
   min-width: 0;
   width: 100%;
 }
+
+/* Opt-in avatar rails for lead management and my-students, without changing other inboxes. */
+.inbox-avatar-controls { display: flex; flex: none; justify-content: flex-end; gap: var(--crm-sp-2); margin-bottom: var(--crm-sp-2); }
+.inbox-avatar-layout.is-avatar-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
+.inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-controls,
+.inbox-avatar-error,
+.inbox-avatar-pagination { display: flex; flex: none; flex-direction: column; align-items: center; gap: var(--crm-sp-2); }
+.inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item { min-height: 48px; flex: none; padding: var(--crm-sp-2); }
+.inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item-main { justify-content: center; }
+.inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item-copy,
+.inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item-meta { display: none; }
+.inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item.active { border-color: var(--crm-color-primary); }
+.inbox-avatar-layout .lead-inbox-item:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
+.inbox-avatar-unseen { position: absolute; top: var(--crm-sp-1); right: var(--crm-sp-1); width: 8px; height: 8px; border-radius: 50%; background: var(--crm-color-error); }
+.inbox-avatar-empty,
+.inbox-avatar-pagination > span { color: var(--crm-text-secondary); text-align: center; overflow-wrap: anywhere; font-size: var(--crm-font-sm); }
+.inbox-avatar-layout.is-avatar-collapsed .lead-list-sentinel { text-align: center; overflow-wrap: anywhere; }
+.inbox-avatar-pagination { padding-top: var(--crm-sp-2); }
+@media (max-width: 768px) {
+  .inbox-avatar-layout.is-avatar-collapsed { display: flex; flex-direction: column; height: auto; }
+  .inbox-avatar-layout.is-avatar-collapsed .lead-inbox-list-pane { height: auto; flex: none; }
+  .inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-controls,
+  .inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-pagination,
+  .inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-error { flex-direction: row; justify-content: flex-start; }
+  .inbox-avatar-layout.is-avatar-collapsed .lead-inbox-scroll { flex: none; flex-direction: row; overflow-x: auto; overflow-y: hidden; min-height: 52px; }
+  .inbox-avatar-layout.is-avatar-collapsed .lead-inbox-item { width: 52px; }
+  .inbox-avatar-layout.is-avatar-collapsed .lead-list-skeletons { flex-direction: row; }
+  .inbox-avatar-layout.is-avatar-collapsed .lead-list-sentinel { width: 64px; }
+  .student-avatar-layout.is-avatar-collapsed .lead-inbox-detail-pane { display: block; }
+}
+
+.inbox-avatar-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--crm-sp-2); align-items: center; padding-right: calc(var(--inbox-scrollbar-width, 0px) + var(--crm-sp-1)); margin-bottom: var(--crm-sp-3); }
+.inbox-avatar-toolbar .inbox-avatar-controls { grid-column: 1; grid-row: 1; margin: 0; }
+.inbox-avatar-filters:not([hidden]),
+.inbox-avatar-filters .lead-inbox-toolbar { display: contents; }
+.inbox-avatar-filters .advanced-filter-toolbar { grid-column: 2; grid-row: 1; min-width: 0; gap: var(--crm-sp-2); }
+.inbox-avatar-filters .advanced-filter-toolbar > .ant-input-affix-wrapper { width: 0; min-width: 0; }
+.inbox-avatar-filters .advanced-filter-toolbar > .ant-badge { flex: none; }
+.inbox-avatar-filters .advanced-filter-tags { grid-column: 1 / -1; }
+.inbox-avatar-secondary-filters { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--crm-sp-2); }
+.inbox-avatar-secondary-filters > .ant-select { min-width: 0; }
+.inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-toolbar { display: flex; justify-content: center; padding-right: var(--crm-sp-1); }
+@media (max-width: 768px) {
+  .inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-toolbar { justify-content: flex-start; }
+}
+
+.inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-controls { flex-direction: row; justify-content: center; gap: var(--crm-sp-1); }
+.inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-toolbar { padding-block: var(--crm-sp-1); border-bottom: 1px solid var(--crm-border); }
+
+@media (max-width: 768px) {
+  .inbox-avatar-toolbar { padding-right: var(--inbox-scrollbar-width, 0px); }
+}

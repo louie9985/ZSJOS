@@ -12,13 +12,14 @@ import static cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryErro
 public class StudentDeliveryStagePermissionProvider implements ZsjosObjectPermissionProvider {
     public static final String BIZ_TYPE = "student-delivery-stage";
     @Resource private StudentDeliveryStageMapper stageMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountObjectPermissionProvider accounts;
 
     @Override public String getBizType() { return BIZ_TYPE; }
 
     @Override public boolean hasPermission(Long id, String action, Long userId) {
-        if (userId == null || !"defer".equals(action)) return false;
+        if (userId == null || !java.util.Set.of("defer", "submit").contains(action)) return false;
         var stage = stageMapper.selectById(id);
-        return stage != null && userId.equals(stage.getDirectorUserId());
+        return stage != null && userId.equals(stage.getDirectorUserId()) && accounts.hasPermission(stage.getAccountId(), "edit", userId);
     }
 
     @Override public void check(Long id, String action, Long userId) {

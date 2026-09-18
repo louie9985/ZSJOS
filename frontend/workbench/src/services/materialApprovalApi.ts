@@ -2,6 +2,7 @@ import { http, unwrap, type PageResult } from './api'
 import type { MaterialVersion } from './materialApi'
 import type { Timestamp } from './time'
 export type MaterialApproval = {
+  typeCode?: string
   task: { id: string; status?: number; reason?: string; createTime?: Timestamp; endTime?: Timestamp }
   versionId: number
   materialNo: string

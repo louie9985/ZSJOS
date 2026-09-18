@@ -17,7 +17,7 @@ describe('student positioning interview and account workspace boundary', () => {
     expect(page).toContain('studentAssignCollaborator(selectedService.serviceRelationId')
     expect(page).toContain('media-students-item-copy')
     expect(page).toContain("label: '新增账号'")
-    expect(page).toContain("label: '开通兼职账号'")
+    expect(page).toContain("'开通兼职账号'")
     expect(page).not.toContain("key: 'accounts'")
     expect(page).not.toContain("key: 'content', label: '内容生产历史'")
     expect(page).not.toContain('contextHeader={serviceContextHeader}')

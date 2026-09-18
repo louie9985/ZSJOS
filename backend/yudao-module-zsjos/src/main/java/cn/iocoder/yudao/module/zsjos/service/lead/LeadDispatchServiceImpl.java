@@ -52,6 +52,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadAssignmentRuleMapper ruleMapper;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private LeadDispatchRedisRepository dispatchRedisRepository;
     @Resource private DictDataApi dictDataApi;
     @Resource private ApplicationEventPublisher applicationEventPublisher;
@@ -80,9 +81,13 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             leadMapper.updateById(lead); return;
         }
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
-            boolean allowed = assignmentService.getEligibleSalesUsers().stream()
-                    .anyMatch(user -> Objects.equals(user.getId(), specifiedSalesUserId));
-            if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
+            if (SOURCE_PARTNER.equals(lead.getSourceType())) {
+                partnerAssignmentService.validateTarget(specifiedSalesUserId, lead.getPendingOwnerIdentity());
+            } else {
+                boolean allowed = assignmentService.getEligibleSalesUsers().stream()
+                        .anyMatch(user -> Objects.equals(user.getId(), specifiedSalesUserId));
+                if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
+            }
             lead.setAssignmentStatus(ASSIGNMENT_PENDING);
             lead.setPendingAssigneeUserId(specifiedSalesUserId);
             lead.setPendingExpiresAt(null);
@@ -199,6 +204,12 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
     public void accept(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
+        String acceptedIdentity = SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
+                ? lead.getPendingOwnerIdentity() : OWNER_SALES;
+        if (SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
+            partnerAssignmentService.validateTarget(userId, acceptedIdentity);
+        }
+        lead.setOwnerIdentity(acceptedIdentity);
         LocalDateTime acceptedAt = LocalDateTime.now();
         if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_OWNED, userId, acceptedAt) == 0) {
             throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
@@ -206,7 +217,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, userId, userId,
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-        lead.setOwnerUserId(userId); lead.setOwnerIdentity(OWNER_SALES);
+        lead.setOwnerUserId(userId); lead.setOwnerIdentity(acceptedIdentity);
         lead.setOwnershipStartedAt(acceptedAt);
         LeadMapper.advanceActivity(lead, acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
@@ -582,9 +593,11 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                                                Long ruleId, Integer attempt, LocalDateTime expiresAt,
                                                String reason, LocalDateTime occurredAt) {
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
-        history.setOwnerIdentitySnapshot(ACTION_ACCEPT.equals(action) || ACTION_CLAIM.equals(action)
-                ? (DISPATCH_SELF.equals(lead.getDispatchMode()) && Objects.equals(candidate, lead.getOwnerUserId())
-                    ? lead.getOwnerIdentity() : OWNER_SALES) : lead.getOwnerIdentity());
+        history.setOwnerIdentitySnapshot(ACTION_CLAIM.equals(action) ? OWNER_SALES
+                : ACTION_ACCEPT.equals(action) ? lead.getOwnerIdentity()
+                : ACTION_DISPATCH.equals(action) && SOURCE_PARTNER.equals(lead.getSourceType())
+                    && DISPATCH_SPECIFIED.equals(lead.getDispatchMode()) ? lead.getPendingOwnerIdentity()
+                : lead.getOwnerIdentity());
         history.setLeadId(lead.getId()); history.setActionType(action); history.setCandidateUserId(candidate);
         history.setToOwnerUserId(ACTION_ACCEPT.equals(action) || ACTION_CLAIM.equals(action) ? candidate : null);
         history.setOperatorUserId(operator == null ? 0L : operator); history.setReason(reason);

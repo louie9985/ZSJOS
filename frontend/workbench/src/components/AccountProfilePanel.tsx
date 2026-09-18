@@ -1,3 +1,6 @@
+import { diagnosisApi, type DiagnosisTodo } from "../services/mediaAccountProfile";
+import AccountDiagnosisForm from "./AccountDiagnosisForm";
+import AccountReviewRecord from "./AccountReviewRecord";
 import {
   EditOutlined,
   FileImageOutlined,
@@ -25,11 +28,12 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { api, type DictData, type MediaStudentDetail } from "../services/api";
 import {
   accountProfileApi,
   fieldEmpty,
+  formatAccountMetric,
   POSITIONING_SYNC_FIELDS,
   profileChanges,
   profileMissing,
@@ -42,6 +46,9 @@ import {
 } from "../services/mediaAccountProfile";
 import { formatTimestamp } from "../services/time";
 import AccountPositioningCard from './AccountPositioningCard';
+import AccountProfileTextInput from './AccountProfileTextInput';
+import ResourceLink from './ResourceLink';
+const MemoAccountPositioningCard = memo(AccountPositioningCard);
 
 type Account = MediaStudentDetail["accounts"][number];
 const owners = {
@@ -69,11 +76,33 @@ const safeLink = (url?: string) => {
   }
 };
 
+export function diagnosisHistoryText(entry: ProfileEntry): string | undefined {
+  if (entry.kind !== 'DIAGNOSIS' || !entry.content) return entry.content;
+  try {
+    const data = JSON.parse(entry.content) as Record<string, unknown>;
+    const requirements = data.requirementSnapshot as Record<string,unknown> | undefined;
+    const source = data.requirementSource as {submissionNo?:number} | undefined;
+    const requirementText = requirements ? ['diagnosis_7d','diagnosis_14d','diagnosis_28d'].map((key,i) => `${[7,14,28][i]}天要求：${requirements[key] ?? '未填写'}`).join('\n') : '诊断要求：历史版本未留存';
+    return `${source?.submissionNo ? `来源：定位卡第${source.submissionNo}次提交\n` : ''}${requirementText}\n` + ([['cycle', '第几轮诊断'], ['currentStageLabel', '阶段'], ['accountStatusLabel', '账号状态'],
+      ['primaryProblemLabel', '主要瓶颈'], ['primaryProblemEvidence', '主要瓶颈证据'],
+      ['cooperationLevelLabel', '配合等级'], ['cooperationEvidence', '配合等级证据'],
+      ['secondaryProblemLabel', '次要瓶颈'], ['secondaryProblemEvidence', '次要瓶颈证据'],
+      ['conclusion', '诊断结论'], ['improvementMeasures', '改进措施'], ['observedData', '重点观测数据'],
+      ['reposition', '是否重新定位']] as const)
+      .filter(([key]) => data[key] != null && data[key] !== '' && !(key === 'cycle' && entry.fieldKey === 'diagnosis_initial'))
+      .map(([key, label]) => `${label}：${typeof data[key] === 'boolean' ? (data[key] ? '是' : '否') : String(data[key])}`).join('\n');
+  } catch { return '诊断记录格式无法读取，请联系管理员'; }
+}
+
 export default function AccountProfilePanel({
   account,
   canQuery,
   canQueryPositioning = false,
+  student,
+  serviceRelationId,
+  canReadInterview = false,
   initiallyEditing = false,
+  diagnosisTaskId,
   onEditingFinished,
   onSaved,
   onMissingChange,
@@ -83,19 +112,36 @@ export default function AccountProfilePanel({
   deliveryActions?: ReactNode;
   canQuery: boolean;
   canQueryPositioning?: boolean;
+  student?: MediaStudentDetail["student"];
+  serviceRelationId?: number;
+  canReadInterview?: boolean;
   canMaintain: boolean;
   initiallyEditing?: boolean;
+  diagnosisTaskId?: number;
   onEditingFinished?: () => void;
   onSaved: () => Promise<void>;
   onMissingChange?: (id: number, count: number) => void;
 }) {
   const { message, modal } = App.useApp();
+  const [positioningRefresh, setPositioningRefresh] = useState(0);
+  const [positioningStatusTarget, setPositioningStatusTarget] = useState<HTMLDivElement | null>(null);
   const [profile, setProfile] = useState<AccountProfile>(),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const [open, setOpen] = useState(false),
-    [values, setValues] = useState<Record<string, unknown>>({}),
+    [values, publishValues] = useState<Record<string, unknown>>({}),
     [files, setFiles] = useState<Record<string, ProfileFile>>({});
+  const [diagnosisSeed, setDiagnosisSeed] = useState<Record<string, unknown>>({});
+  const [diagnosisPrevious, setDiagnosisPrevious] = useState<number>();
+  const [diagnosisSaving, setDiagnosisSaving] = useState(false);
+  const diagnosisLock = useRef(false);
+  const diagnosisRequest = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
+  const [diagnosisTask, setDiagnosisTask] = useState<DiagnosisTodo>();
+  const [diagnosisTasks, setDiagnosisTasks] = useState<DiagnosisTodo[]>([]);
+  const [diagnosisTasksLoading, setDiagnosisTasksLoading] = useState(false);
+  const [diagnosisTasksError, setDiagnosisTasksError] = useState('');
+  const openedDiagnosisTask = useRef<number | undefined>(undefined);
+  const startupPromptedTask = useRef<number | undefined>(undefined);
   const [diagnosisOpen, setDiagnosisOpen] = useState(false), [diagnosisType, setDiagnosisType] = useState<DiagnosisRequest["templateType"]>("diagnosis_7d");
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({}),
     [dictError, setDictError] = useState(""),
@@ -118,7 +164,23 @@ export default function AccountProfilePanel({
     ),
     generation = useRef(0),
     body = useRef<HTMLDivElement>(null);
-  const fields = profile?.config.fields.filter((f) => f.enabled && f.group !== 'POSITIONING' && !f.key.startsWith('pc_') && !['positioning_history', 'positioning_snapshot'].includes(f.key)) || [],
+  const latestValues = useRef<Record<string, unknown>>({});
+  const setValues = useCallback((action: SetStateAction<Record<string, unknown>>) => {
+    latestValues.current = typeof action === 'function' ? action(latestValues.current) : action;
+    publishValues(latestValues.current);
+  }, []);
+  const updateText = useCallback((key: string, value: string) => {
+    const previous = latestValues.current[key];
+    latestValues.current = { ...latestValues.current, [key]: value };
+    // Only completeness/dirty transitions need the rest of the sheet to update while typing.
+    const original = profile?.values[key] ?? '';
+    if (fieldEmpty(previous) !== fieldEmpty(value) || (previous === original) !== (value === original)) {
+      publishValues(latestValues.current);
+    }
+  }, [profile?.values]);
+  const flushText = useCallback(() => publishValues(latestValues.current), []);
+  const refreshPositioning = useCallback(() => setPositioningRefresh(value => value + 1), []);
+  const fields = useMemo(() => profile?.config.fields.filter((f) => f.enabled && f.group !== 'POSITIONING' && !f.key.startsWith('pc_') && !['positioning_history', 'positioning_snapshot'].includes(f.key)) || [], [profile?.config.fields]),
     editable = profile?.editableFields || [];
   const missing = profileMissing(fields, open ? values : profile?.values || {});
   const required = fields.filter(
@@ -128,8 +190,8 @@ export default function AccountProfilePanel({
       !POSITIONING_SYNC_FIELDS.has(f.key) &&
       f.type !== "record",
   ).length;
-  const changes = profile
-    ? profileChanges(fields, editable, profile.values, values)
+  const currentChanges = () => profile
+    ? profileChanges(fields, editable, profile.values, latestValues.current)
     : {};
   const load = async () => {
     if (!account || !canQuery) return;
@@ -149,13 +211,37 @@ export default function AccountProfilePanel({
       if (gen === generation.current) setLoading(false);
     }
   };
+  const loadDiagnosisTasks = useCallback(async () => {
+    if (!account || !profile?.canSubmitDiagnosis) return;
+    const gen = generation.current;
+    setDiagnosisTasksLoading(true);
+    setDiagnosisTasksError('');
+    try {
+      const tasks = await diagnosisApi.tasks(account.id);
+      if (gen === generation.current) setDiagnosisTasks(tasks);
+    } catch (cause) {
+      if (gen === generation.current) setDiagnosisTasksError(errorText(cause));
+    } finally {
+      if (gen === generation.current) setDiagnosisTasksLoading(false);
+    }
+  }, [account?.id, profile]);
+  useEffect(() => {
+    setDiagnosisTasks([]);
+    setDiagnosisTasksError('');
+    void loadDiagnosisTasks();
+  }, [loadDiagnosisTasks]);
+  useEffect(() => {
+    // Applying a card changes both the account version and startup eligibility.
+    if (positioningRefresh > 0) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positioningRefresh]);
   const loadHistory = async (p = 1) => {
     if (!account || !profile?.canViewHistory) return;
     const gen = generation.current;
     setHistoryLoading(true);
     setHistoryError("");
     try {
-      const r = await accountProfileApi.history(account.id, p);
+      const r = await accountProfileApi.history(account.id, p, { kind: "PROFILE" });
       if (gen === generation.current) {
         setHistory(r.list);
         setTotal(r.total);
@@ -200,6 +286,8 @@ export default function AccountProfilePanel({
     setProfile(undefined);
     setOpen(false);
     setRecord(undefined);
+    setDiagnosisOpen(false);
+    diagnosisRequest.current = undefined;
     setHistory([]);
     pending.current = undefined;
     void load();
@@ -247,7 +335,7 @@ export default function AccountProfilePanel({
       const data = {
         version: profile.account.version,
         configVersionId: profile.config.id,
-        changes,
+        changes: currentChanges(),
       };
       await accountProfileApi.patch(account.id, {
         ...data,
@@ -270,7 +358,7 @@ export default function AccountProfilePanel({
   };
   const close = () => {
     if (saving || uploading) return;
-    if (Object.keys(changes).length) {
+    if (Object.keys(currentChanges()).length) {
       const dialog = modal.confirm({
         title: "有尚未保存的账号资料",
         content: "保存后仍可继续补充缺失字段。",
@@ -281,7 +369,7 @@ export default function AccountProfilePanel({
         },
         footer: (_, { OkBtn, CancelBtn }) => (
           <Space>
-            <Button
+        <Button
               onClick={() => {
                 dialog.destroy();
                 setOpen(false);
@@ -358,12 +446,12 @@ export default function AccountProfilePanel({
     const v = profile?.values[f.key];
     if (fieldEmpty(v))
       return f.ownerType === "AUTO"
-        ? "等待来源数据"
+        ? profile?.sourceNotes[f.key] || "等待来源数据"
         : f.type === "record"
           ? "按次追加，详见下方记录"
           : "待补充";
     return f.ownerType === "AUTO"
-      ? String(v)
+      ? formatAccountMetric(f.key, v) ?? profile?.snapshots.find(s => s.key === f.key)?.displayValue ?? String(v)
       : profile?.snapshots.find((s) => s.key === f.key)?.displayValue ||
           String(v);
   };
@@ -386,29 +474,87 @@ export default function AccountProfilePanel({
       <Typography.Text type="secondary">{f.name} · 暂不可预览</Typography.Text>
     );
   const recordButton = (f: ProfileField) =>
-    editable.includes(f.key) ? (
+    editable.includes(f.key) && !f.key.startsWith("delivery_s") && (!["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) || profile?.canSubmitDiagnosis) ? (
       <Button
         size="small"
         disabled={
-          saving || uploading || (open && Object.keys(changes).length > 0)
+          saving || uploading || (open && Object.keys(currentChanges()).length > 0)
         }
         onClick={() => {
+          if (["diagnosis_7d", "diagnosis_14d", "adjustment_28d"].includes(f.key)) {
+            openDiagnosis(f.key === "adjustment_28d" ? "diagnosis_28d" : f.key as DiagnosisRequest["templateType"]);
+            return;
+          }
           setRecord(f);
           setContent("");
           setRecordFiles([]);
         }}
       >
-        填写记录
+        {["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) ? "填写诊断" : "填写记录"}
       </Button>
       ) : null;
+  const openDiagnosis = async (type: DiagnosisRequest["templateType"], previous?: ProfileEntry, requestedTaskId?: number, anyTemplate = false) => {
+    if (!profile) return;
+    let seed: Record<string, unknown> = {};
+    if (previous?.kind === "DIAGNOSIS" && previous.content) {
+      try { seed = JSON.parse(previous.content) as Record<string, unknown>; } catch { message.error("记录格式无法读取"); return; }
+    }
+    const requestGeneration = generation.current;
+    let task: DiagnosisTodo | undefined;
+    if (!previous && type !== 'diagnosis_initial') {
+      const accountId = account!.id;
+      try {
+        const tasks = await diagnosisApi.tasks(accountId);
+        if (requestGeneration !== generation.current) return;
+        setDiagnosisTasks(tasks);
+        task = tasks.find(t => requestedTaskId ? t.taskId === requestedTaskId : anyTemplate || t.templateType === type);
+        if (!task) { message.info('暂无可填写任务：本周期可能已完成或任务尚未生成，请刷新任务查看'); return; }
+        seed.cycle = task.cycle; type = task.templateType;
+      } catch (cause) { message.error(errorText(cause)); return; }
+    }
+    if (requestGeneration !== generation.current) return;
+    setDiagnosisTask(task);
+    setDiagnosisSeed(seed); setDiagnosisPrevious(previous?.id);
+    setDiagnosisType(type); diagnosisRequest.current = undefined; setDiagnosisOpen(true);
+    void loadDicts(profile);
+  };
+  const diagnosisDeadline = (fieldKey: string) => {
+    if (!profile?.canSubmitDiagnosis) return <Typography.Paragraph type="secondary">{profile?.canStartDiagnosis ? '完成启动诊断后可查看周期任务及截止时间' : '周期任务暂不可用，请确认有效定位卡、启动诊断及账号维护权限'}</Typography.Paragraph>;
+    if (diagnosisTasksLoading) return <Typography.Paragraph type="secondary">正在加载诊断截止时间…</Typography.Paragraph>;
+    if (diagnosisTasksError) return <Alert type="error" showIcon message={`诊断任务加载失败：${diagnosisTasksError}`} action={<Button size="small" onClick={() => void loadDiagnosisTasks()}>重试</Button>} />;
+    const task = diagnosisTasks.find(t => t.templateType === (fieldKey === 'adjustment_28d' ? 'diagnosis_28d' : fieldKey));
+    return <Typography.Paragraph>
+      {task ? <>第 {task.cycle} 轮 · <Typography.Text strong>截止时间：{formatTimestamp(task.dueAt)}（北京时间）</Typography.Text><br />{task.dueAt < Date.now() ? '已逾期，仍可补填' : '可提前填写，提交后完成本次任务'}</> : '暂无待填写任务，本周期可能已完成；下一周期开始后生成新任务'}
+      {' '}<Button type="link" size="small" onClick={() => void loadDiagnosisTasks()}>刷新任务</Button>
+    </Typography.Paragraph>;
+  };
+  useEffect(() => {
+    if (!profile || !diagnosisTaskId || !account || openedDiagnosisTask.current === diagnosisTaskId) return;
+    if (!profile.canSubmitDiagnosis) {
+      if (startupPromptedTask.current !== diagnosisTaskId) {
+        startupPromptedTask.current = diagnosisTaskId;
+        message.info(profile.canStartDiagnosis ? '请先完成启动诊断，再填写本次跟进' : '请先应用有效定位卡并完成启动诊断，或确认账号维护权限');
+        if (profile.canStartDiagnosis) void openDiagnosis('diagnosis_initial');
+      }
+      return;
+    }
+    openedDiagnosisTask.current = diagnosisTaskId;
+    void openDiagnosis('diagnosis_7d', undefined, diagnosisTaskId);
+  }, [profile, account?.id, diagnosisTaskId]);
   const submitDiagnosis = async (values: Record<string, unknown>) => {
-    if (!profile || !account) return;
+    if (!profile || !account || diagnosisLock.current) return;
+    const gen = generation.current;
+    diagnosisLock.current = true; setDiagnosisSaving(true);
     try {
-      await accountProfileApi.diagnosis(account.id, { version: profile.account.version, configVersionId: profile.config.id,
-        idempotencyKey: `diagnosis-${account.id}-${diagnosisType}-${Date.now()}`, templateType: diagnosisType, cycle: Number(values.cycle ?? 1),
-        ...(values as Omit<DiagnosisRequest, "version" | "configVersionId" | "idempotencyKey" | "templateType" | "cycle">) });
-      message.success("诊断已提交"); setDiagnosisOpen(false); await load(); await loadHistory();
+      const payload = { ...values, version: profile.account.version, configVersionId: profile.config.id,
+        previousEntryId: diagnosisPrevious, taskId: diagnosisTask?.taskId, templateType: diagnosisType, cycle: diagnosisType === 'diagnosis_initial' ? 0 : Number(diagnosisPrevious != null ? diagnosisSeed.cycle : diagnosisTask?.cycle) };
+      const fingerprint = JSON.stringify(payload);
+      if (diagnosisRequest.current?.fingerprint !== fingerprint) diagnosisRequest.current = { fingerprint, key: crypto.randomUUID() };
+      await accountProfileApi.diagnosis(account.id, { ...payload, idempotencyKey: diagnosisRequest.current.key } as DiagnosisRequest);
+      if (gen !== generation.current) return;
+      message.success("诊断已提交"); setDiagnosisOpen(false); await load(); await loadHistory(); await onSaved();
     } catch (cause) { message.error(errorText(cause)); }
+    finally { diagnosisLock.current = false; setDiagnosisSaving(false); }
   };
   const control = (f: ProfileField) => {
     const allowed = editable.includes(f.key),
@@ -418,12 +564,16 @@ export default function AccountProfilePanel({
       setValues((current) => ({ ...current, [f.key]: v }));
     if (f.type === "record")
       return (
-        <Space wrap>
-          <Typography.Text type="secondary">
-            按次追加，先保存资料修改
-          </Typography.Text>
-          {recordButton(f)}
-        </Space>
+        <>
+          {(["diagnosis_7d", "diagnosis_14d", "adjustment_28d"].includes(f.key)) && (
+            <>{diagnosisDeadline(f.key)}<Typography.Paragraph type="secondary" style={{ whiteSpace: "pre-wrap" }}>
+              定位卡诊断要求：{String(profile?.positioningRequirements?.[f.key === "adjustment_28d" ? "diagnosis_28d" : f.key] ?? "未填写诊断要求")}
+              <br />{profile?.diagnosisContext?.submissionNo ? `来源：第${profile.diagnosisContext.submissionNo}次提交 · 更新 ${profile.diagnosisContext.syncedAt}` : '等待有效定位卡，计时待核实'}
+            </Typography.Paragraph></>
+          )}
+          <AccountReviewRecord accountId={account!.id} fieldKey={f.key} latest={profile?.latestRecords?.[f.key]} canHistory={!!profile?.canViewHistory}
+          text={diagnosisHistoryText} action={recordButton(f)} onRevise={profile?.canSubmitDiagnosis && ["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) ? entry => openDiagnosis(f.key === "adjustment_28d" ? "diagnosis_28d" : f.key as DiagnosisRequest["templateType"], entry) : undefined} />
+        </>
       );
     if (f.type === "materials")
       return <div className="account-profile-readonly">{display(f)}</div>;
@@ -561,27 +711,14 @@ export default function AccountProfilePanel({
           disabled={disabled}
         />
       );
-    if (f.type === "textarea")
-      return (
-        <Input.TextArea
-          aria-label={f.label}
-          value={String(value ?? "")}
-          onChange={(e) => update(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          showCount
-          disabled={disabled}
-        />
-      );
     return (
-      <Input
-        aria-label={f.label}
-        value={String(value ?? "")}
-        type={f.type === "date" ? "date" : "text"}
-        onChange={(e) => update(e.target.value)}
+      <AccountProfileTextInput
+        key={`${account?.id}-${open}`}
+        fieldKey={f.key} label={f.label} value={String(value ?? "")}
+        multiline={f.type === 'textarea'} date={f.type === 'date'}
+        onChange={updateText} onBlur={flushText}
         maxLength={["nickname", "uid"].includes(f.key) ? 255 : 2000}
         disabled={disabled}
-        placeholder="待补充，可留空"
       />
     );
   };
@@ -605,7 +742,7 @@ export default function AccountProfilePanel({
       />
     );
   if (!profile) return <Empty description="账号资料未加载" />;
-  const reminder = (
+  const reminder = missing.length ? (
     <Alert
       className="account-profile-reminder"
       type={missing.length ? "warning" : "success"}
@@ -639,6 +776,12 @@ export default function AccountProfilePanel({
         </Space>
       }
     />
+  ) : (
+    <div className="account-profile-complete" role="status">
+      <Tag color="success">资料已齐全</Tag>
+      <Button type="link" size="small" onClick={() => { setMissingOwner('DIRECTOR'); setShowMissing(true) }}>编导待补 0</Button>
+      <Button type="link" size="small" onClick={() => { setMissingOwner('OPERATOR'); setShowMissing(true) }}>运营待补 0</Button>
+    </div>
   );
   const missingList = showMissing && (
     <div className="account-profile-missing">
@@ -667,16 +810,24 @@ export default function AccountProfilePanel({
         {tag(f)}
       </div>
       <div>
-        {f.type === "image" && files[f.key] ? (
+        {f.type === "record" ? control(f) : f.type === "image" && files[f.key] ? (
           <Image width={64} src={safeLink(files[f.key].previewUrl)} />
+        ) : f.type === 'url' && !fieldEmpty(profile.values[f.key]) ? (
+          <ResourceLink href={String(profile.values[f.key])} />
+        ) : (['publish_rhythm', 'account_position', 'professional_position', 'stage', 'current_status', 'bottleneck', 'content_format'].includes(f.key) || f.type === 'select' || f.type === 'multi_select') && !fieldEmpty(profile.values[f.key]) ? (
+          <span className="account-value-tags">{(f.type === 'multi_select' || ['account_position', 'professional_position', 'content_format'].includes(f.key)
+            // The profile API joins historical multi-selection labels with this delimiter.
+            ? display(f).split('、').map(value => value.trim()).filter(Boolean)
+            : [display(f)]).map((label, index) => <Tag key={`${index}-${label}`} className="account-value-tag" color="blue">{label}</Tag>)}</span>
         ) : (
           <Typography.Text
             type={fieldEmpty(profile.values[f.key]) ? "secondary" : undefined}
+            style={f.type === "textarea" ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : undefined}
           >
             {display(f)}
           </Typography.Text>
         )}
-        {f.type === "record" && recordButton(f)}
+
         {profile.sourceNotes[f.key] && (
           <Tooltip title={profile.sourceNotes[f.key]}>
             <InfoCircleOutlined aria-label={profile.sourceNotes[f.key]} />
@@ -687,60 +838,21 @@ export default function AccountProfilePanel({
   );
   return (
     <section className="media-students-card account-profile">
-      <div className="media-students-tab-heading">
-        <div>
-          <Typography.Title level={5}>
-            {profile.account.nickname || "未命名账号"}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {profile.account.platformLabelSnapshot || "平台待填写"}
-          </Typography.Text>
-          <Tag>{String(profile.values.current_status || "状态等待来源")}</Tag>
-        </div>
-        <div className="account-profile-actions">
-        {deliveryActions}
-        {editable.length > 0 && (
-          <Button icon={<EditOutlined />} onClick={() => openEditor()}>
-            维护账号表
-          </Button>
-        )}
-        {editable.length > 0 && <Button onClick={() => setDiagnosisOpen(true)}>填写周期诊断</Button>}
-        </div>
-      </div>
-      <Modal title="周期诊断" open={diagnosisOpen} onCancel={() => setDiagnosisOpen(false)} footer={null} destroyOnHidden>
-        <Form layout="vertical" onFinish={submitDiagnosis} initialValues={{ reposition: false }}>
-          <Form.Item label="诊断模板" name="templateType"><Select value={diagnosisType} onChange={setDiagnosisType} options={[{value:'diagnosis_7d',label:'7天账号数据诊断'},{value:'diagnosis_14d',label:'14天验证指标诊断'},{value:'diagnosis_28d',label:'28天调整触发条件'}]} /></Form.Item>
-          <Form.Item label="当前阶段" name="currentStage" rules={[{required:true}]}><Select options={(dicts.zsjos_media_account_stage || []).map(x => ({value:x.value,label:x.label}))} /></Form.Item>
-          <Form.Item label="账号状态" name="accountStatus" rules={[{required:true}]}><Select options={(dicts.zsjos_media_account_current_status || []).map(x => ({value:x.value,label:x.label}))} /></Form.Item>
-          <Form.Item label="学员配合等级" name="cooperationLevel" rules={[{required:true}]}><Select options={(dicts.zsjos_media_account_cooperation_level || []).map(x => ({value:x.value,label:x.label}))} /></Form.Item>
-          {[["cooperationEvidence","配合等级证据"],["primaryProblemEvidence","主要瓶颈证据"],["secondaryProblemEvidence","次要瓶颈证据"],["conclusion","一句话诊断结论"],["improvementMeasures","改进措施"],["observedData","重点观测数据"]].map(([name,label]) => <Form.Item key={name} label={label} name={name} rules={[{required:true}]}><Input.TextArea rows={2}/></Form.Item>)}
-          <Form.Item label="主要瓶颈" name="primaryProblem" rules={[{required:true}]}><Select options={(dicts.zsjos_media_account_primary_problem || []).map(x => ({value:x.value,label:x.label}))} /></Form.Item>
-          <Form.Item label="次要瓶颈" name="secondaryProblem" rules={[{required:true}]}><Select options={(dicts.zsjos_media_account_primary_problem || []).map(x => ({value:x.value,label:x.label}))} /></Form.Item>
-          <Form.Item label="是否重新定位" name="reposition" rules={[{required:true}]}><Select options={[{value:true,label:'是'},{value:false,label:'否'}]} /></Form.Item>
-          <Button type="primary" htmlType="submit">提交诊断</Button>
-        </Form>
+      <Modal title={diagnosisType === "diagnosis_initial" ? "启动诊断" : "周期诊断"} open={diagnosisOpen} onCancel={() => { if (!diagnosisSaving) setDiagnosisOpen(false); }} width={1080} style={{top:16,maxWidth:'calc(100vw - 32px)',paddingBottom:0}}
+        styles={{container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column'},body:{minHeight:0,overflowY:'auto'},footer:{flexShrink:0}}}
+        footer={<Button type="primary" htmlType="submit" form="account-diagnosis-form" loading={diagnosisSaving} disabled={!!dictError || dictLoading}>提交诊断</Button>} destroyOnHidden>
+        {dictError && <Alert type="error" message={dictError} action={<Button onClick={() => void loadDicts(profile)}>重试字典</Button>} />}
+        {diagnosisTask && <Alert type={diagnosisTask.dueAt < Date.now() ? 'warning' : 'info'} showIcon
+          message={`截止时间：${formatTimestamp(diagnosisTask.dueAt)}（北京时间）`}
+          description={diagnosisTask.dueAt < Date.now() ? '本次任务已逾期，仍可补填。' : '可以提前填写，提交后即完成本次诊断任务。'} />}
+        {diagnosisType !== 'diagnosis_initial' && <Typography.Paragraph style={{whiteSpace:'pre-wrap'}}>
+          本次诊断要求：{String((diagnosisPrevious ? (diagnosisSeed.requirementSnapshot as Record<string,unknown> | undefined) : diagnosisTask?.payload.requirementSnapshot)?.[diagnosisType] ?? '历史版本未留存')}
+        </Typography.Paragraph>}
+        <AccountDiagnosisForm key={`${diagnosisType}-${diagnosisPrevious ?? diagnosisTask?.taskId ?? 'new'}`} type={diagnosisType}
+          seed={diagnosisSeed} revising={diagnosisPrevious != null} disabled={diagnosisSaving || dictLoading || !!dictError}
+          dicts={dicts} onFinish={submitDiagnosis} />
       </Modal>
-      <div className="account-profile-legend">
-        {(["AUTO", "DIRECTOR", "OPERATOR"] as const).map((owner) => (
-          <Tag
-            key={owner}
-            className={`account-owner owner-${owner.toLowerCase()}`}
-          >
-            {owners[owner]}
-          </Tag>
-        ))}
-      </div>
-      {reminder}
-      {missingList}
-      <Progress
-        percent={
-          required
-            ? Math.round(((required - missing.length) / required) * 100)
-            : 100
-        }
-        size="small"
-      />
-      {/* 定高版式：左列主页图固定，右侧三个板块各自滚动，整页不滚。 */}
+      {/* 主体自然滚动；右侧摘要栏由 CSS sticky 保持在视口内。 */}
       <div className="account-profile-grid">
         <aside className="account-profile-aside">
           <div className="account-profile-cover">
@@ -757,6 +869,24 @@ export default function AccountProfilePanel({
           <p>学员：{profile.studentName || "未记录"}</p>
           <p>编导：{profile.directorName || "未分配"}</p>
           <p>运营：{profile.operatorName || "未分配"}</p>
+          <section className="account-profile-positioning-status" aria-label="定位卡状态与操作">
+            <Typography.Text strong>定位卡状态与操作</Typography.Text>
+            <div ref={setPositioningStatusTarget} />
+          </section>
+          <section className="account-profile-sidebar-summary">
+            <Typography.Text strong>账号状态</Typography.Text>
+            <Tag color={profile.snapshots.find(s => s.key === "current_status")?.displayValue ? "processing" : "default"}>
+              {profile.snapshots.find(s => s.key === "current_status")?.displayValue || "待完成启动诊断"}
+            </Tag>
+            <div className="account-profile-sidebar-actions">
+              {editable.length > 0 && <Button icon={<EditOutlined />} onClick={() => openEditor()}>维护账号表</Button>}
+              {profile.canStartDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_initial')}>填写启动诊断</Button>}
+              {profile.canSubmitDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_7d', undefined, undefined, true)}>填写周期诊断</Button>}
+            </div>
+            {reminder}
+            {missingList}
+            <Progress percent={required ? Math.round(((required - missing.length) / required) * 100) : 100} size="small" />
+          </section>
         </aside>
         <div className="account-profile-sections">
           {groups.map(([k, name]) => (
@@ -776,7 +906,7 @@ export default function AccountProfilePanel({
                 )}
               </div>
               <div className="account-profile-section-body">
-                {k === "POSITIONING" ? <AccountPositioningCard key={`${account.id}-${account.version}`} accountId={account.id} canQuery={canQueryPositioning} /> : k === "STATUS" ? (
+                {k === "POSITIONING" ? <MemoAccountPositioningCard hideHistory statusTarget={positioningStatusTarget} key={`${account.id}-${account.version}`} accountId={account.id} canQuery={canQueryPositioning} studentName={student?.name || profile.studentName} studentContact={student?.mobile} serviceRelationId={serviceRelationId} canReadInterview={canReadInterview} refresh={positioningRefresh} onApplied={refreshPositioning} /> : k === "STATUS" ? (
                   <div className="account-profile-status-columns">
                     <div data-profile-status="identity">
                       {fields
@@ -799,14 +929,14 @@ export default function AccountProfilePanel({
                     </div>
                   </div>
                 ) : (
-                  fields.filter((f) => profileSection(f) === k).map(renderRow)
+                  <>{fields.filter((f) => profileSection(f) === k && !f.key.startsWith("delivery_s")).map(renderRow)}{k === "REVIEW" && deliveryActions}</>
                 )}
                 {k === "REVIEW" && (
                   <>
                     {profile.canViewHistory && (
-                      <section className="account-profile-history">
+                      <details className="account-profile-history"><summary>查看资料变更历史</summary>
                         <Typography.Title level={5}>
-                          记录时间线
+                          资料变更历史
                         </Typography.Title>
                         {historyError && (
                           <Alert
@@ -834,8 +964,8 @@ export default function AccountProfilePanel({
                                   {formatTimestamp(e.operatedAt)}
                                 </Typography.Text>
                               </Space>
-                              <Typography.Paragraph>
-                                {e.content}
+                              <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
+                                {diagnosisHistoryText(e)}
                               </Typography.Paragraph>
                               {e.snapshots.length > 0 && (
                                 <details>
@@ -857,7 +987,7 @@ export default function AccountProfilePanel({
                         ) : (
                           <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description="暂无维护或复盘记录"
+                            description="暂无资料变更历史"
                           />
                         )}
                         {total > 10 && (
@@ -868,7 +998,7 @@ export default function AccountProfilePanel({
                             onChange={(p) => void loadHistory(p)}
                           />
                         )}
-                      </section>
+                      </details>
                     )}
                   </>
                 )}
@@ -879,7 +1009,9 @@ export default function AccountProfilePanel({
       </div>
       <Modal
         title={`维护账号表 · ${profile.account.nickname || account.accountNo}`}
-        width="min(1680px, calc(100vw - 24px))"
+        width={1680}
+        style={{ top: 16, maxWidth: 'calc(100vw - 24px)', paddingBottom: 0 }}
+        styles={{ container: { maxHeight: 'calc(100dvh - 32px)', display: 'flex', flexDirection: 'column' }, body: { minHeight: 0, overflowY: 'auto' }, header: { flexShrink: 0 }, footer: { flexShrink: 0 } }}
         open={open}
         onCancel={close}
         maskClosable={false}
@@ -987,10 +1119,14 @@ export default function AccountProfilePanel({
           <div className="account-profile-editor-main">
             {/* 三张卡片各是一列网格项，内部各自滚动。 */}
             <div className="account-profile-editor-columns">
-              {groups.filter(([key]) => key !== "POSITIONING").map(([k, name]) => {
+              {groups.map(([k, name]) => {
+                if (k === 'POSITIONING') return <section key={k} className="account-profile-section" data-profile-section={k}>
+                  <div className="account-profile-section-heading"><Typography.Title level={5}>{name}</Typography.Title></div>
+                  <div className="account-profile-section-body"><MemoAccountPositioningCard key={account.id} accountId={account.id} canQuery={canQueryPositioning} studentName={student?.name || profile.studentName} studentContact={student?.mobile} serviceRelationId={serviceRelationId} canReadInterview={canReadInterview} refresh={positioningRefresh} onApplied={refreshPositioning} /></div>
+                </section>;
                 const visible = fields.filter(
                   (f) =>
-                    profileSection(f) === k &&
+                    profileSection(f) === k && !f.key.startsWith("delivery_s") &&
                     (!onlyMissing || missing.some((m) => m.key === f.key)),
                 );
                 const controlCell = (f: ProfileField) => (
@@ -1073,7 +1209,7 @@ export default function AccountProfilePanel({
                           </div>
                         </div>
                       ) : (
-                        visible.map(controlCell)
+                        <>{visible.map(controlCell)}{k === "REVIEW" && deliveryActions}</>
                       )}
                     </div>
                   </section>

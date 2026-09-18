@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerStudentLinkMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardSubmissionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class MediaAccountProfileService {
     @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService businessTaskCommandService;
     @Resource private MediaAccountMapper mapper;
+    @Resource private MediaAccountDiagnosisReminderService diagnosisReminders;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper diagnosisTasks;
     @Resource private MediaAccountProfileEntryMapper entries;
     @Resource private MediaAccountFieldConfigService configs;
     @Resource private MediaAccountService accounts;
@@ -39,6 +43,8 @@ public class MediaAccountProfileService {
     @Resource private PartnerStudentLinkMapper partnerLinks;
     @Resource private PartnerMapper partners;
     @Resource private SalesOrderMapper orders;
+    @Resource private PositioningCardSubmissionMapper positioningSubmissions;
+    @Resource private cn.iocoder.yudao.module.system.api.dict.DictDataApi diagnosisDicts;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper leadMapper;
 
     @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
@@ -52,27 +58,76 @@ public class MediaAccountProfileService {
         var person=a.getStudentPersonId()==null?null:people.selectById(a.getStudentPersonId());
         result.setStudentName(person==null?null:person.getName()); result.setCurrentUserName(userName(userId));
         result.setDirectorName(userName(a.getDirectorUserId())); result.setOperatorName(userName(a.getOwnerOperatorUserId()));
-        result.setPartnerMetrics(partnerMetrics(a.getStudentPersonId()));
+        var metrics = partnerMetrics(a.getStudentPersonId());
+        result.setPartnerMetrics(metrics);
         for(var f:config.getFields()) {
-            if(!"AUTO".equals(f.getOwnerType())) continue;
-            if (MediaAccountFieldPolicy.POSITIONING_SYNC_FIELDS.contains(f.getKey())) continue;
+            if(!"AUTO".equals(f.getOwnerType()) && !Set.of("account_position", "professional_position", "content_format").contains(f.getKey())) continue;
             Object value=switch(f.getKey()) {
                 case "account_no" -> a.getAccountNo();
                 case "student_name" -> person==null?null:person.getName();
                 case "contact" -> person==null?null:person.getMobile();
+                case "total_leads" -> metrics.getTotalLeads();
+                case "month_leads" -> metrics.getMonthLeads();
+                case "total_conversion" -> metrics.getPartnerId()==null?null:metrics.getTotalDealRate();
+                case "month_conversion" -> metrics.getPartnerId()==null?null:metrics.getMonthDealRate();
+                case "total_amount" -> metrics.getPartnerId()==null?null:metrics.getTotalDealAmount();
+                case "month_amount" -> metrics.getPartnerId()==null?null:metrics.getMonthDealAmount();
+                case "accompany_days" -> effectiveAccompanyDays(a);
+                case "position_rounds" -> appliedPositioning(a).rounds();
+                case "account_position", "professional_position", "content_format" -> appliedPositioning(a).values().get(f.getKey());
+                case "delivery_goals" -> values.get(f.getKey());
                 default -> null;
             };
             values.remove(f.getKey()); if(value!=null)values.put(f.getKey(),value);
-            notes.put(f.getKey(),value==null?"等待来源数据；不接受人工覆盖":
+            notes.put(f.getKey(),value==null?automaticMissingNote(f.getKey()):
                 "student_name".equals(f.getKey())||"contact".equals(f.getKey())?"当前学员档案":"账号已保存的业务数据与标签快照");
-            if("METRICS".equals(f.getGroup())) notes.put(f.getKey(),f.getKey().startsWith("month_")?"本月截至当前；统计口径未配置":"累计至当前；统计口径未配置");
+            if (Set.of("account_position", "professional_position", "content_format", "position_rounds").contains(f.getKey())) {
+                var applied = appliedPositioning(a);
+                notes.put(f.getKey(), applied.submission() == null ? "尚未应用定位卡" : "当前应用定位卡，第 " + applied.submission().getSubmissionNo() + " 次提交");
+            } else if ("accompany_days".equals(f.getKey())) {
+                notes.put(f.getKey(), a.getCreateTime() == null ? "缺少账号创建时间" : "账号创建日起算，扣除有效暂停天数");
+            }
+            if (Set.of("total_leads","month_leads","total_conversion","month_conversion","total_amount","month_amount").contains(f.getKey())) {
+                notes.put(f.getKey(), metrics.getPartnerId()==null ? "学员尚未绑定本系统兼职账号" :
+                    switch(f.getKey()) {
+                        case "total_leads" -> "绑定兼职账号累计提交的有效客资数";
+                        case "month_leads" -> "北京时间本月提交的有效客资数";
+                        case "total_conversion" -> "累计有效客资中已成交客资占比；按客资去重";
+                        case "month_conversion" -> "本月提交的有效客资中已成交客资占比；按客资去重";
+                        case "total_amount" -> "绑定兼职账号已生效订单成交总额；不扣退款";
+                        default -> "北京时间本月生效订单成交总额；不扣退款";
+                    });
+            }
         }
-        // Diagnosis fields are configured data. Until a diagnosis is submitted, they remain empty.
-        if (a.getSStage() != null) values.put("stage", a.getSStage());
-        if (a.getCurrentStatusValue() != null) values.put("current_status", a.getCurrentStatusValue());
-        if (a.getPrimaryProblemCodeValue() != null) values.put("bottleneck", a.getPrimaryProblemCodeValue());
-        result.setValues(values);result.setSourceNotes(notes);result.setSnapshots(readSnapshots(a));
+        var diagnosis = entries.latestDiagnosis(id);
+        boolean started = diagnosis != null;
+        List.of("stage", "current_status", "bottleneck").forEach(values::remove);
+        result.setDiagnosisStarted(started);
+        if (started) {
+            if (a.getSStage() != null) values.put("stage", a.getSStage());
+            if (a.getCurrentStatusValue() != null) values.put("current_status", a.getCurrentStatusValue());
+            if (a.getPrimaryProblemCodeValue() != null) values.put("bottleneck", a.getPrimaryProblemCodeValue());
+        }
+        for (String key : List.of("stage", "current_status", "bottleneck"))
+            notes.put(key, started ? ("diagnosis_initial".equals(diagnosis.getFieldKey()) ? "启动诊断" : "最新周期诊断") : "待完成启动诊断");
+        var snapshots = new ArrayList<>(readSnapshots(a));
+        snapshots.removeIf(item -> Set.of("stage", "current_status", "bottleneck").contains(item.getKey()));
+        if (started && diagnosis.getSnapshotJson() != null)
+            snapshots.addAll(JsonUtils.parseArray(diagnosis.getSnapshotJson(), MediaAccountDetailSnapshotVO.class));
+        Map<String, Object> requirements = new LinkedHashMap<>();
+        requirements.put("diagnosis_7d", values.get("diagnosis_7d_requirement"));
+        requirements.put("diagnosis_14d", values.get("diagnosis_14d_requirement"));
+        requirements.put("diagnosis_28d", values.get("diagnosis_28d_requirement"));
+        requirements.put("student_commitments", values.get("student_commitments"));
+        requirements.put("company_commitments", values.get("company_commitments"));
+        requirements.put("delivery_goals", values.get("delivery_goals"));
+        result.setPositioningRequirements(requirements);
+        result.setDiagnosisContext(cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSource.parse(values.get("_diagnosisContext") instanceof String json ? json : null));
+        result.setValues(values);result.setSourceNotes(notes);result.setSnapshots(snapshots);
         boolean write=canMaintain(a,userId);
+        boolean director = write && Objects.equals(a.getDirectorUserId(), userId);
+        result.setCanSubmitDiagnosis(director && started);
+        result.setCanStartDiagnosis(director && !started && appliedPositioning(a).submission() != null);
         result.setEditableFields(config.getFields().stream().filter(f->write&&MediaAccountFieldPolicy.canWrite(f,a,userId)).map(f->f.getKey()).toList());
         var missing=config.getFields().stream().filter(f->Boolean.TRUE.equals(f.getEnabled())&&Boolean.TRUE.equals(f.getRequiredForComplete())
             && !MediaAccountFieldPolicy.POSITIONING_SYNC_FIELDS.contains(f.getKey())
@@ -88,7 +143,13 @@ public class MediaAccountProfileService {
         for(var f:config.getFields())if("attachment".equals(f.getType())&&values.get(f.getKey()) instanceof Collection<?> ids) {
             for(Object fileId:ids)if(fileId instanceof Number n) files.put(String.valueOf(n.longValue()),storedFile(n.longValue(),id));
         }
-        result.setFiles(files);return result;
+        result.setFiles(files);
+        Map<String,Entry> latestRecords = new LinkedHashMap<>();
+        for (var field : config.getFields()) if ("record".equals(field.getType()) && Boolean.TRUE.equals(field.getEnabled())) {
+            var latestEntry = entries.latestField(id, field.getKey());
+            if (latestEntry != null) latestRecords.put(field.getKey(), historyEntry(latestEntry, id));
+        }
+        result.setLatestRecords(latestRecords); return result;
     }
 
     @Transactional(rollbackFor=Exception.class)
@@ -147,6 +208,8 @@ public class MediaAccountProfileService {
     @Transactional(rollbackFor=Exception.class)
     @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
     public Integer append(Long id, RecordRequest req, Long userId) {
+        if (Set.of("diagnosis_7d", "diagnosis_14d", "diagnosis_28d", "adjustment_28d", "diagnosis_initial").contains(req.getFieldKey())
+                || req.getFieldKey().startsWith("delivery_s")) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
         MediaAccountDO a=lock(id);requireMaintain(a,userId);var config=configs.getPublished();
         var f=config.getFields().stream().filter(x->x.getKey().equals(req.getFieldKey())&&"record".equals(x.getType())).findFirst().orElseThrow(()->exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
         if(!MediaAccountFieldPolicy.canWrite(f,a,userId))throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
@@ -166,27 +229,170 @@ public class MediaAccountProfileService {
     @Transactional(rollbackFor=Exception.class)
     @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
     public Integer submitDiagnosis(Long id, DiagnosisRequest req, Long userId) {
-        if (!Set.of("diagnosis_7d", "diagnosis_14d", "diagnosis_28d", "adjustment_28d").contains(req.getTemplateType()))
+        if ("adjustment_28d".equals(req.getTemplateType())) req.setTemplateType("diagnosis_28d");
+        boolean initial = "diagnosis_initial".equals(req.getTemplateType());
+        if (req.getTemplateType() == null || !Set.of("diagnosis_initial", "diagnosis_7d", "diagnosis_14d", "diagnosis_28d", "adjustment_28d").contains(req.getTemplateType()))
             throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
-        String fieldKey = "diagnosis_28d".equals(req.getTemplateType()) ? "adjustment_28d" : req.getTemplateType();
-        Map<String,Object> data = new LinkedHashMap<>();
-        data.put("templateType", req.getTemplateType()); data.put("currentStage", req.getCurrentStage());
-        data.put("accountStatus", req.getAccountStatus()); data.put("cooperationLevel", req.getCooperationLevel());
-        data.put("cooperationEvidence", req.getCooperationEvidence()); data.put("primaryProblem", req.getPrimaryProblem());
-        data.put("primaryProblemEvidence", req.getPrimaryProblemEvidence()); data.put("secondaryProblem", req.getSecondaryProblem());
-        data.put("secondaryProblemEvidence", req.getSecondaryProblemEvidence()); data.put("conclusion", req.getConclusion());
-        data.put("improvementMeasures", req.getImprovementMeasures()); data.put("observedData", req.getObservedData());
-        data.put("reposition", req.getReposition());
-        RecordRequest record = new RecordRequest(); record.setVersion(req.getVersion()).setConfigVersionId(req.getConfigVersionId())
-                .setFieldKey(fieldKey).setIdempotencyKey(req.getIdempotencyKey()).setContent(JsonUtils.toJsonString(data)).setFileIds(List.of());
-        Integer result = append(id, record, userId);
-        String taskType = switch (req.getTemplateType()) {
-            case "diagnosis_7d" -> "media_account_diagnosis_7d";
-            case "diagnosis_14d" -> "media_account_diagnosis_14d";
-            default -> "media_account_diagnosis_28d";
+        var account = lock(id);
+        requireMaintain(account, userId);
+        if (!Objects.equals(account.getDirectorUserId(), userId)) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+        String fp = fingerprint("DIAGNOSIS", req.getVersion(), req.getConfigVersionId(), req);
+        Integer replay = replay(id, userId, req.getIdempotencyKey(), fp);
+        // A retry must not restore an older diagnosis over a newer one.
+        if (replay != null) return replay;
+        requireVersion(account, req.getVersion(), req.getConfigVersionId(), configs.getPublished().getId());
+        Map<String, Object> previousContent = Map.of();
+        Map<String,Object> frozenRequirement = null;
+        Object frozenSource = null;
+        String completionKey = null;
+        if (req.getPreviousEntryId() != null) {
+            String field = "diagnosis_28d".equals(req.getTemplateType()) ? "adjustment_28d" : req.getTemplateType();
+            var previous = entries.latestField(id, field);
+            if (previous == null || !Objects.equals(previous.getId(), req.getPreviousEntryId()) || !"DIAGNOSIS".equals(previous.getKind())) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+            var old = cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSource.parse(previous.getContent());
+            previousContent = old;
+            if (!Objects.equals(old.get("cycle"), req.getCycle()) || (old.get("templateType") != null && !Objects.equals(old.get("templateType"), req.getTemplateType()))) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+            frozenRequirement = (Map<String,Object>)old.get("requirementSnapshot"); frozenSource = old.get("requirementSource");
+        } else if (!initial) {
+            var todo = diagnosisReminders.accountTasks(id,userId).stream()
+                    .filter(t -> Objects.equals(t.templateType(), req.getTemplateType()) && Objects.equals(t.cycle(),req.getCycle())
+                            && (req.getTaskId() == null || Objects.equals(t.taskId(),req.getTaskId())))
+                    .findFirst().orElseThrow(() -> exception(MEDIA_ACCOUNT_DIAGNOSIS_TASK_UNAVAILABLE));
+            var task = diagnosisTasks.selectByIdForUpdate(todo.taskId(),TenantContextHolder.getRequiredTenantId());
+            if (task == null || !"pending".equals(task.getStatus()) || !Objects.equals(task.getBizId(),id) || !Objects.equals(task.getAssigneeId(),userId)) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+            completionKey = task.getIdempotencyKey();
+            frozenRequirement = (Map<String,Object>)todo.payload().get("requirementSnapshot"); frozenSource = todo.payload().get("source");
+        }
+        var latest = entries.latestDiagnosis(id);
+        if (initial && latest != null) throw exception(MEDIA_ACCOUNT_DIAGNOSIS_ALREADY_STARTED);
+        if (initial && appliedPositioning(account).submission() == null) throw exception(MEDIA_ACCOUNT_DIAGNOSIS_POSITIONING_REQUIRED);
+        if (!initial && latest == null) throw exception(MEDIA_ACCOUNT_DIAGNOSIS_INITIAL_REQUIRED);
+        if (initial && !Objects.equals(req.getCycle(), 0)) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        if (!initial && (req.getCycle() == null || req.getCycle() < 1
+                || java.util.stream.Stream.of(req.getCooperationLevel(), req.getCooperationEvidence(), req.getSecondaryProblem(),
+                    req.getSecondaryProblemEvidence(), req.getImprovementMeasures(), req.getObservedData()).anyMatch(v -> v == null || v.isBlank())))
+            throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        boolean hasSecondary = req.getSecondaryProblem() != null && !req.getSecondaryProblem().isBlank();
+        boolean hasSecondaryEvidence = req.getSecondaryProblemEvidence() != null && !req.getSecondaryProblemEvidence().isBlank();
+        if (initial && hasSecondary != hasSecondaryEvidence) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        String stageLabel = diagnosisLabel("zsjos_media_account_stage", req.getCurrentStage());
+        String statusLabel = diagnosisLabel("zsjos_media_account_current_status", req.getAccountStatus());
+        String problemLabel = diagnosisLabel("zsjos_media_account_primary_problem", req.getPrimaryProblem());
+        String cooperationLabel = initial ? null : diagnosisLabel("zsjos_media_account_cooperation_level", req.getCooperationLevel());
+        String secondaryLabel = null;
+        if (hasSecondary) {
+            // An unchanged historical selection keeps its original meaning after dictionary edits.
+            secondaryLabel = Objects.equals(previousContent.get("secondaryProblem"), req.getSecondaryProblem())
+                    && previousContent.get("secondaryProblemLabel") instanceof String savedLabel ? savedLabel
+                    : diagnosisLabel("zsjos_media_account_primary_problem", req.getSecondaryProblem());
+        }
+        var snapshots = new ArrayList<MediaAccountDetailSnapshotVO>();
+        snapshots.add(diagnosisSnapshot("stage", "当前期段", req.getCurrentStage(), stageLabel));
+        snapshots.add(diagnosisSnapshot("current_status", "账号状态", req.getAccountStatus(), statusLabel));
+        snapshots.add(diagnosisSnapshot("bottleneck", "当前瓶颈", req.getPrimaryProblem(), problemLabel));
+        if (mapper.update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id)
+                .eq(MediaAccountDO::getVersion,req.getVersion()).set(MediaAccountDO::getVersion,req.getVersion()+1)
+                .set(MediaAccountDO::getSStage,req.getCurrentStage()).set(MediaAccountDO::getSStageLabelSnapshot,stageLabel)
+                .set(MediaAccountDO::getCurrentStatusValue,req.getAccountStatus()).set(MediaAccountDO::getCurrentStatusLabelSnapshot,statusLabel)
+                .set(MediaAccountDO::getPrimaryProblemCodeValue,req.getPrimaryProblem()).set(MediaAccountDO::getPrimaryProblemCodeLabelSnapshot,problemLabel)) != 1)
+            throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        Map<String,Object> content = JsonUtils.parseObject(JsonUtils.toJsonString(req), Map.class);
+        Map<String, Object> positioning = readValues(account);
+        Map<String, Object> requirementSnapshot = new LinkedHashMap<>();
+        requirementSnapshot.put("diagnosis_7d", positioning.get("diagnosis_7d_requirement"));
+        requirementSnapshot.put("diagnosis_14d", positioning.get("diagnosis_14d_requirement"));
+        requirementSnapshot.put("diagnosis_28d", positioning.get("diagnosis_28d_requirement"));
+        content.put("requirementSnapshot", initial ? requirementSnapshot : frozenRequirement);
+        content.put("requirementSource", initial ? MediaAccountDiagnosisScheduler.context(account) : frozenSource);
+        content.put("currentStageLabel", stageLabel); content.put("accountStatusLabel", statusLabel); content.put("primaryProblemLabel", problemLabel);
+        if (!initial) {
+            content.put("cooperationLevelLabel", cooperationLabel);
+        }
+        if (hasSecondary) content.put("secondaryProblemLabel", secondaryLabel);
+        var entry = entry(id,userId,req.getIdempotencyKey(),fp,req.getVersion()+1,"DIAGNOSIS",req.getTemplateType(),
+                initial ? "启动诊断" : "周期诊断",JsonUtils.toJsonString(content));
+        entry.setSnapshotJson(JsonUtils.toJsonString(snapshots)); entries.insert(entry);
+        if (completionKey != null && !businessTaskCommandService.completeByKey(completionKey, java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))))
+            throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        return req.getVersion()+1;
+    }
+
+    private String diagnosisLabel(String type, String value) {
+        if (value == null || value.isBlank()) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        diagnosisDicts.validateDictDataList(type, List.of(value));
+        return diagnosisDicts.getDictDataList(type).stream().filter(d -> value.equals(d.getValue()))
+                .map(d -> d.getLabel()).findFirst().orElseThrow(() -> exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
+    }
+
+    private MediaAccountDetailSnapshotVO diagnosisSnapshot(String key, String label, String value, String display) {
+        var item = new MediaAccountDetailSnapshotVO();
+        item.setKey(key); item.setLabel(label); item.setValue(value); item.setDisplayValue(display); item.setOwnerType("AUTO"); item.setType("text");
+        return item;
+    }
+
+    private record AppliedPositioning(PositioningCardSubmissionDO submission, Map<String, Object> values) {
+        Integer rounds() { return submission == null ? null : submission.getSubmissionNo(); }
+    }
+
+    private AppliedPositioning appliedPositioning(MediaAccountDO account) {
+        var submission = positioningSubmissions.selectCurrentConfirmedByAccount(account.getId());
+        if (submission == null || account.getStudentPersonId() == null || account.getCreateServiceRelationId() == null
+                || !Objects.equals(TenantContextHolder.getRequiredTenantId(), submission.getTenantId())
+                || !Objects.equals(account.getStudentPersonId(), submission.getStudentPersonId())
+                || !Objects.equals(account.getCreateServiceRelationId(), submission.getServiceRelationId()))
+            return new AppliedPositioning(null, Map.of());
+        Map<String, Object> raw = JsonUtils.parseObject(submission.getValuesSnapshotJson(), Map.class);
+        Map<String, Object> dict = JsonUtils.parseObject(submission.getDictSnapshotJson(), Map.class);
+        if (raw == null) raw = Map.of();
+        if (dict == null) dict = Map.of();
+        Map<String, Object> projected = new LinkedHashMap<>();
+        projected.put("account_position", historicalDisplay(raw.get("pc_account_position"), dict.get("pc_account_position")));
+        projected.put("professional_position", historicalDisplay(raw.get("pc_profession"), dict.get("pc_profession")));
+        projected.put("content_format", historicalDisplay(raw.get("pc_content_form"), dict.get("pc_content_form")));
+        projected.values().removeIf(Objects::isNull);
+        return new AppliedPositioning(submission, projected);
+    }
+
+    private String historicalDisplay(Object value, Object snapshot) {
+        if (snapshot instanceof Collection<?> list && !list.isEmpty()) {
+            List<String> labels = list.stream().map(this::snapshotLabel).filter(Objects::nonNull).toList();
+            if (!labels.isEmpty()) return String.join("、", labels);
+        }
+        if (snapshot instanceof Map<?, ?> map) {
+            String label = snapshotLabel(map);
+            if (label != null) return label;
+        }
+        if (value instanceof Collection<?> list) return list.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("、"));
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String snapshotLabel(Object value) {
+        if (!(value instanceof Map<?, ?> map)) return value == null ? null : String.valueOf(value);
+        Object label = map.containsKey("label") ? map.get("label") : map.get("labelSnapshot");
+        return label == null ? null : String.valueOf(label);
+    }
+
+    private Long effectiveAccompanyDays(MediaAccountDO account) {
+        if (account.getCreateTime() == null) return null;
+        var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var anchor = account.getCreateTime().toLocalDate();
+        long days = java.time.temporal.ChronoUnit.DAYS.between(anchor, today) + 1;
+        if (account.getMaintenanceStartDate() != null && account.getMaintenanceEndDate() != null
+                && !account.getMaintenanceEndDate().isBefore(account.getMaintenanceStartDate())) {
+            var end = today.isBefore(account.getMaintenanceEndDate()) ? today : account.getMaintenanceEndDate();
+            if (!end.isBefore(account.getMaintenanceStartDate()))
+                days -= java.time.temporal.ChronoUnit.DAYS.between(account.getMaintenanceStartDate(), end) + 1;
+        }
+        return Math.max(days, 0);
+    }
+
+    private String automaticMissingNote(String key) {
+        return switch (key) {
+            case "accompany_days" -> "缺少账号创建时间";
+            case "position_rounds", "account_position", "professional_position", "content_format" -> "尚未应用定位卡";
+            case "stage", "current_status", "bottleneck" -> "等待最新周期诊断";
+            default -> "等待来源数据；不接受人工覆盖";
         };
-        businessTaskCommandService.completeByKey("media-diagnosis:" + id + ":" + taskType + ":" + (req.getCycle() == null ? 1 : req.getCycle()), java.time.LocalDateTime.now());
-        return result;
     }
 
     private PartnerMetrics partnerMetrics(Long studentPersonId) {
@@ -198,23 +404,21 @@ public class MediaAccountProfileService {
         if (partner == null) { m.setSourceStatus("WAITING_PARTNER_ACCOUNT"); return m; }
         m.setPartnerId(partner.getId()); m.setSourceStatus("READY");
         var tenant = TenantContextHolder.getRequiredTenantId();
-        var start = partner.getCreateTime() == null ? java.time.LocalDateTime.MIN : partner.getCreateTime();
-        var month = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai")).withDayOfMonth(1).toLocalDate().atStartOfDay();
-        m.setTotalLeads(leadMapper.countPartnerLeadsSince(tenant, partner.getId(), start));
-        m.setMonthLeads(leadMapper.countPartnerLeadsSince(tenant, partner.getId(), month));
-        var total = orders.aggregatePartnerDeals(tenant, partner.getId(), start);
-        var current = orders.aggregatePartnerDeals(tenant, partner.getId(), month);
-        setDeal(m, total, true); setDeal(m, current, false);
+        var now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var month = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+        // Conversion is a cohort of submitted valid leads, never order count / lead count.
+        var total = leadMapper.aggregatePartnerValidCohort(tenant, partner.getId(), null, now);
+        var current = leadMapper.aggregatePartnerValidCohort(tenant, partner.getId(), month, now);
+        m.setTotalLeads(metricCount(total, "leads")); m.setTotalDeals(metricCount(total, "deals"));
+        m.setMonthLeads(metricCount(current, "leads")); m.setMonthDeals(metricCount(current, "deals"));
+        m.setTotalDealAmount(java.util.Objects.requireNonNullElse(orders.sumPartnerEffectiveGross(tenant, partner.getId(), null, now), java.math.BigDecimal.ZERO));
+        m.setMonthDealAmount(java.util.Objects.requireNonNullElse(orders.sumPartnerEffectiveGross(tenant, partner.getId(), month, now), java.math.BigDecimal.ZERO));
         m.setTotalDealRate(rate(m.getTotalDeals(), m.getTotalLeads())); m.setMonthDealRate(rate(m.getMonthDeals(), m.getMonthLeads()));
-        // A bound partner account can exist before its first lead/order is sourced. Keep
-        // this distinct from a ready data source so the UI can show the agreed waiting state.
-        if (m.getTotalLeads() == 0L && m.getTotalDeals() == 0L
-                && m.getTotalDealAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
-            m.setSourceStatus("WAITING_PARTNER_DATA");
-        }
         return m;
     }
-    private void setDeal(PartnerMetrics m, Map<String,Object> row, boolean total) { long d=row==null||row.get("deals")==null?0L:((Number)row.get("deals")).longValue(); java.math.BigDecimal a=row==null||row.get("amount")==null?java.math.BigDecimal.ZERO:new java.math.BigDecimal(row.get("amount").toString()); if(total){m.setTotalDeals(d);m.setTotalDealAmount(a);}else{m.setMonthDeals(d);m.setMonthDealAmount(a);} }
+    private long metricCount(Map<String,Object> row, String key) {
+        return row == null || row.get(key) == null ? 0L : ((Number) row.get(key)).longValue();
+    }
     private java.math.BigDecimal rate(Long deals, Long leads) { return leads==null||leads==0?java.math.BigDecimal.ZERO:java.math.BigDecimal.valueOf(deals==null?0:deals).divide(java.math.BigDecimal.valueOf(leads),4,java.math.RoundingMode.HALF_UP); }
 
     /**
@@ -232,9 +436,6 @@ public class MediaAccountProfileService {
         source.put("account_position", positioningValues.get("pc_account_position"));
         source.put("professional_position", positioningValues.get("pc_profession"));
         source.put("content_format", positioningValues.get("pc_content_form"));
-        source.put("student_commitments", positioningValues.get("pc_student_duties"));
-        source.put("company_commitments", positioningValues.get("pc_company_duties"));
-        source.put("delivery_goals", positioningValues.get("pc_internal_goal"));
         source.forEach((key, value) -> { values.remove(key); if (value != null) values.put(key, value); });
         List<MediaAccountDetailSnapshotVO> snapshots = new ArrayList<>(readSnapshots(account));
         snapshots.removeIf(s -> source.containsKey(s.getKey()));
@@ -275,14 +476,23 @@ public class MediaAccountProfileService {
     @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
     public PageResult<Entry> history(Long id, PageParam page, Long userId) {
         accounts.require(id);var result=entries.page(id,page);
-        return new PageResult<>(result.getList().stream().map(row->{
+        return new PageResult<>(result.getList().stream().map(row -> historyEntry(row,id)).toList(),result.getTotal());
+    }
+
+    @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
+    public PageResult<Entry> history(Long id, HistoryQuery page, Long userId) {
+        accounts.require(id);
+        var result = entries.filteredPage(id, page);
+        return new PageResult<>(result.getList().stream().map(row -> historyEntry(row,id)).toList(),result.getTotal());
+    }
+
+    private Entry historyEntry(MediaAccountProfileEntryDO row, Long id) {
             Entry v=new Entry();v.setId(row.getId());v.setKind(row.getKind());v.setFieldKey(row.getFieldKey());v.setTitle(row.getTitle());v.setContent(row.getContent());
             v.setOperatedBy(row.getOperatedByName());v.setOperatedAt(row.getCreateTime());v.setResultVersion(row.getResultVersion());
             v.setSnapshots(row.getSnapshotJson()==null?List.of():JsonUtils.parseArray(row.getSnapshotJson(),MediaAccountDetailSnapshotVO.class));
             List<FileVO> files=new ArrayList<>(row.getFilesJson()==null?List.of():JsonUtils.parseArray(row.getFilesJson(),FileVO.class));
             v.getSnapshots().stream().filter(s->"image".equals(s.getType())&&s.getValue() instanceof Number).forEach(s->files.add(storedFile(((Number)s.getValue()).longValue(),id)));
             files.forEach(file->{try{file.setPreviewUrl(fileApi.presignGetUrl(file.getId(),300));}catch(RuntimeException unavailable){file.setPreviewUrl(null);}});v.setFiles(files);return v;
-        }).toList(),result.getTotal());
     }
 
     @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")

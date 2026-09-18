@@ -561,10 +561,10 @@ public class PositioningCardService {
         Map<String, Object> positioningValues = StrUtil.isBlank(card.getValuesSnapshotJson())
                 ? Map.of() : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
         if (positioningValues.isEmpty()) throw exception(POSITIONING_CARD_STATE_INVALID);
-        transition(card, version, POSITIONING_CONFIRMED);
+        transition(card, version, "student_evidence_pending");
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, null, POSITIONING_STUDENT_CONFIRM,
-                POSITIONING_CONFIRMED, null, transitionKey(card, version, POSITIONING_CONFIRMED));
-        notifyEmployeeResult(card, "media.positioning.student_confirmed", version, POSITIONING_CONFIRMED);
+                "student_evidence_pending", null, transitionKey(card, version, "student_evidence_pending"));
+        notifyEmployeeResult(card, "media.positioning.student_confirmed", version, "student_evidence_pending");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -593,18 +593,21 @@ public class PositioningCardService {
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
         PositioningCardDO card = mapper.selectByIdForUpdate(id, tenantId);
         if (card == null) throw exception(POSITIONING_CARD_NOT_EXISTS);
-        if ((!POSITIONING_CONFIRMED.equals(card.getStatus()) && !POSITIONING_TRIAL_14D.equals(card.getStatus()))
+        if ((!POSITIONING_CONFIRMED.equals(card.getStatus()) && !POSITIONING_TRIAL_14D.equals(card.getStatus()) && !"student_evidence_pending".equals(card.getStatus()))
                 || !Objects.equals(card.getVersion(), version)
                 || !Objects.equals(card.getDirectorUserId(), userId)) {
             throw exception(POSITIONING_CARD_STATE_INVALID);
         }
         assignmentService.requireMaster(card);
-        PositioningCardSubmissionDO effective = submissionMapper.selectLatestConfirmedByCard(card.getId());
+        PositioningCardSubmissionDO effective = "student_evidence_pending".equals(card.getStatus())
+                ? submissionMapper.selectLatestByCard(card.getId()) : submissionMapper.selectLatestConfirmedByCard(card.getId());
         PositioningCardSubmissionDO latest = submissionMapper.selectLatestByCard(card.getId());
         if (effective == null || latest == null || !Objects.equals(effective.getId(), latest.getId())
                 || !Objects.equals(effective.getCardId(), card.getId())) {
             throw exception(POSITIONING_CARD_STATE_INVALID);
         }
+        if ("student_evidence_pending".equals(card.getStatus()) && submissionMapper.markStatus(effective.getId(), effective.getVersion(),
+                "student_evidence_pending", "evidence_revision_closed") != 1) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
         if (mapper.startRevision(card, effective, version) == 0) {
             throw exception(POSITIONING_CARD_VERSION_CONFLICT);
         }
@@ -796,6 +799,7 @@ public class PositioningCardService {
                 : JsonUtils.parseObject(row.getValuesSnapshotJson(), Map.class));
         response.setDictSnapshot(StrUtil.isBlank(row.getDictSnapshotJson()) ? Map.of()
                 : JsonUtils.parseObject(row.getDictSnapshotJson(), Map.class));
+        enrichSubmission(response, row, userId);
         response.setAvailableActions(List.of());
         return response;
     }
@@ -811,12 +815,28 @@ public class PositioningCardService {
                 : JsonUtils.parseObject(card.getDictSnapshotJson(), Map.class));
         PositioningCardSubmissionDO submission = submissionMapper.selectLatestByCard(card.getId());
         if (submission != null) {
+            enrichSubmission(response, submission, userId);
             response.setSubmissionNo(submission.getSubmissionNo());
             response.setSubmittedAt(submission.getSubmittedAt());
             response.setStudentDecisionComment(submission.getStudentDecisionComment());
         }
         response.setAvailableActions(availableActionsForVisible(card, userId));
         return response;
+    }
+
+    private void enrichSubmission(PositioningCardRespVO response, PositioningCardSubmissionDO row, Long userId) {
+        response.setSubmissionId(row.getId()); response.setSubmissionVersion(row.getVersion());
+        response.setSubmissionStatus(row.getStatus()); response.setStudentDecidedAt(row.getStudentDecidedAt());
+        response.setOperatorReviewedAt(row.getOperatorReviewedAt()); response.setOperatorReviewComment(row.getOperatorReviewComment());
+        response.setEvidenceRequired(Boolean.TRUE.equals(row.getEvidenceRequired()));
+        response.setEvidence(PositioningEvidenceService.evidence(row));
+        response.setCanUploadEvidence(permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:evidence")
+                && objectPermissionProvider.hasPermission(row.getCardId(), "evidence", userId)
+                && (PositioningEvidenceService.eligible(row) || "student_evidence_pending".equals(row.getStatus())));
+        var director = row.getDirectorUserId() == null ? null : adminUserApi.getUser(row.getDirectorUserId());
+        var operator = row.getOperatorUserId() == null ? null : adminUserApi.getUser(row.getOperatorUserId());
+        response.setDirectorName(director == null ? null : director.getNickname());
+        response.setOperatorName(operator == null ? null : operator.getNickname());
     }
 
     public List<String> availableActionsForVisible(PositioningCardDO card, Long userId) {
@@ -843,7 +863,7 @@ public class PositioningCardService {
                 && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:student-link-generate")
                 && objectPermissionProvider.hasPermission(card.getId(), "student-link-generate", userId)) {
             actions.add(ACTION_GENERATE_POSITIONING_STUDENT_LINK);
-        } else if ((POSITIONING_CONFIRMED.equals(card.getStatus()) || POSITIONING_TRIAL_14D.equals(card.getStatus()))
+        } else if ((POSITIONING_CONFIRMED.equals(card.getStatus()) || POSITIONING_TRIAL_14D.equals(card.getStatus()) || "student_evidence_pending".equals(card.getStatus()))
                 && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:edit")
                 && objectPermissionProvider.hasPermission(card.getId(), "edit", userId)) {
             actions.add(ACTION_START_POSITIONING_REVISION);
@@ -854,6 +874,7 @@ public class PositioningCardService {
     private PositioningCardSubmissionDO createSubmission(PositioningCardDO card, Long userId, String status) {
         PositioningCardSubmissionDO latest = submissionMapper.selectLatestByCard(card.getId());
         PositioningCardSubmissionDO submission = new PositioningCardSubmissionDO();
+        submission.setEvidenceRequired(true);
         submission.setCardId(card.getId()).setAccountId(card.getAccountId())
                 .setStudentPersonId(card.getStudentPersonId()).setServiceRelationId(card.getServiceRelationId())
                 .setSubmissionNo(latest == null ? 1 : latest.getSubmissionNo() + 1)

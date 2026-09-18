@@ -12,6 +12,7 @@ import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
+import PaymentQrCard from './PaymentQrCardModal'
 
 type Values = {
   repurchaseReason?: string
@@ -276,7 +277,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             message={paymentAlertMessage(purchaseIntent)}
             description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
               <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
-              <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
+              <Space wrap><PaymentQrCard intent={purchaseIntent}/><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
                 <Button size="small" icon={<ReloadOutlined/>} loading={draftSaving} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button>
                 {purchaseIntent.paymentStatus !== 'paid' && <IrreversiblePopconfirm danger
                   action="取消支付链接并作废原链接"

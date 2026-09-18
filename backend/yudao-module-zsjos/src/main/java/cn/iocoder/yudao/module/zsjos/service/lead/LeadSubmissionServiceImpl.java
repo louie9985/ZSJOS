@@ -68,12 +68,14 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private LeadCategorySnapshotService categorySnapshotService;
     @Resource private PartnerAccountMapper partnerAccountMapper;
+    @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
     @Resource private LeadProviderAttributionService providerAttributionService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId) {
+        reqVO.setSpecifiedOwnerIdentity(null);
         LeadSubmissionIdentityService.Resolution identity = identityService.requireOrdinarySubmitter(submitterUserId);
         validateOrdinaryDispatch(reqVO, submitterUserId, identity.identity());
         return create(reqVO, submitterUserId, submitterUserId, identity, false);
@@ -83,10 +85,23 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId) {
         validatePartnerSubmissionAccount(accountId, partnerId);
-        reqVO.setDispatchMode(DISPATCH_AUTO);
-        reqVO.setSpecifiedSalesUserId(null);
         LeadSubmissionIdentityService.Resolution identity = new LeadSubmissionIdentityService.Resolution(
                 LeadSubmissionIdentityService.Identity.PARTNER, partnerId);
+        LeadCreateRespVO previous = findIdempotent(reqVO.getIdempotencyKey(), identity);
+        if (previous != null) return previous;
+        LeadDuplicateReviewDO previousReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
+        if (previousReview != null) {
+            requireSamePartnerIdentity(previousReview.getSubmissionPartnerId(), identity);
+            return duplicateReviewResponse(previousReview);
+        }
+        if (reqVO.getSpecifiedSalesUserId() != null) throw exception(PARTNER_ASSIGNMENT_TARGET_FORBIDDEN);
+        reqVO.setSpecifiedOwnerIdentity(null);
+        if (reqVO.getDispatchMode() == null) reqVO.setDispatchMode(DISPATCH_AUTO);
+        if (DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode())) {
+            var target = partnerAssignmentService.resolve(partnerId);
+            reqVO.setSpecifiedSalesUserId(target.userId());
+            reqVO.setSpecifiedOwnerIdentity(target.ownerIdentity());
+        }
         validateOrdinaryDispatch(reqVO, null, identity.identity());
         return create(reqVO, accountId, accountId, identity, false);
     }
@@ -436,8 +451,12 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     private void validateOrdinaryDispatch(LeadCreateReqVO reqVO, Long userId,
                                           LeadSubmissionIdentityService.Identity identity) {
-        if (identity == LeadSubmissionIdentityService.Identity.PARTNER
-                && !DISPATCH_AUTO.equals(reqVO.getDispatchMode())) throw exception(LEAD_DISPATCH_MODE_INVALID);
+        if (identity == LeadSubmissionIdentityService.Identity.PARTNER) {
+            if (DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode())) {
+                partnerAssignmentService.validateTarget(reqVO.getSpecifiedSalesUserId(), reqVO.getSpecifiedOwnerIdentity());
+            } else if (!DISPATCH_AUTO.equals(reqVO.getDispatchMode())) throw exception(LEAD_DISPATCH_MODE_INVALID);
+            return;
+        }
         if (!DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode())) return;
         requireSpecifiedDispatchPermission(userId);
         boolean allowed = dispatchService.getEligibleSalesUsers().stream()
@@ -480,6 +499,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setLeadCategoryLabelSnapshot(category.labelSnapshot()); lead.setRemark(reqVO.getRemark());
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);
         lead.setDispatchMode(reqVO.getDispatchMode()); lead.setAssignmentAttemptCount(0);
+        if (identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER && DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode())) {
+            lead.setPendingOwnerIdentity(reqVO.getSpecifiedOwnerIdentity());
+        }
         lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(submittedAt);
         providerAttributionService.apply(lead, identity.identity(), reqVO.getNewMediaProviderUserId(), submittedAt);
         lead.setVersion(0); leadMapper.insert(lead);

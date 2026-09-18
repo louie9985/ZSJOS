@@ -153,7 +153,9 @@
       <el-table-column label="状态" width="100">
         <template #default="scope">{{ invitationStatusLabels[scope.row.status] }}</template>
       </el-table-column>
-      <el-table-column prop="expiresAt" label="过期时间" min-width="170" />
+      <el-table-column label="过期时间" min-width="180">
+        <template #default="scope">{{ formatNullableDate(scope.row.expiresAt) }}</template>
+      </el-table-column>
       <el-table-column prop="createdByName" label="创建人" />
       <el-table-column label="操作" width="100">
         <template #default="scope">
@@ -201,6 +203,15 @@
   </Dialog>
   <Dialog v-model="invitationCreateVisible" title="生成兼职邀请码" width="520px">
     <el-form :model="invitationForm" label-width="100px">
+      <el-form-item label="到期时间" required>
+        <el-date-picker
+          v-model="invitationForm.expiresAt"
+          type="datetime"
+          value-format="x"
+          format="YYYY-MM-DD HH:mm:ss"
+          placeholder="请选择到期时间"
+        />
+      </el-form-item>
       <el-form-item label="姓名" required>
         <el-input v-model="invitationForm.name" maxlength="100" />
       </el-form-item>
@@ -328,6 +339,8 @@ import * as DeptApi from '@/api/system/dept'
 import { useUserStore } from '@/store/modules/user'
 import { defaultProps, handleTree } from '@/utils/tree'
 import { useClipboard } from '@vueuse/core'
+import dayjs from 'dayjs'
+import { formatNullableDate } from '@/utils/formatTime'
 
 defineOptions({ name: 'ZsjosPartner' })
 const message = useMessage()
@@ -446,6 +459,7 @@ const submitCreate = async () => {
   await load()
 }
 const openInvitationCreate = async () => {
+  invitationForm.expiresAt = dayjs().add(7, 'day').startOf('second').valueOf()
   invitationForm.name = ''
   invitationForm.mobile = ''
   invitationForm.assignedOperatorUserId = undefined
@@ -464,6 +478,10 @@ const searchInvitationOperators = async (keyword: string) => {
   }
 }
 const submitInvitation = async () => {
+  const expiresAt = Number(invitationForm.expiresAt)
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    return message.warning('请选择晚于当前时间的到期时间')
+  }
   if (
     !invitationForm.name.trim() ||
     !/^1\d{10}$/.test(invitationForm.mobile) ||
@@ -475,7 +493,8 @@ const submitInvitation = async () => {
     const result = await PartnerApi.createInvitation({
       name: invitationForm.name.trim(),
       mobile: invitationForm.mobile.trim(),
-      assignedOperatorUserId: invitationForm.assignedOperatorUserId
+      assignedOperatorUserId: invitationForm.assignedOperatorUserId,
+      expiresAt
     })
     invitationCreateVisible.value = false
     message.success(`邀请码已生成：${result.inviteCode}`)

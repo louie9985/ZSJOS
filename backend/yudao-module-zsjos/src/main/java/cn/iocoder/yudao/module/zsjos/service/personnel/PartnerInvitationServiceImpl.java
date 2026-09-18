@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvita
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationContextRespVO;
+import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerActivateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
@@ -82,6 +84,7 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
         }
         AdminUserRespDTO operator = requireNewMediaOperator(reqVO.getAssignedOperatorUserId());
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = resolveExpiresAt(reqVO.getExpiresAt(), now);
         invitationMapper.voidActiveByMobile(mobile, now);
         PartnerInvitationDO invitation = new PartnerInvitationDO()
                 .setInviteCode(generateInviteCode())
@@ -91,7 +94,7 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
                 .setAssignedOperatorUserId(operator.getId())
                 .setAssignedOperatorNameSnapshot(operator.getNickname())
                 .setStatus(PARTNER_INVITATION_STATUS_ACTIVE)
-                .setExpiresAt(now.plusDays(EXPIRE_DAYS))
+                .setExpiresAt(expiresAt)
                 .setCreatedByUserId(operatorUserId)
                 .setVersion(0);
         try {
@@ -104,6 +107,7 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student", bizId = "#reqVO.studentPersonId", action = "read")
     public PartnerInvitationRespVO createStudentInvitation(PartnerStudentInvitationCreateReqVO reqVO,
                                                             Long directorUserId) {
         PersonDO student = personMapper.selectById(reqVO.getStudentPersonId());
@@ -120,6 +124,8 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
             throw exception(PARTNER_MOBILE_DUPLICATE);
         }
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = resolveExpiresAt(reqVO.getExpiresAt(), now);
+        AdminUserRespDTO operator = requireNewMediaOperator(reqVO.getAssignedOperatorUserId());
         invitationMapper.voidActiveByStudent(student.getId(), now);
         invitationMapper.voidActiveByMobile(mobile, now);
         PartnerInvitationDO invitation = new PartnerInvitationDO()
@@ -130,10 +136,12 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
                 .setStudentMobileSnapshot(student.getMobile())
                 .setInitiatedByDirectorUserId(directorUserId)
                 .setAssignmentContextJson(buildStudentAssignmentContext(relations))
+                .setAssignedOperatorUserId(operator.getId())
+                .setAssignedOperatorNameSnapshot(operator.getNickname())
                 .setName(StrUtil.trim(reqVO.getName()))
                 .setMobile(mobile)
                 .setStatus(PARTNER_INVITATION_STATUS_ACTIVE)
-                .setExpiresAt(now.plusDays(EXPIRE_DAYS))
+                .setExpiresAt(expiresAt)
                 .setCreatedByUserId(directorUserId)
                 .setVersion(0);
         try {
@@ -142,6 +150,45 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
             throw exception(PARTNER_INVITATION_VERSION_CONFLICT);
         }
         return toResp(invitation, Map.of());
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "student", bizId = "#studentPersonId", action = "read")
+    public PartnerStudentInvitationContextRespVO getStudentContext(Long studentPersonId, Long directorUserId) {
+        List<ServiceRelationDO> relations = serviceRelationMapper
+                .selectActiveByContentDirectorAndPerson(directorUserId, studentPersonId);
+        if (personMapper.selectById(studentPersonId) == null || relations.isEmpty()) {
+            throw exception(PARTNER_STUDENT_INVITATION_FORBIDDEN);
+        }
+        List<Long> operators = relations.stream().map(ServiceRelationDO::getOperatorUserId)
+                .filter(Objects::nonNull).distinct().toList();
+        boolean conflict = operators.size() > 1
+                || (!operators.isEmpty() && relations.stream().anyMatch(row -> row.getOperatorUserId() == null));
+        PartnerStudentInvitationContextRespVO result = new PartnerStudentInvitationContextRespVO()
+                .setOpened(partnerStudentLinkService.hasActiveStudentLink(studentPersonId))
+                .setOperatorAssignmentConflict(conflict)
+                .setDefaultOperatorUserId(!conflict && operators.size() == 1 ? operators.getFirst() : null);
+        if (!result.isOpened()) {
+            PartnerInvitationDO invitation = invitationMapper.selectLatestByStudent(studentPersonId);
+            if (invitation != null) {
+                PartnerInvitationRespVO response = toResp(invitation, Map.of());
+                // 到期状态按服务端时间投影，读取不改写邀请或审计记录。
+                if (PARTNER_INVITATION_STATUS_ACTIVE.equals(invitation.getStatus())
+                        && !invitation.getExpiresAt().isAfter(LocalDateTime.now())) {
+                    response.setStatus(PARTNER_INVITATION_STATUS_EXPIRED);
+                }
+                result.setInvitation(response);
+            }
+        }
+        return result;
+    }
+
+    private LocalDateTime resolveExpiresAt(LocalDateTime requested, LocalDateTime now) {
+        // 在作废旧邀请之前校验，避免无效的新请求影响仍可使用的邀请码。
+        if (requested != null && !requested.isAfter(now)) {
+            throw exception(PARTNER_INVITATION_EXPIRY_INVALID);
+        }
+        return requested == null ? now.plusDays(EXPIRE_DAYS) : requested;
     }
 
     @Override
@@ -238,7 +285,8 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
                 || partnerStudentLinkService.hasActiveStudentLink(invitation.getStudentPersonId()))) {
             throw exception(PARTNER_STUDENT_LINK_CONFLICT);
         }
-        AdminUserRespDTO operator = studentInvitation ? null
+        // 历史学员邀请没有明确选择运营，仍只绑定学员，不推断或补造归属。
+        AdminUserRespDTO operator = studentInvitation && invitation.getAssignedOperatorUserId() == null ? null
                 : requireNewMediaOperator(invitation.getAssignedOperatorUserId());
         PartnerDO partner = new PartnerDO()
                 .setPartnerNo(generatePartnerNo())
@@ -253,7 +301,8 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
         if (studentInvitation) {
             partnerStudentLinkService.bind(partner.getId(), invitation.getStudentPersonId(),
                     "学员邀请码激活绑定", invitation.getInitiatedByDirectorUserId());
-        } else {
+        }
+        if (operator != null) {
             assignOwnership(partner.getId(), operator, invitation.getCreatedByUserId(), now);
         }
         invitation.setStatus(PARTNER_INVITATION_STATUS_USED);
@@ -284,6 +333,7 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
     }
 
     private AdminUserRespDTO requireNewMediaOperator(Long userId) {
+        if (userId == null) throw exception(PARTNER_INVITATION_OPERATOR_INVALID);
         RoleRespDTO role = requireNewMediaOperatorRole();
         Set<Long> userIds = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
         AdminUserRespDTO user = adminUserApi.getUser(userId);

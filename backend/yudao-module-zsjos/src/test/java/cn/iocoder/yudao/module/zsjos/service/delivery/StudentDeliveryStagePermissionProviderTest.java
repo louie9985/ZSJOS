@@ -15,8 +15,10 @@ import static org.mockito.Mockito.*;
 class StudentDeliveryStagePermissionProviderTest {
     @InjectMocks private StudentDeliveryStagePermissionProvider provider;
     @Mock private StudentDeliveryStageMapper mapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountObjectPermissionProvider accounts;
     @Test void allowsOnlyTheStoredDirector() {
-        when(mapper.selectById(1L)).thenReturn(new StudentDeliveryStageDO().setDirectorUserId(10L));
+        when(mapper.selectById(1L)).thenReturn(new StudentDeliveryStageDO().setAccountId(2L).setDirectorUserId(10L));
+        when(accounts.hasPermission(2L,"edit",10L)).thenReturn(true);
         assertTrue(provider.hasPermission(1L, "defer", 10L));
         assertFalse(provider.hasPermission(1L, "defer", 11L));
         assertThrows(RuntimeException.class, () -> provider.check(1L, "defer", 11L));

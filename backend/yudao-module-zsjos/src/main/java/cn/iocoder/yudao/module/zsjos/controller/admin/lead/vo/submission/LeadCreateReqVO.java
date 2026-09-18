@@ -22,8 +22,10 @@ public class LeadCreateReqVO {
     @NotBlank @Size(max = 64) private String leadCategory;
     @Size(max = 1000) private String remark;
     @Valid @Size(max = 9) private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
-    @NotBlank private String dispatchMode;
+    @NotBlank private String dispatchMode = "auto";
     private Long specifiedSalesUserId;
+    // Server-resolved snapshot. All public submission entries discard client values.
+    private String specifiedOwnerIdentity;
     private Long newMediaProviderUserId;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 

@@ -11,6 +11,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentSubjectDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PurchaseIntentDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentIntentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PurchaseIntentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductSkuMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductSkuDO;
 import cn.iocoder.yudao.module.zsjos.framework.allinpay.AllinpayProperties;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -32,7 +34,8 @@ class PublicPaymentDetailTest {
     private final PaymentIntentMapper payments = mock(PaymentIntentMapper.class);
     private final PurchaseIntentMapper intents = mock(PurchaseIntentMapper.class);
     private final ZsjosProductSkuService products = mock(ZsjosProductSkuService.class);
-    private final PaymentSubjectService subjects = mock(PaymentSubjectService.class);
+    private final PaymentSubjectResolver subjects = mock(PaymentSubjectResolver.class);
+    private final ZsjosProductSkuMapper skus = mock(ZsjosProductSkuMapper.class);
     private final AllinpayProperties properties = new AllinpayProperties();
 
     @BeforeEach
@@ -43,18 +46,24 @@ class PublicPaymentDetailTest {
         ReflectionTestUtils.setField(service, "paymentIntentMapper", payments);
         ReflectionTestUtils.setField(service, "purchaseIntentMapper", intents);
         ReflectionTestUtils.setField(service, "productSkuService", products);
-        ReflectionTestUtils.setField(service, "paymentSubjectService", subjects);
+        ReflectionTestUtils.setField(service, "paymentSubjectResolver", subjects);
         ReflectionTestUtils.setField(service, "allinpayProperties", properties);
+        ReflectionTestUtils.setField(service, "productSkuMapper", skus);
     }
 
     @Test
     void newPaymentFreezesAuthoritativeNamesAndSpecsButKeepsNegotiatedPrices() {
         var request = prepareDraft();
-        when(subjects.getPaymentSubjectByCode("school")).thenReturn(new PaymentSubjectDO());
-        when(products.validateLeadProduct("COURSE-1", false, "SKU-1", false)).thenReturn(product("课程一", "高级班"));
-        when(products.validateLeadProduct("COURSE-2", false, "SKU-2", false)).thenReturn(product("课程二", "基础班"));
+        when(subjects.resolve(any())).thenReturn(new PaymentSubjectDO());
+        when(products.validateLeadProduct("COURSE-1", false, "sku_random1", false)).thenReturn(product("课程一", "高级班"));
+        when(products.validateLeadProduct("COURSE-2", false, "sku_random2", false)).thenReturn(product("课程二", "基础班"));
 
+        var firstSku = new ZsjosProductSkuDO(); firstSku.setSpuId(101L);
+        var secondSku = new ZsjosProductSkuDO(); secondSku.setSpuId(202L);
+        when(skus.selectBySkuRef("sku_random1")).thenReturn(firstSku);
+        when(skus.selectBySkuRef("sku_random2")).thenReturn(secondSku);
         service.createPaymentLink(request, 7L);
+        verify(subjects).resolve(java.util.Set.of(101L, 202L));
 
         var capture = ArgumentCaptor.forClass(PaymentIntentDO.class);
         verify(payments).insert(capture.capture());
@@ -70,7 +79,7 @@ class PublicPaymentDetailTest {
         // Existing command readers must still deserialize the original reference/amount fields.
         var compatible = JsonUtils.parseArray(payment.getProductItemsSnapshot(), PurchaseIntentSaveDraftReqVO.Item.class);
         assertEquals("COURSE-1", compatible.getFirst().getSpuRef());
-        assertEquals("SKU-1", compatible.getFirst().getSkuRef());
+        assertEquals("sku_random1", compatible.getFirst().getSkuRef());
 
         clearInvocations(products);
         expose(payment);
@@ -82,6 +91,48 @@ class PublicPaymentDetailTest {
         assertFalse(publicJson.contains("spuRef"));
         assertFalse(publicJson.contains("skuRef"));
         assertFalse(publicJson.contains("subjectSnapshot"));
+    }
+
+    @Test
+    void newLinkFreezesCommonConfiguredSubjectForRealSkuReferences() {
+        assertFrozenSubject(false);
+    }
+
+    @Test
+    void newLinkFreezesDefaultSubjectWhenProductsResolveToDifferentSubjects() {
+        assertFrozenSubject(true);
+    }
+
+    private void assertFrozenSubject(boolean mixed) {
+        var request = prepareDraft();
+        var resolver = new PaymentSubjectResolver();
+        var configuredSubjects = mock(PaymentSubjectService.class);
+        var relations = mock(ProductPaymentSubjectService.class);
+        ReflectionTestUtils.setField(resolver, "paymentSubjectService", configuredSubjects);
+        ReflectionTestUtils.setField(resolver, "productPaymentSubjectService", relations);
+        ReflectionTestUtils.setField(resolver, "gatewayFactory", PaymentSubjectTestData.factory(properties));
+        ReflectionTestUtils.setField(service, "paymentSubjectResolver", resolver);
+        when(relations.getPaymentSubjectIdsByProductIds(List.of(101L, 202L)))
+                .thenReturn(java.util.Map.of(101L, 10L, 202L, mixed ? 20L : 10L));
+        when(configuredSubjects.getPaymentSubject(10L)).thenReturn(PaymentSubjectTestData.subject(10));
+        when(configuredSubjects.getPaymentSubject(20L)).thenReturn(PaymentSubjectTestData.subject(20));
+        when(configuredSubjects.getDefaultPaymentSubject()).thenReturn(PaymentSubjectTestData.subject(30));
+        when(products.validateLeadProduct("COURSE-1", false, "sku_random1", false)).thenReturn(product("课程一", "高级班"));
+        when(products.validateLeadProduct("COURSE-2", false, "sku_random2", false)).thenReturn(product("课程二", "基础班"));
+        var firstSku = new ZsjosProductSkuDO(); firstSku.setSpuId(101L);
+        var secondSku = new ZsjosProductSkuDO(); secondSku.setSpuId(202L);
+        when(skus.selectBySkuRef("sku_random1")).thenReturn(firstSku);
+        when(skus.selectBySkuRef("sku_random2")).thenReturn(secondSku);
+
+        service.createPaymentLink(request, 7L);
+
+        var capture = ArgumentCaptor.forClass(PaymentIntentDO.class);
+        verify(payments).insert(capture.capture());
+        var snapshot = JsonUtils.parseObject(capture.getValue().getSubjectSnapshotJson(), PaymentSubjectDO.class);
+        assertEquals(mixed ? 30L : 10L, snapshot.getId());
+        assertEquals(mixed ? "merchant-30" : "merchant-10", snapshot.getCusid());
+        if (!mixed) verify(configuredSubjects, never()).getDefaultPaymentSubject();
+        verify(configuredSubjects, never()).getPaymentSubjectByCode(any());
     }
 
     @Test
@@ -130,8 +181,8 @@ class PublicPaymentDetailTest {
     @Test
     void disabledOrInvalidProductCannotCreateANewPayment() {
         var request = prepareDraft();
-        when(subjects.getPaymentSubjectByCode("school")).thenReturn(new PaymentSubjectDO());
-        when(products.validateLeadProduct("COURSE-1", false, "SKU-1", false))
+        when(subjects.resolve(any())).thenReturn(new PaymentSubjectDO());
+        when(products.validateLeadProduct("COURSE-1", false, "sku_random1", false))
                 .thenThrow(new ServiceException(1, "商品不可用"));
         assertThrows(ServiceException.class, () -> service.createPaymentLink(request, 7L));
         verify(payments, never()).insert(any(PaymentIntentDO.class));
@@ -140,7 +191,7 @@ class PublicPaymentDetailTest {
     private PurchaseIntentSaveDraftReqVO prepareDraft() {
         var request = new PurchaseIntentSaveDraftReqVO();
         request.setCollectionMode("online_link");
-        request.setItems(List.of(item("COURSE-1", "SKU-1", "3980.00"), item("COURSE-2", "SKU-2", "680.00")));
+        request.setItems(List.of(item("COURSE-1", "sku_random1", "3980.00"), item("COURSE-2", "sku_random2", "680.00")));
         var saved = new PurchaseIntentRespVO();
         saved.setId(1L);
         doReturn(saved).when(service).saveDraft(request, 7L);

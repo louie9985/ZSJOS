@@ -66,7 +66,7 @@ export interface LeadCreateParams {
   leadCategory: string
   remark?: string
   attachments?: { infraFileId: number }[]
-  dispatchMode: 'auto'
+  dispatchMode: 'auto' | 'specified'
   idempotencyKey: string
 }
 
@@ -433,6 +433,16 @@ export async function uploadLeadAttachment(file: File, options: LeadAttachmentUp
     throw new TypeError('图片上传结果缺少预览地址')
   }
   return result
+}
+
+export interface PartnerAssignmentOptions {
+  configured: boolean
+  specifiedAvailable: boolean
+  reason?: string | null
+}
+
+export function getAssignmentOptions() {
+  return request.get<never, PartnerAssignmentOptions>('/zsjos/lead/assignment-options')
 }
 
 /** 提交客资 */

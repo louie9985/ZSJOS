@@ -44,7 +44,7 @@ const otherEntries = computed(() => [
   { title: '版本控制与更新', icon: 'info-o', to: '/profile/version-update', value: hasUpdate.value ? '有更新' : `v${currentVersion.version}` }
 ].filter(item => item.show !== false))
 
-const identityName = computed(() => profile.value?.nickname || userStore.nickname || partner.value?.name || '兼职伙伴')
+const identityName = computed(() => profile.value?.name || partner.value?.name || userStore.nickname || '兼职伙伴')
 const identitySubtitle = computed(() => maskMobile(profile.value?.mobile || partner.value?.mobile || ''))
 
 async function loadProfile() {

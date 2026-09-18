@@ -7,6 +7,7 @@ import lombok.Data;
 
 @Data
 public class PartnerProfileUpdateReqVO {
+    @NotBlank @Size(max = 100) private String name;
     @NotBlank @Size(max = 100) private String nickname;
     @Email @Size(max = 100) private String email;
     @Size(max = 512) private String avatar;

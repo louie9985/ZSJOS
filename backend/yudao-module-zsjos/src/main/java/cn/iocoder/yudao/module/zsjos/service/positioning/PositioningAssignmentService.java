@@ -73,7 +73,7 @@ public class PositioningAssignmentService {
                 .filter(PositioningAssignmentService::confirmed).toList();
     }
     static boolean confirmed(PositioningCardSubmissionDO row) {
-        return List.of("confirmed", "superseded", "student_agreed").contains(row.getStatus());
+        return PositioningEvidenceService.eligible(row);
     }
     @ZsjosPermission(bizType="media-account", bizId="#req.accountId", action="positioning-apply")
     @Transactional(rollbackFor=Exception.class)

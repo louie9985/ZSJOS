@@ -271,6 +271,29 @@
   gap: var(--crm-sp-2);
 }
 
+/* 审批详情是阅读面，不使用素材编辑页的内凹字段块。 */
+.material-approval-page .material-approval-toolbar { margin-block: var(--crm-sp-3); }
+.material-approval-detail-modal .ant-modal-body { max-height: min(78vh, 900px); overflow: auto; }
+.material-approval-detail { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: var(--crm-sp-6); }
+.material-approval-visual { display: flex; min-width: 0; flex-direction: column; gap: var(--crm-sp-3); }
+.material-approval-cover { display: block; width: 100%; max-height: 420px; object-fit: contain; object-position: top center; background: var(--crm-fill-secondary); }
+.material-approval-links { display: grid; gap: var(--crm-sp-2); }
+.material-approval-content { min-width: 0; }
+.material-approval-meta { display: flex; align-items: center; gap: var(--crm-sp-4); flex-wrap: wrap; padding-bottom: var(--crm-sp-3); border-bottom: 1px solid var(--crm-border); }
+.material-approval-record { display: inline-flex; align-items: center; gap: var(--crm-sp-2); margin-inline-start: auto; padding-inline-start: var(--crm-sp-4); border-inline-start: 1px solid var(--crm-border); color: var(--crm-text-secondary); }
+.material-approval-record strong { color: var(--crm-text); }
+.material-approval-content .material-four-column-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--crm-sp-4); }
+.material-approval-content .material-detail-column { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.material-approval-content .material-field { padding-inline: 0; }
+.material-approval-content .material-repeat-row { padding: var(--crm-sp-3) 0; border-radius: 0; background: transparent; box-shadow: none; border-top: 1px solid var(--crm-border); }
+.material-approval-actions { margin-top: var(--crm-sp-5); padding-top: var(--crm-sp-4); border-top: 1px solid var(--crm-border); }
+@media (max-width: 720px) {
+  .material-approval-detail { grid-template-columns: 1fr; }
+  .material-approval-cover { max-height: 280px; }
+  .material-approval-content .material-four-column-layout { grid-template-columns: 1fr; }
+  .material-approval-record { width: 100%; margin-inline-start: 0; padding-inline-start: 0; border-inline-start: 0; }
+}
+
 .material-repeat-row {
   padding: var(--crm-sp-3);
   grid-template-columns: repeat(2, minmax(0, 1fr));

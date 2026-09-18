@@ -5,6 +5,9 @@ package cn.iocoder.yudao.module.zsjos.enums;
  */
 public interface LeadAssignmentConstants {
 
+    String PARTNER_SCENE = "partner_lead_specified_assignment";
+    String PERMISSION_ACCEPT = "zsjos:lead:accept";
+
     String SCENE = "lead_specified_assignment";
 
     String MODE_APPEND = "append";

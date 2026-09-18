@@ -1,3 +1,5 @@
+import { useContext } from 'react'
+import ResourceLink, { ResourceLinkPresentation } from '../components/ResourceLink'
 import {
   BookOutlined,
   CloseOutlined,
@@ -124,6 +126,7 @@ function FieldValue({ field, version, value, snapshot, path, groupIndex = -1 }: 
   path: string
   groupIndex?: number
 }) {
+  const resourceLinks = useContext(ResourceLinkPresentation)
   if (['image', 'video', 'attachment'].includes(field.type)) {
     return <FileValue version={version} fieldKey={path} groupIndex={groupIndex} />
   }
@@ -131,7 +134,7 @@ function FieldValue({ field, version, value, snapshot, path, groupIndex = -1 }: 
     return value ? <SafeRichText html={String(value)} /> : <Typography.Text type="secondary">未填写</Typography.Text>
   }
   if (field.type === 'https-link' && value) {
-    return <a href={String(value)} target="_blank" rel="noreferrer">{String(value)}</a>
+    return resourceLinks ? <ResourceLink href={String(value)} variant="resource" /> : <a href={String(value)} target="_blank" rel="noreferrer">{String(value)}</a>
   }
   if (['dict-single', 'dict-multi', 'employee', 'department'].includes(field.type)) {
     return <Typography.Text>{displaySnapshot(snapshot)}</Typography.Text>
@@ -402,7 +405,7 @@ function ReferenceDialog({ material, open, onClose, onSuccess }: {
 export default function MaterialLibraryPage({ permissions = [], management = false }: { permissions?: string[]; management?: boolean }) {
   const [searchParams] = useSearchParams()
   const { message } = App.useApp()
-  const [view, setView] = useState<ViewKey>(management ? 'all' : 'recommendation')
+  const [view, setView] = useState<ViewKey>(searchParams.get('view') === 'mine' ? 'mine' : management ? 'all' : 'recommendation')
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState<number>()
@@ -618,9 +621,10 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     setSelected(undefined); setFormTypeCode('viral_content'); setFormMode('create'); setFormOpen(true)
   }
   const openEdit = () => {
-    if (!selected || !viralType || !viralContentType) return
-    if (![viralType.id, viralContentType.id].includes(selected.materialTypeId)) return
-    setFormTypeCode(selected.materialTypeId === viralContentType.id ? 'viral_content' : 'viral_account')
+    if (!selected || !canUpdate) return
+    if (selected.materialTypeId === viralContentType?.id) setFormTypeCode('viral_content')
+    else if (selected.materialTypeId === viralType?.id) setFormTypeCode('viral_account')
+    else return
     setFormMode('edit')
     setFormOpen(true)
   }
@@ -631,6 +635,8 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     setFormOpen(true)
   }
   const canUpdate = selected?.availableActions.includes('UPDATE') && hasPermission(permissions, 'zsjos:material:update')
+  const displayedTypeCode = formMode === 'create' ? formTypeCode
+    : types.find(type => type.id === selected?.materialTypeId)?.code
   const onFormSaved = async () => {
     setFormOpen(false)
     await load(page, selectedId)
@@ -736,18 +742,23 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     {(viralType || viralContentType) && <Drawer
       title={formMode === 'create' ? (formTypeCode === 'viral_content' ? '创建爆款内容拆解' : '创建爆款账号拆解') : formMode === 'edit' ? '编辑爆款拆解' : '查看爆款拆解'}
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
+      {detailLoading && formMode !== 'create' ? <Skeleton active /> : detailError && formMode !== 'create'
+        ? <Alert type="error" showIcon message={detailError} action={<Button onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>} />
+        : <>
       {formMode === 'view' && selected && <div className="material-layout-summary">
         <div className="material-layout-summary-info"><span>负责人：{selected.ownerName || '未记录'}</span><span>当前版本：V{selected.currentVersion?.versionNo || '-'}</span><span>调用量：{selected.referenceCount}</span><span>点赞量：{selected.likeCount}</span></div>
-        {(canApprove || canReject) && <div className="material-layout-summary-actions">
+        {(canUpdate || canApprove || canReject) && <div className="material-layout-summary-actions">
+          {canUpdate && ['viral_account', 'viral_content'].includes(displayedTypeCode || '') && <Button type="primary" icon={<EditOutlined />} onClick={openEdit}>继续编辑</Button>}
           {canApprove && <Button type="primary" onClick={() => setApprovalAction('approve')}>通过审批</Button>}
           {canReject && <Button danger onClick={() => setApprovalAction('reject')}>驳回审批</Button>}
         </div>}
       </div>}
-      {formTypeCode === 'viral_content'
+      {displayedTypeCode === 'viral_content'
         ? viralContentType && <ViralContentMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
-        : viralType && <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
+        : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />}
+      </>}
     </Drawer>}
   </section>
 }

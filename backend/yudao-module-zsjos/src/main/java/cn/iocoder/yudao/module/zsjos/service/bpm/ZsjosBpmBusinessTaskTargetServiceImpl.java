@@ -67,7 +67,9 @@ public class ZsjosBpmBusinessTaskTargetServiceImpl implements ZsjosBpmBusinessTa
             }
             Long versionId = cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalService.versionId(task);
             materialApprovalService.requireTask(versionId, taskId, done, userId);
-            ZsjosBpmBusinessTaskTargetRespVO target = supported("material", "/zsjos/material-library/manage");
+            // Viral material tasks are handled by the dedicated approval page. The
+            // management page cannot reconstruct a pending BPM task from a material id.
+            ZsjosBpmBusinessTaskTargetRespVO target = supported("material", "/zsjos/material-library/approvals");
             target.getQuery().put("taskId", taskId);
             target.getQuery().put("versionId", versionId);
             target.getQuery().put("done", done);

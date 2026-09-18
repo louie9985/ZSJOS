@@ -9,11 +9,13 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 /** Object responsibility supplements menu permission; unassigned and system fields fail closed. */
 public final class MediaAccountFieldPolicy {
     public static final Set<String> POSITIONING_SYNC_FIELDS = Set.of("account_position", "professional_position",
-            "content_format", "student_commitments", "company_commitments", "delivery_goals");
+            "content_format", "diagnosis_7d_requirement", "diagnosis_14d_requirement", "diagnosis_28d_requirement",
+            "delivery_goals");
     private MediaAccountFieldPolicy() {}
     public static boolean canWrite(FieldVO field, MediaAccountDO account, Long userId) {
         if (userId == null || !Boolean.TRUE.equals(field.getEnabled())) return false;
         if (POSITIONING_SYNC_FIELDS.contains(field.getKey()) || isRetiredPositioning(field)) return false;
+        if (Set.of("student_commitments", "company_commitments").contains(field.getKey()) && !userId.equals(account.getDirectorUserId())) return false;
         return "DIRECTOR".equals(field.getOwnerType()) && userId.equals(account.getDirectorUserId())
                 || "OPERATOR".equals(field.getOwnerType()) && userId.equals(account.getOwnerOperatorUserId());
     }

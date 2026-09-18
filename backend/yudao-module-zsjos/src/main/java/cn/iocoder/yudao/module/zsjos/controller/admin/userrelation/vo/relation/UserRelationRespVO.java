@@ -15,5 +15,7 @@ public class UserRelationRespVO extends LeadAssignmentUserRespVO {
     private Integer validTargetCount;
     private Integer invalidTargetCount;
     private LocalDateTime updateTime;
+    private String sourceType;
+    private String ownerIdentity;
 
 }

@@ -51,6 +51,8 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
     private PermissionApi permissionApi;
     @Resource
     private UserRelationSceneService sceneService;
+    @Resource private PartnerLeadAssignmentService partnerAssignmentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper partnerMapper;
 
     @Override
     public PageResult<LeadAssignmentRelationRespVO> getRelationPage(
@@ -193,6 +195,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
 
     @Override
     public PageResult<UserRelationRespVO> getAdminRelationPage(UserRelationPageReqVO reqVO) {
+        if (PARTNER_SCENE.equals(reqVO.getSceneCode())) return partnerAssignmentService.page(reqVO);
         UserRelationSceneDO scene = sceneService.getSceneByCode(reqVO.getSceneCode());
         LeadAssignmentRelationPageReqVO relationReq = new LeadAssignmentRelationPageReqVO();
         relationReq.setPageNo(reqVO.getPageNo());
@@ -222,6 +225,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
 
     @Override
     public List<LeadAssignmentUserRespVO> getAdminEligibleTargetUsers(String sceneCode) {
+        if (PARTNER_SCENE.equals(sceneCode)) return partnerAssignmentService.targets();
         return getEligibleTargetUsers(sceneService.getSceneByCode(sceneCode));
     }
 
@@ -241,6 +245,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void saveAdminRelations(UserRelationSaveReqVO reqVO, Long operatorUserId) {
+        if (PARTNER_SCENE.equals(reqVO.getSceneCode())) { partnerAssignmentService.save(reqVO, operatorUserId); return; }
         UserRelationSceneDO scene = sceneService.getEnabledSceneByCode(reqVO.getSceneCode());
         saveRelationsInternal(reqVO.getSourceUserIds(), reqVO.getTargetUserIds(), reqVO.getMode(),
                 operatorUserId, scene, false, false);
@@ -256,7 +261,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
             PageResult<LeadAssignmentRelationLogDO> page) {
         Set<Long> userIds = page.getList().stream()
                 .flatMap(log -> {
-                    Set<Long> ids = parseIds(log.getSourceUserIds());
+                    Set<Long> ids = PARTNER_SCENE.equals(log.getScene()) ? new HashSet<>() : parseIds(log.getSourceUserIds());
                     ids.addAll(parseIds(log.getTargetUserIds()));
                     ids.add(log.getOperatorUserId());
                     return ids.stream();
@@ -265,7 +270,12 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         List<LeadAssignmentLogRespVO> list = page.getList().stream().map(log -> {
             LeadAssignmentLogRespVO result = new LeadAssignmentLogRespVO();
             result.setId(log.getId());
-            result.setSourceUsers(joinNames(log.getSourceUserIds(), userMap));
+            result.setSourceUsers(PARTNER_SCENE.equals(log.getScene())
+                    ? parseIds(log.getSourceUserIds()).stream().map(id -> {
+                        var partner = partnerMapper.selectById(id);
+                        return partner == null ? "已失效兼职" : partner.getName();
+                    }).sorted().collect(Collectors.joining("、"))
+                    : joinNames(log.getSourceUserIds(), userMap));
             result.setTargetUsers(joinNames(log.getTargetUserIds(), userMap));
             result.setActionType(log.getActionType());
             result.setOperatorUserId(log.getOperatorUserId());

@@ -48,13 +48,13 @@
       <el-table-column label="来源用户" min-width="210">
         <template #default="{ row }">
           <div>{{ row.sourceLabel }}</div>
-          <div class="secondary-text">岗位：{{ postName(row.sourcePostCode) }}</div>
+          <div class="secondary-text">{{ row.sourceType === 'partner' ? '主体：兼职' : `岗位：${postName(row.sourcePostCode)}` }}</div>
         </template>
       </el-table-column>
       <el-table-column label="目标用户" min-width="210">
         <template #default="{ row }">
           <div>{{ row.targetLabel }}</div>
-          <div class="secondary-text">岗位：{{ postName(row.targetPostCode) }}</div>
+          <div class="secondary-text">{{ row.targetEligibilityType === 'permission' ? `权限：${row.targetPermissionCode}` : `岗位：${postName(row.targetPostCode)}` }}</div>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90" align="center">

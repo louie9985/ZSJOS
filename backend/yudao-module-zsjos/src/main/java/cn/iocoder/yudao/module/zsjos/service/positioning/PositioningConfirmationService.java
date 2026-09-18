@@ -100,6 +100,19 @@ public class PositioningConfirmationService {
         return baseUrl;
     }
 
+    @Resource private PositioningSnapshotResourceService resources;
+
+    public Object resource(String rawToken, Long resourceId, boolean material) {
+        var link = linkMapper.selectByTokenHash(hash(rawToken));
+        if (!isActive(link, LocalDateTime.now())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
+        return inTenant(link.getTenantId(), () -> {
+            readyDetail(link);
+            var submission = submissionMapper.selectById(link.getSubmissionId());
+            return material ? resources.materialFromSnapshot(submission.getDictSnapshotJson(), resourceId)
+                    : resources.attachmentFromSnapshot(submission.getDictSnapshotJson(), resourceId);
+        });
+    }
+
     public PublicPositioningConfirmationRespVO publicDetail(String rawToken) {
         PositioningConfirmationLinkDO link = linkMapper.selectByTokenHash(hash(rawToken));
         if (!isActive(link, LocalDateTime.now())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
@@ -177,7 +190,7 @@ public class PositioningConfirmationService {
         }
         LocalDateTime now = LocalDateTime.now();
         boolean agreed = "agree".equals(request.getDecision());
-        String submissionStatus = agreed ? POSITIONING_CONFIRMED : "change_requested";
+        String submissionStatus = agreed ? "student_evidence_pending" : "change_requested";
         if (submissionMapper.markStudentDecision(submission.getId(), submission.getVersion(),
                 POSITIONING_STUDENT_CONFIRM, submissionStatus, request.getDecision(),
                 agreed ? null : request.getComment().trim(), now) == 0

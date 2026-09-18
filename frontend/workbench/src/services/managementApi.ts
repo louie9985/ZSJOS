@@ -12,9 +12,9 @@ export type BusinessAudit = { id: number; operatorUserId?: number; operatorNameS
 export type ImpersonationAudit = { id: number; sessionId: number; administratorUserId: number; targetUserId: number; httpMethod: string; requestPath: string; occurredAt: Timestamp }
 export type Cashback = { id: number; cashbackNo: string; type: 'valid' | 'deal'; status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'; beneficiaryUserId: number; leadId?: number; leadNo?: string; orderId?: number; orderItemId?: number; productRefSnapshot?: string; productNameSnapshot: string; baseAmount?: number; rateSnapshot?: number; amount: number; observationDaysSnapshot?: number; generatedAt: Timestamp; availableAt?: Timestamp; settledAt?: Timestamp; cancelledAt?: Timestamp; cancelReason?: string }
 export type Withdrawal = { id: number; withdrawalNo: string; applicantUserId: number; status: string; verificationStatus: string; applicationAmount: number; availableBalanceSnapshot?: number; accountNameSnapshot: string; maskedCardNumber: string; cardNumber?: string; bankNameSnapshot: string; branchNameSnapshot?: string; submittedAt: Timestamp; approvedAmount?: number; reviewedByUserId?: number; reviewedAt?: Timestamp; rejectionReason?: string; bankTransactionNo?: string; proofUrl?: string; payoutRemark?: string; paidByUserId?: number; paidAt?: Timestamp; items?: Array<{ cashbackId: number; amount: number }> }
-export type RelationScene = { id?: number; name: string; code: string; sourceLabel: string; targetLabel: string; sourcePostCode: string; targetPostCode?: string; targetEligibilityType: 'post' | 'permission'; targetPermissionCode?: string; status: number; remark?: string }
+export type RelationScene = { id?: number; name: string; code: string; sourceLabel: string; targetLabel: string; sourceType?: 'system_user' | 'partner'; sourcePostCode: string; targetPostCode?: string; targetEligibilityType: 'post' | 'permission'; targetPermissionCode?: string; status: number; remark?: string }
 export type RelationUser = { id: number; nickname: string; maskedMobile?: string; deptId?: number; deptName?: string; status: number }
-export type UserRelation = RelationUser & { targetUsers: RelationUser[]; validTargetCount: number; invalidTargetCount: number; updateTime?: Timestamp }
+export type UserRelation = RelationUser & { ownerIdentity?: 'sales' | 'education'; targetUsers: RelationUser[]; validTargetCount: number; invalidTargetCount: number; updateTime?: Timestamp }
 export type UserRelationLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type SimplePost = { id: number; name: string; code: string }
 export type NotifyScene = { code: string; name: string; recipientRoles: Array<{ code: string; name: string }>; allowedActions: Array<'none' | 'message_detail' | 'business_detail'>; timed?: boolean }
@@ -22,6 +22,8 @@ export type NotifyTemplate = { id: number; name: string; code: string; sceneCode
 export type NotifyRule = { id?: number; name: string; sceneCode: string; channelCode: 'in_app' | 'websocket' | 'wecom' | 'sms'; templateId?: number; recipientRoles: string[]; specifiedUserIds: number[]; actionType: 'none' | 'message_detail' | 'business_detail'; timingStage?: 'advance' | 'due' | 'overdue'; timingOffsetMinutes?: number; status: number }
 
 export const managementApi = {
+  bindPartnerStudent: async (params: { partnerId: number; studentPersonId: number; reason?: string }) =>
+    unwrap<boolean>(await http.post('/zsjos/partner-student-link/bind', null, { params })),
   users: async () => unwrap<SimpleUser[]>(await http.get('/system/user/simple-list')),
   departments: async () => unwrap<SimpleDept[]>(await http.get('/system/dept/simple-list')),
   posts: async () => unwrap<SimplePost[]>(await http.get('/system/post/simple-list')),
@@ -59,8 +61,8 @@ export const managementApi = {
   deleteRelationScene: async (id: number) => unwrap<boolean>(await http.delete('/zsjos/user-relation/scene/delete', { params: { id } })),
   relations: async (sceneCode: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<UserRelation>>(await http.get('/zsjos/user-relation/relation/page', { params: { sceneCode, pageNo, pageSize } })),
   relationTargets: async (sceneCode: string) => unwrap<RelationUser[]>(await http.get('/zsjos/user-relation/target/simple-list', { params: { sceneCode } })),
-  saveRelations: async (data: { sceneCode: string; sourceUserIds: number[]; targetUserIds: number[]; mode: 'append' | 'replace' | 'remove' }) => unwrap<boolean>(await http.put('/zsjos/user-relation/relation/save', data)),
-  relationLogs: async (sceneCode: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<UserRelationLog>>(await http.get('/zsjos/user-relation/log/page', { params: { sceneCode, pageNo, pageSize } })),
+  saveRelations: async (data: { sceneCode: string; sourceUserIds: number[]; targetUserIds: number[]; ownerIdentity?: 'sales' | 'education'; mode: 'append' | 'replace' | 'remove' }) => unwrap<boolean>(await http.put('/zsjos/user-relation/relation/save', data)),
+  relationLogs: async (sceneCode: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<UserRelationLog>>(await http.get('/zsjos/user-relation/log/page', { params: { scene: sceneCode, pageNo, pageSize } })),
   maintenance: async () => unwrap<{ enabled: boolean }>(await http.get('/system/maintenance-mode')),
   updateMaintenance: async (enabled: boolean) => unwrap<boolean>(await http.put('/system/maintenance-mode', { enabled })),
   notifyScenes: async () => unwrap<NotifyScene[]>(await http.get('/system/notify-scene/list')),

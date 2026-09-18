@@ -225,7 +225,8 @@ public class MediaAccountFieldConfigService {
             if ("url".equals(field.getType())) {
                 try {
                     java.net.URI uri = java.net.URI.create(value);
-                    if (!Set.of("http", "https").contains(uri.getScheme()) || uri.getHost() == null) throw new IllegalArgumentException();
+                    if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+                            || uri.getHost() == null) throw new IllegalArgumentException();
                 } catch (IllegalArgumentException invalid) { throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID); }
             }
             result.setValue(value); result.setDisplayValue(value);
@@ -267,6 +268,12 @@ public class MediaAccountFieldConfigService {
             if (field.getRequiredForComplete() == null) field.setRequiredForComplete(field.getRequired());
             if (field.getGroup() == null) field.setGroup("PROFILE");
             if (!Set.of("PROFILE", "POSITIONING", "STATUS", "METRICS", "REVIEW").contains(field.getGroup())) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+            if ("delivery_goals".equals(field.getKey())) {
+                field.setOwnerType("AUTO"); field.setSourceType("ACCOUNT");
+            }
+            if (Set.of("student_commitments", "company_commitments").contains(field.getKey())) {
+                field.setOwnerType("DIRECTOR"); field.setSourceType("MANUAL");
+            }
             if (field.getSourceType() == null) field.setSourceType("MANUAL");
             if (!Set.of("MANUAL", "ACCOUNT", "STUDENT", "PENDING").contains(field.getSourceType())) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
             field.setSnapshotPolicy("ON_SELECTION");

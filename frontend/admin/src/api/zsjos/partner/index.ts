@@ -26,12 +26,20 @@ export interface PartnerCreateVO {
 }
 
 export const getPartnerList = () => request.get<PartnerVO[]>({ url: '/zsjos/partner/list' })
-export const getPartnerPage = (params: {
-  pageNo: number
-  pageSize: number
-  keyword?: string
-  status?: string
-}) => request.get<{ list: PartnerVO[]; total: number }>({ url: '/zsjos/partner/page', params })
+export const getPartnerPage = (
+  params: {
+    pageNo: number
+    pageSize: number
+    keyword?: string
+    status?: string
+  },
+  preserveBusinessError = false
+) =>
+  request.get<{ list: PartnerVO[]; total: number }>({
+    url: '/zsjos/partner/page',
+    params,
+    preserveBusinessError
+  })
 export const createPartner = (data: PartnerCreateVO) =>
   request.post({ url: '/zsjos/partner/create', data })
 export const disablePartner = (id: number, reason: string) =>
@@ -87,13 +95,13 @@ export interface PartnerInvitationVO {
   assignedOperatorUserId: number
   assignedOperatorName?: string
   status: 'active' | 'used' | 'voided' | 'expired'
-  expiresAt: string
-  usedAt?: string
-  voidedAt?: string
+  expiresAt: number
+  usedAt?: number
+  voidedAt?: number
   partnerId?: number
   createdByUserId?: number
   createdByName?: string
-  createTime: string
+  createTime: number
   version: number
 }
 
@@ -101,6 +109,7 @@ export interface PartnerInvitationCreateVO {
   name: string
   mobile: string
   assignedOperatorUserId?: number
+  expiresAt?: number
 }
 
 export const getInvitationPage = (params: {

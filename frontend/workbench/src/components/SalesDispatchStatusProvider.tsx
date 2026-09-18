@@ -27,7 +27,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
   const [error, setError] = useState('')
 
   const heartbeat = useCallback(async () => {
-    if (!canAccept || realtimeStatus !== 'open' || !navigator.onLine) return
+    if (!canAccept || status?.eligible !== true || realtimeStatus !== 'open' || !navigator.onLine) return
     try {
       setStatus(await api.dispatchHeartbeat())
       setError('')
@@ -36,7 +36,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
     } finally {
       setLoading(false)
     }
-  }, [canAccept, realtimeStatus])
+  }, [canAccept, realtimeStatus, status?.eligible])
 
   const refresh = useCallback(async () => {
     if (!canAccept) return
@@ -45,7 +45,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
       const current = await api.myDispatchStatus()
       setStatus(current)
       setError('')
-      if (realtimeStatus === 'open' && navigator.onLine) {
+      if (current.eligible && realtimeStatus === 'open' && navigator.onLine) {
         setStatus(await api.dispatchHeartbeat())
       }
     } catch (loadError) {
@@ -68,7 +68,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
   }, [])
 
   useEffect(() => {
-    if (!canAccept || realtimeStatus !== 'open' || !browserOnline) {
+    if (!canAccept || !status?.eligible || realtimeStatus !== 'open' || !browserOnline) {
       if (canAccept && status?.presence === 'online') {
         void api.dispatchOffline().then(setStatus).catch(() => undefined)
       }
@@ -84,7 +84,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
       window.removeEventListener('focus', refreshVisible)
       document.removeEventListener('visibilitychange', refreshVisible)
     }
-  }, [browserOnline, canAccept, heartbeat, realtimeStatus, status?.presence])
+  }, [browserOnline, canAccept, heartbeat, realtimeStatus, status?.presence, status?.eligible])
 
   const setAccepting = useCallback(async (accepting: boolean) => {
     if (!status || !isDispatchPageActive(realtimeStatus, browserOnline, status)) return
@@ -102,7 +102,7 @@ export function SalesDispatchStatusProvider({ canAccept, children }: { canAccept
   }, [browserOnline, realtimeStatus, status])
 
   const value = useMemo<SalesDispatchStatusContextValue>(() => ({
-    enabled: canAccept,
+    enabled: canAccept && status?.eligible === true,
     status,
     loading,
     updating,

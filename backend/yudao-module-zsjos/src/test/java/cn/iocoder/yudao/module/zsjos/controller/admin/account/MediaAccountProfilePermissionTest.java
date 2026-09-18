@@ -28,7 +28,7 @@ class MediaAccountProfilePermissionTest {
             assertThrows(AccessDeniedException.class,()->controller.get(1L));
             assertThrows(AccessDeniedException.class,()->controller.patch(1L,new Patch()));
             assertThrows(AccessDeniedException.class,()->controller.append(1L,new RecordRequest()));
-            assertThrows(AccessDeniedException.class,()->controller.history(1L,new PageParam()));
+            assertThrows(AccessDeniedException.class,()->controller.history(1L,new cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountProfileVO.HistoryQuery()));
             verifyNoInteractions(ctx.getBean(MediaAccountProfileService.class));
         }
     }

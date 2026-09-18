@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue'
-import {showToast} from 'vant'
+import {showToast,showConfirmDialog} from 'vant'
 import dayjs from 'dayjs'
-import {decidePositioning,getPositioningCard,type PositioningConfirmation} from '@/api/positioning'
+import {decidePositioning,getPositioningCard,getPositioningAttachment,type PositioningConfirmation} from '@/api/positioning'
+
+import ConfirmationFile from './ConfirmationFile.vue'
+import ConfirmationMaterial from './ConfirmationMaterial.vue'
 
 const confirmation=ref<PositioningConfirmation>()
 const loading=ref(true),error=ref(''),submitting=ref(false),completed=ref<'agree'|'request_changes'>()
@@ -10,6 +13,9 @@ const revisionOpen=ref(false),comment=ref('')
 const token=()=>new URLSearchParams(window.location.hash.slice(1)).get('token')||''
 const fields=computed(()=>confirmation.value?.fields?.filter(field=>field.enabled!==false)||[])
 const legacySections=computed(()=>Object.entries(confirmation.value?.legacySections||{}).filter(([,value])=>Object.keys(value||{}).length))
+const attachments=(key:string)=> (confirmation.value?.dictSnapshots?.[key] || []) as Array<{id:number;name:string}>
+const materials=(key:string)=> (confirmation.value?.dictSnapshots?.[key] || []) as Array<{materialVersionId:number;titleSnapshot:string}>
+const confirmAgree=async()=>{try{await showConfirmDialog({title:'确认同意本版定位卡？',message:'请确认已阅读定位内容及参考资料。'});await decide('agree')}catch{/* user cancelled */}}
 const displayValue=(key:string)=>{
   const snapshot=confirmation.value?.dictSnapshots?.[key] as {labelSnapshot?:string}|Array<{labelSnapshot?:string;titleSnapshot?:string;name?:string}>|undefined
   if(Array.isArray(snapshot)){
@@ -30,20 +36,23 @@ onMounted(load)
     <van-nav-bar title="定位卡确认" />
     <van-loading v-if="loading" class="positioning-share-state" vertical>正在加载定位卡</van-loading>
     <van-empty v-else-if="error" :description="error"><van-button size="small" type="primary" @click="load">重试</van-button></van-empty>
-    <van-empty v-else-if="completed||confirmation?.state==='processed'" :description="completed==='request_changes'?'修改意见已提交':'该定位卡已完成确认'" />
+    <van-empty v-else-if="completed||confirmation?.state==='processed'" :description="completed==='request_changes'?'修改意见已提交':'学员已确认，待运营上传确认凭证'" />
     <template v-else-if="confirmation?.state==='ready'">
       <section class="positioning-share-heading">
         <h1>{{ confirmation.serviceLabel || '课程服务定位卡' }}</h1>
         <p>{{ confirmation.cardNo || '定位卡' }} · 提交于 {{ confirmation.submittedAt ? dayjs(confirmation.submittedAt).format('YYYY-MM-DD HH:mm') : '历史时间未记录' }}</p>
       </section>
       <van-cell-group inset title="定位内容">
-        <van-cell v-for="field in fields" :key="field.key" :title="field.title" :label="displayValue(field.key)" />
+        <van-cell v-for="field in fields" :key="field.key" :title="field.title" :label="field.type==='attachment'||field.type==='material_picker' ? undefined : displayValue(field.key)">
+          <template v-if="field.type==='attachment'" #label><ConfirmationFile v-for="file in attachments(field.key)" :key="file.id" :name="file.name" :load="()=>getPositioningAttachment(token(),file.id)" /></template>
+          <template v-else-if="field.type==='material_picker'" #label><ConfirmationMaterial v-for="item in materials(field.key)" :key="item.materialVersionId" :token="token()" :id="item.materialVersionId" :title="item.titleSnapshot" /></template>
+        </van-cell>
       </van-cell-group>
       <van-cell-group v-for="[title,section] in legacySections" :key="title" inset :title="title">
         <van-cell v-for="(value,key) in section" :key="key" :title="String(key)" :label="typeof value==='object'?JSON.stringify(value):String(value)" />
       </van-cell-group>
       <div class="positioning-share-actions">
-        <van-button type="primary" block :loading="submitting" @click="decide('agree')">同意定位卡</van-button>
+        <van-button type="primary" block :loading="submitting" @click="confirmAgree">同意定位卡</van-button>
         <van-button block :disabled="submitting" @click="revisionOpen=true">提出修改</van-button>
       </div>
     </template>

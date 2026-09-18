@@ -12,6 +12,7 @@ export interface AssignmentUserVO {
 }
 
 export interface AssignmentRelationVO extends AssignmentUserVO {
+  ownerIdentity?: 'sales' | 'education'
   salesUsers: AssignmentUserVO[]
   validSalesCount: number
   invalidSalesCount: number

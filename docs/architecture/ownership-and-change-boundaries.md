@@ -145,4 +145,4 @@ names. The route-to-renderer inventory is `docs/frontend/zsjos-menu-coverage.md`
 
 素材库、动态模板和生产内容批审由 `yudao-module-zsjos` 持有业务记录、版本快照、推荐索引、互动统计和收录关系；BPM 仅持有流程定义、实例、任务和历史，ZSJOS 通过公共 API 与事件契约访问，不直接读取 BPM 表。
 
-Infra 持有文件对象和预签名上传校验。素材字段中的字典选择必须来自 System 字典 API，并保存选择时的 value、类型和 label 快照。学员兼职账号属于人员关系域，账号主体只与学员信息主体建立 `PartnerStudentLink`，编导/运营分配关系不作为所有权依据。
+Infra 持有文件对象和预签名上传校验。素材字段中的字典选择必须来自 System 字典 API，并保存选择时的 value、类型和 label 快照。学员兼职账号属于人员关系域，账号主体与学员信息主体建立 `PartnerStudentLink`；邀请表单明确选择运营后，激活事务另建兼职运营归属。学员服务中的运营仅为表单默认值，可改选，不自动联动后续改派；历史未选择运营的邀请码不补造归属。详见[学员兼职邀请](../api/student-partner-invitation.md)。

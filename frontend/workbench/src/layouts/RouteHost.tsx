@@ -53,6 +53,7 @@ import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
 import AnnouncementCenterPage from '../pages/AnnouncementCenterPage'
 import DeliveryClassPage from '../pages/DeliveryClassPage'
 import MaterialLibraryPage from '../pages/MaterialLibraryPage'
+import MaterialApprovalPage from '../pages/MaterialApprovalPage'
 import ViralAccountDecomposePage from '../pages/ViralAccountDecomposePage'
 import ViralContentDecomposePage from '../pages/ViralContentDecomposePage'
 import ContentProductionPage from '../pages/ContentProductionPage'
@@ -151,6 +152,7 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_LIBRARY) return <MaterialLibraryPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_MANAGEMENT) return <MaterialLibraryPage permissions={permissions} management />
+  if (menu?.path === APP_ROUTES.MATERIAL_APPROVALS) return <MaterialApprovalPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.VIRAL_ACCOUNT_DECOMPOSE) return <ViralAccountDecomposePage />
   if (menu?.path === APP_ROUTES.VIRAL_CONTENT_DECOMPOSE) return <ViralContentDecomposePage />
   if (menu?.path === APP_ROUTES.CONTENT_PRODUCTION) return <ContentProductionPage permissions={permissions}/>

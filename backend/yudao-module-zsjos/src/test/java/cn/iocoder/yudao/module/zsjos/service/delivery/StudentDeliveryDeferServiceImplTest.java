@@ -34,19 +34,23 @@ class StudentDeliveryDeferServiceImplTest {
     @Mock private BpmProcessInstanceApi processInstanceApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryPlanMapper plans;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService events;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService tasks;
     private StudentDeliveryStageDO stage;
 
     @BeforeEach void setUp() {
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "delivery-test"), StudentDeliveryStageDO.class);
         TenantContextHolder.setTenantId(1L);
+        lenient().when(plans.selectById(2L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO().setStatus("ACTIVE"));
         SecurityFrameworkUtils.setLoginUser(new LoginUser().setId(10L).setUserType(2), new MockHttpServletRequest());
-        stage = new StudentDeliveryStageDO().setId(1L).setDirectorUserId(10L).setStageCode("S1")
-                .setStatus("PENDING").setDueAt(LocalDateTime.of(2026, 9, 14, 12, 0));
+        stage = new StudentDeliveryStageDO().setId(1L).setPlanId(2L).setDirectorUserId(10L).setStageCode("S1")
+                .setVersion(0).setStatus("PENDING").setDueAt(LocalDateTime.now().plusDays(2).withNano(0));
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); SecurityContextHolder.clearContext(); }
     private StudentDeliveryDeferReqVO request(int days) {
         return new StudentDeliveryDeferReqVO().setStageId(1L).setRequestedBy(999L)
-                .setSupervisorUserId(999L).setRequestedDays(days).setReason("调整交付安排");
+                .setVersion(0).setIdempotencyKey("test-defer").setNewDueAt(days > 0 ? stage.getDueAt().plusDays(days) : null).setSupervisorUserId(999L).setRequestedDays(days).setReason("调整交付安排");
     }
     private void stubStage() { when(stageMapper.selectByIdForUpdate(1L, 1L)).thenReturn(stage); }
     private void stubSupervisor() {
@@ -58,16 +62,16 @@ class StudentDeliveryDeferServiceImplTest {
         stubStage(); stubSupervisor();
         when(stageMapper.update(isNull(), any(Wrapper.class))).thenReturn(1);
         doAnswer(invocation -> { invocation.<StudentDeliveryDeferDO>getArgument(0).setId(50L); return 1; }).when(deferMapper).insert(any(StudentDeliveryDeferDO.class));
-        when(processInstanceApi.createProcessInstance(eq(10L), any())).thenReturn("process-1");
+
         var result = service.request(request(30));
         assertEquals(30, result.getRequestedDays());
         assertEquals(10L, result.getRequestedBy());
         assertEquals(30L, result.getSupervisorUserId());
-        ArgumentCaptor<BpmProcessInstanceCreateReqDTO> process = ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
-        verify(processInstanceApi).createProcessInstance(eq(10L), process.capture());
-        assertEquals(java.util.List.of(30L), process.getValue().getStartUserSelectAssignees().get("deliverySupervisorReview"));
-        assertEquals("2026-10-14T12:00", process.getValue().getVariables().get("requestedDueAt"));
-        assertEquals("process-1", result.getBpmProcessInstanceId());
+        assertEquals("EFFECTIVE", result.getStatus());
+        assertEquals(stage.getDueAt().plusDays(30),result.getNewDueAt());
+        verifyNoInteractions(processInstanceApi);
+        verify(events).notify(eq("student.delivery.deferred"),anyString(),eq(1L),eq(30L),eq(10L),eq("delivery-defer:50"),anyMap());
+
     }
     @Test void rejectsNonpositiveDays() {
         assertThrows(RuntimeException.class, () -> service.request(request(0)));
@@ -90,7 +94,7 @@ class StudentDeliveryDeferServiceImplTest {
     }
     @Test void duplicateRequestReturnsPendingApproval() {
         stubStage(); stage.setStatus("DEFER_PENDING");
-        var pending = new StudentDeliveryDeferDO().setId(50L).setStatus("PENDING");
+        var pending = new StudentDeliveryDeferDO().setId(50L).setStatus("EFFECTIVE").setReason("调整交付安排").setNewDueAt(stage.getDueAt().plusDays(7));
         when(deferMapper.selectOne(any(Wrapper.class))).thenReturn(pending);
         assertSame(pending, service.request(request(7)));
         verifyNoInteractions(adminUserApi, processInstanceApi);

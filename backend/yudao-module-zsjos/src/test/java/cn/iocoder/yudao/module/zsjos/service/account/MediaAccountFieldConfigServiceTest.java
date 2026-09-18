@@ -30,6 +30,34 @@ class MediaAccountFieldConfigServiceTest {
     @Mock private DictDataApi dictDataApi;
 
     @Test
+    void homepageUrlRejectsMissingSchemeWithoutNullPointer() {
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(8L)
+                .setStatus("published").setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils
+                        .toJsonString(List.of(field("homepage_url", "主页链接", "url", null, false)))));
+        for (String value : List.of("123", "example.com/profile", "/profile", "//example.com", "https://", "https://bad host", "javascript:alert(1)", "ftp://example.com")) {
+            var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.validateAndSnapshot(Map.of("homepage_url", value)), value);
+            assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(), error.getCode());
+        }
+        for (String value : List.of("https://example.com/profile", "http://example.com", "HTTPS://example.com/profile"))
+            assertEquals(value, service.validateAndSnapshot(Map.of("homepage_url", value)).values().get("homepage_url"));
+    }
+
+    @Test
+    void appearanceTextPreservesNewlinesAndEnforcesLength() {
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(8L)
+                .setStatus("published").setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils
+                        .toJsonString(List.of(field("avatar", "头像设置", "textarea", null, true),
+                                field("background", "背景设置", "textarea", null, true)))));
+        String text = "中文说明\n" + "字".repeat(1995);
+        assertEquals(2000, text.length());
+        assertEquals(text, service.validateAndSnapshot(Map.of("avatar", text)).values().get("avatar"));
+        assertEquals("背景\n说明", service.validateAndSnapshot(Map.of("background", "背景\n说明")).values().get("background"));
+        assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of("avatar", text + "字")));
+        assertEquals(null, service.validateAndSnapshot(Map.of("avatar", "")).values().get("avatar"));
+    }
+
+    @Test
     void snapshotsLabelsAndDictionaryLabelsFromPublishedVersion() {
         MediaAccountFieldConfigRespVO.FieldVO nickname = field("nickname", "昵称", "text", null, true);
         MediaAccountFieldConfigRespVO.FieldVO level = field("level", "账号等级", "select", "account_level", true);

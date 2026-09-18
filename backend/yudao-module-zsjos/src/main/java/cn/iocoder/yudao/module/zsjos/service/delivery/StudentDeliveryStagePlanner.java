@@ -22,7 +22,7 @@ public final class StudentDeliveryStagePlanner {
             case "S1" -> result.put("S2", StudentDeliverySchedule.next("S2", completedAt, config));
             case "S2" -> StudentDeliverySchedule.PARALLEL_AFTER_S2.forEach(stage ->
                     result.put(stage, StudentDeliverySchedule.next(stage, completedAt, config)));
-            case "S5" -> result.put("S6", StudentDeliverySchedule.next("S6", completedAt, config));
+
             default -> { }
         }
         return result;

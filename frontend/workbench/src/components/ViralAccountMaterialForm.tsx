@@ -71,6 +71,14 @@ function empty(value: unknown) {
   return value == null || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0)
 }
 
+export function hasMaterialDraftContent(value: unknown): boolean {
+  if (value == null) return false
+  if (typeof value === 'string') return value.trim().length > 0
+  if (Array.isArray(value)) return value.some(hasMaterialDraftContent)
+  if (typeof value === 'object') return Object.values(value).some(hasMaterialDraftContent)
+  return true
+}
+
 function dictionaryText(value: unknown, snapshot: unknown, options: DictOption[]) {
   const snapshotValues = Array.isArray(snapshot) ? snapshot : snapshot == null ? [] : [snapshot]
   const values = Array.isArray(value) ? value : value == null ? [] : [value]
@@ -153,19 +161,20 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
         onChange={event => onChange(event.target.value)} />}</label>
 }
 
-export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true }: {
+export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true, requireDraftContent = false }: {
   mode: Mode
   type: MaterialType
   material?: Material
   dicts: Record<string, DictOption[]>
   onClose: () => void
-  onSaved: () => void
+  onSaved: (result: { materialId: number; submitted: boolean }) => void
   onRetry?: () => void
   titleFieldKey?: string
   coverLabel?: string
   coverRequiredMessage?: string
   sectionLabels?: Partial<Record<ViralAccountSectionKey, string>>
   submitAllowed?: boolean
+  requireDraftContent?: boolean
 }) {
   const fields = useMemo(() => type.currentSchema?.fields || material?.currentVersion?.fields || [], [material, type])
   const initialValues = material?.currentVersion?.values || {}
@@ -178,9 +187,11 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   const [error, setError] = useState('')
   const [persistedMaterialId, setPersistedMaterialId] = useState<number>()
   const readonly = mode === 'view'
+  const draftEmpty = requireDraftContent && !fields.some(field => hasMaterialDraftContent(values[field.key]))
   const layout = useMemo(() => buildViralAccountLayout(fields), [fields])
   const update = (key: string, value: unknown) => setValues(current => ({ ...current, [key]: value }))
   const persist = async (submitApproval: boolean) => {
+    if (!submitApproval && draftEmpty) return setError('请先填写爆款内容拆解内容，再保存草稿')
     const problem = fields.map(field => validateField(field, values[field.key], submitApproval && Boolean(field.required), field.label)).find(Boolean)
     if (problem) return setError(problem as string)
     if (submitApproval && !coverFileId) return setError(coverRequiredMessage)
@@ -207,7 +218,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
         const saved = await materialApi.get(materialId)
         await materialApi.submit(materialId, saved.version)
       }
-      onSaved()
+      onSaved({ materialId, submitted: submitApproval })
     } catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败') }
     finally { setSaving(false) }
   }
@@ -224,7 +235,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   </div>)}</div>
   const actions = readonly
     ? <Button onClick={onClose}>关闭</Button>
-    : <><Button onClick={onClose}>取消</Button><Button loading={saving} onClick={() => void saveDraft()}>保存草稿</Button>{submitAllowed && <Button type="primary" loading={saving} onClick={() => void submit()}>提交审批</Button>}</>
+    : <><Button onClick={onClose}>取消</Button><Button loading={saving} disabled={draftEmpty || uploading} onClick={() => void saveDraft()}>保存草稿</Button>{draftEmpty && <Typography.Text type="secondary">请先填写拆解内容，再保存草稿</Typography.Text>}{submitAllowed && <Button type="primary" loading={saving} onClick={() => void submit()}>提交审批</Button>}</>
   if (!fields.length) return <Alert type="error" showIcon title="拆解模板不可用"
     description="模板缺失或未配置字段，请联系管理员检查素材类型与已发布模板后重试。"
     action={<Button onClick={onRetry || onClose}>{onRetry ? '重试' : '关闭'}</Button>} />

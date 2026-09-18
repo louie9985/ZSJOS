@@ -18,7 +18,7 @@
 | PUT | `/part-api/zsjos/profile/update-password` | `{oldPassword,newPassword}` |
 | GET | `/part-api/zsjos/partner/me` | 当前 Partner 主体资料 |
 
-登录和刷新校验 `zsjos_partner_account` 与 `zsjos_partner` 均启用。首次登录前，管理员在 Vue Admin 的兼职管理页生成一次性邀请码，填写姓名、手机号和归属运营；归属运营来自 System 中启用的 `new_media_operator` 角色用户。邀请码由服务端生成四位大写英文字母加四位数字，默认 7 天后过期；同手机号生成新邀请码会使旧的待激活邀请码立即失效。H5 通过 `/auth/activate` 提交手机号、新密码、确认密码和邀请码，服务端匹配手机号与邀请码后创建 `zsjos_partner`、`zsjos_partner_account` 和当前归属记录，并把邀请码标记为已使用，不可复用。账号密码登录时，如果手机号存在有效未激活邀请而尚无 Partner 账号，接口返回“该手机号尚未激活，请先使用邀请码激活”。
+登录和刷新校验 `zsjos_partner_account` 与 `zsjos_partner` 均启用。首次登录前，管理员在 Vue Admin 的兼职管理页生成一次性邀请码，填写姓名、手机号和归属运营；归属运营来自 System 中启用的 `new_media_operator` 角色用户。邀请码由服务端生成四位大写英文字母加四位数字，可指定到期日期时间，未指定时默认 7 天后过期；同手机号生成新邀请码会使旧的待激活邀请码立即失效。H5 通过 `/auth/activate` 提交手机号、新密码、确认密码和邀请码，服务端匹配手机号与邀请码后创建 `zsjos_partner`、`zsjos_partner_account` 和当前归属记录，并把邀请码标记为已使用，不可复用。账号密码登录时，如果手机号存在有效未激活邀请而尚无 Partner 账号，接口返回“该手机号尚未激活，请先使用邀请码激活”。
 
 `permission-info` 返回固定角色 `partner` 和十项门户能力用于客户端展示；服务端不使用这些字符串代替 `partnerId` 对象授权。
 企业微信登录、绑定和消息回跳使用 Partner 专用 OAuth/票据链路，业务请求仍以 PARTNER Token 和 Partner Account ID 作为身份边界。
@@ -137,3 +137,8 @@ H5 登录恢复后先重新读取 `permission-info`，再校验目标路由权�
 ## 联调前置
 
 V072 在维护窗口执行账号迁移：预检通过后复制原 BCrypt 哈希，为 enabled/disabled Partner 建独立账号，迁移站内信，撤销旧 `part_time_partner` 角色关系，禁用旧 System 账号并删除其 ADMIN Token。converted Partner 不建账号，历史 Flowable 快照不改写。迁移文件生成不等于授权执行；应用到现有数据库仍需单独确认精确环境、备份和维护窗口。
+
+
+## 兼职客资分配方式
+
+提交支持自动或指定分配，默认自动。分配能力使用 `/part-api/zsjos/lead/assignment-options`，只返回配置状态和安全原因，不返回接单人员。指定请求只提交 `dispatchMode=specified`，目标由服务器解析；配置失效报错并保留表单，不自动降级。配置、错误码和复核快照规则见 [兼职指定分配与教务接单](partner-specified-assignment.md)。

@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvita
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationContextRespVO;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerInvitationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -52,6 +53,12 @@ public class PartnerInvitationController {
         return success(invitationService.getPage(reqVO));
     }
 
+    @GetMapping("/student/context")
+    @PreAuthorize("@ss.hasPermission('zsjos:partner-invitation:create-student')")
+    public CommonResult<PartnerStudentInvitationContextRespVO> studentContext(@RequestParam Long studentPersonId) {
+        return success(invitationService.getStudentContext(studentPersonId, getLoginUserId()));
+    }
+
     @PutMapping("/{id}/void")
     @PreAuthorize("@ss.hasPermission('zsjos:partner-invitation:void')")
     public CommonResult<Boolean> voidInvitation(@PathVariable Long id) {
@@ -60,7 +67,7 @@ public class PartnerInvitationController {
     }
 
     @GetMapping("/operator-candidates")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner-invitation:query', 'zsjos:partner-invitation:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner-invitation:query', 'zsjos:partner-invitation:create', 'zsjos:partner-invitation:create-student')")
     public CommonResult<PageResult<LeadAssignmentUserRespVO>> operatorCandidates(
             @RequestParam(required = false) @Size(max = 100) String keyword,
             @RequestParam(defaultValue = "1") Integer pageNo,

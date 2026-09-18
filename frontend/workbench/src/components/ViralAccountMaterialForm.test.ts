@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { MaterialFieldDefinition, MaterialType } from '../services/materialApi'
 import ViralContentMaterialForm from './ViralContentMaterialForm'
-import ViralAccountMaterialForm, { buildViralAccountLayout } from './ViralAccountMaterialForm'
+import ViralAccountMaterialForm, { buildViralAccountLayout, hasMaterialDraftContent } from './ViralAccountMaterialForm'
 
 const field = (key: string, sort: number, section?: string, group?: string): MaterialFieldDefinition => ({
   key,
@@ -12,6 +12,15 @@ const field = (key: string, sort: number, section?: string, group?: string): Mat
   sort,
   section: section as MaterialFieldDefinition['section'],
   group
+})
+
+describe('material draft content', () => {
+  it.each([undefined, null, '', ' \n\t', [], {}, [{ text: ' ', choices: [] }]])('rejects empty value %j', value => {
+    expect(hasMaterialDraftContent(value)).toBe(false)
+  })
+  it.each(['部分内容', 0, false, ['selected'], [{ text: '拆解内容' }]])('retains meaningful value %j', value => {
+    expect(hasMaterialDraftContent(value)).toBe(true)
+  })
 })
 
 describe('buildViralAccountLayout', () => {

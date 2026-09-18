@@ -12,6 +12,11 @@ import java.util.List;
 @Mapper
 public interface UserRelationSceneMapper extends BaseMapperX<UserRelationSceneDO> {
 
+    default UserRelationSceneDO lockByCode(String code) {
+        return selectOne(new LambdaQueryWrapperX<UserRelationSceneDO>()
+                .eq(UserRelationSceneDO::getCode, code).last("FOR UPDATE"));
+    }
+
     default UserRelationSceneDO selectByCode(String code) {
         return selectOne(UserRelationSceneDO::getCode, code);
     }

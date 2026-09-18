@@ -14,13 +14,18 @@ import java.time.LocalDateTime;
 @Component @Slf4j
 public class StudentDeliveryStageJob implements JobHandler {
     @Resource private StudentDeliveryStageMapper stageMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryCycleService cycles;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryPlanMapper plans;
     @Resource private BusinessTaskCommandService taskService;
 
     @Override @TenantJob
     @org.springframework.transaction.annotation.Transactional
     public String execute(String param) {
+        cycles.monitor();
         int processed = 0;
         for (StudentDeliveryStageDO stage : stageMapper.selectDueWaiting(LocalDateTime.now(), 200)) {
+            if ("S6".equals(stage.getStageCode())) continue;
+            var plan=plans.selectById(stage.getPlanId()); if(plan==null || !"ACTIVE".equals(plan.getStatus())) continue;
             if (!stageMapper.claim(stage.getId(), stage.getTriggerAt())) continue;
             String key = "student-delivery:" + stage.getPlanId() + ":" + stage.getStageCode();
             taskService.create(new BusinessTaskCreateCommand(

@@ -1,0 +1,60 @@
+# -*- coding: utf-8 -*-
+from pathlib import Path
+from tempfile import gettempdir
+from playwright.sync_api import sync_playwright, expect
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome', headless=True)
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    url = 'http://127.0.0.1:5174/test/student-partner-binding.html'
+    page.goto(url)
+    page.get_by_role('button', name='绑定已有兼职账号').click()
+    modal = page.get_by_role('dialog', name='绑定已有兼职账号')
+    expect(modal.get_by_text('P-TEST-1', exact=True)).to_be_visible()
+    expect(modal.get_by_role('button', name='确认绑定')).to_be_disabled()
+    modal.get_by_title('2', exact=True).click()
+    expect(modal.get_by_text('P-TEST-11', exact=True)).to_be_visible()
+    modal.get_by_label('搜索兼职账号').fill('测试兼职2')
+    modal.get_by_role('button', name='搜 索').click()
+    expect(modal.get_by_text('P-TEST-2', exact=True)).to_be_visible()
+    modal.get_by_role('radio').click()
+    modal.get_by_role('textbox', name='绑定说明').fill('已核对身份')
+    page.evaluate("railFixture.mode='bind-conflict'")
+    modal.get_by_role('button', name='确认绑定').click()
+    expect(modal.get_by_text('兼职账号或学员已绑定其他身份')).to_be_visible()
+    page.screenshot(path=str(Path(gettempdir()) / 'student-binding-desktop.png'))
+    page.evaluate("railFixture.mode='success'")
+    modal.get_by_role('button', name='确认绑定').click()
+    expect(modal).not_to_be_visible()
+    assert page.evaluate('railFixture.boundParams') == {'partnerId': 2, 'studentPersonId': 1, 'reason': '已核对身份'}
+    expect(page.get_by_role('button', name='绑定已有兼职账号')).to_have_count(0)
+
+    page.goto(url + '?manage-only')
+    page.get_by_role('button', name='绑定已有兼职账号').click()
+    expect(modal.get_by_text('P-TEST-1', exact=True)).to_be_visible()
+    modal.get_by_role('button', name='取 消').click()
+    page.evaluate("railFixture.mode='partner-error'")
+    page.get_by_role('button', name='绑定已有兼职账号').click()
+    expect(modal.get_by_text('兼职列表加载失败')).to_be_visible()
+    page.evaluate("railFixture.mode='partner-empty'")
+    modal.get_by_role('button', name='重试加载').click()
+    expect(modal.get_by_text('没有找到兼职账号，请调整搜索条件')).to_be_visible()
+    modal.get_by_role('button', name='取 消').click()
+    page.evaluate("railFixture.mode='partner-denied'")
+    page.get_by_role('button', name='绑定已有兼职账号').click()
+    expect(modal.get_by_text('无权查询兼职')).to_be_visible()
+    page.evaluate("railFixture.mode='success'")
+    modal.get_by_role('button', name='重试加载').click()
+    expect(modal.get_by_text('P-TEST-1', exact=True)).to_be_visible()
+    page.set_viewport_size({'width': 390, 'height': 720})
+    page.screenshot(path=str(Path(gettempdir()) / 'student-binding-mobile.png'))
+    expect(modal.get_by_role('button', name='确认绑定')).to_be_in_viewport()
+    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+    page.goto(url + '?no-permission')
+    expect(page.get_by_text('学员档案', exact=True)).to_be_visible()
+    expect(page.get_by_role('button', name='绑定已有兼职账号')).to_have_count(0)
+    assert not errors, errors
+    browser.close()
+    print('PASS: paging/search, binding payload/success, conflict, retry/empty/denied, manage-only and absent permission, desktop/mobile')

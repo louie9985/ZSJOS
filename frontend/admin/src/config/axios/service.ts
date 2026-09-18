@@ -1,5 +1,11 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    preserveBusinessError?: boolean
+  }
+}
+
 import { ElMessage, ElMessageBox } from 'element-plus'
 import qs from 'qs'
 import { config } from '@/config/axios/config'
@@ -233,7 +239,9 @@ service.interceptors.response.use(
       } else {
         ElMessage.error(msg)
       }
-      return Promise.reject('error')
+      return Promise.reject(
+        response.config.preserveBusinessError ? Object.assign(new Error(msg), { code }) : 'error'
+      )
     } else {
       return data
     }

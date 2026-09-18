@@ -1,5 +1,7 @@
 # 支付主体配置功能 - 项目总结
 
+> 本文保留历史设计/阶段总结。2026-09-18 已明确交易路由：真实 SKU 关联解析产品，同主体合并沿用该主体，不同主体合并使用当前租户默认主体；支付与退款统一使用订单快照，不再静默回退全局商户。当前实现契约见[支付主体 API](api/payment-subject.md)，历史流程图不作为现行接口或配置字段依据。
+
 ## ✅ 已完成工作
 
 ### 1. 数据库设计与迁移（100% 完成）
@@ -421,9 +423,9 @@ FMS 财务管理（601894）
 
 ## 🔗 相关文档
 
-- [部署文档](../deployment/payment-subject-deployment.md)
-- [技术设计文档](../design/payment-subject-design.md)
-- [数据库迁移文件](../../script/sql/mysql/migrations/)
+- [部署文档](deployment/payment-subject-deployment.md)
+- [技术设计文档](design/payment-subject-design.md)
+- [数据库迁移文件](../script/sql/mysql/migrations/)
 
 ## 📞 项目联系人
 

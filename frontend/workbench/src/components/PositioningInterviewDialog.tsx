@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { positioningInterviewApi, interviewMissingFields, type InterviewContext, type InterviewItem, type InterviewCommand } from '../services/positioningInterviewApi'
 
-export default function PositioningInterviewDialog({ relationId, onClose, onChanged }: {
-  relationId: number; onClose: () => void; onChanged: () => void
+export default function PositioningInterviewDialog({ relationId, onClose, onChanged, forceReadOnly = false }: {
+  relationId: number; onClose: () => void; onChanged: () => void; forceReadOnly?: boolean
 }) {
   const { message } = App.useApp()
   const [context, setContext] = useState<InterviewContext>()
@@ -24,7 +24,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
     finally { if (run === generation.current) setLoading(false) }
   }
   useEffect(() => { void load(); return () => { generation.current++ } }, [relationId])
-  const readOnly = context?.status === 'completed'
+  const readOnly = forceReadOnly || context?.status === 'completed'
   const canSave = !readOnly && context?.availableActions.some(action => ['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW'].includes(action))
   const canComplete = !readOnly && context?.availableActions.includes('COMPLETE_POSITIONING_INTERVIEW')
   const change = (key: string, update: Partial<InterviewItem>) => setItems(previous => {
@@ -83,7 +83,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
     </Space>}>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" disabled={busy} onClick={() => void load()}>重新加载</Button>} />}
     {loading ? <Spin /> : !context ? <Empty description="暂时无法加载定位访谈" /> : <>
-      {readOnly && <Alert type="success" message="已完成定位访谈，记录只读" />}
+      {readOnly && <Alert type="success" message={context?.status === 'completed' ? '已完成定位访谈，记录只读' : '定位访谈记录只读'} />}
       {context.status === 'empty' && <Typography.Paragraph type="secondary">尚无草稿，可随时保存已填写的部分。</Typography.Paragraph>}
       <div className="positioning-interview-table-scroll"><table className="positioning-interview-table"><thead><tr><th>字段</th><th>访谈注意</th><th>访谈内容确认</th></tr></thead><tbody>
       {context.fields.filter(field => field.enabled).map(field => {

@@ -270,6 +270,15 @@ export type PartnerStudentInvitation = {
   mobile: string
   status: string
   expiresAt: Timestamp
+  assignedOperatorUserId?: number
+  assignedOperatorName?: string
+}
+
+export type PartnerStudentInvitationContext = {
+  opened: boolean
+  defaultOperatorUserId?: number
+  operatorAssignmentConflict: boolean
+  invitation?: PartnerStudentInvitation
 }
 
 export const materialApi = {
@@ -406,6 +415,17 @@ export const contentReviewApi = {
 }
 
 export const partnerStudentInvitationApi = {
-  create: async (data: { studentPersonId: number; name: string; mobile: string }) =>
-    unwrap<PartnerStudentInvitation>(await http.post('/zsjos/partner-invitation/student/create', data))
+  create: async (data: { studentPersonId: number; assignedOperatorUserId: number; name: string; mobile: string; expiresAt?: Timestamp }) =>
+    unwrap<PartnerStudentInvitation>(await http.post('/zsjos/partner-invitation/student/create', data)),
+  context: async (studentPersonId: number) => unwrap<PartnerStudentInvitationContext>(
+    await http.get('/zsjos/partner-invitation/student/context', { params: { studentPersonId } })),
+  operators: async () => {
+    const result: Array<{ id: number; nickname: string }> = []
+    for (let pageNo = 1; ; pageNo++) {
+      const page = unwrap<PageResult<{ id: number; nickname: string }>>(await http.get(
+        '/zsjos/partner-invitation/operator-candidates', { params: { pageNo, pageSize: 100 } }))
+      result.push(...page.list)
+      if (result.length >= page.total || page.list.length === 0) return result
+    }
+  },
 }

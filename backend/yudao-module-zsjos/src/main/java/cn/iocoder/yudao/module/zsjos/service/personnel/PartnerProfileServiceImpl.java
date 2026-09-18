@@ -30,7 +30,7 @@ public class PartnerProfileServiceImpl implements PartnerProfileService {
         PartnerAccountDO account = accountService.getByPartnerId(context.partnerId());
         SocialUserRespDTO wecom = socialUserApi.getSocialUserByUserId(UserTypeEnum.PARTNER.getValue(),
                 context.accountId(), SocialTypeEnum.WECHAT_ENTERPRISE.getType());
-        return new PartnerProfileRespVO().setNickname(partner.getName()).setMobile(account.getMobile())
+        return new PartnerProfileRespVO().setName(partner.getName()).setNickname(partner.getNickname()).setMobile(account.getMobile())
                 .setEmail(partner.getEmail()).setAvatar(partner.getAvatar()).setSex(partner.getSex())
                 .setWecomBound(wecom != null).setWecomEnabled(Boolean.TRUE.equals(account.getWecomEnabled()));
     }
@@ -38,7 +38,8 @@ public class PartnerProfileServiceImpl implements PartnerProfileService {
     @Override
     public void update(Long accountId, PartnerProfileUpdateReqVO reqVO) {
         PartnerContext context = accountService.requireContext(accountId);
-        partnerMapper.updateById(new PartnerDO().setId(context.partnerId()).setName(reqVO.getNickname())
+        partnerMapper.updateById(new PartnerDO().setId(context.partnerId()).setName(reqVO.getName().trim())
+                .setNickname(reqVO.getNickname().trim())
                 .setEmail(reqVO.getEmail()).setAvatar(reqVO.getAvatar()).setSex(reqVO.getSex()));
     }
 

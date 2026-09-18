@@ -111,7 +111,7 @@ async function handleActivate() {
     normalizedCode
   )
   if (success) {
-    router.replace(redirectPath())
+    router.replace({ path: '/profile/edit', query: { complete: '1', redirect: redirectPath() } })
   }
 }
 

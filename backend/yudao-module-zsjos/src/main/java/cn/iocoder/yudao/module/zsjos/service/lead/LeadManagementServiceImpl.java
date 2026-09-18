@@ -362,6 +362,10 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         boolean blindIdentity = identityContext.counterpartyMaskingEnabled();
         boolean viewerIsOwner = identityContext.viewerIsOwner();
         boolean viewerIsSubmitter = identityContext.viewerIsSubmitter();
+        if (PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) {
+            result.setProviderOwnerNameSnapshot(leadIdentityMaskingService.partnerName(
+                    identityContext, lead.getProviderOwnerNameSnapshot()));
+        }
         boolean selfSourcedWithoutProvider = cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 && lead.getSourceProviderUserId() == null;

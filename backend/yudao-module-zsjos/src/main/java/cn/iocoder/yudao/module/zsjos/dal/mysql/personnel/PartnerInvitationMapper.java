@@ -16,6 +16,14 @@ import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_INV
 @Mapper
 public interface PartnerInvitationMapper extends BaseMapperX<PartnerInvitationDO> {
 
+    default PartnerInvitationDO selectLatestByStudent(Long studentPersonId) {
+        return selectOne(new LambdaQueryWrapperX<PartnerInvitationDO>()
+                .eq(PartnerInvitationDO::getStudentPersonId, studentPersonId)
+                .eq(PartnerInvitationDO::getInvitationScene,
+                        cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_INVITATION_SCENE_STUDENT)
+                .orderByDesc(PartnerInvitationDO::getId).last("LIMIT 1"));
+    }
+
     default PageResult<PartnerInvitationDO> selectPage(PartnerInvitationPageReqVO reqVO) {
         LambdaQueryWrapperX<PartnerInvitationDO> query = new LambdaQueryWrapperX<>();
         if (StrUtil.isNotBlank(reqVO.getKeyword())) {

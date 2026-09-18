@@ -90,6 +90,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadNumberService leadNumberService;
     @Mock private LeadProviderAttributionService providerAttributionService;
     @Mock private PartnerAccountMapper partnerAccountMapper;
+    @Mock private PartnerLeadAssignmentService partnerAssignmentService;
     @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
 
     @org.junit.jupiter.api.BeforeEach
@@ -145,6 +146,38 @@ class LeadSubmissionServiceImplTest {
         List<LeadAssignmentUserRespVO> result = service.getSpecifiedSalesUsers(1L);
 
         assertEquals(List.of(20L), result.stream().map(LeadAssignmentUserRespVO::getId).toList());
+    }
+
+    @Test
+    void partnerSuccessfulRetryDoesNotResolveChangedRelationship() {
+        LeadCreateReqVO req = baseRequest(); req.setDispatchMode("specified");
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(new LeadDO().setId(100L).setPartnerId(10L).setSourceType("partner"));
+        assertEquals(100L, service.createForPartner(req,20L,10L).getLeadId());
+        org.mockito.Mockito.verifyNoInteractions(partnerAssignmentService);
+    }
+
+    @Test
+    void partnerRejectsClientSuppliedTargetBeforeCreatingAnything() {
+        LeadCreateReqVO req = baseRequest(); req.setDispatchMode("specified"); req.setSpecifiedSalesUserId(999L);
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_ASSIGNMENT_TARGET_FORBIDDEN.getCode(),
+                assertThrows(ServiceException.class,()->service.createForPartner(req,20L,10L)).getCode());
+        org.mockito.Mockito.verifyNoInteractions(partnerAssignmentService, personIdentityWriteService);
+    }
+
+    @Test
+    void partnerSpecifiedResolvesServerIdentityAndPreservesItForReview() {
+        LeadCreateReqVO req = baseRequest(); req.setDispatchMode("specified"); req.setSpecifiedOwnerIdentity("sales");
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
+        when(partnerAssignmentService.resolve(10L)).thenReturn(new PartnerLeadAssignmentService.Target(8L,"education"));
+        // Deliberately invalid contact stops after resolution, before any database mutation.
+        assertEquals(LEAD_CONTACT_REQUIRED.getCode(),assertThrows(ServiceException.class,()->service.createForPartner(req,20L,10L)).getCode());
+        assertEquals(8L,req.getSpecifiedSalesUserId()); assertEquals("education",req.getSpecifiedOwnerIdentity());
+        verify(partnerAssignmentService).validateTarget(8L,"education");
+        String snapshot=cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(req);
+        LeadCreateReqVO restored=cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(snapshot,LeadCreateReqVO.class);
+        assertEquals("education",restored.getSpecifiedOwnerIdentity()); assertEquals(8L,restored.getSpecifiedSalesUserId());
     }
 
     @Test

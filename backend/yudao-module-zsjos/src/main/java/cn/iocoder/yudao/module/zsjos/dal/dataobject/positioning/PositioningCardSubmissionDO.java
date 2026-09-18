@@ -46,5 +46,7 @@ public class PositioningCardSubmissionDO extends TenantBaseDO {
     private String studentDecision;
     private String studentDecisionComment;
     private LocalDateTime studentDecidedAt;
+    private Boolean evidenceRequired;
+    private String evidenceJson;
     private Integer version;
 }

@@ -339,9 +339,12 @@ class LeadManagementServiceImplTest {
         lead.setPartnerId(80L);
         lead.setProviderOwnerType("partner");
         lead.setProviderOwnerId(80L);
+        lead.setProviderOwnerNameSnapshot("张三");
+        lead.setDispatchMode("specified");
         PartnerDO partner = new PartnerDO();
         partner.setId(80L);
         partner.setName("张三");
+        partner.setNickname("排行榜昵称");
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -354,6 +357,9 @@ class LeadManagementServiceImplTest {
 
         assertEquals("兼职提交", result.getSourceLabel());
         assertNotEquals("张三", result.getSourceUserName());
+        assertEquals("张*", result.getSourceUserName());
+        assertEquals("张*", result.getProviderOwnerNameSnapshot());
+        assertEquals("张三", lead.getProviderOwnerNameSnapshot());
         assertEquals(null, result.getSourceUserId());
         assertEquals("counterparty_masked", result.getIdentityMaskMode());
     }

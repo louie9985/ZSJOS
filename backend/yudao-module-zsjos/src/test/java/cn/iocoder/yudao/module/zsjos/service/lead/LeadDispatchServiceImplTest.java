@@ -54,6 +54,7 @@ class LeadDispatchServiceImplTest {
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Mock private PartnerLeadAssignmentService partnerAssignmentService;
     @InjectMocks
     private LeadDispatchServiceImpl service;
     @Mock
@@ -86,6 +87,20 @@ class LeadDispatchServiceImplTest {
     private LeadAgingPoolService agingPoolService;
     @Mock
     private LeadClaimDailyCounterMapper claimDailyCounterMapper;
+
+    @Test
+    void specifiedEducationAcceptanceFreezesEducationHistory() {
+        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
+        service.accept(1L, 10L);
+        assertEquals("education", lead.getOwnerIdentity());
+        var capture = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
+        verify(historyMapper).insert(capture.capture());
+        assertEquals("education", capture.getValue().getOwnerIdentitySnapshot());
+        verify(partnerAssignmentService).validateTarget(10L,"education");
+        verify(assignmentService, never()).getEligibleSalesUsers();
+    }
 
     @Test
     void acceptAtomicallyCompletesAssignmentAndCreatesFirstFollowUpTask() {

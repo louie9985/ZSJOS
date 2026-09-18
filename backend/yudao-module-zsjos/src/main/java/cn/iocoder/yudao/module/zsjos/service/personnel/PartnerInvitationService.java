@@ -6,10 +6,13 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvita
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerInvitationRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.PartnerStudentInvitationContextRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerActivateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 
 public interface PartnerInvitationService {
+
+    PartnerStudentInvitationContextRespVO getStudentContext(Long studentPersonId, Long directorUserId);
 
     PartnerInvitationRespVO create(PartnerInvitationCreateReqVO reqVO, Long operatorUserId);
 

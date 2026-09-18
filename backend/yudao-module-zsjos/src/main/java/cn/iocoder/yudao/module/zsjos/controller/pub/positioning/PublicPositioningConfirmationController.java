@@ -29,6 +29,16 @@ public class PublicPositioningConfirmationController {
         return success(service.publicDetail(token));
     }
 
+    @GetMapping("/attachments/{id}")
+    public CommonResult<Object> attachment(@RequestHeader(TOKEN_HEADER) @NotBlank String token, @PathVariable Long id) {
+        return success(service.resource(token, id, false));
+    }
+
+    @GetMapping("/materials/{id}")
+    public CommonResult<Object> material(@RequestHeader(TOKEN_HEADER) @NotBlank String token, @PathVariable Long id) {
+        return success(service.resource(token, id, true));
+    }
+
     @PostMapping("/decision")
     public CommonResult<Boolean> decide(@RequestHeader(TOKEN_HEADER) @NotBlank String token,
                                         @Valid @RequestBody PublicPositioningDecisionReqVO request) {

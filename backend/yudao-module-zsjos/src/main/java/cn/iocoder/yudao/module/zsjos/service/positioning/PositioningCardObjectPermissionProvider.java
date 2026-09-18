@@ -19,7 +19,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.POSITI
 public class PositioningCardObjectPermissionProvider implements ZsjosObjectPermissionProvider {
     private static final Set<String> DIRECTOR_ACTIONS = Set.of("read", "edit", "submit-review");
     private static final Set<String> OPERATOR_ACTIONS = Set.of("read", "operator-confirm", "operator-reject",
-            "student-link-generate");
+            "student-link-generate", "evidence");
     @Resource private PositioningCardMapper mapper;
     @Resource private PermissionApi permissionApi;
     @Resource private MediaAccountMapper accountMapper;

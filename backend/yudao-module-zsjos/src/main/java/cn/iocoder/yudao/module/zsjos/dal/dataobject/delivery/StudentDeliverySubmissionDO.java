@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 @TableName("zsjos_student_delivery_submission") @KeySequence("zsjos_student_delivery_submission_seq")
 @Data @EqualsAndHashCode(callSuper = true)
 public class StudentDeliverySubmissionDO extends TenantBaseDO {
+ private String idempotencyKey;
  @TableId private Long id; private Long stageId; private Long templateVersionId; private String fieldValuesJson;
  private String dictionarySnapshotJson; private String attachmentSnapshotJson; private Long submittedBy; private LocalDateTime submittedAt;
 }

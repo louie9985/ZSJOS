@@ -19,6 +19,7 @@ public class UserRelationSceneDO extends TenantBaseDO {
     private String code;
     private String sourceLabel;
     private String targetLabel;
+    private String sourceType;
     private String sourcePostCode;
     private String targetPostCode;
     private String targetEligibilityType;

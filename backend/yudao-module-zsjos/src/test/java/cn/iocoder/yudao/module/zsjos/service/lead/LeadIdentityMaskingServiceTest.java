@@ -105,6 +105,16 @@ class LeadIdentityMaskingServiceTest {
                 .setDispatchMode("auto").setAssignmentStatus("owned");
     }
 
+    @Test
+    void specifiedPartnerDispatchStillMasksSalesNameButPreservesAuthorizedReader() {
+        LeadDO lead = lead().setProviderOwnerType("partner").setProviderOwnerId(30L).setDispatchMode("specified");
+        LeadObjectPermissionService permission = mock(LeadObjectPermissionService.class);
+        when(permission.canViewUnmaskedIdentity(99L, lead)).thenReturn(true);
+        LeadIdentityMaskingService service = new LeadIdentityMaskingService(permission);
+        assertEquals("张*", service.partnerName(service.resolve(20L, lead), "张三"));
+        assertEquals("张三", service.partnerName(service.resolve(99L, lead), "张三"));
+    }
+
     private static AdminUserRespDTO user(Long id, String nickname) {
         AdminUserRespDTO user = new AdminUserRespDTO();
         user.setId(id);

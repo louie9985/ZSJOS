@@ -197,3 +197,22 @@ Workbench 只把未查看客资和通知深链目标等特殊集合移到顶部�
 附件先作为本地 File 暂存，不进入草稿请求。显式保存新卡时先创建草稿取得 ID，再逐个上传，最后保存附件 ID；已有卡直接上传并保存关联。上传成功即将本地待上传项替换为 ID，失败重试不重复上传已成功项，每次草稿写入使用上次响应版本。该多请求过程不是原子事务：部分失败可能已创建草稿或上传文件，但未完成关联，必须保留现场并重试；不自动删除存储文件。
 
 真实版本冲突保留输入，不自动覆盖或重新加载；复制内容会以文件名标识待上传附件，不包含文件字节。重新加载经放弃确认后读取最新草稿。附件下载仅调用 GET，不写草稿。后端附件上传的非责任编导错误使用 POSITIONING_CARD_PERMISSION_DENIED（1900014004），不再误报版本冲突；手动保存阶段沿用既有接口和租户权限；后续独立定位卡功能的数据库变更见 V258 契约。
+
+### 素材草稿继续编辑
+
+素材库「我的素材」中打开已保存素材，按服务端素材类型选择爆款账号或爆款内容表单。详情同时具备服务端 `UPDATE` 操作与 `zsjos:material:update` 权限时显示「继续编辑」；编辑后可保存草稿，具备 `zsjos:material:submit` 权限时可提交审批。保存后关闭表单并刷新当前列表，重新进入仍更新同一素材。详情加载失败显示重试，加载中不展示旧素材的编辑入口。
+
+爆款内容拆解的独立创建页和素材库表单均禁止保存空草稿：至少一个模板字段有实际值，纯空格、全空重复行和仅有封面不满足条件；部分填写可保存，提交审批仍使用原校验。草稿保存成功后弹窗说明在「素材库 → 我的素材」查找，并提供 `/zsjos/material-library/browse?view=mine` 链接；打开链接直接进入我的素材，使用默认空筛选。提交审批或保存失败不显示草稿成功弹窗。此限制为前端表单校验，后端通用素材接口不变。
+
+## 学员兼职邀请状态与运营
+
+手工绑定接口现经独立 ADMIN 服务入口校验目标学员 `student/read` 对象权限，叠加既有 `zsjos:partner:manage-all`，参数与返回值不变。不可读学员请求会拒绝；邀请码激活自动绑定不受此 ADMIN 对象校验影响。
+
+学员总览的「绑定已有兼职账号」复用 `GET /zsjos/partner/page` 分页候选及 `POST /zsjos/partner-student-link/bind` 查询参数（partnerId、studentPersonId、reason）。入口沿用 `zsjos:partner:manage-all`，不依赖邀请码创建权限。后端拒绝已有绑定冲突；前端保留错误、支持查询重试，成功后刷新详情及可读的邀请码状态。兼职原运营归属保持不变。
+
+学员开通请求必填 `assignedOperatorUserId`，默认运营由 `/zsjos/partner-invitation/student/context` 返回，允许从既有运营候选 API 改选。状态查询按当前学员及编导接收关系授权，返回 opened、defaultOperatorUserId、operatorAssignmentConflict、invitation。前端按状态展示开通、查看邀请码、重新生成或已开通；窗口恢复焦点时刷新，失败显示重试。注册后以有效绑定为已开通依据。表单选择只决定兼职归属，不修改或跟随学员运营分配。完整契约见 [学员兼职邀请](../../../docs/api/student-partner-invitation.md)。
+
+
+### Media student overview background collection (2026-09-18)
+
+The Workbench overview reuses `studentInfoApi.detail` with `selectedService.leadId ?? student.leadId`, the same association as StudentDetail. Both `zsjos:student-info-form:read` and the contact context `visibleTabs` entry `student-info` are required before loading. Backend Lead object/tenant authorization remains authoritative; denial is shown without fallback data. General details remain masked, while the existing full-info panel separately gates sensitive-read/export. Missing association, no grant, unsubmitted form, loading and failure are distinct. Student/service changes discard stale responses. No endpoint, permission or Admin/H5 contract changed.

@@ -34,6 +34,7 @@ public class PartnerAppPortalController {
     @Resource private PartnerAccountService partnerAccountService;
     @Resource private PartnerManagementService partnerService;
     @Resource private LeadSubmissionService submissionService;
+    @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadProductService productService;
     @Resource private ZsjosProductSkuService skuService;
@@ -58,9 +59,16 @@ public class PartnerAppPortalController {
         return success(attachmentService.uploadForPartner(file, getLoginUserId()));
     }
 
+    @GetMapping("/lead/assignment-options")
+    public CommonResult<PartnerAssignmentOptionsRespVO> assignmentOptions() {
+        return success(partnerAssignmentService.options(partnerId()));
+    }
+
     @PostMapping("/lead/create")
     public CommonResult<LeadCreateRespVO> createLead(@Valid @RequestBody LeadCreateReqVO request) {
-        return success(submissionService.createForPartner(request, getLoginUserId(), partnerId()));
+        var result = submissionService.createForPartner(request, getLoginUserId(), partnerId());
+        result.setPendingAssigneeUserId(null);
+        return success(result);
     }
 
     @GetMapping("/lead/inbox/submitted/page")

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fieldEmpty,
+  formatAccountMetric,
   profileChanges,
   profileMissing,
   type ProfileField,
@@ -24,6 +25,12 @@ const field = (
   sort: 1,
 });
 describe("account profile responsibilities", () => {
+  it('formats live partner totals without treating zero as missing', () => {
+    expect(formatAccountMetric('total_leads', 0)).toBe('0');
+    expect(formatAccountMetric('month_conversion', 0.25)).toBe('25.00%');
+    expect(formatAccountMetric('total_amount', '1200.5')).toBe('¥1,200.50');
+    expect(formatAccountMetric('month_amount', null)).toBeUndefined();
+  });
   it("counts configured missing manual fields even before the first snapshot", () => {
     expect(
       profileMissing(

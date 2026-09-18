@@ -50,6 +50,9 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
         if (!Objects.equals(existing.getCode(), reqVO.getCode())) {
             throw exception(USER_RELATION_SCENE_CODE_IMMUTABLE);
         }
+        if (!Objects.equals(existing.getSourceType(), reqVO.getSourceType())) {
+            throw exception(USER_RELATION_SCENE_ELIGIBILITY_INVALID);
+        }
         validateEligibility(reqVO);
         sceneMapper.updateById(BeanUtils.toBean(reqVO, UserRelationSceneDO.class));
     }
@@ -114,7 +117,15 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
     }
 
     private void validateEligibility(UserRelationSceneSaveReqVO reqVO) {
-        if (postApi.getPostByCode(reqVO.getSourcePostCode()) == null) {
+        if ("partner".equals(reqVO.getSourceType())) {
+            if (!cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PARTNER_SCENE.equals(reqVO.getCode())) {
+                throw exception(USER_RELATION_SCENE_ELIGIBILITY_INVALID);
+            }
+            reqVO.setSourcePostCode(null);
+            reqVO.setTargetEligibilityType("permission");
+            reqVO.setTargetPermissionCode(cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PERMISSION_ACCEPT);
+        } else if (cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PARTNER_SCENE.equals(reqVO.getCode())
+                || isBlank(reqVO.getSourcePostCode()) || postApi.getPostByCode(reqVO.getSourcePostCode()) == null) {
             throw exception(USER_RELATION_SCENE_POST_INVALID);
         }
         if ("permission".equals(reqVO.getTargetEligibilityType())) {

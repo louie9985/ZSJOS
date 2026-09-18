@@ -32,6 +32,7 @@ public class MediaNotifySceneProvider implements NotifySceneProvider {
             Map.entry("media.account.rebind_rejected", "账号换绑驳回"),
             Map.entry("media.account.maintenance_changed", "账号状态维护变更"),
             Map.entry("media.account.diagnosis", "账号周期诊断逾期提醒"),
+            Map.entry("student.delivery.deferred", "账号交付已延期"),
             Map.entry("student.delivery.confirmation", "S0-S6交付确认待填写"),
             Map.entry("media.positioning.operator_review", "定位待运营复核"),
             Map.entry("media.positioning.operator_rejected", "定位运营退回"),

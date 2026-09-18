@@ -1,7 +1,13 @@
-import { CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
+import AccountPositioningHistory from '../components/AccountPositioningHistory'
+import StudentOverviewBackground from '../components/StudentOverviewBackground'
+import PositioningDialog from '../components/PositioningDialog'
+import StudentPartnerBindingDialog from '../components/StudentPartnerBindingDialog'
+import PositioningSnapshot from '../components/PositioningSnapshot'
+import { LeftOutlined, RightOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined, ExclamationCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
   SendOutlined, UploadOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Cascader, Checkbox, DatePicker, Empty, Form, Input, InputNumber, Modal, Pagination, Radio, Select, Skeleton, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { InputRef } from 'antd'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import DetailFieldGrid from '../components/DetailFieldGrid'
@@ -22,7 +28,7 @@ import { mergePositioningJsonValues, parsePositioningJson, serializePositioningF
 import { workOrderApi, type WorkOrderDepartment, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
 import AccountPublishedWorks from '../components/AccountPublishedWorks'
 import { StudentDeliveryPanel } from '../components/StudentDeliveryPanel'
-import { contentReviewApi, partnerStudentInvitationApi, type PartnerStudentInvitation } from '../services/materialApi'
+import { contentReviewApi, partnerStudentInvitationApi, type PartnerStudentInvitation, type PartnerStudentInvitationContext } from '../services/materialApi'
 import PositioningCardMaterialPicker from '../components/PositioningCardMaterialPicker'
 import PositioningCardAttachments from '../components/PositioningCardAttachments'
 import PositioningCardFields from '../components/PositioningCardFields'
@@ -31,6 +37,7 @@ import { StudentPlannerOperations } from './RegistrationPages'
 import { positioningInterviewApi, type InterviewContext } from '../services/positioningInterviewApi'
 import { PositioningManualSave, isPendingPositioningFile } from '../services/positioningManualSave'
 
+const LIST_COLLAPSED_KEY = 'zsjos.media-students.list-collapsed'
 const PAGE_SIZE = 20
 const AUTO_SAVE_DELAY_MS = 1500
 export const normalizeMediaStudentTab = (value: string | null) => value && /^account-\d+$/.test(value) ? value : 'overview'
@@ -168,6 +175,25 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const initialLocationKey = useRef(location.key)
   const { message, modal } = App.useApp()
   const [params, setParams] = useSearchParams()
+  const [listCollapsed, setListCollapsed] = useState(() => {
+    try { return localStorage.getItem(LIST_COLLAPSED_KEY) === 'true' } catch { return false }
+  })
+  const listScrollRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<InputRef>(null)
+  const focusSearch = useRef(false)
+  const listPositions = useRef({ expanded: { top: 0, left: 0 }, collapsed: { top: 0, left: 0 } })
+  const changeListCollapsed = (collapsed: boolean, search = false) => {
+    const scroll = listScrollRef.current
+    if (scroll) listPositions.current[listCollapsed ? 'collapsed' : 'expanded'] = { top: scroll.scrollTop, left: scroll.scrollLeft }
+    focusSearch.current = search
+    setListCollapsed(collapsed)
+    try { localStorage.setItem(LIST_COLLAPSED_KEY, String(collapsed)) } catch { /* Storage is optional; the in-page toggle remains available. */ }
+  }
+  useLayoutEffect(() => {
+    const position = listPositions.current[listCollapsed ? 'collapsed' : 'expanded']
+    listScrollRef.current?.scrollTo({ top: position.top, left: position.left })
+    if (!listCollapsed && focusSearch.current) { searchRef.current?.focus(); focusSearch.current = false }
+  }, [listCollapsed])
   const [rows, setRows] = useState<MyStudent[]>([]), [detail, setDetail] = useState<MediaStudentDetail>()
   const [selectedServiceId, setSelectedServiceId] = useState<number>(), [selectedAccountId, setSelectedAccountId] = useState<number>()
   const [accountMissing, setAccountMissing] = useState<Record<number, number>>({})
@@ -203,6 +229,44 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [ticketContext, setTicketContext] = useState<ProductionTicketCreateContext>(), [ticketContextLoading, setTicketContextLoading] = useState(false), [ticketContextError, setTicketContextError] = useState(''), [ticketOpen, setTicketOpen] = useState(false), [ticketSaving, setTicketSaving] = useState(false), [ticketTemplates, setTicketTemplates] = useState<WorkOrderTemplate[]>([]), [ticketDepartments, setTicketDepartments] = useState<WorkOrderDepartment[]>([]), [ticketTargetDepartments, setTicketTargetDepartments] = useState<WorkOrderDepartment[]>([]), [ticketUsers, setTicketUsers] = useState<Array<{ id: number; nickname: string }>>([]), [ticketDictionaries, setTicketDictionaries] = useState<Array<{ dictType: string; value: string; label: string }>>([]), [ticketFiles, setTicketFiles] = useState<WorkOrderFile[]>([]), [ticketAccountId, setTicketAccountId] = useState<number>()
   const [shareLink, setShareLink] = useState<string>()
   const [studentInvitation, setStudentInvitation] = useState<PartnerStudentInvitation>()
+  const [bindingStudent, setBindingStudent] = useState<{ id: number; name: string }>()
+  const [invitationContext, setInvitationContext] = useState<PartnerStudentInvitationContext>()
+  const [invitationLoading, setInvitationLoading] = useState(false), [invitationError, setInvitationError] = useState('')
+  const [invitationOperators, setInvitationOperators] = useState<Array<{ id: number; nickname: string }>>([])
+  const [invitationOperatorsLoading, setInvitationOperatorsLoading] = useState(false), [invitationOperatorsError, setInvitationOperatorsError] = useState('')
+  const invitationRequest = useRef(0)
+  const invitationStudentId = detail?.student.personId
+  useEffect(() => { setBindingStudent(undefined) }, [invitationStudentId])
+  const canInviteStudent = hasPermission(permissions, 'zsjos:partner-invitation:create-student')
+  const refreshInvitation = useCallback(async () => {
+    if (!invitationStudentId || !canInviteStudent) return undefined
+    const request = ++invitationRequest.current
+    setInvitationLoading(true); setInvitationError('')
+    try {
+      const context = await partnerStudentInvitationApi.context(invitationStudentId)
+      if (request !== invitationRequest.current) return undefined
+      setInvitationContext(context)
+      setStudentInvitation(current => current && context.invitation?.status === 'active' ? context.invitation : undefined)
+      if (context.opened) setDialog(current => current === 'student-partner' ? undefined : current)
+      return context
+    } catch (cause) {
+      if (request === invitationRequest.current) { setInvitationContext(undefined); setStudentInvitation(undefined); setInvitationError(errorText(cause)) }
+      return undefined
+    } finally { if (request === invitationRequest.current) setInvitationLoading(false) }
+  }, [invitationStudentId, canInviteStudent])
+  useEffect(() => {
+    setInvitationContext(undefined); setStudentInvitation(undefined)
+    void refreshInvitation()
+    const onFocus = () => { void refreshInvitation() }
+    window.addEventListener('focus', onFocus)
+    return () => { invitationRequest.current++; window.removeEventListener('focus', onFocus) }
+  }, [refreshInvitation, location.key])
+  const loadInvitationOperators = async () => {
+    setInvitationOperatorsLoading(true); setInvitationOperatorsError(''); setInvitationOperators([])
+    try { setInvitationOperators(await partnerStudentInvitationApi.operators()) }
+    catch (cause) { setInvitationOperatorsError(errorText(cause)) }
+    finally { setInvitationOperatorsLoading(false) }
+  }
   const [autoSave, setAutoSave] = useState<DirectorAutoSaveState>({ status: 'idle' })
   const [rejectingContent, setRejectingContent] = useState<MediaStudentDetail['contents'][number]>()
   const [rejectingPositioning, setRejectingPositioning] = useState<MediaStudentDetail['positioningCards'][number]>()
@@ -569,12 +633,19 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         setContentSubmitAfterSave(false)
       }
       if (dialog === 'student-partner') {
+        if (invitationLoading || !invitationContext || invitationContext.opened || invitationOperatorsLoading || invitationOperatorsError) return
         const invitation = await partnerStudentInvitationApi.create({
           studentPersonId: detail.student.personId,
+          assignedOperatorUserId: Number(values.assignedOperatorUserId),
           name: String(values.studentName || '').trim(),
           mobile: String(values.studentMobile || '').trim(),
+          expiresAt: dayjs(values.invitationExpiresAt as dayjs.Dayjs).valueOf(),
         })
+        // 生成结果优先于此前发出的焦点刷新，避免旧状态覆盖刚生成的邀请码。
+        invitationRequest.current++
+        setInvitationLoading(false)
         setStudentInvitation(invitation)
+        setInvitationContext(current => current && { ...current, invitation })
         setDialog(undefined)
         message.success('兼职账号邀请码已生成')
         await loadDetail(detail.student.personId, selectedServiceId, selectedAccountId)
@@ -614,16 +685,21 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     } catch (cause) {
       if (!(cause as { errorFields?: unknown }).errorFields) {
         message.error(errorText(cause))
+        if (dialog === 'student-partner') void refreshInvitation()
         if (dialog === 'precheck' && !(cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code))) {
           scheduleAutoSave()
         }
       }
     } finally { setSaving(false) } }
-  const openStudentPartnerInvitation = () => {
+  const openStudentPartnerInvitation = async () => {
     if (!detail) return
+    const context = await refreshInvitation()
+    if (!context || context.opened) return
+    if (context.invitation?.status === 'active') { setStudentInvitation(context.invitation); return }
     form.resetFields()
-    form.setFieldsValue({ studentName: detail.student.name || '', studentMobile: detail.student.mobile || '' })
+    form.setFieldsValue({ studentName: detail.student.name || '', studentMobile: detail.student.mobile || '', assignedOperatorUserId: context.defaultOperatorUserId, invitationExpiresAt: dayjs().add(7, 'day').startOf('second') })
     setDialog('student-partner')
+    void loadInvitationOperators()
   }
   const copyStudentInvitationCode = async () => {
     if (!studentInvitation) return
@@ -675,6 +751,10 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   // 内容审批由运营发起；编导只负责后续逐条审核。
   const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:submit') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => void open('content') }] : []
   const overviewAccountActions: ToolbarAction[] = [
+    ...(hasPermission(permissions, 'zsjos:partner:manage-all') && detail && !invitationContext?.opened ? [{
+      key: 'BIND_EXISTING_STUDENT_PARTNER', icon: <LinkOutlined />, label: '绑定已有兼职账号',
+      onClick: () => setBindingStudent({ id: detail.student.personId, name: detail.student.name || '未填写姓名' }), disabled: saving,
+    }] : []),
     ...(directorContext?.availableActions.includes('CREATE_MEDIA_ACCOUNT') ? [{
       key: 'CREATE_MEDIA_ACCOUNT',
       icon: <PlusOutlined />,
@@ -688,42 +768,69 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       }),
       disabled: saving,
     }] : []),
-    ...(hasPermission(permissions, 'zsjos:partner-invitation:create-student') ? [{
+    ...(canInviteStudent && invitationContext && !invitationContext.opened ? [{
       key: 'CREATE_STUDENT_PARTNER',
       icon: <PlusOutlined />,
-      label: '开通兼职账号',
-      onClick: openStudentPartnerInvitation,
+      label: invitationContext.invitation?.status === 'active' ? '查看兼职邀请码' : invitationContext.invitation ? '重新生成兼职邀请码' : '开通兼职账号',
+      onClick: () => void openStudentPartnerInvitation(),
+      disabled: invitationLoading || saving,
     }] : []),
   ]
   const overviewContent = (plannerActions: ToolbarAction[]) => {
     const overviewToolbarActions = [...plannerActions, ...directorActions, ...contentApprovalAction, ...overviewAccountActions]
-    return <div className="media-students-overview-content">
-      {overviewToolbarActions.length > 0 && <OverflowToolbar actions={overviewToolbarActions} />}
-    {selectedService && <ServicePositioningCard serviceRelationId={selectedService.serviceRelationId} canQuery={hasPermission(permissions, 'zsjos:positioning-card:query')} refresh={positioningRefresh} onEdit={id => void open('positioning', undefined, id)} />}
-    <section className="lead-card media-students-profile-card">
+    const profileContent = <section className="lead-card media-students-profile-card">
       <div className="lead-card-header"><Typography.Text strong>学员档案</Typography.Text></div>
       <div className="lead-profile-fields">
         {[
-          ['姓名', detail?.student.name || '未填写'], ['学员编号', detail?.student.personNo || '历史未记录'],
+          ['学员编号', detail?.student.personNo || '历史未记录'],
           ['手机号', detail?.student.mobile || '未填写'], ['微信号', detail?.student.wechatId || '未填写'],
         ].map(([label, value]) => <div className="lead-profile-row" key={label}><span className="lead-field-label">{label}</span><span className="lead-field-value">{value}</span></div>)}
       </div>
+      <StudentOverviewBackground key={`${selectedService?.serviceRelationId}-${selectedService?.leadId}-${hasPermission(permissions, 'zsjos:student-info-form:read')}`}
+        leadId={selectedService?.leadId ?? detail?.student.leadId}
+        allowed={hasPermission(permissions, 'zsjos:student-info-form:read') && !!directorContext?.visibleTabs.includes('student-info')} />
+      <div className="student-overview-subheading"><Typography.Text strong>当前课程服务</Typography.Text></div>
+      <dl className="student-overview-fields">{[
+        ['课程', selectedService?.courseName || '历史未记录'], ['规格', selectedService?.skuName || '历史未记录'],
+        ['班级', selectedService?.className || '未分班'], ['开通时间', formatTimestamp(selectedService?.activatedAt)],
+      ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <div className="student-overview-subheading"><Typography.Text strong>服务团队</Typography.Text></div>
       <div className="lead-profile-meta">
         {[
           ['学习规划师', directorContext?.ownerUserName || selectedService?.ownerUserName || '未指派'],
           ['责任编导', directorContext?.contentDirectorUserName || selectedService?.contentDirectorUserName || '未指派'],
           ['职业规划师', directorContext?.careerPlannerUserName || selectedService?.careerPlannerUserName || '未指派'],
           ['运营负责人', directorContext?.operatorUserName || selectedService?.operatorUserName || '未指派'],
-          ['当前阶段', statusLabel(directorStage)],
-          ['定位访谈预约时间', formatTimestamp(directorContext?.directorInterviewAt)],
-          ['访谈进度', directorStage === 'positioning_interview_completed' ? '已完成定位访谈' : directorActions.some(action => action.key === 'CONTINUE_POSITIONING_INTERVIEW') ? '草稿已保存，可继续填写' : '尚未完成定位访谈'],
-          ['确认完成度', interviewSummary ? `${interviewSummary.items.filter(item => item.status).length} / ${interviewSummary.fields.filter(field => field.enabled && !field.systemField).length} 项` : '暂无访谈记录'],
-          ['访谈稿', interviewSummary ? `${interviewSummary.attachments.length} 份` : '暂无访谈稿'],
-          ['服务状态', statusLabel(selectedService?.status)],
         ].map(([label, value]) => <div className="lead-profile-row" key={label}><span className="lead-field-label">{label}</span><span className="lead-field-value">{value}</span></div>)}
       </div>
       {summaryError && <Alert type="error" message={summaryError} action={selectedId ? <Button onClick={() => void loadDetail(selectedId, selectedServiceId, selectedAccountId)}>重试</Button> : undefined} />}
     </section>
+    const statusContent = <div className="student-overview-base-status">
+      <div><Typography.Text type="secondary">服务状态</Typography.Text><Tag>{statusLabel(selectedService?.status)}</Tag></div>
+      <div><Typography.Text type="secondary">兼职账号</Typography.Text>
+        {!canInviteStudent ? <Typography.Text type="secondary">暂无查看权限</Typography.Text>
+          : invitationLoading ? <Skeleton.Input active size="small" />
+          : invitationError ? <Alert type="error" showIcon message={invitationError} action={<Button size="small" onClick={() => void refreshInvitation()}>重试加载兼职状态</Button>} />
+          : invitationContext ? <Tag color={invitationContext.opened ? 'success' : 'default'}>{invitationContext.opened ? '兼职账号已开通' : '未开通'}</Tag>
+          : <Typography.Text type="secondary">暂无状态信息</Typography.Text>}
+      </div>
+    </div>
+    const interviewContent = <section className="student-overview-interview"><Typography.Text strong>定位访谈</Typography.Text><dl className="student-overview-fields">{[
+      ['当前阶段', statusLabel(directorStage)], ['定位访谈预约时间', formatTimestamp(directorContext?.directorInterviewAt)],
+      ['访谈进度', directorStage === 'positioning_interview_completed' ? '已完成定位访谈' : directorActions.some(action => action.key === 'CONTINUE_POSITIONING_INTERVIEW') ? '草稿已保存，可继续填写' : '尚未完成定位访谈'],
+      ['访谈记录', interviewSummary ? `已记录 ${interviewSummary.items.filter(item => item.status).length} / ${interviewSummary.fields.filter(field => field.enabled && !field.systemField).length} 项` : '暂无访谈记录'],
+      ['访谈稿', interviewSummary ? `${interviewSummary.attachments.length} 份` : '暂无访谈稿'],
+    ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    {directorActions.some(action => ['VIEW_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW', 'START_POSITIONING_INTERVIEW'].includes(action.key)) && <Button onClick={() => selectedService && setInterviewId(selectedService.serviceRelationId)}>查看定位访谈及材料</Button>}
+    </section>
+    return <div className="media-students-overview-content">
+      {bindingStudent && bindingStudent.id === detail?.student.personId && hasPermission(permissions, 'zsjos:partner:manage-all') && <StudentPartnerBindingDialog
+        key={bindingStudent.id} studentPersonId={bindingStudent.id} studentName={bindingStudent.name} onClose={() => setBindingStudent(undefined)}
+        onBound={() => { setBindingStudent(undefined); message.success('兼职账号已绑定'); void refreshInvitation(); void loadDetail(bindingStudent.id, selectedServiceId, selectedAccountId) }} />}
+
+      {overviewToolbarActions.length > 0 && <OverflowToolbar actions={overviewToolbarActions} />}
+      {selectedService ? <ServicePositioningCard key={selectedService.serviceRelationId} serviceRelationId={selectedService.serviceRelationId} canQuery={hasPermission(permissions, 'zsjos:positioning-card:query')} refresh={positioningRefresh} onEdit={id => void open('positioning', undefined, id)} statusContent={statusContent} profileContent={profileContent} interviewContent={interviewContent} />
+        : <div className="student-overview-grid"><section className="lead-card student-overview-main">暂无课程服务</section><aside className="student-overview-aside"><section className="lead-card">{statusContent}</section>{profileContent}</aside></div>}
     </div>
   }
 
@@ -734,8 +841,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       label: `${accountTabLabels.get(account.id) || '未命名账号 · 平台待填写'}${accountMissing[account.id] > 0 ? ` · 待补 ${accountMissing[account.id]}` : ''}`,
       children: <div className="media-account-workspace-shell">
         <div className="media-account-workspace">
-          <AccountMaintenancePanel canQueryPositioning={hasPermission(permissions, 'zsjos:positioning-card:query')} key={`${account.id}-${maintenanceEditorAccountId === account.id ? 'edit' : 'view'}`} account={account} deliveryActions={<StudentDeliveryPanel accountId={account.id} submittedBy={directorContext?.contentDirectorUserId || 0} canQuery={hasPermission(permissions, 'zsjos:student-delivery:query')} canSubmit={hasPermission(permissions, 'zsjos:student-delivery:submit')} canDefer={hasPermission(permissions, 'zsjos:student-delivery:defer')} onChanged={() => { if (selectedId) void loadDetail(selectedId, selectedServiceId, account.id, true) }} />} canQuery={hasPermission(permissions, 'zsjos:media-account:query')} onMissingChange={updateMissing} canMaintain={account.availableActions.includes('MAINTAIN_ACCOUNT')} initiallyEditing={maintenanceEditorAccountId === account.id} onEditingFinished={() => setMaintenanceEditorAccountId(undefined)} onSaved={async () => { if (selectedId) await loadDetail(selectedId, selectedServiceId, account.id, true) }} />
+          <AccountMaintenancePanel diagnosisTaskId={Number(params.get("diagnosisTaskId")) || undefined} student={detail?.student} serviceRelationId={selectedServiceId} canReadInterview={hasPermission(permissions, 'zsjos:student:positioning-interview-query')} canQueryPositioning={hasPermission(permissions, 'zsjos:positioning-card:query')} key={`${account.id}-${maintenanceEditorAccountId === account.id ? 'edit' : 'view'}`} account={account} deliveryActions={<StudentDeliveryPanel accountId={account.id} submittedBy={directorContext?.contentDirectorUserId || 0} canQuery={hasPermission(permissions, 'zsjos:student-delivery:query')} canSubmit={hasPermission(permissions, 'zsjos:student-delivery:submit')} canDefer={hasPermission(permissions, 'zsjos:student-delivery:defer')} onChanged={() => { if (selectedId) void loadDetail(selectedId, selectedServiceId, account.id, true) }} />} canQuery={hasPermission(permissions, 'zsjos:media-account:query')} onMissingChange={updateMissing} canMaintain={account.availableActions.includes('MAINTAIN_ACCOUNT')} initiallyEditing={maintenanceEditorAccountId === account.id} onEditingFinished={() => setMaintenanceEditorAccountId(undefined)} onSaved={async () => { if (selectedId) await loadDetail(selectedId, selectedServiceId, account.id, true) }} />
           <AccountPublishedWorks key={account.id} accountId={account.id} contents={detail?.contents || []} canQuery={hasPermission(permissions, 'zsjos:content:query')} />
+          <section className="account-history-full" aria-label="历史定位与采访记录"><Typography.Title level={5}>历史定位与采访记录</Typography.Title>
+            {hasPermission(permissions, 'zsjos:positioning-card:query') ? <AccountPositioningHistory key={`${account.id}-${selectedServiceId}`} relationId={selectedServiceId} canReadInterview={hasPermission(permissions, 'zsjos:student:positioning-interview-query')} /> : <Typography.Text type="secondary">暂无查看定位卡历史权限</Typography.Text>}
+          </section>
         </div>
       </div>,
     }
@@ -759,7 +869,33 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     />}
   </StudentPlannerOperations> : <Empty description="当前学员暂无可用服务关系" />
 
-  return <section className="workspace-page media-students-page"><header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)} /></Tooltip></header><div className="media-students-inbox-layout"><aside className="media-students-list-pane"><div className="media-students-toolbar"><Input.Search allowClear value={search} onChange={e => setSearch(e.target.value)} onSearch={value => setKeyword(value.trim())} placeholder="搜索姓名或手机号" /></div>{error && <Alert type="error" showIcon message={error} />}<div className="media-students-scroll">{loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(x => <button type="button" className={`media-students-item${selectedId === x.personId ? ' active' : ''}`} key={x.personId} onClick={() => { setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}><NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" /><span className="media-students-item-copy"><strong>{x.name || '未填写姓名'}</strong><span>{x.personNo || '暂无学员编号'}</span><span>{x.mobile || '无手机号'} · {x.services.length} 项服务</span></span></button>) : <Empty description="暂无可见学员" />}</div>{total > PAGE_SIZE && <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} onChange={value => void loadPage(value)} />}</aside><main className="media-students-detail-pane">{body}</main></div>
+  return <section className="workspace-page media-students-page">
+    <header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button aria-label="刷新学员" icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)} /></Tooltip></header>
+    <div className={`media-students-inbox-layout${listCollapsed ? ' is-list-collapsed' : ''}`}>
+      <aside className="media-students-list-pane" aria-label="学员列表">
+        <div className="media-students-toolbar">
+          <Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip>
+          <div className="media-students-search" hidden={listCollapsed}><Input.Search ref={searchRef} allowClear value={search} onChange={e => { setSearch(e.target.value); if (!e.target.value) setKeyword('') }} onSearch={value => setKeyword(value.trim())} placeholder="搜索姓名或手机号" /></div>
+          {listCollapsed && <Tooltip title={keyword ? '搜索学员（已筛选）' : '搜索学员'}><Button size="small" aria-label="搜索学员" type={keyword ? 'primary' : 'text'} icon={<SearchOutlined />} onClick={() => changeListCollapsed(false, true)} /></Tooltip>}
+        </div>
+        {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
+        {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
+        <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
+          {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <Tooltip key={x.personId} title={listCollapsed ? `${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}>
+            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}>
+              <NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" />
+              <span className="media-students-item-copy"><strong>{x.name || '未填写姓名'}</strong><span>{x.personNo || '暂无学员编号'}</span><span>{x.mobile || '无手机号'} · {x.services.length} 项服务</span></span>
+            </button>
+          </Tooltip>) : !error && (listCollapsed ? <Tooltip title="暂无可见学员"><span className="media-students-rail-empty" role="status">暂无<br />学员</span></Tooltip> : <Empty description="暂无可见学员" />)}
+        </div>
+        {total > PAGE_SIZE && (listCollapsed ? <nav className="media-students-rail-pagination" aria-label="学员分页">
+          <Tooltip title="上一页"><Button aria-label="上一页学员" icon={<LeftOutlined />} disabled={loading || pageNo <= 1} onClick={() => void loadPage(pageNo - 1)} /></Tooltip>
+          <span aria-label={`第 ${pageNo} 页，共 ${Math.ceil(total / PAGE_SIZE)} 页`}>{pageNo}/{Math.ceil(total / PAGE_SIZE)}</span>
+          <Tooltip title="下一页"><Button aria-label="下一页学员" icon={<RightOutlined />} disabled={loading || pageNo >= Math.ceil(total / PAGE_SIZE)} onClick={() => void loadPage(pageNo + 1)} /></Tooltip>
+        </nav> : <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} disabled={loading} onChange={value => void loadPage(value)} />)}
+      </aside>
+      <main className="media-students-detail-pane">{body}</main>
+    </div>
     {interviewId && <PositioningInterviewDialog relationId={interviewId} onClose={() => setInterviewId(undefined)} onChanged={() => selectedId ? loadDetail(selectedId, selectedServiceId, selectedAccountId) : Promise.resolve()} />}
     <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" disabled={dialog === 'positioning' && positioningBusy} onValuesChange={scheduleAutoSave}>
@@ -771,14 +907,14 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         {dialog === 'positioning' && <><div className="media-students-positioning-toolbar"><Space wrap><Button icon={<UploadOutlined />} disabled={positioningBusy} onClick={() => { setPositioningJsonText(''); setPositioningJsonFileName(''); setPositioningJsonPreview(undefined); setPositioningJsonError(''); setPositioningJsonOpen(true) }}>导入 JSON</Button>{hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />} title={!positioningDraft.current?.id ? '请先保存草稿，再导入历史版本' : undefined} disabled={positioningBusy || !positioningDraft.current?.id} onClick={() => { setPositioningImportOpen(true); if (!positioningImportSources.length && !positioningImportLoading) void loadPositioningImportSources() }}>导入现有定位卡</Button>}</Space></div><PositioningCardFields fields={positioningTemplate?.fields || []} render={directorField} /></>}
         {dialog === 'precheck' && <><Alert type="info" showIcon message="核对学员、订单和服务归属后，预约定位访谈。"/><Form.Item name="confirmed" valuePropName="checked" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请确认资料无误'))}]}><Checkbox>已确认资料无误</Checkbox></Form.Item><Form.Item name="interviewAt" label="定位访谈预约时间（北京时间）" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false?Promise.resolve():!v?Promise.reject(new Error('请选择定位访谈预约时间')):dayjs(v).isAfter(dayjs())?Promise.resolve():Promise.reject(new Error('定位访谈预约时间必须晚于当前北京时间'))}]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>确认完成资料预审</Checkbox></Form.Item></>}
         {dialog === 'operator' && <><Form.Item name="userId" label="运营负责人" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={operatorCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>{directorContext?.operatorAssignmentConflict && <Form.Item name="correctionReason" label="统一归属说明" rules={[{ required: true, max: 500 }]}><Input.TextArea rows={3} /></Form.Item>}</>}
-        {dialog === 'student-partner' && <><Alert type="info" showIcon message="姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。" /><Form.Item name="studentName" label="注册姓名" rules={[{ required: true, whitespace: true, max: 100, message: '请输入注册姓名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="studentMobile" label="注册手机号" rules={[{ required: true, whitespace: true, message: '请输入注册手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的 11 位手机号' }]}><Input maxLength={11} /></Form.Item></>}
+        {dialog === 'student-partner' && <><Alert type="info" showIcon message="姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。" />{invitationContext?.invitation && <Alert type="warning" showIcon message="原邀请码已失效，重新生成后请发送新邀请码。" />}{invitationContext?.operatorAssignmentConflict && <Alert type="warning" showIcon message="学员运营归属不一致，请明确选择本次兼职的归属运营。" />}{invitationOperatorsError && <Alert type="error" showIcon message={invitationOperatorsError} action={<Button onClick={() => void loadInvitationOperators()}>重试加载运营</Button>} />}<Form.Item name="assignedOperatorUserId" label="归属运营" extra="默认学员当前运营，可改选；仅决定本次兼职归属，不改变学员运营安排。" rules={[{ required: true, message: '请选择归属运营' }, { validator: (_, value) => !value || invitationOperators.some(operator => operator.id === value) ? Promise.resolve() : Promise.reject(new Error('该运营已不可用，请重新选择')) }]}><Select showSearch optionFilterProp="label" loading={invitationOperatorsLoading} disabled={invitationOperatorsLoading || Boolean(invitationOperatorsError)} placeholder="请选择归属运营" notFoundContent={invitationOperatorsLoading ? '加载中' : '暂无可用运营'} options={invitationOperators.map(operator => ({ value: operator.id, label: operator.nickname }))} /></Form.Item><Form.Item name="studentName" label="注册姓名" rules={[{ required: true, whitespace: true, max: 100, message: '请输入注册姓名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="studentMobile" label="注册手机号" rules={[{ required: true, whitespace: true, message: '请输入注册手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的 11 位手机号' }]}><Input maxLength={11} /></Form.Item><Form.Item name="invitationExpiresAt" label="到期时间" rules={[{ required: true, message: '请选择到期时间' }, { validator: (_, value) => !value || dayjs(value).isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('到期时间必须晚于当前时间')) }]}><DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} /></Form.Item></>}
         {(dialog === 'reject-content' || dialog === 'reject-positioning') && <Form.Item name="reason" label="退回原因" rules={[{ required: true, max: 500 }]}><Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} /></Form.Item>}
       </Form>
     </Modal>
-    <Modal title="导入现有定位卡" mask={{ closable: false }} keyboard={false} open={positioningImportOpen} closable={!positioningBusy} cancelButtonProps={{ disabled: positioningBusy }} onCancel={() => { if (!positioningLock.current) setPositioningImportOpen(false) }} onOk={() => void importPositioningSubmission()} okText="导入并保存" okButtonProps={{ disabled: positioningBusy || !positioningImportSourceId }} confirmLoading={positioningImportSaving}>
+    <PositioningDialog title="导入现有定位卡" mask={{ closable: false }} keyboard={false} open={positioningImportOpen} closable={!positioningBusy} cancelButtonProps={{ disabled: positioningBusy }} onCancel={() => { if (!positioningLock.current) setPositioningImportOpen(false) }} onOk={() => void importPositioningSubmission()} okText="导入并保存" okButtonProps={{ disabled: positioningBusy || !positioningImportSourceId }} confirmLoading={positioningImportSaving}>
       {positioningImportLoading ? <Skeleton active paragraph={{ rows: 4 }} /> : positioningImportError ? <Alert type="error" showIcon message={positioningImportError} action={<Button size="small" onClick={() => void loadPositioningImportSources()}>重试</Button>} /> : positioningImportSources.length ? <Radio.Group value={positioningImportSourceId} onChange={event => setPositioningImportSourceId(event.target.value)} className="media-students-positioning-import-list">{positioningImportSources.map(source => <Radio value={source.submissionId} key={source.submissionId}><span className="media-students-positioning-import-option"><strong>{source.accountLabel}</strong><span><Tag color={source.sameAccount ? 'blue' : undefined}>历史版本</Tag>第 {source.submissionNo} 次提交 · {formatTimestamp(source.submittedAt)} · {statusLabel(source.status)}</span></span></Radio>)}</Radio.Group> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可导入的已提交定位卡" />}
-    </Modal>
-    <Modal width="min(760px, calc(100vw - 32px))" title="导入定位卡 JSON" open={positioningJsonOpen} onCancel={() => { if (!positioningJsonSaving) setPositioningJsonOpen(false) }} onOk={() => void confirmPositioningJsonImport()} okText="导入到表单" okButtonProps={{ disabled: !positioningJsonPreview || !positioningJsonPreview.importable.length && !positioningJsonPreview.cleared.length }} confirmLoading={positioningJsonSaving} mask={{ closable: false }} keyboard={false}>
+    </PositioningDialog>
+    <PositioningDialog width="min(760px, calc(100vw - 32px))" title="导入定位卡 JSON" open={positioningJsonOpen} onCancel={() => { if (!positioningJsonSaving) setPositioningJsonOpen(false) }} onOk={() => void confirmPositioningJsonImport()} okText="导入到表单" okButtonProps={{ disabled: !positioningJsonPreview || !positioningJsonPreview.importable.length && !positioningJsonPreview.cleared.length }} confirmLoading={positioningJsonSaving} mask={{ closable: false }} keyboard={false}>
       <div className="media-students-json-import">
         <Alert type="info" showIcon message="仅按当前模板字段 key 匹配" description="字典字段请填写服务端稳定 value；null 表示清空该字段，未提供或校验失败的字段会保留原值。" action={<Button size="small" icon={<CopyOutlined />} onClick={() => void copyPositioningJsonPrompt()}>复制提示词</Button>} />
         <Upload.Dragger accept=".json,application/json" maxCount={1} showUploadList={false} beforeUpload={readPositioningJsonFile} disabled={positioningJsonSaving || positioningBusy}>
@@ -796,11 +932,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           {!positioningJsonPreview.importable.length && !positioningJsonPreview.cleared.length && !positioningJsonPreview.skipped.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="JSON 中没有可处理的字段" />}
         </div>}
       </div>
-    </Modal>
+    </PositioningDialog>
     <Modal width="min(1040px, calc(100vw - 32px))" title="发起拍剪工单" open={ticketOpen} onCancel={() => setTicketOpen(false)} onOk={() => void createTicket()} okText="确认发起" okButtonProps={{ disabled: !ticketContext?.canCreate || Boolean(ticketContextError) }} confirmLoading={ticketSaving}>
       {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} action={<Button size="small" onClick={() => ticketAccountId && void openTicket(ticketAccountId)}>重试</Button>} /> : ticketContext ? <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" label="工单模板" rules={[{ required: true }]}><Select options={ticketTemplates.map(item => ({ value: item.code, label: item.name }))} onChange={code => ticketAccountId && void loadTicketContext(ticketAccountId, code)} /></Form.Item><DetailFieldGrid columns={2} items={[{ key: 'student', label: '学员姓名', value: ticketContext.studentName || '未记录' }, { key: 'account', label: '第三方账号', value: `${ticketContext.platformLabel || '平台未记录'} · ${ticketContext.accountName || ticketContext.accountNo || '账号未记录'}` }, ...(ticketContext.accountFields || []).map(field => ({ key: field.key, label: field.label, value: field.displayValue || String(field.value ?? '未记录') }))]} />{ticketContext.canCreate ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true, message: '请选择接收部门' }]}><Select showSearch optionFilterProp="label" options={ticketTargetDepartments.map(dept => ({ value: dept.id, label: dept.name }))} /></Form.Item> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true, message: '请选择剪拍专员' }]}><Select showSearch optionFilterProp="label" options={ticketContext.assigneeCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : undefined}>{field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'user' ? <Select showSearch optionFilterProp="label" options={ticketUsers.map(item => ({ value: item.id, label: item.nickname }))} /> : field.type === 'department' ? <Select showSearch optionFilterProp="label" options={ticketDepartments.map(item => ({ value: item.id, label: item.name }))} /> : field.type === 'dictionary' ? <Select options={ticketDictionaries.filter(item => item.dictType === field.dictionaryType).map(item => ({ value: item.value, label: item.label }))} /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true, message: '请填写运营备注' }, { max: 500, message: '运营备注不能超过 500 字' }]}><Input.TextArea rows={4} maxLength={500} showCount placeholder="补充拍摄重点、剪辑要求或其他交接事项" /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="warning" showIcon message={ticketContext.unavailableReason || '当前账号不可发起拍剪工单'} />}</Form> : null}
     </Modal>
-    <Modal title="定位卡内容" open={Boolean(positioningDetail)} footer={null} onCancel={() => setPositioningDetail(undefined)}><DetailFieldGrid columns={1} items={(positioningDetail?.fieldsSnapshot || []).filter(field => field.enabled).map(field => ({ key: field.key, label: field.title, value: positioningDisplayValue(positioningDetail, field.key) }))} /></Modal>
+    <PositioningDialog title="定位卡内容" open={Boolean(positioningDetail)} footer={null} onCancel={() => setPositioningDetail(undefined)}>{positioningDetail && <PositioningSnapshot card={positioningDetail} />}</PositioningDialog>
     <Modal title="兼职账号邀请码" open={Boolean(studentInvitation)} onCancel={() => setStudentInvitation(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => void copyStudentInvitationCode()}>复制邀请码</Button>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Alert type="success" showIcon message="邀请码已生成" description="请将邀请码和注册手机号一并提供给学员。" />
@@ -808,8 +944,9 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           { key: 'student', label: '学员', value: studentInvitation?.studentNameSnapshot || studentInvitation?.name },
           { key: 'name', label: '注册姓名', value: studentInvitation?.name },
           { key: 'mobile', label: '注册手机号', value: studentInvitation?.mobile },
+          { key: 'operator', label: '归属运营', value: studentInvitation?.assignedOperatorName || '历史邀请未指定' },
           { key: 'inviteCode', label: '邀请码', value: <Typography.Text code>{studentInvitation?.inviteCode}</Typography.Text> },
-          { key: 'expiresAt', label: '有效期至', value: formatTimestamp(studentInvitation?.expiresAt) },
+          { key: 'expiresAt', label: '有效期至', value: formatTimestamp(studentInvitation?.expiresAt, '-', 'second') },
         ]} />
       </Space>
     </Modal>

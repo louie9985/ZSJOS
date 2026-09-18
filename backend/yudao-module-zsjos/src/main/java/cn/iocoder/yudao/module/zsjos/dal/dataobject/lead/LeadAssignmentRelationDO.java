@@ -19,5 +19,6 @@ public class LeadAssignmentRelationDO extends TenantBaseDO {
     private Long sourceUserId;
     private Long targetUserId;
     private Integer status;
+    private String ownerIdentity;
 
 }

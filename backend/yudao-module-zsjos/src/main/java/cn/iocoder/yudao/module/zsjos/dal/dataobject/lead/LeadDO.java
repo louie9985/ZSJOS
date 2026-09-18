@@ -53,6 +53,7 @@ public class LeadDO extends TenantBaseDO {
     private String dispatchMode;
     private Long ownerUserId;
     private String ownerIdentity;
+    private String pendingOwnerIdentity;
     private LocalDateTime ownershipStartedAt;
     private Long currentAssignmentHistoryId;
     private LocalDateTime currentAssignmentFirstFollowUpAt;

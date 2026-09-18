@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { ApiBusinessError } from '@/api/request'
 import ProductSpecs from '../../components/ProductSpecs.vue'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
-import { getAreaTree, getLeadCatalog, createLead, type LeadCatalog, type LeadCreateResult, type UploadResult } from '@/api/lead'
+import { getAreaTree, getLeadCatalog, getAssignmentOptions, type PartnerAssignmentOptions, createLead, type LeadCatalog, type LeadCreateResult, type UploadResult } from '@/api/lead'
 import { useDict } from '@/composables/useDict'
 import type { DictItem } from '@/stores/app'
 import type { AreaNode } from '@/components/AreaPicker.vue'
@@ -24,6 +25,20 @@ const currentStep = ref(0)
 const submitting = ref(false)
 const dataLoading = ref(true)
 const dataError = ref('')
+const dispatchMode = ref<'auto' | 'specified'>('auto')
+const assignmentOptions = ref<PartnerAssignmentOptions>()
+const assignmentLoading = ref(false)
+const assignmentError = ref('')
+const submitError = ref('')
+async function loadAssignmentOptions() {
+  assignmentLoading.value = true
+  assignmentError.value = ''
+  try { assignmentOptions.value = await getAssignmentOptions() }
+  catch (error) { assignmentError.value = error instanceof Error ? error.message : '分配配置加载失败，请重试' }
+  finally { assignmentLoading.value = false }
+}
+function chooseAuto() { dispatchMode.value = 'auto'; submitError.value = '' }
+
 
 // 表单数据
 const form = reactive({
@@ -73,7 +88,7 @@ async function loadConfiguration() {
   }
 }
 
-onMounted(loadConfiguration)
+onMounted(() => { void loadConfiguration(); void loadAssignmentOptions() })
 
 // --- Steps ---
 const steps = [
@@ -125,7 +140,13 @@ function prevStep() {
 
 // --- Submit ---
 async function handleSubmit() {
-  if (submitting.value) return
+  if (submitting.value || assignmentLoading.value) return
+  if (assignmentError.value || !assignmentOptions.value) { showToast('请先重试加载分配配置'); return }
+  if (dispatchMode.value === 'specified' && !assignmentOptions.value.specifiedAvailable) {
+    submitError.value = assignmentOptions.value.reason || '指定分配配置已变化，请选择自动分配或联系管理员'
+    return
+  }
+  submitError.value = ''
   if (!validateStep3()) {
     currentStep.value = 2
     return
@@ -154,12 +175,16 @@ async function handleSubmit() {
       leadCategory: form.leadCategory,
       remark: form.remark.trim() || undefined,
       attachments: attachments.map(file => ({ infraFileId: file.infraFileId })),
-      dispatchMode: 'auto',
+      dispatchMode: dispatchMode.value,
       idempotencyKey
     })
     submitResult.value = result
     currentStep.value = 4 // 结果页
   } catch (cause) {
+    submitError.value = cause instanceof Error ? cause.message : '提交失败，请重试'
+    if (cause instanceof ApiBusinessError && cause.code >= 1045090001 && cause.code <= 1045090005) {
+      await loadAssignmentOptions()
+    }
     if (cause instanceof TypeError) {
       showToast({ message: cause.message || '提交失败，请重试', type: 'fail' })
     }
@@ -170,6 +195,9 @@ async function handleSubmit() {
 
 // --- Result ---
 function submitAnother() {
+  dispatchMode.value = 'auto'
+  submitError.value = ''
+  void loadAssignmentOptions()
   form.name = ''
   form.mobile = ''
   form.wechatId = ''
@@ -232,7 +260,7 @@ function selectCategory(value: string) {
         <div class="page-hero__aside">
           <span class="page-chip">{{ currentStepBadge }}</span>
           <HelpPopover
-            text="按步骤完善客户信息，提交后系统自动分配。"
+            text="按步骤完善客户信息，确认后提交。"
             placement="bottom-end"
             aria-label="查看提交说明"
           />
@@ -457,11 +485,35 @@ function selectCategory(value: string) {
               <span class="confirm-label">客资分类</span>
               <span class="confirm-value">{{ categoryLabel }}</span>
             </div>
-            <div class="confirm-row">
-              <span class="confirm-label">派单方式</span>
-              <span class="confirm-value">系统自动分配</span>
+            <div v-if="assignmentLoading" class="field-hint"><van-loading size="16">正在加载分配配置</van-loading></div>
+            <div v-else-if="assignmentError" role="alert" class="assignment-feedback">
+              <span>{{ assignmentError }}</span>
+              <van-button size="small" plain @click="loadAssignmentOptions">重试</van-button>
             </div>
-            <div class="field-hint">提交后由系统自动分配销售，无需手动选择</div>
+            <template v-else-if="assignmentOptions?.configured">
+              <div class="assignment-field">
+                <div class="assignment-field__label">分配方式</div>
+                <div class="assignment-options" role="radiogroup" aria-label="分配方式">
+                  <button type="button" role="radio" aria-label="自动分配" :aria-checked="dispatchMode === 'auto'"
+                    class="assignment-option" :class="{ 'is-selected': dispatchMode === 'auto' }"
+                    :disabled="submitting" @click="chooseAuto">
+                    <span class="assignment-option__heading"><van-icon name="exchange" size="18" /><strong>自动分配</strong><van-icon v-if="dispatchMode === 'auto'" class="assignment-option__check" name="checked" size="16" /></span>
+                    <span class="assignment-option__description">由系统安排接单</span>
+                  </button>
+                  <button type="button" role="radio" aria-label="指定分配" :aria-checked="dispatchMode === 'specified'"
+                    class="assignment-option" :class="{ 'is-selected': dispatchMode === 'specified' }"
+                    :disabled="submitting || !assignmentOptions.specifiedAvailable" @click="dispatchMode = 'specified'; submitError = ''">
+                    <span class="assignment-option__heading"><van-icon name="user-circle-o" size="18" /><strong>指定分配</strong><van-icon v-if="dispatchMode === 'specified'" class="assignment-option__check" name="checked" size="16" /></span>
+                    <span class="assignment-option__description">由已配置人员接单</span>
+                  </button>
+                </div>
+                <div v-if="assignmentOptions.reason" class="field-hint">{{ assignmentOptions.reason }}</div>
+              </div>
+            </template>
+            <div v-if="submitError" role="alert" class="assignment-feedback">
+              <span>{{ submitError }}</span>
+              <van-button v-if="dispatchMode === 'specified'" size="small" plain :disabled="submitting" @click="chooseAuto">改选自动分配</van-button>
+            </div>
             <div v-if="form.remark" class="confirm-row">
               <span class="confirm-label">备注</span>
               <span class="confirm-value">{{ form.remark }}</span>
@@ -498,13 +550,29 @@ function selectCategory(value: string) {
       <div v-if="currentStep < 4" class="submit-actions safe-area-bottom">
         <van-button v-if="currentStep > 0" round plain @click="prevStep">上一步</van-button>
         <van-button v-if="currentStep < 3" type="primary" round @click="nextStep">下一步</van-button>
-        <van-button v-if="currentStep === 3" type="primary" round :loading="submitting" @click="handleSubmit">确认提交</van-button>
+        <van-button v-if="currentStep === 3" type="primary" round :loading="submitting" :disabled="assignmentLoading || !!assignmentError" @click="handleSubmit">确认提交</van-button>
       </div>
     </template>
   </div>
 </template>
 
 <style scoped>
+.assignment-field { margin: 16px 0; }
+.assignment-field__label { margin-bottom: 10px; color: var(--h5-text-secondary); font-size: 13px; }
+.assignment-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.assignment-option { min-width: 0; padding: 13px 12px; border: 1px solid var(--h5-glass-border); border-radius: 12px; background: var(--h5-glass-sunken); color: var(--h5-text-primary); text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+.assignment-option__heading { display: flex; align-items: center; gap: 6px; min-height: 20px; }
+.assignment-option__heading > .van-icon:first-child { color: var(--h5-text-secondary); }
+.assignment-option__heading strong { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.assignment-option__check { margin-left: auto; color: var(--h5-primary); }
+.assignment-option__description { display: block; margin-top: 7px; color: var(--h5-text-secondary); font-size: 11px; line-height: 1.5; }
+.assignment-option.is-selected { border-color: color-mix(in srgb, var(--h5-primary) 55%, var(--h5-glass-border)); background: var(--h5-primary-opacity); }
+.assignment-option.is-selected .assignment-option__heading { color: var(--h5-primary); }
+.assignment-option.is-selected .assignment-option__heading > .van-icon:first-child { color: var(--h5-primary); }
+.assignment-option:disabled { opacity: .5; cursor: not-allowed; }
+.assignment-option:focus-visible { outline: 2px solid var(--h5-primary); outline-offset: 3px; }
+.assignment-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; color: var(--h5-danger); font-size: 13px; }
+
 .submit-page {
   padding-bottom: 152px;
 }

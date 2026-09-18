@@ -20,8 +20,20 @@ public class MediaAccountProfileVO {
     private String currentUserName;
     private String directorName;
     private String operatorName;
+    private Map<String, Entry> latestRecords;
+    /** Frozen requirements copied from the latest evidence-complete positioning card. */
+    private Map<String, Object> positioningRequirements;
+    private Map<String, Object> diagnosisContext;
     private boolean canViewHistory;
+    private boolean canSubmitDiagnosis;
+    private boolean canStartDiagnosis;
+    private boolean diagnosisStarted;
     private PartnerMetrics partnerMetrics;
+    public record DiagnosisTodo(Long taskId, Long accountId, Long studentPersonId, String accountName, String title,
+                                String templateType, Integer cycle, LocalDateTime dueAt, Map<String,Object> payload) {}
+    @Data public static class ReminderAck {
+        @NotEmpty @Size(max=500) private List<@NotNull Long> taskIds;
+    }
     @Data public static class PartnerMetrics { private Long partnerId,totalLeads,monthLeads,totalDeals,monthDeals; private java.math.BigDecimal totalDealAmount=java.math.BigDecimal.ZERO,monthDealAmount=java.math.BigDecimal.ZERO,totalDealRate=java.math.BigDecimal.ZERO,monthDealRate=java.math.BigDecimal.ZERO; private String sourceStatus; }
     @Data public static class Patch {
         @NotNull @PositiveOrZero private Integer version;
@@ -37,7 +49,14 @@ public class MediaAccountProfileVO {
         @Size(max=10000) private String content;
         @Size(max=20) private List<@NotNull Long> fileIds;
     }
+    @Data public static class HistoryQuery extends cn.iocoder.yudao.framework.common.pojo.PageParam {
+        @Size(max=64) private String fieldKey;
+        @Size(max=32) private String kind;
+        @Positive private Integer cycle;
+    }
     @Data public static class DiagnosisRequest {
+        private Long previousEntryId;
+        private Long taskId;
         @NotNull @PositiveOrZero private Integer cycle;
         @NotNull @PositiveOrZero private Integer version;
         @NotNull private Long configVersionId;
@@ -45,15 +64,15 @@ public class MediaAccountProfileVO {
         @NotBlank private String templateType;
         @NotBlank private String currentStage;
         @NotBlank private String accountStatus;
-        @NotBlank private String cooperationLevel;
-        @NotBlank private String cooperationEvidence;
+        @Size(max=2000) private String cooperationLevel;
+        @Size(max=2000) private String cooperationEvidence;
         @NotBlank private String primaryProblem;
-        @NotBlank private String primaryProblemEvidence;
-        @NotBlank private String secondaryProblem;
-        @NotBlank private String secondaryProblemEvidence;
-        @NotBlank private String conclusion;
-        @NotBlank private String improvementMeasures;
-        @NotBlank private String observedData;
+        @NotBlank @Size(max=2000) private String primaryProblemEvidence;
+        @Size(max=2000) private String secondaryProblem;
+        @Size(max=2000) private String secondaryProblemEvidence;
+        @NotBlank @Size(max=2000) private String conclusion;
+        @Size(max=2000) private String improvementMeasures;
+        @Size(max=2000) private String observedData;
         @NotNull private Boolean reposition;
     }
     @Data public static class Entry {

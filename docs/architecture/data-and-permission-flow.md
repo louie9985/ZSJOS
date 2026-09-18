@@ -1,5 +1,13 @@
 # Data and Permission Flow
 
+## Student and Partner manual identity binding
+
+Admin student details and Workbench manual binding share `zsjos:partner:manage-all` plus the target student's `student/read` object authorization. The additive `/zsjos/partner-student-link/student` read returns the current tenant's active binding summary and rejects broken references. Manual commands pass through `PartnerStudentManualLinkService`; invitation activation retains its separately authorized internal transaction path. No role grants or student visibility expansion are implied. See [the binding contract](../api/student-partner-invitation.md).
+
+## Partner name and public nickname
+
+Partner `name` remains the business identity and snapshot source; nullable `nickname` is used only by the H5 leaderboard, with 未设置昵称 for missing values. Authenticated profile editing saves both separately. Invite activation routes to profile completion with the invitation name prefilled. Sales-owner Lead projections mask Partner names and provider snapshots even for specified dispatch, without rewriting finance/media identity data or broadening grants. See [the profile contract](../api/partner-profile-nickname.md).
+
 ## 角色菜单授权来源（2026-09-17）
 
 角色菜单关系仅由 System 角色管理配置。迁移、初始化种子、独立部署 SQL 及生成器不得自动授予、继承、回补、重分配或撤销角色菜单权限。SQL 继续维护菜单/按钮定义，双端继续消费服务端授权，后端继续独立校验权限。清理脚本不重置既有数据库授权；新环境普通角色须由管理员配置。
@@ -725,6 +733,7 @@ password, conversion, student-link and ownership commands. The three read scopes
 self-only configuration must not also grant `zsjos:partner:query`. Unassigned Partners remain visible only
 to `manage-all`. `zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
 same Vue Admin Partner page; these permissions do not create Partner accounts until H5 activation succeeds.
+Student invitations explicitly select an operator (prefilled from the received student service). Activation creates both the student identity link and the independent Partner ownership; student-service reassignment does not change that ownership. Legacy student invitations without a selected operator retain identity-link-only activation. Student invitation context reads require create-student permission, student object read access and a current accepted director relationship; they do not grant full invitation-list access.
 Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
 moves all historical and future Partner Lead visibility to the new employee, while each new Partner Lead
 continues to snapshot the configured employee ID and name at submission time. Historical null snapshots
@@ -916,4 +925,4 @@ ZSJOS 将 H5 排行榜开关、榜单类型、默认周期及员工提交者统�
 
 ### 教务自拓与成交身份
 
-教务自拓通过独立配置权限直接归属当前员工，由本人完成跟进、判定和成交，复用原审批/超时机制。客资来源、当前负责人身份与订单成交身份分别持久化；历史空身份不通过当前角色补造。接单、抢单和销售候选资格不扩大。接口、快照、迁移和授权范围见 [教务自拓与直接成交](../api/zsjos-education-self-sourced.md)。
+教务自拓通过独立配置权限直接归属当前员工，由本人完成跟进、判定和成交，复用原审批/超时机制。客资来源、当前负责人身份与订单成交身份分别持久化；历史空身份不通过当前角色补造。自动派单、抢单和销售候选资格不扩大。V263 允许具备接单权限的教务承接兼职指定客资，关系主体、单目标约束与身份快照见 [兼职指定分配与教务接单](../api/partner-specified-assignment.md)。接口、快照、迁移和授权范围见 [教务自拓与直接成交](../api/zsjos-education-self-sourced.md)。

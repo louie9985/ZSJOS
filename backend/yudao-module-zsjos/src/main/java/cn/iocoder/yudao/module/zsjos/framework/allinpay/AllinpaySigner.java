@@ -22,6 +22,18 @@ public class AllinpaySigner {
         this.properties = properties;
     }
 
+    /** 在生成支付链接前检查密钥可用性，不发送支付请求。 */
+    public void validateKeys() {
+        try {
+            Signature signature = Signature.getInstance("SHA1withRSA");
+            signature.initSign(loadPrivateKey());
+            signature.initVerify(loadPublicKey());
+        } catch (Exception ex) {
+            // 密钥解析异常可能带原始内容，不向调用方传播异常链。
+            throw new IllegalStateException("通联签名密钥配置无效");
+        }
+    }
+
     public String sign(Map<String, ?> parameters) {
         try {
             Signature signature = Signature.getInstance("SHA1withRSA");

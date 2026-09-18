@@ -1,5 +1,6 @@
+import PositioningDialog from './PositioningDialog'
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Input, Modal, Select, Space, Spin, Table, Typography } from 'antd'
+import { Alert, Button, Empty, Input, Select, Space, Spin, Table, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { api, type DictData, type StudentContactFormField } from '../services/api'
 import { materialApi, type Material, type MaterialVersion } from '../services/materialApi'
@@ -71,7 +72,7 @@ export default function PositioningCardMaterialPicker({ field, value = EMPTY_SEL
     {!disabled && <Button icon={<PlusOutlined />} disabled={!canQuery} onClick={begin}>选择素材</Button>}
     {!canQuery && <Typography.Text type="secondary">无素材查询权限</Typography.Text>}
     {field.recommendedCount && <Typography.Text type="secondary">建议 {field.recommendedCount} 份，已选 {value.length} 份</Typography.Text>}
-    <Modal title={field.title} open={open} width="min(1280px, calc(100vw - 32px))" styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }} onCancel={() => setOpen(false)} onOk={() => { onChange?.(selected); setOpen(false) }} okText={`确认选择（${selected.length}）`}>
+    <PositioningDialog title={field.title} open={open} width="min(1280px, calc(100vw - 32px))" styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }} onCancel={() => setOpen(false)} onOk={() => { onChange?.(selected); setOpen(false) }} okText={`确认选择（${selected.length}）`}>
       <Space wrap style={{ marginBottom: 16 }}>
         <Input.Search aria-label="搜索素材" placeholder="搜索素材" allowClear onSearch={keyword => { setFilters(current => ({ ...current, keyword })); setPage(1) }} />
         {filterDefinitions.map(f => <Select key={f.key} aria-label={f.title} placeholder={f.title} allowClear showSearch optionFilterProp="label" style={{ width: 170, maxWidth: '100%' }}
@@ -86,9 +87,9 @@ export default function PositioningCardMaterialPicker({ field, value = EMPTY_SEL
         columns={[{ title: '素材', dataIndex: 'title', render: (title: string) => <span style={{ overflowWrap: 'anywhere' }}>{title}</span> },
           { title: '预览', width: 64, render: (_, row) => <Button aria-label="预览完整素材" icon={<EyeOutlined />} onClick={() => void showPreview(row.currentEffectiveVersionId!)} /> }]}
         pagination={{ current: page, total, pageSize: 10, showSizeChanger: false, onChange: setPage, simple: true }} />}
-    </Modal>
-    <Modal title={preview ? versions[preview]?.title || '素材预览' : '素材预览'} open={preview !== undefined} footer={null} onCancel={() => setPreview(undefined)} width="min(1480px, calc(100vw - 32px))" styles={{ body: { maxHeight: '78vh', overflowY: 'auto' } }}>
+    </PositioningDialog>
+    <PositioningDialog title={preview ? versions[preview]?.title || '素材预览' : '素材预览'} open={preview !== undefined} footer={null} onCancel={() => setPreview(undefined)} width="min(1480px, calc(100vw - 32px))" styles={{ body: { maxHeight: '78vh', overflowY: 'auto' } }}>
       {previewError ? <Alert type="error" message={previewError} action={<Button onClick={() => preview && void showPreview(preview)}>重试</Button>} /> : preview && versions[preview] ? <><Button icon={<ReloadOutlined />} onClick={() => void showPreview(preview)}>刷新预览</Button><PositioningMaterialPreview key={`${preview}-${versions[preview].coverPreviewUrl || ''}`} version={versions[preview]} /></> : <Spin />}
-    </Modal>
+    </PositioningDialog>
   </Space>
 }

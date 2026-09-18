@@ -36,7 +36,9 @@ public class LeadIdentityMaskingService {
         boolean sourceDiffersFromOwner = sourceIdentityType == SourceIdentityType.PARTNER
                 ? sourcePartnerId != null
                 : sourceEmployeeUserId != null && !Objects.equals(sourceEmployeeUserId, lead.getOwnerUserId());
-        boolean counterpartyMasking = !DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
+        // Partner business names stay masked for the sales owner even after specified dispatch.
+        boolean counterpartyMasking = (!DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
+                || sourceIdentityType == SourceIdentityType.PARTNER)
                 && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && sourceDiffersFromOwner && lead.getOwnerUserId() != null
                 && !canViewUnmasked;

@@ -32,7 +32,7 @@ public class MediaAccountProfileController {
     }
     @GetMapping("/history")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")
-    public CommonResult<PageResult<Entry>> history(@PathVariable Long id,@Valid PageParam page){return success(service.history(id,page,getLoginUserId()));}
+    public CommonResult<PageResult<Entry>> history(@PathVariable Long id,@Valid HistoryQuery page){return success(service.history(id,page,getLoginUserId()));}
     @PostMapping("/files")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:edit','zsjos:media-account:maintenance')")
     public CommonResult<FileVO> upload(@PathVariable Long id,@RequestParam String fieldKey,@RequestParam MultipartFile file) throws IOException {

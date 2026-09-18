@@ -468,7 +468,11 @@ export type PositioningServiceOverview = {
   candidates: PositioningCard[]; current?: PositioningCard; effective?: PositioningCard; history: PositioningCard[];
 }
 export type PositioningApplicationOptions = { version: number; submissionId?: number; canApply: boolean; newerAvailable: boolean; candidates: PositioningCard[] }
+export type PositioningFile = { id: number; name: string; type: string; size: number; url?: string };
 export type PositioningCard = {
+  submissionVersion?: number; submissionStatus?: string; evidenceRequired?: boolean; canUploadEvidence?: boolean;
+  evidence?: Array<PositioningFile & { uploadedBy?: number; uploadedAt?: Timestamp }>;
+  directorName?: string; operatorName?: string; operatorReviewedAt?: Timestamp;
   submissionId?: number; operatorReviewComment?: string; studentDecidedAt?: Timestamp; studentDecisionComment?: string;
   submissionNo?: number;
   submittedAt?: Timestamp;
@@ -2146,7 +2150,11 @@ export type BusinessTask = {
   targetRecordId?: number;
   actionable: boolean;
 };
-export type StudentDeliveryPlan = { id: number; accountId: number; status: string; accountOpenedAt: Timestamp; stages: Array<{ id: number; stageCode: string; status: string; triggerAt?: Timestamp; dueAt?: Timestamp; completedAt?: Timestamp }> };
+export type DeliveryAgreement = { cardId?: number; submissionId?: number; submissionNo?: number; agreement?: string; references?: Array<{materialVersionId: number; titleSnapshot: string}> };
+export type StudentDeliveryPlan = { id: number; accountId: number; status: string; roundNo?: number; sourceAvailable: boolean; notificationRecipient?: string; weeklyLeads?: number;
+ accountOpenedAt: Timestamp; rounds?: Array<{id:number;roundNo?:number;status:string}>; stages: Array<{ id: number; stageCode: string; status: string; version:number; canSubmit:boolean;canDefer:boolean;canReposition:boolean;
+ triggerAt?: Timestamp; dueAt?: Timestamp; completedAt?: Timestamp;completedByName?:string; agreement: DeliveryAgreement;confirmation?:Record<string,unknown>;defers?:Array<{id:number;reason:string;originalDueAt:Timestamp;newDueAt?:Timestamp;status:string;createdAt:Timestamp}> }> };
+export type DeliveryReminder = {accountId:number;stageId:number;stageCode:string;accountName?:string;dueAt?:Timestamp;weeklyLeads?:number};
 export type StudentDeliverySubmission = { id: number; stageId: number; submittedAt: Timestamp };
 export type StudentDeliveryDefer = { id: number; stageId: number; requestedDays: number; status: string };
 /**
@@ -3884,6 +3892,14 @@ export const api = {
       ),
   },
   positioningCard: {
+    snapshotMaterial: async (id: number, versionId: number, submissionId?: number) => unwrap<import('./materialApi').MaterialVersion>(await http.get(`/zsjos/positioning-card/${id}/snapshot/materials/${versionId}`, { params: { submissionId } })),
+    snapshotAttachment: async (id: number, fileId: number, submissionId?: number) => unwrap<PositioningFile>(await http.get(`/zsjos/positioning-card/${id}/snapshot/attachments/${fileId}`, { params: { submissionId } })),
+    uploadEvidence: async (id: number, submissionId: number, file: File) => {
+      const data = new FormData(); data.append('file', file);
+      return unwrap<PositioningFile>(await http.post(`/zsjos/positioning-card/${id}/submissions/${submissionId}/evidence/files`, data));
+    },
+    submitEvidence: async (id: number, submissionId: number, version: number, fileIds: number[]) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/submissions/${submissionId}/evidence`, { version, fileIds })),
+    evidenceFile: async (id: number, submissionId: number, fileId: number) => unwrap<PositioningFile>(await http.get(`/zsjos/positioning-card/${id}/submissions/${submissionId}/evidence/${fileId}`)),
     serviceOverview: async (serviceRelationId: number) => unwrap<PositioningServiceOverview>(await http.get('/zsjos/positioning-card/service-overview', { params: { serviceRelationId } })),
     selectMaster: async (serviceRelationId: number, cardId: number) => unwrap<boolean>(await http.post('/zsjos/positioning-card/select-master', null, { params: { serviceRelationId, cardId } })),
     applicationOptions: async (accountId: number) => unwrap<PositioningApplicationOptions>(await http.get('/zsjos/positioning-card/application-options', { params: { accountId } })),
@@ -4904,12 +4920,15 @@ export const api = {
       await http.get("/zsjos/business-task/my-summary"),
     ),
   studentDelivery: {
-    plan: async (accountId: number) => unwrap<StudentDeliveryPlan | null>(await http.get("/zsjos/student-delivery/plan", { params: { accountId } })),
+    reminders: async () => unwrap<DeliveryReminder[]>(await http.get('/zsjos/student-delivery/reminders')),
+    acknowledge: async (ids:number[]) => unwrap<boolean>(await http.post('/zsjos/student-delivery/reminders/acknowledge',ids)),
+    reposition: async (data:{accountId:number;planId:number;version:number}) => unwrap<number>(await http.post('/zsjos/student-delivery/reposition',data)),
+    plan: async (accountId: number, planId?:number) => unwrap<StudentDeliveryPlan | null>(await http.get("/zsjos/student-delivery/plan", { params: { accountId, planId } })),
     ensurePlan: async (data: { studentPersonId: number; accountId: number; serviceRelationId?: number; directorUserId?: number; accountOpenedAt: string }) =>
       unwrap<StudentDeliveryPlan>(await http.post("/zsjos/student-delivery/plan", undefined, { params: data })),
-    submit: async (data: { stageId: number; submittedBy: number; templateVersionId?: number; fieldValuesJson: string; dictionarySnapshotJson?: string; attachmentSnapshotJson?: string }) =>
+    submit: async (data: { stageId: number; version:number;idempotencyKey:string; submittedBy: number; templateVersionId?: number; fieldValuesJson: string; dictionarySnapshotJson?: string; attachmentSnapshotJson?: string }) =>
       unwrap<StudentDeliverySubmission>(await http.post("/zsjos/student-delivery/submission", data)),
-    defer: async (data: { stageId: number; requestedBy: number; requestedDays: number; reason: string; supervisorUserId?: number }) =>
+    defer: async (data: { stageId: number; version:number;idempotencyKey:string;newDueAt:number;requestedBy: number; requestedDays?: number; reason: string; supervisorUserId?: number }) =>
       unwrap<StudentDeliveryDefer>(await http.post("/zsjos/student-delivery/defer", data)),
   },
   studentDeliveryConfig: {

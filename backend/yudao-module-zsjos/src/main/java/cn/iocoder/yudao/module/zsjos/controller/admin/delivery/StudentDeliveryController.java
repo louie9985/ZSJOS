@@ -26,6 +26,21 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @RestController @RequestMapping("/zsjos/student-delivery") @Validated
 public class StudentDeliveryController {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryOverviewService overview;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryCycleService cycles;
+    public record RestartRequest(@NotNull Long accountId,@NotNull Long planId,@NotNull Integer version) {}
+    @GetMapping("/reminders") @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:query')")
+    public CommonResult<java.util.List<cn.iocoder.yudao.module.zsjos.service.delivery.StudentDeliveryCycleService.Reminder>> reminders() {
+        return success(cycles.reminders(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()));
+    }
+    @PostMapping("/reminders/acknowledge") @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:query')")
+    public CommonResult<Boolean> acknowledge(@RequestBody @jakarta.validation.constraints.Size(max=500) java.util.List<Long> ids) {
+        cycles.acknowledge(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId(),ids); return success(true);
+    }
+    @PostMapping("/reposition") @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:reposition') && @ss.hasPermission('zsjos:positioning-card:edit')")
+    public CommonResult<Long> reposition(@RequestBody @jakarta.validation.Valid RestartRequest req) {
+        return success(cycles.reposition(req.accountId(),req.planId(),req.version(),cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()));
+    }
     @Resource private StudentDeliveryPlanService planService;
     @Resource private StudentDeliverySubmissionService submissionService;
     @Resource private StudentDeliveryDeferService deferService;
@@ -35,18 +50,25 @@ public class StudentDeliveryController {
 
     @GetMapping("/config")
     @PreAuthorize("@ss.hasPermission('zsjos:student-delivery-config:query')")
-    public CommonResult<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO> getConfig() { return success(configMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO>().eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled, true).orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getVersion).last("LIMIT 1"))); }
+    public CommonResult<StudentDeliveryConfigReqVO> getConfig() {
+        var row=configMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO>()
+                .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled,true).orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getVersion).last("LIMIT 1"));
+        var value=new StudentDeliveryConfigReqVO();
+        value.setS0Days(row==null?3:row.getS0Days()).setS1Days(row==null?7:row.getS1Days()).setS2Days(row==null?7:row.getS2Days())
+                .setS3Days(row==null?7:row.getS3Days()).setS4Days(row==null?10:row.getS4Days()).setS5Days(row==null?14:row.getS5Days()).setS6Days(0);
+        return success(value);
+    }
 
+
+    @org.springframework.transaction.annotation.Transactional(rollbackFor=Exception.class)
     @PutMapping("/config")
     @PreAuthorize("@ss.hasPermission('zsjos:student-delivery-config:update')")
-    public CommonResult<Boolean> updateConfig(@RequestBody @Validated StudentDeliveryConfigReqVO req) { var row=configMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO>().eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled,true).orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getVersion).last("LIMIT 1")); if(row==null) row=new cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO().setVersion(1).setEnabled(true); else row.setVersion(row.getVersion()+1); row.setS0Days(req.getS0Days()).setS1Days(req.getS1Days()).setS2Days(req.getS2Days()).setS3Days(req.getS3Days()).setS4Days(req.getS4Days()).setS5Days(req.getS5Days()).setS6Days(req.getS6Days()); configMapper.insert(row); return success(true); }
+    public CommonResult<Boolean> updateConfig(@RequestBody @Validated StudentDeliveryConfigReqVO req) { var row=configMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO>().eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled,true).orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getVersion).last("LIMIT 1")); if(row==null) row=new cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO().setVersion(1).setEnabled(true); else row.setVersion(row.getVersion()+1); row.setS0Days(req.getS0Days()).setS1Days(req.getS1Days()).setS2Days(req.getS2Days()).setS3Days(req.getS3Days()).setS4Days(req.getS4Days()).setS5Days(req.getS5Days()).setS6Days(req.getS6Days()); row.setId(null); configMapper.update(null,new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO>().eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled,true).set(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryConfigDO::getEnabled,false)); configMapper.insert(row); return success(true); }
 
     @GetMapping("/plan")
     @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:query')")
-    public CommonResult<StudentDeliveryPlanRespVO> getPlan(@RequestParam Long accountId) {
-        var plan = planMapper.selectActiveByAccountId(accountId); if (plan == null) return success(null);
-        var vo = new StudentDeliveryPlanRespVO(); vo.setId(plan.getId()); vo.setAccountId(plan.getAccountId()); vo.setStatus(plan.getStatus()); vo.setAccountOpenedAt(plan.getAccountOpenedAt());
-        vo.setStages(stageMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryStageDO>().eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryStageDO::getPlanId, plan.getId()).orderByAsc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryStageDO::getStageCode)).stream().map(stage -> { var s = new StudentDeliveryPlanRespVO.Stage(); s.setId(stage.getId()); s.setStageCode(stage.getStageCode()); s.setStatus(stage.getStatus()); s.setTriggerAt(stage.getTriggerAt()); s.setDueAt(stage.getDueAt()); s.setCompletedAt(stage.getCompletedAt()); return s; }).collect(Collectors.toList())); return success(vo);
+    public CommonResult<StudentDeliveryPlanRespVO> getPlan(@RequestParam Long accountId, @RequestParam(required=false) Long planId) {
+        return success(overview.get(accountId, cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId(), planId));
     }
 
     @PostMapping("/defer")
@@ -61,12 +83,9 @@ public class StudentDeliveryController {
 
     @PostMapping("/plan")
     @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:create')")
-    public CommonResult<StudentDeliveryPlanDO> ensurePlan(@RequestParam @NotNull Long studentPersonId,
-                                                          @RequestParam @NotNull Long accountId,
-                                                          @RequestParam(required = false) Long serviceRelationId,
-                                                          @RequestParam(required = false) Long directorUserId,
-                                                          @RequestParam LocalDateTime accountOpenedAt) {
-        return success(planService.ensurePlan(studentPersonId, accountId, serviceRelationId, directorUserId, accountOpenedAt));
+    public CommonResult<StudentDeliveryPlanRespVO> ensurePlan(@RequestParam @NotNull Long accountId) {
+        Long userId=cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        overview.ensure(accountId,userId); return success(overview.get(accountId,userId,null));
     }
 
     @PostMapping("/plan/{planId}/complete")

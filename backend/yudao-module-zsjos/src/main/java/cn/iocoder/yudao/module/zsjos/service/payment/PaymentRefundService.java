@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.zsjos.service.payment;
 
-import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PaymentRefundApplyReqVO;
@@ -8,7 +7,6 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PaymentRefundRe
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.*;
 import cn.iocoder.yudao.module.zsjos.framework.allinpay.AllinpayClient;
-import cn.iocoder.yudao.module.zsjos.framework.allinpay.AllinpayProperties;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
@@ -29,54 +27,8 @@ public class PaymentRefundService {
     @Resource private PaymentTransactionMapper transactionMapper;
     @Resource private PaymentIntentMapper paymentMapper;
     @Resource private PaymentGatewayEventMapper eventMapper;
-    @Resource private AllinpayProperties properties;
+    @Resource private PaymentSubjectGatewayFactory gatewayFactory;
     @Resource private BpmProcessInstanceApi processInstanceApi;
-
-    /**
-     * 根据支付订单创建 AllinpayClient
-     * 从支付订单的主体快照中读取配置
-     */
-    private AllinpayClient createAllinpayClient(PaymentIntentDO payment) {
-        if (payment == null || payment.getSubjectSnapshotJson() == null || payment.getSubjectSnapshotJson().isBlank()) {
-            return new AllinpayClient(properties);
-        }
-
-        try {
-            PaymentSubjectDO snapshot = JsonUtils.parseObject(payment.getSubjectSnapshotJson(), PaymentSubjectDO.class);
-            if (snapshot == null || StrUtil.isBlank(snapshot.getCusid()) || StrUtil.isBlank(snapshot.getAppid())) {
-                return new AllinpayClient(properties);
-            }
-
-            AllinpayProperties dynamicProps = new AllinpayProperties();
-            dynamicProps.setEnabled(properties.isEnabled());
-            dynamicProps.setCusid(snapshot.getCusid());
-            dynamicProps.setAppid(snapshot.getAppid());
-            dynamicProps.setOrgid(snapshot.getOrgid());
-            dynamicProps.setMerchantPrivateKey(snapshot.getMerchantPrivateKey());
-            dynamicProps.setPlatformPublicKey(snapshot.getPlatformPublicKey());
-
-            // 通用配置从全局读取
-            dynamicProps.setUnionorderUrl(properties.getUnionorderUrl());
-            dynamicProps.setUnitorderPayUrl(properties.getUnitorderPayUrl());
-            dynamicProps.setQueryUrl(properties.getQueryUrl());
-            dynamicProps.setCloseUrl(properties.getCloseUrl());
-            dynamicProps.setRefundUrl(properties.getRefundUrl());
-            dynamicProps.setRefundQueryUrl(properties.getRefundQueryUrl());
-            dynamicProps.setRefundVersion(properties.getRefundVersion());
-            dynamicProps.setNotifyUrl(properties.getNotifyUrl());
-            dynamicProps.setRefundNotifyUrl(properties.getRefundNotifyUrl());
-            dynamicProps.setReturnUrl(properties.getReturnUrl());
-            dynamicProps.setPublicBaseUrl(properties.getPublicBaseUrl());
-            dynamicProps.setLinkHmacSecret(properties.getLinkHmacSecret());
-            dynamicProps.setLinkTtlHours(properties.getLinkTtlHours());
-            dynamicProps.setConnectTimeoutSeconds(properties.getConnectTimeoutSeconds());
-            dynamicProps.setReadTimeoutSeconds(properties.getReadTimeoutSeconds());
-
-            return new AllinpayClient(dynamicProps);
-        } catch (Exception e) {
-            return new AllinpayClient(properties);
-        }
-    }
 
     @Transactional(rollbackFor = Exception.class)
     public PaymentRefundRespVO apply(PaymentRefundApplyReqVO req, Long userId) {
@@ -114,7 +66,7 @@ public class PaymentRefundService {
         PaymentRefundDO refund = refundMapper.selectByIdForUpdate(id); if (refund == null) throw exception(PAYMENT_REFUND_NOT_EXISTS);
         if (!("accepted".equals(refund.getStatus()) || "unknown".equals(refund.getStatus()))) return toVO(refund);
         PaymentIntentDO payment = paymentMapper.selectById(refund.getPaymentOrderId());
-        AllinpayClient.GatewayResponse result = createAllinpayClient(payment).queryRefund(refund.getRefundReqsn(), null);
+        AllinpayClient.GatewayResponse result = gatewayFactory.create(payment).queryRefund(refund.getRefundReqsn(), null);
         recordEvent(refund, "refund_query", result, result.isSignatureValid());
         applyResult(refund, result); refund.setLastQueriedAt(LocalDateTime.now()); refundMapper.updateById(refund); return toVO(refund);
     }
@@ -142,7 +94,17 @@ public class PaymentRefundService {
         }
         if (refund == null) throw exception(PAYMENT_REFUND_NOT_EXISTS);
         PaymentIntentDO payment = paymentMapper.selectById(refund.getPaymentOrderId());
-        AllinpayClient.GatewayResponse result = AllinpayClient.GatewayResponse.from(payload, createAllinpayClient(payment).verify(payload));
+        AllinpayClient client = gatewayFactory.create(payment);
+        int fen;
+        try { fen = Integer.parseInt(String.valueOf(payload.get("trxamt"))); }
+        catch (RuntimeException ex) { throw exception(PAYMENT_CALLBACK_INVALID); }
+        if (!client.verify(payload) || !gatewayFactory.matchesMerchant(payment, payload)
+                || !java.util.Objects.equals(refund.getRefundReqsn(), reqsn)
+                || refund.getRefundAmount().movePointRight(2).intValueExact() != fen) {
+            throw exception(PAYMENT_CALLBACK_INVALID);
+        }
+        if ("succeeded".equals(refund.getStatus())) return;
+        AllinpayClient.GatewayResponse result = AllinpayClient.GatewayResponse.from(payload, true);
         recordEvent(refund, "refund_notify", result, result.isSignatureValid());
         applyResult(refund, result); refund.setLastQueriedAt(LocalDateTime.now()); refundMapper.updateById(refund);
     }
@@ -155,8 +117,10 @@ public class PaymentRefundService {
         if ("unknown".equals(refund.getStatus())) return refresh(id);
         PaymentIntentDO payment = paymentMapper.selectById(refund.getPaymentOrderId());
         int fen = refund.getRefundAmount().movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).intValueExact();
+        // 本地配置错误尚未发送请求，不能伪装成网关结果未知。
+        AllinpayClient client = gatewayFactory.create(payment);
         try {
-            AllinpayClient.GatewayResponse result = createAllinpayClient(payment).refund(refund.getRefundReqsn(), fen, refund.getOriginalReqsn(), refund.getOriginalTrxId(), refund.getReason());
+            AllinpayClient.GatewayResponse result = client.refund(refund.getRefundReqsn(), fen, refund.getOriginalReqsn(), refund.getOriginalTrxId(), refund.getReason());
             recordEvent(refund, "refund_submit", result, result.isSignatureValid()); applyResult(refund, result);
         } catch (RuntimeException ex) { refund.setStatus("unknown").setLastErrorMessage(cut(ex.getMessage(), 500)).setRetryCount((refund.getRetryCount() == null ? 0 : refund.getRetryCount()) + 1); refundMapper.updateById(refund); }
         return toVO(refund);

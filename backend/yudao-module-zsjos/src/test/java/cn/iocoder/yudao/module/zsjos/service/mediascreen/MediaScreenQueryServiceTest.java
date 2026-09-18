@@ -45,7 +45,7 @@ class MediaScreenQueryServiceTest {
         when(leadMapper.countMediaScreenDailyContributions(anyLong(),any(),any())).thenReturn(List.of());
         when(snapshotMapper.selectByDate(anyLong(),any())).thenReturn(List.of());
         when(partnerMapper.selectBatchIds(anyCollection())).thenReturn(List.of(
-                new PartnerDO().setId(101L).setName("合作方甲").setStatus("enabled"),
+                new PartnerDO().setId(101L).setName("合作方甲").setNickname("榜单昵称甲").setStatus("enabled"),
                 new PartnerDO().setId(102L).setName("合作方乙").setStatus("disabled")));
         service=new MediaScreenQueryService(leadMapper,snapshotMapper,partnerMapper,userApi,deptApi,
                 mock(MaintenanceModeApi.class),redis,properties);
@@ -71,6 +71,7 @@ class MediaScreenQueryServiceTest {
         assertEquals(6,included.getSummary().getMonthEffective());
         assertEquals(7,included.getPartTimeCompanionDepartment().getMetrics().getMonthTotal());
         assertEquals(1,included.getPartTimeCompanionDepartment().getMembers().get(0).getPartTimers().size());
+        assertEquals("合作方甲",included.getPartTimeCompanionDepartment().getMembers().get(0).getPartTimers().get(0).getName());
         assertEquals(7,included.getTodayStar().getToday());
         assertTrue(included.getTodayStar().isIncludesPartTime());
     }

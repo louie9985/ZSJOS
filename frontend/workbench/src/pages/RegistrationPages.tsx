@@ -1,3 +1,4 @@
+import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
 import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ClipboardEvent as ReactClipboardEvent } from "react";
@@ -20,6 +21,7 @@ import {
   Switch,
   Tag,
   Tabs,
+  Tooltip,
   Typography,
   Upload,
   message,
@@ -704,6 +706,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 
 export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
   const { useTableLayout } = useInboxTableLayout();
+  const avatarRail = useInboxAvatarRail('zsjos.my-students.list-collapsed');
   const location = useLocation();
   const taskTarget = location.state as { personId?: number; serviceRelationId?: number; classId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedPersonId = Number(taskTarget?.personId) || undefined;
@@ -1034,16 +1037,10 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         onRow={row => ({ onClick: () => { void loadStudent(row.personId); setDrawerOpen(true); } })}
         columns={studentTableColumns}
         onChange={(_, __, sorter) => { const active = Array.isArray(sorter) ? sorter[0] : sorter; setStudentSort({ key: String(active?.columnKey || ""), order: active?.order || undefined }); }}
-      /> : <div className="lead-inbox-layout">
+      /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
         <aside className="lead-inbox-list-pane">
-          <div className="lead-inbox-toolbar">
-            <Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} optionFilterProp="label" value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: '100%', marginBottom: 8 }}
-              onChange={value => { resetSelection(); setPageNo(1); setClassId(value); }}
-              options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}
-              notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />
-            <Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: '100%', marginBottom: 8 }}
-              onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value); }}
-              options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
+          <div className="inbox-avatar-toolbar"><InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+          <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
             <AdvancedFilterToolbar
               scene="student"
               pageKey="student_my"
@@ -1061,22 +1058,33 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
                 setAdvancedFilter(value);
               }}
             />
+            <div className="inbox-avatar-secondary-filters">
+            <Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} optionFilterProp="label" value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: '100%' }}
+              onChange={value => { resetSelection(); setPageNo(1); setClassId(value); }}
+              options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}
+              notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />
+            <Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: '100%' }}
+              onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value); }}
+              options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
+            </div>
           </div>
-          {error && <LoadState error={error} retry={() => void load(pageNo)} />}
-          <div className="lead-inbox-scroll">
+          </div></div>
+          {error && (avatarRail.collapsed ? <InboxAvatarError message={error} expand={() => avatarRail.change(false)} retry={() => void load(pageNo)} /> : <LoadState error={error} retry={() => void load(pageNo)} />)}
+          <div id="student-avatar-list" aria-busy={loading} ref={avatarRail.scrollRef} className="lead-inbox-scroll">
             {loading && !rows.length ? (
               Array.from({ length: 5 }, (_, index) => (
                 <div className="lead-inbox-item" key={index}>
-                  <Skeleton active avatar paragraph={{ rows: 2 }} />
+                  {avatarRail.collapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active avatar paragraph={{ rows: 2 }} />}
                 </div>
               ))
             ) : !rows.length && !error ? (
-              <Empty description="当前筛选下暂无学员" />
+              avatarRail.collapsed ? <span className="inbox-avatar-empty" role="status">暂无学员</span> : <Empty description="当前筛选下暂无学员" />
             ) : (
               rows.map((row) => (
-                <button
+                <Tooltip key={row.personId} title={avatarRail.collapsed ? `${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}><button
                   type="button"
-                  key={row.personId}
+                  aria-label={`${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}`}
+                  aria-current={selected?.personId === row.personId ? 'true' : undefined}
                   className={`lead-inbox-item${selected?.personId === row.personId ? " active" : ""}`}
                   onClick={() => void loadStudent(row.personId)}
                 >
@@ -1098,11 +1106,11 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
                       </span>
                     </div>
                   </div>
-                </button>
+                </button></Tooltip>
               ))
             )}
           </div>
-          {total > PAGE_SIZE && (
+          {total > PAGE_SIZE && (avatarRail.collapsed ? <InboxAvatarPagination page={pageNo} total={total} pageSize={PAGE_SIZE} loading={loading} onChange={value => void load(value)} /> :
             <Pagination
               className="registration-pagination"
               simple

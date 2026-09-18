@@ -11,6 +11,13 @@ import java.util.Map;
 public class PositioningCardRespVO {
     private Long id;
     private Long submissionId;
+    private Integer submissionVersion;
+    private Boolean evidenceRequired;
+    private Boolean canUploadEvidence;
+    private String submissionStatus;
+    private String directorName;
+    private String operatorName;
+    private List<cn.iocoder.yudao.module.zsjos.service.positioning.PositioningEvidenceService.Evidence> evidence;
     private LocalDateTime studentDecidedAt;
     private String studentDecisionComment;
     private String cardNo;

@@ -126,17 +126,16 @@ zsjos:
   payment:
     allinpay:
       enabled: false
-      cusid: ${ZSJOS_ALLINPAY_CUSID:}
-      appid: ${ZSJOS_ALLINPAY_APPID:}
-      orgid: ${ZSJOS_ALLINPAY_ORGID:}
       notify-url: ${ZSJOS_ALLINPAY_NOTIFY_URL:}
       return-url: ${ZSJOS_ALLINPAY_RETURN_URL:}
       public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
-      merchant-private-key-location: ${ZSJOS_ALLINPAY_PRIVATE_KEY:}
-      platform-public-key-location: ${ZSJOS_ALLINPAY_PUBLIC_KEY:}
       link-hmac-secret: ${ZSJOS_PAYMENT_LINK_HMAC_SECRET:}
       allowed-payinfo-hosts: ${ZSJOS_ALLINPAY_PAYINFO_HOSTS:}
 ```
+
+上述配置仅管理通用支付入口、回调、超时及链接参数。购买支付与退款的商户号、应用 ID、机构号、私钥和平台公钥来自订单主体快照；全局同名字段及密钥文件路径不再作为异常回退来源。
+
+主体路由以服务端真实 SKU 关联为准：各产品有配置时使用其主体，没有配置时使用当前租户默认主体；所有明细最终主体相同则使用共同主体，不同则使用默认主体。不会因多个 SKU 或多条明细直接指定学校编码。所有参与解析的主体及最终默认主体必须有效，否则生成链接失败。完整错误与快照契约见[支付主体 API](../api/payment-subject.md#支付主体路由与快照2026-09-18)。
 
 ## 8. 发布与验收
 

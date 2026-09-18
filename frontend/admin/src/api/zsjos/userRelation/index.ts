@@ -7,6 +7,7 @@ export interface UserRelationSceneVO {
   code: string
   sourceLabel: string
   targetLabel: string
+  sourceType?: 'system_user' | 'partner'
   sourcePostCode: string
   targetPostCode?: string
   targetEligibilityType: 'post' | 'permission'
@@ -28,6 +29,7 @@ export interface RelationUserVO {
 }
 
 export interface UserRelationVO extends RelationUserVO {
+  ownerIdentity?: 'sales' | 'education'
   targetUsers: RelationUserVO[]
   validTargetCount: number
   invalidTargetCount: number
@@ -74,6 +76,7 @@ export const saveRelations = (data: {
   sceneCode: string
   sourceUserIds: number[]
   targetUserIds: number[]
+  ownerIdentity?: 'sales' | 'education'
   mode: 'append' | 'replace' | 'remove'
 }) => request.put({ url: '/zsjos/user-relation/relation/save', data })
 

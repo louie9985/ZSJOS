@@ -5,12 +5,18 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import java.time.LocalDateTime;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Data
 public class PartnerStudentInvitationCreateReqVO {
 
     @NotNull
     private Long studentPersonId;
+
+    @NotNull
+    @Schema(description = "本次邀请明确选择的归属运营，不修改学员服务关系")
+    private Long assignedOperatorUserId;
 
     @NotBlank
     @Size(max = 100)
@@ -19,4 +25,7 @@ public class PartnerStudentInvitationCreateReqVO {
     @NotBlank
     @Mobile
     private String mobile;
+
+    @Schema(description = "到期时间，毫秒时间戳；未传时默认生成时刻起 7 天")
+    private LocalDateTime expiresAt;
 }

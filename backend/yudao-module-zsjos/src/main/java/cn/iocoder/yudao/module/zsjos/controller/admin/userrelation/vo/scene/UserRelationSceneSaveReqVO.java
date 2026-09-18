@@ -23,7 +23,8 @@ public class UserRelationSceneSaveReqVO {
     @NotBlank(message = "目标用户称谓不能为空")
     private String targetLabel;
 
-    @NotBlank(message = "来源岗位不能为空")
+    @Pattern(regexp = "system_user|partner", message = "来源主体类型不正确")
+    private String sourceType = "system_user";
     private String sourcePostCode;
 
     private String targetPostCode;

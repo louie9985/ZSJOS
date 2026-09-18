@@ -29,7 +29,7 @@ public interface ProductPaymentSubjectMapper extends BaseMapperX<ProductPaymentS
                 AND r.tenant_id = p.tenant_id AND r.deleted = 0
             LEFT JOIN zsjos_payment_subject s ON s.id = r.payment_subject_id
                 AND s.tenant_id = p.tenant_id AND s.deleted = 0
-            WHERE p.deleted = 0 AND p.tenant_id = #{tenantId}
+            WHERE p.deleted = 0 AND p.tenant_id = #{tenantId} AND p.status = 0
             <if test="req.productName != null and req.productName != ''">
                 AND p.name LIKE CONCAT('%', #{req.productName}, '%')
             </if>

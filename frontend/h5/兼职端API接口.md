@@ -107,7 +107,7 @@ inviteCode: 四位大写英文字母 + 四位数字；前端会自动转大写
 password/confirmPassword: 8-20 位且同时包含字母和数字，必须一致
 ```
 
-服务端按手机号和邀请码匹配管理员生成的待激活记录。邀请码默认 7 天过期，使用后立即失效且不可复用；同一手机号被创建新邀请码时，旧待激活邀请码会直接失效。激活成功会创建兼职主体、独立 Partner 登录账号和归属运营记录，并直接返回登录 Token。
+服务端按手机号和邀请码匹配管理员生成的待激活记录。邀请码可在管理端或工作台生成时设置到期日期时间，未指定时默认 7 天过期，使用后立即失效且不可复用；同一手机号被创建新邀请码时，旧待激活邀请码会直接失效。激活成功会创建兼职主体、独立 Partner 登录账号和归属运营记录，并直接返回登录 Token。
 
 ### 1.2 企业微信授权地址
 
@@ -1144,3 +1144,7 @@ H5 按 ZSJOS Partner 响应 VO 使用真实字段：课程目录使用分类节�
 
 ### H5 排行榜配置补充（2026-09-14）
 管理后台通过 `/admin-api/zsjos/partner/leaderboard-config/get` 查询、`PUT /admin-api/zsjos/partner/leaderboard-config/save` 保存当前租户配置。配置包含 `enabled`、`includeEmployeeSubmitter`、`employeeRoleCodes`、`enabledTypes`、`defaultType` 和 `defaultPeriod`；未配置时服务端返回安全默认值。员工提交者只有在开关开启且提交时角色编码命中配置时进入统计。
+
+## 兼职客资分配方式
+
+提交支持自动或指定分配，默认自动。分配能力使用 `/part-api/zsjos/lead/assignment-options`，只返回配置状态和安全原因，不返回接单人员。指定请求只提交 `dispatchMode=specified`，目标由服务器解析；配置失效报错并保留表单，不自动降级。配置、错误码和复核快照规则见 [兼职指定分配与教务接单](../../docs/api/partner-specified-assignment.md)。
