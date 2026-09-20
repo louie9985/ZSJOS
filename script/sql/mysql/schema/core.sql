@@ -4052,6 +4052,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `public_pool_at` datetime DEFAULT NULL COMMENT '进入抢单池时间',
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交幂等键',
   `active_person_id` bigint GENERATED ALWAYS AS (CASE WHEN (`deleted` = b'0') THEN `person_id` ELSE NULL END) STORED COMMENT '活动客户主客资唯一键',
+  `pending_owner_identity` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '指定承接身份快照',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_lead_no` (`tenant_id`,`lead_no`),
   UNIQUE KEY `uk_tenant_submission_idempotency` (`tenant_id`,`submission_idempotency_key`),
@@ -4913,6 +4914,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_partner` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '兼职主体编号',
   `partner_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '兼职主体业务编号',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名或主体名称',
+  `nickname` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '排行榜昵称',
   `mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '手机号',
   `email` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '邮箱',
   `avatar` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像地址',
@@ -5702,6 +5704,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  `owner_identity` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '承接身份',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_scene_source_target` (`tenant_id`,`scene`,`source_user_id`,`target_user_id`),
   KEY `idx_tenant_scene_source_status` (`tenant_id`,`scene`,`source_user_id`,`status`)
@@ -5732,7 +5735,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   `code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '场景编码',
   `source_label` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '来源用户称谓',
   `target_label` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标用户称谓',
-  `source_post_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '来源岗位编码',
+  `source_post_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '来源岗位编码',
   `target_post_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标岗位编码',
   `target_eligibility_type` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'post',
   `target_permission_code` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -5744,6 +5747,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  `source_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'system_user' COMMENT '来源主体类型',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
@@ -6667,6 +6671,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_positioning_card_submission` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   `tenant_id` bigint NOT NULL,
+  `evidence_required` bit(1) NOT NULL DEFAULT b'0' COMMENT '本轮是否要求确认凭证',
+  `evidence_json` longtext COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '运营确认凭证及上传记录',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_card_submission` (`tenant_id`,`card_id`,`submission_no`,`deleted`),
   KEY `idx_tenant_student_account_submitted` (`tenant_id`,`student_person_id`,`account_id`,`submitted_at`),
@@ -7554,6 +7560,147 @@ CREATE TABLE IF NOT EXISTS zsjos_student_positioning_interview_attachment (
   KEY idx_tenant_interview (tenant_id,interview_id,deleted),
   KEY idx_tenant_student (tenant_id,student_person_id,deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位访谈稿引用';
+
+-- zsjos_student_delivery_config
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `s0_days` int NOT NULL DEFAULT '3',
+  `s1_days` int NOT NULL DEFAULT '7',
+  `s2_days` int NOT NULL DEFAULT '7',
+  `s3_days` int NOT NULL DEFAULT '14',
+  `s4_days` int NOT NULL DEFAULT '14',
+  `s5_days` int NOT NULL DEFAULT '14',
+  `s6_days` int NOT NULL DEFAULT '30',
+  `enabled` bit(1) NOT NULL DEFAULT b'1',
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_config_version` (`tenant_id`,`version`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期配置'
+
+-- zsjos_student_delivery_defer
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_defer` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `stage_id` bigint NOT NULL,
+  `requested_by` bigint NOT NULL,
+  `supervisor_user_id` bigint DEFAULT NULL,
+  `requested_days` int NOT NULL,
+  `original_due_at` datetime NOT NULL,
+  `reason` varchar(1000) NOT NULL,
+  `bpm_process_instance_id` varchar(64) DEFAULT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'PENDING',
+  `decided_at` datetime DEFAULT NULL,
+  `decision_reason` varchar(1000) DEFAULT NULL,
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `new_due_at` datetime DEFAULT NULL,
+  `idempotency_key` varchar(128) DEFAULT NULL,
+  `pending_stage_id` bigint GENERATED ALWAYS AS ((case when ((`deleted` = 0x00) and (`status` = _utf8mb4'PENDING')) then `stage_id` else NULL end)) STORED,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_pending` (`tenant_id`,`pending_stage_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付延期审批'
+
+-- zsjos_student_delivery_form
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_form` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `stage_code` varchar(8) NOT NULL,
+  `version` int NOT NULL,
+  `status` varchar(16) NOT NULL DEFAULT 'DRAFT',
+  `fields_json` longtext NOT NULL,
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_form` (`tenant_id`,`stage_code`,`version`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认表单版本'
+
+-- zsjos_student_delivery_plan
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_plan` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `student_person_id` bigint NOT NULL,
+  `account_id` bigint NOT NULL,
+  `service_relation_id` bigint DEFAULT NULL,
+  `director_user_id` bigint DEFAULT NULL,
+  `account_opened_at` datetime NOT NULL,
+  `config_version` int NOT NULL DEFAULT '1',
+  `status` varchar(32) NOT NULL DEFAULT 'ACTIVE',
+  `version` int NOT NULL DEFAULT '0',
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `round_no` int DEFAULT NULL COMMENT '交付轮次',
+  `source_submission_id` bigint DEFAULT NULL,
+  `restart_requested_at` datetime DEFAULT NULL,
+  `live_account_id` bigint GENERATED ALWAYS AS ((case when ((`deleted` = 0x00) and (`status` in (_utf8mb4'ACTIVE',_utf8mb4'REPOSITIONING'))) then `account_id` else NULL end)) STORED,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_live` (`tenant_id`,`live_account_id`),
+  KEY `idx_delivery_plan_account` (`tenant_id`,`account_id`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期计划'
+
+-- zsjos_student_delivery_stage
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_stage` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `plan_id` bigint NOT NULL,
+  `account_id` bigint NOT NULL,
+  `stage_code` varchar(8) NOT NULL,
+  `director_user_id` bigint DEFAULT NULL,
+  `trigger_at` datetime NOT NULL,
+  `due_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `completed_by` bigint DEFAULT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'WAITING',
+  `defer_days` int DEFAULT NULL,
+  `defer_reason` varchar(1000) DEFAULT NULL,
+  `bpm_process_instance_id` varchar(64) DEFAULT NULL,
+  `form_version_id` bigint DEFAULT NULL,
+  `submission_json` longtext,
+  `version` int NOT NULL DEFAULT '0',
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_stage` (`tenant_id`,`plan_id`,`stage_code`,`deleted`),
+  KEY `idx_delivery_stage_due` (`tenant_id`,`director_user_id`,`status`,`due_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付阶段任务'
+
+-- zsjos_student_delivery_submission
+CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_submission` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `stage_id` bigint NOT NULL,
+  `template_version_id` bigint DEFAULT NULL,
+  `field_values_json` longtext NOT NULL,
+  `dictionary_snapshot_json` longtext,
+  `attachment_snapshot_json` longtext,
+  `submitted_by` bigint NOT NULL,
+  `submitted_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `creator` varchar(64) NOT NULL DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) NOT NULL DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `idempotency_key` varchar(128) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_delivery_submission_stage` (`tenant_id`,`stage_id`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认提交快照'
 
 -- 内容审核字典类型（业务字典项由管理员在字典管理中维护）
 INSERT IGNORE INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`updater`)

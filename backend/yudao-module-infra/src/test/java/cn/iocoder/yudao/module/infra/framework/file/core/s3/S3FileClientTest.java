@@ -19,6 +19,72 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class S3FileClientTest {
 
     @Test
+    public void testPresignPutUrl_customDomain_usesStorageEndpoint() {
+        S3FileClientConfig config = uploadConfig();
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+
+        String path = ".direct-upload/中文 image.png";
+        URI legacy = URI.create(client.presignPutUrl(path));
+        var direct = client.presignPutUrl(path, "image/png", 123L, 900);
+        URI upload = URI.create(direct.uploadUrl());
+        assertEquals("material-test.cos.ap-guangzhou.myqcloud.com", legacy.getHost());
+        assertEquals(legacy.getHost(), upload.getHost());
+        assertEquals("/" + path, upload.getPath());
+        assertTrue(upload.getQuery().contains("X-Amz-Expires=900"));
+        assertTrue(direct.headers().entrySet().stream().anyMatch(entry ->
+                entry.getKey().equalsIgnoreCase("content-type") && entry.getValue().equals("image/png")));
+        assertFalse(direct.headers().keySet().stream().anyMatch(name ->
+                name.equalsIgnoreCase("host") || name.equalsIgnoreCase("content-length")));
+        assertEquals("https://files.example.test/cover.png", client.presignGetUrl("cover.png", 300));
+        assertEquals("https://files.example.test", config.getDomain());
+    }
+
+    @Test
+    public void testPresignPutUrl_pathStyle_keepsPrivateReadEndpoint() {
+        S3FileClientConfig config = uploadConfig();
+        config.setEndpoint("http://127.0.0.1:9000");
+        config.setDomain("https://files.example.test/material-test");
+        config.setEnablePathStyleAccess(true);
+        config.setEnablePublicAccess(false);
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+
+        URI upload = URI.create(client.presignPutUrl("cover.png", "image/png", 123L, 900).uploadUrl());
+        assertEquals("127.0.0.1", upload.getHost());
+        assertEquals(9000, upload.getPort());
+        assertEquals("/material-test/cover.png", upload.getPath());
+        URI read = URI.create(client.presignGetUrl("cover.png", 300));
+        assertEquals("files.example.test", read.getHost());
+        assertEquals("/material-test/cover.png", read.getPath());
+        assertTrue(read.getQuery().contains("X-Amz-Expires=300"));
+    }
+
+    @Test
+    public void testPresignPutUrl_defaultDomain() {
+        S3FileClientConfig config = uploadConfig();
+        config.setDomain(null);
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+        assertEquals("material-test.cos.ap-guangzhou.myqcloud.com",
+                URI.create(client.presignPutUrl("cover.png")).getHost());
+        assertEquals("https://material-test.cos.ap-guangzhou.myqcloud.com/cover.png",
+                client.presignGetUrl("cover.png", 300));
+    }
+
+    private S3FileClientConfig uploadConfig() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setAccessKey("test-access-key");
+        config.setAccessSecret("test-access-secret");
+        config.setBucket("material-test");
+        config.setEndpoint("https://cos.ap-guangzhou.myqcloud.com");
+        config.setDomain("https://files.example.test");
+        config.setEnablePathStyleAccess(false);
+        config.setEnablePublicAccess(true);
+        return config;
+    }
+
+    @Test
     public void testPresignGetUrl_publicAccess_encodeUrlPath() {
         // 准备参数
         S3FileClientConfig config = new S3FileClientConfig();

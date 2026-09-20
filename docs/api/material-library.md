@@ -19,6 +19,12 @@
 
 字典字段保存 value、类型和选择时的 label 快照，历史详情不重新解析当前字典。文件通过 Infra 预签名直传，再由服务端确认对象元数据。
 
+Infra S3 的两个 PUT 预签名入口均使用存储配置的 `endpoint`，由 SDK 按桶名和
+path-style 配置生成上传地址；`endpoint` 必须能被上传浏览器访问，并允许站点来源、PUT
+及上传请求头的 CORS 预检。自定义 `domain` 继续用于文件访问，公开读取 URL 和私有 GET
+签名保持原有逻辑。修复上传不需要改写 `domain` 或历史文件链接；部署后应验证初始化、
+浏览器 PUT、上传确认与保存后预览的完整流程。
+
 Workbench provides direct creation pages for `viral_account` and `viral_content` under the server-owned
 `/zsjos` menu. Both use `zsjos:material:create`; the browse page also exposes the same forms. The stable
 `viral_content` type is displayed as “爆款内容” and its `zsjos_viral_content_type` selections retain their

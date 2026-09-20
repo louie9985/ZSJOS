@@ -369,3 +369,45 @@
 - Verification evidence: 三个备份目录递归检查剩余文件数为 0；完整目录扫描未发现额外压缩 SQL/数据库 dump 候选；Git scoped diff 确认 3 个跟踪备份删除；handoff scoped diff --check 通过；df 显示磁盘可用约 37 GiB、使用率 68%。
 - Dependency or integration impact: None；未执行数据库 SQL、服务变更、提交或推送；源码测试不适用于备份清理。
 - Remaining work: None；已删除备份不可用于历史恢复，自动备份策略未变更。
+
+## Workstream Registration - 2026-09-19T00:35:58+08:00
+
+- Workstream ID: `test-origin-sync-20260919`; Owner: Codex `/root`。
+- Goal: 按用户要求拉取远程最新代码并合并到当前本地 main。
+- Non-goals: 不部署、重启、执行数据库迁移、推送或修改业务实现；保留已有 yudao-server.jar 修改。
+- Environment: test（/etc/zsjos/agent-environment）；Branch: main；Worktree: /opt/zsjos；Base commit: d9850a6a15a77b2ddd7a1f508df1d7a8eab2d3e1。
+- Ownership scope: origin/main 两个提交涉及的跟踪文件（仅 Git 快进同步）及 handoff/test_main.md（追加记录）。
+- Dependencies: origin/main；用户已明确授权拉取合并。Target branch: main；Integration order: origin/main 快进至 main。
+- Verification plan: 检查提交分歧、快进结果、HEAD 与 origin/main 一致性、无冲突及原有 jar SHA-256 保持不变；本次仅同步，不作运行时验收。
+
+## Delivery Entry - 2026-09-19T00:36:26+08:00
+
+- Workstream ID: `test-origin-sync-20260919`; Owner / Branch / Worktree: 同本轮登记；HEAD: `7785d317c829650980192d06383739958f642e43`。
+- User goal: 拉取远程最新代码合并到本地。
+- Key decisions: 使用 git fetch origin 与 git merge --ff-only origin/main；无需暂存或覆盖本地改动。
+- Execution result: 从 d9850a6a 快进至 7785d317，同步 2 个提交、281 个文件，无冲突。
+- Changed files: 上述远程提交包含的 281 个文件（git diff --name-only d9850a6a..7785d317 可复现清单）；本地追加 handoff/test_main.md。
+- Verification evidence: HEAD 与 origin/main 完全一致，ahead/behind 为 0/0，git ls-files -u 为空；原有 yudao-server.jar SHA-256 前后一致（54a2794d0993d47ccf1a4613cd8be97e86904a50e480a1343999936bdb32a81d）；记录 scoped diff --check 通过。
+- Dependency or integration impact: 无新合并提交、推送、部署、服务或数据库操作；工作区保留 jar 原有修改及本次交付记录。
+- Remaining work: None（代码同步范围）；未执行构建、应用测试或 SQL，远程变更运行效果未验证。
+
+## Workstream Registration - 2026-09-19 13:26:55 +08:00
+
+- Workstream ID: `test-s3-upload-endpoint`
+- Goal: 修复自定义访问域名导致的上传预签名地址错误，保留读取链接行为。
+- Non-goals: 不改数据库/domain、前端、权限、GET 签名行为；不部署、重启、提交或推送。
+- Branch: `main`; Worktree: `/opt/zsjos`; Base commit: `7785d317c829650980192d06383739958f642e43`; Target branch / Integration order: None
+- Ownership scope: Infra `S3FileClient.java`、`S3FileClientTest.java`、`docs/api/material-library.md`、`handoff/test_main.md`。
+- Owner: Codex `/root`; Dependencies: 现有 AWS SDK / JUnit，无新依赖。
+- Verification plan: PUT 两个入口、自定义公开读取域名、私有 GET、path-style 回归测试及编译；核对 Admin/Workbench 调用契约与 scoped diff。真实共享环境上传和服务启停须另行授权。
+
+## Delivery Entry - 2026-09-19 13:29:23 +08:00
+
+- Workstream ID: `test-s3-upload-endpoint`; Branch / Worktree: 同本次登记；HEAD: `7785d317c829650980192d06383739958f642e43`（未变）。
+- User goal: 修复爆款账号拆解图片上传失败，保留自定义文件访问域名。
+- Key decisions: 新增独立 PUT 签名器，两个上传入口均使用存储 endpoint；原 GET 签名器及 domain 配置不变，无数据库写入。
+- Result: 修复自定义域名前被 SDK 重复拼接桶名的问题；Admin 旧 PUT 入口与 Workbench 业务直传入口同步修复，响应字段不变。读取行为按原逻辑保留。
+- Changed files: `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/framework/file/core/client/s3/S3FileClient.java`; `backend/yudao-module-infra/src/test/java/cn/iocoder/yudao/module/infra/framework/file/core/s3/S3FileClientTest.java`; `docs/api/material-library.md`; `handoff/test_main.md`。其余既有修改保留。
+- Verification evidence: Maven reactor 测试在 yudao-common testCompile 因无法创建测试输出目录中止；改用现有依赖与 target/classes，在 `/tmp/zsjos-s3-check-bcszpco8` javac 编译目标生产类和测试，JUnit Launcher 执行 7 项通过、6 项外部存储集成测试按原注解跳过。覆盖 COS 自定义域名、两个 PUT 入口、签名期限/请求头、公开读取域名、path-style 私有 GET、默认桶域名。Workbench `npm test -- src/services/directUpload.test.ts --configLoader runner` 2 项通过（默认配置打包因 .vite-temp 无写权限失败，runner 成功绕过）。Admin `useUpload.ts` 已核对直接 PUT 后端返回 uploadUrl，与旧入口测试匹配；浏览器实测未执行。`git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖，无前端/认证/权限接口格式变更；未提交、部署、重启或覆盖现有 jar。存储 endpoint 必须可被浏览器访问且允许 CORS。
+- Remaining work: 经用户另行明确授权后构建并部署测试服务、重启并验证 Admin/Workbench 实际上传、确认和预览；当前运行服务尚未加载修复。完整 Maven reactor 验证仍受既有输出目录问题阻断。

@@ -46,6 +46,7 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     private S3Client client;
     private S3Presigner presigner;
+    private S3Presigner uploadPresigner;
 
     public S3FileClient(Long id, S3FileClientConfig config) {
         super(id, config);
@@ -79,6 +80,13 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
                 .credentialsProvider(credentialsProvider)
                 .region(region)
                 .endpointOverride(presignerEndpoint)
+                .serviceConfiguration(serviceConfiguration)
+                .build();
+        // 自定义访问域名可能仅支持读取；PUT 使用存储 endpoint，避免 SDK 再给访问域名拼接桶名。
+        uploadPresigner = S3Presigner.builder()
+                .credentialsProvider(credentialsProvider)
+                .region(region)
+                .endpointOverride(endpoint)
                 .serviceConfiguration(serviceConfiguration)
                 .build();
     }
@@ -118,7 +126,7 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     @Override
     public String presignPutUrl(String path) {
-        return presigner.presignPutObject(PutObjectPresignRequest.builder()
+        return uploadPresigner.presignPutObject(PutObjectPresignRequest.builder()
                 .signatureDuration(EXPIRATION_DEFAULT)
                 .putObjectRequest(b -> b.bucket(config.getBucket()).key(path)).build())
                 .url().toString();
@@ -133,7 +141,7 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
                 .contentType(contentType)
                 .contentLength(contentLength)
                 .build();
-        PresignedPutObjectRequest presigned = presigner.presignPutObject(PutObjectPresignRequest.builder()
+        PresignedPutObjectRequest presigned = uploadPresigner.presignPutObject(PutObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofSeconds(expirationSeconds))
                 .putObjectRequest(request)
                 .build());
