@@ -478,8 +478,10 @@ Admin area management
   Hong Kong and Macao. The lead contract remains `provinceCode + cityCode`: a direct province leaf
   is normalized to `cityCode=OTHER`, while its persisted city display name remains empty.
 - V013 initializes ordinary siblings in Chinese pinyin order. The System service always keeps
-  `selection_code=OTHER` at the end of each level, while subsequent administrator edits to ordinary
-  nodes' `sort` values remain authoritative.
+  `selection_code=OTHER` first among siblings in management lists and enabled trees, while subsequent
+  administrator edits to ordinary nodes' `sort` values remain authoritative (ID breaks ties).
+  Admin, Workbench and H5 preserve the server order. List/tree cache keys use the `other-first`
+  suffix so deployment does not reuse cached results from the previous other-last ordering.
 - `AreaUtils` uses the System provider in a complete application and retains CSV only for runtimes
   that do not assemble the System module. Administrator changes invalidate both service and
   framework area caches.
@@ -942,3 +944,11 @@ ZSJOS 将 H5 排行榜开关、榜单类型、默认周期及员工提交者统�
 ### 教务自拓与成交身份
 
 教务自拓通过独立配置权限直接归属当前员工，由本人完成跟进、判定和成交，复用原审批/超时机制。客资来源、当前负责人身份与订单成交身份分别持久化；历史空身份不通过当前角色补造。自动派单、抢单和销售候选资格不扩大。V263 允许具备接单权限的教务承接兼职指定客资，关系主体、单目标约束与身份快照见 [兼职指定分配与教务接单](../api/partner-specified-assignment.md)。接口、快照、迁移和授权范围见 [教务自拓与直接成交](../api/zsjos-education-self-sourced.md)。
+
+### 关联用户有效性校验
+
+System 公共 API `validateUser` / `validateUserList` 校验指定用户在当前租户内是否存在且启用，
+不受调用方部门或“仅本人”数据范围过滤。单用户与批量入口均显式经过数据权限拦截；
+接口默认方法的内部转调不能替代代理入口。租户隔离、逻辑删除与停用校验仍生效。
+这不授予用户列表读取或业务操作权限：调用方仍须校验功能权限、对象关系和指派资格。
+Admin 与 Workbench 共用此服务端规则；运营新增学员账号仍经过账号创建权限和学员服务指派关系校验。

@@ -2,12 +2,17 @@ package cn.iocoder.yudao.module.system.service.ip;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.module.system.controller.admin.ip.vo.AreaListReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.ip.vo.AreaNodeRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.ip.vo.AreaSaveReqVO;
+
 import cn.iocoder.yudao.module.system.dal.dataobject.ip.AreaDO;
 import cn.iocoder.yudao.module.system.dal.mysql.ip.AreaMapper;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
@@ -112,19 +117,56 @@ class AreaServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    void treeKeepsOtherLastRegardlessOfStoredSort() {
-        insertArea(1, "中国", 1, 0, 0);
-        insertArea(110000, "北京市", 2, 1, 0);
-        insertArea(990000000, "其他", 2, 1, 0);
-        AreaDO other = areaMapper.selectById(990000000);
-        other.setSelectionCode("OTHER");
-        other.setSort(0);
-        areaMapper.updateById(other);
+    void treeKeepsOtherFirstAtEveryLevelRegardlessOfStoredSort() {
+        insertOrderingFixture();
 
         var provinces = areaService.getEnabledChinaTree();
 
-        assertEquals(110000, provinces.getFirst().getId());
-        assertEquals(990000000, provinces.getLast().getId());
+        assertEquals(List.of(990000000, 120000, 110000),
+                provinces.stream().map(AreaNodeRespVO::getId).toList());
+        var cities = provinces.getLast().getChildren();
+        assertEquals(List.of(990000001, 110100, 110200),
+                cities.stream().map(AreaNodeRespVO::getId).toList());
+        assertEquals(List.of(990000002, 110101),
+                cities.get(1).getChildren().stream().map(AreaNodeRespVO::getId).toList());
+    }
+
+    @Test
+    void managementListsKeepOtherFirstAndPreserveOrdinarySortAndIdOrder() {
+        insertOrderingFixture();
+        List<Integer> expected = List.of(1, 990000000, 120000, 110000,
+                990000001, 110100, 110200, 990000002, 110101);
+
+        assertEquals(expected, areaService.getAreaList().stream().map(AreaDO::getId).toList());
+        assertEquals(expected, areaService.getAreaList(new AreaListReqVO()).stream()
+                .map(AreaDO::getId).toList());
+        AreaListReqVO filter = new AreaListReqVO();
+        filter.setName("测试城市");
+        assertEquals(List.of(990000001, 110100, 110200),
+                areaService.getAreaList(filter).stream().map(AreaDO::getId).toList());
+    }
+
+    private void insertOrderingFixture() {
+        insertArea(1, "中国", 1, 0, 0);
+        insertArea(110000, "北京市", 2, 1, 0);
+        insertArea(120000, "天津市", 2, 1, 0);
+        AreaDO tianjin = areaMapper.selectById(120000);
+        tianjin.setSort(0);
+        areaMapper.updateById(tianjin);
+        insertArea(110200, "测试城市二", 3, 110000, 0);
+        insertArea(110100, "测试城市一", 3, 110000, 0);
+        insertArea(110101, "东城区", 4, 110100, 0);
+        insertOtherArea(990000000, "其他", 2, 1);
+        insertOtherArea(990000001, "其他测试城市", 3, 110000);
+        insertOtherArea(990000002, "其他区县", 4, 110100);
+    }
+
+    private void insertOtherArea(int id, String name, int type, int parentId) {
+        insertArea(id, name, type, parentId, 0);
+        AreaDO other = areaMapper.selectById(id);
+        other.setSelectionCode("OTHER");
+        other.setSort(Integer.MAX_VALUE);
+        areaMapper.updateById(other);
     }
 
     private static AreaSaveReqVO request(int id, String name, int parentId) {

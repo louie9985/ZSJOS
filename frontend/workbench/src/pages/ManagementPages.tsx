@@ -1,9 +1,9 @@
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio, Select, Space, Spin, Switch, Tabs, Tag, Typography, Upload, message } from 'antd'
+import { Alert, Avatar, Button, DatePicker, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio, Select, Space, Spin, Switch, Tabs, Tag, Typography, message } from 'antd'
 import {
   CheckOutlined, CloseOutlined, DeleteOutlined, EditOutlined, PlusOutlined,
-  ReloadOutlined, SafetyCertificateOutlined, StopOutlined, UploadOutlined
+  ReloadOutlined, SafetyCertificateOutlined, StopOutlined
 } from '@ant-design/icons'
 import { formatTimestamp } from '../services/time'
 import {
@@ -16,7 +16,6 @@ import SubordinatePartnerPage from './SubordinatePartnerPage'
 import { availableAuditTabs, canUpdateMaintenance, hasPermission, withdrawalDetailScope } from '../services/managementAccess'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import DateTimeText from '../components/DateTimeText'
-import { ClipboardUploadButtons } from '../components/ClipboardPasteTarget'
 import { type ProColumns } from '@ant-design/pro-components'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 
@@ -103,21 +102,55 @@ export function CashbackPage({ permissions }: { permissions: string[] }) {
 export function WithdrawalPage({ permissions }: { permissions: string[] }) {
   const detailScope = withdrawalDetailScope(permissions), own = detailScope === 'own', authorized = own ? hasPermission(permissions, 'zsjos:withdrawal:my-query') : true, [items, setItems] = useState<Withdrawal[]>([]), [loading, setLoading] = useState(false), [error, setError] = useState(authorized ? '' : '无权查看提现记录'), [page, setPage] = useState(1), [total, setTotal] = useState(0), [status, setStatus] = useState<string>(), [detail, setDetail] = useState<Withdrawal>()
   const [applyOpen, setApplyOpen] = useState(false), [available, setAvailable] = useState<Cashback[]>([]), [applyForm] = Form.useForm(), [selectedCashbacks, setSelectedCashbacks] = useState<number[]>([])
-  const [action, setAction] = useState<'reject' | 'payout'>(), [actionForm] = Form.useForm(), [proofFileId, setProofFileId] = useState<number>()
+  const [action, setAction] = useState<'reject' | 'payout' | 'batch-payout'>(), [actionForm] = Form.useForm()
+  const [selectedWithdrawals, setSelectedWithdrawals] = useState<number[]>([]), [payoutIds, setPayoutIds] = useState<number[]>([]), [savingAction, setSavingAction] = useState(false)
+  const canPayout = !own && hasPermission(permissions, 'zsjos:withdrawal:payout')
   const [keyword, setKeyword] = useState(''), [advancedFilter, setAdvancedFilter] = useState<import('../services/api').AdvancedFilterGroup>()
-  const load = useCallback(async (next = page) => { if (!authorized) return; setLoading(true); setError(''); try { const result = await managementApi.withdrawals(own, { pageNo: next, pageSize: 10, status, keyword: keyword || undefined, advancedFilter }); setItems(result.list); setTotal(result.total); setPage(next) } catch (e) { setError(errorText(e, '提现记录加载失败')) } finally { setLoading(false) } }, [authorized, own, page, status, keyword, advancedFilter])
+  const load = useCallback(async (next = page) => { if (!authorized) return; setSelectedWithdrawals([]); setItems([]); setLoading(true); setError(''); try { const result = await managementApi.withdrawals(own, { pageNo: next, pageSize: 10, status, keyword: keyword || undefined, advancedFilter }); setItems(result.list); setTotal(result.total); setPage(next) } catch (e) { setError(errorText(e, '提现记录加载失败')) } finally { setLoading(false) } }, [authorized, own, page, status, keyword, advancedFilter])
   useEffect(() => { void load(1) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const openDetail = async (row: Withdrawal) => { try { setDetail(await managementApi.withdrawal(row.id, detailScope)) } catch (e) { message.error(errorText(e, '提现详情加载失败')) } }
   const openApply = async () => { setApplyOpen(true); setSelectedCashbacks([]); try { setAvailable((await managementApi.cashbacks(true, { pageNo: 1, pageSize: 100, status: 'available' })).list) } catch (e) { message.error(errorText(e, '可提现返现加载失败')) } }
   const submitApply = async () => { try { const values = await applyForm.validateFields(); if (!selectedCashbacks.length) return message.warning('请选择返现记录'); await managementApi.applyWithdrawal({ ...values, cashbackIds: selectedCashbacks }); message.success('提现申请已提交'); setApplyOpen(false); await load(1) } catch (e) { if (e instanceof Error) message.error(e.message) } }
   const cancel = async (id: number) => { try { await managementApi.cancelWithdrawal(id); message.success('提现申请已撤销'); await load() } catch (e) { message.error(errorText(e, '撤销失败')) } }
-  const uploadProof = async (file: File) => { try { setProofFileId((await managementApi.uploadWithdrawalProof(file)).infraFileId); message.success('凭证已上传') } catch (e) { message.error(errorText(e, '凭证上传失败')) } }
-  const submitAction = async () => { if (!detail || !action) return; try { const values = await actionForm.validateFields(); if (action === 'reject') await managementApi.rejectWithdrawal(detail.id, values.reason); else { if (!proofFileId) return message.warning('请上传付款凭证'); await managementApi.payoutWithdrawal(detail.id, { bankTransactionNo: values.bankTransactionNo, proofFileId, remark: values.remark }) } message.success(action === 'reject' ? '已驳回提现' : '已登记打款'); setAction(undefined); setDetail(undefined); await load() } catch (e) { if (e instanceof Error) message.error(e.message) } }
+  const openPayout = (ids: number[], batch = false) => {
+    if (!canPayout || !ids.length) return
+    actionForm.resetFields()
+    setPayoutIds([...ids])
+    setAction(batch ? 'batch-payout' : 'payout')
+  }
+  const submitAction = async () => {
+    if (!action || savingAction) return
+    setSavingAction(true)
+    try {
+      const values = await actionForm.validateFields()
+      if (action === 'reject') {
+        if (!detail) return
+        await managementApi.rejectWithdrawal(detail.id, values.reason)
+      } else {
+        const data = { paidAt: values.paidAt?.format('YYYY-MM-DDTHH:mm:ss'), remark: values.remark?.trim() || undefined }
+        if (action === 'batch-payout') await managementApi.batchPayoutWithdrawals({ ...data, ids: payoutIds })
+        else await managementApi.payoutWithdrawal(payoutIds[0], data)
+      }
+      message.success(action === 'reject' ? '已驳回提现' : '已登记打款')
+      setAction(undefined)
+      setDetail(undefined)
+      await load()
+    } catch (e) { if (e instanceof Error) message.error(e.message) }
+    finally { setSavingAction(false) }
+  }
   const withdrawalColumns: ProColumns<Withdrawal>[] = [{ title: '提现单号', dataIndex: 'withdrawalNo', fixed: 'left' }, { title: '申请人', dataIndex: 'applicantUserId' }, { title: '申请金额', dataIndex: 'applicationAmount', render: v => money(v as number) }, { title: '状态', dataIndex: 'status', render: value => <Tag>{value}</Tag> }, { title: '账户名', dataIndex: 'accountNameSnapshot' }, { title: '银行卡', dataIndex: 'maskedCardNumber' }, { title: '开户行', dataIndex: 'bankNameSnapshot' }, { title: '提交时间', dataIndex: 'submittedAt', render: value => formatTimestamp(value as any) }, { title: '审核时间', dataIndex: 'reviewedAt', render: value => formatTimestamp(value as any) }, { title: '打款时间', dataIndex: 'paidAt', render: value => formatTimestamp(value as any) }, { key: 'action', title: '操作', fixed: 'right', render: (_, row) => <Space><Button type="link" onClick={() => void openDetail(row)}>详情</Button>{own && row.status === 'pending_review' && <Popconfirm title="确认撤销该提现申请？" onConfirm={() => void cancel(row.id)}><Button type="link" danger>撤销</Button></Popconfirm>}</Space> }]
-  return <section className="workspace-page management-page">{pageTitle(own ? '我的提现' : '提现管理', own ? '提交并跟踪返现提现申请' : '审核与登记提现打款', own && hasPermission(permissions, 'zsjos:withdrawal:apply') ? <Button type="primary" icon={<PlusOutlined/>} onClick={() => void openApply()}>申请提现</Button> : undefined)}<BusinessTable<Withdrawal> tableKey="management-pages-4" rowKey="id"  dataSource={items} loading={loading} columns={withdrawalColumns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-withdrawal-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Input.Search allowClear value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="提现单号 / 银行流水号" onSearch={() => void load(1)}/><Select allowClear value={status} onChange={setStatus} placeholder="提现状态" options={['pending_review','approved','rejected','paid','cancelled'].map(value => ({ value, label: value }))}/><Button type="primary" onClick={() => void load(1)}>查询</Button><AdvancedFilterToolbar scene="withdrawal" pageKey="withdrawal" placeholder="高级筛选" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1400 }} locale={{ emptyText: error || '当前筛选下暂无提现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}
+  return <section className="workspace-page management-page">{pageTitle(own ? '我的提现' : '提现管理', own ? '提交并跟踪返现提现申请' : '审核与登记提现打款', own && hasPermission(permissions, 'zsjos:withdrawal:apply') ? <Button type="primary" icon={<PlusOutlined/>} onClick={() => void openApply()}>申请提现</Button> : undefined)}<BusinessTable<Withdrawal> tableKey="management-pages-4" rowKey="id" rowSelection={canPayout ? { selectedRowKeys: selectedWithdrawals, onChange: keys => setSelectedWithdrawals(keys as number[]), getCheckboxProps: row => ({ disabled: row.status !== 'approved' }) } : undefined} batchActions={canPayout ? <Button type="primary" disabled={loading || !selectedWithdrawals.length} onClick={() => openPayout(selectedWithdrawals, true)}>批量登记打款（{selectedWithdrawals.length}）</Button> : undefined}  dataSource={items} loading={loading} columns={withdrawalColumns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-withdrawal-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Input.Search allowClear value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="提现单号 / 银行流水号" onSearch={() => void load(1)}/><Select allowClear value={status} onChange={setStatus} placeholder="提现状态" options={['pending_review','approved','rejected','paid','cancelled'].map(value => ({ value, label: value }))}/><Button type="primary" onClick={() => void load(1)}>查询</Button><AdvancedFilterToolbar scene="withdrawal" pageKey="withdrawal" placeholder="高级筛选" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1400 }} locale={{ emptyText: error || '当前筛选下暂无提现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}
     <Modal width={760} title="申请提现" open={applyOpen} onCancel={() => setApplyOpen(false)} onOk={() => void submitApply()}><BusinessTable tableKey="management-pages-5" columnMode="native" mode="compact" rowKey="id" size="small" dataSource={available} rowSelection={{ selectedRowKeys: selectedCashbacks, onChange: keys => setSelectedCashbacks(keys as number[]) }} pagination={false} columns={[{ title: '返现单号', dataIndex: 'cashbackNo' }, { title: '产品', dataIndex: 'productNameSnapshot' }, { title: '金额', dataIndex: 'amount', render: money }]}/><Form form={applyForm} layout="vertical"><Form.Item name="accountName" label="账户名" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="cardNumber" label="银行卡号" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="bankName" label="开户银行" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="branchName" label="开户支行"><Input/></Form.Item><Form.Item name="saveCard" label="保存银行卡" valuePropName="checked" initialValue={false}><Switch/></Form.Item></Form></Modal>
-    <Modal title="提现详情" open={Boolean(detail) && !action} onCancel={() => setDetail(undefined)} footer={detail && !own ? <Space>{hasPermission(permissions, 'zsjos:withdrawal:review') && detail.status === 'approved' && <Button danger onClick={() => { actionForm.resetFields(); setAction('reject') }}>驳回已通过申请</Button>}{hasPermission(permissions, 'zsjos:withdrawal:payout') && detail.status === 'approved' && <Button type="primary" onClick={() => { actionForm.resetFields(); setProofFileId(undefined); setAction('payout') }}>登记打款</Button>}</Space> : undefined}><Descriptions bordered column={1} items={detail ? [{ key: 'no', label: '提现单号', children: detail.withdrawalNo }, { key: 'amount', label: '金额', children: money(detail.applicationAmount) }, { key: 'account', label: '收款账户', children: `${detail.accountNameSnapshot} / ${detail.bankNameSnapshot} / ${detail.maskedCardNumber}` }, { key: 'status', label: '状态', children: detail.status }, { key: 'reason', label: '驳回原因', children: detail.rejectionReason || '-' }] : []}/></Modal>
-    <Modal title={action === 'reject' ? '驳回提现' : '登记打款'} open={Boolean(action)} onCancel={() => setAction(undefined)} onOk={() => void submitAction()}><Form form={actionForm} layout="vertical">{action === 'reject' ? <Form.Item name="reason" label="驳回原因" rules={[{ required: true }]}><Input.TextArea rows={4}/></Form.Item> : <><Form.Item name="bankTransactionNo" label="银行流水号" rules={[{ required: true }]}><Input/></Form.Item><Form.Item label="付款凭证" required><ClipboardUploadButtons disabled={Boolean(proofFileId)} canPaste={() => !proofFileId} onFiles={files => { const file = files[0]; if (file) void uploadProof(file) }}><Upload maxCount={1} onRemove={() => { setProofFileId(undefined) }} beforeUpload={async file => { setProofFileId(undefined); await uploadProof(file); return false }}><Button icon={<UploadOutlined/>}>上传附件</Button></Upload></ClipboardUploadButtons></Form.Item><Form.Item name="remark" label="备注"><Input.TextArea rows={3}/></Form.Item></>}</Form></Modal>
+    <Modal title="提现详情" open={Boolean(detail) && !action} onCancel={() => setDetail(undefined)} footer={detail && !own ? <Space>{hasPermission(permissions, 'zsjos:withdrawal:review') && detail.status === 'approved' && <Button danger onClick={() => { actionForm.resetFields(); setAction('reject') }}>驳回已通过申请</Button>}{hasPermission(permissions, 'zsjos:withdrawal:payout') && detail.status === 'approved' && <Button type="primary" onClick={() => openPayout([detail.id])}>登记打款</Button>}</Space> : undefined}><Descriptions bordered column={1} items={detail ? [{ key: 'no', label: '提现单号', children: detail.withdrawalNo }, { key: 'amount', label: '金额', children: money(detail.applicationAmount) }, { key: 'account', label: '收款账户', children: `${detail.accountNameSnapshot} / ${detail.bankNameSnapshot} / ${detail.maskedCardNumber}` }, { key: 'status', label: '状态', children: detail.status }, { key: 'reason', label: '驳回原因', children: detail.rejectionReason || '-' }, ...(detailScope === 'finance' && detail.status === 'paid' ? [{ key: 'paidAt', label: '打款时间', children: formatTimestamp(detail.paidAt) }, { key: 'remark', label: '备注', children: detail.payoutRemark || '-' }] : [])] : []}/></Modal>
+    <Modal title={action === 'reject' ? '驳回提现' : action === 'batch-payout' ? '批量登记打款' : '登记打款'} open={Boolean(action)} confirmLoading={savingAction} closable={!savingAction} keyboard={!savingAction} maskClosable={!savingAction} cancelButtonProps={{ disabled: savingAction }} onCancel={() => setAction(undefined)} onOk={() => void submitAction()}>
+      {action === 'batch-payout' && <Alert type="info" showIcon title={`已选择 ${payoutIds.length} 条待打款记录，打款时间和备注将统一应用。`} />}
+      <Form form={actionForm} layout="vertical" disabled={savingAction}>
+        {action === 'reject' ? <Form.Item name="reason" label="驳回原因" rules={[{ required: true }]}><Input.TextArea rows={4}/></Form.Item> : <>
+          <Form.Item name="paidAt" label="打款时间（选填）"><DatePicker showTime format="YYYY-MM-DD HH:mm:ss" placeholder="请选择打款时间" style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="remark" label="备注（选填）" rules={[{ max: 500, message: '备注最多 500 字' }]}><Input.TextArea rows={3} maxLength={500} showCount /></Form.Item>
+        </>}
+      </Form>
+    </Modal>
   </section>
 }
 

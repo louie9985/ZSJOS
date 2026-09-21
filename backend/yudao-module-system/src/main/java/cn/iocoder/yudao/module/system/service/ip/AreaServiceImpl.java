@@ -37,7 +37,7 @@ public class AreaServiceImpl implements AreaService {
 
     private static final String OTHER_SELECTION_CODE = "OTHER";
     private static final Comparator<AreaDO> AREA_SIBLING_COMPARATOR = Comparator
-            .comparing((AreaDO area) -> OTHER_SELECTION_CODE.equals(area.getSelectionCode()) ? 1 : 0)
+            .comparing((AreaDO area) -> OTHER_SELECTION_CODE.equals(area.getSelectionCode()) ? 0 : 1)
             .thenComparing(AreaDO::getSort)
             .thenComparing(AreaDO::getId);
 
@@ -194,7 +194,7 @@ public class AreaServiceImpl implements AreaService {
     }
 
     @Override
-    @Cacheable(cacheNames = RedisKeyConstants.AREA_LIST, key = "'all'")
+    @Cacheable(cacheNames = RedisKeyConstants.AREA_LIST, key = "'all-other-first'")
     public List<AreaDO> getAreaList() {
         return sortAreasForDisplay(areaMapper.selectAll());
     }
@@ -212,7 +212,7 @@ public class AreaServiceImpl implements AreaService {
     }
 
     @Override
-    @Cacheable(cacheNames = RedisKeyConstants.AREA_TREE, key = "'enabled-china'")
+    @Cacheable(cacheNames = RedisKeyConstants.AREA_TREE, key = "'enabled-china-other-first'")
     public List<AreaNodeRespVO> getEnabledChinaTree() {
         List<AreaDO> enabled = areaMapper.selectAll().stream()
                 .filter(area -> CommonStatusEnum.ENABLE.getStatus().equals(area.getStatus()))
@@ -231,7 +231,7 @@ public class AreaServiceImpl implements AreaService {
             }
         }
         nodes.values().forEach(node -> node.getChildren().sort(Comparator
-                .comparing((AreaNodeRespVO child) -> OTHER_SELECTION_CODE.equals(child.getSelectionCode()) ? 1 : 0)));
+                .comparing((AreaNodeRespVO child) -> OTHER_SELECTION_CODE.equals(child.getSelectionCode()) ? 0 : 1)));
         AreaNodeRespVO china = nodes.get(Area.ID_CHINA);
         return china == null ? List.of() : china.getChildren();
     }

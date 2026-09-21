@@ -61,6 +61,16 @@ EAM 资产流转推荐资产为 Simple 模型 `eam_asset_transfer/1.0.0/process-
 
 生产内容批审使用服务端固定 Key `zsjos_production_content_review`，推荐资产为 `1.1.0/process-model.json`，最低迁移 V194，分类固定为 `zsjos_content_review`（由 `MaterialTenantInitializer` 在应用启动后为每个租户创建并启用）。流程骨架被业务表结构固定：`zsjos_content_review_batch_item` 每条只有一组编导结论和一组终审结论，因此必须恰好两个串行节点，且两个节点都必须是单人执行。服务端 `validTaskSequence` 会校验这一点，任何多人审批方式（或签、会签、依次审批）都会让提交失败并返回“生产内容审核配置尚未完成或已失效”。
 
+**发布前后必须核对节点编码，而不是只看流程标识。** 设计器的“审批节点”默认生成 `Activity_<uuid>` 形式的元素编码和“审批人”名称；只有从 `1.1.0` 资产载入才会得到 `directorReview` / `finalReview`。用 Simple 设计器手工拖拽出这两个节点、或复制其它模型后只改流程标识，都会保留随机编码，`validTaskSequence` 随即失败，运营提交统一报“生产内容审核配置尚未完成或已失效”。发布后按部署产物复核：
+
+```sql
+-- 期望只剩 StartUserNode / directorReview / finalReview 三个 userTask，且无 Activity_ 前缀
+SELECT ID_, KEY_, VERSION_, SUSPENSION_STATE_, CATEGORY_
+  FROM ACT_RE_PROCDEF WHERE KEY_ = 'zsjos_production_content_review';
+```
+
+同时确认扩展表 `bpm_process_definition_info.category` 取 `zsjos_content_review`（服务端按该行判定分类，Flowable 的 `ACT_RE_PROCDEF.CATEGORY_` 仅作展示），以及同一 `KEY_` 下只有一行 `SUSPENSION_STATE_=1`。
+
 两个节点的审批人来源不同，这是有意的：
 
 - `directorReview` 保持候选策略 35（发起人自选）。责任编导由服务端按 `content_director_operator` 关系解析——以提交运营为 `target_user_id` 反查唯一启用关系的 `source_user_id`，要求编导与运营账号均启用，并要求批次内每个账号的 `director_user_id` 与之一致。**在 BPM 为该节点配置的审批人不会生效**，会被启动时传入的 `startUserSelectAssignees` 覆盖。要改变编导归属请维护关系数据，不要改模型。

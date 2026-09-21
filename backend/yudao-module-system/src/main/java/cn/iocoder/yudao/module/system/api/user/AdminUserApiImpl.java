@@ -175,10 +175,17 @@ public class AdminUserApiImpl implements AdminUserApi {
     }
 
     @Override
+    @DataPermission(enable = false)
+    public void validateUser(Long id) {
+        // 显式入口保证单用户校验经过代理，避免接口默认方法内部调用绕过数据权限注解。
+        userService.validateUserList(java.util.Collections.singleton(id));
+    }
+
+    @Override
+    @DataPermission(enable = false) // 关联用户有效性不取决于调用方的数据范围；租户和账号状态校验仍保留。
     public void validateUserList(Collection<Long> ids) {
         userService.validateUserList(ids);
     }
 
 }
-
 

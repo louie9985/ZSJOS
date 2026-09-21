@@ -8,6 +8,14 @@
     >
       <Icon icon="ep:wallet" />申请提现
     </el-button>
+    <el-button
+      v-if="canPayout"
+      type="primary"
+      class="mb-16px"
+      :disabled="loading || !selectedWithdrawals.length"
+      @click="openBatchPayout"
+      >批量登记打款（{{ selectedWithdrawals.length }}）</el-button
+    >
     <el-form inline @submit.prevent>
       <el-form-item label="状态">
         <el-select v-model="query.status" clearable class="!w-160px">
@@ -26,7 +34,18 @@
     >
   </ContentWrap>
   <ContentWrap>
-    <el-table v-loading="loading" :data="list">
+    <el-table
+      v-loading="loading"
+      :data="list"
+      row-key="id"
+      @selection-change="selectedWithdrawals = $event"
+    >
+      <el-table-column
+        v-if="canPayout"
+        type="selection"
+        width="50"
+        :selectable="(row: Api.WithdrawalVO) => row.status === 'approved'"
+      />
       <el-table-column prop="withdrawalNo" label="提现单号" min-width="210" />
       <el-table-column prop="applicantUserId" label="申请人" width="100" />
       <el-table-column label="金额" width="120"
@@ -67,7 +86,7 @@
             link
             type="primary"
             @click="openPayout(scope.row.id)"
-            >记录打款</el-button
+            >登记打款</el-button
           >
         </template>
       </el-table-column>
@@ -100,6 +119,12 @@
       <el-descriptions-item v-if="detail.proofUrl" label="打款凭证"
         ><el-link :href="detail.proofUrl" target="_blank">查看凭证</el-link></el-descriptions-item
       >
+      <el-descriptions-item v-if="detail.status === 'paid' && canViewFinance" label="打款时间">{{
+        formatDate(detail.paidAt) || '-'
+      }}</el-descriptions-item>
+      <el-descriptions-item v-if="detail.status === 'paid' && canViewFinance" label="备注">{{
+        detail.payoutRemark || '-'
+      }}</el-descriptions-item>
     </el-descriptions>
   </Dialog>
   <Dialog v-model="applyVisible" title="申请提现" width="720px">
@@ -158,22 +183,40 @@
       ></template
     >
   </Dialog>
-  <Dialog v-model="payoutVisible" title="记录线下打款" width="520px">
-    <el-form label-width="100px">
-      <el-form-item label="银行流水号" required
-        ><el-input v-model="payoutForm.bankTransactionNo" maxlength="100"
-      /></el-form-item>
-      <el-form-item label="打款凭证" required
-        ><ClipboardUploadActions :disabled="saving" :can-paste="!saving" @files="files => { const file = files[0]; if (file) void upload({ file } as any).catch(() => undefined) }"><el-upload :disabled="saving" :http-request="upload" :limit="1" accept="image/*,.pdf"
-          ><el-button><Icon icon="ep:upload" />上传附件</el-button></el-upload
-        ></ClipboardUploadActions></el-form-item
-      >
-      <el-form-item label="备注"
+  <Dialog
+    v-model="payoutVisible"
+    :title="batchPayout ? '批量登记打款' : '登记打款'"
+    width="min(520px, calc(100vw - 32px))"
+    :before-close="
+      (done: () => void) => {
+        if (!saving) done()
+      }
+    "
+  >
+    <el-alert
+      v-if="batchPayout"
+      :title="`已选择 ${payoutIds.length} 条待打款记录，打款时间和备注将统一应用。`"
+      type="info"
+      :closable="false"
+      class="mb-16px"
+    />
+    <el-form label-position="top" :disabled="saving">
+      <el-form-item label="打款时间（选填）">
+        <el-date-picker
+          v-model="payoutForm.paidAt"
+          type="datetime"
+          value-format="YYYY-MM-DDTHH:mm:ss"
+          placeholder="请选择打款时间"
+          class="!w-full"
+          clearable
+        />
+      </el-form-item>
+      <el-form-item label="备注（选填）"
         ><el-input v-model="payoutForm.remark" type="textarea" maxlength="500"
       /></el-form-item>
     </el-form>
     <template #footer
-      ><el-button @click="payoutVisible = false">取消</el-button
+      ><el-button :disabled="saving" @click="payoutVisible = false">取消</el-button
       ><el-button type="primary" :loading="saving" @click="submitPayout"
         >确认已线下打款</el-button
       ></template
@@ -187,7 +230,7 @@ import * as CashbackApi from '@/api/zsjos/cashback'
 import * as ExportTaskApi from '@/api/zsjos/exportTask'
 import { useUserStore } from '@/store/modules/user'
 import { withdrawalDataScope } from '@/utils/zsjosDataScope'
-import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
+import { formatDate } from '@/utils/formatTime'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
 const router = useRouter()
@@ -213,6 +256,20 @@ const applyForm = reactive({
   branchName: '',
   saveCard: false
 })
+const selectedWithdrawals = ref<Api.WithdrawalVO[]>([])
+const payoutIds = ref<number[]>([])
+const batchPayout = ref(false)
+const canPayout = computed(
+  () =>
+    withdrawalDataScope(userStore.getPermissions) === 'all' &&
+    (userStore.getPermissions.has('*:*:*') ||
+      userStore.getPermissions.has('zsjos:withdrawal:payout'))
+)
+const canViewFinance = computed(
+  () =>
+    userStore.getPermissions.has('*:*:*') ||
+    userStore.getPermissions.has('zsjos:withdrawal:finance-query')
+)
 const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined })
 const canExport = computed(
   () =>
@@ -246,8 +303,7 @@ const exportCurrent = async () => {
   }
 }
 const payoutForm = reactive({
-  bankTransactionNo: '',
-  proofFileId: undefined as number | undefined,
+  paidAt: undefined as string | undefined,
   remark: ''
 })
 const statuses = [
@@ -260,6 +316,8 @@ const statuses = [
 const statusName = (v: string) => statuses.find((i) => i.value === v)?.label || v,
   money = (v: number) => Number(v).toFixed(2)
 const load = async () => {
+  selectedWithdrawals.value = []
+  list.value = []
   loading.value = true
   error.value = ''
   try {
@@ -277,7 +335,7 @@ const load = async () => {
 const openDetail = async (id: number) => {
   const scope = withdrawalDataScope(userStore.getPermissions)
   detail.value = await (scope === 'all'
-    ? userStore.getPermissions.has('zsjos:withdrawal:finance-query')
+    ? canViewFinance.value
       ? Api.getFinanceDetail(id)
       : Api.getDetail(id)
     : Api.getMyDetail(id))
@@ -328,24 +386,32 @@ const submitReject = async () => {
   }
 }
 const openPayout = (id: number) => {
-  currentId.value = id
-  Object.assign(payoutForm, { bankTransactionNo: '', proofFileId: undefined, remark: '' })
+  payoutIds.value = [id]
+  batchPayout.value = false
+  Object.assign(payoutForm, { paidAt: undefined, remark: '' })
   payoutVisible.value = true
 }
-const upload = async (options: any) => {
-  const form = new FormData()
-  form.append('file', options.file)
-  const result = await Api.uploadProof(form)
-  payoutForm.proofFileId = result.infraFileId
-  options.onSuccess?.(result)
+const openBatchPayout = () => {
+  if (!canPayout.value || !selectedWithdrawals.value.length) return
+  payoutIds.value = selectedWithdrawals.value.map((row) => row.id)
+  batchPayout.value = true
+  Object.assign(payoutForm, { paidAt: undefined, remark: '' })
+  payoutVisible.value = true
 }
 const submitPayout = async () => {
-  if (!payoutForm.bankTransactionNo.trim() || !payoutForm.proofFileId) return
+  if (saving.value || !payoutIds.value.length) return
   saving.value = true
   try {
-    await Api.payout(currentId.value, payoutForm)
+    const data = {
+      paidAt: payoutForm.paidAt || undefined,
+      remark: payoutForm.remark.trim() || undefined
+    }
+    if (batchPayout.value) await Api.batchPayout({ ...data, ids: payoutIds.value })
+    else await Api.payout(payoutIds.value[0], data)
     payoutVisible.value = false
     await load()
+  } catch {
+    // The request client displays the business error; retain this selection and form for retry.
   } finally {
     saving.value = false
   }

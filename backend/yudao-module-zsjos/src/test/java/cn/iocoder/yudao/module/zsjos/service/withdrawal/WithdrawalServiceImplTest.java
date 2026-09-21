@@ -5,7 +5,6 @@ import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
-import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
@@ -92,15 +91,16 @@ class WithdrawalServiceImplTest {
                 argThat(payload -> "TX-TEST-50".equals(payload.get("withdrawal.no"))));
     }
 
-    @Test void payoutRequiresOwnedProofAndWithdrawsCashback() {
+    @Test void payoutWithoutBankTransactionOrProofStoresOptionalTimeAndWithdrawsCashback() {
         WithdrawalDO row=withdrawal(50L,"approved");when(withdrawalMapper.selectByIdForUpdate(50L,9L)).thenReturn(row);
-        when(withdrawalMapper.selectByTransactionNo("TX1")).thenReturn(null);
-        when(fileApi.getFileInfo(90L)).thenReturn(new FileInfoRespDTO(1L,1L,"proof.pdf","zsjos/withdrawal-proof/x","u","application/pdf",100L,"30"));
         when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of(new WithdrawalItemDO().setCashbackId(1L).setActiveFlag(true)));
         CashbackDO cashback=cashback(1L,"20").setStatus("withdrawing");when(cashbackMapper.selectByIdForUpdate(1L,9L)).thenReturn(cashback);
         when(cashbackMapper.transitionStatus(1L,0,"withdrawing","withdrawn")).thenReturn(1);when(userApi.getUserListByStatus(0)).thenReturn(List.of());
-        WithdrawalPayoutReqVO req=new WithdrawalPayoutReqVO();req.setBankTransactionNo("TX1");req.setProofFileId(90L);
+        WithdrawalPayoutReqVO req=new WithdrawalPayoutReqVO();
+        req.setPaidAt(LocalDateTime.of(2026,9,20,14,30)); req.setRemark("  批量登记  ");
         service.recordPayout(50L,30L,req);assertEquals("paid",row.getStatus());assertEquals(30L,row.getPaidByUserId());verify(auditService).record(any(),any(),any(),any(),any(),any());
+        assertEquals(req.getPaidAt(), row.getPaidAt()); assertEquals("批量登记", row.getPayoutRemark());
+        assertNull(row.getBankTransactionNo()); assertNull(row.getProofFileId()); verifyNoInteractions(fileApi);
     }
 
     @Test void ordinaryDetailRedactsFinanceFieldsAndDoesNotCreateProofUrl() {

@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.*;
 import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalService;
+import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalBatchPayoutService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -22,6 +23,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/withdrawal")
 public class WithdrawalController {
     @Resource private WithdrawalService service;
+    @Resource private WithdrawalBatchPayoutService batchPayoutService;
 
     @PostMapping("/search-page")
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
@@ -92,6 +94,13 @@ public class WithdrawalController {
     @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:payout')")
     public CommonResult<Boolean> payout(@PathVariable Long id, @Valid @RequestBody WithdrawalPayoutReqVO request) {
         service.recordPayout(id, WebFrameworkUtils.getLoginUserId(), request); return success(true);
+    }
+    @PutMapping("/batch-payout")
+    @Operation(summary = "批量登记打款")
+    @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:payout')")
+    public CommonResult<Boolean> batchPayout(@Valid @RequestBody WithdrawalBatchPayoutReqVO request) {
+        batchPayoutService.recordPayouts(WebFrameworkUtils.getLoginUserId(), request);
+        return success(true);
     }
     @PostMapping("/proof/upload")
     @Operation(summary = "上传线下打款凭证")

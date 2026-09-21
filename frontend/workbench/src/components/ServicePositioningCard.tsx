@@ -49,7 +49,12 @@ export default function ServicePositioningCard({ serviceRelationId, canQuery, re
         {action('APPROVE_POSITIONING_FEASIBILITY')&&<Button type="primary" disabled={busy} onClick={()=>modal.confirm({ title:'确认复核通过此定位卡？', width:520, content:`正在处理第 ${current.submissionNo || 0} 次提交。通过后进入学员确认环节，请确认正文、参考账号与素材均已核对。`, okText:'确认通过', cancelText:'取消', mask:{closable:false}, keyboard:false, onOk:()=>run(()=>api.positioningCard.operatorApprove(current.id,current.version)) })}>复核通过</Button>}
         {action('REJECT_POSITIONING_FEASIBILITY')&&<Button disabled={busy} onClick={()=>{setReason('');setReject(true)}}>驳回修改</Button>}
         {action('GENERATE_POSITIONING_STUDENT_LINK')&&<Button disabled={busy} onClick={()=>void run(async()=>{const result=await api.positioningCard.generateStudentLink(current.id,current.version);setLink(result.sharePath)})}>生成学员确认链接</Button>}
-        {action('START_POSITIONING_REVISION')&&<Button disabled={busy} onClick={()=>void run(async()=>{await api.positioningCard.startRevision(current.id,current.version);onEdit(current.id)})}>修订定位卡</Button>}
+        {action('START_POSITIONING_REVISION')&&<Button disabled={busy} onClick={()=>modal.confirm({
+          title: '确认修改定位卡？', width: 520,
+          content: '确认后，当前定位卡将进入草稿状态。修改后需重新提交运营审核、学员确认并补齐确认凭证。已有历史版本和账号已应用版本保留。是否继续修改？',
+          okText: '确认修改', cancelText: '取消', autoFocusButton: 'cancel', mask: { closable: false }, keyboard: false,
+          onOk: () => run(async () => { await api.positioningCard.startRevision(current.id, current.version); onEdit(current.id) }),
+        })}>修订定位卡</Button>}
 
           <PositioningEvidence mode="actions" card={current} onChanged={() => setRetry(v => v + 1)} /></div></> : <Typography.Text type="secondary">{data?.candidates.length ? '待选择主定位卡' : '尚未填写定位卡'}</Typography.Text>}
           {data?.canCreate && <Button type="primary" block onClick={() => onEdit()}>填写定位卡</Button>}

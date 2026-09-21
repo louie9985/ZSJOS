@@ -1,5 +1,19 @@
 package cn.iocoder.yudao.module.system.api.user;
 
+import cn.iocoder.yudao.framework.datapermission.core.aop.DataPermissionContextHolder;
+import cn.iocoder.yudao.framework.datapermission.core.aop.DataPermissionAnnotationAdvisor;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import org.springframework.aop.framework.ProxyFactory;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_IS_DISABLE;
 import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
@@ -18,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
+@DataPermission
 @ExtendWith(MockitoExtension.class)
 class AdminUserApiImplTest {
 
@@ -74,4 +89,60 @@ class AdminUserApiImplTest {
         assertNotNull(annotation);
         assertFalse(annotation.enable());
     }
+    @Test
+    void singleAndBatchValidationIgnoreCallerScopeAndRestoreContext() {
+        var proxy = validationProxy();
+        var outer = AdminUserApiImplTest.class.getAnnotation(DataPermission.class);
+        DataPermissionContextHolder.add(outer);
+        TenantContextHolder.setTenantId(1L);
+        try {
+            doAnswer(invocation -> {
+                assertFalse(DataPermissionContextHolder.get().enable());
+                assertEquals(1L, TenantContextHolder.getRequiredTenantId());
+                assertFalse(TenantContextHolder.isIgnore());
+                return null;
+            }).when(userService).validateUserList(anyCollection());
+            proxy.validateUser(47L);
+            assertSame(outer,
+                    DataPermissionContextHolder.get());
+            proxy.validateUserList(List.of(47L, 48L));
+            assertSame(outer,
+                    DataPermissionContextHolder.get());
+            verify(userService).validateUserList(java.util.Collections.singleton(47L));
+            verify(userService).validateUserList(List.of(47L, 48L));
+        } finally {
+            DataPermissionContextHolder.clear();
+            TenantContextHolder.clear();
+        }
+    }
+
+    @Test
+    void invalidUsersStillFailAndPermissionContextIsRestored() {
+        var proxy = validationProxy();
+        for (var code : List.of(
+                USER_NOT_EXISTS,
+                USER_IS_DISABLE)) {
+            var failure = new ServiceException(code);
+            doThrow(failure).when(userService)
+                    .validateUserList(anyCollection());
+            assertSame(failure,
+                    assertThrows(
+                            ServiceException.class,
+                            () -> proxy.validateUser(47L)));
+            assertSame(failure,
+                    assertThrows(
+                            ServiceException.class,
+                            () -> proxy.validateUserList(List.of(47L))));
+            assertNull(
+                    DataPermissionContextHolder.get());
+        }
+    }
+
+    private AdminUserApi validationProxy() {
+        var factory = new ProxyFactory(api);
+        factory.setProxyTargetClass(true);
+        factory.addAdvisor(new DataPermissionAnnotationAdvisor());
+        return (AdminUserApi) factory.getProxy();
+    }
+
 }

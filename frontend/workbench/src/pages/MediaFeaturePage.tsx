@@ -721,7 +721,19 @@ export default function MediaFeaturePage({
                           key={action}
                           type="primary"
                           size="small"
-                          onClick={() => void doAction(action)}
+                          onClick={() => {
+                            if (feature === "positioning" && action === "START_POSITIONING_REVISION") {
+                              Modal.confirm({
+                                title: "确认修改定位卡？", width: 520,
+                                content: "确认后，当前定位卡将进入草稿状态。修改后需重新提交运营审核、学员确认并补齐确认凭证。已有历史版本和账号已应用版本保留。是否继续修改？",
+                                okText: "确认修改", cancelText: "取消", autoFocusButton: "cancel",
+                                mask: { closable: false }, keyboard: false,
+                                onOk: () => doAction(action),
+                              });
+                              return;
+                            }
+                            void doAction(action);
+                          }}
                         >
                           {actionText(action)}
                         </Button>

@@ -214,10 +214,6 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     public void recordPayout(Long id, Long userId, WithdrawalPayoutReqVO request) {
         WithdrawalDO record = lock(id);
         if (!STATUS_APPROVED.equals(record.getStatus())) throw exception(WITHDRAWAL_STATE_INVALID);
-        String transactionNo = request.getBankTransactionNo().trim();
-        WithdrawalDO duplicate = withdrawalMapper.selectByTransactionNo(transactionNo);
-        if (duplicate != null && !Objects.equals(duplicate.getId(), id)) throw exception(WITHDRAWAL_TRANSACTION_DUPLICATE);
-        FileInfoRespDTO proof = requireProof(request.getProofFileId(), userId);
         List<WithdrawalItemDO> items = itemMapper.selectByWithdrawalId(id);
         for (WithdrawalItemDO item : items) {
             CashbackDO cashback = cashbackMapper.selectByIdForUpdate(item.getCashbackId(), TenantContextHolder.getRequiredTenantId());
@@ -226,15 +222,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 throw exception(WITHDRAWAL_STATE_INVALID);
             }
         }
-        LocalDateTime now = LocalDateTime.now();
-        record.setStatus(STATUS_PAID).setBankTransactionNo(transactionNo).setProofFileId(proof.getId())
-                .setProofFileNameSnapshot(proof.getName()).setProofFileTypeSnapshot(proof.getType())
-                .setPayoutRemark(StrUtil.trim(request.getRemark())).setPaidByUserId(userId).setPaidAt(now);
-        try { withdrawalMapper.updateById(record); } catch (DuplicateKeyException duplicateKey) {
-            throw exception(WITHDRAWAL_TRANSACTION_DUPLICATE);
-        }
+        record.setStatus(STATUS_PAID).setPayoutRemark(StrUtil.trim(request.getRemark()))
+                .setPaidByUserId(userId).setPaidAt(request.getPaidAt());
+        withdrawalMapper.updateById(record);
         auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_PAYOUT, "withdrawal", String.valueOf(id),
-                "finance", Map.of("amount", record.getApplicationAmount(), "proofFileId", proof.getId()));
+                "finance", Map.of("amount", record.getApplicationAmount()));
         notifyPublisher.publish(SCENE_PAID, id, "withdrawal-paid:" + id, userId,
                 notifyPayload(record, financeReviewers()));
     }
@@ -522,15 +514,6 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .setOwnerUserId(record.getApplicantUserId()).setAccountName(record.getAccountNameSnapshot())
                 .setCardNumber(record.getCardNumberSnapshot()).setBankName(record.getBankNameSnapshot())
                 .setBranchName(record.getBranchNameSnapshot()).setDefaultCard(false).setVersion(0));
-    }
-
-    private FileInfoRespDTO requireProof(Long fileId, Long userId) {
-        FileInfoRespDTO file;
-        try { file = fileApi.getFileInfo(fileId); } catch (ServiceException ex) { throw exception(WITHDRAWAL_PROOF_INVALID); }
-        if (file == null || !PROOF_TYPES.contains(file.getType()) || file.getSize() == null || file.getSize() > MAX_PROOF_SIZE
-                || !String.valueOf(userId).equals(file.getCreator()) || StrUtil.isBlank(file.getPath())
-                || !file.getPath().startsWith("zsjos/withdrawal-proof/")) throw exception(WITHDRAWAL_PROOF_INVALID);
-        return file;
     }
 
     private List<Long> financeReviewers() {
