@@ -19,6 +19,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class LeadSubmitterFeedbackPermissionProvider implements ZsjosObjectPermissionProvider {
     @Resource private LeadMapper leadMapper;
     @Resource private PartnerAccountService partnerAccountService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @Override public String getBizType() { return "lead-submitter-feedback"; }
     @Override public boolean hasPermission(Long id, String action, Long userId) {
@@ -43,6 +44,7 @@ public class LeadSubmitterFeedbackPermissionProvider implements ZsjosObjectPermi
         if (!allowed) throw exception(LEAD_PERMISSION_DENIED);
     }
     public boolean canRead(LeadDO lead, Long userId) {
+        if (userId != null && permissionApi.hasTenantReadAllAccess(userId)) return true;
         return userId != null && (Objects.equals(userId, lead.getOwnerUserId())
                 || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(userId, lead.getProviderOwnerId()));

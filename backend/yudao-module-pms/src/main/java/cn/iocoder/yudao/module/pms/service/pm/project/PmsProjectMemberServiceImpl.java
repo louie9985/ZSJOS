@@ -99,7 +99,7 @@ public class PmsProjectMemberServiceImpl implements PmsProjectMemberService {
         // 2. 公开项目允许查看，私有项目只允许项目成员或超级管理员查看
         if (Boolean.FALSE.equals(project.getOpenStatus())
                 && projectMemberMapper.selectByProjectIdAndUserId(projectId, userId) == null
-                && !isSuperAdmin(userId)) {
+                && !isSuperAdmin(userId) && !permissionApi.hasTenantReadAllAccess(userId)) {
             throw exception(PROJECT_ACCESS_DENIED);
         }
         return project;

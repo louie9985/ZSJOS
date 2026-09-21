@@ -17,6 +17,12 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 
 @Mapper
 public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
+    default List<ServiceRelationDO> selectTenantReadByPersonIds(Collection<Long> personIds, String status) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .in(ServiceRelationDO::getPersonId, personIds).eqIfPresent(ServiceRelationDO::getStatus, status)
+                .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId));
+    }
     @Select("SELECT * FROM zsjos_service_relation WHERE status='active' AND acceptance_status='accepted' "
             + "AND delivery_stage='supervision' AND exam_date IS NOT NULL AND exam_notice_sent_at IS NULL "
             + "AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")

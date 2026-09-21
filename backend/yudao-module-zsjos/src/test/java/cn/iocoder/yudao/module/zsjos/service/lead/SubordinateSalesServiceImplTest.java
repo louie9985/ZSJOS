@@ -43,6 +43,21 @@ class SubordinateSalesServiceImplTest {
     @Mock private BusinessTaskMapper taskMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PostApi postApi;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    @Test
+    void administratorReadsDisabledSalesWithoutGainingBulkPauseAuthority() {
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
+        PostRespDTO post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserListByPostIds(Set.of(5L))).thenReturn(List.of(subordinate(30L, 1, 5L)));
+        when(taskMapper.selectMyPending(30L)).thenReturn(List.of());
+        assertEquals(0L, service.getTaskPage(30L, new SubordinateTaskPageReqVO(), 10L).getTotal());
+        assertEquals(0, service.pauseAllDispatch(10L).getTotalCount());
+        verify(dispatchStatusService, never()).pausePreferenceByManager(org.mockito.ArgumentMatchers.anyLong());
+        verify(adminUserApi, never()).updateUserStatus(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString());
+    }
 
     @Test
     void subordinateSalesProjectsSystemAvatar() throws Exception {

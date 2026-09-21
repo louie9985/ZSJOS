@@ -368,10 +368,24 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "read")
     public SalesOrderRespVO get(Long orderId, Long userId) {
+        return get(orderId, userId, null);
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "read")
+    public SalesOrderRespVO get(Long orderId, Long userId, String taskId) {
         SalesOrderDO order = orderMapper.selectById(orderId);
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
         SalesOrderApprovalRoundDO round = roundMapper.selectLatestByOrderId(orderId);
-        return convert(order, round, null, userId);
+        BpmTaskRespDTO task = StrUtil.isBlank(taskId) ? null : processTaskApi.getTodoTask(userId, taskId);
+        if (!StrUtil.isBlank(taskId) && (task == null || round == null
+                || !Objects.equals(task.getBusinessKey(), BUSINESS_KEY_PREFIX + orderId)
+                || !Objects.equals(task.getProcessInstanceId(), round.getProcessInstanceId())
+                || Boolean.TRUE.equals(task.getSignTask())
+                || !Set.of(TASK_REGISTRATION, TASK_FINANCE).contains(task.getTaskDefinitionKey()))) {
+            throw exception(SALES_ORDER_PERMISSION_DENIED);
+        }
+        return convert(order, round, task, userId);
     }
 
     @Override
@@ -804,13 +818,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private void decide(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO, boolean approve) {
+        String reason = StrUtil.trimToEmpty(reqVO.getReason());
+        if (!approve && StrUtil.isBlank(reason)) throw exception(SALES_ORDER_REJECT_REASON_REQUIRED);
         SalesOrderDO order = requireOrderForUpdate(orderId);
         SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(reqVO.getApprovalRoundId(),
                 TenantContextHolder.getRequiredTenantId());
         if (round == null || !Objects.equals(round.getOrderId(), orderId)
                 || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) throw exception(SALES_ORDER_VERSION_CONFLICT);
         String commandType = approve ? "approve" : "reject";
-        String fingerprint = commandService.fingerprint(reqVO.getReason().trim(), reqVO.getOrderVersion(),
+        String fingerprint = commandService.fingerprint(reason, reqVO.getOrderVersion(),
                 reqVO.getRoundVersion());
         SalesOrderCommandService.Command replay = new SalesOrderCommandService.Command(orderId, round.getId(),
                 round.getProcessInstanceId(), commandType, null, reqVO.getTaskId(), userId, fingerprint);
@@ -851,7 +867,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             supervisorConfirmationService.cancelPending(round.getId(), task.getTaskDefinitionKey(), LocalDateTime.now());
         }
         BpmTaskDecisionReqDTO decision = new BpmTaskDecisionReqDTO();
-        decision.setTaskId(reqVO.getTaskId()); decision.setReason(reqVO.getReason().trim());
+        decision.setTaskId(reqVO.getTaskId()); decision.setReason(reason);
         if (approve) {
             processTaskApi.approveTask(userId, decision);
             if (TASK_REGISTRATION.equals(task.getTaskDefinitionKey())) {
@@ -1499,7 +1515,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 backfillCompletedCenters(result);
             }
         }
-        if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
+        if (task != null) { result.setTaskId(task.getId()); result.setApprovalReasonRequired(task.getReasonRequire()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
         result.setCanRevise(Set.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED).contains(order.getStatus())
                 && permissionService.canRevise(order, userId));
         result.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus())
@@ -1693,7 +1709,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
         }
         if (task != null) {
-            result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
+            result.setTaskId(task.getId()); result.setApprovalReasonRequired(task.getReasonRequire()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
             result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime());
         }
         if (round != null && task != null) {

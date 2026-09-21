@@ -15,6 +15,9 @@
       </el-form-item>
       <el-form-item label="主体编码" prop="subjectCode">
         <el-input v-model="formData.subjectCode" placeholder="请输入主体编码" />
+        <div class="text-12px text-[var(--el-text-color-secondary)]">
+          school 用于未配置产品，company 用于多产品主体冲突；修改编码会影响新支付链接，已有链接保留原主体。
+        </div>
       </el-form-item>
       <el-form-item label="商户号" prop="cusid">
         <el-input v-model="formData.cusid" placeholder="请输入商户号" />

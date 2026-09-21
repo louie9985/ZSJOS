@@ -352,13 +352,13 @@ export default function SalesOrderSupervisorInbox({
           columns={[
             { title: "订单号", dataIndex: "orderNo", width: 180, fixed: "left", ellipsis: true },
             { title: "学员姓名", dataIndex: "studentName", width: 140 },
-            { title: "审批节点", dataIndex: "taskDefinitionKey", width: 150, render: value => SALES_ORDER_TASK_LABELS[String(value)] || "-" },
-            { title: "申请人", dataIndex: "requesterUserName", width: 140, render: value => value || "-" },
+            { title: "审批节点", dataIndex: "taskDefinitionKey", width: 150, render: (_, row) => SALES_ORDER_TASK_LABELS[String(row.taskDefinitionKey)] || "-" },
+            { title: "申请人", dataIndex: "requesterUserName", width: 140, render: (_, row) => row.requesterUserName || "-" },
             { title: "申请原因", dataIndex: "requestReason", width: 280, ellipsis: true },
-            { title: "状态", dataIndex: "status", width: 110, render: value => <Tag color={STATUS_COLORS[value as SalesOrderSupervisorInboxItem["status"]]}>{STATUS_LABELS[value as SalesOrderSupervisorInboxItem["status"]]}</Tag> },
-            { title: "主管意见", dataIndex: "decisionReason", width: 280, ellipsis: true, render: value => value || "-" },
-            { title: "申请时间", dataIndex: "requestedAt", width: 170, render: value => formatTimestamp(value as SalesOrderSupervisorInboxItem["requestedAt"]) },
-            { title: "处理时间", dataIndex: "decidedAt", width: 170, render: value => formatTimestamp(value as SalesOrderSupervisorInboxItem["decidedAt"]) },
+            { title: "状态", dataIndex: "status", width: 110, render: (_, row) => <Tag color={STATUS_COLORS[row.status as SalesOrderSupervisorInboxItem["status"]]}>{STATUS_LABELS[row.status as SalesOrderSupervisorInboxItem["status"]]}</Tag> },
+            { title: "主管意见", dataIndex: "decisionReason", width: 280, ellipsis: true, render: (_, row) => row.decisionReason || "-" },
+            { title: "申请时间", dataIndex: "requestedAt", width: 170, render: (_, row) => formatTimestamp(row.requestedAt as SalesOrderSupervisorInboxItem["requestedAt"]) },
+            { title: "处理时间", dataIndex: "decidedAt", width: 170, render: (_, row) => formatTimestamp(row.decidedAt as SalesOrderSupervisorInboxItem["decidedAt"]) },
             { title: "操作", key: "action", width: 88, fixed: "right", hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelectedId(item.id); setDrawerOpen(true) }}>详细</Button> }
           ]}
         /></>

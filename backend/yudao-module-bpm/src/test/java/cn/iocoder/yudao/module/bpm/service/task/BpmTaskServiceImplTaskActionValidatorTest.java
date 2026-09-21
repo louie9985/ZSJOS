@@ -76,6 +76,7 @@ class BpmTaskServiceImplTaskActionValidatorTest extends BaseMockitoUnitTest {
         assertEquals(BpmTaskActionValidator.ACTION_REJECT, context.getValue().getAction());
         assertEquals("content-review-batch:99", context.getValue().getBusinessKey());
         assertEquals("directorReview", context.getValue().getTaskDefinitionKey());
+        assertEquals("reject", context.getValue().getReason());
         verify(taskService, never()).setVariableLocal(any(), any(), any());
         verify(taskService, never()).complete(any(String.class));
         verify(commentService, never()).createComment(any(), any(), any(), any(String.class));

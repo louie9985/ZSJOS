@@ -39,7 +39,7 @@
 - `GET /zsjos/sales-order/approval/notification-target?orderId=&sceneCode=&sourceEventKey=`：仅接受主管申请和主管决定两个通知场景，分别要求当前用户是指定主管或加签申请人；服务端使用消息既有的事件幂等键精确恢复确认记录和固化任务定位，并执行订单对象权限检查。兼容缺少事件键的旧消息时才回退该订单最新确认记录；前端不得提交用户 ID 或任意目标 URL。
 - `GET /zsjos/sales-order/approval/inbox-page?center=registration|finance&groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和中心分页查询订单列表，支持订单号、学员姓名和手机号搜索，并返回与本人/团队订单表格一致的可见业务字段及当前任务上下文；`handled` 仍可作为兼容参数。服务端将筛选条件与当前用户允许的 BPM 任务节点取交集，伪造无权中心返回权限错误，前端隐藏筛选项不是授权边界。
 - `POST /zsjos/sales-order/approval/search-page`：在当前用户 BPM 任务和中心权限固定范围内组合关键词与高级条件；高级条件非空时忽略可选处理分组，但不扩大允许的任务节点。
-- `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId`、当前 `approvalRoundId`、订单/轮次版本、审批意见和幂等键。订单行与轮次行锁保证审批、驳回和终止只有首个命令成功。
+- `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId`、当前 `approvalRoundId`、订单/轮次版本和幂等键。`reason` 最长 1000 字；通过允许缺省、null、空串或纯空格，统一去除首尾空白并将未填写规范化为空串，是否必填仍按任务所属流程定义执行；驳回必须提供非空白原因（含通用 BPM 入口）。订单行与轮次行锁保证审批、驳回和终止只有首个命令成功。
 - `PUT /zsjos/sales-order/{id}/supervisor-confirmation/request`：当前报名履约或财务普通审批人申请订单销售主管审批。请求必须提交普通 `taskId`、轮次、订单/轮次版本、必填且不超过 1000 字的 `reason` 和幂等键。每轮最多一条申请，另一中心不能再次加签；BPM 创建并行加签任务，报名履约、财务和主管三方任务均保持可见可处理。申请加签后，该中心普通审批与对应主管审批都成为本轮通过条件：中心先通过时等待主管，主管先通过时等待中心；另一中心状态不受影响，任一方驳回则整轮驳回，三方全部通过后订单才通过。
 - `GET /zsjos/sales-order/supervisor-confirmation/inbox-page`、`POST /zsjos/sales-order/supervisor-confirmation/search-page`：只查询当前用户作为指定主管的待办或已办，`handled=false|true` 区分状态，支持订单关键词和订单高级条件。
 - `GET /zsjos/sales-order/supervisor-confirmation/inbox-cursor`、`POST /zsjos/sales-order/supervisor-confirmation/search-cursor`：与分页接口使用完全相同的主管、页签、关键词和高级条件；游标指纹绑定这些条件，条件变化后旧游标失效。
@@ -84,3 +84,9 @@
 Sales-order notifications use the order business number (`orderNo`) and do not render the student or buyer name. Internal employee names used for approval roles remain available where required by the notification scene.
 Applied V085 environments use forward migration V087 to repair safely resolvable residual `order.studentName` snapshots, including logically deleted history, without changing V085 or the occupied V086 permission migration. Missing tenant-scoped order relations block the repair; an internal order or Lead ID is never substituted as the visible identifier.
 - `POST /zsjos/sales-order/student/{personId}/repurchase`：需要独立权限 `zsjos:sales-order:student-repurchase`。学习规划师只能为本人已接收且状态为服务中、已暂停或已结业的学员录入复购；该权限不开放通用订单创建或外部历史客户复购。订单提交人和正式销售归属均为当前学习规划师；订单仅关联 `personId`，不继承原客资或兼职返现。幂等重放还必须匹配客户、提交人、提交中心、复购原因和完整订单请求指纹，跨中心或不同请求复用 key 返回冲突。
+
+### 双中心通过意见选填（流程资产 2.1.0）
+
+财务与报名履约普通节点在新定义中通过意见选填，驳回原因必填。审批列表（分页/游标）、任务详情（`GET /{id}?taskId=...`，省略 taskId 保留原业务详情语义）及普通任务定位响应新增 `approvalReasonRequired`，由 BPM 当前任务所属定义的节点配置提供；缺失或读取失败时前端阻止提交并提供重试，不能按最新定义猜测。主管确认及其申请原因要求不变。
+
+先部署兼容新旧规则的后端与双端，再发布流程资产 2.1.0。仅发布后新建或重提的审批轮次使用新规则，已有实例不迁移。空意见不补写“同意”，详情与历史保持空值展示；幂等指纹与 BPM 提交使用同一规范化意见。

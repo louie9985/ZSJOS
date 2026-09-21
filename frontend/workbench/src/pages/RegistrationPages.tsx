@@ -693,7 +693,11 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   );
 }
 
-export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope';
+
+export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { permissions?: string[]; tenantReadAll?: boolean }) {
+  const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' });
+  const readOnly = readScope.readScope !== 'SELF';
   const { useTableLayout } = useInboxTableLayout();
   const avatarRail = useInboxAvatarRail('zsjos.my-students.list-collapsed');
   const location = useLocation();
@@ -814,7 +818,8 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   useEffect(() => { void loadClassOptions(); }, [loadClassOptions]);
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
-      const baseRequestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
+      if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRows([]); setTotal(0); setSelected(undefined); return; }
+      const baseRequestKey = `${JSON.stringify(readScope)}:${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
       const requestKey = options.force
         ? `${baseRequestKey}:force:${++forcedListSequence.current}`
@@ -825,6 +830,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       setError("");
       try {
         const page = await api.myStudents({
+          ...(tenantReadAll ? readScope : {}),
           pageNo: targetPage,
           pageSize: PAGE_SIZE,
           keyword: keyword || undefined,
@@ -850,11 +856,11 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, classId, keyword, serviceStatus]);
+  }, [advancedFilter, classId, keyword, serviceStatus, readScope]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
   const refreshCurrentStudent = useCallback(async () => {
     if (!selected) {
@@ -901,8 +907,8 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       key={selectedService.serviceRelationId}
       student={selected}
       service={selectedService}
-      context={studentContactContext}
-      permissions={permissions}
+      context={readOnly ? { ...studentContactContext, availableActions: [] } : studentContactContext}
+      permissions={readOnly ? [] : permissions}
       openTaskId={taskTarget?.openContactTask ? taskTarget.taskId : undefined}
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
@@ -1000,6 +1006,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       <header className="registration-filter-shell">
         <div>
           <Typography.Title level={4}>学员管理</Typography.Title>
+          {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setReadScope(value); setSelected(undefined); setDrawerOpen(false); }} />}
           <Typography.Text type="secondary">
             查看当前负责的学员及课程权益
           </Typography.Text>

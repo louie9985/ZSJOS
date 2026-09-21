@@ -41,9 +41,9 @@ public class SalesOrderObjectPermissionService {
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
-            case "read" -> canRead(order, userId);
+            case "read" -> permissionApi.hasTenantReadAllAccess(userId) || canRead(order, userId);
             case "read-management" -> canReadManagement(order, userId);
-            case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
+            case "read-own" -> permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
             case "continue-revise" -> canContinue(order, userId);
             case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId)
@@ -120,6 +120,9 @@ public class SalesOrderObjectPermissionService {
      */
     public SalesOrderManagementScope resolveManagementScope(Long userId) {
         if (permissionApi == null) return SalesOrderManagementScope.empty();
+        if (permissionApi.hasTenantReadAllAccess(userId)) {
+            return new SalesOrderManagementScope(true, true, Set.of(), Set.of());
+        }
         DeptDataPermissionRespDTO scope = permissionApi.getDeptDataPermission(userId);
         if (scope == null) return SalesOrderManagementScope.empty();
         Set<Long> result = new LinkedHashSet<>();

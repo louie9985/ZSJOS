@@ -53,6 +53,7 @@ class WorkPlanServiceImplTest {
     @Mock private WorkReportMapper reportMapper;
     @Mock private WorkPlanObjectPermissionProvider permissionProvider;
     @Mock private BusinessTaskCommandService taskCommandService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }

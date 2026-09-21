@@ -12,8 +12,13 @@ import java.util.List;
 @Mapper
 public interface PersonalCalendarEventMapper extends BaseMapperX<PersonalCalendarEventDO> {
     default List<PersonalCalendarEventDO> selectMyRange(Long ownerUserId, LocalDateTime start, LocalDateTime end) {
+        java.util.Objects.requireNonNull(ownerUserId);
+        return selectReadRange(ownerUserId, start, end);
+    }
+
+    default List<PersonalCalendarEventDO> selectReadRange(Long ownerUserId, LocalDateTime start, LocalDateTime end) {
         return selectList(new LambdaQueryWrapperX<PersonalCalendarEventDO>()
-                .eq(PersonalCalendarEventDO::getOwnerUserId, ownerUserId)
+                .eqIfPresent(PersonalCalendarEventDO::getOwnerUserId, ownerUserId)
                 // Normal events intersect the half-open day range; zero-length events belong to their point day.
                 .and(wrapper -> wrapper
                         .and(normal -> normal.lt(PersonalCalendarEventDO::getStartTime, end)

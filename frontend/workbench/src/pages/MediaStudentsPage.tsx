@@ -15,6 +15,7 @@ import DetailFieldGrid from '../components/DetailFieldGrid'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
 import { NameAvatar } from '../components/LeadDetailOverview'
 import StudentDetail from '../components/StudentDetail'
+import OperatorAssignmentDialog from '../components/OperatorAssignmentDialog'
 import OverflowToolbar, { type ToolbarAction } from '../components/OverflowToolbar'
 import ServicePositioningCard from '../components/ServicePositioningCard'
 import AccountMaintenancePanel from '../components/AccountMaintenancePanel'
@@ -22,7 +23,7 @@ import ProductionTicketPositioningCard from '../components/ProductionTicketPosit
 import WorkOrderAttachmentPicker from '../components/WorkOrderAttachmentPicker'
 import ResourceLink from '../components/ResourceLink'
 import ResourceLinkInput from '../components/ResourceLinkInput'
-import { ApiError, api, type AreaNode, type DictData, type DirectorTemplateSnapshot, type MediaStudentDetail, type MyStudent, type PositioningCard, type PositioningCardImportSource, type ProductionTicketCreateContext, type StudentContactContext, type StudyPlanner } from '../services/api'
+import { ApiError, api, type AreaNode, type DictData, type DirectorTemplateSnapshot, type MediaStudentDetail, type MyStudent, type PositioningCard, type PositioningCardImportSource, type ProductionTicketCreateContext, type StudentContactContext } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { hasPermission } from '../services/managementAccess'
 import { formatTimestamp } from '../services/time'
@@ -214,7 +215,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
   const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'operator' | 'student-partner'>(), [saving, setSaving] = useState(false), [contentSubmitAfterSave, setContentSubmitAfterSave] = useState(false)
-  const [directorContext, setDirectorContext] = useState<StudentContactContext>(), [operatorCandidates, setOperatorCandidates] = useState<StudyPlanner[]>([])
+  const [directorContext, setDirectorContext] = useState<StudentContactContext>()
   const [contentClasses, setContentClasses] = useState<DictData[]>([])
   const [contentPurposes, setContentPurposes] = useState<DictData[]>([])
   const [contentFormats, setContentFormats] = useState<DictData[]>([])
@@ -283,7 +284,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const stageDraftVersion = useRef<number | undefined>(undefined)
   const draftIdentity = useRef<{ serviceRelationId: number; stage: 'precheck'; session: number; templateVersionId?: number } | undefined>(undefined)
   const precheckPending = useRef<{ fingerprint: string; key: string } | undefined>(undefined)
-  const operatorPending = useRef<{ fingerprint: string; key: string } | undefined>(undefined)
   const accountCreatePending = useRef<{ fingerprint: string; key: string } | undefined>(undefined)
   const manualSave = useRef(new PositioningManualSave())
   const [positioningRefresh, setPositioningRefresh] = useState(0)
@@ -325,7 +325,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     catch (cause) { if (run === detailRun.current) { setDetail(undefined); setDetailError(cause instanceof ApiError && cause.code === 403 ? '无权查看该学员' : errorText(cause)) } }
     finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [params])
-  const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false) => {
+  const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false, keepDetail = false) => {
     if (append && listBusy.current) return
     listBusy.current = true
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
@@ -335,7 +335,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       setRows(current => append ? [...current, ...result.list.filter(row => !current.some(existing => existing.personId === row.personId))] : result.list)
       setPageNo(targetPage); setHasMore(result.list.length > 0 && targetPage * PAGE_SIZE < result.total)
       // Appending students must not reload the selected detail or discard its editor state.
-      if (!append) {
+      if (!append && !keepDetail) {
         listScrollRef.current?.scrollTo({ top: 0, left: 0 })
         const target = preferred || Number(params.get('personId')) || result.list[0]?.personId
         if (target) await loadDetail(target, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
@@ -344,7 +344,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     } catch (cause) {
       if (run === listRun.current) {
         if (append) setMoreError(errorText(cause))
-        else { setRows([]); setDetail(undefined); setError(errorText(cause)) }
+        else { setRows([]); if (!keepDetail) setDetail(undefined); setError(errorText(cause)) }
       }
     } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
   }, [keyword, loadDetail, params])
@@ -455,10 +455,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         setDialog(type)
         void loadPositioningImportSources()
       } catch (cause) { if (autoSaveCoordinator.current!.isCurrent(session)) { setDialog(undefined); message.error(errorText(cause)) } return }
-    }
-    if (type === 'operator' && selectedServiceId) {
-      try { const candidates = await api.studentCollaboratorCandidates(selectedServiceId, 'operator'); if (autoSaveCoordinator.current!.isCurrent(session)) setOperatorCandidates(candidates) }
-      catch (cause) { if (autoSaveCoordinator.current!.isCurrent(session)) { setDialog(undefined); message.error(errorText(cause)) } return }
     }
     if (type === 'content' && (!contentClasses.length || !contentPurposes.length || !contentFormats.length)) {
       try { const [classes, purposes, formats] = await Promise.all([api.dictDataByType('zsjos_content_class'), api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')]); if (autoSaveCoordinator.current!.isCurrent(session)) { setContentClasses(classes); setContentPurposes(purposes); setContentFormats(formats) } }
@@ -720,13 +716,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         await api.studentDirectorPrecheckSubmit(selectedService.serviceRelationId, request)
         precheckPending.current = undefined
       }
-      if (dialog === 'operator' && selectedService && directorContext) {
-        const requestBody = { collaboratorType: 'operator', userId: Number(values.userId), version: directorContext.version, correctionReason: values.correctionReason ? String(values.correctionReason) : undefined } as const
-        const fingerprint = JSON.stringify(requestBody)
-        if (operatorPending.current?.fingerprint !== fingerprint) operatorPending.current = { fingerprint, key: crypto.randomUUID() }
-        await api.studentAssignCollaborator(selectedService.serviceRelationId, { ...requestBody, idempotencyKey: operatorPending.current.key })
-        operatorPending.current = undefined
-      }
       if (dialog === 'reject-content' && rejectingContent) await api.mediaContent.rejectAcceptance(rejectingContent.id, rejectingContent.version, String(values.reason))
       if (dialog === 'reject-positioning' && rejectingPositioning) await api.positioningCard.operatorReject(rejectingPositioning.id, rejectingPositioning.version, String(values.reason))
       if (autoSaveDialog) autoSaveCoordinator.current!.invalidate()
@@ -949,7 +938,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       <main className="media-students-detail-pane">{body}</main>
     </div>
     {interviewId && <PositioningInterviewDialog relationId={interviewId} onClose={() => setInterviewId(undefined)} onChanged={() => selectedId ? loadDetail(selectedId, selectedServiceId, selectedAccountId) : Promise.resolve()} />}
-    <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog)} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
+    {dialog === 'operator' && !detailLoading && selectedService && detail && <OperatorAssignmentDialog key={selectedService.serviceRelationId}
+      relationId={selectedService.serviceRelationId} onCancel={() => setDialog(undefined)} onSaved={async () => {
+        setDialog(undefined)
+        await Promise.all([loadPage(1, undefined, false, true), loadDetail(detail.student.personId, selectedService.serviceRelationId, selectedAccountId)])
+      }} />}
+    <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog) && dialog !== 'operator'} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" disabled={dialog === 'positioning' && positioningBusy} onValuesChange={scheduleAutoSave}>
         {autoSaveNotice}
         {dialog === 'positioning' && !positioningCanSubmit && <Alert type="info" message="提交前请指派课程服务责任运营，并确认你拥有提交审核权限" />}
@@ -958,7 +952,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         {dialog === 'content' && <ContentApprovalDraft disabled={saving} accounts={detail?.accounts || []} purposeOptions={contentPurposes.map(x => ({ value: x.value, label: x.label }))} formatOptions={contentFormats.map(x => ({ value: x.value, label: x.label }))} />}
         {dialog === 'positioning' && <><div className="media-students-positioning-toolbar"><Space wrap><Button icon={<UploadOutlined />} disabled={positioningBusy} onClick={() => { setPositioningJsonText(''); setPositioningJsonFileName(''); setPositioningJsonPreview(undefined); setPositioningJsonError(''); setPositioningJsonOpen(true) }}>导入 JSON</Button>{hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />} title={!positioningDraft.current?.id ? '请先保存草稿，再导入历史版本' : undefined} disabled={positioningBusy || !positioningDraft.current?.id} onClick={() => { setPositioningImportOpen(true); if (!positioningImportSources.length && !positioningImportLoading) void loadPositioningImportSources() }}>导入现有定位卡</Button>}</Space></div><PositioningCardFields fields={positioningTemplate?.fields || []} render={directorField} /></>}
         {dialog === 'precheck' && <><Alert type="info" showIcon message="核对学员、订单和服务归属后，预约定位访谈。"/><Form.Item name="confirmed" valuePropName="checked" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请确认资料无误'))}]}><Checkbox>已确认资料无误</Checkbox></Form.Item><Form.Item name="interviewAt" label="定位访谈预约时间（北京时间）" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false?Promise.resolve():!v?Promise.reject(new Error('请选择定位访谈预约时间')):dayjs(v).isAfter(dayjs())?Promise.resolve():Promise.reject(new Error('定位访谈预约时间必须晚于当前北京时间'))}]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>确认完成资料预审</Checkbox></Form.Item></>}
-        {dialog === 'operator' && <><Form.Item name="userId" label="运营负责人" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={operatorCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>{directorContext?.operatorAssignmentConflict && <Form.Item name="correctionReason" label="统一归属说明" rules={[{ required: true, max: 500 }]}><Input.TextArea rows={3} /></Form.Item>}</>}
         {dialog === 'student-partner' && <><Alert type="info" showIcon message="姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。" />{invitationContext?.invitation && <Alert type="warning" showIcon message="原邀请码已失效，重新生成后请发送新邀请码。" />}{invitationContext?.operatorAssignmentConflict && <Alert type="warning" showIcon message="学员运营归属不一致，请明确选择本次兼职的归属运营。" />}{invitationOperatorsError && <Alert type="error" showIcon message={invitationOperatorsError} action={<Button onClick={() => void loadInvitationOperators()}>重试加载运营</Button>} />}<Form.Item name="assignedOperatorUserId" label="归属运营" extra="默认学员当前运营，可改选；仅决定本次兼职归属，不改变学员运营安排。" rules={[{ required: true, message: '请选择归属运营' }, { validator: (_, value) => !value || invitationOperators.some(operator => operator.id === value) ? Promise.resolve() : Promise.reject(new Error('该运营已不可用，请重新选择')) }]}><Select showSearch optionFilterProp="label" loading={invitationOperatorsLoading} disabled={invitationOperatorsLoading || Boolean(invitationOperatorsError)} placeholder="请选择归属运营" notFoundContent={invitationOperatorsLoading ? '加载中' : '暂无可用运营'} options={invitationOperators.map(operator => ({ value: operator.id, label: operator.nickname }))} /></Form.Item><Form.Item name="studentName" label="注册姓名" rules={[{ required: true, whitespace: true, max: 100, message: '请输入注册姓名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="studentMobile" label="注册手机号" rules={[{ required: true, whitespace: true, message: '请输入注册手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的 11 位手机号' }]}><Input maxLength={11} /></Form.Item><Form.Item name="invitationExpiresAt" label="到期时间" rules={[{ required: true, message: '请选择到期时间' }, { validator: (_, value) => !value || dayjs(value).isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('到期时间必须晚于当前时间')) }]}><DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} /></Form.Item></>}
         {(dialog === 'reject-content' || dialog === 'reject-positioning') && <Form.Item name="reason" label="退回原因" rules={[{ required: true, max: 500 }]}><Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} /></Form.Item>}
       </Form>

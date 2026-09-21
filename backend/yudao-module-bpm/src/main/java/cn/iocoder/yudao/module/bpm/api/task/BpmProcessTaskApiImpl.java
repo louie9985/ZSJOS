@@ -1,5 +1,10 @@
 package cn.iocoder.yudao.module.bpm.api.task;
 
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
+import org.flowable.bpmn.model.BpmnModel;
+
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
@@ -33,6 +38,8 @@ import java.util.Date;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_REASON_REQUIRE;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 
 /**
@@ -46,6 +53,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Resource
     private BpmTaskService bpmTaskService;
+    @Resource
+    private BpmProcessDefinitionService processDefinitionService;
     @Resource
     private BpmProcessInstanceService processInstanceService;
     @Resource
@@ -145,6 +154,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         }
         Set<String> processIds = convertSet(page.getList(), Task::getProcessInstanceId);
         Map<String, ProcessInstance> processes = processInstanceService.getProcessInstanceMap(processIds);
+        Map<String, BpmnModel> models = new HashMap<>();
         java.util.List<BpmTaskRespDTO> list = page.getList().stream().map(task -> {
             ProcessInstance process = processes.get(task.getProcessInstanceId());
             BpmTaskRespDTO result = new BpmTaskRespDTO();
@@ -152,6 +162,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
+            result.setReasonRequire(readReasonRequire(task.getProcessDefinitionId(), task.getTaskDefinitionKey(), models));
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             return result;
         }).toList();
@@ -192,6 +203,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
         result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
+        result.setReasonRequire(readReasonRequire(task.getProcessDefinitionId(), task.getTaskDefinitionKey(), new HashMap<>()));
         return result;
     }
 
@@ -214,6 +226,17 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         return result;
     }
 
+    private Boolean readReasonRequire(String definitionId, String taskKey,
+                                      Map<String, BpmnModel> models) {
+        if (!models.containsKey(definitionId)) {
+            models.put(definitionId, processDefinitionService.getProcessDefinitionBpmnModel(definitionId));
+        }
+        BpmnModel model = models.get(definitionId);
+        if (model == null || BpmnModelUtils
+                .getFlowElementById(model, taskKey) == null) return null;
+        return BpmnModelUtils.parseReasonRequire(model, taskKey);
+    }
+
     @Override
     public void approveTask(Long userId, BpmTaskDecisionReqDTO reqDTO) {
         bpmTaskService.approveTask(userId, new BpmTaskApproveReqVO().setId(reqDTO.getTaskId())
@@ -222,6 +245,9 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Override
     public void rejectTask(Long userId, BpmTaskDecisionReqDTO reqDTO) {
+        if (StrUtil.isBlank(reqDTO.getReason())) {
+            throw exception(TASK_REASON_REQUIRE);
+        }
         bpmTaskService.rejectTask(userId, new BpmTaskRejectReqVO().setId(reqDTO.getTaskId())
                 .setReason(reqDTO.getReason()).setAttachments(reqDTO.getAttachments()));
     }

@@ -27,6 +27,7 @@ public class PositioningCardObjectPermissionProvider implements ZsjosObjectPermi
     @Override public boolean hasPermission(Long id, String action, Long userId) {
         PositioningCardDO card = mapper.selectById(id);
         if (card == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all")) return true;
         if (userId.equals(card.getDirectorUserId()) && DIRECTOR_ACTIONS.contains(action)) return true;
         if (card.getServiceRelationId() != null) {

@@ -48,6 +48,14 @@ import static cn.iocoder.yudao.module.fms.enums.LogRecordConstants.FMS_ACCOUNT_S
 @Service
 @Validated
 public class FmsAccountSetServiceImpl implements FmsAccountSetService {
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    @Override
+    public List<FmsAccountSetDO> getReadableAccountSets(Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return accountSetMapper.selectList();
+        return getAccountSetList(accountUserService.getAccountUserList(userId).stream()
+                .map(FmsAccountUserDO::getAccountSetId).toList());
+    }
 
     @Resource
     private FmsAccountSetMapper accountSetMapper;
@@ -177,6 +185,7 @@ public class FmsAccountSetServiceImpl implements FmsAccountSetService {
     @Override
     public FmsAccountSetDO validateAccountSetReadPermission(Long accountSetId, Long userId) {
         FmsAccountSetDO accountSet = validateAccountSetExists(accountSetId);
+        if (permissionApi.hasTenantReadAllAccess(userId)) return accountSet;
         FmsAccountUserDO accountUser = accountUserService.getAccountUser(accountSetId, userId);
         if (accountUser == null || !FmsAccountUserLevelEnum.isReadable(accountUser.getLevel())) {
             throw exception(ACCOUNT_SET_ACCESS_DENIED);

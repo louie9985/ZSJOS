@@ -25,7 +25,7 @@ EAM 资产流转推荐资产为 Simple 模型 `eam_asset_transfer/1.0.0/process-
 | `eam_asset_transfer` | `1.0.0` | 条件跳过的线性审批/履行 | `departmentLeaderReview`, `sourceDepartmentReview`, `targetDepartmentReview`, `assetAdministratorReview`, `receiverSign` |
 | `zsjos_class_transfer` | `1.0.0` | 单级主管审批，发起时预选审批人 | `originalSupervisorReview` |
 | `zsjos_feedback_requirement_approval` | `2.0.0` | 可选部门负责人后董事长终审 | `departmentLeaderReview`, `chairmanReview` |
-| `zsjos_sales_order_dual_approval` | `2.0.0` | 双中心并行会签 | `registrationReview`, `financeReview` |
+| `zsjos_sales_order_dual_approval` | `2.1.0` | 双中心并行会签 | `registrationReview`, `financeReview` |
 | `zsjos_lead_appeal_review` | `2.0.0` | 单级多人或签 | `appealReview` |
 | `zsjos_lead_transfer_request` | `2.0.0` | 单级多人或签 | `ownerManagerReview` |
 | `zsjos_partner_withdrawal` | `2.0.0` | 单级多人或签 | `financeReview` |
@@ -81,3 +81,11 @@ SELECT ID_, KEY_, VERSION_, SUSPENSION_STATE_, CATEGORY_
 收录到素材库的“生产内容”类型（`production_content`）由 `MaterialTypeServiceImpl.ensureDefaultSchema` 在启动时自动建模并发布，字段全部非必填——收录只在终审通过时由服务端写入，没有人工补填入口，任何必填字段都会让缺少来源的那条内容收录失败而不是阻塞批审。内容与账号快照到模板字段的映射是服务端固定契约，`ensureDefaultConfig` 会为映射仍为空的存量租户补齐，已由管理员配置过的映射不覆盖。退款审批尚无仓库资产及明确候选人契约，应保持“流程不可用”的失败行为，待业务规则确定后补齐；不得配置自动通过以绕过缺项。
 
 文本校验兼容既有原始字节、LF、CRLF 哈希；实际内容变化仍失败。历史版本元数据保持不变，新版本使用 UTF-8/LF。新模型在 Admin 中编辑/保存/导出后须复核任务 Key；在 Workbench 中验证待办、业务表单及批准/拒绝投影；运行中旧实例保留原定义并继续验证完成路径。
+
+## 成交订单双中心通过意见选填（2.1.0）
+
+新增资产仅将 `registrationReview` 和 `financeReview` 的 `reasonRequire` 设为 false；审批人策略、任务 Key、并行结构和历史版本不变。先部署支持可空通过意见、任务配置透传及驳回非空校验的后端与双端，再由模型管理员按上述已有模型更新流程载入 2.1.0 并单独发布。代码交付不等于模型已发布。
+
+发布后核对新实例定义 ID、双中心空意见通过、空原因驳回被拒绝、有效驳回退回补正及双方完成条件。保留一个旧定义受控实例验证其仍要求意见。旧实例不迁移、不重启；新建或重提的审批轮次才使用新定义。主管确认及申请原因规则保持现状。
+
+回退时保留已发布版本，基于原模型重新发布恢复必填配置的新定义；不得修改历史定义或运行中实例。记录资产 SHA-256、定义 ID、版本、发布时间与操作人。

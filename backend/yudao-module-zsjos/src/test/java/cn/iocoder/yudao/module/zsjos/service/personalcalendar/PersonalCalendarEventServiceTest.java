@@ -22,6 +22,22 @@ import static org.mockito.Mockito.*;
 class PersonalCalendarEventServiceTest {
     @InjectMocks private PersonalCalendarEventService service;
     @Mock private PersonalCalendarEventMapper mapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
+
+    @Test
+    void allReadDoesNotGrantWriteOwnership() {
+        var req = listReq();
+        req.setReadScope("ALL");
+        when(readScopeService.resolve("ALL", null, 20L)).thenReturn(null);
+        when(mapper.selectReadRange(null, req.getRangeStart(), req.getRangeEnd())).thenReturn(List.of());
+        assertTrue(service.list(req, 20L).isEmpty());
+        verify(mapper).selectReadRange(null, req.getRangeStart(), req.getRangeEnd());
+        when(mapper.selectById(9L)).thenReturn(new PersonalCalendarEventDO().setId(9L).setOwnerUserId(21L));
+        assertThrows(ServiceException.class, () -> service.update(9L, saveReq(), 20L));
+        assertThrows(ServiceException.class, () -> service.delete(9L, 20L));
+        verify(mapper, never()).updateOwned(any(), anyLong());
+        verify(mapper, never()).deleteOwned(anyLong(), anyLong(), any());
+    }
 
     @Test
     void listAlwaysUsesCurrentUserAsOwner() {

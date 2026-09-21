@@ -19,6 +19,7 @@ class LeadSubmitterFeedbackPermissionProviderTest {
     @InjectMocks private LeadSubmitterFeedbackPermissionProvider provider;
     @Mock private LeadMapper leadMapper;
     @Mock private PartnerAccountService partnerAccountService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     private LeadDO lead;
     @BeforeEach void setup() {
         lead = new LeadDO().setId(1L).setOwnerUserId(20L).setProviderOwnerType("system_user")
@@ -34,6 +35,13 @@ class LeadSubmitterFeedbackPermissionProviderTest {
         login(10L, UserTypeEnum.ADMIN);
         assertTrue(provider.hasPermission(1L, "read", 10L));
         assertFalse(provider.hasPermission(1L, "create", 10L));
+    }
+    @Test void administratorCanReadWithoutBecomingSender() {
+        login(30L, UserTypeEnum.ADMIN);
+        when(permissionApi.hasTenantReadAllAccess(30L)).thenReturn(true);
+        assertTrue(provider.hasPermission(1L, "read", 30L));
+        assertFalse(provider.hasPermission(1L, "create", 30L));
+        assertFalse(provider.canCreate(lead, 30L));
     }
     @Test void ownerCanSendAndUnrelatedEmployeeCannotRead() {
         login(20L, UserTypeEnum.ADMIN);

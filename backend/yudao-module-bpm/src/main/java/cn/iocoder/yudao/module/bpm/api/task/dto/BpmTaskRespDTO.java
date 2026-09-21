@@ -16,6 +16,8 @@ public class BpmTaskRespDTO {
     private Boolean signTask;
     private Integer status;
     private String reason;
+    /** 当前任务所属流程定义的节点意见配置；无法读取时为 null。 */
+    private Boolean reasonRequire;
     private LocalDateTime createTime;
     private LocalDateTime endTime;
 }

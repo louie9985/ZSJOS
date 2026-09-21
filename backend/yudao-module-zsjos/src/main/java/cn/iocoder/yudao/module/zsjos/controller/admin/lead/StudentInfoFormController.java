@@ -52,7 +52,7 @@ public class StudentInfoFormController {
     public CommonResult<Detail> detail(@PathVariable Long leadId) { return success(service.detail(leadId)); }
 
     @GetMapping("/{leadId}/student-info-form/sensitive")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read') && @studentInfoFormService.canReadSensitive()")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
     public CommonResult<Detail> sensitive(@PathVariable Long leadId) { return success(service.sensitiveDetail(leadId)); }

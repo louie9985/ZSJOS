@@ -775,7 +775,8 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
     private ServiceRelationDO requireReadable(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(id);
-        if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
+        if (relation == null || (!permissionApi.hasTenantReadAllAccess(userId)
+                && !Set.of("active", "paused", "completed").contains(relation.getStatus()))) {
             throw exception(STUDENT_SERVICE_NOT_EXISTS);
         }
         if (!Objects.equals(relation.getOwnerUserId(), userId)

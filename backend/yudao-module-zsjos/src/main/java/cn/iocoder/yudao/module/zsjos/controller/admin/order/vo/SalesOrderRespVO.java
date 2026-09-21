@@ -55,6 +55,7 @@ public class SalesOrderRespVO {
     private String approvalRoundStatus;
     private String processInstanceId;
     private String taskId;
+    private Boolean approvalReasonRequired;
     private String taskDefinitionKey;
     private Integer taskStatus;
     private String taskReason;

@@ -228,6 +228,10 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
                     : userMember != null ? userMember.getLevel()
                     : deptMember != null ? deptMember.getLevel()
                     : null;
+            // Preview is the only extra capability; preserve any existing edit/manage level.
+            if (level == null && permissionApi.hasTenantReadAllAccess(userId)) {
+                level = PmsKnowledgeContentLevelEnum.PREVIEW.getLevel();
+            }
             levelMap.put(permission.getId(), level);
         }
         return levelMap;
@@ -245,7 +249,8 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
         }
         Set<Long> permissionIds = convertSet(permissions, PmsKnowledgeContentPermissionDO::getId);
         // 1.2 超级管理员可以读取全部内容
-        if (permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode())) {
+        if (permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode())) {
             return permissionIds;
         }
 

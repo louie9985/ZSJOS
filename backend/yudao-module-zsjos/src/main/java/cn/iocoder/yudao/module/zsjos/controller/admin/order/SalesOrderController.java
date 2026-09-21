@@ -91,8 +91,8 @@ public class SalesOrderController {
     @GetMapping("/{id}")
     @Operation(summary = "获得成交订单详情")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
-    public CommonResult<SalesOrderRespVO> get(@PathVariable Long id) {
-        return success(orderService.get(id, WebFrameworkUtils.getLoginUserId()));
+    public CommonResult<SalesOrderRespVO> get(@PathVariable Long id, @RequestParam(required = false) String taskId) {
+        return success(orderService.get(id, WebFrameworkUtils.getLoginUserId(), taskId));
     }
 
     @GetMapping("/my-page")

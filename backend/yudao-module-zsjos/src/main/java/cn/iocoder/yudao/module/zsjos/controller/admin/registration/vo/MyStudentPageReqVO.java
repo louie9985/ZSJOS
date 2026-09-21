@@ -11,6 +11,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.Advanced
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class MyStudentPageReqVO extends PageParam {
+    private String readScope;
+    private Long targetUserId;
     @Size(max = 100) private String keyword;
     @Pattern(regexp = "active|paused|completed", message = "学员服务状态不正确") private String serviceStatus;
     private Long classId;

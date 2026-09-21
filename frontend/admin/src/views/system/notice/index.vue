@@ -52,8 +52,9 @@
         </el-table-column>
         <el-table-column label="发布时间" prop="publishTime" width="180" :formatter="dateFormatter" />
         <el-table-column label="创建时间" prop="createTime" width="180" :formatter="dateFormatter" />
-        <el-table-column label="操作" fixed="right" width="300" align="center">
+        <el-table-column label="操作" fixed="right" width="350" align="center">
           <template #default="scope">
+            <el-button link type="primary" @click="detailRef?.open(scope.row.id)" v-hasPermi="['system:notice:query']">查看</el-button>
             <el-button v-if="scope.row.publishStatus === 'DRAFT'" link type="primary" @click="openEditor(scope.row.id)" v-hasPermi="['system:notice:update']">编辑</el-button>
             <el-button v-if="scope.row.publishStatus === 'DRAFT'" link type="primary" @click="publish(scope.row)" v-hasPermi="['system:notice:publish']">发布</el-button>
             <el-button v-if="scope.row.publishStatus === 'PUBLISHED'" link type="warning" @click="offline(scope.row)" v-hasPermi="['system:notice:offline']">下线</el-button>
@@ -65,6 +66,7 @@
       <Pagination v-model:limit="queryParams.pageSize" v-model:page="queryParams.pageNo" :total="total" @pagination="getList" />
     </ContentWrap>
   </template>
+  <NoticeDetail ref="detailRef" />
 </template>
 
 <script lang="ts" setup>
@@ -72,11 +74,13 @@ import { DICT_TYPE } from '@/utils/dict'
 import { dateFormatter } from '@/utils/formatTime'
 import * as NoticeApi from '@/api/system/notice'
 import NoticeEditor from './NoticeEditor.vue'
+import NoticeDetail from './NoticeDetail.vue'
 
 defineOptions({ name: 'SystemNotice' })
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const detailRef = ref<InstanceType<typeof NoticeDetail>>()
 const loading = ref(false)
 const list = ref<NoticeApi.NoticeVO[]>([])
 const total = ref(0)

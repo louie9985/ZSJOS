@@ -1,5 +1,12 @@
 <template>
   <ContentWrap>
+    <el-alert
+      title="未配置按学校；多产品主体一致按配置；主体不一致统一按公司。仅对新生成的支付链接生效。"
+      type="info"
+      show-icon
+      :closable="false"
+      class="mb-15px"
+    />
     <el-alert v-if="subjectError" :title="subjectError" type="error" :closable="false">
       <el-button @click="getSubjectList">重试</el-button>
     </el-alert>
@@ -67,10 +74,13 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="产品编号" align="center" prop="productId" width="100" />
       <el-table-column label="产品名称" align="center" prop="productName" min-width="200" />
-      <el-table-column label="当前支付主体" align="center" prop="subjectName" width="180">
+      <el-table-column label="已配置支付主体" align="center" prop="subjectName" min-width="240">
         <template #default="scope">
-          <el-tag v-if="scope.row.subjectName" type="success">{{ scope.row.subjectName }}</el-tag>
-          <el-tag v-else type="info">未配置</el-tag>
+          <el-tag v-if="scope.row.paymentSubjectId == null" type="info">
+            未配置（按规则使用学校）
+          </el-tag>
+          <el-tag v-else-if="scope.row.subjectName" type="success">{{ scope.row.subjectName }}</el-tag>
+          <el-tag v-else type="danger">关联主体异常</el-tag>
         </template>
       </el-table-column>
       <el-table-column

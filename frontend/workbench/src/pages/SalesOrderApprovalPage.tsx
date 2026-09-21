@@ -8,7 +8,7 @@ import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderApproval
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
-import { mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
+import { validateSalesOrderDecisionReason, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
@@ -65,6 +65,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const inflightPages = useRef(new Set<string>())
   const profileRequest = useRef<Promise<void> | undefined>(undefined)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [reasonConfigLoading, setReasonConfigLoading] = useState(false)
   const { useTableLayout } = useInboxTableLayout()
   const [leadDetailModalOpen, setLeadDetailModalOpen] = useState(false)
   const [leadDetailModalLeadId, setLeadDetailModalLeadId] = useState<number>()
@@ -129,7 +130,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     void Promise.all([api.salesOrder(requestedOrderId), targetRequest]).then(([order, target]) => {
       if (version !== deepLinkVersion.current) return
       const item = { ...salesOrderDetailToListItem(order), taskId: target?.taskId || requestedTaskId,
-        taskDefinitionKey: target?.taskDefinitionKey || order.supervisorApproval?.taskDefinitionKey }
+        taskDefinitionKey: target?.taskDefinitionKey || order.supervisorApproval?.taskDefinitionKey,
+        approvalReasonRequired: target?.approvalReasonRequired }
       setItems(current => mergeSalesOrderListItems([item], current, salesOrderTaskKey))
       ++detailVersion.current
       setSelectedKey(salesOrderTaskKey(item)); setDetail(order)
@@ -167,8 +169,28 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       }
     }
   })
+  const retryReasonConfig = async () => {
+    const taskId = selectedItem?.taskId
+    if (!taskId) { message.warning('审批任务信息缺失，请刷新列表'); return }
+    setReasonConfigLoading(true)
+    try {
+      const target = await api.salesOrderApprovalTaskTarget(taskId)
+      if (typeof target.approvalReasonRequired !== 'boolean') throw new Error('审批意见配置未返回，请重试')
+      setItems(current => current.map(item => item.taskId === taskId
+        ? { ...item, approvalReasonRequired: target.approvalReasonRequired } : item))
+    } catch (error) { message.error(error instanceof Error ? error.message : '审批意见配置加载失败') }
+    finally { setReasonConfigLoading(false) }
+  }
+  const reasonRequired = decision === 'reject' || selectedItem?.approvalReasonRequired !== false
+  const validateDecision = () => {
+    if (!selectedItem?.taskId || !decision) return '审批任务信息缺失，请刷新列表'
+    if (!detail || detail.id !== selectedItem.id || detailLoading) return '请等待订单详情加载完成'
+    return validateSalesOrderDecisionReason(decision, selectedItem.approvalReasonRequired, reason)
+  }
   const submitDecision = async () => {
     setConfirmOpen(false)
+    const validationError = validateDecision()
+    if (validationError) { message.warning(validationError); return }
     if (!selectedItem?.taskId || !decision) return
     const order = selectedItem
     const nextDecision = decision
@@ -179,10 +201,11 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         roundVersion: detail.approvalRoundVersion, idempotencyKey })
       complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回提交人补正');
       setConfirmOpen(false); setDecision(undefined); setReason(''); reload()
-    }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
+    }).catch(saveError => { message.error(saveError instanceof Error ? saveError.message : '审批失败') })
   }
   const prepareDecision = () => {
-    if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
+    const validationError = validateDecision()
+    if (validationError) { message.warning(validationError); return }
     setConfirmOpen(true)
   }
   const submitSupervisorRequest = async () => {
@@ -236,7 +259,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       </div>
     </aside><main className="business-inbox-detail-pane">{detailContent}</main></div>}
     <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" placement="right" width="100%">{detailContent}</ResizableDetailDrawer>
-    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}><Form.Item label="审批意见" required><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见"/></Form.Item></Modal>
+    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}>{typeof selectedItem?.approvalReasonRequired !== 'boolean' && <Alert type="error" showIcon message="审批意见配置未加载，暂不能提交" action={<Button size="small" loading={reasonConfigLoading} onClick={() => void retryReasonConfig()}>重试</Button>} />}<Form.Item label="审批意见" required={reasonRequired}><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder={decision === 'reject' ? '请填写驳回原因' : reasonRequired ? '请填写审批意见' : '审批意见（选填）'}/></Form.Item></Modal>
     <Modal title="申请主管确认" open={supervisorOpen} onCancel={() => { setSupervisorOpen(false); setReason(''); resetIntent() }}
       onOk={() => void submitSupervisorRequest()} confirmLoading={saving} okText="提交申请">
       <Form.Item label="申请原因" required><Input.TextArea rows={5} maxLength={1000} showCount value={reason}

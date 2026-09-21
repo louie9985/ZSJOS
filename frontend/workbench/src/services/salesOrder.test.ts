@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDictionaryLabelMap, canReviewSalesOrderTask, mergeSalesOrderListItems, resolveDictionaryLabel, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
+import { validateSalesOrderDecisionReason, buildDictionaryLabelMap, canReviewSalesOrderTask, mergeSalesOrderListItems, resolveDictionaryLabel, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
 import type { SalesOrder, SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
@@ -75,5 +75,20 @@ describe('sales-order dictionary labels', () => {
     expect(resolveDictionaryLabel('retail', labels, 'error')).toBe('标签加载失败')
     expect(resolveDictionaryLabel('unknown', labels, 'ready')).toBe('标签未配置')
     expect(resolveDictionaryLabel(undefined, labels, 'ready')).toBe('-')
+  })
+})
+
+describe('decision reason contract', () => {
+  it.each(['', '   ', '正常意见'])('allows optional approvals: %j', reason => {
+    expect(validateSalesOrderDecisionReason('approve', false, reason)).toBeUndefined()
+  })
+  it.each(['', '   '])('requires old-definition approval and all rejection reasons: %j', reason => {
+    expect(validateSalesOrderDecisionReason('approve', true, reason)).toBe('请填写审批意见')
+    for (const required of [true, false])
+      expect(validateSalesOrderDecisionReason('reject', required, reason)).toBe('请填写驳回原因')
+  })
+  it('blocks missing configuration and accepts actual rejection reasons', () => {
+    expect(validateSalesOrderDecisionReason('approve', undefined, '')).toBe('审批意见配置未加载，请重试')
+    expect(validateSalesOrderDecisionReason('reject', false, ' 补正资料 ')).toBeUndefined()
   })
 })

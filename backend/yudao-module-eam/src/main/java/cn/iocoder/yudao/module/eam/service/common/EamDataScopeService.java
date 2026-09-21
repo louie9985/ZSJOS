@@ -26,6 +26,7 @@ public class EamDataScopeService {
     @Resource private HrmEmployeeApi employeeApi;
 
     public Scope resolve(Long userId, String selfPermission, String deptPermission) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return Scope.full();
         if (permissionApi.hasAnyPermissions(userId, MANAGE_ALL)) return Scope.full();
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         Set<Long> deptIds = new HashSet<>();

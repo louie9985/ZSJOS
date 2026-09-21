@@ -79,7 +79,8 @@ queries to the assigned director/operator unless the independent all-account per
 
 V186 retires V161's shared `/calendar/all` page and does not copy its grants to the new personal calendar.
 Account-calendar `query-managed` and `query-all` are independently administrator-configured; the former consumes
-only bounded System department scope and the latter alone grants all accounts. The new personal-calendar page
+only bounded System department scope and the latter grants all accounts. The approved System tenant-read-all
+capability also grants current-tenant account reads without granting maintenance operations. The personal-calendar page
 and create/update/delete buttons are added to eligible tenant packages without automatic role grants.
 
 V187 adds `zsjos:exam-calendar:query` for page access and `zsjos:exam-calendar:manage` for every mutation.

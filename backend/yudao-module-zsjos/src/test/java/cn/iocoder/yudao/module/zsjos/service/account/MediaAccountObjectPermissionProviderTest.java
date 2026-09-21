@@ -23,6 +23,17 @@ class MediaAccountObjectPermissionProviderTest {
     @Mock private ServiceRelationMapper relationMapper;
 
     @Test
+    void tenantReadAllDoesNotGrantMaintenanceOrProduction() {
+        when(mapper.selectById(1L)).thenReturn(new MediaAccountDO().setId(1L).setDirectorUserId(20L));
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
+        assertTrue(provider.hasPermission(1L, "read", 10L));
+        assertFalse(provider.hasPermission(1L, "update", 10L));
+        assertFalse(provider.hasPermission(1L, "maintenance", 10L));
+        assertFalse(provider.hasPermission(1L, "production-ticket-create", 10L));
+        assertFalse(provider.hasPermission(2L, "read", 10L));
+    }
+
+    @Test
     void sourcedAccountUsesOnlyExactActiveAcceptedRelationMembers() {
         MediaAccountDO account = new MediaAccountDO().setId(1L).setStudentPersonId(40L)
                 .setCreateServiceRelationId(30L).setOwnerOperatorUserId(999L).setDirectorUserId(998L);

@@ -15,6 +15,7 @@ public interface SalesOrderService {
     Long createStudentRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO reqVO);
     Long reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
     SalesOrderRespVO get(Long orderId, Long userId);
+    SalesOrderRespVO get(Long orderId, Long userId, String taskId);
     SalesOrderRespVO getOwn(Long orderId, Long userId);
     SalesOrderRespVO getManagement(Long orderId, Long userId);
     PageResult<SalesOrderListItemRespVO> getManagementPage(SalesOrderMyPageReqVO reqVO, Long userId);

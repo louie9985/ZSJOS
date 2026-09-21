@@ -41,6 +41,7 @@ import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class LeadObjectPermissionServiceTest {
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @InjectMocks
     private LeadObjectPermissionService service;

@@ -225,8 +225,12 @@ proxy requirements are documented in `docs/operations/positioning-confirmation-d
 
 运营候选人与指派复用协作者接口，类型为 `operator`：候选人来自服务端配置的
 `content_director_operator` 人员关系，source 为当前编导、target 为运营。运营归属写入同一学员
-全部有效服务关系的 `operatorUserId`，并同步未归档定位卡的当前运营；运营只能读取被
+全部有效且已接收服务关系的 `operatorUserId`，并同步未归档定位卡的当前运营；运营只能读取被
 指派学员全部账号与定位卡，并在具备定位卡操作权限时逐账号确认或退回。
+运营指派请求继续使用 `correctionReason`、`version` 和 `idempotencyKey`。任何有效且已接收的服务已有不同于目标的运营时，原因必填（非空白，最多 500 字）；首次指派或保持相同运营不额外要求原因。缺少原因返回 `1900010035`。归属冲突标记只表示多个不同运营，不代表所有需要原因的场景。
+
+Workbench 指派弹窗始终提供原因输入；普通更换和冲突时前置校验，服务端要求补充原因时保留表单并显示字段错误。每次打开重新读取上下文和候选，加载失败可重试；版本冲突及候选失效需刷新并重新确认。服务关系、未归档定位卡及学员账号的运营同步沿用原事务，记录分配原因并发送既有通知；不改写历史快照。成功后独立刷新列表和当前课程详情。
+
 #### Director form dictionary snapshots (V129)
 
 Director interview and account-positioning enum fields use System dictionaries. Configuration

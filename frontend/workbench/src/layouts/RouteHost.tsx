@@ -63,6 +63,7 @@ interface RouteHostProps {
   menu?: WorkbenchMenu
   permissions: string[]
   roles: string[]
+  tenantReadAll?: boolean
   authPlatform: AuthPlatform
   onOpenAssignment: () => void
 }
@@ -71,7 +72,7 @@ interface RouteHostProps {
  * 根据当前菜单路径/组件名渲染对应业务页面。
  * 未迁移的菜单显示占位提示。
  */
-export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
+export default function RouteHost({ menu, permissions, roles, tenantReadAll = false, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
 
   // BPM 审批中心：通过 location.pathname 判断，因为 /bpm/task/done 可能没有对应的 menu
@@ -83,7 +84,7 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
-  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
@@ -129,12 +130,12 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
-  if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
-  if (menu?.path === APP_ROUTES.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
@@ -145,7 +146,7 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
-  if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage/>
+  if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_LIBRARY) return <MaterialLibraryPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MATERIAL_MANAGEMENT) return <MaterialLibraryPage permissions={permissions} management />

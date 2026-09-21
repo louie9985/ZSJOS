@@ -46,6 +46,59 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     private BpmProcessInstanceService processInstanceService;
     @Mock
     private AdminUserApi adminUserApi;
+    @Mock
+    private cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService processDefinitionService;
+
+    @Test
+    void pageReadsEachTasksOwnDefinitionAndCachesModels() {
+        var oldModel = reasonModel(true);
+        var newModel = reasonModel(false);
+        when(processDefinitionService.getProcessDefinitionBpmnModel("old")).thenReturn(oldModel);
+        when(processDefinitionService.getProcessDefinitionBpmnModel("new")).thenReturn(newModel);
+        var tasks = new java.util.ArrayList<Task>();
+        for (String definition : List.of("old", "new", "new")) {
+            Task task = mock(Task.class);
+            when(task.getProcessDefinitionId()).thenReturn(definition);
+            when(task.getTaskDefinitionKey()).thenReturn("financeReview");
+            tasks.add(task);
+        }
+        when(bpmTaskService.getTaskTodoPage(eq(USER_ID), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(new PageResult<>(tasks, 3L));
+        var result = processTaskApi.getTodoTaskPage(USER_ID, pageReq());
+        assertEquals(List.of(true, false, false), result.getList().stream().map(BpmTaskRespDTO::getReasonRequire).toList());
+        verify(processDefinitionService, org.mockito.Mockito.times(1)).getProcessDefinitionBpmnModel("new");
+    }
+
+    @Test
+    void missingModelDoesNotSilentlyAdvertiseOptionalReason() {
+        Task task = mock(Task.class);
+        when(task.getProcessDefinitionId()).thenReturn("missing");
+        when(task.getTaskDefinitionKey()).thenReturn("financeReview");
+        when(bpmTaskService.validateTask(USER_ID, "task")).thenReturn(task);
+        org.junit.jupiter.api.Assertions.assertNull(processTaskApi.getTodoTask(USER_ID, "task").getReasonRequire());
+    }
+
+    @Test
+    void publicRejectRejectsBlankWithoutCallingTaskService() {
+        for (String reason : new String[]{null, "", "   "}) {
+            var request = new cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO().setTaskId("task").setReason(reason);
+            org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> processTaskApi.rejectTask(USER_ID, request));
+        }
+        verifyNoInteractions(bpmTaskService);
+    }
+
+    private org.flowable.bpmn.model.BpmnModel reasonModel(boolean required) {
+        var model = new org.flowable.bpmn.model.BpmnModel();
+        var process = new org.flowable.bpmn.model.Process();
+        process.setId("test");
+        var task = new org.flowable.bpmn.model.UserTask();
+        task.setId("financeReview");
+        cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils.addReasonRequire(required, task);
+        process.addFlowElement(task); model.addProcess(process);
+        return model;
+    }
 
     @Test
     void getTodoTaskPageReturnsEmptyPageWithoutQueryingProcessInstances() {

@@ -24,11 +24,24 @@ public class PersonalCalendarEventService {
     public static final String SOURCE_MANUAL = "MANUAL";
 
     @Resource private PersonalCalendarEventMapper mapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
+    @Resource private cn.iocoder.yudao.module.system.api.user.AdminUserApi userApi;
 
     public List<PersonalCalendarEventRespVO> list(PersonalCalendarEventListReqVO req, Long userId) {
         validateRange(req.getRangeStart(), req.getRangeEnd());
-        return BeanUtils.toBean(mapper.selectMyRange(userId, req.getRangeStart(), req.getRangeEnd()),
-                PersonalCalendarEventRespVO.class);
+        Long ownerId = req.getReadScope() == null && req.getTargetUserId() == null ? userId
+                : readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId);
+        var rows = ownerId == null ? mapper.selectReadRange(null, req.getRangeStart(), req.getRangeEnd())
+                : mapper.selectMyRange(ownerId, req.getRangeStart(), req.getRangeEnd());
+        var result = BeanUtils.toBean(rows, PersonalCalendarEventRespVO.class);
+        if (!rows.isEmpty()) {
+            var users = userApi.getUserMap(rows.stream().map(PersonalCalendarEventDO::getOwnerUserId).distinct().toList());
+            result.forEach(row -> {
+                var owner = users.get(row.getOwnerUserId());
+                row.setOwnerName(owner == null ? "未知账号" : owner.getNickname());
+            });
+        }
+        return result;
     }
 
     @Transactional(rollbackFor = Exception.class)

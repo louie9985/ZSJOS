@@ -30,6 +30,9 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
             return !relationMapper.selectOwnedRepurchaseEligibleByPerson(userId, bizId).isEmpty();
         }
         if (!"read".equals(action)) return false;
+        if (permissionApi.hasTenantReadAllAccess(userId)) {
+            return !relationMapper.selectTenantReadByPersonIds(java.util.List.of(bizId), null).isEmpty();
+        }
         if (!relationMapper.selectByOwnerAndPersonIncludingHistory(userId, bizId).isEmpty()) return true;
         if (relationMapper.existsActiveByCollaboratorAndPerson(userId, bizId)) return true;
         if (!hasManagedStudentReadPermission(userId)) return false;

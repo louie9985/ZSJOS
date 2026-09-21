@@ -26,6 +26,16 @@ public class AuthPermissionInfoRespVO {
     @Schema(description = "操作权限数组", requiredMode = Schema.RequiredMode.REQUIRED)
     private Set<String> permissions;
 
+    @Schema(description = "服务端数据读取能力，不替代菜单及操作权限")
+    private DataAccessVO dataAccess;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DataAccessVO {
+        private boolean tenantReadAll;
+    }
+
     @Schema(description = "菜单树", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<MenuVO> menus;
 

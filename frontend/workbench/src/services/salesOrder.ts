@@ -92,3 +92,10 @@ export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListIte
     effectiveAt: order.effectiveAt
   }
 }
+
+/** 新旧实例的意见要求由任务配置决定，缺失配置不能视为选填。 */
+export function validateSalesOrderDecisionReason(decision: 'approve' | 'reject', required: boolean | undefined, reason: string) {
+  if (typeof required !== 'boolean') return '审批意见配置未加载，请重试'
+  if ((decision === 'reject' || required) && !reason.trim())
+    return decision === 'reject' ? '请填写驳回原因' : '请填写审批意见'
+}

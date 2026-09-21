@@ -37,6 +37,11 @@ public class LeadObjectPermissionService {
     private LeadMapper leadMapper;
     @Resource
     private SecurityFrameworkService securityFrameworkService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    public boolean hasTenantReadAll(Long userId) {
+        return permissionApi.hasTenantReadAllAccess(userId);
+    }
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
@@ -56,10 +61,12 @@ public class LeadObjectPermissionService {
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
             case "read", "follow-up-read", "flow-read" -> canReadDetail(lead, userId);
-            case "pending-read", "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
+            case "pending-read" -> hasTenantReadAll(userId) || ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     && Objects.equals(userId, lead.getPendingAssigneeUserId());
-            case "owner-read" -> Objects.equals(userId, lead.getOwnerUserId());
-            case "owner-or-manager-read" -> canReadAsOwnerOrManager(lead, userId);
+            case "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
+                    && Objects.equals(userId, lead.getPendingAssigneeUserId());
+            case "owner-read" -> hasTenantReadAll(userId) || Objects.equals(userId, lead.getOwnerUserId());
+            case "owner-or-manager-read" -> hasTenantReadAll(userId) || canReadAsOwnerOrManager(lead, userId);
             case "sales-history-read" -> canReadDetail(lead, userId);
             case "follow-up-create" -> canOperateAsSales(lead, userId)
                     && (STATUS_INVALID.equals(lead.getStatus())
@@ -105,6 +112,10 @@ public class LeadObjectPermissionService {
      * Unified Lead detail visibility. List scope remains owned by the individual business inboxes.
      */
     public boolean canReadDetail(LeadDO lead, Long userId) {
+        return hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId);
+    }
+
+    private boolean canReadDetailByRelationship(LeadDO lead, Long userId) {
         if (userId == null) return false;
         if (hasQueryAll() || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(userId, lead.getProviderOwnerId())
@@ -133,7 +144,7 @@ public class LeadObjectPermissionService {
             return Objects.equals(userId, cycle.getOriginalOwnerUserId())
                     || Objects.equals(userId, cycle.getCollaboratorUserId());
         }
-        return canReadDetail(lead, userId);
+        return canReadDetailByRelationship(lead, userId);
     }
 
     public boolean canReadSubordinatePartnerLead(LeadDO lead, Long userId) {
@@ -161,7 +172,7 @@ public class LeadObjectPermissionService {
      * 管理员及负责人部门主管可以查看提交人与负责人的完整员工身份信息。
      */
     public boolean canViewUnmaskedIdentity(Long userId, Long ownerUserId) {
-        return hasQueryAll() || managesUserDepartment(userId, ownerUserId);
+        return hasTenantReadAll(userId) || hasQueryAll() || managesUserDepartment(userId, ownerUserId);
     }
 
     public boolean canViewUnmaskedIdentity(Long userId, LeadDO lead) {

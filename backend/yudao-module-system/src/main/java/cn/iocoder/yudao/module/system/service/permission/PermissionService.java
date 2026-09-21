@@ -16,6 +16,9 @@ import static java.util.Collections.singleton;
  */
 public interface PermissionService {
 
+    /** Current-tenant read-only administrator exception, independent of menu grants. */
+    boolean hasTenantReadAllAccess(Long userId);
+
     /**
      * 判断是否有权限，任一一个即可
      *

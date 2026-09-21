@@ -17,12 +17,22 @@ Partner `name` remains the business identity and snapshot source; nullable `nick
 The account calendar is a projection of media-account maintenance dates. Page permission, account relationship
 scope and filters are cumulative: ordinary users see accounts where they are director or operator;
 `zsjos:media-calendar:query-managed` enables the bounded System department scope; only
-`zsjos:media-calendar:query-all` grants all-account visibility. Generic unbounded department scope does not
+`zsjos:media-calendar:query-all` or System's tenant-read-all capability grants all-account visibility. Generic unbounded department scope does not
 substitute for that explicit permission. Filter candidates are derived from the already-authorized account set.
 
 `/calendar/personal` uses the independent tenant-owned `zsjos_personal_calendar_event` source. Its query and
-commands always bind `owner_user_id` to the current ADMIN user. The first version supports manual events only,
-with no work-plan aggregation and no administrator read/manage-other-user bypass.
+commands default to the current ADMIN user. Reads accept `readScope=SELF|ALL|USER` and `targetUserId`;
+ALL and another user's USER scope require System's tenant-read-all capability. Commands always bind
+`owner_user_id` to the current user. Both frontends default to SELF; other scopes are read-only and show
+ownership. Manual events remain independent of work-plan aggregation.
+
+System owns `PermissionApi.hasTenantReadAllAccess(userId)`: the effective enabled ADMIN user and an enabled
+`super_admin` or `system_administrator` role must belong to the current tenant. The auth response exposes
+`dataAccess.tenantReadAll`; frontend role-name inference is prohibited. Impersonation uses the effective user.
+This explicitly approved exception expands business reads only; configured feature permissions, tenant and
+logical-delete predicates, association integrity, and command ownership/lifecycle checks remain mandatory.
+Sensitive business reads retain their dedicated actions and audit. Credentials and system secrets are excluded.
+Implementation coverage and remaining acceptance work are tracked in [the delivery matrix](../api/tenant-admin-read-all.md).
 
 ## Student Information Collection
 
@@ -406,7 +416,7 @@ WebSocket events are refresh hints, while the persisted message page remains aut
 
 - System owns announcement drafts, lifecycle, attachment snapshots and per-ADMIN-user read records. Existing `system_notice` rows remain `DRAFT` after the upgrade and are never exposed implicitly.
 - Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
-- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page. The announcement center uses `/system/notice/my-cursor` with `publish_time DESC, id DESC` for additive scroll loading; `/system/notice/my-page` remains compatible for legacy callers. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
+- React Workbench employee reading uses only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu into 我的公告 and 公告管理 views. The read permission controls employee reading, query controls management list/details, and create/update/publish/offline/delete independently control management operations. Accounts with both permissions default to 我的公告; announcementId deep links always target employee reading. React management is explicitly approved alongside Vue management (2026-09-21). Both use existing System page/get and lifecycle APIs; management preview never calls mark-read or expands employee recipient visibility. Vue management details support every lifecycle state. React lazily loads @wangeditor-next/editor 5.7.0, consumes the System notice type dictionary and recipient-options, and uploads through the existing System attachment and Infra content endpoints. Published content remains immutable. The announcement center uses `/system/notice/my-cursor` with `publish_time DESC, id DESC` for additive scroll loading; `/system/notice/my-page` remains compatible for legacy callers. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
 - `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
 - Notices may target `ALL` enabled ADMIN users with `system:notice:read`, or `TARGET` departments and/or users. The administration tree keeps department and user selections independent, shows enabled users without read permission as disabled, and keeps users without a current department in a separate group. Department selections include the complete department subtree at publish time; mixed department/user selections are unioned and de-duplicated. TARGET selections are expanded into immutable `system_notice_recipient` user snapshots at publish time, and every list/detail/read operation enforces that snapshot. Existing notices without targeting columns remain ALL for compatibility.
 - Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.

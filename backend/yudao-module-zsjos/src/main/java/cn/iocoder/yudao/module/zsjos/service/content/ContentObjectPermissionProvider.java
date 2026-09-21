@@ -22,6 +22,7 @@ public class ContentObjectPermissionProvider implements ZsjosObjectPermissionPro
     @Override public boolean hasPermission(Long id, String action, Long userId) {
         ContentDO content = mapper.selectById(id);
         if (content == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if (permissionApi.hasAnyPermissions(userId, "zsjos:content:query-all")) return true;
         if (userId.equals(content.getOwnerOperatorUserId()) || userId.equals(content.getFilmingEditorUserId())) return true;
         MediaAccountDO account = accountMapper.selectById(content.getAccountId());

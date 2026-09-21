@@ -10,10 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@zsjos/avatar-kit": "file:../shared/avatar-kit",
     "@ant-design/icons": "^6.3.2",
     "@ant-design/pro-components": "^3.1.14-2",
     "@iconify/react": "^6.0.2",
+    "@wangeditor-next/editor": "5.7.0",
+    "@zsjos/avatar-kit": "file:../shared/avatar-kit",
     "antd": "^6.5.1",
     "antd-style": "^4.1.0",
     "axios": "^1.13.2",

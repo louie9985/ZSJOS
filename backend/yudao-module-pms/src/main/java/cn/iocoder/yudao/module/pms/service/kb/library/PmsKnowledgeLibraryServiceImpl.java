@@ -130,7 +130,8 @@ public class PmsKnowledgeLibraryServiceImpl implements PmsKnowledgeLibraryServic
             }
         }
         // 2. 超级管理员查询全部知识库，普通用户查询公开或已加入知识库
-        boolean includeAll = permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode());
+        boolean includeAll = permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode());
 
         // 3. 执行分页查询
         return libraryMapper.selectPage(pageReqVO, memberLibraryIds, includeAll, filterLibraryIds,

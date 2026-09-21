@@ -22,10 +22,11 @@ public class WithdrawalObjectPermissionProvider implements ZsjosObjectPermission
     @Override public void check(Long bizId, String action, Long userId) {
         WithdrawalDO row = mapper.selectById(bizId); if (row == null) throw exception(WITHDRAWAL_NOT_EXISTS);
         boolean allowed = switch (action) {
-            case "read-own", "cancel" -> Objects.equals(row.getApplicantUserId(), userId);
-            case "read" -> Objects.equals(row.getApplicantUserId(), userId) || permissionApi.hasAnyPermissions(userId,
+            case "read-own" -> permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(row.getApplicantUserId(), userId);
+            case "cancel" -> Objects.equals(row.getApplicantUserId(), userId);
+            case "read" -> permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(row.getApplicantUserId(), userId) || permissionApi.hasAnyPermissions(userId,
                     "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query");
-            case "finance-read" -> permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query");
+            case "finance-read" -> permissionApi.hasTenantReadAllAccess(userId) || permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query");
             case "review" -> permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:review");
             case "payout" -> permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:payout");
             default -> false;

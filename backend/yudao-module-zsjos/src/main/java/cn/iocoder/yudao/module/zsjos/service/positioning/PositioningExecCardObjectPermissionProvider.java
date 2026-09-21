@@ -24,6 +24,7 @@ public class PositioningExecCardObjectPermissionProvider implements ZsjosObjectP
         var positioning = cardMapper.selectById(card.getPositioningCardId());
         var account = accountMapper.selectById(card.getAccountId());
         if (positioning == null || account == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all")) return true;
         return Objects.equals(userId, positioning.getDirectorUserId()) || Objects.equals(userId, account.getOwnerOperatorUserId());
     }

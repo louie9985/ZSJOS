@@ -286,7 +286,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     public WithdrawalRespVO getDetail(Long id, Long userId, boolean fullCard) {
         WithdrawalDO record = withdrawalMapper.selectById(id);
         if (record == null) throw exception(WITHDRAWAL_NOT_EXISTS);
-        if (fullCard && !permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query")) {
+        if (fullCard && !permissionApi.hasTenantReadAllAccess(userId)
+                && !permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query")) {
             throw exception(WITHDRAWAL_PERMISSION_DENIED);
         }
         WithdrawalRespVO response = toResponse(record, fullCard);

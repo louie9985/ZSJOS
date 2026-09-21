@@ -72,7 +72,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
-| 51 | 通知公告 | `/messages/notice` | `AnnouncementCenterPage` | `system/notice/index`（公告管理，原菜单 107；员工只读权限为子按钮 `79913` / `system:notice:read`） |
+| 51 | 通知公告 | `/messages/notice` | `AnnouncementCenterPage`（我的公告 + 按权限开放的公告管理） | `system/notice/index`（公告管理及只读详情，原菜单 107；员工阅读权限为子按钮 `79913` / `system:notice:read`） |
 | 52 | 强制表单 | `/zsjos/forced-form` | 不注册（全局强制填写 Provider） | `zsjos/forcedForm/index`（Admin 配置页，`workbenchRenderMode=admin_only`） |
 | 53 | 素材浏览 | `/zsjos/material-library/browse` | `MaterialLibraryPage` | Workbench 原生页 |
 | 54 | 素材管理 | `/zsjos/material-library/manage` | `admin_embed` | `zsjos/material/index` |
@@ -126,3 +126,7 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 - 定位卡运营确认和退回继续使用 `zsjos:positioning-card:operator-confirm`、`zsjos:positioning-card:operator-reject`；生成或重新生成学员外链使用独立按钮权限 `zsjos:positioning-card:student-link-generate`。V134 将该按钮挂在媒体学员页下并授予现有 `new_media_operator` 角色，服务端仍独立校验当前运营归属、最新版和状态。
 - 定位卡不再展示确认试跑或归档动作。学员确认即完成本轮；原编导在同时具备 `zsjos:positioning-card:edit` 和对象权限时收到服务端 `START_POSITIONING_REVISION` 动作。Workbench 按账号分别展示“当前生效定位”“审核中版本”“历史版本”，并只用 `effective` 版本开放拍剪工单入口。
 - Account, content, and positioning notifications deep-link to the student center with `personId`, `tab`, and the relevant record ID. Historical records without a student binding show an explicit unavailable target instead of opening a retired route.
+
+### 公告原生管理（2026-09-21）
+
+`/messages/notice` 保留原菜单。React 阅读使用 `system:notice:read`，管理列表/详情使用 `system:notice:query`，各写操作复用已有按钮权限。管理预览不写已读；首页 `announcementId` 链接进入员工阅读。Vue 详情覆盖草稿、已发布、已下线。本次不修改实际角色授权或渲染配置；当前为 `admin_embed` 的菜单需由管理员配置为 `native` 才启用 React 原生页面。富文本核心按需加载；两端共享 System/Infra API，不共享框架组件。

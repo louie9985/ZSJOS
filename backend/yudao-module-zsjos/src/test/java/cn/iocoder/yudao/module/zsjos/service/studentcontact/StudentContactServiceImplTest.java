@@ -39,6 +39,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentCollaboratorAssignReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudyPlannerSimpleRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentCollaboratorAssignmentLogMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentCollaboratorAssignmentLogDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.HashMap;
@@ -60,6 +68,10 @@ class StudentContactServiceImplTest {
 
     @InjectMocks private StudentContactServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;
+    @Mock private StudentCollaboratorAssignmentLogMapper assignmentLogMapper;
+    @Mock private PositioningCardMapper positioningCardMapper;
+    @Mock private MediaAccountMapper mediaAccountMapper;
+    @Mock private StudentContactNotifyPublisher studentContactNotifyPublisher;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper positioningInterviewMapper;
     @Mock private StudentContactConfigVersionMapper configMapper;
     @Mock private StudentContactRecordMapper recordMapper;
@@ -566,4 +578,94 @@ class StudentContactServiceImplTest {
         assertThrows(IllegalStateException.class, () -> service.getRecords(10L, new PageParam(), 9L));
         verifyNoInteractions(recordMapper);
     }
+
+    private StudentCollaboratorAssignReqVO operatorRequest(String reason) {
+        StudentCollaboratorAssignReqVO request = new StudentCollaboratorAssignReqVO();
+        request.setCollaboratorType("operator"); request.setUserId(9L); request.setVersion(0);
+        request.setCorrectionReason(reason); request.setIdempotencyKey("operator-test");
+        return request;
+    }
+
+    private ServiceRelationDO operatorRelation(long id, Long operator) {
+        ServiceRelationDO row = relation("accepted");
+        row.setId(id); row.setPersonId(100L); row.setContentDirectorUserId(7L);
+        row.setOperatorUserId(operator); row.setVersion(0);
+        return row;
+    }
+
+    private StudentContactServiceImpl prepareOperatorAssignment(List<ServiceRelationDO> rows) {
+        TenantContextHolder.setTenantId(1L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(rows.getFirst());
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)).thenReturn(true);
+        when(relationMapper.selectActiveAcceptedByPersonForUpdate(100L, 1L)).thenReturn(rows);
+        StudentContactServiceImpl target = spy(service);
+        doReturn(List.of(new StudyPlannerSimpleRespVO(9L, "测试运营")))
+                .when(target).getCollaboratorCandidates(10L, "operator", 7L);
+        return target;
+    }
+
+    @Test
+    void operatorChangeRequiresReasonEvenWhenOnlyAnotherServiceHasAnOperator() {
+        StudentContactServiceImpl target = prepareOperatorAssignment(List.of(operatorRelation(10L, null), operatorRelation(11L, 8L)));
+        for (String reason : new String[]{null, "", "   "}) {
+            ServiceException error = assertThrows(ServiceException.class, () -> target.assignCollaborator(10L, operatorRequest(reason), 7L));
+            assertEquals(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED.getCode(), error.getCode());
+        }
+        verify(relationMapper, never()).updateById(any(ServiceRelationDO.class));
+        verifyNoInteractions(positioningCardMapper, mediaAccountMapper, collaborationNotify, studentContactNotifyPublisher);
+        verify(assignmentLogMapper, never()).insert(any(StudentCollaboratorAssignmentLogDO.class));
+    }
+
+    @Test
+    void operatorChangeSynchronizesRelationsCardsAccountsAndLogsReason() {
+        ServiceRelationDO selected = operatorRelation(10L, 8L), other = operatorRelation(11L, 6L);
+        StudentContactServiceImpl target = prepareOperatorAssignment(List.of(selected, other));
+        MediaAccountDO account = new MediaAccountDO(); account.setId(30L); account.setVersion(2); account.setOwnerOperatorUserId(8L);
+        when(mediaAccountMapper.selectByStudent(100L)).thenReturn(List.of(account));
+        when(mediaAccountMapper.updateOwnerOperator(30L, 9L, 2)).thenReturn(1);
+        target.assignCollaborator(10L, operatorRequest("工作交接"), 7L);
+        assertEquals(9L, selected.getOperatorUserId()); assertEquals(9L, other.getOperatorUserId());
+        assertEquals(1, selected.getVersion()); assertEquals(1, other.getVersion());
+        verify(positioningCardMapper).updateCurrentOperatorByServiceRelations(List.of(10L, 11L), 9L);
+        verify(mediaAccountMapper).updateOwnerOperator(30L, 9L, 2);
+        ArgumentCaptor<StudentCollaboratorAssignmentLogDO> logs = ArgumentCaptor.forClass(StudentCollaboratorAssignmentLogDO.class);
+        verify(assignmentLogMapper, times(2)).insert(logs.capture());
+        assertTrue(logs.getAllValues().stream().allMatch(row -> "工作交接".equals(row.getReason())));
+        StudentCollaboratorAssignmentLogDO replay = logs.getAllValues().getFirst();
+        when(assignmentLogMapper.selectByIdempotencyKey("operator-test")).thenReturn(replay);
+        target.assignCollaborator(10L, operatorRequest("工作交接"), 7L);
+        verify(assignmentLogMapper, times(2)).insert(any(StudentCollaboratorAssignmentLogDO.class));
+        verify(positioningCardMapper, times(1)).updateCurrentOperatorByServiceRelations(anyList(), eq(9L));
+        verify(studentContactNotifyPublisher, times(1)).publish(anyString(), eq(10L), anyString(), isNull(), any(), anyMap());
+    }
+
+    @Test
+    void firstOperatorAssignmentAndUnchangedOperatorNeedNoReason() {
+        ServiceRelationDO selected = operatorRelation(10L, null);
+        StudentContactServiceImpl target = prepareOperatorAssignment(List.of(selected));
+        target.assignCollaborator(10L, operatorRequest(null), 7L);
+        StudentCollaboratorAssignReqVO unchanged = operatorRequest(null); unchanged.setVersion(1); unchanged.setIdempotencyKey("same-operator");
+        target.assignCollaborator(10L, unchanged, 7L);
+        verify(relationMapper, times(1)).updateById(any(ServiceRelationDO.class));
+        assertEquals(1, selected.getVersion());
+    }
+
+    @Test
+    void operatorAssignmentWithoutPermissionCannotWrite() {
+        TenantContextHolder.setTenantId(1L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(operatorRelation(10L, 8L));
+        assertPermissionDenied(() -> service.assignCollaborator(10L, operatorRequest("工作交接"), 7L));
+        verifyNoInteractions(assignmentLogMapper, positioningCardMapper, mediaAccountMapper);
+        verify(relationMapper, never()).updateById(any(ServiceRelationDO.class));
+    }
+
+    @Test
+    void operatorAssignmentLocksOnlyRequestedTenantAndRejectsMissingRelation() {
+        TenantContextHolder.setTenantId(2L);
+        ServiceException error = assertThrows(ServiceException.class, () -> service.assignCollaborator(10L, operatorRequest("工作交接"), 7L));
+        assertEquals(STUDENT_SERVICE_NOT_EXISTS.getCode(), error.getCode());
+        verify(relationMapper).selectByIdForUpdate(10L, 2L);
+        verifyNoInteractions(assignmentLogMapper, positioningCardMapper, mediaAccountMapper);
+    }
+
 }

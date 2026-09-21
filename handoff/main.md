@@ -25992,3 +25992,237 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Dependency or integration impact: 未新增依赖；未执行数据库迁移、数据库写入或服务重启；保护 stash 与未跟踪临时产物保留。
 - Remaining work: 提交本记录、推送 `origin/main` 并核对远程一致性；发布时仍需按各前序交付条目完成环境相关迁移与运行验收。
 - Status: `ready-to-push`。
+
+## Registration — 2026-09-20 — director-operator-training
+- Workstream ID: main / director-operator-training; owner: Codex /root; environment: local (environment variable and environment file absent).
+- Goal: 生成编导与运营培训手册，说明功能、解决的问题、操作路径与岗位练习。
+- Non-goals: 不更改系统行为、数据库、权限、服务或既有业务文档；不提交推送。
+- Branch: main; absolute worktree: D:\ZSJ-OS; base commit: 7785d317c829650980192d06383739958f642e43.
+- Ownership scope: output/director-operator-training/ 下培训正文、Word 与排版验证文件；handoff/main.md。
+- Dependencies: 当前业务契约与实现，只读核对；文档生成运行环境。Target branch / integration order: None.
+- Verification plan: 逐项核对当前入口与状态规则；检查正文和编号；Word 渲染并逐页检查；说明实际部署未核验边界。保留全部原有未提交改动。
+
+## Delivery — 2026-09-20 17:06:00 +08:00 — director-operator-training
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged 7785d317c829650980192d06383739958f642e43; registration above.
+- User goal: 生成面向编导和运营的培训手册，重点解释系统功能及其解决的问题。
+- Key decisions: 采用功能总览、问题与使用路径、完成标志、岗位清单、兼职客资协作及90分钟演练；定位凭证、账号主动应用、周期提前填写与即时延期按最新确认规则说明，不把旧设计当现状。
+- Result: 完成12页Word手册及UTF-8正文源文件。仅生成文档，无业务代码或系统状态变更。
+- Changed files: output/director-operator-training/培训手册.md、编导与运营系统培训手册.docx、build_manual.py、render_manual.py、核对记录.md及qa排版验证文件；handoff/main.md。
+- Verification: 已核对相关文档和当前前端/交付后端；DOCX包完整、11章节及关键流程、无替换字符、12页PDF检查通过；Word导出后调用技能render_docx.py栅格化，逐页检查中文、表格和分页，修复标题线与孤页；handoff局部diff检查通过。运行缓存无LibreOffice，使用Word导出，不调用桌面LibreOffice。
+- Dependencies / integration impact: None；无新增依赖、账号授权、数据库操作、服务重启、分支操作、提交或推送；既有未提交改动保留。
+- Remaining work: 培训环境菜单、角色配置和新版接口未实机核验；正式演示前需核对实际环境。手册正文已完成。
+
+## Registration — 2026-09-20 — sales-specialist-training
+- Workstream ID: main / sales-specialist-training; owner: Codex /root; environment: local (环境变量与环境文件缺省).
+- Goal: 为销售专员生成可分发的Word培训手册，解释系统功能、解决的问题及操作完成标志。
+- Non-goals: 不改业务代码、数据库、权限与服务；不提交推送；不覆盖编导运营手册或已有改动。
+- Branch: main; worktree: D:\ZSJ-OS; base commit: 7785d317c829650980192d06383739958f642e43.
+- Ownership: output/sales-specialist-training/ 正文、生成脚本、Word和QA文件；handoff/main.md。
+- Dependencies: 当前客资、成交、支付、反馈、学员收集表文档与实现；复用本地已核实的文档运行时。Target branch / integration order: None.
+- Verification: 功能契约与页面交叉核对，检查Word结构与内容，渲染并逐页检查，不以源码检查替代培训环境实机验收。
+
+## Registration — 2026-09-20 — study-planner-training
+- Workstream ID: main / study-planner-training; owner: Codex /root; environment: local (environment variable and environment file absent).
+- Goal: 生成面向学生交付中心学习规划师的培训手册，说明系统功能及其解决的问题。
+- Non-goals: 不修改系统行为、数据库、权限、服务或既有业务文档；不提交推送。
+- Branch: main; absolute worktree: D:\ZSJ-OS; base commit: 7785d317c829650980192d06383739958f642e43.
+- Ownership scope: output/study-planner-training/ 下培训正文、Word 与排版验证文件；handoff/main.md。
+- Dependencies: 当前报名履约、联系、班级、日历和强制表单契约，只读核对；文档生成运行环境。Target branch / integration order: None.
+- Verification plan: 核对学习规划师当前入口、动作、阶段规则和异常处理；Word 渲染并逐页检查；说明培训环境实机核验边界。
+
+## Delivery — 2026-09-20 18:22:00 +08:00 — sales-specialist-training
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged 7785d317c829650980192d06383739958f642e43; registration above.
+- User goal: 销售专员培训手册，重点说明系统有哪些功能、能解决哪些问题。
+- Key decisions: 按接单/自拓、跟进、判定、协作、公海、收款录单、补正、成交后资料与复购组织；附每日清单和90分钟演练。公海成交资格按后续已确认规则，区分到账、录单、审批和履约。
+- Result: 12页Word及UTF-8正文已完成；逐页检查并消除初版空白分页。
+- Changed files: output/sales-specialist-training/培训手册.md、销售专员系统培训手册.docx、build_manual.py、render_manual.py、核对记录.md及qa验证文件；handoff/main.md。
+- Verification: 业务文档与当前页面交叉核对；DOCX包完整性、Unicode、11章、关键流程及12页非空验证通过；Word导出配合技能render_docx.py栅格化后，逐页视觉检查通过；handoff局部diff检查。未执行无关业务测试。
+- Dependency / integration impact: None；无业务代码、数据库、授权、服务、分支、提交和推送操作；上一份编导运营手册及其他既有改动保留。
+- Remaining: 培训环境实际菜单、配置与支付通道未实机核验，正式演示前需核对。文档制作完成。
+
+## Delivery — 2026-09-20 18:24:53 +08:00 — study-planner-training
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged 7785d317c829650980192d06383739958f642e43; registration above.
+- User goal: 学生交付中心学习规划师培训手册，重点说明功能能解决哪些工作问题。
+- Key decisions: 以课程服务为核心组织班级入口、接收首联、学习计划、督学、联系延期审批、协作者、调班、考前考后、复购和辅助功能；突出真实业务完成与系统记录的区别；如实补充当前JSON阶段事实填写速查。
+- Result: 12页Word手册完成，含功能价值对照、操作与完成标志、日常清单、常见问题及90分钟演练。
+- Changed files: output/study-planner-training/培训手册.md、学习规划师系统培训手册.docx、build_manual.py、render_manual.py、核对记录.md及qa验证文件；handoff/main.md。
+- Verification: 核对当前业务文档、前端入口与联系后端阶段；Word渲染12页后逐页检查，中文/表格/分页清晰；DOCX完整性、11章、关键规则、UTF-8、PDF页数、4个JSON对象解析及字段校验通过；handoff局部diff检查通过。
+- Dependencies / integration impact: None；无新依赖、数据库/权限/服务变更、真实业务操作、分支操作、提交或推送；既有文件修改保留。
+- Remaining work: 实际培训环境菜单、模板和审批配置未实机核验，演示前应核对；文档已完成。
+
+## Delivery — 2026-09-20 18:41:43 +08:00 — pull-origin-main
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD `050f43dd0dcc996ce468efafa4715870264dafd6`; integration target `origin/main`.
+- User goal: 拉取远程最新代码并合并到本地，冲突须经用户确认。
+- Key decisions: 先以包含未跟踪文件的保护性 stash 保存全部本地改动；远程仅领先一个提交，因此以 fast-forward 合并；恢复 stash 时两个 TypeScript 构建缓存发生冲突，经用户确认均采用远程版本，不改动业务源码。
+- Result: 本地 `main` 已从 `7785d317c8` 快进到 `050f43dd0d`，与 `origin/main` 一致；除经确认采用远程版本的两个构建缓存外，其余原有本地修改与未跟踪文件均已恢复，没有未解决冲突。保护性 stash `codex-pre-pull-20260920-main` 保留以便回退。
+- Changed files: 远程提交更新 S3 文件客户端及测试、材料库 API 文档、两个前端构建缓存、测试环境交付记录、bootstrap/core SQL 元数据与 `yudao-server.jar`；本条追加 `handoff/main.md`。其他本地改动保持原状。
+- Verification: `git diff --name-only --diff-filter=U` 无输出；`HEAD...origin/main` 为 `0 0`；两个冲突文件已采用当前远程 HEAD 内容；未执行业务测试（本轮仅同步既有远程提交）。
+- Dependencies / integration impact: 无新增依赖、数据库执行、服务操作、提交或推送；未清理任何临时文件。`handoff/main.md` 仍为本地修改。
+- Remaining work: None；如后续提交本地改动，应按范围审查并另行获得提交/推送授权。
+
+## Delivery — 2026-09-21 14:07:03 +08:00 — pull-origin-main
+- Context: local; branch main; worktree `D:\ZSJ-OS`; owner Codex /root; HEAD `e2584ce2879dd11ebd18c6f5450ec9353c80d060`; integration target `origin/main`.
+- User goal: 拉取远程最新代码并合并到本地，发生冲突时向用户确认。
+- Key decisions: 先以包含未跟踪文件的独立保护性 stash 保存全部本地内容；远程领先一个提交且本地无独有提交，因此执行 fast-forward；恢复 stash 时不自动丢弃或覆盖任何本地内容。
+- Result: 本地 `main` 已从 `050f43dd0d` 快进到 `e2584ce287`，本地改动和临时产物已恢复，未发生冲突。远程更新 `.gitignore` 后部分临时产物不再显示在状态列表，但抽查确认文件仍存在。保护性 stash `codex-pre-pull-20260921-main` 保留以便回退。
+- Changed files: 远程提交涉及后端、三套前端、SQL、脚本、测试和文档等 396 个文件；本轮本地仅追加本交付记录至 `handoff/main.md`，其余本地内容保持原状。
+- Verification: `git diff --name-only --diff-filter=U` 无输出；`HEAD...origin/main` 为 `0 0`；抽查三个培训输出目录、临时脚本和缓存目录均仍存在；未执行业务测试（本轮仅同步远程既有提交）。
+- Dependencies / integration impact: 未执行数据库脚本、服务操作、提交或推送；未清理临时文件。远程提交自身包含依赖/运行行为变化，其验证责任属于该提交，本轮未重新验证。
+- Remaining work: None；如需提交本地改动或部署远程变更，需另行明确授权并按相应范围验证。
+
+## Delivery — 2026-09-21 18:37:09 +08:00 — pull-origin-main
+- Context: local; branch main; worktree `D:\ZSJ-OS`; owner Codex /root; HEAD `23fe24b6467b13633dfdbe4cf4c8e077de580dc0`; integration target `origin/main`.
+- User goal: 拉取远程最新代码并合并到本地，冲突须向用户确认。
+- Key decisions: 使用保护性 stash 保存本地后将远程 `main` 快进合并；恢复本地改动时仅 `frontend/workbench/src/pages/ManagementPages.tsx` 冲突。按用户确认采用远程提现表单及单笔/批量登记打款、打款时间和备注，移除本地强制银行流水号与付款凭证；保留本地提现状态中文显示及筛选映射。
+- Result: 冲突已解决并标记完成；远程提交 `23fe24b646` 已合并，本地改动和未跟踪文件恢复，未自动丢弃其他内容。
+- Changed files: 远程提交涉及后端、前端、文档、测试等 34 个文件；本轮冲突调整文件为 `frontend/workbench/src/pages/ManagementPages.tsx`，并追加本记录到 `handoff/main.md`。其他本地改动保持原状。
+- Verification: `git diff --name-only --diff-filter=U` 无输出；`HEAD...origin/main` 为 `0 0`；无冲突标记、无流水号/付款凭证强制上传引用；`frontend/workbench` 执行 `npm run typecheck` 通过。
+- Dependencies / integration impact: 未新增依赖、未执行数据库或服务操作、未提交或推送；保护性 stash `codex-pre-pull-20260921-main-2` 保留。
+- Remaining work: 本地大量修改仍未提交；如需提交或推送需另行明确授权。
+
+## Delivery — 2026-09-21 18:45:00 +08:00 — commit-push-main
+- Context: local; branch `main`; worktree `D:\ZSJ-OS`; owner Codex /root; HEAD `a1daf1343b9268c01ed9e966218e11668e764d4b`; remote `origin/main`.
+- User goal: 将本地代码提交并推送到远端 `main` 分支。
+- Key decisions: 提交 170 个业务相关文件，包含后端、前端、测试、文档、流程配置及提现冲突解决；排除探针、缓存、截图、临时目录和 `backend/.mvn` 等环境产物。
+- Result: 创建提交 `a1daf1343b`（`feat: consolidate latest local business updates`）并通过禁用本机代理的直连方式推送成功。
+- Verification: 远端 fetch 后 `HEAD` 与 `origin/main` 均为 `a1daf1343b9268c01ed9e966218e11668e764d4b`，`HEAD...origin/main` 为 `0 0`；`frontend/workbench` 的 `npm run typecheck` 通过。
+- Dependency / integration impact: 未执行数据库写入或服务重启；未提交排除的临时文件；既有保护性 stash 保留。
+- Remaining work: 工作树仅保留未跟踪环境产物，未再推送；如需清理须另行确认。
+
+## Registration — 2026-09-21 — finance-table-values
+- Workstream ID: main / finance-table-values; owner: Codex /root; environment: local (variable/file absent).
+- Goal: 修复提现中文状态、金额 NaN，并排查修复财务返现、订单与审批表格的同类原始值误用。
+- Non-goals: 不改数据库、业务状态机、权限、API或真实财务记录；其他模块仅报告检查发现；不提交推送。
+- Branch: main; worktree: D:\ZSJ-OS; base/HEAD: e2584ce2879dd11ebd18c6f5450ec9353c80d060.
+- Ownership: frontend/workbench/src/pages/ManagementPages.tsx、BpmApprovalCenterPage.tsx；src/components/SalesOrderTableColumns.tsx、SalesOrderSupervisorInbox.tsx；相关回归测试及 test/finance-table* 夹具；frontend/workbench/docs/business-table.md；docs/api/withdrawal-and-offline-payout.md；handoff/main.md。
+- Dependencies: 已有 ProTable、后端提现状态机与VO；无新增依赖。Target branch/integration order: None.
+- Verification: 实际 ProTable 渲染回归（金额、零值、空值、状态和时间）、TypeScript、浏览器夹具和可用真实页面检查；只读扫描其他表格；保留已有改动。
+
+## Delivery — 2026-09-21 14:23:00 +08:00 — finance-table-values
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration above.
+- User goal: 修复财务提现状态英文、申请金额 NaN，并完整检查同类问题。
+- Key decisions: ProColumns.render 首参数是格式化 ReactNode，不能用类型断言当原始金额/状态/时间；业务格式化改读第二参数 row。固定提现生命周期按后端与 Admin 契约展示中文，查询仍传原编码；不新建字典或改业务状态机。
+- Result: 修复提现筛选/列表/详情状态、提现金额与时间、返现类型/基数/比例/金额/状态/时间、共用成交订单金额/状态/轮次/审批结果/时间、主管确认与 BPM 审批表格状态/时间。金额缺失或无效显示横线，合法零显示 ¥0.00。原生列适配不改。
+- Changed files: frontend/workbench/src/pages/ManagementPages.tsx、BpmApprovalCenterPage.tsx、finance-table-values.test.tsx；src/components/SalesOrderTableColumns.tsx、SalesOrderSupervisorInbox.tsx；frontend/workbench/test/finance-table.html、finance-table.tsx；frontend/workbench/docs/business-table.md；docs/api/withdrawal-and-offline-payout.md；handoff/main.md。
+- Verification: npm run typecheck 通过；7 个相关测试文件共39项通过/1项既有失败。失败为 BusinessTable/entry.guard.test.ts 用 /BusinessTable/ 排除路径而 Windows 返回反斜杠，将组件自身误报为 direct table import，文件未改。5项新增测试用实际 ProTable SSR 覆盖提现非零/零/缺失/非法金额、返现比例与类型、共用订单状态与金额。浏览器 localhost:5174/test/finance-table.html 实际组件夹具核验五种中文状态、approved 查询编码、过滤单行、详情状态/金额、返现200元/15%/30元/时间；检查1280桌面及窄屏，未修改布局。git diff --check 通过。
+- Dependency/integration impact: None；未改 API、依赖、数据库、账号权限或真实财务记录；未执行服务操作、分支切换、提交/推送；无打包输入变化，未重复生产构建。
+- Remaining work: 本地真实业务页面要求登录，无当前认证会话，实际账号/运行接口数据未验证，夹具不能替代真实数据验收。财务外只读发现同类用法：AnnouncementCenterPage.tsx:135-136 正文/高亮，LeadAppealPage.tsx:293/305 轮次/可再次申诉，LeadDuplicateReviewPage.tsx:211 重复标记；本轮不扩展修改这些业务。修复已在本地源码，未发布。
+
+## Registration — 2026-09-21 — sales-order-optional-approval-reason
+- Workstream ID: main / sales-order-optional-approval-reason; owner: Codex /root; environment: local (variable/file absent).
+- Goal: 实施已确认的成交订单双中心通过意见选填方案，仅新定义的新审批轮次生效，驳回原因必填。
+- Non-goals: 不发布流程、不修改已有实例、数据库、权限或其他审批业务规则；不提交推送。
+- Branch: main; worktree: D:\ZSJ-OS; base/HEAD: e2584ce2879dd11ebd18c6f5450ec9353c80d060.
+- Ownership: BPM task API/DTO、任务服务及相关测试；ZSJOS order VO/service/错误码及相关测试；工作台 SalesOrderApprovalPage、services/api.ts、services/salesOrder.ts 及相关测试/浏览器夹具；Admin salesOrderApproval 页面、workbenchMenus API 及相关测试；script/bpm/manifest.json、新订单 2.1.0 资产；docs/api/zsjos-sales-order.md、docs/operations/zsjos-bpm-versioned-assets.md；handoff/main.md。
+- Dependencies: 当前 BPM 节点意见配置、任务动作扩展点、双端订单 API；无新依赖。Target branch/integration order: None. 上一 finance-table-values 工作流已交付，其修改保留。
+- Verification: 后端空值/驳回/旧定义/幂等/任务配置测试、实际引擎新旧定义验证、双端静态检查与浏览器检查、资产清单/旧资产校验；无法执行的环境验收明确记录。
+
+## Registration update — 2026-09-21 — sales-order-optional-approval-reason
+- Scope addition: SalesOrderController 的详情可选 taskId 参数（现有无任务上下文的详情无法确定双中心中哪一任务的配置，保持原无参调用兼容）；Admin test/approval-reason* 隔离浏览器夹具。固定元数据和验证计划沿用本工作流登记；无其他活跃所有者冲突。
+
+## Delivery — 2026-09-21 14:55:50 +08:00 — sales-order-optional-approval-reason
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration and scope update above.
+- User goal: 按确认方案实现财务/报名履约通过意见选填，驳回必填，仅新发布定义的新审批轮次生效。
+- Key decisions: 订单通过 reason 缺省/null/空白统一为空串，指纹与 BPM 传同一规范化值；驳回在订单业务及 BPM 公共拒绝入口校验。BPM 动作上下文透传 reason/parentTaskId，由 ZSJOS 扩展同时保护通用入口的驳回与主管子任务原必填规则。任务配置按自身定义读取，分页内按定义缓存；双端缺失配置阻止提交并支持重试。详情增加可选 taskId 并校验任务/订单/轮次关系；无 taskId 兼容原详情。2.1.0 仅改变两个 reasonRequire 标志；历史资产、实例、会签结构、权限和数据库不变。
+- Result: 后端、双端、2.1.0 流程资产、接口/发布文档及隔离测试夹具已完成。Admin 当前审批弹窗改用 min(560px, calc(100vw - 32px))，修复验证中发现的手机宽度下按钮被遮挡；未更改全局布局。工作台失败处理不返回消息 thenable，保留输入及重试。流程未发布、服务未部署/重启。
+- Changed files: BPM api/task/BpmProcessTaskApiImpl.java、dto/BpmTaskActionContext.java、BpmTaskDecisionReqDTO.java、BpmTaskRespDTO.java、service/task/BpmTaskServiceImpl.java 及 BpmExternalSimpleEngineTest/BpmProcessTaskApiImplTest/BpmTaskServiceImplTaskActionValidatorTest；ZSJOS SalesOrderController、SalesOrderDecisionReqVO/SalesOrderRespVO/SalesOrderListItemRespVO/SalesOrderApprovalTaskTargetRespVO、ZsjosErrorCodeConstants、SalesOrderService/Impl、SalesOrderSupervisorConfirmationService、新 SalesOrderTaskActionValidator 及对应三个订单测试；Workbench SalesOrderApprovalPage.tsx、services/api.ts、salesOrder.ts、salesOrder.test.ts、test/approval-reason.html/tsx；Admin workbenchMenus.ts、salesOrderApproval/index.vue、test/approval-reason.html/ts；script/bpm/manifest.json、新 zsjos_sales_order_dual_approval/2.1.0/process-model.json；docs/api/zsjos-sales-order.md、docs/operations/zsjos-bpm-versioned-assets.md；handoff/main.md。其余既有财务表格改动及临时文件保留；校验生成的已跟踪 Python 缓存已仅恢复为本轮前内容。
+- Verification: 后端 reactor compile 通过；11 个相关测试类共102项通过（订单Service 55、主管10、命令4、对象权限5、Controller权限3、订单动作校验1、BPM API12、动作扩展1、并行加签4、真实Flowable引擎7）。实际引擎使用隔离H2执行新旧订单资产并验证两中心新定义空意见完成、旧实例仍必填且不受发布影响；业务校验测试覆盖空原因拒绝、主管意见约束、长度、任务归属、版本冲突和规范化幂等重放。Workbench typecheck、Admin pnpm ts:check 最终均通过；3个前端测试文件21项通过。浏览器实际页面组件+完全拦截HTTP的夹具验证双端选填通过、旧定义必填、配置缺失阻止提交/重试、有效驳回及空白拦截；工作台报名节点失败保留意见后重试成功、原确认步骤、深链接、财务/报名节点；1280桌面与390移动弹窗检查。git diff --check通过。
+- Asset verification: 全量 validate_manifest.py --base-ref HEAD 被既有未登记文件 zsjos_feedback_requirement_approval/1.1.0/process-model.json 阻断，未扩展修复。独立调用原验证器对27项已登记资产的结构/哈希/推荐版本及基线不可变元数据检查通过；逐一与HEAD比对全部历史资产（规范化LF/CRLF）一致，新订单资产与2.0.0仅两个 reasonRequire 不同。
+- Dependencies / integration impact: 无新依赖、数据库/账号权限变更、分支切换、提交或推送。需先部署本次后端与双端，再由模型管理员单独发布2.1.0；已有实例仍用原定义，新建/重提轮次才使用新定义。发布不在本轮授权范围。无生产打包输入变化，未重复生产构建。
+- Remaining work: 运行环境只读审批接口返回401，无已认证会话，真实账号、真实租户订单及发布后业务回调验收未执行；浏览器夹具和隔离引擎不替代此验收。模型发布及目标环境新旧实例验收待单独操作。完整资产扫描的既有未登记文件问题另行处理。
+
+## Registration — 2026-09-21 — payment-subject-routing
+- Workstream ID: main / payment-subject-routing; owner: Codex /root; environment: local.
+- Goal: 未配置走学校、任何多主体冲突走公司，同主体按配置，历史支付快照保留。
+- Non-goals: 不改数据库数据/schema、权限、历史交易、支付状态机；不新增依赖、不提交推送或部署服务。
+- Branch: main; worktree: D:\ZSJ-OS; base/HEAD: e2584ce2879dd11ebd18c6f5450ec9353c80d060.
+- Ownership: backend/yudao-module-zsjos 支付主体 resolver、主体编码常量、错误码增量及相关支付测试；frontend/admin 支付主体/产品配置页面及定向测试夹具；docs/api/payment-subject.md、docs/deployment/payment-subject-deployment.md；script/sql/mysql/tools/payment_subject_audit.sql；handoff/main.md。
+- Dependencies: 现有产品关联、主体服务、支付快照和网关；保留错误码文件及其他文件既有修改；无新增依赖。Target branch/integration order: None.
+- Verification: 后端选路矩阵、租户隔离、生成/复用/重建快照与网关回归；Admin 定向测试、类型检查、构建、浏览器夹具与可用实际页面；审计SQL只读验证；真实通联不可用则注明。
+
+## Delivery — 2026-09-21 16:23:14 +08:00 — payment-subject-routing
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration above.
+- User goal: 实施支付主体方案：未配置走学校、任意多主体冲突走公司、相同主体按配置；旧链接与退款保留冻结主体。
+- Key decisions: school/company 为业务路由编码集中定义；isDefault 保留兼容但不参与本路由。全部参与主体和最终主体仍校验有效性；学校/公司缺失分别使用1900017024/1900017025。无 schema、权限、依赖或历史快照变更。按本次明确要求替换旧默认主体规则，更新直接相关文档及审计。
+- Result: 后端按租户配置选路；Admin 显示已配置主体、未配置按学校、关联异常和编码提示；现有配置接口与 admin_embed 归属保留。历史 created/waiting/paid 链接复用，取消成功后才重建切换；实际支付/退款沿用快照。
+- Changed files: PaymentSubjectCodes.java、ZsjosErrorCodeConstants.java（仅新增两项，保留既有审批修改）、PaymentSubjectResolver.java；PaymentSubjectResolverTest.java、PaymentSubjectTenantTest.java、PublicPaymentDetailTest.java；frontend/admin/src/views/zsjos/payment/productSubject/index.vue、subject/SubjectForm.vue；frontend/admin/test/payment-subject.html、payment-subject.ts；docs/api/payment-subject.md、docs/deployment/payment-subject-deployment.md；script/sql/mysql/tools/payment_subject_audit.sql；handoff/main.md。
+- Verification: Maven 定向 PaymentSubject*Test/PublicPaymentDetailTest/PurchaseIntentCancelPaymentTest 首轮54项全通过；补充未配置产品学校快照用例后重跑 PublicPaymentDetailTest 10项全通过，当前合计55项；包含真实 resolver 与购买服务组合、SKU引用、冻结/复用/取消重建和配置错误不插单、租户/删除隔离、本机HTTP模拟商户下单/查单/关单/退款及回调。首次 Maven 参数被 PowerShell 拆分，补齐引号后正常运行。Admin 两项API测试、pnpm ts:check、定向eslint和pnpm build:local通过。浏览器实际Vue组件夹具验证桌面列表、规则说明、编码表单、未配置/学校/公司/失效关联、无权限、空列表、失败重试及选择公司后原接口参数；所有夹具请求使用合成数据。文档链接、UTF-8读取与git diff --check通过。
+- Database evidence: 使用UTF-8客户端在本地配置数据库租户1执行只读审计SQL成功，school/company各1条存在/启用/凭据字段完整；失效产品关联0；存量支付2条均closed，快照缺失/不完整0，记录商户不匹配0。未修改数据，字段完整不代表RSA或通联实际授权通过。
+- Dependencies / integration impact: None；无新增依赖、分支/工作树操作、提交推送、数据库写入或服务启停；原有文件修改保留。部署需后端与Admin同时交付，现有工作台嵌入消费同一Admin页面。
+- Remaining work: 真实Admin和Workbench均跳转登录/会话失效，无有效认证会话，真实账号下原生与嵌入验收未验证；真实通联支付到账和退款未执行，自动测试仅本机合成网关。目标环境审计、部署及受控真实通道验收待对应环境执行；本地静态审计不替代真实授权验证。
+
+## Registration — 2026-09-21 16:27:01 +08:00 — announcement-management
+- Environment: local (ZSJOS_AGENT_ENV and environment file absent); branch main; worktree D:\ZSJ-OS; base/HEAD e2584ce2879dd11ebd18c6f5450ec9353c80d060; owner Codex /root.
+- Goal: Implement approved React announcement reading/management and Vue management detail plan. Non-goals: backend schema/API changes, role grants, menu configuration writes, unrelated pending work.
+- Ownership: frontend/workbench announcement pages/components/services/tests and browser fixtures, RouteHost.tsx, package.json/package-lock.json; frontend/admin system/notice view/detail and scoped fixture; docs/architecture/data-and-permission-flow.md; docs/frontend/zsjos-menu-coverage.md; handoff/main.md.
+- Dependencies: existing System/Infra APIs, approved @wangeditor-next/editor 5.7.0. Target branch/integration order: None.
+- Verification: focused permissions/service/UI tests, both frontend type checks/builds, browser desktop/mobile fixtures and available live sessions, editor chunk sizes, scoped diff checks.
+
+
+## Delivery — 2026-09-21 17:01:12 +08:00 — announcement-management
+- Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration above. Target branch/integration order: None.
+- User goal: Implement approved React announcement reading/management and Vue read-only management details.
+- Decisions: Explicit user approval supersedes former React-read-only documentation. Same menu and existing System/Infra APIs; read/query and per-operation permissions remain independent. Employee deep links target reading; management preview never marks read. Published content immutable. No backend/schema/grant/menu configuration writes.
+- Result: React adds permission-filtered views, management table/filter/pagination, draft creation/edit/save/publish, offline/copy/delete, all-state detail, lazy native rich text, authoritative type/recipient selectors, independent department/user checks, upload progress/error/limits and save guards, preview, unsaved close/back/reload guards and stale lifecycle feedback. Vue adds safe HTML read-only detail with retry, scope/state/highlight and unavailable attachment handling. Fixed scoped existing reader search input/raw-row renders and redundant identical URL writes while preserving reading. StrictMode editor initialization is deferred to avoid asynchronous toolbar callbacks from discarded instances.
+- Changed files: frontend/workbench/package.json/package-lock.json; src/services/noticeManagement.ts and noticeManagement.test.ts; src/components/NoticeEditorDialog.tsx, NoticeManagementDetail.tsx, NoticeRichTextEditor.tsx; src/pages/NoticeManagementPage.tsx, AnnouncementCenterPage.tsx; src/layouts/RouteHost.tsx; frontend/admin/src/views/system/notice/index.vue, NoticeDetail.vue; both frontend test/announcements.html and announcements.ts(x); docs/architecture/data-and-permission-flow.md; docs/frontend/zsjos-menu-coverage.md; handoff/main.md. Pre-existing unrelated changes preserved.
+- Verification: Workbench typecheck/build passed; 40 focused Vitest tests passed (15 management contracts/permissions/recipients/uploads, 23 menus, 2 announcement guards). Admin ts:check, scoped ESLint and final build:local passed. Maven NoticeControllerTest/NoticeServiceImplTest/NoticeMapperTest passed 14 tests covering existing backend notice lifecycle/read/recipient/tenant contracts. Scoped git diff --check and UTF-8/trailing-whitespace checks passed.
+- Browser evidence: Actual React/Vue components with intercepted synthetic API fixtures. React verified create/rich-text save/publish, publish failure preserving draft, offline/copy/delete, management detail without mark-read, query-only/read-only/both/no-permission cases (no permission -> no API request), default reading and management switch, empty/error/retry/403, independent department selection with disabled ineligible users, upload success/failure and uploading/failed-entry save blockers, unsaved Back/close confirmation and 390px editor layout. Vue verified draft/published/offline details, error/retry, desktop/mobile detail and removal of injected event attributes. Same HTML fixture renders in React reader/editor and Vue detail. Final fresh React fixture console errors: none. No real announcement was sent or real business row mutated.
+- Dependencies: User-approved @wangeditor-next/editor 5.7.0 pinned; asynchronous editor JS 699.12 kB (gzip 224.98 kB), CSS 28.58 kB (gzip 5.85 kB). Compatible transitive nanoid updated 3.3.17 -> 3.3.19 because editor upload dependency brought the pre-existing vulnerable version into production; npm production audit against official registry reports zero vulnerabilities. Mirror audit endpoint unsupported; official registry used. Vite retains >500 kB chunk warning. No other new direct dependency.
+- Known unrelated verification issue: BusinessTable/entry.guard.test.ts fails on Windows because its '/BusinessTable/' exclusion does not match backslashes and reports its own implementation as a direct import. Existing handoff already records this failure; untouched. Full npm audit also reports two development-only moderate issues; no unrelated dependency expansion.
+- Remaining verification: Live Workbench has no authenticated session; live Vue displays login timeout. Real-account end-to-end, actual storage uploads and persisted cross-client edit round-trip remain unverified; isolated browser fixtures and existing backend tests do not replace them. Renderer selection remains administrator-controlled (admin_embed -> native where desired); no automatic role changes. Temporary task-owned Vue fixture server on 5186 stopped, existing services untouched. No commit/push.
+
+## Registration — operator-assignment-reason
+- Beijing time: 2026-09-21 17:02:56 +08:00; environment local (environment variable/file absent); owner Codex /root.
+- Branch main; worktree D:\ZSJ-OS; base/HEAD e2584ce2879dd11ebd18c6f5450ec9353c80d060; target branch/integration order None.
+- Goal: implement approved operator reassignment reason form and failure recovery. Non-goals: business rule/schema/permission changes, unrelated pending work.
+- Ownership: MediaStudentsPage.tsx; new OperatorAssignmentDialog component, scoped logic/tests and browser fixture; StudentContactServiceImplTest.java; ZsjosErrorCodeConstants.java (reason wording only); docs/api/registration-fulfillment-api.md; handoff/main.md.
+- Dependencies: existing Ant Design/API/Vitest/Maven facilities; no new packages. Prior completed work and pending edits preserved.
+- Verification: focused frontend/backend tests, typecheck, browser fixture desktop/mobile, available authenticated environment, scoped diff checks.
+
+## Delivery — 2026-09-21 17:14:27 +08:00 — operator-assignment-reason
+- Context: local; main; D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration above. Target branch/integration order None.
+- User goal: implement approved director operator reassignment reason form and recovery plan.
+- Decisions: reason always visible; required for differing existing operator/conflict or server-required response; retain existing backend rule, transaction, permissions, tenant boundary and API wire shape. Document active-and-accepted relation scope rather than expanding writes.
+- Result: isolated assignment dialog reloads context/candidates, blocks loading/error/empty/unauthorized submission, validates trimmed reason and length, retains inputs on failure, handles 1900010035 inline and version/candidate refresh explicitly. Session/request guards and submission lock retain idempotency on retry. Successful save independently refreshes list and selected service detail. Generic error wording no longer incorrectly says administrator only.
+- Changed files: frontend/workbench/src/components/OperatorAssignmentDialog.tsx and .test.ts; src/pages/MediaStudentsPage.tsx and media-students.guard.test.ts; test/operator-assignment.html, operator-assignment.tsx, operator-assignment-browser.mjs; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImplTest.java; backend error constants (reason message only, existing other changes preserved); docs/api/registration-fulfillment-api.md; handoff/main.md.
+- Verification: npm run typecheck passed; focused Vitest 9/9 passed (reason cases, media workspace, student contact, toolbar). Maven StudentContactServiceImplTest/StudentServiceObjectPermissionProviderTest/StudentContactControllerPermissionTest 46/46 passed; includes 5 added tests for missing reason on another service/no writes, synchronized relations/cards/accounts/reason log and replay, first/same operator, permission denial, requested tenant lock/missing relation. Tenant test is mocked contract evidence, not a real database isolation test.
+- Browser: existing Chromium and bundled Playwright, synthetic HTTP adapter only; 12 scenarios passed (ordinary change/whitespace/trim/500 limit, first/same, conflict, server reason fallback, version refresh, network retry reusing key, loading/empty/denied/load retry, desktop/mobile). Screenshots visually checked at 1280x900 and 390x844; no uncaught browser errors. Screenshots in OS temp operator-assignment-desktop.png/operator-assignment-mobile.png. CUA initialization failed; existing headless Chromium used without installation. Initial test harness selector mismatch and Mockito strict-stub mismatch corrected; final runs green.
+- Diff/content: scoped git diff --check passed; Chinese text read as UTF-8. No database writes, package additions, service changes, branches, commits or publication. Existing unrelated edits preserved.
+- Dependencies/integration impact: None; ship Workbench form and backend error wording through normal deployment. Vue has no assignment entry and receives no new page.
+- Remaining verification: live Workbench /zsjos/my-students displays unified login with no authenticated session. Real director account mutation, persisted database/notification outcomes and full live selected-detail refresh not verified; tests cover component behavior and mocked service boundaries. No production deployment performed.
+
+## Registration — lead-accept-overview
+- Beijing time: 2026-09-21 17:43:44 +08:00; environment local (environment variable/file absent); owner Codex /root.
+- Branch main; worktree D:\ZSJ-OS; base/HEAD e2584ce2879dd11ebd18c6f5450ec9353c80d060; target branch/integration order None.
+- Goal: accepted assignment opens its Lead overview, including same-page/table/mobile navigation and stale-response protection. Non-goals: claim pool, backend, permissions, unrelated pending edits.
+- Ownership: frontend/workbench/src/components/LeadAssignmentHost.tsx; src/pages/LeadManagementPage.tsx; scoped lead acceptance browser fixtures/tests; docs/navigation.md; handoff/main.md; build-generated tsconfig.tsbuildinfo if updated.
+- Dependencies: existing React/Ant Design/router/API/test tooling; no new packages.
+- Verification: focused tests, typecheck/build, synthetic real-browser flows at desktop/mobile widths, available live session and scoped diff checks.
+
+## Delivery — 2026-09-21 17:56:28 +08:00 — lead-accept-overview
+- Context: local; main; D:\ZSJ-OS; owner Codex /root; HEAD unchanged e2584ce2879dd11ebd18c6f5450ec9353c80d060; registration above. Target branch/integration order None.
+- User goal/decisions: only assignment acceptance opens the accepted Lead overview in the current tab; claim pool unchanged; remaining assignments continue immediately. No automatic follow-up-tab switch.
+- Result: successful acceptance navigates before pending-list refresh, locally removes processed assignment, preserves marking/count/notification. Same-page deep links synchronize selected Lead independent of list filters; table/mobile opens existing drawer; stale detail success/error/finally cannot replace newer detail. Acceptance modal uses Ant Design popup-base token plus one overlay level so next assignment stays clickable over the detail drawer. Existing server route/object/tab/action authorization reused.
+- Changed files: frontend/workbench/src/components/LeadAssignmentHost.tsx; src/pages/LeadManagementPage.tsx; docs/navigation.md; test/lead-accept.html, lead-accept.tsx, lead-accept-browser.mjs; handoff/main.md. Production build also refreshed pre-existing modified frontend/workbench/tsconfig.tsbuildinfo; unrelated edits preserved.
+- Verification: typecheck passed; final build passed (existing large-chunk warning). Focused Vitest 100/100 passed across leadAssignment, leadManagement, leadFollowUp, leadInboxUnseen, notifyMessageAction and menu. Scoped git diff --check passed.
+- Browser evidence: existing Chromium plus bundled Playwright against existing Vite 5174; isolated synthetic API fixture only, no business writes. Passed automatic/specified acceptance, other-page and same-page navigation, filtered-empty list direct detail, sequential/racing detail responses, accept failure/reject/defer no navigation, pending-refresh error still navigates, detail error retry, denied object/tab, desktop split/table and mobile drawers, mobile consecutive acceptance and follow-up form fill/confirm/submit. No uncaught browser errors. Desktop 1280x900, mobile 390x844 screenshots visually checked in OS temp lead-accept-desktop/table/mobile.png. Initial synthetic field/selector issues corrected; mobile test exposed drawer blocking next assignment and verified the layer fix.
+- Environment limitations: CUA initialization failed (missing kernel assets), existing headless Chromium used without installation. Live Workbench displays unified login with no authenticated session; real sales-account acceptance, persisted ownership/follow-up and live permission enforcement remain unverified. Synthetic browser checks do not replace live integration acceptance.
+- Dependencies/integration: None; no API/schema/dependency changes, shared services reconfiguration, branches, commit or publication. Remaining work: authenticated end-to-end acceptance when session available; normal deployment.
+
+
+## Registration — 2026-09-21 17:58:50 +08:00 — tenant-admin-read-all
+- Environment: local; branch main; worktree D:\ZSJ-OS; base/HEAD e2584ce2879dd11ebd18c6f5450ec9353c80d060; owner Codex /root.
+- Goal: Implement approved current-tenant read-all for enabled super_admin/system_administrator, retaining feature permissions and existing command authorization; personal SELF/ALL/USER views.
+- Non-goals: role/menu grants, database changes, dependency additions, service operations, branch/commit/publication; preserve all existing changes.
+- Ownership: System permission API/service/auth DTO and tests; ZSJOS business read services/providers/controllers/VO/mappers and tests; FMS/PMS/HRM/EAM/BPM read boundaries and tests; both frontend auth state, affected business read views/services/tests; directly affected permission/API/navigation docs; handoff/main.md.
+- Dependencies: existing System roles, tenant context and business APIs. User confirmed continuation after previous ownership query; prior work retained. Target branch/integration order: None.
+- Verification: focused role/tenant/read-versus-write tests; module compile; frontend type/build checks and available browser/API verification; explicit incomplete coverage record.
+
+## Delivery checkpoint — 2026-09-21 18:28:20 +08:00 — tenant-admin-read-all
+- Context: local; main; D:\ZSJ-OS; owner Codex /root; registration above. Observed HEAD changed externally from e2584ce2879dd11ebd18c6f5450ec9353c80d060 to 23fe24b6467b13633dfdbe4cf4c8e077de580dc0 during execution. This workstream did not stage, commit, switch, or restore files. Integration order: None.
+- Goal: Continue approved tenant-admin read-all implementation with unchanged command authorization.
+- Decisions/results: Added dedicated forced-form-submission read provider with submission/parent existence checks; separated feedback mark-read-own from expanded read-own; extended StudentInfo sensitive read through explicit audited action while retaining base query/export permissions; preserved media account source association checks; widened historical student detail reads and worked on advanced-filter root/relationship predicates and authoritative user candidates. Added read-versus-write regression cases and updated calendar permission contracts. Full approved scope remains incomplete.
+- Changed files this continuation: ZSJOS framework/permission/ForcedFormSubmissionObjectPermissionProvider.java and test; feedback/FeedbackObjectPermissionProvider.java, FeedbackServiceImpl.java and provider test; lead/LeadSubmitterFeedbackPermissionProviderTest.java; controller/admin/lead/StudentInfoFormController.java; studentinfo/StudentInfoFormService.java and test; account/MediaAccountObjectPermissionProvider.java; registration/MyStudentServiceImpl.java; studentcontact/StudentContactServiceImpl.java; dal/mysql/lead/PersonMapper.java; advancedfilter/AdvancedFilterService.java, AdvancedFilterVisibleUserService.java, dal/mysql/advancedfilter/AdvancedFilterMapper.java; personalcalendar/PersonalCalendarEventServiceTest.java; workplan/WorkPlanServiceImplTest.java; docs/architecture/data-and-permission-flow.md, zsjos-role-permission-matrix.md; docs/api/media-account-maintenance-calendar.md, tenant-admin-read-all.md; this record. Prior continuation changes remain as registered; unrelated changes preserved.
+- Evidence: Prior focused multi-module permission/FMS/PMS run returned exit 0; Admin ts:check and Workbench typecheck returned exit 0 before external worktree mutations. Focused System/read-scope/calendar/feedback/submission/StudentInfo run returned exit 0; report examples: BusinessReadScope 2, calendar 6, feedback provider 7, form submission provider 1, StudentInfo service 9 all passed. Broader ZSJOS run: 75 tests, one WorkPlan fixture error due missing PermissionApi mock; fixture supplemented but not rerun yet. Latest historical student/advanced-filter changes require regression. No new true HTTP or browser acceptance evidence.
+- Dependency/integration impact: No added dependency, database modification, role/menu grants or service operations. External Git activity staged many task and unrelated files, changed HEAD, temporarily replaced PersonalCalendarPage.tsx and removed browser fixtures, then restored some content while this workstream was still running. Source edits paused under shared-worktree serialization rule; do not overwrite or reset these changes.
+- Remaining: Resolve exclusive writer before continuing; inspect new base and retained changes, rerun invalidated checks, complete coverage matrix pending areas (personal views, histories/attachments/exports, HRM/BPM, cross-module and dual-frontend acceptance). This is a checkpoint, not completion or release approval.

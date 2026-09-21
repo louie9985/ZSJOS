@@ -43,6 +43,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DictDataApi dictDataApi;
     @Resource private PostApi postApi;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private LeadObjectPermissionService permissionService;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private SalesDispatchStatusService dispatchStatusService;
@@ -55,7 +56,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
 
     @Override
     public PageResult<SubordinateSalesRespVO> getPage(SubordinateSalesPageReqVO reqVO, Long managerUserId) {
-        List<AdminUserRespDTO> users = salesSubordinates(managerUserId);
+        List<AdminUserRespDTO> users = readableSales(managerUserId);
         String keyword = trimToNull(reqVO.getKeyword());
         List<SubordinateSalesRespVO> rows = buildRows(users).stream()
                 .filter(row -> keyword == null || contains(row.getName(), keyword)
@@ -97,21 +98,21 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
 
     @Override
     public SubordinateSalesRespVO getOverview(Long salesUserId, Long managerUserId) {
-        AdminUserRespDTO user = requireSalesSubordinate(salesUserId, managerUserId);
+        AdminUserRespDTO user = requireReadableSales(salesUserId, managerUserId);
         return buildRows(List.of(user)).get(0);
     }
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(Long salesUserId, LeadManagementPageReqVO reqVO,
                                                          Long managerUserId) {
-        requireSalesSubordinate(salesUserId, managerUserId);
+        requireReadableSales(salesUserId, managerUserId);
         return leadManagementService.getManagedOwnerLeadPage(reqVO, managerUserId, salesUserId);
     }
 
     @Override
     public PageResult<SubordinateTaskRespVO> getTaskPage(Long salesUserId, SubordinateTaskPageReqVO reqVO,
                                                           Long managerUserId) {
-        requireSalesSubordinate(salesUserId, managerUserId);
+        requireReadableSales(salesUserId, managerUserId);
         LocalDate today = LocalDate.now(BEIJING);
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
@@ -304,6 +305,17 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         row.setEffectiveOrderAmount(orders.stream().map(SalesOrderDO::getTotalAmount).filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         return row;
+    }
+
+    private List<AdminUserRespDTO> readableSales(Long userId) {
+        if (!permissionApi.hasTenantReadAllAccess(userId)) return salesSubordinates(userId);
+        PostRespDTO salesPost = postApi.getPostByCode(SALES_POST_CODE);
+        return salesPost == null ? List.of() : adminUserApi.getUserListByPostIds(Set.of(salesPost.getId()));
+    }
+
+    private AdminUserRespDTO requireReadableSales(Long userId, Long readerId) {
+        return readableSales(readerId).stream().filter(user -> Objects.equals(user.getId(), userId))
+                .findFirst().orElseThrow(() -> exception(SUBORDINATE_SALES_NOT_MANAGED));
     }
 
     private List<AdminUserRespDTO> salesSubordinates(Long managerUserId) {
