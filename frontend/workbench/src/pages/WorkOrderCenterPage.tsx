@@ -1,9 +1,10 @@
 import { platformHref } from '../services/mobileRoutes'
 import { getAuthPlatform } from '../services/authSession'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Card, DatePicker, Descriptions, Empty, Form, Input, InputNumber, List, Modal, Select, Space, Spin, Tabs, Tag, Timeline, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
+import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 import WorkOrderAttachmentPicker from '../components/WorkOrderAttachmentPicker'
 import ResourceLinkInput from '../components/ResourceLinkInput'
 import { APP_ROUTES } from '../constants'
@@ -23,11 +24,25 @@ function DynamicAttachmentField({ value = [], onChange = () => undefined }: {
   return <WorkOrderAttachmentPicker value={value} onChange={onChange} />
 }
 
-export default function WorkOrderCenterPage() {
+export default function WorkOrderCenterPage({ tenantReadAll = false }: { tenantReadAll?: boolean }) {
+  const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
+  const requestSequence = useRef(0)
   const location = useLocation(); const [templates, setTemplates] = useState<WorkOrderTemplate[]>([]); const [orders, setOrders] = useState<WorkOrder[]>([]); const [selected, setSelected] = useState<WorkOrder>(); const [template, setTemplate] = useState<WorkOrderTemplate>(); const [candidates, setCandidates] = useState<Array<{ id: number; name: string }>>([]); const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]); const [targetDepartments, setTargetDepartments] = useState<Array<{ id: number; name: string }>>([]); const [users, setUsers] = useState<Array<{ id: number; nickname: string }>>([]); const [accounts, setAccounts] = useState<WorkOrderAccount[]>([]); const [dictionaryOptions, setDictionaryOptions] = useState<Array<{ dictType: string; value: string; label: string }>>([]); const [assignmentType, setAssignmentType] = useState<'PERSON' | 'DEPARTMENT'>('PERSON'); const [dispatchMode, setDispatchMode] = useState<'FREE' | 'DIRECTED' | 'URGENT' | 'REWARD'>('DIRECTED'); const [requestFiles, setRequestFiles] = useState<WorkOrderFile[]>([]); const [resultFiles, setResultFiles] = useState<WorkOrderFile[]>([]); const [mineView, setMineView] = useState('PENDING_ACCEPT'); const [command, setCommand] = useState<Command>(); const [commandText, setCommandText] = useState(''); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [form] = Form.useForm()
   const createMode = location.pathname === APP_ROUTES.WORK_ORDER_CREATE; const availableMode = location.pathname === APP_ROUTES.WORK_ORDER_AVAILABLE
-  const load = async () => { setLoading(true); setError(''); try { if (createMode) setTemplates((await workOrderApi.templates()).list || []); else setOrders((availableMode ? await workOrderApi.available() : await workOrderApi.mine(1, 20, mineView)).list || []) } catch (cause) { setError(cause instanceof Error ? cause.message : '工单加载失败') } finally { setLoading(false) } }
-  useEffect(() => { void load() }, [location.pathname, mineView])
+  const readOnly = !createMode && !availableMode && readScope.readScope !== 'SELF'
+  const load = async () => {
+    const sequence = ++requestSequence.current
+    setLoading(true); setError(''); setOrders([])
+    try {
+      if (createMode) setTemplates((await workOrderApi.templates()).list || [])
+      else if (!(readScope.readScope === 'USER' && !readScope.targetUserId && !availableMode)) {
+        const page = availableMode ? await workOrderApi.available() : await workOrderApi.mine(1, 20, mineView, undefined, readScope)
+        if (sequence === requestSequence.current) setOrders(page.list || [])
+      }
+    } catch (cause) { if (sequence === requestSequence.current) setError(cause instanceof Error ? cause.message : '工单加载失败') }
+    finally { if (sequence === requestSequence.current) setLoading(false) }
+  }
+  useEffect(() => { void load() }, [location.pathname, mineView, readScope])
   useEffect(() => {
     const id = Number(new URLSearchParams(location.search).get('workOrderId'))
     if (!Number.isSafeInteger(id) || id <= 0) return
@@ -38,7 +53,7 @@ export default function WorkOrderCenterPage() {
   }, [location.search])
   const run = async (fn: () => Promise<unknown>) => { await fn(); setSelected(undefined); setCommand(undefined); setCommandText(''); setResultFiles([]); message.success('操作已提交'); await load() }
   const confirm = (title: string, content: string, onOk: () => Promise<void>) => Modal.confirm({ title, content, okText: '确认操作', cancelText: '取消', onOk })
-  const actions = useMemo(() => selected?.availableActions || [], [selected])
+  const actions = useMemo(() => readOnly ? [] : selected?.availableActions || [], [selected, readOnly])
   const submitCommand = () => { if (!selected || !command || !commandText.trim()) return message.warning(command === 'complete' ? '请填写完成说明' : '请填写原因'); const id = selected.id; const version = selected.version; const text = commandText.trim(); const files = resultFiles.map(item => item.id); confirm(`确认${commandLabels[command]}？`, commandImpacts[command], () => run(() => command === 'reject' ? workOrderApi.reject(id, version, text) : command === 'withdraw' ? workOrderApi.withdraw(id, version, text) : command === 'complete' ? workOrderApi.complete(id, version, text, files) : command === 'terminate' ? workOrderApi.terminate(id, version, text) : workOrderApi.rework(id, version, text))) }
   const displayFieldValue = (field: NonNullable<WorkOrder['fields']>[number]) => {
     const value = selected?.values?.[field.key]
@@ -52,6 +67,7 @@ export default function WorkOrderCenterPage() {
   }
   if (loading) return <section className="workspace-page"><Spin /></section>
   return <section className="workspace-page"><Card title={createMode ? '发起工单' : availableMode ? '可接工单' : '我的工单'} extra={!createMode && <Button icon={<ReloadOutlined />} onClick={() => void load()} aria-label="刷新工单" />}>
+    {!createMode && !availableMode && tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setReadScope(value); setSelected(undefined); setCommand(undefined) }} />}
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} />}
     {createMode ? <>
       <Select placeholder="选择工单类型" style={{ width: 'min(100%, 360px)', marginBottom: 16 }} onChange={code => workOrderApi.template(code).then(async item => { setTemplate(item); form.resetFields(); setRequestFiles([]); const [people, targetDepts, allDepts, allUsers, dictionaries, accountPage] = await Promise.all([workOrderApi.candidates(code), workOrderApi.candidateDepartments(code), workOrderApi.departments(), workOrderApi.users(), workOrderApi.dictionaries(), item.processorType === 'PRODUCTION_TICKET' ? workOrderApi.accounts() : Promise.resolve({ list: [], total: 0 })]); setCandidates(people.list); setDepartments(allDepts); setTargetDepartments(targetDepts.list.map(dept => ({ id: dept.id, name: dept.name }))); setUsers(allUsers); setAccounts(accountPage.list); setDictionaryOptions(dictionaries); setAssignmentType(item.allowedAssignmentTypes?.[0] === 'DEPARTMENT' ? 'DEPARTMENT' : 'PERSON') }).catch(cause => setError(cause instanceof Error ? cause.message : '模板加载失败'))} options={templates.map(item => ({ value: item.code, label: item.name }))} />
@@ -66,7 +82,7 @@ export default function WorkOrderCenterPage() {
       {!templates.length && <Empty description="暂无可发起的工单" />}
     </> : <>
       {!availableMode && <Tabs activeKey={mineView} items={views} onChange={setMineView} />}
-      <List dataSource={orders} locale={{ emptyText: <Empty description="暂无工单" /> }} renderItem={item => <List.Item actions={item.businessType === 'PRODUCTION_TICKET' ? [<Button key="production" type="link" href={platformHref(`/zsjos/production-tickets?ticketId=${item.businessId}`, getAuthPlatform())}>进入拍剪工单</Button>] : [<Button key="detail" type="link" onClick={() => workOrderApi.detail(item.id).then(setSelected).catch(cause => message.error(cause instanceof Error ? cause.message : '详情加载失败'))}>查看</Button>]}><List.Item.Meta title={<Space wrap>{item.orderNo}<Tag>{labels[item.status] || item.status}</Tag></Space>} description={`${item.sceneName || item.sceneCode} · 第 ${item.currentRound} 轮`} /></List.Item>} />
+      <List dataSource={orders} locale={{ emptyText: <Empty description="暂无工单" /> }} renderItem={item => <List.Item actions={item.businessType === 'PRODUCTION_TICKET' && !readOnly ? [<Button key="production" type="link" href={platformHref(`/zsjos/production-tickets?ticketId=${item.businessId}`, getAuthPlatform())}>进入拍剪工单</Button>] : [<Button key="detail" type="link" onClick={() => workOrderApi.detail(item.id).then(setSelected).catch(cause => message.error(cause instanceof Error ? cause.message : '详情加载失败'))}>查看</Button>]}><List.Item.Meta title={<Space wrap>{item.orderNo}<Tag>{labels[item.status] || item.status}</Tag></Space>} description={`${item.sceneName || item.sceneCode} · 第 ${item.currentRound} 轮`} /></List.Item>} />
     </>}
     {selected && <Modal open title={selected.orderNo} width={720} footer={null} onCancel={() => setSelected(undefined)}><Descriptions column={1} items={[{ label: '状态', children: labels[selected.status] || selected.status }, { label: '发起人', children: selected.sourceName }, { label: '处理人', children: selected.targetName || '候选池' }, ...(selected.fields || []).map(field => ({ label: field.label, children: displayFieldValue(field) })), { label: '备注', children: selected.remark || '-' }, { label: '完成说明', children: selected.completionRemark || '-' }, { label: '轮次', children: selected.currentRound }]} /><Typography.Title level={5}>流转记录</Typography.Title><Timeline items={(selected.timeline || []).map(item => ({ children: <><strong>第 {item.roundNo || 1} 轮 · {item.operatorName || '系统'}</strong><div>{item.fromStatus ? `${labels[item.fromStatus] || item.fromStatus} → ` : ''}{labels[item.toStatus] || item.toStatus}</div>{(item.reason || item.resultRemark) && <Typography.Text type="secondary">{item.reason || item.resultRemark}</Typography.Text>}</>, label: item.operatedAt }))} /><Typography.Title level={5}>操作</Typography.Title><Space wrap>
       {actions.includes('take') && <Button onClick={() => void confirm('确认接单？', '接单后工单将进入处理中，操作不可撤销。', () => run(() => workOrderApi.take(selected.id, selected.version)))}>接单</Button>}

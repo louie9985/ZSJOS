@@ -43,9 +43,16 @@ public interface FeedbackMapper extends BaseMapperX<FeedbackDO> {
     }
 
     default PageResult<FeedbackDO> selectMyPage(FeedbackPageReqVO req, String subjectType, Long userId) {
+        java.util.Objects.requireNonNull(userId);
+        return selectReadPage(req, subjectType, userId);
+    }
+
+    default PageResult<FeedbackDO> selectReadPage(FeedbackPageReqVO req, String subjectType, Long userId) {
         LambdaQueryWrapperX<FeedbackDO> query = new LambdaQueryWrapperX<FeedbackDO>()
-                .eq(FeedbackDO::getSubmitterSubjectType, subjectType)
-                .eq(FeedbackDO::getSubmitterUserId, userId)
+                .eqIfPresent(FeedbackDO::getSubmitterSubjectType, subjectType)
+                .eqIfPresent(FeedbackDO::getSubmitterUserId, userId)
+                .eqIfPresent(FeedbackDO::getAssigneeUserId, req.getAssigneeUserId())
+                .betweenIfPresent(FeedbackDO::getCreateTime, req.getCreateTime())
                 .eqIfPresent(FeedbackDO::getFeedbackType, req.getFeedbackType())
                 .eqIfPresent(FeedbackDO::getStatus, req.getStatus());
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {

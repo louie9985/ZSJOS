@@ -79,6 +79,7 @@ class StudentContactServiceImplTest {
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactExtensionMapper extensionMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider serviceReadPermission;
     @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoPermissionProvider studentInfoPermission;
     @Mock private AdminUserApi adminUserApi;
@@ -88,6 +89,16 @@ class StudentContactServiceImplTest {
     @Mock private BusinessEventMapper eventMapper;
     @Mock private DirectorConfigService directorConfigService;
     @Mock private DirectorFormTemplateService directorFormTemplateService;
+
+    @Test void administratorReadsExtensionHistoryWithoutAssumingReviewerIdentity() {
+        var page = new cn.iocoder.yudao.framework.common.pojo.PageParam();
+        when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);
+        when(extensionMapper.selectReadPage(page, 9L, "history", true))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
+        assertEquals(0L, service.getExtensions(page, "history", 9L).getTotal());
+        verify(extensionMapper).selectReadPage(page, 9L, "history", true);
+        verifyNoInteractions(taskCommandService);
+    }
 
     @BeforeEach
     void grantDeliveryStagePermissionForServiceContractTests() {

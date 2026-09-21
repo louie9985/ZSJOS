@@ -9,6 +9,23 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
 class SalesOrderTaskActionValidatorTest {
     private final SalesOrderTaskActionValidator validator = new SalesOrderTaskActionValidator();
     @Test
+    void allDefinitionVersionsUseOptionalOrdinaryApprovalButRequiredSupervisorApproval() {
+        for (String taskKey : new String[]{TASK_REGISTRATION, TASK_FINANCE}) {
+            for (int version : new int[]{1, 2, 3, 99}) {
+                var context = new BpmTaskActionContext().setProcessDefinitionKey(PROCESS_DEFINITION_KEY)
+                        .setTaskDefinitionKey(taskKey).setProcessDefinitionVersion(version);
+                assertEquals(false, validator.approvalReasonRequired(context));
+                context.setParentTaskId("supervisor-parent");
+                assertEquals(true, validator.approvalReasonRequired(context));
+                context.setProcessDefinitionKey("other-process");
+                assertNull(validator.approvalReasonRequired(context));
+            }
+        }
+        assertNull(validator.approvalReasonRequired(new BpmTaskActionContext()
+                .setProcessDefinitionKey(PROCESS_DEFINITION_KEY).setTaskDefinitionKey("other-node")));
+    }
+
+    @Test
     void bothCentersRequireRejectReasonButAllowEmptyApproval() {
         for (String key : new String[]{TASK_FINANCE, TASK_REGISTRATION}) {
             for (String reason : new String[]{null, "", "   "}) {

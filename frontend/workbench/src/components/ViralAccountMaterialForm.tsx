@@ -164,7 +164,8 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
         onChange={event => onChange(event.target.value)} />}</label>
 }
 
-export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true, requireDraftContent = false }: {
+export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true, requireDraftContent = false, onDirty }: {
+  onDirty?: () => void
   mode: Mode
   type: MaterialType
   material?: Material
@@ -179,7 +180,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   submitAllowed?: boolean
   requireDraftContent?: boolean
 }) {
-  const fields = useMemo(() => type.currentSchema?.fields || material?.currentVersion?.fields || [], [material, type])
+  const fields = useMemo(() => (material?.currentVersion && (mode === 'view' || mode === 'edit' && material.currentVersion.status === 'DRAFT') ? material.currentVersion.fields : type.currentSchema?.fields) || material?.currentVersion?.fields || [], [material, type, mode])
   const initialValues = material?.currentVersion?.values || {}
   const initialSnapshots = material?.currentVersion?.dictSnapshot || {}
   const [values, setValues] = useState<Record<string, unknown>>(JSON.parse(JSON.stringify(initialValues)))
@@ -192,7 +193,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   const readonly = mode === 'view'
   const draftEmpty = requireDraftContent && !fields.some(field => hasMaterialDraftContent(values[field.key]))
   const layout = useMemo(() => buildViralAccountLayout(fields), [fields])
-  const update = (key: string, value: unknown) => setValues(current => ({ ...current, [key]: value }))
+  const update = (key: string, value: unknown) => { onDirty?.(); setValues(current => ({ ...current, [key]: value })) }
   const persist = async (submitApproval: boolean) => {
     if (!submitApproval && draftEmpty) return setError('请先填写爆款内容拆解内容，再保存草稿')
     const problem = fields.map(field => validateField(field, values[field.key], submitApproval && Boolean(field.required), field.label)).find(Boolean)
@@ -229,7 +230,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   const saveDraft = async () => { if (!readonly) await persist(false) }
   const uploadCover = async (file: File) => {
     setUploading(true); setError('')
-    try { const result = await materialApi.uploadCover(file); setCoverFileId(result.fileId); setCoverPreviewUrl(result.previewUrl) }
+    try { const result = await materialApi.uploadCover(file); onDirty?.(); setCoverFileId(result.fileId); setCoverPreviewUrl(result.previewUrl) }
     catch (cause) { setError(cause instanceof Error ? cause.message : '截图上传失败') }
     finally { setUploading(false) }
   }
@@ -258,7 +259,7 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
           </div>
           <div className="viral-account-side-actions">
             {!readonly && !coverFileId && <ClipboardUploadButtons disabled={uploading} canPaste={() => !uploading} onFiles={files => { const file = files[0]; if (file) void uploadCover(file) }}><Upload accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void uploadCover(file); return false }}><Button block icon={<UploadOutlined />} loading={uploading}>上传图片</Button></Upload></ClipboardUploadButtons>}
-            {!readonly && coverFileId && <Button danger block icon={<DeleteOutlined />} disabled={uploading} onClick={() => { setCoverFileId(undefined); setCoverPreviewUrl(undefined) }}>删除图片</Button>}
+            {!readonly && coverFileId && <Button danger block icon={<DeleteOutlined />} disabled={uploading} onClick={() => { onDirty?.(); setCoverFileId(undefined); setCoverPreviewUrl(undefined) }}>删除图片</Button>}
             <Space className="viral-account-actions" direction="vertical" size={8}>{actions}</Space>
           </div>
         </div>

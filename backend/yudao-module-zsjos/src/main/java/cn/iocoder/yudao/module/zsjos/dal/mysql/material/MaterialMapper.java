@@ -24,6 +24,7 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                 .eqIfPresent(MaterialDO::getSource, req.getSource());
         if (canManage) {
             query.eqIfPresent(MaterialDO::getStatus, req.getStatus());
+            if (Boolean.TRUE.equals(req.getMine())) query.eq(MaterialDO::getOwnerUserId, userId);
         } else if (Boolean.TRUE.equals(req.getMine())) {
             query.eq(MaterialDO::getOwnerUserId, userId).eqIfPresent(MaterialDO::getStatus, req.getStatus());
         } else {

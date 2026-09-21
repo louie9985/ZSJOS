@@ -115,8 +115,25 @@ class SalesOrderServiceImplTest {
     @Mock private CashbackService cashbackService;
     @Mock private BusinessTaskCommandService businessTaskCommandService;
 
+    @Test void managementAdvancedSearchPreservesExplicitStatus() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO();
+        request.setStatus(STATUS_EFFECTIVE);
+        var scope = new SalesOrderManagementScope(true, false, Set.of(), Set.of());
+        when(permissionService.resolveManagementScope(11L)).thenReturn(scope);
+        when(advancedFilterService.matchOrderIds(request.getAdvancedFilter())).thenReturn(List.of(7L));
+        when(orderMapper.selectManagementPage(scope, request, List.of(7L)))
+                .thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L));
+        service.getManagementPage(request, 11L);
+        assertEquals(STATUS_EFFECTIVE, request.getStatus());
+        verify(orderMapper).selectManagementPage(scope, request, List.of(7L));
+    }
+
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(dictDataApi.getDictDataList(anyString())).thenAnswer(invocation ->
+            java.util.stream.Stream.of("new_student", "direct_enrollment", "retail", "company_qr", "employed", "one_year", "internal", "full", "bank", "nature", "period", "source", "fee", "payment", "a", "b")
+                .map(value -> new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO().setValue(value).setLabel("历史标签"))
+                .toList());
         lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
         lenient().doNothing().when(collaborationService).requireCanEnterDealForUpdate(any(LeadDO.class), anyLong());
@@ -138,7 +155,7 @@ class SalesOrderServiceImplTest {
 
         String summary = ReflectionTestUtils.invokeMethod(service, "courseSummary", item);
 
-        assertEquals("course-legacy / sku-legacy", summary);
+        assertEquals("历史未记录", summary);
     }
 
     @Test // 迁移订单没有轮次，财务导出台账的审批结论不能整列空白（后台任务，无人盯屏）
@@ -199,6 +216,12 @@ class SalesOrderServiceImplTest {
         verify(roundMapper).insert(roundCaptor.capture());
         assertEquals("process-1", roundCaptor.getValue().getProcessInstanceId());
         assertEquals("key-1", roundCaptor.getValue().getSubmissionIdempotencyKey());
+        SalesOrderSnapshot frozen = SalesOrderSnapshot.read(roundCaptor.getValue().getOrderSnapshot());
+        assertEquals(2, frozen.getSnapshotVersion());
+        assertEquals("历史标签", frozen.label("paymentMethod"));
+        assertEquals("company_qr", frozen.getSelections().get("paymentMethod").value());
+        assertFalse(roundCaptor.getValue().getOrderSnapshot().contains("submissionIdempotencyKey"));
+
         verify(processInstanceApi).createProcessInstance(eq(20L), argThat(req ->
                 req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
                         && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
@@ -499,7 +522,7 @@ class SalesOrderServiceImplTest {
         assertEquals("一年", result.getList().getFirst().getServicePeriodLabelSnapshot());
         assertEquals("KZ-100", result.getList().getFirst().getLeadNo());
         assertEquals("销售自拓录", result.getList().getFirst().getLeadSourceLabel());
-        assertEquals("course-1 / sku-1", result.getList().getFirst().getProductSummary());
+        assertEquals("历史未记录", result.getList().getFirst().getProductSummary());
         verify(orderMapper).selectMyPage(20L, reqVO, null);
         verify(itemMapper).selectListByOrderIds(List.of(100L));
         verifyNoInteractions(fileApi);
@@ -552,7 +575,8 @@ class SalesOrderServiceImplTest {
         round.setId(200L); round.setOrderId(100L); round.setRoundNo(1); round.setProcessInstanceId("process-1");
         BpmProcessNodeStatusRespDTO registration = new BpmProcessNodeStatusRespDTO();
         registration.setTaskDefinitionKey(TASK_REGISTRATION); registration.setStatus("approved");
-        registration.setReviewerUserId(233L); registration.setReviewerUserName("审核员甲");
+        registration.setReviewerUserId(233L); registration.setReviewerUserName("当前新姓名");
+        registration.setActionUserId(233L); registration.setActionUserNameSnapshot("审核员甲");
         registration.setEndTime(LocalDateTime.of(2026, 8, 12, 10, 30));
         when(orderMapper.selectById(100L)).thenReturn(order);
         when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
@@ -650,33 +674,30 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void getProjectsAuthoritativeLinkedLeadProfile() {
+    void missingHistoricalLeadProfileNeverQueriesCurrentLeadOrUsers() {
         SalesOrderDO order = new SalesOrderDO();
-        order.setId(100L); order.setOrderNo("SO-100"); order.setLeadId(1L); order.setStatus(STATUS_EFFECTIVE);
-        order.setStudentName("订单学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
-        LeadDO lead = new LeadDO();
-        lead.setId(1L); lead.setLeadNo("KZ202608191041490002"); lead.setSubmittedName("客资客户");
-        lead.setSubmittedMobile("19926231001"); lead.setSubmittedWechatId("wx-customer");
-        lead.setSourceType(SOURCE_INTERNAL_NEW_MEDIA); lead.setSourceUserId(31L); lead.setOwnerUserId(32L);
-        lead.setSourceChannelId("information_flow"); lead.setLeadCategory("high_intent"); lead.setDispatchMode("auto");
-        lead.setProvinceName("广东省"); lead.setCityName("湛江市");
-        AdminUserRespDTO sourceUser = new AdminUserRespDTO(); sourceUser.setId(31L); sourceUser.setNickname("新媒体专员");
-        AdminUserRespDTO ownerUser = new AdminUserRespDTO(); ownerUser.setId(32L); ownerUser.setNickname("销售专员2");
+        order.setId(100L); order.setLeadId(1L); order.setStatus(STATUS_EFFECTIVE);
+        order.setSubmitterUserId(20L);
         when(orderMapper.selectById(100L)).thenReturn(order);
-        when(leadMapper.selectById(1L)).thenReturn(lead);
         when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
-        when(adminUserApi.getUserMap(Set.of(31L, 32L))).thenReturn(Map.of(31L, sourceUser, 32L, ownerUser));
-
         var result = service.get(100L, 40L);
+        assertNull(result.getLeadProfile());
+        assertEquals("history_not_recorded", result.getHistoryMissingFields().get("leadProfile"));
+        verifyNoInteractions(leadMapper, adminUserApi, partnerMapper);
+    }
 
-        assertNotNull(result.getLeadProfile());
-        assertEquals("KZ202608191041490002", result.getLeadProfile().getLeadNo());
-        assertEquals("客资客户", result.getLeadProfile().getSubmittedName());
-        assertEquals("新媒体提交", result.getLeadProfile().getSourceLabel());
-        assertEquals("新媒体专员", result.getLeadProfile().getSourceUserName());
-        assertEquals("销售专员2", result.getLeadProfile().getOwnerUserName());
-        assertEquals("information_flow", result.getLeadProfile().getSourceChannel());
-        assertEquals("high_intent", result.getLeadProfile().getLeadCategory());
+    @Test
+    void unchangedSelectionRetainsDeletedDictionaryLabel() {
+        String label = ReflectionTestUtils.invokeMethod(service, "validateSelection", "type", "old", "old", "已删除旧标签");
+        assertEquals("已删除旧标签", label);
+        verifyNoInteractions(dictDataApi);
+    }
+
+    @Test
+    void missingHistoricalLabelCannotBeInventedOnResubmission() {
+        assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "validateSelection", "type", "old", "old", null));
+        verifyNoInteractions(dictDataApi);
     }
 
     @Test

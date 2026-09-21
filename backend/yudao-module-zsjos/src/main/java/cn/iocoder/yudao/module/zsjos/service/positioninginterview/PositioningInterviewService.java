@@ -47,14 +47,21 @@ public class PositioningInterviewService {
  @Resource private PermissionApi permissionApi;
  @Resource private FileApi fileApi;
 
- @ZsjosPermission(bizType="student-service",bizId="#relationId",action="director-interview")
+ @ZsjosPermission(bizType="student-service",bizId="#relationId",action="positioning-interview-read")
  public Context context(Long relationId,Long userId) {
   requireFeature(userId,QUERY);
-  ServiceRelationDO relation=authorized(relationId,userId);
+  ServiceRelationDO relation=authorizedRead(relationId,userId);
   return project(relation,current(relation.getId(),relation.getPersonId()),userId);
  }
  private ServiceRelationDO authorized(Long relationId,Long userId) {
   ServiceRelationDO relation=relationMapper.selectById(relationId);
+  return validateAuthorization(relation,userId);
+ }
+ private ServiceRelationDO authorizedRead(Long relationId,Long userId) {
+  ServiceRelationDO relation=relationMapper.selectById(relationId);
+  if(relation==null || !Objects.equals(relation.getTenantId(),TenantContextHolder.getRequiredTenantId())) throw exception(STUDENT_PERMISSION_DENIED);
+  if(cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentReadScope.canReadAll(permissionApi,userId)
+    && relationMapper.selectMediaReadByPersonIds(List.of(relation.getPersonId()),null).stream().anyMatch(row->Objects.equals(row.getId(),relationId))) return relation;
   return validateAuthorization(relation,userId);
  }
  private ServiceRelationDO validateAuthorization(ServiceRelationDO relation,Long userId) {
@@ -98,8 +105,10 @@ public class PositioningInterviewService {
    c.setAttachments(attachmentMapper.selectList(new LambdaQueryWrapper<PositioningInterviewAttachmentDO>().eq(PositioningInterviewAttachmentDO::getInterviewId,row.getId())).stream().map(this::attachment).toList());
   }
   List<String> actions=new ArrayList<>();
-  if(row!=null&&"completed".equals(row.getStatus())) actions.add("VIEW_POSITIONING_INTERVIEW");
-  else if(ready(relation)) {
+  if(row!=null) actions.add("VIEW_POSITIONING_INTERVIEW");
+  if((row==null||!"completed".equals(row.getStatus())) && ready(relation)
+    && "active".equals(relation.getStatus()) && "accepted".equals(relation.getAcceptanceStatus())
+    && Objects.equals(relation.getContentDirectorUserId(),userId)) {
    if(permissionApi.hasAnyPermissions(userId,EDIT))actions.add(row==null?"START_POSITIONING_INTERVIEW":"CONTINUE_POSITIONING_INTERVIEW");
    if(permissionApi.hasAnyPermissions(userId,COMPLETE))actions.add("COMPLETE_POSITIONING_INTERVIEW");
   }
@@ -223,9 +232,9 @@ public class PositioningInterviewService {
   row.setMimeType(detected);row.setUploadedBy(userId);row.setDirectory(directory);attachmentMapper.insert(row);return attachment(row);
  }
  private Attachment attachment(PositioningInterviewAttachmentDO row){Attachment a=new Attachment();a.setFileId(row.getFileId());a.setFileName(row.getFileName());a.setMimeType(row.getMimeType());a.setFileSize(row.getFileSize());return a;}
- @ZsjosPermission(bizType="student-service",bizId="#relationId",action="director-interview")
+ @ZsjosPermission(bizType="student-service",bizId="#relationId",action="positioning-interview-read")
  public Attachment download(Long relationId,Long userId,Long fileId){
-  requireFeature(userId,QUERY);var relation=authorized(relationId,userId);
+  requireFeature(userId,QUERY);var relation=authorizedRead(relationId,userId);
   var row=attachmentMapper.selectOne(new LambdaQueryWrapper<PositioningInterviewAttachmentDO>().eq(PositioningInterviewAttachmentDO::getStudentPersonId,relation.getPersonId()).eq(PositioningInterviewAttachmentDO::getFileId,fileId));
   if(row==null||!belongsToRelation(row,relationId,relation.getPersonId(),userId))throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
   var result=attachment(row);result.setUrl(fileApi.presignGetUrl(fileId,300));return result;

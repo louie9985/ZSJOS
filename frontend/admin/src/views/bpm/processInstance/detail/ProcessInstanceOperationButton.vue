@@ -156,7 +156,7 @@
       placement="top-start"
       :width="420"
       trigger="click"
-      v-if="runningTask && isHandleTaskStatus()"
+      v-if="!decisionOnly && runningTask && isHandleTaskStatus()"
     >
       <template #reference>
         <el-button plain type="primary" @click="openPopover('comment')">
@@ -416,7 +416,7 @@
       placement="top-start"
       :width="420"
       trigger="click"
-      v-if="runningTask?.children?.length > 0"
+      v-if="!decisionOnly && runningTask?.children?.length > 0"
     >
       <template #reference>
         <div @click="openPopover('deleteSign')" class="hover-bg-gray-100 rounded-xl p-6px">
@@ -520,7 +520,7 @@
       :width="420"
       trigger="click"
       v-if="
-        userId === processInstance?.startUser?.id && !isEndProcessStatus(processInstance?.status)
+        !decisionOnly && userId === processInstance?.startUser?.id && !isEndProcessStatus(processInstance?.status)
       "
     >
       <template #reference>
@@ -561,7 +561,7 @@
       @click="handleReCreate()"
       class="hover-bg-gray-100 rounded-xl p-6px"
       v-if="
-        userId === processInstance?.startUser?.id &&
+        !decisionOnly && userId === processInstance?.startUser?.id &&
         isEndProcessStatus(processInstance?.status) &&
         processDefinition?.formType === 10
       "
@@ -610,6 +610,9 @@ const props = defineProps<{
   normalFormApi: any // 流程表单 formCreate Api
   writableFields: string[] // 流程表单可以编辑的字段
 }>()
+
+// 内容批审仅接受通过/驳回；按服务端业务标识限制操作，不替代菜单权限。
+const decisionOnly = computed(() => props.processInstance?.businessKey?.startsWith('content-review-batch:') === true)
 
 const formLoading = ref(false) // 表单加载中
 const popOverVisible = ref({
@@ -1212,6 +1215,7 @@ const isEndProcessStatus = (status: number) => {
 
 /** 是否显示按钮 */
 const isShowButton = (btnType: OperationButtonType): boolean => {
+  if (decisionOnly.value && btnType !== OperationButtonType.APPROVE && btnType !== OperationButtonType.REJECT) return false
   let isShow = true
   if (runningTask.value?.buttonsSetting && runningTask.value?.buttonsSetting[btnType]) {
     isShow = runningTask.value.buttonsSetting[btnType].enable

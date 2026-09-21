@@ -43,6 +43,8 @@ public class LeadTransferContentProvider implements BpmApprovalContentProvider {
     private LeadAgingPoolService agingPoolService;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @Override
     public String bizType() {
@@ -129,6 +131,7 @@ public class LeadTransferContentProvider implements BpmApprovalContentProvider {
             return false;
         }
         try {
+            if (permissionApi.hasTenantReadAllAccess(viewerId) && leadMapper.selectById(row.getLeadId()) != null) return true;
             return agingPoolService.canRead(row.getLeadId(), viewerId);
         } catch (Exception ex) {
             return false;

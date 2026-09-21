@@ -1,5 +1,16 @@
 # Data and Permission Flow
 
+## Media student full reads
+
+Media student lists default to the full current-tenant media population when System
+`hasTenantReadAllAccess` or configured `zsjos:media-student:query-all` grants it.
+The page still requires `zsjos:media-student:query-my`; ordinary users retain personal
+relationships and explicit SELF remains personal. Related assets keep their own
+permissions. Full reads include historical services and retained drafts, but never
+authorize a command. Interview reads and legacy talk writes have separate checks.
+V270 defines only menu metadata; administrators own all ordinary role assignments.
+See [the API contract](../api/registration-fulfillment-api.md#content-director-students).
+
 ## Student and Partner manual identity binding
 
 Admin student details and Workbench manual binding share `zsjos:partner:manage-all` plus the target student's `student/read` object authorization. The additive `/zsjos/partner-student-link/student` read returns the current tenant's active binding summary and rejects broken references. Manual commands pass through `PartnerStudentManualLinkService`; invitation activation retains its separately authorized internal transaction path. No role grants or student visibility expansion are implied. See [the binding contract](../api/student-partner-invitation.md).
@@ -47,7 +58,7 @@ Template versions and dictionary/area labels are immutable snapshots. See
 
 Lead sales feedback uses server-owned read/create menu permissions and the ZSJOS
 `lead-submitter-feedback` object permission provider. Only the current owner can create;
-employee and Partner recipients read only their own feedback. Partner account IDs remain
+employee and Partner recipients normally read only their own feedback; the approved tenant administrator exception applies to ADMIN business reads only. Partner account IDs remain
 separate from ADMIN IDs. Recipient and identity snapshots, temporary attachment binding,
 versioning, System Outbox and both frontend consumers are documented in
 [the feedback API contract](../api/lead-submitter-feedback.md).
@@ -962,3 +973,10 @@ System 公共 API `validateUser` / `validateUserList` 校验指定用户在当�
 接口默认方法的内部转调不能替代代理入口。租户隔离、逻辑删除与停用校验仍生效。
 这不授予用户列表读取或业务操作权限：调用方仍须校验功能权限、对象关系和指派资格。
 Admin 与 Workbench 共用此服务端规则；运营新增学员账号仍经过账号创建权限和学员服务指派关系校验。
+
+Administrator read scopes are resolved at explicit read boundaries. Task/feedback/work-order/withdrawal personal lists and their projections retain the actor and only change the queried subject. FMS default-account writes and PMS knowledge interactions retain their original membership checks. Flowable instance/history reads carry explicit tenant predicates. See the delivery matrix for verified scopes and live acceptance limitations.
+
+
+### 订单历史姓名与当前授权（2026-09-22）
+
+订单历史展示使用订单/课程/BPM 动作快照，缺失不回退当前字典、客资或用户姓名；详情、列表、两端审批卡和导出遵循同一来源。用户 ID 继续用于当前服务端权限、数据范围、业务关联与通知收件人计算，历史姓名不参与授权。BPM 的新增动作人快照字段不改变既有 reviewer 接口含义；订单主管申请保留申请时/指派时姓名，实际审核历史仍由 BPM 持有。详见 [订单 API](../api/zsjos-sales-order.md#订单历史展示契约2026-09-22)。

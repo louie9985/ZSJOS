@@ -2,17 +2,46 @@
 
 生产内容批审以账号为边界组成批次，一个批次只能包含同一账号的 1 至 20 条内容版本。提交后冻结账号、运营、责任编导关系快照和审核上下文。
 
-## 核心接口
+## 审批动作与状态（2026-09-22）
 
-- `POST /admin-api/zsjos/content-review/batches`：创建批次并校验条数、账号一致性和内容版本状态。
-- `POST /admin-api/zsjos/content-review/batches/{id}/submit`：提交 BPM 审批实例。
-- `PUT /admin-api/zsjos/content-review/batches/{id}/items/{itemId}/director-decision`：编导逐条暂存通过或退回。
-- `POST /admin-api/zsjos/content-review/batches/{id}/director-complete`：编导完成本轮，要求所有条目已有结论。
-- `PUT /admin-api/zsjos/content-review/batches/{id}/items/{itemId}/final-decision`：总监逐条暂存结论并选择是否收录素材库。
-- `POST /admin-api/zsjos/content-review/batches/{id}/final-complete`：总监完成整批结论并统一落地。
-- `POST /admin-api/zsjos/content-review/items/{itemId}/publish`：登记实际发布平台链接和时间。
+运营提交 → 编导逐条审核 → 编导通过后进入终审 → 终审通过后待发布。
+编导或终审必须逐条保存所有必需结论；全部通过才可整批通过，任一不通过则只能整批退回运营。
+终审只编辑编导通过项。已经进入终审的旧混合批次保留编导退回项，但最终只能整批退回。
 
-总监完成全部条目结论后，批次内通过项统一进入待发布，收录项在同一事务中生成“生产内容”素材；退回项退出本轮。收录字段无法从内容、账号或系统默认值映射时，仅禁止该条收录，不阻止批审完成。BPM 回调、重复提交和重复收录均按业务键与事件号幂等处理。
+流程定义必须是编导、终审两个人工节点顺序执行，且两个节点的拒绝处理都必须结束流程，
+不得配置为退回流程内部节点。BPM 公开节点元数据 `rejectEndsProcess`，内容审批在新提交时
+校验；不符合时返回配置无效，避免业务修订轮次与 BPM 内部回退冲突。本次不修改已发布定义或存量实例。
+
+以下接口均以 `/admin-api/zsjos/content-review` 为前缀：
+
+- `POST /batch/create`、`POST /batch/create-from-student`：创建草稿。
+- `POST /batch/{batchId}/submit`：冻结快照并启动 BPM。
+- `PUT /batch/{batchId}/item/{itemId}/director-decision`、`final-decision`：暂存逐条结论。
+- `POST /batch/{batchId}/complete-director`、`complete-final`：提交整批动作。
+- `POST /batch/{batchId}/resubmit-from-student`：被退回后创建修订草稿。
+- `POST /batch/{batchId}/save-student-draft`：原位保存草稿，批次编号不变；新客户端传 expectedVersion。
+- `POST /batch/{batchId}/item/{itemId}/publish`：登记发布结果。
+
+整批请求 `{expectedVersion, taskId, decision, reason}` 中 `decision` 为 `APPROVED` 或 `RETURNED`；
+新客户端必须明确传入。旧客户端省略时根据已保存结论推断。reason 沿用必填、最长 2000 字。
+服务端返回 `DIRECTOR_APPROVE/DIRECTOR_RETURN/FINAL_APPROVE/FINAL_RETURN` 控制可执行动作，
+保留 `DIRECTOR_COMPLETE/FINAL_COMPLETE` 兼容标识。前端对有审核权限者展示两个按钮及不可用原因；
+未保存的本地逐条修改也阻止整批提交。
+
+功能权限、对象权限、当前 BPM 任务及版本校验累计生效，管理端通用 BPM 接口不能绕过业务校验。
+退回调用 BPM reject，业务批次为 NEED_MODIFY，所有条目退出本轮；逐条结论不被伪造为全部不通过。
+原内容版本保持冻结并写入审核结果，运营通过同一作品的新版本修订，不能修改历史快照。
+取消与拒绝分开处理：取消为 CANCELLED，不生成审核退回结论。
+
+终审通过仅在全部结论通过时落地待发布及已选素材收录；任一映射失败整体回滚，可取消该条收录后再提交。
+终审退回不验证、不创建素材。通知复用现有通过/退回场景和 BPM 记录，不新增审批历史表。
+
+修改入口回填内容、附件、素材引用，提供“保存修改”和“重新提交审批”。后者保存后立即调用 submit；提交失败保留编辑内容及已保存草稿编号，重试复用该草稿。
+来源版本必须属于本次原批次，账号集合及学员不变；重复重提旧轮次返回版本冲突，应从历史轮次进入已有新草稿。
+草稿后续保存保留批次和作品身份，仅更新尚未提交的条目及内容版本；已提交的历史批次与版本只读；作品目的/形式未改变时保留原字典标签快照。
+实际发布、运行流程定义与真实账号授权须在目标环境另行验收，本次不自动重写历史实例。
+上述回填重提入口适用于带 `studentPersonId` 的学员内容审批；旧通用创建入口产生的非学员批次，
+目前没有对应的工作台修订编辑器，不能视为已覆盖其回填重提流程。
 
 ## 运营审核附件（2026-09-21）
 
@@ -30,8 +59,8 @@
 实际工作台入口使用以下 POST 接口（均以 `/admin-api/zsjos/content-review` 为前缀）：
 
 - `/batch/create-from-student`：新建，`works[].deliverableSnapshotJson` 传文件 ID 数组的 JSON 字符串。
-- `/batch/{batchId}/save-student-draft`：保存新草稿轮次，保留旧轮次供审计。
-- `/batch/{batchId}/resubmit-from-student`：驳回后生成新草稿轮次；保存后仍需点击“提交审批”。
+- `/batch/{batchId}/save-student-draft`：原位保存未提交草稿；保留内容版本，不创建额外审批轮次。
+- `/batch/{batchId}/resubmit-from-student`：驳回后生成新草稿轮次；编辑器选择重新提交时紧接调用 submit，选择保存时仅保存。
 
 修订时省略 `deliverableSnapshotJson`（或 null）继承原版本附件；传 `"[]"` 显式清空；
 传非空 ID 数组替换当前新版本附件。清空不删除文件对象或修改历史审批版本。
@@ -49,3 +78,20 @@ UI 使用工作台主题 token、文件类型图标和图片放大预览，窄�
 `deliverableFileIds`。若审核附件包含图片或文档，勾选收录可能触发既有“字段映射或文件快照无效”
 校验；不勾选收录的普通审批不受影响。本次不改变素材模板、管理员映射或静默丢弃非视频附件。
 支持混合附件自动收录需要另行明确素材字段归属并调整对应模板/映射。
+
+
+### 学员入口草稿恢复（2026-09-21）
+
+中世健员工工作台“发起内容审批”先展示当前学员的已有草稿和独立的新建入口。沿用 mine + DRAFT 分页接口，读取全部页后按 studentPersonId 过滤；继续编辑前重新读取批次详情并核对学员、状态与服务端 SUBMIT 动作。不新增客户端权限来源或业务接口。
+
+新建表单保存草稿后保留填写内容和批次标识。同一表单内容未变时复用已保存批次；内容变化时走 save-student-draft 更新同一草稿。创建成功但提交失败时不丢弃批次标识，重试复用草稿，不再无条件新建。
+
+编辑草稿的 referenceMaterials 从原 materialRefs 快照回填到表单保存数据；预览由同一表单值派生，作品排序与删除不再错配素材。未修改的 materialVersionId、素材展示快照、封面和附件引用均保留，移除一条素材不清空其余素材版本。既有完整性校验和审核提交契约不变。
+
+内容审核专用面板、工作台审批中心与管理端审批操作栏仅显示通过/驳回类操作，隐藏转办、委派、加减签、内部节点退回、抄送及评论操作按钮。历史评论仍可查看；运营草稿与修订入口保持原行为。此限制是内容批审仅支持两级结论的业务约束，不代替服务端菜单权限或动作校验，其他流程仍使用服务端按钮配置。
+
+提交时按已发布 BPM 定义的两级顺序解析实际节点编码，不要求节点必须命名 directorReview/finalReview，也不按显示名称判断业务角色。设计器生成的 Activity_* 编码可直接使用；首级用于责任编导分配，首级/末级编码一并冻结到本轮上下文，后续逐条结论和整批动作读取该快照。非两级、断链、多实例或驳回至内部节点仍拒绝提交，存量快照不重写。
+
+驳回修订与草稿编辑复用首次提交的 ContentApprovalDraft 表单，字段顺序、布局和作品校验一致；原账号集合只读，避免改变本轮来源范围。账号展示字段从原 accountSnapshots 归一化回填（sStageLabel/currentStatusLabel 对应原表单标签字段），不从当前账号资料覆盖历史。作品保留来源 ID、评论区钩子、原链接、附件和参考素材，仅在表单前补充审核意见与修订提示。
+
+当前列表按租户关联过滤已有后续轮次的祖先记录，仅展示每条修订链的最新记录；历史接口保留原 BPM 结果，响应状态展示为 REVISION_DRAFT（已有修订草稿）或 RESUBMITTED（已重新提交），不再提供旧轮次处理动作。保存与发起审批分为两个请求，前者成功而后者失败时已保存的数据不会回滚丢失。

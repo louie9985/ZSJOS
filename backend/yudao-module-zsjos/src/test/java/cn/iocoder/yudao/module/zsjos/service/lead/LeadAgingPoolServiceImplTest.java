@@ -60,6 +60,7 @@ class LeadAgingPoolServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private SecurityFrameworkService securityFrameworkService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private LeadPublicSeaRecordMapper publicSeaRecordMapper;
@@ -67,6 +68,14 @@ class LeadAgingPoolServiceImplTest {
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
+
+    @Test void administratorCountsIgnoreDepartmentWithoutGrantingSharedCommandEligibility() {
+        when(permissionApi.hasTenantReadAllAccess(42L)).thenReturn(true);
+        assertEquals(0L, service.getCounts(42L).get("all"));
+        verify(cycleMapper).selectCountByStatus(null, null, AGING_POOL_WAITING_ASSIGNMENT);
+        verify(cycleMapper).selectCountByStatus(null, null, AGING_POOL_ASSIGNED);
+        assertFalse(service.canOperate(1L, 10L, 42L));
+    }
 
     @Test
     void personalQueryUsesCallerIdentityForManageAllAndPreservesAdvancedStatusIntersection() {

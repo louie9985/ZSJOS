@@ -20,6 +20,9 @@ public class SalesOrderRespVO {
     private String formalOwnerIdentity;
     private String formalOwnerIdentityLabel;
     private Long submitterUserId;
+    private String submitterUserName;
+    private String formalSalesUserName;
+    private Map<String, String> historyMissingFields;
     private Long supersedesOrderId;
     private Long supersededByOrderId;
     private String buyerName;
@@ -85,6 +88,9 @@ public class SalesOrderRespVO {
         private String submittedName;
         private String submittedMobile;
         private String submittedWechatId;
+        private String sourceSubjectType;
+        private Long sourceSubjectId;
+        private Long ownerUserId;
         private String sourceType;
         private String sourceLabel;
         private String sourceUserName;

@@ -6,6 +6,8 @@
     </div>
     <el-tabs v-model="activeTab">
       <el-tab-pane label="业务待办" name="business">
+        <BusinessReadScope v-if="userStore.dataAccess.tenantReadAll" v-model="readScope" />
+        <el-pagination v-model:current-page="pageNo" :page-size="100" :total="total" layout="total, prev, pager, next" />
         <el-alert
           v-if="business.error"
           :title="business.error"
@@ -24,6 +26,7 @@
               row.name || row.taskName || row.title || `任务 #${row.id}`
             }}</template></el-table-column
           >
+          <el-table-column v-if="readScope.readScope !== 'SELF'" label="执行人" prop="assigneeName" min-width="130" />
           <el-table-column label="状态" prop="status" width="140" />
           <el-table-column label="创建时间" width="180"
             ><template #default="{ row }">{{
@@ -68,9 +71,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
+import { useUserStore } from '@/store/modules/user'
 import * as Api from '@/api/zsjos/workbenchMenus'
 
+const userStore = useUserStore()
+const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
+const pageNo = ref(1), total = ref(0)
+let requestSequence = 0
 const activeTab = ref('business')
 const business = reactive({ rows: [] as Api.WorkbenchListItem[], loading: false, error: '' })
 const bpm = reactive({
@@ -84,21 +93,26 @@ const formatTime = (value: unknown) =>
   value ? new Date(Number(value)).toLocaleString('zh-CN') : '-'
 
 const loadBusiness = async () => {
+  const sequence = ++requestSequence
+  business.rows = []; total.value = 0
+  if (readScope.value.readScope === 'USER' && !readScope.value.targetUserId) { business.loading = false; return }
   business.loading = true
   business.error = ''
   try {
-    const result = await Api.page('/zsjos/business-task/my-page', {
+    const result = await Api.page('/zsjos/business-task/my-task-page', {
+      ...readScope.value,
       bucket: 'today',
       status: 'pending',
-      pageNo: 1,
+      pageNo: pageNo.value,
       pageSize: 100
     })
-    business.rows = result.list || []
+    if (sequence === requestSequence) { business.rows = result.list || []; total.value = result.total }
   } catch (error: any) {
+    if (sequence !== requestSequence) return
     business.rows = []
     business.error = error?.msg || error?.message || '业务待办加载失败'
   } finally {
-    business.loading = false
+    if (sequence === requestSequence) business.loading = false
   }
 }
 const loadBpm = async () => {
@@ -117,5 +131,7 @@ const loadBpm = async () => {
   }
 }
 const loadAll = () => Promise.all([loadBusiness(), loadBpm()])
+watch(readScope, () => { pageNo.value = 1; void loadBusiness() })
+watch(pageNo, loadBusiness)
 onMounted(loadAll)
 </script>

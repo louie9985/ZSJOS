@@ -1,12 +1,11 @@
 import BusinessTable from './BusinessTable'
 import ProductSpecs from './ProductSpecs'
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'antd'
 import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
-import { api, type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
+import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { buildDictionaryLabelMap, canReviewSalesOrderTask, resolveDictionaryLabel, type DictionaryLoadState } from '../services/salesOrder'
-import { DICT_TYPE } from '../constants'
+import { canReviewSalesOrderTask } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
@@ -21,15 +20,6 @@ export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
 const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批通过', 3: '审批不通过', 4: '已取消', 5: '已退回', 7: '审批通过中' }
 const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
-const ORDER_DICTIONARY_TYPES = [
-  DICT_TYPE.LEAD_CATEGORY,
-  DICT_TYPE.LEAD_SOURCE_CHANNEL,
-  DICT_TYPE.ORDER_STUDENT_NATURE,
-  DICT_TYPE.ORDER_SERVICE_PERIOD,
-  DICT_TYPE.ORDER_STUDENT_SOURCE,
-  DICT_TYPE.ORDER_FEE_MODE,
-  DICT_TYPE.ORDER_PAYMENT_METHOD
-]
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
@@ -81,7 +71,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
     const status: ApprovalStatus = node.approval?.status || (node.active ? 'pending' : 'not_started')
     const supervisorStatus = node.supervisorApproval?.status || node.supervisorConfirmation?.status
     const supervisorReviewer = node.supervisorApproval?.supervisorUserName
-      || (node.supervisorConfirmation?.status === 'confirmed' ? '负责人主管' : undefined)
+      || (supervisorStatus === 'confirmed' || supervisorStatus === 'rejected' ? '历史未记录' : undefined)
     return {
       color: approvalTimelineColor(status),
       content: <article className={`sales-order-approval-node${node.active ? ' active' : ''}`}>
@@ -92,7 +82,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
         {node.active && <Typography.Text className="sales-order-approval-current">当前节点</Typography.Text>}
         <Typography.Text type="secondary" className="sales-order-approval-node-description">{node.description}</Typography.Text>
         <div className="sales-order-approval-node-meta">
-          <span>审批人：{node.approval?.reviewerUserName || (node.active ? '待处理' : '-')}</span>
+          <span>审批人：{node.approval?.reviewerUserName || (status === 'approved' || status === 'rejected' ? '历史未记录' : node.active ? '待处理' : '-')}</span>
           <span>{node.approval?.endTime ? `完成时间：${formatTimestamp(node.approval.endTime)}` : node.approval?.createTime ? `开始时间：${formatTimestamp(node.approval.createTime)}` : ''}</span>
         </div>
         {supervisorStatus && <div className="sales-order-supervisor-signoff">
@@ -101,7 +91,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
             <ApprovalStatusTag status={supervisorStatus} supervisor/>
           </div>
           <div className="sales-order-approval-node-meta">
-            <span>申请人：{node.supervisorConfirmation?.requesterUserName || '-'}</span>
+            <span>申请人：{node.supervisorConfirmation?.requesterUserName || '历史未记录'}</span>
             <span>确认人：{supervisorReviewer || '-'}</span>
             <span>{node.supervisorConfirmation?.decidedAt ? `确认时间：${formatTimestamp(node.supervisorConfirmation.decidedAt)}` : node.supervisorConfirmation?.requestedAt ? `申请时间：${formatTimestamp(node.supervisorConfirmation.requestedAt)}` : ''}</span>
           </div>
@@ -131,21 +121,6 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
   onRevise?: () => void
   onTerminate?: () => void
 }) {
-  const [dictionaryState, setDictionaryState] = useState<DictionaryLoadState>('loading')
-  const [dictionaryLabels, setDictionaryLabels] = useState<Record<string, Map<string, string>>>({})
-  const loadDictionaries = useCallback(async () => {
-    setDictionaryState('loading')
-    try {
-      const results = await Promise.all(ORDER_DICTIONARY_TYPES.map(type => api.dictDataByType(type)))
-      setDictionaryLabels(Object.fromEntries(ORDER_DICTIONARY_TYPES.map((type, index) => [type, buildDictionaryLabelMap(results[index])])))
-      setDictionaryState('ready')
-    } catch {
-      setDictionaryLabels({})
-      setDictionaryState('error')
-    }
-  }, [])
-  useEffect(() => { void loadDictionaries() }, [loadDictionaries])
-  const label = (type: string, value?: string) => resolveDictionaryLabel(value, dictionaryLabels[type] || new Map(), dictionaryState)
   const task = approvalContext || order
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
   const supervisorConfirmation = task.taskDefinitionKey === 'registrationReview'
@@ -206,8 +181,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <Typography.Text type="secondary">{order.orderNo} · 第 {order.approvalRoundNo || 1} 轮</Typography.Text>
       </div>
     </div>
-    {dictionaryState === 'error' && <Alert type="warning" showIcon title="详情字典标签加载失败" description="订单与客资原始编码未展示，请重试加载业务标签。"
-      action={<Button size="small" onClick={() => void loadDictionaries()}>重试</Button>}/>}
+    {order.historyMissingFields?.leadProfile && <Alert type="info" showIcon title="客资档案历史未记录"/>}
     <div className="sales-order-detail-layout">
       <main className="sales-order-detail-main">
         <section className="sales-order-information">
@@ -226,8 +200,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <div className="lead-profile-meta">
           <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">提交人</span><span className="lead-field-value">{leadProfile.sourceUserName || '-'}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '暂未分配'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">提交人</span><span className="lead-field-value">{leadProfile.sourceUserName || '历史未记录'}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '历史未记录'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">地区</span><span className="lead-field-value">{[leadProfile.provinceName, leadProfile.cityName].filter(Boolean).join(' / ') || '-'}</span></div>
@@ -255,7 +229,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <DetailFieldGrid items={[
           { key: 'buyer', label: '购买方', value: order.buyerName },
           { key: 'student', label: '学员姓名', value: order.studentName },
-          { key: 'nature', label: '学员性质', value: order.studentNatureLabelSnapshot || label(DICT_TYPE.ORDER_STUDENT_NATURE, order.studentNature) },
+          { key: 'nature', label: '学员性质', value: order.studentNatureLabelSnapshot || "历史未记录" },
           { key: 'mobile', label: '手机号', value: order.studentMobile },
           { key: 'wechat', label: '微信号', value: order.studentWechatId },
           { key: 'region', label: '所在地区', value: [order.provinceName, order.cityName].filter(Boolean).join(' / ') }
@@ -265,12 +239,12 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <div className="sales-order-section-heading"><Typography.Text strong>成交与付款</Typography.Text><Typography.Text className="sales-order-total-amount">¥{Number(order.totalAmount).toFixed(2)}</Typography.Text></div>
         <DetailFieldGrid items={[
           { key: 'paidAt', label: '客户付款时间', value: formatTimestamp(order.customerPaidAt) },
-          { key: 'feeMode', label: '缴费方式', value: order.feeModeLabelSnapshot || label(DICT_TYPE.ORDER_FEE_MODE, order.feeMode) },
-          { key: 'paymentMethod', label: '支付方式', value: order.paymentMethodLabelSnapshot || label(DICT_TYPE.ORDER_PAYMENT_METHOD, order.paymentMethod) },
+          { key: 'feeMode', label: '缴费方式', value: order.feeModeLabelSnapshot || "历史未记录" },
+          { key: 'paymentMethod', label: '支付方式', value: order.paymentMethodLabelSnapshot || "历史未记录" },
           { key: 'examTime', label: '商定考试时间', value: order.agreedExamTime },
           { key: 'classType', label: '开通班种', value: order.classType },
-          { key: 'servicePeriod', label: '服务周期', value: order.servicePeriodLabelSnapshot || label(DICT_TYPE.ORDER_SERVICE_PERIOD, order.servicePeriod) },
-          { key: 'studentSource', label: '学生来源', value: order.studentSourceLabelSnapshot || label(DICT_TYPE.ORDER_STUDENT_SOURCE, order.studentSource) }
+          { key: 'servicePeriod', label: '服务周期', value: order.servicePeriodLabelSnapshot || "历史未记录" },
+          { key: 'studentSource', label: '学生来源', value: order.studentSourceLabelSnapshot || "历史未记录" }
         ]}/>
       </section>
       {order.repurchaseReason && <section className="sales-order-info-block sales-order-info-block-wide">
@@ -289,6 +263,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
           <section className="sales-order-content-section">
             <div className="sales-order-section-heading"><Typography.Text strong>备注与服务</Typography.Text></div>
             <DetailFieldGrid columns={1} items={[
+              { key: 'submitter', label: '实际提交人', value: order.submitterUserName || '历史未记录' },
+              { key: 'sales', label: '成交负责人', value: order.formalSalesUserName || '历史未记录' },
               { key: 'remark', label: '订单备注', value: order.remark },
               { key: 'requirements', label: '学生特殊要求', value: order.studentSpecialRequirements },
               { key: 'delivery', label: '教材邮递联系', value: order.materialDeliveryContact }
@@ -296,7 +272,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
           </section>
           <section className="sales-order-content-section">
             <div className="sales-order-section-heading"><Typography.Text strong>缴费凭证</Typography.Text></div>
-            {order.paymentVouchers.length ? <Image.PreviewGroup><div className="sales-order-vouchers">{order.paymentVouchers.map(file => file.contentType === 'application/pdf'
+            {order.paymentVouchers.length ? <Image.PreviewGroup><div className="sales-order-vouchers">{order.paymentVouchers.map(file => !file.fileUrl ? <Typography.Text key={file.infraFileId} type="warning">{file.originalName}（凭证暂不可用）</Typography.Text> : file.contentType === 'application/pdf'
               ? <Button key={file.infraFileId} href={file.fileUrl} target="_blank">{file.originalName}</Button>
               : <Image key={file.infraFileId} width={88} height={88} src={file.fileUrl} alt={file.originalName}/>)}</div></Image.PreviewGroup>
               : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无缴费凭证"/>}

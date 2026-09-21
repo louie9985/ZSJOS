@@ -60,12 +60,17 @@ public class PmsKnowledgeInteractionTargetServiceImpl implements PmsKnowledgeInt
 
         // 2. 校验对象可读
         if (PmsKnowledgeObjectTypeEnum.LIBRARY.equals(objectType)) {
-            return libraryMemberService.validateLibraryReadable(entityId, userId).getId();
+            return libraryMemberService.validateLibraryInteraction(entityId, userId).getId();
         }
         if (PmsKnowledgeObjectTypeEnum.FOLDER.equals(objectType)) {
-            return folderReadService.getReadableFolder(entityId, userId).getLibraryId();
+            var folder = folderReadService.getReadableFolder(entityId, userId);
+            libraryMemberService.validateLibraryInteraction(folder.getLibraryId(), userId);
+            contentPermissionService.validateContentPermissionInteraction(folder.getPermissionId(), folder.getLibraryId(), userId);
+            return folder.getLibraryId();
         }
         PmsKnowledgeDocumentDO document = documentService.getDocument(entityId, userId);
+        libraryMemberService.validateLibraryInteraction(document.getLibraryId(), userId);
+        contentPermissionService.validateContentPermissionInteraction(document.getPermissionId(), document.getLibraryId(), userId);
         if (ObjectUtil.notEqual(type, document.getType())) {
             throw exception(KNOWLEDGE_INTERACTION_OBJECT_INVALID);
         }

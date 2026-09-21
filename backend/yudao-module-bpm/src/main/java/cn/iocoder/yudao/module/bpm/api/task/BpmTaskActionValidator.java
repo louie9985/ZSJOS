@@ -20,4 +20,9 @@ public interface BpmTaskActionValidator {
 
     void validate(BpmTaskActionContext context);
 
+    /** 已确认业务规则可覆盖通过意见配置；null 表示沿用流程定义。不得改变任务权限或流转条件。 */
+    default Boolean approvalReasonRequired(BpmTaskActionContext context) {
+        return null;
+    }
+
 }

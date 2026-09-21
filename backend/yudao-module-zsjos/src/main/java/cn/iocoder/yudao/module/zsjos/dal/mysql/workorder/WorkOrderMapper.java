@@ -51,6 +51,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
             """)
     IPage<WorkOrderDO> selectEligiblePool(IPage<WorkOrderDO> page, @Param("sceneCode") String sceneCode, @Param("userId") Long userId);
     default PageResult<WorkOrderDO> selectMyPage(PageParam page, String status, String view, Long userId) {
+        java.util.Objects.requireNonNull(userId, "personal work-order subject");
         var query = new LambdaQueryWrapperX<WorkOrderDO>().ne(WorkOrderDO::getBusinessType, "FEEDBACK")
                 .eq(status != null, WorkOrderDO::getStatus, status);
         switch (view == null ? "ALL" : view) {
@@ -61,6 +62,19 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
             case "CLOSED" -> query.and(w -> w.eq(WorkOrderDO::getSourceUserId, userId).or().eq(WorkOrderDO::getTargetUserId, userId))
                     .in(WorkOrderDO::getStatus, "COMPLETED", "REJECTED_INVALID", "WITHDRAWN", "TERMINATED_UNQUALIFIED");
             default -> query.and(w -> w.eq(WorkOrderDO::getSourceUserId, userId).or().eq(WorkOrderDO::getTargetUserId, userId));
+        }
+        return selectPage(page, query.orderByDesc(WorkOrderDO::getCreateTime));
+    }
+    default PageResult<WorkOrderDO> selectReadPage(PageParam page, String status, String view, Long subject) {
+        if (subject != null) return selectMyPage(page, status, view, subject);
+        var query = new LambdaQueryWrapperX<WorkOrderDO>().ne(WorkOrderDO::getBusinessType, "FEEDBACK")
+                .eq(status != null, WorkOrderDO::getStatus, status);
+        switch (view == null ? "ALL" : view) {
+            case "PENDING_ACCEPT" -> query.eq(WorkOrderDO::getStatus, "PENDING_ACCEPT");
+            case "PROCESSING" -> query.eq(WorkOrderDO::getStatus, "IN_PROGRESS");
+            case "PENDING_REVIEW" -> query.eq(WorkOrderDO::getStatus, "PENDING_REVIEW");
+            case "CLOSED" -> query.in(WorkOrderDO::getStatus, "COMPLETED", "REJECTED_INVALID", "WITHDRAWN", "TERMINATED_UNQUALIFIED");
+            default -> { }
         }
         return selectPage(page, query.orderByDesc(WorkOrderDO::getCreateTime));
     }

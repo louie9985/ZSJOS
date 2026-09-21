@@ -20,6 +20,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FOLLOW
 
 @Mapper
 public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
+    @org.apache.ibatis.annotations.Update("UPDATE zsjos_business_task SET status='cancelled', cancelled_at=#{now}, cancel_reason=#{reason}, version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND status='pending' AND ((biz_type='media_account_diagnosis' AND biz_id=#{accountId}) OR JSON_UNQUOTE(JSON_EXTRACT(payload,'$.accountId'))=CAST(#{accountId} AS CHAR))")
+    int cancelByAccountId(@Param("accountId") Long accountId, @Param("now") LocalDateTime now, @Param("reason") String reason);
     @Select("SELECT * FROM zsjos_business_task WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     BusinessTaskDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
@@ -109,7 +111,13 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
 
     default PageResult<BusinessTaskDO> selectMyPage(Long assigneeId, BusinessTaskPageReqVO reqVO,
                                                     LocalDateTime now) {
-        LambdaQueryWrapperX<BusinessTaskDO> query = buildMyQuery(
+        java.util.Objects.requireNonNull(assigneeId);
+        return selectReadPage(assigneeId, reqVO, now);
+    }
+
+    default PageResult<BusinessTaskDO> selectReadPage(Long assigneeId, BusinessTaskPageReqVO reqVO,
+                                                     LocalDateTime now) {
+        LambdaQueryWrapperX<BusinessTaskDO> query = buildReadQuery(
                 assigneeId, reqVO.getStatus(), reqVO.getBucket(), now);
         if (TASK_STATUS_PENDING.equals(reqVO.getStatus())) {
             query.orderByAsc(BusinessTaskDO::getDueAt).orderByAsc(BusinessTaskDO::getId);
@@ -121,8 +129,18 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
 
     private static LambdaQueryWrapperX<BusinessTaskDO> buildMyQuery(Long assigneeId, String status,
                                                                      String bucket, LocalDateTime now) {
+        java.util.Objects.requireNonNull(assigneeId);
+        return buildReadQuery(assigneeId, status, bucket, now);
+    }
+
+    default long selectReadPendingCount(Long assigneeId, String bucket, LocalDateTime now) {
+        return selectCount(buildReadQuery(assigneeId, TASK_STATUS_PENDING, bucket, now));
+    }
+
+    private static LambdaQueryWrapperX<BusinessTaskDO> buildReadQuery(Long assigneeId, String status,
+                                                                     String bucket, LocalDateTime now) {
         LambdaQueryWrapperX<BusinessTaskDO> query = new LambdaQueryWrapperX<BusinessTaskDO>()
-                .eq(BusinessTaskDO::getAssigneeId, assigneeId);
+                .eqIfPresent(BusinessTaskDO::getAssigneeId, assigneeId);
         if ("done".equals(status)) {
             query.in(BusinessTaskDO::getStatus, List.of("completed", "cancelled"));
         } else {

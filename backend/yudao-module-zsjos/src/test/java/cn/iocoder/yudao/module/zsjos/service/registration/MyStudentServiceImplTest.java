@@ -51,6 +51,32 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MyStudentServiceImplTest {
+    @Test
+    void administratorDefaultsToAllMediaWithoutAssignedRelations() {
+        MyStudentPageReqVO req = new MyStudentPageReqVO();
+        when(permissionApi.hasTenantReadAllAccess(28L)).thenReturn(true);
+        when(personMapper.selectAllMediaStudentPage(req, List.of())).thenReturn(PageResult.empty());
+        assertEquals(0L, service.getMediaPage(28L, req).getTotal());
+        verify(personMapper, never()).selectMediaStudentPage(req, 28L);
+    }
+
+    @Test
+    void configuredAllPermissionUsesTheSameMediaScope() {
+        MyStudentPageReqVO req = new MyStudentPageReqVO(); req.setReadScope("ALL");
+        when(permissionApi.hasAnyPermissions(28L, MediaStudentReadScope.QUERY_ALL)).thenReturn(true);
+        when(personMapper.selectAllMediaStudentPage(req, List.of())).thenReturn(PageResult.empty());
+        assertEquals(0L, service.getMediaPage(28L, req).getTotal());
+    }
+
+    @Test
+    void allReaderCanReadOrphanMediaAssetsButNotUnrelatedPeople() {
+        when(permissionApi.hasTenantReadAllAccess(28L)).thenReturn(true);
+        when(personMapper.existsMediaStudent(2L)).thenReturn(true);
+        PersonDO person = new PersonDO(); person.setId(2L);
+        when(personMapper.selectById(2L)).thenReturn(person);
+        assertEquals(List.of(), service.getMediaStudent(28L, 2L).getServices());
+        assertThrows(ServiceException.class, () -> service.getMediaStudent(28L, 3L));
+    }
 
     @InjectMocks private MyStudentServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;

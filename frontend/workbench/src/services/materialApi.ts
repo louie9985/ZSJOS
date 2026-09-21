@@ -379,6 +379,7 @@ export const contentReviewApi = {
     works: Array<Record<string, unknown>>
   }) => unwrap<number>(await http.post(`/zsjos/content-review/batch/${batchId}/resubmit-from-student`, data)),
   saveStudentDraft: async (batchId: number, data: {
+    expectedVersion?: number
     studentPersonId: number
     accountIds: number[]
     accountSnapshots?: Record<string, Record<string, unknown>>
@@ -404,9 +405,9 @@ export const contentReviewApi = {
   }) => unwrap<boolean>(
     await http.put(`/zsjos/content-review/batch/${batchId}/item/${itemId}/final-decision`, data)
   ),
-  completeDirector: async (batchId: number, data: { expectedVersion: number; taskId: string; reason: string }) =>
+  completeDirector: async (batchId: number, data: { expectedVersion: number; taskId: string; decision?: 'APPROVED' | 'RETURNED'; reason: string }) =>
     unwrap<boolean>(await http.post(`/zsjos/content-review/batch/${batchId}/complete-director`, data)),
-  completeFinal: async (batchId: number, data: { expectedVersion: number; taskId: string; reason: string }) =>
+  completeFinal: async (batchId: number, data: { expectedVersion: number; taskId: string; decision?: 'APPROVED' | 'RETURNED'; reason: string }) =>
     unwrap<boolean>(await http.post(`/zsjos/content-review/batch/${batchId}/complete-final`, data)),
   registerPublished: async (batchId: number, itemId: number, data: {
     platformUrl: string; publishedAt: string; expectedContentVersion: number

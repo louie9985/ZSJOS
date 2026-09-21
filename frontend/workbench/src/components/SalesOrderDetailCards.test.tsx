@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { SalesOrder } from '../services/api'
 import SalesOrderDetailCards from './SalesOrderDetailCards'
+import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 
 function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
   return {
@@ -37,6 +38,23 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('retains course names and specs after removal from the active catalog', () => {
+    const html = renderToStaticMarkup(<SalesOrderCoursePicker catalog={{ categoryTree: [], spus: [], skus: [] }} value="old::old-sku"
+      historicalItems={[{ id: 1, productRef: 'old', skuRef: 'old-sku', productName: '历史课程名称', skuName: '历史班次', actualAmount: 100 } as SalesOrder['items'][number]]} />)
+    expect(html).toContain('历史课程名称')
+    expect(html).toContain('历史班次')
+    expect(html).not.toContain('old-sku')
+  })
+  it('renders recorded labels without resolving current dictionaries and marks missing history', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
+      paymentMethodLabelSnapshot: '已删除的历史支付方式',
+      historyMissingFields: { leadProfile: 'history_not_recorded' }
+    })} />)
+    expect(html).toContain('已删除的历史支付方式')
+    expect(html).toContain('历史未记录')
+    expect(html).not.toContain('wechat')
+    expect(html).not.toContain('标签加载')
+  })
   it('keeps the SKU custom name alongside named specifications', () => {
     const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({ items: [{
       id: 1, productName: '考试课程', skuName: '周末强化方案', actualAmount: 100,

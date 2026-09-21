@@ -24,6 +24,9 @@ public interface PmsKnowledgeLibraryMemberService {
      */
     PmsKnowledgeLibraryDO validateLibraryReadable(Long libraryId, Long userId);
 
+    /** Original relationship gate for commands; tenant-wide reading grants no mutation. */
+    PmsKnowledgeLibraryDO validateLibraryInteraction(Long libraryId, Long userId);
+
     /**
      * 校验知识库可写
      *

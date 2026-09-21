@@ -19,13 +19,13 @@
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：要求 `zsjos:lead-detail:order-read`，并以统一 Lead 详情对象关系按客户聚合首购与复购订单。
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：同样累计标签 feature 权限、Lead 对象关系和订单与客资 `personId` 一致性校验。
 - `PUT /zsjos/sales-order/{id}/resubmit`：对允许重提的 `revision_required` 或 `terminated` 订单创建全新订单并返回新订单 ID。旧订单进入 `superseded` 终态，使用 `supersedes_order_id` / `superseded_by_order_id` 双向关联；旧审批轮次、明细、凭证和驳回原因保持不变，新订单从第 1 个审批轮次独立启动。若同一客资已存在另一张活动首购订单，或同一客户已存在另一张活动复购订单，则拒绝重提；复购创建与重提通过客户主档行锁串行化。
-- `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，兼容回退到当前可读投影。首购订单关联的当前客资仍存在时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/姓名及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
+- `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，返回历史缺失信息，不回退当前字典、客资或用户资料。首购订单有历史客资快照时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/动作时姓名快照及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/management/{id}`：订单管理详情。仅接受 `zsjos:sales-order:query-management`，并按当前 System 数据权限校验订单提交人范围；不会继承旧 `query-team` 的团队读取范围。
 - `GET /zsjos/sales-order/my-page`：本人提交订单分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。列表响应直接投影订单详情中可用于表格展示的业务字段，包括购买方、学员联系方式与地区、历史字典标签快照、课程摘要、付款与服务信息、备注、关联客资业务编号及来源摘要；课程明细按当前页批量读取，不要求前端逐行请求详情。内部关联 ID 仍只用于路由和命令，不作为用户可见列。
 - `GET /zsjos/sales-order/management-page`、`POST /zsjos/sales-order/management-search-page`：订单管理分页及高级筛选，服务端按 System 数据权限计算订单提交人范围。
 - `GET /zsjos/sales-order/management-cursor`、`POST /zsjos/sales-order/management-search-cursor`：订单管理游标查询，与分页接口使用相同可见范围。
 - `GET /zsjos/sales-order/management-status-counts`：订单管理状态统计，与订单列表使用相同可见范围。
-- `POST /zsjos/sales-order/my-search-page`：在本人订单固定范围内组合关键词与高级条件树；高级条件非空时忽略可选状态分组。
+- `POST /zsjos/sales-order/my-search-page`：在本人订单固定范围内组合关键词与高级条件树；高级条件与用户选择的可选状态分组同时生效（管理员全量读取仅解除权限范围，不解除用户筛选）。
 - `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、已驳回待修改、已通过数量。
 - `GET /zsjos/sales-order/my/{id}`：本人订单完整详情；已驳回订单包含最新轮次 `decisionReason` 和 `canRevise`。
 - `GET /zsjos/sales-order/team-page`、`POST /zsjos/sales-order/team-search-page`：团队订单分页查询，支持状态、关键词和高级条件；团队成员提交范围始终作为固定边界。
@@ -39,7 +39,7 @@
 - `GET /zsjos/sales-order/approval/notification-target?orderId=&sceneCode=&sourceEventKey=`：仅接受主管申请和主管决定两个通知场景，分别要求当前用户是指定主管或加签申请人；服务端使用消息既有的事件幂等键精确恢复确认记录和固化任务定位，并执行订单对象权限检查。兼容缺少事件键的旧消息时才回退该订单最新确认记录；前端不得提交用户 ID 或任意目标 URL。
 - `GET /zsjos/sales-order/approval/inbox-page?center=registration|finance&groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和中心分页查询订单列表，支持订单号、学员姓名和手机号搜索，并返回与本人/团队订单表格一致的可见业务字段及当前任务上下文；`handled` 仍可作为兼容参数。服务端将筛选条件与当前用户允许的 BPM 任务节点取交集，伪造无权中心返回权限错误，前端隐藏筛选项不是授权边界。
 - `POST /zsjos/sales-order/approval/search-page`：在当前用户 BPM 任务和中心权限固定范围内组合关键词与高级条件；高级条件非空时忽略可选处理分组，但不扩大允许的任务节点。
-- `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId`、当前 `approvalRoundId`、订单/轮次版本和幂等键。`reason` 最长 1000 字；通过允许缺省、null、空串或纯空格，统一去除首尾空白并将未填写规范化为空串，是否必填仍按任务所属流程定义执行；驳回必须提供非空白原因（含通用 BPM 入口）。订单行与轮次行锁保证审批、驳回和终止只有首个命令成功。
+- `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId`、当前 `approvalRoundId`、订单/轮次版本和幂等键。`reason` 最长 1000 字；通过允许缺省、null、空串或纯空格，统一去除首尾空白并将未填写规范化为空串，财务及报名履约普通节点的新旧实例均选填；驳回必须提供非空白原因（含通用 BPM 入口）。订单行与轮次行锁保证审批、驳回和终止只有首个命令成功。
 - `PUT /zsjos/sales-order/{id}/supervisor-confirmation/request`：当前报名履约或财务普通审批人申请订单销售主管审批。请求必须提交普通 `taskId`、轮次、订单/轮次版本、必填且不超过 1000 字的 `reason` 和幂等键。每轮最多一条申请，另一中心不能再次加签；BPM 创建并行加签任务，报名履约、财务和主管三方任务均保持可见可处理。申请加签后，该中心普通审批与对应主管审批都成为本轮通过条件：中心先通过时等待主管，主管先通过时等待中心；另一中心状态不受影响，任一方驳回则整轮驳回，三方全部通过后订单才通过。
 - `GET /zsjos/sales-order/supervisor-confirmation/inbox-page`、`POST /zsjos/sales-order/supervisor-confirmation/search-page`：只查询当前用户作为指定主管的待办或已办，`handled=false|true` 区分状态，支持订单关键词和订单高级条件。
 - `GET /zsjos/sales-order/supervisor-confirmation/inbox-cursor`、`POST /zsjos/sales-order/supervisor-confirmation/search-cursor`：与分页接口使用完全相同的主管、页签、关键词和高级条件；游标指纹绑定这些条件，条件变化后旧游标失效。
@@ -85,8 +85,26 @@ Sales-order notifications use the order business number (`orderNo`) and do not r
 Applied V085 environments use forward migration V087 to repair safely resolvable residual `order.studentName` snapshots, including logically deleted history, without changing V085 or the occupied V086 permission migration. Missing tenant-scoped order relations block the repair; an internal order or Lead ID is never substituted as the visible identifier.
 - `POST /zsjos/sales-order/student/{personId}/repurchase`：需要独立权限 `zsjos:sales-order:student-repurchase`。学习规划师只能为本人已接收且状态为服务中、已暂停或已结业的学员录入复购；该权限不开放通用订单创建或外部历史客户复购。订单提交人和正式销售归属均为当前学习规划师；订单仅关联 `personId`，不继承原客资或兼职返现。幂等重放还必须匹配客户、提交人、提交中心、复购原因和完整订单请求指纹，跨中心或不同请求复用 key 返回冲突。
 
-### 双中心通过意见选填（流程资产 2.1.0）
+### 双中心通过意见选填（所有审批轮次）
 
-财务与报名履约普通节点在新定义中通过意见选填，驳回原因必填。审批列表（分页/游标）、任务详情（`GET /{id}?taskId=...`，省略 taskId 保留原业务详情语义）及普通任务定位响应新增 `approvalReasonRequired`，由 BPM 当前任务所属定义的节点配置提供；缺失或读取失败时前端阻止提交并提供重试，不能按最新定义猜测。主管确认及其申请原因要求不变。
+财务与报名履约普通节点不区分流程版本，通过意见统一选填，驳回原因必填。审批列表（分页/游标）、任务详情（`GET /{id}?taskId=...`，省略 taskId 保留原业务详情语义）及普通任务定位响应新增 `approvalReasonRequired`，由 BPM 的有效业务意见策略提供：成交订单双中心普通任务为 false，主管子任务为 true，其他业务仍使用原定义配置；缺失或读取失败时前端阻止提交并提供重试，不能按最新定义猜测。主管确认及其申请原因要求不变。
 
-先部署兼容新旧规则的后端与双端，再发布流程资产 2.1.0。仅发布后新建或重提的审批轮次使用新规则，已有实例不迁移。空意见不补写“同意”，详情与历史保持空值展示；幂等指纹与 BPM 提交使用同一规范化意见。
+部署本次后端后，已有待审订单立即适用选填规则；双端继续消费服务端策略。无需发布新模型或迁移已有实例，2.1.0 资产仍作为后续部署的推荐定义。空意见不补写“同意”，详情与历史保持空值展示；幂等指纹与 BPM 提交使用同一规范化意见。
+
+
+## 订单历史展示契约（2026-09-22）
+
+新增审批轮次写入 `snapshotVersion=2`：`order` 为明确类型的交易事实，不再序列化 DO 的状态、版本、幂等信息；`orderLabels` 和 `selections` 保存字典类型、编码、选择时名称；`submitter`、`formalSales` 保存 ADMIN 用户 ID、当时姓名与业务身份；`leadProfile` 保存客资档案和员工/兼职主体类型、ID。课程仍以订单明细 `productSnapshot` 为唯一历史产品来源，凭证在交易事实中保存文件 ID 及元数据。生命周期、权限和当前数据范围不从快照恢复。
+
+详情、列表、BPM 订单内容卡和财务导出使用同一历史投影。财务支付方式输出快照名称。已删除/改名的字典、用户、客资、产品不改变已有历史；历史产品资料缺失时展示“历史未记录”，不展示内部引用代替名称。凭证访问链接实时生成；文件服务无法提供链接时保留元数据并显示“凭证暂不可用”。
+
+`SalesOrderRespVO` 新增 `submitterUserName`、`formalSalesUserName`、`historyMissingFields`；列表亦返回缺失信息。缺失原因 `history_not_recorded` 与 `invalid_snapshot` 分开。第一版已有标签/客资快照继续读取，旧订单主表的独立交易字段保留；不读取当前资料伪造历史，不批量回填旧记录。无关联客资的复购不标记客资缺失。
+
+补正未改变的字典选择和产品保留旧快照。历史字典名称缺失时，两端清空该选择并要求重新选择，提交 `refreshedDictionaryFields`（仅允许 studentNature/servicePeriod/studentSource/feeMode/paymentMethod），服务端再次校验当前字典并生成本次选择快照。未显式重选的缺失历史返回 `SALES_ORDER_DICTIONARY_RESELECTION_REQUIRED`；当前字典名称不可用返回 `SALES_ORDER_DICTIONARY_LABEL_UNAVAILABLE`。前端提交名称不作为权威来源。后继订单记录本次提交人，旧订单不变。
+
+BPM 在通过/驳回动作内写入任务局部变量 `bpm_action_actor_events` 与终态动作的 `bpm_action_actor_snapshot`，记录主体、ID、动作时姓名、动作与时间。委派回应仅追加动作事件，不覆盖最终审核人；自动执行标识 SYSTEM，不借用受理人身份。公共任务/节点 DTO 追加 `actionUserId`、`actionUserNameSnapshot`；旧 reviewer 字段保留兼容，订单使用新增历史字段。主管确认申请/指派姓名分别写入 V272 的可空列，实际审核姓名从 BPM 历史读取，取消不伪造审核人。
+
+部署：保留已应用迁移，按现有版本顺序执行 `V272__order_actor_name_snapshots.sql` 后部署服务；不重启或发布现有服务作为本地代码交付的一部分。V272 不更新旧业务行或权限，重复执行不覆盖新姓名；回退应用不得删除新历史字段。专项验证：`python script/sql/mysql/tools/verify_order_snapshot_upgrade.py`，隔离 MySQL 中验证原表升级、版本记录、重复执行、跨租户数据保留及中文 HEX。全链初始化与真实登录验收需另外记录运行结果。
+
+
+本次本地验证边界：V272 专项升级/重复性/UTF-8 测试通过；完整 fresh 检查被已有 `zsjos_media_account_delete_request` 目标 schema 缺失阻断，直接运行既有 bootstrap 亦在 student-delivery-defer 建表附近报语法错误。本次不修改这些无关基线问题。尚未对部署数据库执行 V272、重启后端或完成真实登录端到端验收。发布前必须修复基线问题、通过完整初始化链并按顺序升级目标数据库，不能将专项通过视为发布验收通过。只读历史缺失清单见 `script/sql/mysql/verify-order-history.sql`。

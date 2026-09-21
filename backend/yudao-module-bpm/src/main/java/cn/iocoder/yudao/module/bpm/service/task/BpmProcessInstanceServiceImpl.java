@@ -132,12 +132,15 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     private BpmProcessIdRedisDAO processIdRedisDAO;
     @Resource
     private BpmProcessInstanceRelationService processInstanceRelationService;
+    @Resource
+    private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     // ========== Query 查询相关方法 ==========
 
     @Override
     public ProcessInstance getProcessInstance(String id) {
         return runtimeService.createProcessInstanceQuery()
+                .processInstanceTenantId(FlowableUtils.getTenantId())
                 .includeProcessVariables()
                 .processInstanceId(id)
                 .singleResult();
@@ -145,18 +148,21 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
 
     @Override
     public List<ProcessInstance> getProcessInstances(Set<String> ids) {
-        return runtimeService.createProcessInstanceQuery().processInstanceIds(ids).includeProcessVariables().list();
+        return runtimeService.createProcessInstanceQuery().processInstanceTenantId(FlowableUtils.getTenantId())
+                .processInstanceIds(ids).includeProcessVariables().list();
     }
 
     @Override
     public HistoricProcessInstance getHistoricProcessInstance(String id) {
-        return historyService.createHistoricProcessInstanceQuery().processInstanceId(id).includeProcessVariables()
+        return historyService.createHistoricProcessInstanceQuery().processInstanceTenantId(FlowableUtils.getTenantId())
+                .processInstanceId(id).includeProcessVariables()
                 .singleResult();
     }
 
     @Override
     public List<HistoricProcessInstance> getHistoricProcessInstances(Set<String> ids) {
-        return historyService.createHistoricProcessInstanceQuery().processInstanceIds(ids).includeProcessVariables()
+        return historyService.createHistoricProcessInstanceQuery().processInstanceTenantId(FlowableUtils.getTenantId())
+                .processInstanceIds(ids).includeProcessVariables()
                 .list();
     }
 
@@ -396,6 +402,11 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         // 2. 表单权限
         String taskId = reqVO.getTaskId() == null && todoTask != null ? todoTask.getId() : reqVO.getTaskId();
         Map<String, String> formFieldsPermission = getFormFieldsPermission(bpmnModel, reqVO.getActivityId(), taskId);
+        if (formFieldsPermission != null && permissionApi.hasTenantReadAllAccess(
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId())) {
+            // Visibility expansion never promotes a hidden field to an editable field.
+            formFieldsPermission.replaceAll((field, permission) -> "3".equals(permission) ? "1" : permission);
+        }
 
         // 3. 拼接数据
         return BpmProcessInstanceConvert.INSTANCE.buildApprovalDetail(bpmnModel, processDefinition,

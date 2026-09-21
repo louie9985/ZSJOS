@@ -1,5 +1,6 @@
 <template>
   <ContentWrap>
+    <BusinessReadScope v-if="userStore.dataAccess.tenantReadAll" v-model="readScope" />
     <el-form :model="query" inline @submit.prevent>
       <el-form-item label="学员搜索">
         <el-input
@@ -102,7 +103,7 @@
         </el-descriptions>
 
         <StudentPartnerBinding
-          v-if="checkPermi(['zsjos:partner:manage-all'])"
+          v-if="readScope.readScope === 'SELF' && checkPermi(['zsjos:partner:manage-all'])"
           :key="detail.personId"
           :student-person-id="detail.personId"
           :student-name="detail.name"
@@ -138,6 +139,8 @@
 
 <script lang="ts" setup>
 import ProductSpecs from './components/ProductSpecs.vue'
+import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
+import { useUserStore } from '@/store/modules/user'
 import StudentPartnerBinding from './components/StudentPartnerBinding.vue'
 import { checkPermi } from '@/utils/permission'
 import { productSpecText } from '@/utils/productSpecs'
@@ -147,6 +150,8 @@ import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
 defineOptions({ name: 'ZsjosMyStudents' })
 
 const loading = ref(false)
+const userStore = useUserStore()
+const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
 const error = ref('')
 const list = ref<RegistrationApi.MyStudent[]>([])
 const total = ref(0)
@@ -173,22 +178,29 @@ const serviceCategoryPath = (service: RegistrationApi.StudentService) =>
   service.categoryPath?.length ? service.categoryPath.join(' / ') : '课程分类暂未记录'
 const serviceStatusLabel = (status: string) =>
   ({ active: '服务中', completed: '已完成', cancelled: '已取消' })[status] || '未知状态'
+let listRequest = 0
 const load = async () => {
+  const run = ++listRequest
+  list.value = []; total.value = 0
   loading.value = true
   error.value = ''
   try {
+    if (readScope.value.readScope === 'USER' && !readScope.value.targetUserId) return
     const data = await RegistrationApi.getMyStudentPage({
       ...query,
+      ...(userStore.dataAccess.tenantReadAll ? readScope.value : {}),
       keyword: query.keyword.trim() || undefined
     })
+    if (run !== listRequest) return
     list.value = data.list
     total.value = data.total
   } catch (cause: any) {
+    if (run !== listRequest) return
     list.value = []
     total.value = 0
     error.value = cause?.msg || cause?.message || '学员列表加载失败'
   } finally {
-    loading.value = false
+    if (run === listRequest) loading.value = false
   }
 }
 const handleQuery = () => {
@@ -220,6 +232,7 @@ const openDetail = async (personId: number) => {
   }
 }
 const reloadDetail = () => detailPersonId.value && openDetail(detailPersonId.value)
+watch(readScope, () => { detailRequest++; detailOpen.value = false; detail.value = undefined; handleQuery() }, { deep: true })
 
 onMounted(load)
 </script>

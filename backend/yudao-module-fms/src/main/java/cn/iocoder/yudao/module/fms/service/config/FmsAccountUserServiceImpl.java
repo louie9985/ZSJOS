@@ -73,6 +73,11 @@ public class FmsAccountUserServiceImpl implements FmsAccountUserService {
         accountSetService.validateAccountSetReadPermission(accountSetId, userId);
 
         // 2. 清除用户原默认账套，再设置目标账套
+        FmsAccountUserDO membership = accountUserMapper.selectByAccountSetIdAndUserId(accountSetId, userId);
+        if (membership == null || !FmsAccountUserLevelEnum.isReadable(membership.getLevel())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.fms.enums.ErrorCodeConstants.ACCOUNT_SET_ACCESS_DENIED);
+        }
         accountUserMapper.updateDefaultStatusByUserId(userId);
         accountUserMapper.updateDefaultStatusByAccountSetIdAndUserId(accountSetId, userId);
     }

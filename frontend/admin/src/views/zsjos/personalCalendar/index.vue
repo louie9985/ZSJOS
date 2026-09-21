@@ -29,7 +29,7 @@ const message=useMessage(), anchor=ref(new Date()), events=ref<CalendarApi.Perso
 const userStore = useUserStore()
 const readScope = ref<'SELF' | 'ALL' | 'USER'>('SELF'), targetUserId = ref<number>()
 const users = ref<UserSimpleVO[]>([]), usersLoading = ref(false), usersError = ref('')
-const loadUsers = async () => { usersLoading.value = true; usersError.value = ''; try { users.value = await getSimpleUserOptions() } catch { usersError.value = '人员加载失败' } finally { usersLoading.value = false } }
+const loadUsers = async () => { usersLoading.value = true; usersError.value = ''; try { users.value = await getSimpleUserOptions(true) } catch { usersError.value = '人员加载失败' } finally { usersLoading.value = false } }
 let requestSequence = 0
 watch(readScope, () => { targetUserId.value = undefined; visible.value = false; if (readScope.value === 'USER') void loadUsers() })
 const form=reactive({ title:'', description:'', range:[] as string[], allDay:false })

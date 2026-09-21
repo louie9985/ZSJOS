@@ -67,7 +67,7 @@ public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService 
     @Transactional(rollbackFor = Exception.class)
     public Long createFolder(PmsKnowledgeFolderSaveReqVO saveReqVO, Long userId) {
         // 1.1 校验知识库读取权限
-        libraryMemberService.validateLibraryReadable(saveReqVO.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(saveReqVO.getLibraryId(), userId);
         // 1.2 校验父文件夹存在
         PmsKnowledgeFolderDO parent = validateFolderParent(saveReqVO.getLibraryId(), saveReqVO.getParentId());
         Long permissionId;
@@ -94,7 +94,7 @@ public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService 
         // 1.1 校验文件夹存在
         PmsKnowledgeFolderDO folder = validateFolderExists(saveReqVO.getId());
         // 1.2 校验所属知识库可读
-        libraryMemberService.validateLibraryReadable(folder.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(folder.getLibraryId(), userId);
         // 1.3 校验内容编辑权限
         contentPermissionService.validateContentPermissionWritable(folder.getPermissionId(), folder.getLibraryId(), userId);
         // 1.4 校验文件夹属于请求知识库
@@ -113,7 +113,7 @@ public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService 
         // 1.1 校验文件夹存在
         PmsKnowledgeFolderDO folder = validateFolderExists(id);
         // 1.2 校验所属知识库可读
-        libraryMemberService.validateLibraryReadable(folder.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(folder.getLibraryId(), userId);
         // 1.3 校验内容删除权限
         contentPermissionService.validateContentPermissionDeletable(folder.getPermissionId(), folder.getLibraryId(), userId);
 
@@ -132,8 +132,8 @@ public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService 
         // 1.1 校验源文件夹存在
         PmsKnowledgeFolderDO folder = validateFolderExists(moveReqVO.getId());
         // 1.2 校验源知识库和目标知识库可读
-        libraryMemberService.validateLibraryReadable(folder.getLibraryId(), userId);
-        libraryMemberService.validateLibraryReadable(moveReqVO.getTargetLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(folder.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(moveReqVO.getTargetLibraryId(), userId);
         // 1.3 移动会改变目录结构，校验源文件夹管理权限
         contentPermissionService.validateContentPermissionManageable(
                 folder.getPermissionId(), folder.getLibraryId(), userId);

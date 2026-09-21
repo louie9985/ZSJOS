@@ -47,7 +47,36 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     @Mock
     private AdminUserApi adminUserApi;
     @Mock
+    private org.springframework.beans.factory.ObjectProvider<BpmTaskActionValidator> taskActionValidatorProvider;
+    @Mock
     private cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService processDefinitionService;
+
+    @Test
+    void nodeActorSnapshotIsIndependentOfCurrentReviewerProfile() {
+        HistoricTaskInstance approved = historicTask("registrationReview", 2, 1000L, "233");
+        when(approved.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, 2,
+                cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.ACTOR,
+                Map.of("userId", 233L, "name", "审批时姓名", "subjectType", "ADMIN")));
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("process-1"))).thenReturn(List.of());
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1"))).thenReturn(List.of(approved));
+        when(adminUserApi.getUserMap(Set.of(233L))).thenReturn(Map.of());
+        var result = processTaskApi.getProcessNodeStatuses("process-1", Set.of("registrationReview")).getFirst();
+        assertEquals("审批时姓名", result.getActionUserNameSnapshot());
+        assertEquals(233L, result.getActionUserId());
+    }
+
+    @Test
+    void effectivePolicyIsReturnedForLegacyTask() {
+        Task task = mock(Task.class);
+        when(task.getProcessDefinitionId()).thenReturn("old");
+        when(task.getTaskDefinitionKey()).thenReturn("financeReview");
+        when(bpmTaskService.validateTask(USER_ID, "task")).thenReturn(task);
+        when(processDefinitionService.getProcessDefinitionBpmnModel("old")).thenReturn(reasonModel(true));
+        BpmTaskActionValidator policy = mock(BpmTaskActionValidator.class);
+        when(policy.approvalReasonRequired(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        when(taskActionValidatorProvider.orderedStream()).thenAnswer(a -> java.util.stream.Stream.of(policy));
+        assertEquals(false, processTaskApi.getTodoTask(USER_ID, "task").getReasonRequire());
+    }
 
     @Test
     void pageReadsEachTasksOwnDefinitionAndCachesModels() {

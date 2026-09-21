@@ -191,7 +191,8 @@ public class StudentContactServiceImpl implements StudentContactService {
             availableActions.add(hasDraft ? CONTEXT_ACTION_CONTINUE_POSITIONING_INTERVIEW
                     : CONTEXT_ACTION_START_POSITIONING_INTERVIEW);
         }
-        if (operational && accepted && director && "positioning_interview_completed".equals(directorStage)
+        if ((operational && accepted && director && "positioning_interview_completed".equals(directorStage)
+                || positioningInterview != null && cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentReadScope.canReadAll(permissionApi, userId))
                 && permissionApi.hasAnyPermissions(userId, "zsjos:student:positioning-interview-query")) {
             availableActions.add(CONTEXT_ACTION_VIEW_POSITIONING_INTERVIEW);
         }
@@ -641,7 +642,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (statusScope != null && !Set.of("pending", "history", "all").contains(statusScope)) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
-        PageResult<StudentContactExtensionDO> rows = extensionMapper.selectVisiblePage(page, userId, statusScope);
+        PageResult<StudentContactExtensionDO> rows = permissionApi.hasTenantReadAllAccess(userId)
+                ? extensionMapper.selectReadPage(page, userId, statusScope, true)
+                : extensionMapper.selectVisiblePage(page, userId, statusScope);
         return new PageResult<>(rows.getList().stream().map(row -> {
             StudentContactExtensionRespVO result = new StudentContactExtensionRespVO();
             result.setId(row.getId()); result.setServiceRelationId(row.getServiceRelationId()); result.setTaskId(row.getTaskId());

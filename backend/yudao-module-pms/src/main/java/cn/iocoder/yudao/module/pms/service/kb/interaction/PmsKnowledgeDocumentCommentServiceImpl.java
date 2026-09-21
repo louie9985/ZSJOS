@@ -39,11 +39,13 @@ public class PmsKnowledgeDocumentCommentServiceImpl implements PmsKnowledgeDocum
     @Resource
     @Lazy // 延迟加载，避免与文档回收逻辑形成循环依赖
     private PmsKnowledgeDocumentService documentService;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.library.PmsKnowledgeLibraryMemberService libraryMemberService;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeContentPermissionService contentPermissionService;
 
     @Override
     public Long createDocumentComment(PmsKnowledgeDocumentCommentSaveReqVO saveReqVO, Long userId) {
         // 1.1 校验文档可评论
-        validateDocumentCommentable(saveReqVO.getDocumentId(), userId);
+        validateDocumentCommentable(saveReqVO.getDocumentId(), userId, true);
         // 1.2 校验回复关系
         Long mainId = saveReqVO.getMainId() != null ? saveReqVO.getMainId()
                 : PmsKnowledgeDocumentCommentDO.MAIN_ID_ROOT;
@@ -68,7 +70,7 @@ public class PmsKnowledgeDocumentCommentServiceImpl implements PmsKnowledgeDocum
         // 1.1 校验评论存在
         PmsKnowledgeDocumentCommentDO comment = validateCommentExists(id);
         // 1.2 校验文档可评论
-        validateDocumentCommentable(comment.getDocumentId(), userId);
+        validateDocumentCommentable(comment.getDocumentId(), userId, true);
         // 1.3 校验评论属于当前用户
         validateCommentOwner(comment, userId);
 
@@ -82,7 +84,7 @@ public class PmsKnowledgeDocumentCommentServiceImpl implements PmsKnowledgeDocum
     @Override
     public List<PmsKnowledgeDocumentCommentDO> getDocumentCommentList(Long documentId, Long userId) {
         // 1. 校验文档可访问
-        validateDocumentCommentable(documentId, userId);
+        validateDocumentCommentable(documentId, userId, false);
 
         // 2. 查询评论和回复
         return commentMapper.selectListByDocumentId(documentId);
@@ -110,8 +112,12 @@ public class PmsKnowledgeDocumentCommentServiceImpl implements PmsKnowledgeDocum
         }
     }
 
-    private void validateDocumentCommentable(Long documentId, Long userId) {
+    private void validateDocumentCommentable(Long documentId, Long userId, boolean command) {
         PmsKnowledgeDocumentDO document = documentService.getDocument(documentId, userId);
+        if (command) {
+            libraryMemberService.validateLibraryInteraction(document.getLibraryId(), userId);
+            contentPermissionService.validateContentPermissionInteraction(document.getPermissionId(), document.getLibraryId(), userId);
+        }
         if (!PmsKnowledgeDocumentTypeEnum.RICH_TEXT.getType().equals(document.getType())) {
             throw exception(KNOWLEDGE_DOCUMENT_COMMENT_TYPE_INVALID);
         }

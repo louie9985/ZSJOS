@@ -318,7 +318,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             requireNoOtherActiveOrder(order.getId(), null, order.getPersonId());
         }
         List<SalesOrderItemDO> historicalItems = itemMapper.selectListByOrderId(orderId);
-        ValidatedSubmission validated = validateSubmission(reqVO, userId, historicalItems);
+        ValidatedSubmission validated = validateSubmission(reqVO, userId, historicalItems, order);
         if (reqVO.getPurchaseIntentId() == null) reqVO.setPurchaseIntentId(order.getPurchaseIntentId());
         validatePurchaseIntent(reqVO, validated.total(), order.getPersonId(), order.getId());
         LocalDateTime now = LocalDateTime.now();
@@ -410,7 +410,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
         if (scope.isEmpty()) return PageResult.empty();
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
-        if (matchedOrderIds != null) reqVO.setStatus(null);
         PageResult<SalesOrderDO> page = orderMapper.selectManagementPage(scope, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
         Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
@@ -443,14 +442,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private void enrichManagementRows(List<SalesOrderListItemRespVO> rows, List<SalesOrderDO> orders, Long userId) {
-        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(orders.stream()
-                .map(SalesOrderDO::getSubmitterUserId).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
         for (int i = 0; i < rows.size() && i < orders.size(); i++) {
             SalesOrderDO order = orders.get(i);
             SalesOrderListItemRespVO row = rows.get(i);
             row.setSubmitterUserId(order.getSubmitterUserId());
-            AdminUserRespDTO submitter = users.get(order.getSubmitterUserId());
-            row.setSubmitterUserName(submitter == null ? null : submitter.getNickname());
+            // Historical submitter name is supplied by the order snapshot projection.
             row.setCanRevise((STATUS_REVISION_REQUIRED.equals(order.getStatus()) || STATUS_TERMINATED.equals(order.getStatus()))
                     && permissionService.canRevise(order, userId));
             row.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus())
@@ -472,7 +468,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     public PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId) {
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
-        if (matchedOrderIds != null) reqVO.setStatus(null);
         PageResult<SalesOrderDO> page = orderMapper.selectMyPage(userId, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
         Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
@@ -506,7 +501,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         Set<Long> teamUserIds = permissionService.teamUserIds(userId);
         if (teamUserIds.isEmpty()) return PageResult.empty();
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
-        if (matchedOrderIds != null) reqVO.setStatus(null);
         PageResult<SalesOrderDO> page = orderMapper.selectTeamPage(teamUserIds, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
         Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
@@ -1259,17 +1253,25 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId,
                                                    List<SalesOrderItemDO> historicalItems) {
+        return validateSubmission(req, userId, historicalItems, null);
+    }
+
+    private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId,
+            List<SalesOrderItemDO> historicalItems, SalesOrderDO previousOrder) {
+        SalesOrderSnapshot previousSnapshot = previousOrder == null ? new SalesOrderSnapshot()
+                : readSnapshot(roundMapper.selectById(previousOrder.getCurrentApprovalRoundId()));
+        Map<String, String> labels = new LinkedHashMap<>();
         if (StrUtil.isBlank(req.getStudentMobile()) && StrUtil.isBlank(req.getStudentWechatId())) throw exception(SALES_ORDER_CONTACT_REQUIRED);
         if (StrUtil.isNotBlank(req.getStudentMobile()) && !ValidationUtils.isMobile(req.getStudentMobile().trim())) {
             throw exception(LEAD_MOBILE_INVALID);
         }
         RegionSnapshot region = validateRegion(req.getProvinceCode(), req.getCityCode());
         req.setProvinceName(region.provinceName()); req.setCityName(region.cityName());
-        dictDataApi.validateDictDataList(DICT_STUDENT_NATURE, List.of(req.getStudentNature()));
-        dictDataApi.validateDictDataList(DICT_SERVICE_PERIOD, List.of(req.getServicePeriod()));
-        dictDataApi.validateDictDataList(DICT_STUDENT_SOURCE, List.of(req.getStudentSource()));
-        dictDataApi.validateDictDataList(DICT_FEE_MODE, List.of(req.getFeeMode()));
-        dictDataApi.validateDictDataList(DICT_PAYMENT_METHOD, List.of(req.getPaymentMethod()));
+        labels.put("studentNature", validateSelection(DICT_STUDENT_NATURE, req.getStudentNature(), previousOrder == null || req.getRefreshedDictionaryFields() != null && req.getRefreshedDictionaryFields().contains("studentNature") ? null : previousOrder.getStudentNature(), previousSnapshot.label("studentNature")));
+        labels.put("servicePeriod", validateSelection(DICT_SERVICE_PERIOD, req.getServicePeriod(), previousOrder == null || req.getRefreshedDictionaryFields() != null && req.getRefreshedDictionaryFields().contains("servicePeriod") ? null : previousOrder.getServicePeriod(), previousSnapshot.label("servicePeriod")));
+        labels.put("studentSource", validateSelection(DICT_STUDENT_SOURCE, req.getStudentSource(), previousOrder == null || req.getRefreshedDictionaryFields() != null && req.getRefreshedDictionaryFields().contains("studentSource") ? null : previousOrder.getStudentSource(), previousSnapshot.label("studentSource")));
+        labels.put("feeMode", validateSelection(DICT_FEE_MODE, req.getFeeMode(), previousOrder == null || req.getRefreshedDictionaryFields() != null && req.getRefreshedDictionaryFields().contains("feeMode") ? null : previousOrder.getFeeMode(), previousSnapshot.label("feeMode")));
+        labels.put("paymentMethod", validateSelection(DICT_PAYMENT_METHOD, req.getPaymentMethod(), previousOrder == null || req.getRefreshedDictionaryFields() != null && req.getRefreshedDictionaryFields().contains("paymentMethod") ? null : previousOrder.getPaymentMethod(), previousSnapshot.label("paymentMethod")));
         Set<String> skuRefs = new HashSet<>();
         List<ValidatedItem> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
@@ -1290,7 +1292,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<VoucherRef> vouchers = validateVouchers(req.getPaymentVouchers(), userId);
         if (vouchers.isEmpty()) throw exception(SALES_ORDER_VOUCHER_REQUIRED);
         validateGifts(req);
-        return new ValidatedSubmission(items, vouchers, total.setScale(2));
+        return new ValidatedSubmission(items, vouchers, total.setScale(2), labels);
+    }
+
+    private String validateSelection(String type, String value, String previousValue, String previousLabel) {
+        if (Objects.equals(value, previousValue) && previousValue != null) {
+            if (StrUtil.isBlank(previousLabel)) throw exception(SALES_ORDER_DICTIONARY_RESELECTION_REQUIRED);
+            return previousLabel;
+        }
+        dictDataApi.validateDictDataList(type, List.of(value));
+        String label = dictLabel(type, value);
+        if (StrUtil.isBlank(label)) throw exception(SALES_ORDER_DICTIONARY_LABEL_UNAVAILABLE);
+        return label;
     }
 
     private void validateGifts(SalesOrderSubmitReqVO req) {
@@ -1442,24 +1455,36 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private String buildOrderSnapshot(SalesOrderDO order, ValidatedSubmission validated) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("snapshotVersion", 1);
-        snapshot.put("capturedAt", LocalDateTime.now());
-        snapshot.put("order", order); snapshot.put("items", validated.items().stream().map(item -> Map.of(
-                "product", item.snapshot(), "actualAmount", item.actualAmount())).toList());
-        snapshot.put("paymentVouchers", validated.vouchers());
-        Map<String, Object> orderLabels = new LinkedHashMap<>();
-        orderLabels.put("studentNature", dictLabel(DICT_STUDENT_NATURE, order.getStudentNature()));
-        orderLabels.put("servicePeriod", dictLabel(DICT_SERVICE_PERIOD, order.getServicePeriod()));
-        orderLabels.put("studentSource", dictLabel(DICT_STUDENT_SOURCE, order.getStudentSource()));
-        orderLabels.put("feeMode", dictLabel(DICT_FEE_MODE, order.getFeeMode()));
-        orderLabels.put("paymentMethod", dictLabel(DICT_PAYMENT_METHOD, order.getPaymentMethod()));
-        snapshot.put("orderLabels", orderLabels);
-        snapshot.put("leadProfile", buildLeadProfile(order));
+        SalesOrderSnapshot snapshot = new SalesOrderSnapshot();
+        snapshot.setSnapshotVersion(2);
+        snapshot.setCapturedAt(LocalDateTime.now());
+        snapshot.setOrder(cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(order, SalesOrderSnapshot.Facts.class));
+        snapshot.setOrderLabels(validated.labels());
+        Map<String, SalesOrderSnapshot.Selection> selections = new LinkedHashMap<>();
+        selections.put("studentNature", new SalesOrderSnapshot.Selection(DICT_STUDENT_NATURE, order.getStudentNature(), validated.labels().get("studentNature")));
+        selections.put("servicePeriod", new SalesOrderSnapshot.Selection(DICT_SERVICE_PERIOD, order.getServicePeriod(), validated.labels().get("servicePeriod")));
+        selections.put("studentSource", new SalesOrderSnapshot.Selection(DICT_STUDENT_SOURCE, order.getStudentSource(), validated.labels().get("studentSource")));
+        selections.put("feeMode", new SalesOrderSnapshot.Selection(DICT_FEE_MODE, order.getFeeMode(), validated.labels().get("feeMode")));
+        selections.put("paymentMethod", new SalesOrderSnapshot.Selection(DICT_PAYMENT_METHOD, order.getPaymentMethod(), validated.labels().get("paymentMethod")));
+        snapshot.setSelections(selections);
+        snapshot.setSubmitter(snapshotActor(order.getSubmitterUserId(), order.getSubmitterCenterType()));
+        snapshot.setFormalSales(snapshotActor(order.getFormalSalesUserId(), order.getFormalOwnerIdentity()));
+        snapshot.setLeadProfile(buildLeadProfile(order));
         return JsonUtils.toJsonString(snapshot);
     }
 
-    private SalesOrderRespVO convert(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task, Long userId) {
+    private SalesOrderSnapshot.Actor snapshotActor(Long userId, String identity) {
+        AdminUserRespDTO user = userId == null ? null : adminUserApi.getUser(userId);
+        return new SalesOrderSnapshot.Actor("ADMIN", userId, user == null ? null : user.getNickname(), identity);
+    }
+
+    private SalesOrderSnapshot readSnapshot(SalesOrderApprovalRoundDO round) {
+        return SalesOrderSnapshot.read(round == null ? null : round.getOrderSnapshot());
+    }
+
+    private SalesOrderRespVO convert(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task, Long userId) {
+        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderDO order = history.project(currentOrder);
         SalesOrderRespVO result = new SalesOrderRespVO();
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setOpportunityId(order.getOpportunityId()); result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType());
@@ -1478,11 +1503,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setFeeMode(order.getFeeMode()); result.setPaymentMethod(order.getPaymentMethod()); result.setRemark(order.getRemark());
         result.setStudentSpecialRequirements(order.getStudentSpecialRequirements()); result.setMaterialDeliveryContact(order.getMaterialDeliveryContact());
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
-        result.setLeadProfile(buildLeadProfile(order));
+        history.apply(result);
+        result.setGiftItems(order.getGiftItems()); result.setGiftShippingAddress(order.getGiftShippingAddress());
         result.setItems(itemMapper.selectListByOrderId(order.getId()).stream().map(this::convertItem).toList());
         result.setPaymentVouchers(convertVouchers(order.getPaymentVoucherRefs()));
         if (round != null) {
-            applyOrderSnapshot(result, round.getOrderSnapshot());
             result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus());
             result.setProcessInstanceId(round.getProcessInstanceId()); result.setDecisionReason(round.getDecisionReason());
             result.setApprovalRoundVersion(round.getVersion());
@@ -1523,41 +1548,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    private void applyOrderSnapshot(SalesOrderRespVO result, String rawSnapshot) {
-        if (StrUtil.isBlank(rawSnapshot)) return;
-        try {
-            Map<String, Object> snapshot = JsonUtils.parseObject(rawSnapshot, Map.class);
-            Map<String, Object> labels = snapshot == null ? null : (Map<String, Object>) snapshot.get("orderLabels");
-            if (labels != null) {
-                result.setStudentNatureLabelSnapshot(text(labels.get("studentNature")));
-                result.setServicePeriodLabelSnapshot(text(labels.get("servicePeriod")));
-                result.setStudentSourceLabelSnapshot(text(labels.get("studentSource")));
-                result.setFeeModeLabelSnapshot(text(labels.get("feeMode")));
-                result.setPaymentMethodLabelSnapshot(text(labels.get("paymentMethod")));
-            }
-            Map<String, Object> lead = snapshot == null ? null : (Map<String, Object>) snapshot.get("leadProfile");
-            if (lead != null) {
-                SalesOrderRespVO.LeadProfileVO profile = new SalesOrderRespVO.LeadProfileVO();
-                profile.setLeadNo(text(lead.get("leadNo"))); profile.setSubmittedName(text(lead.get("submittedName")));
-                profile.setSubmittedMobile(text(lead.get("submittedMobile"))); profile.setSubmittedWechatId(text(lead.get("submittedWechatId")));
-                profile.setOwnerIdentity(text(lead.get("ownerIdentity")));
-                profile.setOwnerIdentityLabel(ownerIdentityLabel(profile.getOwnerIdentity()));
-                profile.setSourceType(text(lead.get("sourceType"))); profile.setSourceLabel(text(lead.get("sourceLabel")));
-                profile.setSourceUserName(text(lead.get("sourceUserName"))); profile.setSourceChannel(text(lead.get("sourceChannel")));
-                profile.setSourceChannelLabelSnapshot(text(lead.get("sourceChannelLabelSnapshot")));
-                profile.setProvinceName(text(lead.get("provinceName"))); profile.setCityName(text(lead.get("cityName")));
-                profile.setLeadCategory(text(lead.get("leadCategory"))); profile.setLeadCategoryLabelSnapshot(text(lead.get("leadCategoryLabelSnapshot")));
-                profile.setDispatchMode(text(lead.get("dispatchMode"))); profile.setOwnerUserName(text(lead.get("ownerUserName")));
-                result.setLeadProfile(profile);
-            }
-        } catch (RuntimeException ignored) {
-            // Historical snapshots remain readable through the current projection when an old payload is malformed.
-        }
-    }
-
-    private static String text(Object value) { return value == null ? null : String.valueOf(value); }
-
     private String dictLabel(String type, String value) {
         if (StrUtil.isBlank(value)) return null;
         List<DictDataRespDTO> data = dictDataApi.getDictDataList(type);
@@ -1580,6 +1570,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmittedMobile(lead.getSubmittedMobile());
         result.setSubmittedWechatId(lead.getSubmittedWechatId());
         result.setSourceType(lead.getSourceType());
+        result.setSourceSubjectType(SOURCE_PARTNER.equals(lead.getSourceType()) ? "PARTNER" : "ADMIN");
+        result.setSourceSubjectId(SOURCE_PARTNER.equals(lead.getSourceType()) ? lead.getPartnerId() : lead.getSourceUserId());
+        result.setOwnerUserId(lead.getOwnerUserId());
         result.setOwnerIdentity(lead.getOwnerIdentity());
         result.setOwnerIdentityLabel(ownerIdentityLabel(lead.getOwnerIdentity()));
         result.setSourceLabel(SOURCE_PARTNER.equals(lead.getSourceType()) ? "兼职提交"
@@ -1609,8 +1602,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private SalesOrderRespVO.ApprovalStatusVO convertApprovalStatus(BpmProcessNodeStatusRespDTO source) {
         if (source == null) return null;
         SalesOrderRespVO.ApprovalStatusVO result = new SalesOrderRespVO.ApprovalStatusVO();
-        result.setStatus(source.getStatus()); result.setReviewerUserId(source.getReviewerUserId());
-        result.setReviewerUserName(source.getReviewerUserName());
+        result.setStatus(source.getStatus()); result.setReviewerUserId(source.getActionUserNameSnapshot() != null ? source.getActionUserId() : source.getReviewerUserId());
+        result.setReviewerUserName(source.getActionUserNameSnapshot());
         result.setCreateTime(source.getCreateTime()); result.setEndTime(source.getEndTime());
         return result;
     }
@@ -1639,8 +1632,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (source == null) return null;
         SalesOrderRespVO.SupervisorConfirmationVO result = new SalesOrderRespVO.SupervisorConfirmationVO();
         result.setId(source.getId()); result.setStatus(source.getStatus()); result.setRequesterUserId(source.getRequesterUserId());
-        cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO requester = adminUserApi.getUser(source.getRequesterUserId());
-        result.setRequesterUserName(requester == null ? null : requester.getNickname());
+        result.setRequesterUserName(source.getRequesterNameSnapshot());
         result.setRequestReason(source.getRequestReason()); result.setDecisionReason(source.getDecisionReason());
         result.setRequestedAt(source.getRequestedAt()); result.setDecidedAt(source.getDecidedAt());
         return result;
@@ -1663,9 +1655,16 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @SuppressWarnings("unchecked")
-    private SalesOrderListItemRespVO convertListItem(SalesOrderDO order, SalesOrderApprovalRoundDO round,
+    private SalesOrderListItemRespVO convertListItem(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round,
                                                      BpmTaskRespDTO task, List<SalesOrderItemDO> items) {
+        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderDO order = history.project(currentOrder);
         SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
+        SalesOrderRespVO historicalFields = new SalesOrderRespVO();
+        historicalFields.setLeadId(order.getLeadId());
+        history.apply(historicalFields);
+        result.setHistoryMissingFields(historicalFields.getHistoryMissingFields());
+        result.setSubmitterUserName(history.getSubmitter() == null ? null : history.getSubmitter().name());
         result.setFormalOwnerIdentity(order.getFormalOwnerIdentity());
         result.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
@@ -1682,31 +1681,21 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setRepurchaseReason(order.getRepurchaseReason()); result.setTerminationReason(order.getTerminationReason());
         result.setProductSummary(summarizeOrderItems(items));
         if (round != null) result.setApprovalRoundNo(round.getRoundNo());
-        if (round != null && JsonUtils.isJsonObject(round.getOrderSnapshot())) {
-            try {
-                Map<String, Object> snapshot = JsonUtils.parseObject(round.getOrderSnapshot(), Map.class);
-                Map<String, Object> labels = snapshot == null ? null : (Map<String, Object>) snapshot.get("orderLabels");
-                if (labels != null) {
-                    result.setStudentNatureLabelSnapshot(text(labels.get("studentNature")));
-                    result.setServicePeriodLabelSnapshot(text(labels.get("servicePeriod")));
-                    result.setStudentSourceLabelSnapshot(text(labels.get("studentSource")));
-                    result.setFeeModeLabelSnapshot(text(labels.get("feeMode")));
-                    result.setPaymentMethodLabelSnapshot(text(labels.get("paymentMethod")));
-                }
-                Map<String, Object> lead = snapshot == null ? null : (Map<String, Object>) snapshot.get("leadProfile");
-                if (lead != null) {
-                    result.setLeadNo(text(lead.get("leadNo")));
-                    result.setLeadSourceLabel(text(lead.get("sourceLabel")));
-                    result.setLeadSourceUserName(text(lead.get("sourceUserName")));
-                    result.setLeadOwnerUserName(text(lead.get("ownerUserName")));
-                    result.setLeadCategoryLabelSnapshot(text(lead.get("leadCategoryLabelSnapshot")));
-                    result.setLeadSourceChannelLabelSnapshot(text(lead.get("sourceChannelLabelSnapshot")));
-                    result.setLeadProvinceName(text(lead.get("provinceName")));
-                    result.setLeadCityName(text(lead.get("cityName")));
-                }
-            } catch (RuntimeException ignored) {
-                // Malformed historical snapshots must not prevent the list from loading.
-            }
+        result.setStudentNatureLabelSnapshot(history.label("studentNature"));
+        result.setServicePeriodLabelSnapshot(history.label("servicePeriod"));
+        result.setStudentSourceLabelSnapshot(history.label("studentSource"));
+        result.setFeeModeLabelSnapshot(history.label("feeMode"));
+        result.setPaymentMethodLabelSnapshot(history.label("paymentMethod"));
+        SalesOrderRespVO.LeadProfileVO leadHistory = history.getLeadProfile();
+        if (leadHistory != null) {
+            result.setLeadNo(leadHistory.getLeadNo());
+            result.setLeadSourceLabel(leadHistory.getSourceLabel());
+            result.setLeadSourceUserName(leadHistory.getSourceUserName());
+            result.setLeadOwnerUserName(leadHistory.getOwnerUserName());
+            result.setLeadCategoryLabelSnapshot(leadHistory.getLeadCategoryLabelSnapshot());
+            result.setLeadSourceChannelLabelSnapshot(leadHistory.getSourceChannelLabelSnapshot());
+            result.setLeadProvinceName(leadHistory.getProvinceName());
+            result.setLeadCityName(leadHistory.getCityName());
         }
         if (task != null) {
             result.setTaskId(task.getId()); result.setApprovalReasonRequired(task.getReasonRequire()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
@@ -1718,9 +1707,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (confirmation != null) {
                 result.setSupervisorConfirmationId(confirmation.getId());
                 result.setSupervisorConfirmationStatus(confirmation.getStatus());
-                cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO requester =
-                        adminUserApi.getUser(confirmation.getRequesterUserId());
-                result.setSupervisorRequesterName(requester == null ? null : requester.getNickname());
+                result.setSupervisorRequesterName(confirmation.getRequesterNameSnapshot());
             }
         }
         return result;
@@ -1738,14 +1725,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 if (!JsonUtils.isJsonObject(item.getProductSnapshot())) throw new IllegalArgumentException("invalid product snapshot");
                 LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
                 if (snapshot != null) {
-                    return StrUtil.blankToDefault(snapshot.name(), item.getProductRef())
+                    return StrUtil.blankToDefault(snapshot.name(), "历史未记录")
                             + (StrUtil.isBlank(snapshot.skuName()) ? "" : " / " + snapshot.skuName());
                 }
             } catch (RuntimeException ignored) {
-                // Fall back to stable references for historical items with malformed snapshots.
+                // A reference is not a historical product name.
             }
-            return java.util.stream.Stream.of(item.getProductRef(), item.getSkuRef()).filter(StrUtil::isNotBlank)
-                    .collect(java.util.stream.Collectors.joining(" / "));
+            return "历史未记录";
         }).filter(StrUtil::isNotBlank).collect(java.util.stream.Collectors.joining("；"));
     }
 
@@ -1758,20 +1744,21 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setRequesterUserId(source.getRequesterUserId()); result.setSupervisorUserId(source.getSupervisorUserId());
         result.setRequestReason(source.getRequestReason()); result.setDecisionReason(source.getDecisionReason());
         result.setRequestedAt(source.getRequestedAt()); result.setDecidedAt(source.getDecidedAt());
-        Set<Long> userIds = new LinkedHashSet<>();
-        if (source.getRequesterUserId() != null) userIds.add(source.getRequesterUserId());
-        if (source.getSupervisorUserId() != null) userIds.add(source.getSupervisorUserId());
-        Map<Long, AdminUserRespDTO> users = userIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(userIds);
-        AdminUserRespDTO requester = users.get(source.getRequesterUserId());
-        AdminUserRespDTO supervisor = users.get(source.getSupervisorUserId());
-        result.setRequesterUserName(requester == null ? null : requester.getNickname());
-        result.setSupervisorUserName(supervisor == null ? null : supervisor.getNickname());
+        result.setRequesterUserName(source.getRequesterNameSnapshot());
+        if (Set.of(SUPERVISOR_CONFIRMED, SUPERVISOR_REJECTED).contains(source.getStatus())) {
+            BpmTaskRespDTO handled = processTaskApi.getDoneTask(source.getSupervisorUserId(), source.getSupervisorTaskId());
+            result.setSupervisorUserName(handled == null ? null : handled.getActionUserNameSnapshot());
+        } else if (SUPERVISOR_PENDING.equals(source.getStatus())) {
+            result.setSupervisorUserName(source.getSupervisorNameSnapshot());
+        }
         return result;
     }
 
-    private FinanceOrderExportRowRespVO convertFinanceExportRow(SalesOrderDO order, SalesOrderApprovalRoundDO round,
+    private FinanceOrderExportRowRespVO convertFinanceExportRow(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round,
             List<SalesOrderItemDO> items, Map<String, List<BpmProcessNodeStatusRespDTO>> statuses,
             Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
+        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderDO order = history.project(currentOrder);
         FinanceOrderExportRowRespVO row = new FinanceOrderExportRowRespVO();
         row.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
         row.setOrderNo(order.getOrderNo()); row.setOrderType(order.getOrderType()); row.setStatus(order.getStatus());
@@ -1781,9 +1768,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 .filter(StrUtil::isNotBlank).distinct().collect(java.util.stream.Collectors.joining(" / ")));
         row.setCourseSummary(items.stream().map(this::courseSummary).collect(java.util.stream.Collectors.joining("；")));
         row.setTotalAmount(order.getTotalAmount()); row.setCustomerPaidAt(order.getCustomerPaidAt());
-        row.setPaymentMethod(order.getPaymentMethod());
-        row.setFormalSalesName(userName(users, order.getFormalSalesUserId()));
-        row.setSubmitterName(userName(users, order.getSubmitterUserId()));
+        row.setPaymentMethod(StrUtil.blankToDefault(history.label("paymentMethod"), "历史未记录"));
+        row.setFormalSalesName(history.getFormalSales() == null ? "历史未记录" : StrUtil.blankToDefault(history.getFormalSales().name(), "历史未记录"));
+        row.setSubmitterName(history.getSubmitter() == null ? "历史未记录" : StrUtil.blankToDefault(history.getSubmitter().name(), "历史未记录"));
         row.setSubmittedAt(order.getSubmittedAt()); row.setEffectiveAt(order.getEffectiveAt());
         if (round != null) {
             row.setApprovalRoundNo(round.getRoundNo());
@@ -1809,10 +1796,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private void applyFinanceNode(FinanceOrderExportRowRespVO row, BpmProcessNodeStatusRespDTO node, boolean registration) {
         if (node == null) return;
         if (registration) {
-            row.setRegistrationStatus(node.getStatus()); row.setRegistrationReviewer(node.getReviewerUserName());
+            row.setRegistrationStatus(node.getStatus()); row.setRegistrationReviewer(StrUtil.blankToDefault(node.getActionUserNameSnapshot(), "历史未记录"));
             row.setRegistrationReviewedAt(node.getEndTime());
         } else {
-            row.setFinanceStatus(node.getStatus()); row.setFinanceReviewer(node.getReviewerUserName());
+            row.setFinanceStatus(node.getStatus()); row.setFinanceReviewer(StrUtil.blankToDefault(node.getActionUserNameSnapshot(), "历史未记录"));
             row.setFinanceReviewedAt(node.getEndTime());
         }
     }
@@ -1826,8 +1813,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         } catch (JacksonException ignored) {
             // Historical snapshots are not allowed to make an otherwise valid finance export fail.
         }
-        String name = snapshot == null ? item.getProductRef() : snapshot.name();
-        String sku = snapshot == null ? item.getSkuRef() : snapshot.skuName();
+        String name = snapshot == null ? "历史未记录" : snapshot.name();
+        String sku = snapshot == null ? null : snapshot.skuName();
         return StrUtil.blankToDefault(name, "-") + (StrUtil.isBlank(sku) ? "" : " / " + sku);
     }
 
@@ -1847,7 +1834,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setAttrValues(snapshot.selectedAttrValuesJson() == null ? Map.of() : Optional.ofNullable(JsonUtils.parseObjectQuietly(snapshot.selectedAttrValuesJson(), Map.class)).orElseGet(Map::of));
             result.setSpecs(snapshot.displaySpecs());
         } else {
-            result.setProductName("历史课程信息缺失");
+            result.setProductName("历史未记录");
             result.setSkuName(null);
             result.setCategoryPath(List.of());
             result.setAttrValues(Map.of());
@@ -1869,9 +1856,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private List<SalesOrderRespVO.AttachmentVO> convertVouchers(String json) {
         List<VoucherRef> refs = json == null ? List.of() : JsonUtils.parseArray(json, VoucherRef.class);
-        Map<Long, String> urls = refs.isEmpty() ? Map.of() : fileApi.presignGetUrls(refs.stream().map(VoucherRef::infraFileId).toList(), 600);
+        Map<Long, String> resolved;
+        try {
+            resolved = refs.isEmpty() ? Map.of() : fileApi.presignGetUrls(refs.stream().map(VoucherRef::infraFileId).toList(), 600);
+        } catch (RuntimeException ex) {
+            resolved = Map.of();
+        }
+        Map<Long, String> urls = resolved == null ? Map.of() : resolved;
         return refs.stream().map(ref -> { SalesOrderRespVO.AttachmentVO vo = new SalesOrderRespVO.AttachmentVO();
-            vo.setInfraFileId(ref.infraFileId()); vo.setFileUrl(urls.getOrDefault(ref.infraFileId(), ref.fileUrl()));
+            vo.setInfraFileId(ref.infraFileId()); vo.setFileUrl(urls.get(ref.infraFileId()));
             vo.setOriginalName(ref.originalName()); vo.setContentType(ref.contentType()); vo.setFileSize(ref.fileSize()); return vo; }).toList();
     }
 
@@ -1882,7 +1875,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private record ValidatedItem(LeadProductSnapshot snapshot, BigDecimal actualAmount) {}
-    private record ValidatedSubmission(List<ValidatedItem> items, List<VoucherRef> vouchers, BigDecimal total) {}
+    private record ValidatedSubmission(List<ValidatedItem> items, List<VoucherRef> vouchers, BigDecimal total, Map<String, String> labels) {}
     private record OrderTaskContext(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {}
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}

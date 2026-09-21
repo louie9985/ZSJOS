@@ -91,6 +91,25 @@ class BpmExternalSimpleEngineTest {
     }
 
     @Test
+    void actionActorSnapshotSurvivesActualFlowableTaskCompletion() {
+        BpmTaskServiceImpl taskService = new BpmTaskServiceImpl();
+        ReflectionTestUtils.setField(taskService, "taskService", engine.getTaskService());
+        ReflectionTestUtils.setField(taskService, "adminUserApi", users);
+        when(users.getUser(233L)).thenReturn(new AdminUserRespDTO().setId(233L).setNickname("审批时姓名"));
+        var task = engine.getTaskService().newTask();
+        task.setName("快照持久化测试"); task.setAssignee("233");
+        engine.getTaskService().saveTask(task);
+        ReflectionTestUtils.invokeMethod(taskService, "snapshotActionActor", 233L, task, "approve", true);
+        engine.getTaskService().complete(task.getId());
+        when(users.getUser(233L)).thenReturn(new AdminUserRespDTO().setId(233L).setNickname("后来姓名"));
+        var historical = engine.getHistoryService().createHistoricTaskInstanceQuery()
+                .taskId(task.getId()).includeTaskLocalVariables().singleResult();
+        assertNotNull(historical.getEndTime());
+        assertEquals("审批时姓名", BpmTaskActorSnapshot.name(historical.getTaskLocalVariables()));
+        assertEquals(233L, BpmTaskActorSnapshot.userId(historical.getTaskLocalVariables()));
+    }
+
+    @Test
     void externalSubmissionAssignsRealStrategyCandidatesAndOldInstancesCoexist() throws Exception {
         for (String key : List.of("zsjos_partner_withdrawal", "zsjos_lead_appeal_review")) {
             String taskKey = key.contains("withdrawal") ? "financeReview" : "appealReview";
@@ -164,6 +183,7 @@ class BpmExternalSimpleEngineTest {
         String key = "zsjos_sales_order_dual_approval";
         doReturn(Set.of(30L)).when(invoker).calculateUsersByTask(any());
         var taskService = new BpmTaskServiceImpl();
+        ReflectionTestUtils.setField(taskService, "adminUserApi", users);
         ReflectionTestUtils.setField(taskService, "taskService", engine.getTaskService());
         ReflectionTestUtils.setField(taskService, "runtimeService", engine.getRuntimeService());
         ReflectionTestUtils.setField(taskService, "bpmProcessDefinitionService", definitions);
@@ -199,6 +219,21 @@ class BpmExternalSimpleEngineTest {
         }
         assertNull(engine.getRuntimeService().createProcessInstanceQuery().processInstanceId(newId).singleResult());
         assertEquals(2, engine.getTaskService().createTaskQuery().processInstanceId(oldId).count());
+        // 旧实例定义保持不变，启用业务意见策略后通过真实 Service 完成两个普通节点。
+        BpmTaskActionValidator policy = new BpmTaskActionValidator() {
+            public void validate(BpmTaskActionContext context) {}
+            public Boolean approvalReasonRequired(BpmTaskActionContext context) {
+                return key.equals(context.getProcessDefinitionKey()) ? false : null;
+            }
+        };
+        when(validators.orderedStream()).thenAnswer(a -> java.util.stream.Stream.of(policy));
+        for (var task : oldTasks) {
+            assertTrue(BpmnModelUtils.parseReasonRequire(engine.getRepositoryService()
+                    .getBpmnModel(task.getProcessDefinitionId()), task.getTaskDefinitionKey()));
+            taskService.approveTask(30L, new cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO()
+                    .setId(task.getId()).setReason(""));
+        }
+        assertNull(engine.getRuntimeService().createProcessInstanceQuery().processInstanceId(oldId).singleResult());
     }
 
     private String startOrderForReasonTest(String key) {

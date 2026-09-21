@@ -85,7 +85,7 @@ public class PositioningCardController {
     @GetMapping("/{id}/snapshot/attachments/{fileId}")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")
     public CommonResult<PositioningCardService.CardFile> snapshotAttachment(@PathVariable Long id, @PathVariable Long fileId,
-            @RequestParam(required=false) Long submissionId) { return success(resources.attachment(id, submissionId, fileId)); }
+            @RequestParam(required=false) Long submissionId) { return success(resources.attachmentForTicket(id, submissionId, fileId, getLoginUserId())); }
 
     @PostMapping("/{id}/submissions/{submissionId}/evidence/files")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:evidence')")

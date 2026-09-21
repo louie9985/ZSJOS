@@ -1,6 +1,6 @@
-import { Cascader, Col, Row, Select, Typography } from 'antd'
+import { Button, Cascader, Col, Row, Select, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import type { LeadCatalog, LeadCategoryNode } from '../services/api'
+import type { LeadCatalog, LeadCategoryNode, SalesOrder } from '../services/api'
 import ProductSpecs from './ProductSpecs'
 import { catalogSpecs } from '../services/productSpecs'
 
@@ -13,7 +13,8 @@ function categoryOptions(items: LeadCategoryNode[]): any[] {
   return items.map(item => ({ label: item.name, value: item.id, children: item.children?.length ? categoryOptions(item.children) : undefined }))
 }
 
-export default function SalesOrderCoursePicker({ catalog, value, onChange, disabled }: {
+export default function SalesOrderCoursePicker({ catalog, value, onChange, disabled, historicalItems }: {
+  historicalItems?: SalesOrder['items']
   catalog: LeadCatalog
   value?: string
   onChange?: (value: string) => void
@@ -47,6 +48,12 @@ export default function SalesOrderCoursePicker({ catalog, value, onChange, disab
       if (matched) { setSkuRef(matched.skuRef); onChange?.(`${spuRef}::${matched.skuRef}`) }
     }
   }
+  const historical = historicalItems?.find(item => `${item.productRef}::${item.skuRef}` === value)
+  if (historical) return <div className="sales-order-course-picker">
+    <Typography.Text>{historical.productName || '历史未记录'}{historical.skuName ? ` / ${historical.skuName}` : ''}</Typography.Text>
+    <ProductSpecs product={historical}/>
+    <Button type="link" disabled={disabled} onClick={() => onChange?.('')}>重新选择课程</Button>
+  </div>
   return <div className="sales-order-course-picker">
     <Row gutter={[8, 8]}>
       <Col xs={24} md={8}><Typography.Text type="secondary">课程分类</Typography.Text><Cascader value={categoryPath} options={categoryOptions(catalog.categoryTree)} disabled={disabled} showSearch placeholder="请选择课程分类" onChange={path => { setCategoryPath(Array.from(path) as number[]); setSpuRef(undefined); setSkuRef(undefined); setAttrValues({}); onChange?.('') }}/></Col>

@@ -7,6 +7,9 @@ import lombok.Data;
 
 @Data
 public class ContentReviewCompleteReqVO {
+    /** Null retains compatibility with clients that infer the batch outcome. */
+    @jakarta.validation.constraints.Pattern(regexp = "APPROVED|RETURNED")
+    private String decision;
     @NotNull private Integer expectedVersion;
     @NotBlank private String taskId;
     @NotBlank @Size(max = 2000) private String reason;

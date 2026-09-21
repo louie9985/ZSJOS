@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import OrderProductSummary from '../components/OrderProductSummary.vue'
+import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
 const message = useMessage()
@@ -80,6 +81,7 @@ const submit = async () => {
       <el-alert v-if="loadError" :title="loadError" type="error" :closable="false">
         <el-button link type="primary" @click="load">重试</el-button>
       </el-alert>
+      <OrderHistoryFacts v-if="detail" :order="detail" />
       <OrderProductSummary v-if="detail && !detailLoading" :items="detail.items" />
       <el-descriptions v-if="detail && !detailLoading" :column="1" border>
         <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>

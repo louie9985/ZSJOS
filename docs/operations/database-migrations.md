@@ -1,5 +1,15 @@
 # Database migration operations
 
+## V270 Media student full reads
+
+Apply `V270__media_student_read_all.sql` after V269 with an utf8mb4 client. It requires
+exactly one undeleted `zsjos:media-student:query-my` page and inserts one child button
+`zsjos:media-student:query-all`, plus Core/global version records. Repeated execution
+retains existing metadata. It does not change role grants, tenant packages or business
+rows. Verify the child parent, uniqueness, Chinese `HEX(name)` and unchanged role-menu
+assignments. Rollback retains metadata and version records; reverting application code
+removes the new read behavior, and ordinary-role access is managed through System.
+
 ## Role-menu assignment policy (2026-09-17)
 
 Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer

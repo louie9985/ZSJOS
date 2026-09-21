@@ -15,6 +15,9 @@ import java.util.List;
 @Data
 public class ContentReviewStudentDraftCreateReqVO {
 
+    /** Optimistic version for saving an existing draft; absent only for legacy clients. */
+    private Integer expectedVersion;
+
     @NotNull
     private Long studentPersonId;
 

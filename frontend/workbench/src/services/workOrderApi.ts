@@ -32,7 +32,7 @@ export const workOrderApi = {
   accounts: async () => unwrap<PageResult<WorkOrderAccount>>(await http.get('/zsjos/media-account/page', { params: { pageNo: 1, pageSize: 100 } })),
   create: async (data: { sceneCode: string; relatedAccountId?: number; targetUserId?: number; targetDeptId?: number; remark: string; values: Record<string, unknown>; attachmentIds?: number[] }) => unwrap<number>(await http.post('/zsjos/work-order/create', { ...data, idempotencyKey: createIdempotencyKey() })),
   available: async (pageNo = 1, pageSize = 20) => unwrap<PageResult<WorkOrder>>(await http.get('/zsjos/work-order/pool', { params: { pageNo, pageSize } })),
-  mine: async (pageNo = 1, pageSize = 20, view?: string, status?: string) => unwrap<PageResult<WorkOrder>>(await http.get('/zsjos/work-order/my-page', { params: { pageNo, pageSize, view, status } })),
+  mine: async (pageNo = 1, pageSize = 20, view?: string, status?: string, scope?: { readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }) => unwrap<PageResult<WorkOrder>>(await http.get('/zsjos/work-order/my-page', { params: { pageNo, pageSize, view, status, ...scope } })),
   detail: async (id: number) => unwrap<WorkOrder>(await http.get(`/zsjos/work-order/${id}`)),
   take: (id: number, version: number) => action(id, 'take', version),
   claim: (id: number, version: number) => action(id, 'claim', version),

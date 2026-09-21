@@ -130,6 +130,20 @@ public class PmsProjectServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void tenantReadAllIncludesArchivedPrivateProjectsAndPreservesStatusFilter() {
+        Long userId = randomLongId();
+        PmsProjectDO archived = randomProjectDO(PmsProjectStatusEnum.ARCHIVED.getStatus()).setOpenStatus(false);
+        projectMapper.insert(archived);
+        projectMapper.insert(randomProjectDO(PmsProjectStatusEnum.ACTIVE.getStatus()).setOpenStatus(false));
+        when(permissionApi.hasTenantReadAllAccess(userId)).thenReturn(true);
+        var request = new PmsProjectPageReqVO().setSceneType(PmsProjectSceneTypeEnum.ALL.getType())
+                .setStatus(PmsProjectStatusEnum.ARCHIVED.getStatus());
+        var result = projectService.getProjectPage(request, userId);
+        assertEquals(1L, result.getTotal());
+        assertEquals(archived.getId(), result.getList().getFirst().getId());
+    }
+
+    @Test
     public void testGetProjectPage_createTimeAscending() {
         // mock 数据
         Long userId = randomLongId();

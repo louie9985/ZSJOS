@@ -77,6 +77,7 @@ public class PermissionServiceImpl implements PermissionService {
         // Use the effective subject (including impersonation), never the original operator.
         return getEnableUserRoleListByUserIdFromCache(userId).stream()
                 .filter(role -> tenantId.equals(role.getTenantId()))
+                .filter(role -> CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus()))
                 .anyMatch(role -> SUPER_ADMIN.getCode().equals(role.getCode())
                         || cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum
                                 .SYSTEM_ADMINISTRATOR.getCode().equals(role.getCode()));

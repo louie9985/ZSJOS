@@ -60,10 +60,25 @@ class WorkOrderServiceImplTest {
     @Mock DictDataApi dictDataApi;
     @Mock AdminUserApi adminUserApi;
     @Mock PermissionApi permissionApi;
+    @Mock cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Mock RoleApi roleApi;
     @Mock FileApi fileApi;
     @Mock MediaWorkflowEventService workflowEventService;
     @InjectMocks WorkOrderServiceImpl service;
+
+    @Test void administratorAllReadDoesNotExposeCommandsEvenForOwnOrder() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderMyPageReqVO();
+        request.setReadScope("ALL"); request.setView("PROCESSING");
+        WorkOrderDO row = order(11L, 22L);
+        when(readScopeService.resolve("ALL", null, 22L)).thenReturn(null);
+        when(orderMapper.selectReadPage(request, null, "PROCESSING", null))
+                .thenReturn(new PageResult<>(List.of(row), 1L));
+        var result = service.readPage(request, 22L);
+        assertEquals(List.of(), result.getList().getFirst().getAvailableActions());
+        assertEquals(1L, result.getTotal());
+        verifyNoInteractions(workflowEventService);
+        verify(orderMapper, never()).updateById(any(WorkOrderDO.class));
+    }
 
     @Test void completeMovesAssignedOrderToAcceptance() {
         WorkOrderDO row = order(11L, 22L);

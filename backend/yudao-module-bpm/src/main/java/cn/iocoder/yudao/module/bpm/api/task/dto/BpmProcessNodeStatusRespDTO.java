@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 
 @Data
 public class BpmProcessNodeStatusRespDTO {
+    private Long actionUserId;
+    private String actionUserNameSnapshot;
+
     private String taskDefinitionKey;
     private String status;
     private Long reviewerUserId;

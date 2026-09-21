@@ -35,7 +35,7 @@ public class MaterialObjectPermissionProvider implements ZsjosObjectPermissionPr
         boolean owner = Objects.equals(material.getOwnerUserId(), userId);
         boolean manager = permissionApi.hasAnyPermissions(userId, "zsjos:material:manage");
         return switch (action) {
-            case "read" -> owner || manager || material.getCurrentEffectiveVersionId() != null
+            case "read" -> permissionApi.hasTenantReadAllAccess(userId) || owner || manager || material.getCurrentEffectiveVersionId() != null
                     && permissionApi.hasAnyPermissions(userId, "zsjos:material:query");
             case "edit", "submit" -> owner || manager;
             case "disable", "restore" -> manager;

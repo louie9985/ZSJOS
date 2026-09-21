@@ -22,8 +22,11 @@ public interface StudentContactExtensionMapper extends BaseMapperX<StudentContac
                 .orderByDesc(StudentContactExtensionDO::getId));
     }
     default PageResult<StudentContactExtensionDO> selectVisiblePage(PageParam page, Long userId, String statusScope) {
+        return selectReadPage(page, userId, statusScope, false);
+    }
+    default PageResult<StudentContactExtensionDO> selectReadPage(PageParam page, Long userId, String statusScope, boolean readAll) {
         LambdaQueryWrapperX<StudentContactExtensionDO> query = new LambdaQueryWrapperX<>();
-        query.and(scope -> scope.eq(StudentContactExtensionDO::getApplicantUserId, userId)
+        query.and(!readAll, scope -> scope.eq(StudentContactExtensionDO::getApplicantUserId, userId)
                 .or().eq(StudentContactExtensionDO::getReviewerUserId, userId));
         if ("pending".equals(statusScope)) query.eq(StudentContactExtensionDO::getStatus, "pending");
         if ("history".equals(statusScope)) query.ne(StudentContactExtensionDO::getStatus, "pending");

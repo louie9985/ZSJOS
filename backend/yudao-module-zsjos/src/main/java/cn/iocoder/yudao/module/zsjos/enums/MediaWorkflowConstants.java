@@ -65,6 +65,7 @@ public final class MediaWorkflowConstants {
     public static final String POST_CODE_IP_TEACHER = "ip_teacher";
     public static final String PROCESS_KEY_REPOSITION = "zsjos_media_reposition";
     public static final String PROCESS_KEY_REBIND = "zsjos_media_rebind";
+    public static final String PROCESS_KEY_DELETE = "zsjos_media_account_delete";
     public static final String PROCESS_KEY_OVER_ENTITLEMENT = "zsjos_media_over_entitlement";
     public static final String ACTION_ACCEPT_TICKET = "ACCEPT_TICKET";
     public static final String ACTION_REJECT_TICKET_ASSIGNMENT = "REJECT_TICKET_ASSIGNMENT";

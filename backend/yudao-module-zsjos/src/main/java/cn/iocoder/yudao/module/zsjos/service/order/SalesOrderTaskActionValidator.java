@@ -13,6 +13,16 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
 @Component
 public class SalesOrderTaskActionValidator implements BpmTaskActionValidator {
     @Override
+    public Boolean approvalReasonRequired(BpmTaskActionContext context) {
+        if (!PROCESS_DEFINITION_KEY.equals(context.getProcessDefinitionKey())
+                || !(TASK_REGISTRATION.equals(context.getTaskDefinitionKey()) || TASK_FINANCE.equals(context.getTaskDefinitionKey()))) {
+            return null;
+        }
+        // 新旧普通订单统一选填；主管加签任务仍必填，不能继承普通节点的放宽规则。
+        return StrUtil.isNotBlank(context.getParentTaskId());
+    }
+
+    @Override
     public void validate(BpmTaskActionContext context) {
         if (PROCESS_DEFINITION_KEY.equals(context.getProcessDefinitionKey())
                 && (TASK_REGISTRATION.equals(context.getTaskDefinitionKey()) || TASK_FINANCE.equals(context.getTaskDefinitionKey()))

@@ -49,3 +49,7 @@ Single requests accept `{ "paidAt": "2026-09-21T15:30:00", "remark": "登记说�
 The batch service authorizes all distinct objects before mutation, processes IDs in ascending order, then calls the proxied single-record service (`@ZsjosPermission`, tenant-bound row lock, `approved` state validation and cashback transition) inside one outer transaction. Missing/cross-tenant objects, denied objects, changed withdrawal/cashback states or any persistence/event failure abort the whole batch. Withdrawal, cashback, transactional audit and notification outbox writes roll back together. Already-paid rows cannot be registered twice.
 
 No schema or migration changes are necessary: the existing `paid_at`, `payout_remark`, bank transaction and proof columns are nullable. Existing paid records and any historical proof/transaction projections remain untouched. There is no data cleanup, synthetic historical timestamp or permission reassignment.
+
+## 当前租户管理员读取
+
+Personal page/search-page accept optional readScope=SELF|ALL|USER and targetUserId; defaults remain SELF. Tenant read-all users may use the explicit finance-detail sensitive read through an existing authorized query entry; the service still requires finance-query or tenantReadAll and records the read audit. Both frontends offer a read-only scope and a dedicated full-account-details action. Apply/cancel/review/payout are unchanged.

@@ -96,15 +96,15 @@ public class SalesOrderContentProvider implements BpmApprovalContentProvider {
                 BpmApprovalFieldVO.of("状态", statusText(order.getStatus())),
                 BpmApprovalFieldVO.of("订单类型", orderTypeText(order.getOrderType())),
                 BpmApprovalFieldVO.of("提交时间", BpmApprovalFormat.dateTime(order.getSubmittedAt())),
-                BpmApprovalFieldVO.of("提交人", userName(order.getSubmitterUserId())),
-                BpmApprovalFieldVO.of("正式销售", userName(order.getFormalSalesUserId())))));
+                BpmApprovalFieldVO.of("提交人", historical(order.getSubmitterUserName())),
+                BpmApprovalFieldVO.of("正式销售", historical(order.getFormalSalesUserName())))));
 
         List<BpmApprovalFieldVO> studentFields = new ArrayList<>();
         studentFields.add(BpmApprovalFieldVO.of("学员姓名", order.getStudentName()));
         studentFields.add(BpmApprovalFieldVO.of("购买人", order.getBuyerName()));
         studentFields.add(BpmApprovalFieldVO.of("班型", order.getClassType()));
-        studentFields.add(BpmApprovalFieldVO.of("学员性质", order.getStudentNatureLabelSnapshot()));
-        studentFields.add(BpmApprovalFieldVO.of("服务周期", order.getServicePeriodLabelSnapshot()));
+        studentFields.add(BpmApprovalFieldVO.of("学员性质", historical(order.getStudentNatureLabelSnapshot())));
+        studentFields.add(BpmApprovalFieldVO.of("服务周期", historical(order.getServicePeriodLabelSnapshot())));
         studentFields.add(BpmApprovalFieldVO.of("约定考试时间", order.getAgreedExamTime()));
         studentFields.add(BpmApprovalFieldVO.wide("地区", regionText(order.getProvinceName(), order.getCityName())));
         studentFields.add(BpmApprovalFieldVO.wide("学员特殊要求", order.getStudentSpecialRequirements()));
@@ -112,8 +112,8 @@ public class SalesOrderContentProvider implements BpmApprovalContentProvider {
 
         card.getGroups().add(group("金额与支付", List.of(
                 BpmApprovalFieldVO.of("订单金额", BpmApprovalFormat.amount(order.getTotalAmount())),
-                BpmApprovalFieldVO.of("支付方式", order.getPaymentMethodLabelSnapshot()),
-                BpmApprovalFieldVO.of("收费方式", order.getFeeModeLabelSnapshot()),
+                BpmApprovalFieldVO.of("支付方式", historical(order.getPaymentMethodLabelSnapshot())),
+                BpmApprovalFieldVO.of("收费方式", historical(order.getFeeModeLabelSnapshot())),
                 BpmApprovalFieldVO.of("客户支付时间", BpmApprovalFormat.dateTime(order.getCustomerPaidAt())))));
 
         if (order.getRemark() != null || order.getRepurchaseReason() != null) {
@@ -155,12 +155,8 @@ public class SalesOrderContentProvider implements BpmApprovalContentProvider {
         }
     }
 
-    private String userName(Long userId) {
-        if (userId == null) {
-            return null;
-        }
-        AdminUserRespDTO user = adminUserApi.getUser(userId);
-        return user == null ? null : user.getNickname();
+    private static String historical(String value) {
+        return value == null || value.isBlank() ? "历史未记录" : value;
     }
 
     private static String regionText(String province, String city) {

@@ -11,6 +11,8 @@ public class BpmUserTaskMetadataRespDTO {
     private String key;
     private String name;
     private String executionMode;
+    /** Whether rejection ends the round instead of returning to another user task. */
+    private Boolean rejectEndsProcess;
     private List<String> nextUserTaskKeys;
 
 }

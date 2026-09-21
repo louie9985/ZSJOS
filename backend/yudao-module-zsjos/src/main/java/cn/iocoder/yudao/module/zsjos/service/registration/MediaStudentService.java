@@ -91,13 +91,13 @@ public class MediaStudentService {
             row.setLastActivityAt(account.getUpdateTime());
             return row;
         }).toList());
-        // Interview drafts can exist before an account. Only the current director's
-        // unbound cards supplement the account-authorized collection.
-        var unboundDrafts = (readAll ? positioningMapper.selectUnboundForStudent(personId)
+        // Drafts can precede accounts; all-card readers may inspect these assets without owning them.
+        boolean readAllDrafts = readAll || permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all");
+        var unboundDrafts = (readAllDrafts ? positioningMapper.selectUnboundForStudent(personId)
                 : positioningMapper.selectByDirectorAndStudent(userId, personId)).stream()
                 .filter(row -> row.getAccountId() == null && personId.equals(row.getStudentPersonId()));
         result.setPositioningDrafts(java.util.stream.Stream.concat(positioningCards.stream(), unboundDrafts)
-                .filter(row -> "co_creating".equals(row.getStatus()) && (readAll || userId.equals(row.getDirectorUserId())))
+                .filter(row -> "co_creating".equals(row.getStatus()) && (readAllDrafts || userId.equals(row.getDirectorUserId())))
                 .map(row -> {
                     MediaStudentDetailRespVO.PositioningVO value = BeanUtils.toBean(row,
                             MediaStudentDetailRespVO.PositioningVO.class);
@@ -394,7 +394,10 @@ public class MediaStudentService {
     }
 
     public Long createTalkRecord(Long userId, Long personId, MediaStudentTalkSaveReqVO request) {
-        myStudentService.getMediaStudent(userId, personId);
+        // Full read access is not participation and must not grant this legacy write command.
+        if (relationMapper.selectAssignedByUserAndPersonIds(userId, List.of(personId), null).isEmpty()) {
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+        }
         if (request.getAccountId() != null && accountMapper.selectByParticipantAndStudent(userId, personId).stream()
                 .noneMatch(account -> account.getId().equals(request.getAccountId()))) {
             throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);

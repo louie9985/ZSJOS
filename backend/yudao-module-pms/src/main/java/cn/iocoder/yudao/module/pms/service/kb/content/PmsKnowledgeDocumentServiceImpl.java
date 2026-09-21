@@ -75,7 +75,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
     @Transactional(rollbackFor = Exception.class)
     public Long createDocument(PmsKnowledgeDocumentCreateReqVO createReqVO, Long userId) {
         // 1.1 校验知识库读取权限
-        libraryMemberService.validateLibraryReadable(createReqVO.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(createReqVO.getLibraryId(), userId);
         // 1.2 规范并校验目录位置，同时确定文档权限
         PmsKnowledgeDocumentDO document = BeanUtils.toBean(createReqVO, PmsKnowledgeDocumentDO.class);
         Long permissionId = normalizeAndValidateDocumentPlacement(document, null, userId);
@@ -95,7 +95,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
         // 1.1 校验文档存在
         PmsKnowledgeDocumentDO document = validateDocumentExists(updateReqVO.getId());
         // 1.2 校验所属知识库可读
-        libraryMemberService.validateLibraryReadable(document.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(document.getLibraryId(), userId);
         // 1.3 校验内容编辑权限
         contentPermissionService.validateContentPermissionWritable(document.getPermissionId(), document.getLibraryId(), userId);
         // 1.4 校验标签均存在
@@ -111,7 +111,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
         // 1.1 校验文档存在
         PmsKnowledgeDocumentDO document = validateDocumentExists(id);
         // 1.2 校验所属知识库可读
-        libraryMemberService.validateLibraryReadable(document.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(document.getLibraryId(), userId);
         // 1.3 校验文档内容删除权限
         contentPermissionService.validateContentPermissionDeletable(document.getPermissionId(), document.getLibraryId(), userId);
 
@@ -130,8 +130,8 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
             throw exception(KNOWLEDGE_DOCUMENT_MOVE_TARGET_INVALID);
         }
         // 1.3 校验源知识库和目标知识库可读
-        libraryMemberService.validateLibraryReadable(document.getLibraryId(), userId);
-        libraryMemberService.validateLibraryReadable(moveReqVO.getTargetLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(document.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(moveReqVO.getTargetLibraryId(), userId);
         // 1.4 移动会改变目录结构，校验源文档管理权限
         contentPermissionService.validateContentPermissionManageable(
                 document.getPermissionId(), document.getLibraryId(), userId);

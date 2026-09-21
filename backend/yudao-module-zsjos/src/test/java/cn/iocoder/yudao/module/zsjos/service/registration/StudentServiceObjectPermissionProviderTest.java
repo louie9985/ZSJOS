@@ -120,6 +120,7 @@ class StudentServiceObjectPermissionProviderTest {
 
     @Test
     void managedReadRequiresExactOwnerScopeAndDoesNotGrantCommands() {
+        org.mockito.Mockito.doReturn(false).when(permissionApi).hasAnyPermissions(9L, MediaStudentReadScope.QUERY_ALL);
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
         when(relationMapper.selectById(10L)).thenReturn(relation);
@@ -141,7 +142,20 @@ class StudentServiceObjectPermissionProviderTest {
     }
 
     @Test
+    void mediaAllReadsHistoricalInterviewButCannotSubmitIt() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setPersonId(20L); relation.setContentDirectorUserId(7L);
+        relation.setStatus("completed"); relation.setAcceptanceStatus("accepted");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);
+        when(relationMapper.selectMediaReadByPersonIds(List.of(20L), null)).thenReturn(List.of(relation));
+        assertTrue(provider.hasPermission(10L, "positioning-interview-read", 9L));
+        assertFalse(provider.hasPermission(10L, "director-interview", 9L));
+    }
+
+    @Test
     void managedReadHonorsGlobalAndEmptyDepartmentScopes() {
+        org.mockito.Mockito.doReturn(false).when(permissionApi).hasAnyPermissions(9L, MediaStudentReadScope.QUERY_ALL);
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
         when(relationMapper.selectById(10L)).thenReturn(relation);

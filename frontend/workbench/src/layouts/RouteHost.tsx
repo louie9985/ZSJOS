@@ -107,7 +107,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage permissions={permissions} onOpenAssignment={onOpenAssignment}/>
+  if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage/>
@@ -119,7 +119,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.IMPERSONATION) return <ImpersonationPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.BUSINESS_AUDIT) return <BusinessAuditPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.CASHBACK) return <CashbackPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.WITHDRAWAL) return <WithdrawalPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.WITHDRAWAL) return <WithdrawalPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.USER_RELATION) return <UserRelationPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MAINTENANCE) return <MaintenancePage roles={roles}/>
   if (menu?.path === APP_ROUTES.NOTIFY_RULE) return <NotifyRulePage permissions={permissions}/>
@@ -140,8 +140,8 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
   if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
-  if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage permissions={permissions}/>
-  if (menu && [APP_ROUTES.WORK_ORDER_CREATE, APP_ROUTES.WORK_ORDER_AVAILABLE, APP_ROUTES.WORK_ORDER_MINE].some(path => path === menu.path)) return <WorkOrderCenterPage/>
+  if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage tenantReadAll={tenantReadAll} permissions={permissions}/>
+  if (menu && [APP_ROUTES.WORK_ORDER_CREATE, APP_ROUTES.WORK_ORDER_AVAILABLE, APP_ROUTES.WORK_ORDER_MINE].some(path => path === menu.path)) return <WorkOrderCenterPage tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>

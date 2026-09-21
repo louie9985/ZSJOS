@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 @Data
 public class BusinessTaskRespVO {
     private Long id;
+    private Long assigneeId;
+    private String assigneeName;
     private String taskType;
     private String bizType;
     private Long bizId;

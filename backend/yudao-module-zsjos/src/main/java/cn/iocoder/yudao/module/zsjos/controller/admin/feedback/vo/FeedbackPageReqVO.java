@@ -14,6 +14,9 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FeedbackPageReqVO extends PageParam {
+    @jakarta.validation.constraints.Pattern(regexp = "SELF|ALL|USER")
+    private String readScope;
+    private Long targetUserId;
 
     @Schema(description = "反馈类型")
     private String feedbackType;

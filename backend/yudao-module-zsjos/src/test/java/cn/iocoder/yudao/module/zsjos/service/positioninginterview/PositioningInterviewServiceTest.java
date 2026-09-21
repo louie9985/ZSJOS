@@ -22,6 +22,46 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PositioningInterviewServiceTest {
+ @Test void administratorReadsHistoricalDraftWithoutWriteActions(){
+  relation.setStatus("completed");
+  when(permissionApi.hasAnyPermissions(30L,PositioningInterviewService.QUERY)).thenReturn(true);
+  when(permissionApi.hasTenantReadAllAccess(30L)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);
+  when(relationMapper.selectMediaReadByPersonIds(List.of(2L),null)).thenReturn(List.of(relation));
+  when(mapper.selectOne(any())).thenReturn(row);
+  Context result=service.context(9L,30L);
+  assertEquals("draft",result.getStatus());
+  assertEquals(List.of("VIEW_POSITIONING_INTERVIEW"),result.getAvailableActions());
+  verify(mapper,never()).insert(any(PositioningInterviewDO.class));
+ }
+ @Test void administratorReadDoesNotAuthorizeDraftWrite(){
+  when(permissionApi.hasAnyPermissions(30L,PositioningInterviewService.EDIT)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);
+  assertThrows(ServiceException.class,()->service.save(9L,request("NOT_COMMUNICATED"),30L,false));
+  verify(mapper,never()).lockStudent(anyLong(),anyLong());
+ }
+ @Test void administratorCannotReadAnotherTenantInterview(){
+  relation.setTenantId(2L);
+  when(permissionApi.hasAnyPermissions(30L,PositioningInterviewService.QUERY)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);
+  assertThrows(ServiceException.class,()->service.context(9L,30L));
+  verifyNoInteractions(mapper);
+ }
+ @Test void administratorDownloadsOnlyTheSelectedRelationsBoundAttachment(){
+  relation.setStatus("completed"); row.setTenantId(1L);
+  when(permissionApi.hasAnyPermissions(30L,PositioningInterviewService.QUERY)).thenReturn(true);
+  when(permissionApi.hasTenantReadAllAccess(30L)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);
+  when(relationMapper.selectMediaReadByPersonIds(List.of(2L),null)).thenReturn(List.of(relation));
+  var attachment=new PositioningInterviewAttachmentDO();attachment.setFileId(55L);attachment.setStudentPersonId(2L);attachment.setInterviewId(3L);attachment.setUploadedBy(7L);
+  when(attachmentMapper.selectOne(any())).thenReturn(attachment);
+  when(mapper.selectById(3L)).thenReturn(row);
+  when(fileApi.presignGetUrl(55L,300)).thenReturn("https://example.test/file");
+  assertEquals("https://example.test/file",service.download(9L,30L,55L).getUrl());
+  row.setServiceRelationId(10L);
+  assertThrows(ServiceException.class,()->service.download(9L,30L,55L));
+  verify(fileApi,times(1)).presignGetUrl(55L,300);
+ }
     @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
  @InjectMocks PositioningInterviewService service;
  @Mock PositioningInterviewMapper mapper;

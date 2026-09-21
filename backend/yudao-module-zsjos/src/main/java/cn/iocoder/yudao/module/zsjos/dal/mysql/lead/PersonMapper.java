@@ -15,6 +15,30 @@ import java.util.Set;
 
 @Mapper
 public interface PersonMapper extends BaseMapperX<PersonDO> {
+    String MEDIA_PERSON_PREDICATE = "(EXISTS (SELECT 1 FROM zsjos_service_relation ms WHERE ms.person_id=zsjos_person.id "
+            + "AND ms.tenant_id=zsjos_person.tenant_id AND ms.deleted=b'0' AND (ms.content_director_user_id IS NOT NULL "
+            + "OR ms.career_planner_user_id IS NOT NULL OR ms.operator_user_id IS NOT NULL)) "
+            + "OR EXISTS (SELECT 1 FROM zsjos_media_account ma WHERE ma.student_person_id=zsjos_person.id AND ma.tenant_id=zsjos_person.tenant_id AND ma.deleted=b'0') "
+            + "OR EXISTS (SELECT 1 FROM zsjos_positioning_card pc WHERE pc.student_person_id=zsjos_person.id AND pc.tenant_id=zsjos_person.tenant_id AND pc.deleted=b'0') "
+            + "OR EXISTS (SELECT 1 FROM zsjos_student_positioning_interview pi WHERE pi.student_person_id=zsjos_person.id AND pi.tenant_id=zsjos_person.tenant_id AND pi.deleted=b'0'))";
+
+    default PageResult<PersonDO> selectAllMediaStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds) {
+        QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
+        query.apply(MEDIA_PERSON_PREDICATE);
+        if (req.getClassId() != null || req.getServiceStatus() != null) {
+            query.apply(STUDENT_RELATION_PREDICATE
+                    + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}) AND "
+                    + cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper.MEDIA_RELATION_PREDICATE
+                            .replace("zsjos_service_relation", "sr") + ")",
+                    req.getClassId(), req.getServiceStatus());
+        }
+        return selectPage(req, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
+    default boolean existsMediaStudent(Long personId) {
+        return selectCount(new QueryWrapperX<PersonDO>().eq("id", personId).apply(MEDIA_PERSON_PREDICATE)) > 0;
+    }
+
     default PageResult<PersonDO> selectTenantReadStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
         query.apply(STUDENT_RELATION_PREDICATE

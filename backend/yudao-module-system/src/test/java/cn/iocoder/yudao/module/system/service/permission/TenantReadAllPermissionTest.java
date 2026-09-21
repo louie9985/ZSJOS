@@ -20,7 +20,22 @@ class TenantReadAllPermissionTest {
     @Spy @InjectMocks private PermissionServiceImpl service;
     @Mock private AdminUserService userService;
 
-    @AfterEach void cleanup() { TenantContextHolder.clear(); }
+    @AfterEach void cleanup() { TenantContextHolder.clear(); org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
+    @Test void disabledRoleAndPartnerIdentityCannotGainAdministratorReading() {
+        TenantContextHolder.setTenantId(1L);
+        var user = new AdminUserDO(); user.setTenantId(1L); user.setStatus(0);
+        when(userService.getUser(10L)).thenReturn(user);
+        var role = new RoleDO(); role.setTenantId(1L); role.setCode("super_admin"); role.setStatus(1);
+        doReturn(List.of(role)).when(service).getEnableUserRoleListByUserIdFromCache(10L);
+        assertFalse(service.hasTenantReadAllAccess(10L));
+        role.setStatus(0);
+        cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.setLoginUser(
+                new cn.iocoder.yudao.framework.security.core.LoginUser().setId(10L)
+                        .setUserType(cn.iocoder.yudao.framework.common.enums.UserTypeEnum.PARTNER.getValue()),
+                new org.springframework.mock.web.MockHttpServletRequest());
+        assertFalse(service.hasTenantReadAllAccess(10L));
+    }
 
     @Test void bothAdministratorCodesGrantReadAndRevocationRemovesIt() {
         TenantContextHolder.setTenantId(1L);

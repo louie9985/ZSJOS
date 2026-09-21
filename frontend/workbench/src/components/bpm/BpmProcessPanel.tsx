@@ -33,6 +33,7 @@ const TIMELINE_COLORS: Record<number, string> = {
  */
 export type BpmBusinessAdvanceAction = {
   label: string
+  alternative?: { label: string; disabledReason?: string; onTrigger: () => void }
   /** 未就绪时禁用并说明原因，例如逐条结论尚未填齐。 */
   disabledReason?: string
   /** 进度说明，例如「已完成 3/5 条结论」。 */
@@ -46,6 +47,7 @@ export default function BpmProcessPanel({
   users,
   canUpdate,
   allowDecision = false,
+  decisionOnly = false,
   businessAdvance,
   onActionSuccess
 }: {
@@ -56,6 +58,7 @@ export default function BpmProcessPanel({
   canUpdate: boolean
   /** 是否允许在此面板直接做通过/拒绝的流程结论。 */
   allowDecision?: boolean
+  decisionOnly?: boolean
   /** 业务侧的推进动作，与流程类动作并列展示。 */
   businessAdvance?: BpmBusinessAdvanceAction
   onActionSuccess?: () => void
@@ -98,14 +101,18 @@ export default function BpmProcessPanel({
   // 面板内的动作只针对当前用户的待办任务；已办或非本人任务不提供动作。
   const todoTask: BpmTask | undefined = detail?.todoTask
 
-  const advanceButton = businessAdvance && <Tooltip title={businessAdvance.disabledReason}>
-    <Button
-      type="primary"
-      icon={<CheckCircleOutlined/>}
-      disabled={Boolean(businessAdvance.disabledReason)}
-      onClick={businessAdvance.onTrigger}
-    >{businessAdvance.label}</Button>
-  </Tooltip>
+  const advanceButton = businessAdvance && <Space wrap>
+    <Tooltip title={businessAdvance.disabledReason}>
+      <Button type="primary" icon={<CheckCircleOutlined/>}
+        disabled={Boolean(businessAdvance.disabledReason)} onClick={businessAdvance.onTrigger}>
+        {businessAdvance.label}
+      </Button>
+    </Tooltip>
+    {businessAdvance.alternative && <Tooltip title={businessAdvance.alternative.disabledReason}>
+      <Button danger disabled={Boolean(businessAdvance.alternative.disabledReason)}
+        onClick={businessAdvance.alternative.onTrigger}>{businessAdvance.alternative.label}</Button>
+    </Tooltip>}
+  </Space>
 
   const timelineItems = useMemo(() => nodes.map(node => ({
     color: node.status === undefined ? 'blue' : TIMELINE_COLORS[node.status] ?? 'blue',
@@ -189,9 +196,10 @@ export default function BpmProcessPanel({
             canUpdate={canUpdate}
             users={users}
             allowDecision={allowDecision}
+            decisionOnly={decisionOnly}
             decisionHint={allowDecision
               ? undefined
-              : '审核结论在下方逐条填写并保存；全部填齐后用这里的完成按钮提交，流程才会推进到下一节点。'}
+              : '先逐条保存审核结论，再选择通过或退回运营修改；退回会结束本轮审批。'}
             extraActions={advanceButton}
             extraHint={businessAdvance?.progress}
             onSuccess={refresh}

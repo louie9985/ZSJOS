@@ -132,6 +132,8 @@ export const feedbackApi = {
       })
     ),
   myPage: async (params: {
+    readScope?: 'SELF' | 'ALL' | 'USER'
+    targetUserId?: number
     pageNo: number
     pageSize: number
     feedbackType?: FeedbackType

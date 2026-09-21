@@ -69,7 +69,7 @@ public class ProductionTicketController {
     public CommonResult<Boolean> startProduction(@PathVariable Long id, @RequestParam Integer version) { service.startProduction(id, version); return success(true); }
 
     @PostMapping("/{id}/submit") @PreAuthorize("@ss.hasPermission('zsjos:production-ticket:submit')")
-    public CommonResult<Boolean> submit(@PathVariable Long id, @RequestParam Integer version) { service.submit(id, version); return success(true); }
+    public CommonResult<Boolean> submit(@PathVariable Long id, @Valid @RequestBody ProductionTicketActionReqVO req) { service.submit(id, req); return success(true); }
 
     @PostMapping("/{id}/start-check") @PreAuthorize("@ss.hasPermission('zsjos:production-ticket:check')")
     public CommonResult<Boolean> startCheck(@PathVariable Long id, @RequestParam Integer version) { service.startCheck(id, version); return success(true); }

@@ -4780,6 +4780,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_supervisor_confirmation` (
   `order_id` bigint NOT NULL COMMENT '订单编号',
   `approval_round_id` bigint NOT NULL COMMENT '审批轮次编号',
   `task_definition_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '报名或财务 BPM 节点',
+  `requester_name_snapshot` varchar(255) DEFAULT NULL COMMENT '申请时姓名快照',
+  `supervisor_name_snapshot` varchar(255) DEFAULT NULL COMMENT '指派时主管姓名快照',
   `requester_user_id` bigint NOT NULL COMMENT '申请人用户编号',
   `supervisor_user_id` bigint NOT NULL COMMENT '直属部门负责人用户编号',
   `parent_task_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '原普通审批任务编号',

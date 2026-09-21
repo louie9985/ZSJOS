@@ -103,7 +103,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeFolderDO folder = randomFolderDO(library.getId(), 0L);
         folderMapper.insert(folder);
@@ -134,7 +134,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(folderService.getFolder(0L, userId)).thenReturn(null);
         // 准备参数
         PmsKnowledgeDocumentCreateReqVO reqVO = new PmsKnowledgeDocumentCreateReqVO()
@@ -160,7 +160,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeDocumentDO document = randomDocumentDO(library.getId(), 0L, 0L).setContent("旧正文");
         documentMapper.insert(document);
@@ -177,7 +177,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         assertEquals(document.getTitle(), updatedDocument.getTitle());
         assertEquals(document.getType(), updatedDocument.getType());
         assertEquals(document.getStatus(), updatedDocument.getStatus());
-        verify(memberService).validateLibraryReadable(document.getLibraryId(), userId);
+        verify(memberService).validateLibraryInteraction(document.getLibraryId(), userId);
         verify(contentPermissionService).validateContentPermissionWritable(
                 document.getPermissionId(), document.getLibraryId(), userId);
     }
@@ -211,7 +211,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeDocumentDO parent = randomDocumentDO(library.getId(), 0L, 0L);
         documentMapper.insert(parent);
@@ -226,7 +226,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
                 documentMapper.selectById(parent.getId()).getStatus());
         assertEquals(PmsKnowledgeDocumentStatusEnum.RECYCLED.getStatus(),
                 documentMapper.selectById(child.getId()).getStatus());
-        verify(memberService).validateLibraryReadable(library.getId(), userId);
+        verify(memberService).validateLibraryInteraction(library.getId(), userId);
     }
 
     @Test
@@ -236,7 +236,7 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeDocumentDO parent = randomDocumentDO(library.getId(), 0L, 0L);
         documentMapper.insert(parent);
@@ -273,12 +273,12 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO sourceLibrary = randomLibraryDO();
         libraryMapper.insert(sourceLibrary);
         memberMapper.insert(randomMemberDO(sourceLibrary.getId(), userId));
-        when(memberService.validateLibraryReadable(sourceLibrary.getId(), userId)).thenReturn(sourceLibrary);
+        when(memberService.validateLibraryInteraction(sourceLibrary.getId(), userId)).thenReturn(sourceLibrary);
         when(memberService.validateLibraryWritable(sourceLibrary.getId(), userId)).thenReturn(sourceLibrary);
         PmsKnowledgeLibraryDO targetLibrary = randomLibraryDO();
         libraryMapper.insert(targetLibrary);
         memberMapper.insert(randomMemberDO(targetLibrary.getId(), userId));
-        when(memberService.validateLibraryReadable(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
+        when(memberService.validateLibraryInteraction(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
         when(memberService.validateLibraryWritable(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
         PmsKnowledgeDocumentDO document = randomDocumentDO(sourceLibrary.getId(), 0L, 0L);
         documentMapper.insert(document);
@@ -298,8 +298,8 @@ public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeDocumentDO movedDocument = documentMapper.selectById(document.getId());
         assertEquals(targetLibrary.getId(), movedDocument.getLibraryId());
         assertEquals(targetPermissionId, movedDocument.getPermissionId());
-        verify(memberService).validateLibraryReadable(sourceLibrary.getId(), userId);
-        verify(memberService).validateLibraryReadable(targetLibrary.getId(), userId);
+        verify(memberService).validateLibraryInteraction(sourceLibrary.getId(), userId);
+        verify(memberService).validateLibraryInteraction(targetLibrary.getId(), userId);
         verify(memberService).validateLibraryAdmin(targetLibrary.getId(), userId);
         verify(contentPermissionService).validateContentPermissionManageable(
                 sourcePermissionId, sourceLibrary.getId(), userId);

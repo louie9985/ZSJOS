@@ -44,6 +44,17 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
+        if ("positioning-interview-read".equals(action)) {
+            if (MediaStudentReadScope.canReadAll(permissionApi, userId)) {
+                return relationMapper.selectMediaReadByPersonIds(java.util.List.of(relation.getPersonId()), null)
+                        .stream().anyMatch(row -> Objects.equals(row.getId(), bizId));
+            }
+            return "active".equals(relation.getStatus()) && "accepted".equals(relation.getAcceptanceStatus())
+                    && Objects.equals(relation.getContentDirectorUserId(), userId);
+        }
+        if ("read".equals(action) && MediaStudentReadScope.canReadAll(permissionApi, userId)
+                && relationMapper.selectMediaReadByPersonIds(java.util.List.of(relation.getPersonId()), null)
+                        .stream().anyMatch(row -> Objects.equals(row.getId(), bizId))) return true;
         // Managed visibility applies only to reads and to this exact service, never to commands.
         if ("read".equals(action)
                 && Set.of("active", "paused", "completed").contains(relation.getStatus())

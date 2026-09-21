@@ -51,4 +51,7 @@ public class MediaAccountRespVO {
     private String rebindResultReason;
     private Integer version;
     private List<String> availableActions;
+    private String deleteStatus;
+    private String deleteReason;
+    private String deleteResultReason;
 }

@@ -5,6 +5,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import cn.iocoder.yudao.module.zsjos.service.workorder.WorkOrderFieldDefinition;
+import cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderFileRespVO;
 
 @Data
 public class ProductionTicketRespVO {
@@ -27,4 +29,9 @@ public class ProductionTicketRespVO {
     private String status;
     private Integer version;
     private List<String> availableActions;
+    /** Frozen operator form projected from the linked production envelope. */
+    private List<WorkOrderFieldDefinition> formFields;
+    private Map<String, Object> formValues;
+    private List<WorkOrderFileRespVO> requestAttachments;
+    private String submitterName;
 }

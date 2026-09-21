@@ -149,7 +149,7 @@ public class ContentReviewConfigService {
                 PROCESS_DEFINITION_KEY);
         if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
                 || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition, DIRECTOR_TASK_KEY, FINAL_TASK_KEY)) {
+                || !validTaskSequence(definition)) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
         }
         validateMaterialMapping(PRODUCTION_MATERIAL_TYPE_CODE, mapping(config), defaults(config), userId);
@@ -161,7 +161,7 @@ public class ContentReviewConfigService {
                 PROCESS_DEFINITION_KEY);
         if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
                 || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition, DIRECTOR_TASK_KEY, FINAL_TASK_KEY)) {
+                || !validTaskSequence(definition)) {
             throw exception(CONTENT_REVIEW_CONFIG_INVALID);
         }
         return definition;
@@ -179,30 +179,47 @@ public class ContentReviewConfigService {
     /**
      * 校验流程仍是"编导 → 终审"两级单人骨架。批审的逐条结论只有一组编导列和一组终审列
      * （见 zsjos_content_review_batch_item），因此业务审批节点必须恰好两个、都是单人执行、
-     * 且按 directorReview → finalReview → 结束 串联；多出的节点或多人审批方式都无处落库。
+     * 且按编导 → 终审 → 结束串联（节点编码由已发布定义提供）；多出的节点或多人审批方式都无处落库。
      *
      * <p>SIMPLE 设计器编译时必然额外生成发起人提交节点，它不是业务审批节点，这里按保留
      * 节点编码排除后再计数。不使用 definition.simpleSequentialApproval：那个标志按全部
      * userTask 计数，对任何 SIMPLE 资产都为 false；串联性由 nextUserTaskKeys 自行校验。
      */
-    private boolean validTaskSequence(BpmProcessDefinitionMetadataRespDTO definition,
-                                      String directorTaskKey, String finalTaskKey) {
-        if (definition.getUserTasks() == null) return false;
-        List<BpmUserTaskMetadataRespDTO> approvalTasks = definition.getUserTasks().stream()
-                .filter(task -> !SIMPLE_SUBMISSION_TASK_KEY.equals(task.getKey())).toList();
-        if (approvalTasks.size() != 2) return false;
-        var directorTask = approvalTasks.stream()
-                .filter(task -> directorTaskKey.equals(task.getKey())).findFirst().orElse(null);
-        var finalTask = approvalTasks.stream()
-                .filter(task -> finalTaskKey.equals(task.getKey())).findFirst().orElse(null);
-        return directorTask != null && finalTask != null
-                && "SINGLE".equals(directorTask.getExecutionMode())
-                && "SINGLE".equals(finalTask.getExecutionMode())
-                && Objects.equals(directorTask.getNextUserTaskKeys(), List.of(finalTaskKey))
-                && (finalTask.getNextUserTaskKeys() == null || finalTask.getNextUserTaskKeys().isEmpty());
+    private boolean validTaskSequence(BpmProcessDefinitionMetadataRespDTO definition) {
+        return findReviewTaskKeys(definition) != null;
     }
 
-    @SuppressWarnings("unchecked")
+    public record ReviewTaskKeys(String director, String finalReview) { }
+
+    public ReviewTaskKeys requireReviewTaskKeys(BpmProcessDefinitionMetadataRespDTO definition) {
+        ReviewTaskKeys keys = findReviewTaskKeys(definition);
+        if (keys == null) throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+        return keys;
+    }
+
+    private ReviewTaskKeys findReviewTaskKeys(BpmProcessDefinitionMetadataRespDTO definition) {
+        if (definition == null || definition.getUserTasks() == null) return null;
+        var tasks = definition.getUserTasks().stream()
+                .filter(task -> !SIMPLE_SUBMISSION_TASK_KEY.equals(task.getKey())).toList();
+        if (tasks.size() != 2 || tasks.stream().anyMatch(task -> task.getKey() == null
+                || task.getKey().isBlank() || !Boolean.TRUE.equals(task.getRejectEndsProcess())
+                || !"SINGLE".equals(task.getExecutionMode()))) return null;
+        // Designer node IDs are opaque. The approved two-stage sequence owns the business meaning.
+        for (var director : tasks) {
+            var last = tasks.getFirst() == director ? tasks.getLast() : tasks.getFirst();
+            if (!Objects.equals(director.getKey(), last.getKey())
+                    && Objects.equals(director.getNextUserTaskKeys(), List.of(last.getKey()))
+                    && (last.getNextUserTaskKeys() == null || last.getNextUserTaskKeys().isEmpty())) {
+                var starts = definition.getUserTasks().stream()
+                        .filter(task -> SIMPLE_SUBMISSION_TASK_KEY.equals(task.getKey())).toList();
+                if (starts.size() > 1 || !starts.isEmpty()
+                        && !Objects.equals(starts.getFirst().getNextUserTaskKeys(), List.of(director.getKey()))) return null;
+                return new ReviewTaskKeys(director.getKey(), last.getKey());
+            }
+        }
+        return null;
+    }
+
     public Map<String, String> mapping(ContentReviewConfigDO config) {
         Map<String, Object> raw = JsonUtils.parseMap(config.getMaterialFieldMappingJson());
         if (raw == null) return Map.of();

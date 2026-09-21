@@ -27,6 +27,8 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
     private final BusinessTaskMapper taskMapper;
     private final Map<String, BusinessTaskSceneProvider> sceneProviders;
     private final Clock clock;
+    @jakarta.annotation.Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
+    @jakarta.annotation.Resource private cn.iocoder.yudao.module.system.api.user.AdminUserApi userApi;
 
     @Autowired
     public BusinessTaskServiceImpl(BusinessTaskMapper taskMapper, List<BusinessTaskSceneProvider> providers) {
@@ -60,6 +62,17 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
     }
 
     @Override
+    public BusinessTaskSummaryRespVO getReadSummary(Long userId, String readScope, Long targetUserId) {
+        if (readScope == null && targetUserId == null) return getMySummary(userId);
+        Long subjectId = readScopeService.resolve(readScope, targetUserId, userId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        return new BusinessTaskSummaryRespVO(taskMapper.selectReadPendingCount(subjectId, "unscheduled", now),
+                taskMapper.selectReadPendingCount(subjectId, "overdue", now),
+                taskMapper.selectReadPendingCount(subjectId, "today", now),
+                taskMapper.selectReadPendingCount(subjectId, "future", now));
+    }
+
+    @Override
     public PageResult<BusinessTaskRespVO> getMyPage(Long userId, String bucket, int pageNo, int pageSize) {
         BusinessTaskPageReqVO reqVO = new BusinessTaskPageReqVO();
         reqVO.setBucket(bucket);
@@ -77,10 +90,24 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
             throw exception(BUSINESS_TASK_BUCKET_INVALID);
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        PageResult<BusinessTaskDO> page = taskMapper.selectMyPage(userId, reqVO, now);
+        boolean explicit = reqVO.getReadScope() != null || reqVO.getTargetUserId() != null;
+        Long subjectId = explicit ? readScopeService.resolve(reqVO.getReadScope(), reqVO.getTargetUserId(), userId) : userId;
+        boolean readOnly = explicit && !"SELF".equals(reqVO.getReadScope());
+        PageResult<BusinessTaskDO> page = explicit ? taskMapper.selectReadPage(subjectId, reqVO, now)
+                : taskMapper.selectMyPage(userId, reqVO, now);
         Map<Long, BusinessTaskDisplay> displays = loadDisplays(page.getList());
+        var assignees = page.getList().stream().map(BusinessTaskDO::getAssigneeId).filter(java.util.Objects::nonNull).distinct().toList();
+        var users = assignees.isEmpty() ? java.util.Map.<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO>of()
+                : userApi.getUserMap(assignees);
         return new PageResult<>(page.getList().stream()
-                .map(task -> convert(task, displays.get(task.getId()), now)).toList(), page.getTotal());
+                .map(task -> {
+                    var result = convert(task, displays.get(task.getId()), now);
+                    result.setAssigneeId(task.getAssigneeId());
+                    var assignee = task.getAssigneeId() == null ? null : users.get(task.getAssigneeId());
+                    result.setAssigneeName(assignee == null ? null : assignee.getNickname());
+                    if (readOnly) { result.setActionable(false); result.setActionCode(null); }
+                    return result;
+                }).toList(), page.getTotal());
     }
 
     private long count(Long userId, String bucket, LocalDateTime now) {

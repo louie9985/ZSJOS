@@ -24,6 +24,7 @@ public interface WorkOrderService {
     void withdraw(Long id, WorkOrderActionReqVO req, Long userId);
     void terminate(Long id, WorkOrderActionReqVO req, Long userId);
     PageResult<WorkOrderRespVO> myPage(String status, String view, int pageNo, int pageSize, Long userId);
+    PageResult<WorkOrderRespVO> readPage(WorkOrderMyPageReqVO request, Long userId);
     PageResult<WorkOrderRespVO> pool(String sceneCode, int pageNo, int pageSize, Long userId);
     WorkOrderRespVO get(Long id, Long userId);
     PageResult<WorkOrderRespVO> auditPage(String status, int pageNo, int pageSize);
@@ -37,4 +38,5 @@ public interface WorkOrderService {
                               String reason, String idempotencyKey);
     boolean isProductionTemplate(String sceneCode, Long userId);
     Long getProductionEnvelopeId(Long businessId);
+    WorkOrderRespVO getProductionEnvelopeSnapshot(Long businessId);
 }

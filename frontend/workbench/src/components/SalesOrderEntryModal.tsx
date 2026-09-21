@@ -74,9 +74,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [form] = Form.useForm<Values>()
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
+  const [historicalItems, setHistoricalItems] = useState<SalesOrder['items']>([])
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [catalog, setCatalog] = useState<LeadCatalog>(emptyCatalog)
   const [giftNodes, setGiftNodes] = useState<Array<{ value: string; title: string; children?: any[] }>>([])
+  const [refreshedDictionaryFields, setRefreshedDictionaryFields] = useState<string[]>([])
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({})
   const [loading, setLoading] = useState(false)
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
@@ -112,6 +114,21 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       setGiftNodes(leaf(giftResult as any[]))
       setDicts(Object.fromEntries(dictTypes.map((type, index) => [type, dictResults[index] as DictData[]])))
       const order = orderResult as SalesOrder | undefined
+      const retained = [
+        [DICT_TYPE.ORDER_STUDENT_NATURE, 'studentNature', order?.studentNature, order?.studentNatureLabelSnapshot],
+        [DICT_TYPE.ORDER_SERVICE_PERIOD, 'servicePeriod', order?.servicePeriod, order?.servicePeriodLabelSnapshot],
+        [DICT_TYPE.ORDER_STUDENT_SOURCE, 'studentSource', order?.studentSource, order?.studentSourceLabelSnapshot],
+        [DICT_TYPE.ORDER_FEE_MODE, 'feeMode', order?.feeMode, order?.feeModeLabelSnapshot],
+        [DICT_TYPE.ORDER_PAYMENT_METHOD, 'paymentMethod', order?.paymentMethod, order?.paymentMethodLabelSnapshot]
+      ] as const
+      setRefreshedDictionaryFields(order ? retained.filter(item => !item[3]).map(item => item[1]) : [])
+      if (order) setDicts(previous => Object.fromEntries(Object.entries(previous).map(([type, entries]) => {
+        const old = retained.find(item => item[0] === type)
+        if (!old?.[2] || !old[3]) return [type, entries]
+        return [type, [{ value: old[2], label: old[3] } as DictData, ...entries.filter(item => item.value !== old[2])]]
+      })))
+
+      setHistoricalItems(order?.items || [])
       setOrderNo(order?.orderNo)
       const regionPath = resolveLeadAreaPath(areaResult as AreaNode[], order?.provinceCode || lead.provinceCode,
         order?.cityCode || lead.cityCode, order?.provinceName || lead.provinceName, order?.cityName || lead.cityName)
@@ -120,11 +137,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       const hasPrimary = primary && (catalogResult as LeadCatalog).skus.some(sku => `${sku.spuRef}::${sku.skuRef}` === primary)
       form.setFieldsValue({
         buyerName: order?.buyerName, studentName: order?.studentName || lead.submittedName,
-        studentNature: order?.studentNature, mobile: order?.studentMobile || lead.submittedMobile,
+        studentNature: order?.studentNatureLabelSnapshot ? order.studentNature : undefined, mobile: order?.studentMobile || lead.submittedMobile,
         wechatId: order?.studentWechatId || lead.submittedWechatId, regionPath: regionPath.length ? regionPath : undefined,
-        agreedExamTime: order?.agreedExamTime, classType: order?.classType, servicePeriod: order?.servicePeriod,
-        studentSource: order?.studentSource, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
-        feeMode: order?.feeMode, paymentMethod: order?.paymentMethod, remark: order?.remark,
+        agreedExamTime: order?.agreedExamTime, classType: order?.classType, servicePeriod: order?.servicePeriodLabelSnapshot ? order.servicePeriod : undefined,
+        studentSource: order?.studentSourceLabelSnapshot ? order.studentSource : undefined, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
+        feeMode: order?.feeModeLabelSnapshot ? order.feeMode : undefined, paymentMethod: order?.paymentMethodLabelSnapshot ? order.paymentMethod : undefined, remark: order?.remark,
         specialRequirements: order?.studentSpecialRequirements, materialDeliveryContact: order?.materialDeliveryContact,
         giftItems: order?.giftItems, giftShippingAddress: order?.giftShippingAddress,
         items: order?.items.map(item => ({ courseKey: `${item.productRef}::${item.skuRef}`, actualAmount: item.actualAmount }))
@@ -215,7 +232,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     if (!region.provinceName) { message.warning('请选择有效省市'); return }
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const request: SalesOrderSubmitRequest = {
-        buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
+        refreshedDictionaryFields, buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
         studentMobile: values.mobile?.trim() || undefined, studentWechatId: values.wechatId?.trim() || undefined,
         provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
         agreedExamTime: values.agreedExamTime?.trim() || undefined, classType: values.classType?.trim() || undefined,
@@ -308,7 +325,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Form.List name="items" rules={[{ validator: async (_, value) => value?.length ? undefined : Promise.reject(new Error('至少添加一个成交课程')) }]}>
           {(fields, { add, remove }, { errors }) => <>
             {fields.map((field, index) => <Row gutter={12} key={field.key} align="top">
-              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog} historicalItems={historicalItems} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
               <Col xs={24} md={6}><Form.Item name={[field.name, 'actualAmount']} label={`实际成交金额 ${index + 1}`} rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={0} precision={2} prefix="¥" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
               <Col><Button aria-label="删除成交课程" title="删除成交课程" icon={<DeleteOutlined/>} danger disabled={fields.length === 1} onClick={() => remove(field.name)} style={{ marginTop: 30 }}/></Col>
             </Row>)}

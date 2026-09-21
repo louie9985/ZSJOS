@@ -333,6 +333,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_006_012, "该审批任务已由其他人员处理");
     ErrorCode SALES_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_006_013, "成交订单请求幂等键已被其他请求使用");
     ErrorCode SALES_ORDER_CONTINUATION_CONFLICT = new ErrorCode(1_900_006_014, "该驳回订单已被接续或当前协同销售无权接续");
+    ErrorCode SALES_ORDER_DICTIONARY_RESELECTION_REQUIRED = new ErrorCode(1_900_006_030, "订单字典历史名称未记录，请重新选择后提交");
+    ErrorCode SALES_ORDER_DICTIONARY_LABEL_UNAVAILABLE = new ErrorCode(1_900_006_031, "所选订单字典名称不可用，请刷新选项后重试");
     ErrorCode SALES_ORDER_HISTORICAL_SNAPSHOT_INVALID = new ErrorCode(1_900_006_029, "历史订单课程快照无法解析，不能接续补正");
     ErrorCode SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE = new ErrorCode(1_900_006_015, "该客户已有活动复购订单");
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");

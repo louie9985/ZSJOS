@@ -331,7 +331,8 @@ public class FeedbackContentProvider implements BpmApprovalContentProvider {
             return true;
         }
         try {
-            if (permissionProvider.hasPermission(feedback.getId(), "read-admin", viewerId)) {
+            if (permissionProvider.hasPermission(feedback.getId(), "read-admin", viewerId)
+                    || permissionProvider.hasPermission(feedback.getId(), "read-approver", viewerId)) {
                 return true;
             }
         } catch (Exception ex) {

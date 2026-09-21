@@ -6,14 +6,17 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketCreateContextRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketSaveReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketActionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderCandidatePageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderSceneRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
@@ -34,9 +37,11 @@ import org.springframework.dao.DuplicateKeyException;
 import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -59,6 +64,7 @@ public class ProductionTicketService {
     @Resource private MediaWorkflowEventService workflowEventService;
     @Resource private ProductionTicketCommandService commandService;
     @Resource private WorkOrderService workOrderService;
+    @Resource private FileApi fileApi;
 
     public PageResult<ProductionTicketRespVO> page(ProductionTicketPageReqVO req, Long userId) {
         MediaDataScopeService.Scope scope = dataScopeService.resolve(userId, "zsjos:production-ticket:query-all");
@@ -87,7 +93,10 @@ public class ProductionTicketService {
         }
         ProductionTicketCreateContextRespVO response = new ProductionTicketCreateContextRespVO();
         response.setSceneCode(template.getCode()); response.setTemplateName(template.getName());
-        response.setAllowedAssignmentTypes(template.getAllowedAssignmentTypes());
+        List<String> configuredTypes = new java.util.ArrayList<>(template.getAllowedAssignmentTypes() == null
+                ? List.of() : template.getAllowedAssignmentTypes());
+        if (!configuredTypes.contains("AUTO")) configuredTypes.add("AUTO");
+        response.setAllowedAssignmentTypes(configuredTypes);
         response.setTargetDeptIds(template.getTargetDeptIds());
         response.setFields(template.getFields());
         response.setAccountId(account.getId());
@@ -106,9 +115,9 @@ public class ProductionTicketService {
         }
         WorkOrderCandidatePageReqVO candidateReq = new WorkOrderCandidatePageReqVO();
         candidateReq.setSceneCode(sceneCode); candidateReq.setPageNo(1); candidateReq.setPageSize(100);
-        response.setAssigneeCandidates(workOrderService.candidatePage(candidateReq, userId).getList().stream().map(candidate -> {
+        response.setAssigneeCandidates(relationService.getConfiguredTargetUsers(ASSIGNMENT_SCENE, userId).stream().map(candidate -> {
             LeadAssignmentUserRespVO item = new LeadAssignmentUserRespVO();
-            item.setId(candidate.getId()); item.setNickname(candidate.getName()); item.setDeptId(candidate.getDeptId());
+            item.setId(candidate.getId()); item.setNickname(candidate.getNickname()); item.setDeptId(candidate.getDeptId());
             return item;
         }).toList());
         return response;
@@ -120,8 +129,9 @@ public class ProductionTicketService {
         // 两者共用这一个入口，因此账号在此是可选上下文而不是必填引用。
         List<Long> accountIds = normalizeAccountIds(req);
         String operatorRemark = StrUtil.trimToNull(req.getOperatorRemark());
+        String dispatchMode = "AUTO".equalsIgnoreCase(req.getDispatchMode()) ? "AUTO" : "PERSON";
         String fingerprint = commandService.fingerprint("create", req.getSceneCode(), accountIds,
-                req.getAssigneeUserId(), req.getTargetDeptId(), operatorRemark, req.getValues(),
+                dispatchMode, req.getAssigneeUserId(), req.getTargetDeptId(), operatorRemark, req.getValues(),
                 req.getAttachmentIds(), userId);
         var command = commandService.begin(req.getIdempotencyKey(),
                 new ProductionTicketCommandService.Command("create", accountIds.isEmpty() ? null : accountIds.getFirst(),
@@ -137,15 +147,18 @@ public class ProductionTicketService {
         }
         Map<String, Object> values = enrichAccountLinks(req.getValues(), contexts);
         // 定位卡仅作为上下文信息展示，不再阻断发起（原 canCreate 强制校验已移除）
-        if ((req.getAssigneeUserId() == null) == (req.getTargetDeptId() == null)) {
+        Long effectiveAssignee = req.getAssigneeUserId();
+        List<LeadAssignmentUserRespVO> configuredCandidates = relationService.getConfiguredTargetUsers(ASSIGNMENT_SCENE, userId);
+        if ("AUTO".equals(dispatchMode)) {
+            if (req.getTargetDeptId() != null || configuredCandidates.isEmpty()) throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
+            effectiveAssignee = chooseLeastLoaded(configuredCandidates).getId();
+        }
+        if ((effectiveAssignee == null) == (req.getTargetDeptId() == null)) {
             throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
         }
         // 未绑定账号时没有账号维度的候选列表，改用工单模板的接收人候选校验。
-        if (req.getAssigneeUserId() != null) {
-            List<LeadAssignmentUserRespVO> candidates = context != null
-                    ? context.getAssigneeCandidates()
-                    : templateCandidates(req.getSceneCode(), userId);
-            if (candidates.stream().map(LeadAssignmentUserRespVO::getId).noneMatch(req.getAssigneeUserId()::equals)) {
+        if (effectiveAssignee != null) {
+            if (configuredCandidates.stream().map(LeadAssignmentUserRespVO::getId).noneMatch(effectiveAssignee::equals)) {
                 throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
             }
         }
@@ -155,7 +168,7 @@ public class ProductionTicketService {
         ticket.setAccountIdsJson(JsonUtils.toJsonString(accountIds));
         ticket.setOwnerOperatorUserId(userId);
         ticket.setReviewerUserId(userId);
-        ticket.setAssigneeFilmingEditorUserId(req.getAssigneeUserId());
+        ticket.setAssigneeFilmingEditorUserId(effectiveAssignee);
         ticket.setPositioningSubmissionId(context == null ? null : context.getPositioningSubmissionId());
         List<Map<String, Object>> accountSnapshots = contexts.stream().map(ProductionTicketService::accountSnapshot).toList();
         ticket.setAccountSnapshotJson(JsonUtils.toJsonString(accountSnapshots));
@@ -166,7 +179,7 @@ public class ProductionTicketService {
         ticket.setEntitlementQuota(0);
         ticket.setRemainingCount(0);
         ticket.setOverEntitlement(false);
-        ticket.setStatus(req.getAssigneeUserId() == null ? TICKET_PUBLIC_POOL : TICKET_PENDING_ACCEPT);
+        ticket.setStatus(effectiveAssignee == null ? TICKET_PUBLIC_POOL : TICKET_PENDING_ACCEPT);
         ticket.setVersion(0);
         try {
             mapper.insert(ticket);
@@ -177,15 +190,27 @@ public class ProductionTicketService {
                 ticket.getStatus(), null, "ticket-created:" + ticket.getId());
         workOrderService.createProductionEnvelope(req.getSceneCode(), ticket.getId(),
                 accountIds.isEmpty() ? null : accountIds.getFirst(), userId,
-                req.getAssigneeUserId(), req.getTargetDeptId(), operatorRemark == null ? "拍剪工单" : operatorRemark,
+                effectiveAssignee, req.getTargetDeptId(), operatorRemark == null ? "拍剪工单" : operatorRemark,
                 values, req.getAttachmentIds(), req.getIdempotencyKey());
-        if (req.getAssigneeUserId() != null) {
+        if (effectiveAssignee != null) {
             workflowEventService.createTaskAndNotify("media.ticket.pending_accept", "MEDIA_TICKET_ACCEPT",
-                    BIZ_TYPE_PRODUCTION_TICKET, ticket.getId(), req.getAssigneeUserId(), "拍剪工单待接",
+                    BIZ_TYPE_PRODUCTION_TICKET, ticket.getId(), effectiveAssignee, "拍剪工单待接",
                     ACTION_ACCEPT_TICKET, userId, "ticket-accept:" + ticket.getId(), ticketPayload(ticket));
         }
         commandService.complete(req.getIdempotencyKey(), userId, ticket.getId());
         return ticket.getId();
+    }
+
+    private LeadAssignmentUserRespVO chooseLeastLoaded(List<LeadAssignmentUserRespVO> candidates) {
+        Set<String> active = Set.of(TICKET_PENDING_ACCEPT, TICKET_ACCEPTED, TICKET_IN_PRODUCTION,
+                TICKET_SUBMITTED, TICKET_CHECKING);
+        Map<Long, Long> load = mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ProductionTicketDO>()
+                        .in("status", active).isNotNull("assignee_filming_editor_user_id")).stream()
+                .collect(java.util.stream.Collectors.groupingBy(ProductionTicketDO::getAssigneeFilmingEditorUserId,
+                        java.util.stream.Collectors.counting()));
+        return candidates.stream().min(Comparator.comparingLong((LeadAssignmentUserRespVO item) -> load.getOrDefault(item.getId(), 0L))
+                .thenComparing(LeadAssignmentUserRespVO::getNickname, Comparator.nullsLast(String::compareTo))
+                .thenComparing(LeadAssignmentUserRespVO::getId)).orElseThrow();
     }
 
     public Long createFromWorkOrder(ProductionTicketSaveReqVO req, Long userId) {
@@ -195,6 +220,17 @@ public class ProductionTicketService {
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "read")
     public ProductionTicketRespVO get(Long id, Long userId) { return toResp(require(id), userId); }
+
+    /** Allows a ticket assignee to read only the positioning snapshot attached to that ticket. */
+    public boolean canReadPositioningSnapshot(Long cardId, Long submissionId, Long userId) {
+        if (cardId == null || submissionId == null || userId == null) return false;
+        PositioningCardSubmissionDO submission = positioningSubmissionMapper.selectById(submissionId);
+        if (submission == null || !Objects.equals(submission.getCardId(), cardId)) return false;
+        return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ProductionTicketDO>()
+                .eq("positioning_submission_id", submissionId)
+                .eq("assignee_filming_editor_user_id", userId)
+                .notIn("status", List.of(TICKET_COMPLETED, "cancelled"))).stream().findAny().isPresent();
+    }
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "accept")
     @Transactional(rollbackFor = Exception.class)
@@ -238,7 +274,16 @@ public class ProductionTicketService {
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "submit")
     @Transactional(rollbackFor = Exception.class)
-    public void submit(Long id, Integer version) { transition(id, version, TICKET_IN_PRODUCTION, TICKET_SUBMITTED); }
+    public void submit(Long id, ProductionTicketActionReqVO req) {
+        ProductionTicketDO ticket = require(id);
+        Map<String, Object> context = new LinkedHashMap<>(parseMap(ticket.getDispatchContextSnapshotJson()));
+        context.put("completionRemark", StrUtil.trimToNull(req.getRemark()));
+        context.put("completionAttachmentId", req.getAttachmentId());
+        context.put("videoSentToOperator", Boolean.TRUE.equals(req.getVideoSentToOperator()));
+        ticket.setDispatchContextSnapshotJson(JsonUtils.toJsonString(context));
+        if (mapper.updateById(ticket) == 0) throw exception(PRODUCTION_TICKET_VERSION_CONFLICT);
+        transition(ticket, req.getVersion(), TICKET_IN_PRODUCTION, TICKET_SUBMITTED);
+    }
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "check")
     @Transactional(rollbackFor = Exception.class)
@@ -246,18 +291,20 @@ public class ProductionTicketService {
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "check")
     @Transactional(rollbackFor = Exception.class)
-    public void approve(Long id, Integer version) { transition(id, version, TICKET_CHECKING, TICKET_COMPLETED); }
+    public void approve(Long id, Integer version) { ProductionTicketDO ticket = require(id); transition(ticket, version, TICKET_SUBMITTED.equals(ticket.getStatus()) ? TICKET_SUBMITTED : TICKET_CHECKING, TICKET_COMPLETED); }
 
     @ZsjosPermission(bizType = BIZ_TYPE_PRODUCTION_TICKET, bizId = "#id", action = "check")
     @Transactional(rollbackFor = Exception.class)
     public void reject(Long id, Integer version, String reason) {
         String normalized = normalizedReason(reason, PRODUCTION_TICKET_REJECT_REASON_REQUIRED);
         ProductionTicketDO ticket = require(id);
-        if (mapper.rejectForRevision(id, version, normalized) == 0) throw exception(PRODUCTION_TICKET_VERSION_CONFLICT);
+        String expected = ticket.getStatus();
+        if (!TICKET_SUBMITTED.equals(expected) && !TICKET_CHECKING.equals(expected)) throw exception(PRODUCTION_TICKET_STATE_INVALID);
+        if (mapper.rejectForRevision(id, version, expected, normalized) == 0) throw exception(PRODUCTION_TICKET_VERSION_CONFLICT);
         Long operator = getLoginUserId();
         workOrderService.syncProductionStatus(id, TICKET_REJECTED, ticket.getAssigneeFilmingEditorUserId(), operator,
                 normalized, "ticket:" + id + ":" + version + ":" + TICKET_REJECTED);
-        workflowEventService.transition(BIZ_TYPE_PRODUCTION_TICKET, id, operator, TICKET_CHECKING, TICKET_REJECTED,
+        workflowEventService.transition(BIZ_TYPE_PRODUCTION_TICKET, id, operator, expected, TICKET_REJECTED,
                 normalized, "ticket:" + id + ":" + version + ":" + TICKET_REJECTED);
         workflowEventService.completeTask("MEDIA_TICKET_CHECK", id, ticket.getReviewerUserId());
         workflowEventService.notify("media.ticket.rejected", BIZ_TYPE_PRODUCTION_TICKET, id,
@@ -293,7 +340,7 @@ public class ProductionTicketService {
         if (TICKET_SUBMITTED.equals(target)) {
             workflowEventService.createTaskAndNotify("media.ticket.pending_check", "MEDIA_TICKET_CHECK",
                     BIZ_TYPE_PRODUCTION_TICKET, ticket.getId(), ticket.getReviewerUserId(), "拍剪工单待核对",
-                    ACTION_START_TICKET_CHECK, operator, "ticket-check:" + ticket.getId() + ":" + version,
+                    ACTION_APPROVE_TICKET, operator, "ticket-check:" + ticket.getId() + ":" + version,
                     ticketPayload(ticket));
         }
         if (TICKET_COMPLETED.equals(target) || TICKET_REJECTED.equals(target)) {
@@ -316,6 +363,16 @@ public class ProductionTicketService {
         response.setAccountIds(parseAccountIds(ticket.getAccountIdsJson(), ticket.getAccountId()));
         response.setAccounts(parseAccountSnapshots(ticket.getAccountSnapshotJson()));
         response.setDispatchContext(parseMap(ticket.getDispatchContextSnapshotJson()));
+        WorkOrderRespVO envelope = workOrderService.getProductionEnvelopeSnapshot(ticket.getId());
+        if (envelope != null) {
+            response.setFormFields(envelope.getFields());
+            response.setFormValues(envelope.getValues());
+            response.setRequestAttachments(envelope.getRequestAttachments());
+            response.setSubmitterName(envelope.getSourceName());
+            if (response.getDeadlineAt() == null) {
+                response.setDeadlineAt(parseDeadline(envelope.getValues()));
+            }
+        }
         if (TICKET_PENDING_ACCEPT.equals(ticket.getStatus())) {
             if (!objectPermissionProvider.hasPermission(ticket.getId(), "accept", userId)) {
                 response.setAvailableActions(List.of());
@@ -342,12 +399,25 @@ public class ProductionTicketService {
             case TICKET_PUBLIC_POOL -> List.of(ACTION_CLAIM_TICKET);
             case TICKET_ACCEPTED -> List.of(ACTION_START_TICKET);
             case TICKET_IN_PRODUCTION -> List.of(ACTION_SUBMIT_TICKET);
-            case TICKET_SUBMITTED -> List.of(ACTION_START_TICKET_CHECK);
+            case TICKET_SUBMITTED -> List.of(ACTION_APPROVE_TICKET, ACTION_REJECT_TICKET);
             case TICKET_CHECKING -> List.of(ACTION_APPROVE_TICKET, ACTION_REJECT_TICKET);
             case TICKET_REJECTED -> List.of(ACTION_REACCEPT_TICKET);
             default -> List.of();
         });
         return response;
+    }
+
+    private static java.time.LocalDateTime parseDeadline(Map<String, Object> values) {
+        if (values == null) return null;
+        Object raw = values.get("deadline_at");
+        if (raw == null) raw = values.get("deadlineAt");
+        if (raw == null || String.valueOf(raw).isBlank()) return null;
+        try {
+            return java.time.LocalDateTime.parse(String.valueOf(raw));
+        } catch (RuntimeException ignored) {
+            try { return java.time.LocalDateTime.parse(String.valueOf(raw).replace(' ', 'T')); }
+            catch (RuntimeException ignoredAgain) { return null; }
+        }
     }
 
     private static String objectAction(String status) {
@@ -384,6 +454,9 @@ public class ProductionTicketService {
 
     private static Map<String, Object> positioningSnapshot(PositioningCardSubmissionDO row) {
         Map<String, Object> result = new LinkedHashMap<>();
+        // Keep the owning card id with the frozen submission so clients can use the
+        // existing permission-checked snapshot attachment endpoint.
+        result.put("cardId", row.getCardId());
         result.put("submissionNo", row.getSubmissionNo());
         result.put("submittedAt", row.getSubmittedAt());
         result.put("fields", parseList(row.getFieldsSnapshotJson()));
@@ -423,6 +496,11 @@ public class ProductionTicketService {
         result.put("accountName", context.getAccountName()); result.put("platformLabel", context.getPlatformLabel());
         result.put("homepageUrl", accountFieldValue(context, "homepage_url"));
         result.put("coverFileId", accountFieldValue(context, "cover"));
+        Object cover = result.get("coverFileId");
+        if (cover instanceof Number number) {
+            try { result.put("coverUrl", fileApi.presignGetUrl(number.longValue(), 300)); }
+            catch (RuntimeException ignored) { result.put("coverUrl", null); }
+        }
         return result;
     }
 

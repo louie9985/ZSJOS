@@ -45,6 +45,7 @@ class DeliveryClassServiceImplTest {
     @Mock private DeliveryClassScopeService scopeService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Mock private RoleApi roleApi;
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private DeptApi deptApi;
@@ -52,6 +53,18 @@ class DeliveryClassServiceImplTest {
     @Mock private ExamScheduleMapper scheduleMapper;
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private DeliveryClassNotifyPublisher notifyPublisher;
+
+    @Test void administratorReadScopesDoNotReuseCommandDepartmentScope() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
+        when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);
+        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), null, true, true))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
+        assertEquals(0L, service.getManagedPage(9L, request).getTotal());
+        verifyNoInteractions(scopeService, taskCommandService);
+        request.setReadScope("ALL");
+        when(readScopeService.resolve("ALL", null, 9L)).thenReturn(null);
+        assertEquals(0L, service.getMyPage(9L, request).getTotal());
+    }
 
     @BeforeEach
     void setUp() {

@@ -87,6 +87,9 @@ public class SalesOrderSupervisorConfirmationService {
                 .setTaskId(task.getId()).setAssigneeUserId(supervisor.getId()).setReason(reqVO.getReason().trim()));
         SalesOrderSupervisorConfirmationDO row = new SalesOrderSupervisorConfirmationDO();
         row.setOrderId(orderId); row.setApprovalRoundId(round.getId()); row.setTaskDefinitionKey(task.getTaskDefinitionKey());
+        AdminUserRespDTO requester = adminUserApi.getUser(userId);
+        row.setRequesterNameSnapshot(requester == null ? null : requester.getNickname());
+        row.setSupervisorNameSnapshot(supervisor.getNickname());
         row.setRequesterUserId(userId); row.setSupervisorUserId(supervisor.getId()); row.setParentTaskId(task.getId());
         row.setSupervisorTaskId(supervisorTaskId); row.setRequestReason(reqVO.getReason().trim()); row.setStatus(SUPERVISOR_PENDING);
         row.setRequestedAt(LocalDateTime.now()); row.setVersion(0); confirmationMapper.insert(row);
@@ -293,7 +296,7 @@ public class SalesOrderSupervisorConfirmationService {
         result.setOrderNo(order == null ? null : order.getOrderNo()); result.setStudentName(order == null ? null : order.getStudentName());
         result.setTaskDefinitionKey(row.getTaskDefinitionKey()); result.setTaskId(row.getSupervisorTaskId());
         result.setRequesterUserId(row.getRequesterUserId()); AdminUserRespDTO requester = users.get(row.getRequesterUserId());
-        result.setRequesterUserName(requester == null ? null : requester.getNickname()); result.setSupervisorUserId(row.getSupervisorUserId());
+        result.setRequesterUserName(row.getRequesterNameSnapshot()); result.setSupervisorUserId(row.getSupervisorUserId());
         result.setRequestReason(row.getRequestReason()); result.setDecisionReason(row.getDecisionReason()); result.setStatus(row.getStatus());
         result.setRequestedAt(row.getRequestedAt()); result.setDecidedAt(row.getDecidedAt()); result.setVersion(row.getVersion());
         result.setOrderVersion(order == null ? null : order.getVersion()); result.setRoundVersion(round == null ? null : round.getVersion());

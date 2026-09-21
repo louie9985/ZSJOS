@@ -465,6 +465,8 @@ public class MediaAccountService {
             actions.add(account.getStudentPersonId() == null ? ACTION_BIND_STUDENT : ACTION_UNBIND_STUDENT);
         }
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:edit")) actions.add(ACTION_EDIT_ACCOUNT);
+        if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:delete") && objectPermissionProvider.hasPermission(account.getId(), "delete", userId)
+                && !"pending".equals(account.getDeleteStatus()) && !"deleted".equals(account.getRunStatus())) actions.add("REQUEST_DELETE_ACCOUNT");
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:rescue")) actions.add(ACTION_RESCUE_ACCOUNT);
         if (account.getStudentPersonId() != null && !"pending".equals(account.getRebindStatus())
                 && objectPermissionProvider.hasPermission(account.getId(), "rebind", userId)

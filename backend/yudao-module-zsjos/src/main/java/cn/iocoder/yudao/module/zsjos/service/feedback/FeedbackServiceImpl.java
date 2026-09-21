@@ -109,6 +109,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STA
 
 @Service
 public class FeedbackServiceImpl implements FeedbackService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
 
     private static final DateTimeFormatter NUMBER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final String SCENE_EMPLOYEE_REPLIED = "zsjos.feedback.employee_replied";
@@ -405,8 +406,18 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Override
     public PageResult<FeedbackRespVO> getMyPage(FeedbackPageReqVO request, Long userId) {
         validateOptionalSubmissionType(request.getFeedbackType());
-        PageResult<FeedbackDO> page = feedbackMapper.selectMyPage(request, userId);
-        return new PageResult<>(page.getList().stream().map(row -> toCard(row, userId, false)).toList(),
+        boolean explicit = request.getReadScope() != null || request.getTargetUserId() != null;
+        Long subject = explicit ? readScopeService.resolve(request.getReadScope(), request.getTargetUserId(), userId) : userId;
+        PageResult<FeedbackDO> page = explicit ? feedbackMapper.selectReadPage(request, subject == null ? null : SUBJECT_ADMIN, subject)
+                : feedbackMapper.selectMyPage(request, userId);
+        boolean readOnly = explicit && !"SELF".equals(request.getReadScope());
+        return new PageResult<>(page.getList().stream().map(row -> {
+            FeedbackRespVO result = toCard(row, userId, false);
+            if (readOnly || !SUBJECT_ADMIN.equals(row.getSubmitterSubjectType())) {
+                suppressOwnActions(result);
+            }
+            return result;
+        }).toList(),
                 page.getTotal());
     }
 
@@ -422,7 +433,12 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Override
     @ZsjosPermission(bizType = "feedback", bizId = "#id", action = "read-own")
     public FeedbackRespVO getOwn(Long id, Long userId) {
-        return toDetail(require(id), userId, false);
+        var row = require(id);
+        var result = toDetail(row, userId, false);
+        if (!SUBJECT_ADMIN.equals(row.getSubmitterSubjectType())) {
+            suppressOwnActions(result);
+        }
+        return result;
     }
 
     /**
@@ -1028,7 +1044,16 @@ public class FeedbackServiceImpl implements FeedbackService {
         return attachments;
     }
 
+    private void suppressOwnActions(FeedbackRespVO result) {
+        result.setCanResubmit(false); result.setCanReply(false); result.setCanComplete(false);
+        result.setCanSurvey(false); result.setCanSubmitSurvey(false); result.setUnread(false);
+    }
+
     private void applyActions(FeedbackRespVO result, FeedbackDO row, Long userId, boolean admin) {
+        if (!admin && !Objects.equals(row.getSubmitterUserId(), userId)) {
+            suppressOwnActions(result);
+            return;
+        }
         boolean completed = STATUS_COMPLETED.equals(row.getStatus());
         result.setCanResubmit(!admin && SUBJECT_ADMIN.equals(row.getSubmitterSubjectType())
                 && TYPE_REQUIREMENT.equals(row.getFeedbackType())

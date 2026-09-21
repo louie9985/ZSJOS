@@ -27,6 +27,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
   }
   useEffect(() => { void load(); return () => { generation.current++ } }, [relationId])
   const readOnly = forceReadOnly || context?.status === 'completed'
+    || !context?.availableActions.some(action => ['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW', 'COMPLETE_POSITIONING_INTERVIEW'].includes(action))
   const canSave = !readOnly && context?.availableActions.some(action => ['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW'].includes(action))
   const canComplete = !readOnly && context?.availableActions.includes('COMPLETE_POSITIONING_INTERVIEW')
   const change = (key: string, update: Partial<InterviewItem>) => setItems(previous => {

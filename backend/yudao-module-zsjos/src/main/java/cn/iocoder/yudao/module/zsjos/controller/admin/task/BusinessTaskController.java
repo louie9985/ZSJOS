@@ -35,8 +35,9 @@ public class BusinessTaskController {
     @GetMapping("/my-summary")
     @Operation(summary = "获得我的待办汇总")
     @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
-    public CommonResult<BusinessTaskSummaryRespVO> getMySummary() {
-        return success(taskService.getMySummary(getLoginUserId()));
+    public CommonResult<BusinessTaskSummaryRespVO> getMySummary(
+            @RequestParam(required = false) String readScope, @RequestParam(required = false) Long targetUserId) {
+        return success(taskService.getReadSummary(getLoginUserId(), readScope, targetUserId));
     }
 
     @GetMapping("/my-page")

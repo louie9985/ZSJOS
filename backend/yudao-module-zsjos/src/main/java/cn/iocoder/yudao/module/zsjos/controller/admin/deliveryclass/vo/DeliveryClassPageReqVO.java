@@ -7,6 +7,9 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DeliveryClassPageReqVO extends PageParam {
+    @jakarta.validation.constraints.Pattern(regexp = "SELF|ALL|USER")
+    private String readScope;
+    private Long targetUserId;
     private String status;
     private String keyword;
     private Long categoryId;

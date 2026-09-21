@@ -16,6 +16,8 @@ import java.util.List;
 
 @Mapper
 public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatchDO> {
+    @org.apache.ibatis.annotations.Update("UPDATE zsjos_content_review_batch SET account_ids_json=JSON_REMOVE(account_ids_json, JSON_UNQUOTE(JSON_SEARCH(account_ids_json,'one',CAST(#{accountId} AS CHAR)))), version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND JSON_CONTAINS(account_ids_json,JSON_ARRAY(#{accountId})) AND status IN ('DRAFT','DIRECTOR_REVIEW','FINAL_REVIEW')")
+    int excludeDeletedAccount(@org.apache.ibatis.annotations.Param("accountId") Long accountId);
 
     default PageResult<ContentReviewBatchDO> selectPage(ContentReviewBatchPageReqVO request,
                                                          Long userId, boolean seeAll,
@@ -23,6 +25,9 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
         LambdaQueryWrapperX<ContentReviewBatchDO> query = new LambdaQueryWrapperX<ContentReviewBatchDO>()
                 .eqIfPresent(ContentReviewBatchDO::getStatus, request.getStatus())
                 .eqIfPresent(ContentReviewBatchDO::getAccountId, request.getAccountId());
+        query.apply("NOT EXISTS (SELECT 1 FROM zsjos_content_review_batch successor "
+                        + "WHERE successor.revision_of_batch_id=zsjos_content_review_batch.id "
+                        + "AND successor.tenant_id=zsjos_content_review_batch.tenant_id AND successor.deleted=b'0')");
         if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
             query.like(ContentReviewBatchDO::getBatchNo, request.getKeyword().trim());
         }

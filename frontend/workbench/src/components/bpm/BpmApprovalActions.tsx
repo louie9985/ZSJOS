@@ -100,6 +100,7 @@ export default function BpmApprovalActions({
   canUpdate,
   users,
   allowDecision = true,
+  decisionOnly = false,
   decisionHint,
   extraActions,
   extraHint,
@@ -115,6 +116,8 @@ export default function BpmApprovalActions({
    * 否则直接推进 BPM 会绕过业务结论，导致业务数据与流程状态不一致。
    */
   allowDecision?: boolean
+  /** 业务只支持通过/驳回时，隐藏其余任务操作；不改变服务端权限校验。 */
+  decisionOnly?: boolean
   /** allowDecision=false 时展示的引导文案。 */
   decisionHint?: string
   /** 业务侧推进流程的动作，排在流程类动作之前。 */
@@ -257,6 +260,7 @@ export default function BpmApprovalActions({
   }
 
   if (!task) return null
+  const onlyDecisions = decisionOnly
 
   // 业务侧推进动作由业务权限（如 zsjos:content-review:director-review）授权，
   // 与 bpm:task:update 无关，因此即使没有 BPM 处理权限也要保留它。
@@ -267,7 +271,7 @@ export default function BpmApprovalActions({
   </div>
 
   if (!canUpdate) {
-    return businessOnly('当前账号没有 bpm:task:update 权限，无法使用加签、转办等流程动作。')
+    return businessOnly(onlyDecisions ? '' : '当前账号没有 bpm:task:update 权限，无法使用加签、转办等流程动作。')
   }
 
   if (!isBpmTaskActionable(task)) {
@@ -307,49 +311,49 @@ export default function BpmApprovalActions({
         onClick={() => void openAction('reject')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.REJECT)}</Button>}
 
-      {isBpmButtonVisible(task, BPM_OPERATION_BUTTON.TRANSFER) && <Button
+      {!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.TRANSFER) && <Button
         icon={<SwapOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('transfer')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.TRANSFER)}</Button>}
 
-      {isBpmButtonVisible(task, BPM_OPERATION_BUTTON.DELEGATE) && <Button
+      {!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.DELEGATE) && <Button
         icon={<UserSwitchOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('delegate')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.DELEGATE)}</Button>}
 
-      {isBpmButtonVisible(task, BPM_OPERATION_BUTTON.ADD_SIGN) && <Button
+      {!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.ADD_SIGN) && <Button
         icon={<UserAddOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('addSign')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.ADD_SIGN)}</Button>}
 
       {/* 减签只针对加签产生的子任务，与 Admin 一致：没有子任务时不展示。 */}
-      {childrenTasks.length > 0 && <Button
+      {!onlyDecisions && childrenTasks.length > 0 && <Button
         icon={<UserDeleteOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('deleteSign')}
       >减签</Button>}
 
       {/* 退回同样会推进流程状态，与通过/拒绝一并受 allowDecision 约束。 */}
-      {allowDecision && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.RETURN) && <Button
+      {!onlyDecisions && allowDecision && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.RETURN) && <Button
         icon={<RollbackOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('return')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.RETURN)}</Button>}
 
-      {isBpmButtonVisible(task, BPM_OPERATION_BUTTON.COPY) && <Button
+      {!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.COPY) && <Button
         icon={<SendOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('copy')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.COPY)}</Button>}
 
-      <Button
+      {!onlyDecisions && <Button
         icon={<CommentOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('comment')}
-      >评论</Button>
+      >评论</Button>}
     </Space>
 
     <Modal

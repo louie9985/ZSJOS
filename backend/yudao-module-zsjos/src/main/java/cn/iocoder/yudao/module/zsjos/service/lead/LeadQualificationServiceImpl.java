@@ -161,7 +161,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (!Set.of(STATUS_SUSPENDED, ASSIGNMENT_RECYCLE_PENDING).contains(reqVO.getType())) {
             throw exception(LEAD_QUALIFICATION_EXCEPTION_TYPE_INVALID);
         }
-        boolean manageAll = permissionService.hasQualificationManageAll();
+        boolean manageAll = permissionService.hasTenantReadAll(userId) || permissionService.hasQualificationManageAll();
         Set<Long> managedUserIds = manageAll ? Set.of() : permissionService.getManagedUserIds(userId);
         if (!manageAll && managedUserIds.isEmpty()) return PageResult.empty();
         PageResult<LeadDO> page = leadMapper.selectQualificationExceptionPage(reqVO, reqVO.getType(),

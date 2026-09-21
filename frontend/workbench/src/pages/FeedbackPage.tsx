@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, Badge, Button, Descriptions, Empty, Form, Image, Input, Modal, Segmented,
   Select, Skeleton, Space, Spin, Tag, Timeline, Typography, message
@@ -26,6 +26,8 @@ import { formatTimestamp } from '../services/time'
 import { useSearchParams } from 'react-router-dom'
 import ResizableDrawer from '../components/ResizableDrawer'
 import { FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
+
+import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 
 const PAGE_SIZE = 10
 const TYPE_META: Record<FeedbackType, { label: string; icon: React.ReactNode; permission: string }> = {
@@ -95,6 +97,7 @@ function FeedbackCard({ item, onClick, disabled = false }: { item: FeedbackRecor
     </div>
     <strong className="feedback-record-title">{item.title}</strong>
     <div className="feedback-record-meta">
+      <span>提交人：{item.submitterName || "未知人员"}</span>
       <span>处理人：{item.assigneeName || '待分派'}</span>
       <span>{formatTimestamp(item.lastActivityAt)}</span>
     </div>
@@ -112,7 +115,11 @@ function ValueDescriptions({ fields = [], values = {} }: { fields?: FeedbackFiel
   }))}/>
 }
 
-export default function FeedbackPage({ permissions }: { permissions: string[] }) {
+export default function FeedbackPage({ permissions, tenantReadAll = false }: { permissions: string[]; tenantReadAll?: boolean }) {
+  const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
+  const readOnly = readScope.readScope !== 'SELF'
+  const listSequence = useRef(0)
+  const detailSequence = useRef(0)
   const [searchParams] = useSearchParams()
   const [view, setView] = useState<'home' | 'records'>('home')
   const [portal, setPortal] = useState<FeedbackPortal>()
@@ -152,18 +159,23 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
   }, [])
 
   const loadRecords = useCallback(async (pageNo: number, append = false) => {
+    const sequence = ++listSequence.current
+    if (!append) { setRecords([]); setRecordTotal(0) }
+    if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRecordLoading(false); return }
     setRecordLoading(true)
     setRecordError('')
     try {
-      const result = await feedbackApi.myPage({ pageNo, pageSize: PAGE_SIZE, feedbackType: typeFilter, status: statusFilter })
+      const result = await feedbackApi.myPage({ ...(tenantReadAll ? readScope : {}), pageNo, pageSize: PAGE_SIZE, feedbackType: typeFilter, status: statusFilter })
+      if (sequence !== listSequence.current) return
       setRecords(current => append ? [...current, ...result.list] : result.list)
       setRecordTotal(result.total)
       setRecordPage(pageNo)
     } catch (cause) {
+      if (sequence !== listSequence.current) return
       if (!append) setRecords([])
       setRecordError(cause instanceof Error ? cause.message : '我的记录加载失败')
-    } finally { setRecordLoading(false) }
-  }, [statusFilter, typeFilter])
+    } finally { if (sequence === listSequence.current) setRecordLoading(false) }
+  }, [statusFilter, typeFilter, readScope, tenantReadAll])
 
   useEffect(() => { void loadPortal() }, [loadPortal])
   useEffect(() => { if (view === 'records') void loadRecords(1) }, [loadRecords, view])
@@ -180,6 +192,7 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
    * 也不该出现"修改并重提/回复"这类本人动作（后端已把这三个开关置为 false）。
    */
   const loadDetail = useCallback(async (id: number) => {
+    const sequence = ++detailSequence.current
     setDetailLoading(true)
     setDetailError('')
     try {
@@ -191,17 +204,20 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
         next = await feedbackApi.approverDetail(id)
         approver = true
       }
-      if (!approver && next.unread && hasPermission(permissions, 'zsjos:feedback:read')) {
+      if (sequence !== detailSequence.current) return
+      if (!readOnly && !approver && next.unread && hasPermission(permissions, 'zsjos:feedback:read')) {
         await feedbackApi.markRead(id, next.version)
         next = await feedbackApi.detail(id)
       }
-      setApproverView(approver)
+      if (sequence !== detailSequence.current) return
+      setApproverView(approver || readOnly)
       setDetail(next)
     } catch (cause) {
+      if (sequence !== detailSequence.current) return
       setDetail(undefined)
       setDetailError(cause instanceof Error ? cause.message : '反馈详情加载失败')
-    } finally { setDetailLoading(false) }
-  }, [permissions])
+    } finally { if (sequence === detailSequence.current) setDetailLoading(false) }
+  }, [permissions, readOnly])
 
   useEffect(() => {
     if (!canRead) return
@@ -304,6 +320,7 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
       </Space>
     </header>
 
+    {view === 'records' && tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { detailSequence.current++; setReadScope(value); setDetail(undefined); setReplyOpen(false) }} />}
     {view === 'home' ? <>
       {portalError && <Alert type="error" showIcon message={portalError} action={<Button onClick={() => void loadPortal()}>重试</Button>}/>}
       {portalLoading ? <Skeleton active paragraph={{ rows: 6 }}/> : <>
@@ -375,9 +392,9 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
         <section className="feedback-detail-section"><Typography.Title level={5}>沟通记录</Typography.Title>{detail.replies?.length ? <Timeline items={detail.replies.map(reply => ({ children: <div><div><strong>{reply.authorName || '未知用户'}</strong><Tag className="feedback-author-tag">{reply.authorType === 'EMPLOYEE' ? '员工' : '处理人员'}</Tag></div><p>{reply.content}</p><AttachmentLinks items={reply.attachments}/><Typography.Text type="secondary">{formatTimestamp(reply.createTime)}</Typography.Text></div> }))}/> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无沟通记录"/>}</section>
         {detail.survey && <section className="feedback-detail-section"><Typography.Title level={5}>满意度</Typography.Title>{detail.survey.status === 'PENDING' ? <Alert type="info" showIcon message="等待评价"/> : <ValueDescriptions fields={detail.survey.fields} values={detail.survey.values}/>}</section>}
         <div className="feedback-detail-actions">
-          {detail.canResubmit && hasPermission(permissions, 'zsjos:feedback:requirement:create') && <Button onClick={() => void openResubmit()}>修改并重提</Button>}
-          {detail.canReply && hasPermission(permissions, 'zsjos:feedback:reply-self') && <Button icon={<MessageOutlined/>} onClick={() => setReplyOpen(true)}>回复</Button>}
-          {detail.canSubmitSurvey && hasPermission(permissions, 'zsjos:feedback:survey:submit') && <Button type="primary" onClick={() => { surveyForm.resetFields(); setSurveyOpen(true) }}>满意度评价</Button>}
+          {!readOnly && detail.canResubmit && hasPermission(permissions, 'zsjos:feedback:requirement:create') && <Button onClick={() => void openResubmit()}>修改并重提</Button>}
+          {!readOnly && detail.canReply && hasPermission(permissions, 'zsjos:feedback:reply-self') && <Button icon={<MessageOutlined/>} onClick={() => setReplyOpen(true)}>回复</Button>}
+          {!readOnly && detail.canSubmitSurvey && hasPermission(permissions, 'zsjos:feedback:survey:submit') && <Button type="primary" onClick={() => { surveyForm.resetFields(); setSurveyOpen(true) }}>满意度评价</Button>}
         </div>
       </div>}
     </ResizableDrawer>
