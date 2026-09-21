@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class)
 class PositioningAssignmentServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
  @InjectMocks PositioningAssignmentService service;
  @Mock PositioningServiceCardMapper masterMapper;
  @Mock PositioningCardMapper cardMapper;

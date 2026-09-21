@@ -52,8 +52,6 @@ export const decideAppeal = (
   data: Record<string, unknown>
 ) => request.put({ url: `/zsjos/lead/appeal/${id}/${decision}`, data })
 export const getSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/${id}` })
-export const getMySalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/my/${id}` })
-export const getTeamSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/${id}` })
 export const getManagementSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/management/${id}` })
 export const decideSalesOrder = (
   id: number,

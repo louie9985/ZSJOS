@@ -210,7 +210,7 @@
         </el-descriptions>
         <div v-if="detailVersion" class="material-detail-layout">
           <el-card class="material-detail-cover-card" shadow="never">
-            <el-image v-if="detailVersion.coverPreviewUrl || detail.coverPreviewUrl" :src="detailVersion.coverPreviewUrl || detail.coverPreviewUrl" fit="contain" :preview-src-list="[detailVersion.coverPreviewUrl || detail.coverPreviewUrl]" />
+            <el-image v-if="detailCoverUrl" :src="detailCoverUrl" fit="contain" :preview-src-list="[detailCoverUrl]" />
             <el-empty v-else description="暂无封面" />
           </el-card>
           <el-card v-for="section in ['ACCOUNT_DETAIL', 'DIRECTOR_ANALYSIS', 'BUILD_SUGGESTION']" :key="section" shadow="never" class="material-detail-section">
@@ -309,6 +309,8 @@ const statusOptions = [
 ]
 const creatableTypes = computed(() => types.value.filter((type) => type.status === 0 && type.allowManualCreate && type.currentSchema))
 const optionsReady = computed(() => optionsLoaded.value && !optionsError.value)
+// 详情封面优先取当前版本预览图，回退到材料封面；仅在两者都缺失时为空
+const detailCoverUrl = computed(() => detailVersion.value?.coverPreviewUrl || detail.value?.coverPreviewUrl || '')
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const formatTime = (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
 const statusLabel = (value: string) => statusOptions.find((item) => item.value === value)?.label || value

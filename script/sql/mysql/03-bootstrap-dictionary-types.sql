@@ -531,3 +531,15 @@ SELECT 50,'维持无效','upheld','danger' UNION ALL
 SELECT 60,'已撤回','withdrawn','default') seed
 WHERE NOT EXISTS (SELECT 1 FROM system_dict_data existing WHERE existing.dict_type='zsjos_lead_appeal_status' AND existing.value=seed.value AND existing.deleted=b'0');
 
+-- PARTNER application configuration: System-owned enum, not a business dictionary.
+-- Scope: add only missing active user_type=3 after system_dict_type/data exist.
+-- Safe for fresh/development replay; preserves existing labels/status and all other entries.
+-- Existing deployments must review baseline checksum handling before using this correction;
+-- never reconcile applied checksums automatically. No schema/version/order change.
+-- Rollback: disable the inserted entry only after checking PARTNER configuration consumers.
+SET NAMES utf8mb4;
+INSERT INTO system_dict_data
+    (`sort`, `label`, `value`, `dict_type`, `status`, `color_type`, `css_class`, `remark`, `creator`, `updater`, `deleted`)
+SELECT 3, '兼职合作方', '3', 'user_type', 0, '', '', 'PARTNER 独立身份及三方应用配置', 'system', 'system', b'0'
+WHERE EXISTS (SELECT 1 FROM system_dict_type WHERE type='user_type' AND deleted=b'0')
+  AND NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='user_type' AND value='3' AND deleted=b'0');

@@ -52,6 +52,29 @@ public class LeadSubmissionController {
         return success(attachmentService.upload(file));
     }
 
+    @PostMapping("/contact-check")
+    @Operation(summary = "联系方式查重并激活已有客资")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')")
+    public CommonResult<Boolean> checkContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
+        return success(submissionService.checkContact(reqVO, getLoginUserId()));
+    }
+
+    @PostMapping("/self-sourced/contact-check")
+    @Operation(summary = "销售自拓联系方式查重并激活已有客资")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
+    public CommonResult<Boolean> checkSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
+        return success(submissionService.checkContact(reqVO, getLoginUserId(),
+                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.SALES));
+    }
+
+    @PostMapping("/education-self-sourced/contact-check")
+    @Operation(summary = "教务自拓联系方式查重并激活已有客资")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
+    public CommonResult<Boolean> checkEducationSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
+        return success(submissionService.checkContact(reqVO, getLoginUserId(),
+                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.EDUCATION));
+    }
+
     @PostMapping("/create")
     @Operation(summary = "提交客资")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")

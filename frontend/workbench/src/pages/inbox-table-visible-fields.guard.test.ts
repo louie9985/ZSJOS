@@ -28,7 +28,7 @@ describe('inbox table visible business fields', () => {
       'pages/BpmApprovalCenterPage.tsx': ['流程名称', '流程摘要', '当前处理人', '流程发起时间', '处理耗时', '审批意见'],
       'pages/AnnouncementCenterPage.tsx': ['正文', '高亮状态', '高亮截止时间', '阅读时间', '附件数量'],
       'pages/LeadDuplicateReviewPage.tsx': ['提交姓名', '手机号', '微信号', '重复标记', '命中规则', '候选对象', '复核意见'],
-      'components/SalesOrderSupervisorInbox.tsx': ['ProTable', '申请原因', '主管意见', '申请时间', '处理时间']
+      'components/SalesOrderSupervisorInbox.tsx': ['BusinessTable', '申请原因', '主管意见', '申请时间', '处理时间']
     }
     for (const [path, labels] of Object.entries(expectations)) {
       const page = source(path)

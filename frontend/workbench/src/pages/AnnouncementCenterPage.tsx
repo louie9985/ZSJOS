@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { Alert, Badge, Button, Empty, Grid, Input, List, Skeleton, Space, Tag, Typography } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,7 +9,7 @@ import { useAnnouncements } from '../components/AnnouncementProvider'
 import AnnouncementAttachmentIcon from '../components/AnnouncementAttachmentIcon'
 import SafeRichText from '../components/SafeRichText'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable } from '@ant-design/pro-components'
+
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const CURSOR_LIMIT = 20
@@ -118,11 +119,10 @@ export default function AnnouncementCenterPage() {
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
     {useTableLayout ? <>
-    <ProTable<Announcement>
+    <BusinessTable<Announcement> tableKey="announcement-center-page-1"
       className="announcement-table"
       rowKey="id"
-      search={false}
-      options={{ density: true, fullScreen: true, setting: true }}
+
       columnsState={{ persistenceKey: 'crm-announcement-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
@@ -140,7 +140,7 @@ export default function AnnouncementCenterPage() {
         { title: '阅读时间', dataIndex: 'readTime', render: (_, item) => formatTimestamp(item.readTime), width: 170 },
         { title: '附件数量', width: 100, render: (_, item) => `${item.attachments.length} 个` },
         { title: '附件', width: 280, ellipsis: true, render: (_, item) => item.attachments.map(file => file.fileName).join('；') || '-' },
-        { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => void openDetail(item.id, true)}>详细</Button> }
+        { key: 'action', title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => void openDetail(item.id, true)}>详细</Button> }
       ]}
     />
     </> : <div className="announcement-layout">

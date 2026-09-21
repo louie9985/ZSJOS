@@ -1,3 +1,5 @@
+import { contentReviewApi } from './materialApi'
+import { workOrderApi } from './workOrderApi'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, type NotifyMessage } from './api'
 import {
@@ -201,5 +203,38 @@ describe('notify message business actions', () => {
 
     await expect(resolveNotifyLeadAction(message({ sceneCode: 'zsjos.lead.complaint_founded' })))
       .resolves.toEqual({ kind: 'lead_management', leadId: 29, targetTab: 'overview' })
+  })
+  it.each(['content_review', 'work-order'])('checks %s access before navigation and falls back on denial', async bizType => {
+    const spy = bizType === 'content_review' ? vi.spyOn(contentReviewApi, 'get') : vi.spyOn(workOrderApi, 'detail')
+    spy.mockRejectedValue(new ApiError(403, 'denied'))
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType, bizId: 41 }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+  })
+  it('opens a batch outside the first list page by its stable batch ID', async () => {
+    vi.spyOn(contentReviewApi, 'get').mockResolvedValue({ id: 41 } as never)
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 41 }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith('/zsjos/material-library/content-review?batchId=41')
+  })
+  it.each(['media_account_diagnosis', 'student_delivery_stage'])('resolves %s through authorized server target', async bizType => {
+    vi.spyOn(api.mediaStudents, 'target').mockResolvedValue({ personId: 29, targetTab: 'accounts', recordId: 7 })
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType, bizId: 41 }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(api.mediaStudents.target).toHaveBeenCalledWith(bizType, 41)
+    expect(navigate).toHaveBeenCalledWith('/zsjos/media-students?personId=29&tab=accounts&accountId=7')
+  })
+  it('keeps a pre-account positioning card in its course service context', async () => {
+    vi.spyOn(api.mediaStudents, 'target').mockResolvedValue({ personId: 29, targetTab: 'positioning', recordId: 41, serviceRelationId: 8 })
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'positioning-card', bizId: 41 }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('serviceRelationId=8'))
+  })
+  it('respects the configured message-detail action without fetching the business object', async () => {
+    const get = vi.spyOn(contentReviewApi, 'get')
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'content_review', actionType: 'message_detail' }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(get).not.toHaveBeenCalled()
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
   })
 })

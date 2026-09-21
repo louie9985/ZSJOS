@@ -1,78 +1,50 @@
 package cn.iocoder.yudao.module.zsjos.controller.app.partner;
 
-import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
-import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.security.core.LoginUser;
+import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
 import cn.iocoder.yudao.module.system.service.notify.NotifyMessageService;
+import cn.iocoder.yudao.module.zsjos.service.notification.PartnerNotificationTargetService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerAccountService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerContext;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class PartnerAppMessageControllerTest {
-    private static final long ACCOUNT_ID = 42L;
-    private final NotifyMessageService messageService = mock(NotifyMessageService.class);
-    private final PartnerAccountService accountService = mock(PartnerAccountService.class);
-    private final PartnerAppMessageController controller = new PartnerAppMessageController();
+    @InjectMocks PartnerAppMessageController controller;
+    @Mock NotifyMessageService notifyMessageService;
+    @Mock PartnerAccountService accountService;
+    @Mock PartnerNotificationTargetService targetService;
 
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(controller, "notifyMessageService", messageService);
-        ReflectionTestUtils.setField(controller, "accountService", accountService);
-        when(accountService.requireContext(ACCOUNT_ID)).thenReturn(new PartnerContext(ACCOUNT_ID, 7L));
-        LoginUser user = new LoginUser().setId(ACCOUNT_ID).setUserType(UserTypeEnum.PARTNER.getValue());
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(user, null, List.of()));
+    @Test void ownOrderUsesAuthenticatedPartnerRelation() {
+        fixture("business_detail");
+        when(targetService.orderLeadPath(20L, 8L)).thenReturn("/lead/30");
+        assertEquals("/lead/30", controller.get(1L).getData().getBusinessTarget());
     }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+    @Test void missingRelationExplainsUnavailableTarget() {
+        fixture("business_detail");
+        var response = controller.get(1L).getData();
+        assertNull(response.getBusinessTarget());
+        assertNotNull(response.getTargetUnavailableReason());
     }
-
-    @Test
-    void messageOperationsUsePartnerAccountOwnership() {
-        PartnerAppMessageController.PartnerMessagePageReqVO request =
-                new PartnerAppMessageController.PartnerMessagePageReqVO();
-        request.setGroup("feedback");
-        when(messageService.getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue()))
-                .thenReturn(PageResult.empty());
-        PartnerAppMessageController.ReadReqVO read = new PartnerAppMessageController.ReadReqVO();
-        read.setIds(List.of(8L));
-
-        controller.page(request);
-        controller.get(8L);
-        controller.read(read);
-        controller.unreadCount();
-
-        verify(accountService, times(4)).requireContext(ACCOUNT_ID);
-        assertEquals("feedback", request.getBizType());
-        verify(messageService).getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
-        verify(messageService).getMyNotifyMessage(8L, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
-        verify(messageService).updateNotifyMessageRead(List.of(8L), ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
-        verify(messageService).getUnreadNotifyMessageCount(ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
+    @Test void messageOnlyActionDoesNotResolveBusinessObject() {
+        fixture("message_detail");
+        assertNull(controller.get(1L).getData().getBusinessTarget());
+        verifyNoInteractions(targetService);
     }
-
-    @Test
-    void allMessageGroupDoesNotSetBizTypeFilter() {
-        PartnerAppMessageController.PartnerMessagePageReqVO request =
-                new PartnerAppMessageController.PartnerMessagePageReqVO();
-        request.setGroup("all");
-        when(messageService.getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue()))
-                .thenReturn(PageResult.empty());
-
-        controller.page(request);
-
-        assertEquals(null, request.getBizType());
-        verify(messageService).getMyMyNotifyMessagePage(request, ACCOUNT_ID, UserTypeEnum.PARTNER.getValue());
+    @Test void inaccessibleMessageNeverResolvesBusinessObject() {
+        when(accountService.requireContext(null)).thenReturn(new PartnerContext(7L, 8L));
+        when(notifyMessageService.getMyNotifyMessage(1L, null, 3)).thenReturn(null);
+        assertNull(controller.get(1L).getData());
+        verifyNoInteractions(targetService);
+    }
+    private void fixture(String action) {
+        when(accountService.requireContext(null)).thenReturn(new PartnerContext(7L, 8L));
+        var message = new NotifyMessageDO(); message.setId(1L); message.setBizId(20L);
+        message.setBizType("sales_order"); message.setActionType(action);
+        when(notifyMessageService.getMyNotifyMessage(1L, null, 3)).thenReturn(message);
     }
 }

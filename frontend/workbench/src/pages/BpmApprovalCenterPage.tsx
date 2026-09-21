@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { MATERIAL_APPROVAL_INVALID_TASK } from '../services/materialApprovalApi'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -36,7 +37,7 @@ import {
   type SimpleUser
 } from '../services/api'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable } from '@ant-design/pro-components'
+
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 type BpmTaskView = 'todo' | 'done'
@@ -428,11 +429,10 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
 
     {unauthorized
       ? <Result status="403" title="审批任务加载被拒绝" subTitle={error || '请确认当前账号是否具备 BPM 查询权限。'}/>
-      : useTableLayout ? <ProTable<BpmTask>
+      : useTableLayout ? <BusinessTable<BpmTask> tableKey="bpm-approval-center-page-1" error={error} onReload={() => void loadFirstPage(true)}
         className="business-inbox-table"
         rowKey="id"
-        search={false}
-        options={{ density: true, fullScreen: true, setting: true }}
+
         columnsState={{ persistenceKey: 'crm-bpm-approval-table-columns', persistenceType: 'localStorage' }}
         loading={loading}
         dataSource={tasks}

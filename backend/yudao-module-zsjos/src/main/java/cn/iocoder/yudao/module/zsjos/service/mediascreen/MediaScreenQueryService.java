@@ -14,6 +14,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenContributionRow;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenTimedContributionRow;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerOwnershipMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.mediascreen.MediaScreenDailySnapshotMapper;
 import cn.iocoder.yudao.module.zsjos.framework.mediascreen.MediaScreenProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,6 +53,7 @@ public class MediaScreenQueryService {
     private final LeadMapper leadMapper;
     private final MediaScreenDailySnapshotMapper snapshotMapper;
     private final PartnerMapper partnerMapper;
+    private final PartnerOwnershipMapper ownershipMapper;
     private final AdminUserApi adminUserApi;
     private final DeptApi deptApi;
     private final MaintenanceModeApi maintenanceModeApi;
@@ -57,12 +61,13 @@ public class MediaScreenQueryService {
     private final MediaScreenProperties properties;
 
     public MediaScreenQueryService(LeadMapper leadMapper, MediaScreenDailySnapshotMapper snapshotMapper,
-                                   PartnerMapper partnerMapper, AdminUserApi adminUserApi, DeptApi deptApi,
+                                   PartnerMapper partnerMapper, PartnerOwnershipMapper ownershipMapper, AdminUserApi adminUserApi, DeptApi deptApi,
                                    MaintenanceModeApi maintenanceModeApi, StringRedisTemplate redis,
                                    MediaScreenProperties properties) {
         this.leadMapper = leadMapper;
         this.snapshotMapper = snapshotMapper;
         this.partnerMapper = partnerMapper;
+        this.ownershipMapper = ownershipMapper;
         this.adminUserApi = adminUserApi;
         this.deptApi = deptApi;
         this.maintenanceModeApi = maintenanceModeApi;
@@ -166,7 +171,7 @@ public class MediaScreenQueryService {
         List<MediaScreenRespVO.Department> directDepartments = buildDirectDepartments(
                 scope, rows, roster);
         MediaScreenRespVO.Department companion = includePartTimers
-                ? buildCompanion(rows, users, partners, rosterUserIds) : null;
+                ? buildCompanion(tenantId, scope, rows, users, partners, rosterUserIds) : null;
         MediaScreenRespVO.Metrics summary = sumDepartments(directDepartments);
         if (companion != null) add(summary, companion.getMetrics());
 
@@ -210,24 +215,51 @@ public class MediaScreenQueryService {
         return result;
     }
 
-    private MediaScreenRespVO.Department buildCompanion(List<MediaScreenContributionRow> allRows,
+    private MediaScreenRespVO.Department buildCompanion(Long tenantId, DepartmentScope scope, List<MediaScreenContributionRow> allRows,
                                                          Map<Long, AdminUserRespDTO> users,
                                                          Map<Long, PartnerDO> partners,
                                                          Set<Long> rosterUserIds) {
         List<MediaScreenContributionRow> rows = allRows.stream()
                 .filter(row -> PART_TIME.equals(row.getContributionType())).toList();
-        if (rows.isEmpty()) return null;
+        List<PartnerOwnershipDO> ownerships = rosterUserIds.isEmpty() ? List.of()
+                : ownershipMapper.selectList(new LambdaQueryWrapperX<PartnerOwnershipDO>()
+                        .eq(PartnerOwnershipDO::getTenantId, tenantId)
+                        .in(PartnerOwnershipDO::getEmployeeUserId, rosterUserIds));
+        Map<Long, PartnerDO> currentPartners = ownerships.isEmpty() ? Map.of()
+                : partnerMapper.selectBatchIds(ownerships.stream().map(PartnerOwnershipDO::getPartnerId)
+                        .distinct().toList()).stream().filter(partner -> "enabled".equals(partner.getStatus()))
+                        .collect(Collectors.toMap(PartnerDO::getId, partner -> partner));
+        if (rows.isEmpty() && currentPartners.isEmpty()) return null;
         MediaScreenRespVO.Department department = department(null, "兼职陪跑", "按提交时员工归属统计");
         rows.forEach(row -> add(department.getMetrics(), metrics(row)));
         Map<Long, List<MediaScreenContributionRow>> groups = rows.stream().collect(Collectors.groupingBy(
                 MediaScreenContributionRow::getContributorUserId, LinkedHashMap::new, Collectors.toList()));
+        ownerships.stream().filter(ownership -> currentPartners.containsKey(ownership.getPartnerId()))
+                .forEach(ownership -> groups.computeIfAbsent(ownership.getEmployeeUserId(), ignored -> List.of()));
         for (Map.Entry<Long, List<MediaScreenContributionRow>> entry : groups.entrySet()) {
             if (!rosterUserIds.contains(entry.getKey()) || !isEnabled(users.get(entry.getKey()))) continue;
-            String name = snapshotName(entry.getValue());
+            String name = entry.getValue().isEmpty() ? users.get(entry.getKey()).getNickname()
+                    : snapshotName(entry.getValue());
             if (name == null) continue;
-            String departmentName = distinctDepartmentName(entry.getValue());
+            String departmentName = entry.getValue().isEmpty()
+                    ? scope.rootDepartments().get(scope.rootFor(users.get(entry.getKey()).getDeptId())).getName()
+                    : distinctDepartmentName(entry.getValue());
+            List<MediaScreenRespVO.PartTimerDetail> details = partnerDetails(entry.getValue(), partners);
+            Set<Long> represented = details.stream().map(MediaScreenRespVO.PartTimerDetail::getPartnerId)
+                    .collect(Collectors.toSet());
+            // Current ownership supplies missing roster entries, never transfers historical contributions.
+            ownerships.stream().filter(ownership -> Objects.equals(entry.getKey(), ownership.getEmployeeUserId()))
+                    .map(ownership -> currentPartners.get(ownership.getPartnerId())).filter(Objects::nonNull)
+                    .filter(partner -> represented.add(partner.getId())).forEach(partner -> {
+                        MediaScreenRespVO.PartTimerDetail detail = new MediaScreenRespVO.PartTimerDetail();
+                        detail.setPartnerId(partner.getId());
+                        detail.setName(partner.getName());
+                        details.add(detail);
+                    });
+            details.sort(Comparator.comparingLong(MediaScreenRespVO.PartTimerDetail::getToday).reversed()
+                    .thenComparing(MediaScreenRespVO.PartTimerDetail::getName));
             department.getMembers().add(member(entry.getKey(), name, departmentName, sum(entry.getValue()), false,
-                    partnerDetails(entry.getValue(), partners)));
+                    details));
         }
         return department;
     }

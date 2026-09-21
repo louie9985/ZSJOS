@@ -3478,6 +3478,12 @@ export const api = {
     update: async (id: number, data: CourseCalendarInput) => unwrap<boolean>(await http.put(`/zsjos/course-calendar/${id}`, data)),
     delete: async (id: number) => unwrap<boolean>(await http.delete(`/zsjos/course-calendar/${id}`)),
   },
+  checkLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.post("/zsjos/lead/contact-check", data)),
+  checkSelfSourcedLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.post("/zsjos/lead/self-sourced/contact-check", data)),
+  checkEducationSelfSourcedLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.post("/zsjos/lead/education-self-sourced/contact-check", data)),
   leadCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/lead/product/catalog")),
   uploadLeadAttachment: async (file: File) => {
@@ -3799,7 +3805,7 @@ export const api = {
           params: { accountId, sceneCode },
         }),
       ),
-    create: async (data: { sceneCode: string; accountId: number; assigneeUserId?: number; targetDeptId?: number; operatorRemark?: string; values?: Record<string, unknown>; attachmentIds?: number[] }) =>
+    create: async (data: { sceneCode: string; accountId: number; accountIds?: number[]; studentPersonId?: number; assigneeUserId?: number; targetDeptId?: number; operatorRemark?: string; values?: Record<string, unknown>; attachmentIds?: number[] }) =>
       unwrap<number>(
         await http.post("/zsjos/production-ticket/create", {
           ...data,
@@ -4247,6 +4253,7 @@ export const api = {
     status?: LeadAgingPoolStatus;
     inboxGroup?: string;
     inboxStage?: string;
+    relationScope?: "owned" | "following";
     advancedFilter?: AdvancedFilterGroup;
   }) =>
     params.advancedFilter
@@ -5750,7 +5757,7 @@ export const api = {
         await http.get(`/zsjos/media-students/${personId}`),
       ),
     target: async (bizType: string, bizId: number) =>
-      unwrap<{ personId: number; targetTab: string; recordId: number }>(
+      unwrap<{ personId: number; targetTab: string; recordId: number; serviceRelationId?: number }>(
         await http.get("/zsjos/media-students/target", {
           params: { bizType, bizId },
         }),
@@ -6025,4 +6032,3 @@ export const api = {
       }),
     ),
 };
-

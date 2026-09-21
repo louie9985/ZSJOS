@@ -1,3 +1,4 @@
+import { isMobileWorkbench } from '@/utils/workbenchAuth'
 export const IMPERSONATION_STORAGE_KEY = 'zsjos.impersonation.session'
 export const IMPERSONATION_CHANGE_EVENT = 'zsjos-impersonation-change'
 export const IMPERSONATION_SESSION_INVALID_CODE = 1_900_007_002
@@ -20,6 +21,7 @@ export const clearStoredImpersonation = () => {
 }
 
 export const getStoredImpersonation = <T extends StoredImpersonationSession>(): T | undefined => {
+  if (isMobileWorkbench) return undefined
   const value = sessionStorage.getItem(IMPERSONATION_STORAGE_KEY)
   if (!value) return undefined
   try {

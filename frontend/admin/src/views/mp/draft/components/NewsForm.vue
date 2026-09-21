@@ -93,7 +93,7 @@
             placeholder="请输入作者"
             style="margin-top: 5px"
           />
-          <el-input
+          <ResourceLinkInput
             v-model="activeNewsItem.contentSourceUrl"
             placeholder="请输入原文地址"
             style="margin-top: 5px"
@@ -126,6 +126,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { Editor } from '@/components/Editor'
 import { createEditorConfig } from '../editor-config'
 import CoverSelect from './CoverSelect.vue'

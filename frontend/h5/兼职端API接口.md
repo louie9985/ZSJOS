@@ -1019,6 +1019,8 @@ GET /part-api/zsjos/messages/unread-count
 
 `groups` 返回服务端维护的分组：全部、客资、反馈、提现。分页支持 `group=lead|feedback|withdrawal`，Controller 映射为服务端 `bizType` 查询。
 
+消息详情额外返回可选 `businessTarget`、`targetUnavailableReason`。对 `sales_order` 且 `actionType=business_detail`，后端先校验消息所有权，再确认订单关联客资属于当前兼职业务主体，返回 `/lead/{id}`；H5 使用该路径进入具体客资详情。关联不存在或无权查看时不返回入口，展示原因；不再跳转泛化客资列表。`message_detail`、`none` 不提供业务跳转。客资详情仍执行路由权限与后端对象校验，路径 ID 不作为用户可见客资编号。
+
 已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。消息接口要求 PARTNER 身份，并按 `user_type=PARTNER` 与当前 Partner Account ID 校验所有权。
 
 普通业务请求的 HTTP 401 和业务 `code=401` 进入同一个单航班刷新流程。刷新请求不进入普通拦截器，原请求最多重放一次；刷新失败时全部等待请求结束、认证状态清空，并带原目标地址统一返回登录页。主动退出请求明确跳过刷新，清理后不保留回跳地址。

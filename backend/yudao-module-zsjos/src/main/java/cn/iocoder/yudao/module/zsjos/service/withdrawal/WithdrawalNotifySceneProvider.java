@@ -39,7 +39,8 @@ public class WithdrawalNotifySceneProvider implements NotifySceneProvider {
     }
     private NotifySceneRespDTO scene(String code, String name, String... roles) {
         return new NotifySceneRespDTO(code, name, List.of(
-                new NotifySceneVariableRespDTO("withdrawal.id", "提现单编号", false),
+                new NotifySceneVariableRespDTO("withdrawal.id", "内部提现ID", false),
+                new NotifySceneVariableRespDTO("withdrawal.no", "提现单号", false),
                 new NotifySceneVariableRespDTO("withdrawal.amount", "提现金额", false),
                 new NotifySceneVariableRespDTO("pendingCount", "待审核笔数", false),
                 new NotifySceneVariableRespDTO("approvedCount", "待打款笔数", false),

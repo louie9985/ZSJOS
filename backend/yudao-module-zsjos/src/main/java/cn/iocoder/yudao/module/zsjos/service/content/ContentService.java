@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.content;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
@@ -28,6 +30,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ContentService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private ContentMapper mapper;
     @Resource private ContentVersionMapper contentVersionMapper;
     @Resource private PermissionApi permissionApi;
@@ -184,9 +187,14 @@ public class ContentService {
             payload.put("deepLink", "/zsjos/media-students?personId=" + linkedAccount.getStudentPersonId()
                     + "&tab=content&contentId=" + id);
         }
+        if (CONTENT_ACCEPTANCE.equals(target)) collaborationNotify.send(MEDIA_CONTENT_PENDING_ACCEPTANCE,
+                BIZ_TYPE_CONTENT, id, content.getContentNo(), operator, "content-ready-for-batch:" + id + ":" + version,
+                java.util.Arrays.asList(content.getOwnerOperatorUserId()), payload);
+        if (CONTENT_PUBLISHED.equals(target)) collaborationNotify.account(MEDIA_CONTENT_PUBLISHED, linkedAccount,
+                operator, "content-published:" + id + ":" + version, java.util.Map.of());
         if (CONTENT_READY_TO_PUBLISH.equals(target) || CONTENT_REJECTED.equals(target)) {
             Long recipient = resolveExecutionRecipient(content);
-            String scene = CONTENT_READY_TO_PUBLISH.equals(target) ? "media.content.approved" : "media.content.rejected";
+            String scene = CONTENT_READY_TO_PUBLISH.equals(target) ? MEDIA_CONTENT_APPROVED : MEDIA_CONTENT_REJECTED;
             workflowEventService.notify(scene, BIZ_TYPE_CONTENT, id, recipient, operator,
                     "content-result:" + id + ":" + version + ":" + target, payload);
         }

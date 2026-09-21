@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import cn.hutool.core.io.IoUtil;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.WORK_ORDER_RELATED_ACCOUNT_REQUIRED;
 
 @Tag(name = "管理后台 - 通用工单")
 @RestController
@@ -38,7 +36,7 @@ public class WorkOrderController {
     @PostMapping("/create") @Operation(summary = "发起工单") @PreAuthorize("@ss.hasPermission('zsjos:work-order:create')") public CommonResult<Long> create(@Valid @RequestBody WorkOrderCreateReqVO req) {
         Long userId = getLoginUserId();
         if (!service.isProductionTemplate(req.getSceneCode(), userId)) return success(service.create(req, userId));
-        if (req.getRelatedAccountId() == null) throw exception(WORK_ORDER_RELATED_ACCOUNT_REQUIRED);
+        // 工单中心发起的拍剪工单允许不绑定账号；账号绑定要求只属于账号页的发起来源。
         ProductionTicketSaveReqVO ticket = new ProductionTicketSaveReqVO();
         ticket.setSceneCode(req.getSceneCode()); ticket.setAccountId(req.getRelatedAccountId());
         ticket.setAssigneeUserId(req.getTargetUserId()); ticket.setTargetDeptId(req.getTargetDeptId());

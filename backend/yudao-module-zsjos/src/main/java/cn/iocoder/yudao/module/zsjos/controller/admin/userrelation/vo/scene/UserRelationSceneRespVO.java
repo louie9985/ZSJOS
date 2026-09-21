@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.userrelation.vo.scene;
 
 import lombok.Data;
+import java.util.List;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +16,9 @@ public class UserRelationSceneRespVO {
     private String sourceType;
     private String sourcePostCode;
     private String targetPostCode;
+    private List<String> sourcePostCodes;
+    private List<String> targetPostCodes;
+
     private String targetEligibilityType;
     private String targetPermissionCode;
     private Integer status;

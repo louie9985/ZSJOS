@@ -42,7 +42,7 @@
         <Editor v-model="formData.content" height="320px" />
       </el-form-item>
       <el-form-item v-else label="跳转链接" prop="url">
-        <el-input v-model="formData.url" placeholder="https://example.com/..." />
+        <ResourceLinkInput v-model="formData.url" placeholder="https://example.com/..." />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -53,6 +53,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import * as MaterialApi from '@/api/im/manager/channel/material'
 import ChannelSelect from '../list/components/ChannelSelect.vue'

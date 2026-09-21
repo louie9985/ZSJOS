@@ -123,6 +123,15 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     }
 
     @Override
+    public List<cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO> getPendingTasks(String processInstanceId) {
+        if (processInstanceId == null || processInstanceId.isBlank()) return List.of();
+        return bpmTaskService.getTasksByProcessInstanceIds(List.of(processInstanceId)).stream()
+                .map(task -> new cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO(task.getId(),
+                        task.getTaskDefinitionKey(), NumberUtil.parseLong(task.getAssignee(), null),
+                        toLocalDateTime(task.getCreateTime()))).toList();
+    }
+
+    @Override
     public void triggerTask(String processInstanceId, String taskDefineKey) {
         bpmTaskService.triggerTask(processInstanceId, taskDefineKey);
     }

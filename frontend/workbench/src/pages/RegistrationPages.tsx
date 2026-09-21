@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
 import { productSpecText } from '../services/productSpecs'
@@ -28,7 +29,7 @@ import {
 } from "antd";
 import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
-import { ProTable, type ProColumns } from "@ant-design/pro-components";
+import { type ProColumns } from "@ant-design/pro-components";
 import dayjs from "dayjs";
 import { ClipboardUploadButtons } from "../components/ClipboardPasteTarget";
 import LeadDetailOverview, { NameAvatar } from "../components/LeadDetailOverview";
@@ -40,18 +41,6 @@ import OverflowToolbar, { type ToolbarAction } from "../components/OverflowToolb
 import ResizableDetailDrawer from "../components/ResizableDetailDrawer";
 import { useInboxTableLayout } from "../services/inboxLayout";
 
-const STUDENT_TABLE_WIDTHS_KEY = "crm-student-management-table-widths";
-const clampStudentWidth = (value: number) => Math.max(100, Math.round(value));
-function readStudentWidths(): Record<string, number> {
-  try { const parsed = JSON.parse(window.localStorage.getItem(STUDENT_TABLE_WIDTHS_KEY) || "{}"); return Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isFinite(value)).map(([key, value]) => [key, clampStudentWidth(Number(value))])); } catch { return {}; }
-}
-function resizeStudentColumn(event: React.PointerEvent<HTMLElement>, width: number, onResize: (next: number) => void) {
-  if (event.currentTarget.getBoundingClientRect().right - event.clientX > 12) return;
-  event.preventDefault(); event.stopPropagation(); const startX = event.clientX;
-  const move = (next: PointerEvent) => onResize(clampStudentWidth(width + next.clientX - startX));
-  const done = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", done); };
-  window.addEventListener("pointermove", move); window.addEventListener("pointerup", done, { once: true });
-}
 import {
   api,
   type DictData,
@@ -715,9 +704,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [studentColumnWidths, setStudentColumnWidths] = useState<Record<string, number>>(() => typeof window === "undefined" ? {} : readStudentWidths());
   const [studentSort, setStudentSort] = useState<{ key?: string; order?: "ascend" | "descend" }>({});
-  useEffect(() => { window.localStorage.setItem(STUDENT_TABLE_WIDTHS_KEY, JSON.stringify(studentColumnWidths)); }, [studentColumnWidths]);
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
   const [selectedServiceId, setSelectedServiceId] = useState<number>();
   const [repurchaseOpen, setRepurchaseOpen] = useState(false);
@@ -997,9 +984,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   ];
   const studentTableColumns = studentTableColumnSource.map(column => {
     const key = String(column.key || column.dataIndex || column.title);
-    const width = studentColumnWidths[key] ?? Number(column.width || 140);
-    return { ...column, key, width, ellipsis: true, sortOrder: studentSort.key === key ? studentSort.order : null,
-      onHeaderCell: () => ({ onPointerDownCapture: (event: React.PointerEvent<HTMLElement>) => resizeStudentColumn(event, width, next => setStudentColumnWidths(current => ({ ...current, [key]: next }))) }) };
+    return { ...column, key, sortOrder: studentSort.key === key ? studentSort.order : null };
   });
   const studentTableRows = useMemo(() => {
     if (!studentSort.key || !studentSort.order) return rows;
@@ -1022,16 +1007,16 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
       {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
-      {useTableLayout ? <ProTable<MyStudent>
+      {useTableLayout ? <BusinessTable<MyStudent> tableKey="registration-pages-1" widthPersistenceKey="crm-student-management-table-widths" error={error} onReload={() => { void load(1, { force: true }); void loadDictionaries() }}
         className="lead-management-table"
         rowKey="personId"
-        search={false}
-        toolBarRender={() => [<Space key="student-filters" wrap><Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}
-        options={{ density: true, fullScreen: true, setting: true, reload: () => { void load(1, { force: true }); void loadDictionaries() } }}
+
+        filters={<>{[<Space key="student-filters" wrap><Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
+
         columnsState={{ persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
         loading={loading}
         dataSource={studentTableRows}
-        pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], onChange: value => void load(value) }}
+        pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: value => void load(value) }}
         scroll={{ x: 1400 }}
         locale={{ emptyText: error ? "学员列表加载失败" : "当前筛选下暂无学员" }}
         onRow={row => ({ onClick: () => { void loadStudent(row.personId); setDrawerOpen(true); } })}

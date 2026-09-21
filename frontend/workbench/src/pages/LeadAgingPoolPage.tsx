@@ -8,7 +8,6 @@ import {
   Modal,
   Select,
   Skeleton,
-  Space,
   Tag,
   Typography,
   message,
@@ -26,7 +25,7 @@ import LeadDetail from "../components/LeadDetail";
 import type { ToolbarAction } from "../components/OverflowToolbar";
 import { NameAvatar } from "../components/LeadDetailOverview";
 import { formatTimestamp } from "../services/time";
-import { AdvancedFilterToolbar, filterCount } from "../components/AdvancedFilter";
+import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import { isLeadInboxUnauthorized } from "../services/leadManagement";
 
 const statusLabel: Record<LeadAgingPoolStatus, string> = {
@@ -42,6 +41,7 @@ export default function LeadAgingPoolPage() {
   const [filterProfile, setFilterProfile] = useState<LeadInboxFilterProfile>({
     groups: [],
   });
+  const [relationScope, setRelationScope] = useState<"owned" | "following">();
   const [inboxStage, setInboxStage] = useState<string>();
   const [keyword, setKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
@@ -106,6 +106,7 @@ export default function LeadAgingPoolPage() {
             keyword: nextKeyword || undefined,
             inboxGroup: agingPoolGroup?.key || "all",
             inboxStage: inboxStage || "all",
+            relationScope,
             advancedFilter,
           }),
           api.agingPoolCounts(),
@@ -135,7 +136,7 @@ export default function LeadAgingPoolPage() {
         if (requestId === listRequestRef.current) setLoading(false);
       }
     },
-    [advancedFilter, agingPoolGroup?.key, inboxStage, keyword, loadDetail],
+    [advancedFilter, agingPoolGroup?.key, inboxStage, keyword, loadDetail, relationScope],
   );
 
   useEffect(() => {
@@ -215,37 +216,32 @@ export default function LeadAgingPoolPage() {
 
   return (
     <section className="workspace-page aging-pool-page">
+      <header className="lead-simple-status-shell" role="group" aria-label="公海池常驻筛选">
+        <button type="button" className={!inboxStage && !relationScope ? "active" : ""}
+          aria-pressed={!inboxStage && !relationScope}
+          onClick={() => { setPageNo(1); setInboxStage(undefined); setRelationScope(undefined) }}>
+          全部 {counts.all || 0}
+        </button>
+        <button type="button" className={relationScope === "owned" ? "active" : ""}
+          aria-pressed={relationScope === "owned"}
+          onClick={() => { setPageNo(1); setInboxStage(undefined); setRelationScope("owned") }}>
+          归属我的
+        </button>
+        <button type="button" className={relationScope === "following" ? "active" : ""}
+          aria-pressed={relationScope === "following"}
+          onClick={() => { setPageNo(1); setInboxStage(undefined); setRelationScope("following") }}>
+          我跟进的
+        </button>
+        {agingPoolOptions.filter(option => option.key !== "all").map(option => (
+          <button type="button" key={option.key} className={inboxStage === option.key ? "active" : ""}
+            aria-pressed={inboxStage === option.key}
+            onClick={() => { setPageNo(1); setRelationScope(undefined); setInboxStage(option.key) }}>
+            {option.label}
+          </button>
+        ))}
+      </header>
       <div className="aging-pool-toolbar">
-        {filterCount(advancedFilter) === 0 && <Space wrap>
-          <Button
-            type={!inboxStage ? "primary" : "default"}
-            onClick={() => {
-              setPageNo(1);
-              setInboxStage(undefined);
-            }}
-          >
-            全部 {counts.all || 0}
-          </Button>
-          {agingPoolOptions
-            .filter((option) => option.key !== "all")
-            .map((option) => {
-              return (
-                <Button
-                  key={option.key}
-                  type={inboxStage === option.key ? "primary" : "default"}
-                  onClick={() => {
-                    setPageNo(1);
-                    setInboxStage(option.key);
-                  }}
-                >
-                  {option.label}
-                </Button>
-              );
-            })}
-        </Space>}
-        <Space>
-          <AdvancedFilterToolbar scene="lead" pageKey="lead_aging_pool" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
-        </Space>
+        <AdvancedFilterToolbar scene="lead" pageKey="lead_aging_pool" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
       </div>
       {error && (
         <Alert

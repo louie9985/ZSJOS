@@ -15,6 +15,15 @@ import java.util.List;
 @Mapper
 public interface NotifyBusinessOutboxMapper extends BaseMapperX<NotifyBusinessOutboxDO> {
     @TenantIgnore
+    @Update("""
+            UPDATE system_notify_business_outbox SET payload=#{payload}, lease_until=#{leaseUntil}, update_time=#{now}
+            WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' AND status='processing'
+              AND claim_token=#{claimToken} AND lease_until > #{now}
+            """)
+    int checkpoint(@Param("id") Long id, @Param("tenantId") Long tenantId, @Param("claimToken") String claimToken,
+                   @Param("payload") String payload, @Param("now") LocalDateTime now,
+                   @Param("leaseUntil") LocalDateTime leaseUntil);
+    @TenantIgnore
     @Select("""
             SELECT * FROM system_notify_business_outbox
             WHERE deleted = b'0' AND next_attempt_at <= #{now}
@@ -27,11 +36,18 @@ public interface NotifyBusinessOutboxMapper extends BaseMapperX<NotifyBusinessOu
     @Update("""
             UPDATE system_notify_business_outbox
             SET status='processing', lease_until=#{leaseUntil}, claim_token=#{claimToken}, update_time=#{now}
-            WHERE id=#{id} AND deleted=b'0'
+            WHERE id=#{id} AND deleted=b'0' AND next_attempt_at <= #{now}
               AND (status='pending' OR (status='processing' AND lease_until < #{now}))
             """)
     int claim(@Param("id") Long id, @Param("now") LocalDateTime now,
               @Param("leaseUntil") LocalDateTime leaseUntil, @Param("claimToken") String claimToken);
+
+    @TenantIgnore
+    @Select("""
+            SELECT * FROM system_notify_business_outbox
+            WHERE id=#{id} AND deleted=b'0' AND status='processing' AND claim_token=#{claimToken}
+            """)
+    NotifyBusinessOutboxDO selectClaimed(@Param("id") Long id, @Param("claimToken") String claimToken);
 
     @TenantIgnore
     @Update("""

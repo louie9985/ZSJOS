@@ -1,3 +1,4 @@
+import { isMobileWorkbench } from '@/utils/workbenchAuth'
 /**
  * 配置浏览器本地存储的方式，可直接存储对象数组。
  */
@@ -8,9 +9,9 @@ type CacheType = 'localStorage' | 'sessionStorage'
 
 export const CACHE_KEY = {
   // 用户相关
-  ROLE_ROUTERS: 'roleRouters',
-  USER: 'user',
-  VisitTenantId: 'visitTenantId',
+  ROLE_ROUTERS: isMobileWorkbench ? 'mobileRoleRouters' : 'roleRouters',
+  USER: isMobileWorkbench ? 'mobileUser' : 'user',
+  VisitTenantId: isMobileWorkbench ? 'mobileVisitTenantId' : 'visitTenantId',
   // 系统设置
   IS_DARK: 'isDark',
   LANG: 'lang',

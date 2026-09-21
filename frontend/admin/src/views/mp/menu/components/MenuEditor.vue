@@ -40,7 +40,7 @@
         </div>
         <div class="configur_content" v-if="menu.type === 'view'">
           <span>跳转链接：</span>
-          <el-input class="input_width" v-model="menu.url" placeholder="请输入链接" clearable />
+          <ResourceLinkInput class="input_width" v-model="menu.url" placeholder="请输入链接" clearable />
         </div>
         <div class="configur_content" v-if="menu.type === 'miniprogram'">
           <div class="applet">
@@ -63,7 +63,7 @@
           </div>
           <div class="applet">
             <span>小程序的备用网页：</span>
-            <el-input
+            <ResourceLinkInput
               class="input_width"
               v-model="menu.url"
               placeholder="不支持小程序的老版本客户端将打开本网页"
@@ -113,6 +113,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import WxReplySelect from '@/views/mp/components/wx-reply'
 import WxNews from '@/views/mp/components/wx-news'
 import WxMaterialSelect from '@/views/mp/components/wx-material-select'

@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.pojo.*;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -28,6 +30,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class MediaAccountProfileService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService businessTaskCommandService;
     @Resource private MediaAccountMapper mapper;
     @Resource private MediaAccountDiagnosisReminderService diagnosisReminders;
@@ -314,6 +317,8 @@ public class MediaAccountProfileService {
         entry.setSnapshotJson(JsonUtils.toJsonString(snapshots)); entries.insert(entry);
         if (completionKey != null && !businessTaskCommandService.completeByKey(completionKey, java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))))
             throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        collaborationNotify.account(MEDIA_ACCOUNT_DIAGNOSIS_COMPLETED, account, userId,
+                "diagnosis-completed:" + id + ":" + req.getIdempotencyKey(), Map.of("cycle", req.getCycle()));
         return req.getVersion()+1;
     }
 

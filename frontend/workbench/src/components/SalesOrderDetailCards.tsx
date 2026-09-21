@@ -1,6 +1,7 @@
+import BusinessTable from './BusinessTable'
 import ProductSpecs from './ProductSpecs'
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Image, Space, Table, Tag, Timeline, Typography } from 'antd'
+import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'antd'
 import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { api, type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
@@ -279,7 +280,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         </section>
         <section className="sales-order-content-section">
           <div className="sales-order-section-heading"><Typography.Text strong>成交课程</Typography.Text></div>
-          <Table rowKey="id" size="small" pagination={false} dataSource={order.items} columns={[
+          <BusinessTable tableKey="sales-order-detail-cards-1" columnMode="native" mode="compact" rowKey="id" size="small" pagination={false} dataSource={order.items} columns={[
             { title: '课程', render: (_, item) => <div><strong>{item.productName || item.skuName || '-'}</strong><div>{item.categoryPath?.join(' / ')}</div><ProductSpecs product={item} />{item.skuName && item.skuName !== item.productName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}</div> },
             { title: '实际成交金额', width: 150, render: (_, item) => `¥${Number(item.actualAmount).toFixed(2)}` }
           ]}/>

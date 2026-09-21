@@ -52,11 +52,26 @@ class ZsjosBpmBusinessTaskTargetServiceImplTest {
         when(processTaskApi.getTodoTask(USER_ID, TASK_ID)).thenReturn(task("zsjos_viral_account_review", "material-version:3", "viralReview", "process"));
         when(permissionApi.hasAnyPermissions(USER_ID, "zsjos:material-approval:query")).thenReturn(true);
         var result = service.getTarget(TASK_ID, "todo", USER_ID);
-        // 素材审批没有独立页面：复用素材管理页，由 taskId/versionId 把页面切到审批态。
-        assertEquals("/zsjos/material-library/manage", result.getRoute());
+        // 素材审批有独立页面：管理页无法用素材 id 重建待办 BPM 任务，因此必须走 approvals 专页。
+        assertEquals("/zsjos/material-library/approvals", result.getRoute());
         assertEquals(3L, result.getQuery().get("versionId"));
         assertEquals(TASK_ID, result.getQuery().get("taskId"));
+        assertEquals(Boolean.FALSE, result.getQuery().get("done"));
+        assertEquals("viral_account", result.getQuery().get("typeCode"));
         verify(materialApprovalService).requireTask(3L, TASK_ID, false, USER_ID);
+    }
+
+    /** 已办任务必须带 done=true，审批页据此切成只读态；内容流程与账号流程共用该路由。 */
+    @Test
+    void viralContentDoneTaskLinksToReadOnlyApprovalPage() {
+        when(processTaskApi.getDoneTask(USER_ID, TASK_ID)).thenReturn(task("zsjos_viral_content_review", "material-version:3", "viralReview", "process"));
+        when(permissionApi.hasAnyPermissions(USER_ID, "zsjos:material-approval:query")).thenReturn(true);
+        var result = service.getTarget(TASK_ID, "done", USER_ID);
+        assertEquals("/zsjos/material-library/approvals", result.getRoute());
+        assertEquals(Boolean.TRUE, result.getQuery().get("done"));
+        assertEquals("viral_content", result.getQuery().get("typeCode"));
+        verify(materialApprovalService).requireTask(3L, TASK_ID, true, USER_ID);
+        verify(processTaskApi, never()).getTodoTask(anyLong(), anyString());
     }
 
     @Test

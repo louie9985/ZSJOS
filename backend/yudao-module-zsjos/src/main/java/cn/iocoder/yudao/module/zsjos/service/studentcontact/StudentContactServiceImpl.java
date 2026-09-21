@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
@@ -65,6 +67,7 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 @Service
 @Slf4j
 public class StudentContactServiceImpl implements StudentContactService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.positioninginterview.PositioningInterviewMapper positioningInterviewMapper;
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
@@ -571,6 +574,11 @@ public class StudentContactServiceImpl implements StudentContactService {
         relation.setVersion(relation.getVersion() + 1); relationMapper.updateById(relation);
         writeAssignmentLog(relationId, request.getCollaboratorType(), previous, request.getUserId(), userId,
                 request.getCorrectionReason(), request.getIdempotencyKey());
+        if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType()) && previous != null
+                && !Objects.equals(previous, request.getUserId())) {
+            collaborationNotify.send(MEDIA_STUDENT_COLLABORATOR_CHANGED, "student_service", relationId, "", userId,
+                    "director-handover:" + relationId + ":" + relation.getVersion(), List.of(previous), Map.of());
+        }
         if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) {
             SalesOrderDO order = orderMapper.selectById(relation.getOrderId());
             LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
@@ -984,6 +992,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         relation.setDirectorPrecheckDraftVersion(nextDraftVersion);
         if (submit) relation.setVersion(relation.getVersion() + 1);
         relationMapper.updateById(relation);
+        if (submit) collaborationNotify.student(MEDIA_STUDENT_INTERVIEW_SCHEDULED, relation, userId,
+                "interview-scheduled:" + relationId + ":" + nextDraftVersion);
         return nextDraftVersion;
     }
 
@@ -1113,6 +1123,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (correction && StrUtil.isBlank(request.getCorrectionReason())) {
             throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
         }
+        Set<Long> previousOperators = relations.stream().map(ServiceRelationDO::getOperatorUserId)
+                .filter(Objects::nonNull).filter(id -> !Objects.equals(id, request.getUserId()))
+                .collect(java.util.stream.Collectors.toSet());
         for (ServiceRelationDO relation : relations) {
             Long previous = relation.getOperatorUserId();
             boolean selectedRelation = Objects.equals(relation.getId(), selected.getId());
@@ -1137,6 +1150,8 @@ public class StudentContactServiceImpl implements StudentContactService {
                 }
             }
         }
+        collaborationNotify.send(MEDIA_STUDENT_COLLABORATOR_CHANGED, "student_service", selected.getId(), "", userId,
+                "operator-handover:" + selected.getPersonId() + ":" + request.getIdempotencyKey(), previousOperators, Map.of());
         PersonDO student = personMapper.selectById(selected.getPersonId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("operatorUserId", request.getUserId());

@@ -48,13 +48,21 @@
   </div>
 
   <el-form-item v-else :label="field.label" :required="field.required" class="material-value-field">
+    <ResourceLinkInput
+      v-if="field.type === 'https-link'"
+      :model-value="stringValue"
+      :maxlength="field.maxLength"
+      :disabled="readonly"
+      placeholder="https://"
+      @update:model-value="update"
+    />
     <el-input
-      v-if="field.type === 'text' || field.type === 'https-link'"
+      v-else-if="field.type === 'text'"
       :model-value="stringValue"
       :maxlength="field.maxLength"
       :disabled="readonly"
       clearable
-      :placeholder="field.type === 'https-link' ? 'https://' : undefined"
+      placeholder=""
       @update:model-value="update"
     />
     <el-input
@@ -192,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import type { UploadRequestOptions } from 'element-plus'
 import { Editor } from '@/components/Editor'
 import { uploadMaterialFile, type MaterialFieldDefinition, type MaterialFile } from '@/api/zsjos/material'

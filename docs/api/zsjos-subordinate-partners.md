@@ -48,3 +48,18 @@ owner and does not rewrite Lead snapshots.
 Partner Leads created after V143 snapshot `partnerOwnerUserIdSnapshot` and
 `partnerOwnerNameSnapshot` at submission. Older null snapshots display `未记录`; current ownership is
 never substituted as historical fact.
+
+## Workbench presentation
+
+兼职管理提供收件箱和表格两种视图，复用相同的服务端搜索与分页结果。收件箱沿用学员管理的
+头像卡片、搜索同行收起按钮与窄头像栏；折叠偏好只存储在当前浏览器，切换不改变授权范围。
+桌面列表、搜索工具栏使用一致左右边界，移动端收起后显示横向头像条。
+
+点击兼职默认进入“概览”，展示账号身份、当前归属、生命周期时间与客资统计。“累计提交客资”
+取该兼职客资分页接口的 `total`，不受明细分页影响。概览不展示分页内指标；现有接口没有提供
+全量已分配、成交等汇总，不以当前页数据推断整体成交率、业绩或趋势。“客资明细”提供服务端分页表格，通过客资编号或查看详情
+进入现有只读详情；返回保留兼职选择、搜索和客资分页。编号使用 `leadNo`，分类和提交时归属展示
+保存的快照，缺失时显示未记录。管理命令继续仅对 `zsjos:partner:manage-all` 开放。
+
+兼职列表与客资明细使用现有 ProTable，启用刷新、密度、全屏、列设置；两张表独立保存浏览器列配置。
+搜索仍使用原服务端搜索，分页仍为每页 20 条，不启用重复的自动搜索表单。归属历史弹窗使用紧凑 ProTable，关闭额外工具栏。

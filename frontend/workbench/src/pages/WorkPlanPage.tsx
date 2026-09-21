@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Pagination,
@@ -293,12 +294,36 @@ export default function WorkPlanPage({ permissions }: { permissions: string[] })
     finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [page])
+  const location = useLocation()
+  useEffect(() => {
+    const query = new URLSearchParams(location.search)
+    const planId = Number(query.get('planId')), taskId = Number(query.get('taskId'))
+    let active = true
+    const openLinked = async () => {
+      try {
+        if (taskId > 0) {
+          const task = await api.workTask(taskId)
+          if (!active) return
+          if (task.planId) {
+            const plan = await api.workPlan(task.planId)
+            if (active) setDetail(plan)
+          } else { setView('tasks'); setLinkedTask(task) }
+        } else if (planId > 0) {
+          const plan = await api.workPlan(planId)
+          if (active) setDetail(plan)
+        }
+      } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : '关联任务不可访问') }
+    }
+    void openLinked()
+    return () => { active = false }
+  }, [location.search])
+  const [linkedTask, setLinkedTask] = useState<WorkTask>()
   const openPlan = async (id: number) => setDetail(await api.workPlan(id))
   const savePlan = async (value: WorkPlanInput) => {
     if (planModal?.plan) await api.updateWorkPlan(planModal.plan.id, value); else await api.createWorkPlan(value)
     setPlanModal(undefined); await load(); message.success('计划已保存')
   }
-  const taskList = useMemo(() => plans.flatMap(plan => (plan.tasks || []).map(task => ({ ...task, planTitle: plan.title }))), [plans])
+  const taskList = useMemo(() => [...(linkedTask ? [{ ...linkedTask, planTitle: "临时任务" }] : []), ...plans.flatMap(plan => (plan.tasks || []).map(task => ({ ...task, planTitle: plan.title })))], [plans, linkedTask])
   const renderTaskActions = (task: WorkTask) => <Space wrap>
     {task.availableActions.includes('assign') && <Button size="small" onClick={() => setTaskModal({ task })}>调整任务</Button>}
     {task.availableActions.includes('decompose') && <Button size="small" onClick={() => setTaskModal({ parentTaskId: task.id })}>分派给下属</Button>}

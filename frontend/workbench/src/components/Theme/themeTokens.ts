@@ -42,7 +42,7 @@ const NO_EDGE = 'inset 0 0 0 0 transparent'
 /**
  * 导航栏 / 侧栏底色在容器色里掺入的布局色比例（%）。
  *
- * 表面色阶的设计意图是 layout → sunken → chrome → container → elevated 五级，
+ * 表面层级为 layout → chrome → container → elevated，子块沿用 container，
  * 但 chrome 此前直接取 colorBgContainer，与卡片同为纯白，两级塌成一个色。
  * 掺一点布局灰把这一级拉开：浅色主题下 #ffffff → 约 #fafafb，暗色主题下同理
  * 略微压暗（colorBgLayout 比 container 深），方向一致。
@@ -103,7 +103,8 @@ export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record
     '--crm-bg-elevated': hasBackground ? glass(token.colorBgElevated, elevatedPct) : token.colorBgElevated,
     // overlay：有遮罩隔离的大面板（modal / drawer），比 elevated 更透以配合 backdrop-filter
     '--crm-bg-overlay': hasBackground ? glass(token.colorBgElevated, overlayPct) : token.colorBgElevated,
-    '--crm-bg-sunken': hasBackground ? glass(token.colorFillQuaternary, containerPct) : token.colorFillQuaternary,
+    // 兼容既有 sunken 命名，但表面不再使用更暗底色；子块通过平面或外阴影表达层级。
+    '--crm-bg-sunken': hasBackground ? glass(token.colorBgContainer, containerPct) : token.colorBgContainer,
     '--crm-bg-mask': hasBackground ? glass(token.colorBgMask, 55) : token.colorBgMask,
 
     // ---- 描边（结构分隔线用）----
@@ -132,7 +133,8 @@ export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record
     '--crm-shadow-card': token.boxShadow,
     '--crm-shadow-raised': token.boxShadowSecondary,
     '--crm-shadow-float': token.boxShadow,
-    '--crm-shadow-inset': `inset 0 2px 4px 0 rgba(0, 0, 0, ${hasBackground ? '0.08' : '0.05'})`,
+    // 兼容既有变量名，但统一改为标准外阴影，禁止凹陷内阴影。
+    '--crm-shadow-inset': token.boxShadowTertiary,
 
     // ---- 玻璃：模糊半径与边缘高光 ----
     // 供 CSS 的 backdrop-filter / box-shadow 取用；blur 为 0 时 ThemeVars 会额外

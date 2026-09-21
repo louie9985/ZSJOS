@@ -69,8 +69,6 @@ export const publish = (positioning: boolean, id: number, data: unknown) =>
   request.post({ url: `${prefix(positioning)}/${id}/publish`, data })
 export const createPositioning = (data: unknown) =>
   request.post({ url: '/zsjos/positioning-template', data })
-export const deletePositioning = (id: number) =>
-  request.delete({ url: `/zsjos/positioning-template/${id}` })
 export const getDirectorConfig = (): Promise<DirectorConfig> =>
   request.get({ url: '/zsjos/director-config' })
 export const updateDirectorConfig = (data: DirectorConfig) =>

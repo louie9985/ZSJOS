@@ -9,11 +9,9 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.*;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.AccountStageLogDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountMaintenanceRevisionDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountStageLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMaintenanceRevisionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
@@ -52,7 +50,6 @@ public class MediaAccountMaintenanceService {
 
     @Resource private MediaAccountMapper accountMapper;
     @Resource private MediaAccountMaintenanceRevisionMapper revisionMapper;
-    @Resource private AccountStageLogMapper stageLogMapper;
     @Resource private MediaAccountObjectPermissionProvider objectPermissionProvider;
     @Resource private DictDataApi dictDataApi;
     @Resource private AdminUserApi adminUserApi;
@@ -75,21 +72,6 @@ public class MediaAccountMaintenanceService {
         Map<Long, AdminUserRespDTO> users = userMap(rows.getList().stream()
                 .map(MediaAccountMaintenanceRevisionDO::getOperatedByUserId).toList());
         return new PageResult<>(rows.getList().stream().map(row -> toRevision(row, users)).toList(), rows.getTotal());
-    }
-
-    @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "read")
-    public PageResult<MediaAccountLegacyStageRespVO> legacyStageHistory(Long accountId, PageParam page, Long userId) {
-        require(accountId);
-        PageResult<AccountStageLogDO> rows = stageLogMapper.selectPageByAccountId(page, accountId);
-        Map<Long, AdminUserRespDTO> users = userMap(rows.getList().stream().map(AccountStageLogDO::getJudgedByUserId).toList());
-        return new PageResult<>(rows.getList().stream().map(row -> {
-            MediaAccountLegacyStageRespVO vo = new MediaAccountLegacyStageRespVO();
-            vo.setId(row.getId()); vo.setFromStage(row.getFromStage()); vo.setToStage(row.getToStage());
-            vo.setDirection(row.getDirection()); vo.setJudgmentBasis(row.getJudgmentBasis());
-            vo.setJudgedByUserId(row.getJudgedByUserId()); vo.setJudgedAt(row.getJudgedAt());
-            vo.setJudgedByUserName(userName(users.get(row.getJudgedByUserId())));
-            return vo;
-        }).toList(), rows.getTotal());
     }
 
     public MediaAccountCalendarRespVO calendar(MediaAccountCalendarPageReqVO req, Long userId) {

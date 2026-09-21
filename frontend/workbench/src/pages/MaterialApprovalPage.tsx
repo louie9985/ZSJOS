@@ -1,4 +1,5 @@
-import { Alert, App, Button, Empty, Form, Image, Input, Modal, Result, Skeleton, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
+import BusinessTable from '../components/BusinessTable'
+import { Alert, App, Button, Empty, Form, Image, Input, Modal, Result, Skeleton, Space, Spin, Tabs, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
@@ -83,12 +84,12 @@ export default function MaterialApprovalPage({ permissions }: { permissions: str
     <Tabs activeKey={done ? 'done' : 'todo'} items={[{key:'todo',label:'待我审批'},{key:'done',label:'我已审批'}]}
       onChange={value => {setPage(1); setParams({...(typeCode ? {typeCode} : {}),done:String(value === 'done')})}}/>
     {error ? <Alert type="error" showIcon title={error} action={<Button onClick={() => void load()}>重试</Button>}/> :
-      <Table<MaterialApproval> rowKey={r => r.task.id} dataSource={rows} loading={loading} scroll={{x:640}}
+      <BusinessTable<MaterialApproval> tableKey="material-approval-page-1" columnMode="native" rowKey={r => r.task.id} dataSource={rows} loading={loading} scroll={{x:640}}
         locale={{emptyText:<Empty description={done ? '暂无已审批素材' : '暂无待审批素材'}/>}}
         pagination={{current:page,total,pageSize:APPROVAL_PAGE_SIZE,showSizeChanger:false,onChange:setPage}}
         columns={[{title:'审批类型',render:(_,r) => <Tag color={r.typeCode === 'viral_content' ? 'blue' : 'gold'}>{types.find(type => type.code === r.typeCode)?.name || r.typeCode}</Tag>},{title:'素材编号',dataIndex:'materialNo'},{title:'拆解标题',dataIndex:'title'},
           {title:done ? '处理时间' : '到达时间',render:(_,r) => <DateTimeText value={done ? r.task.endTime : r.task.createTime}/>},
-          {title:'操作',render:(_,r) => <Button type="link" onClick={() => {const next=new URLSearchParams(params); next.set('taskId',r.task.id);next.set('versionId',String(r.versionId));if (r.typeCode) next.set('typeCode',r.typeCode);setParams(next)}}>{done ? '查看记录' : '审批'}</Button>}]}/>}
+          { key: 'action',title:'操作',render:(_,r) => <Button type="link" onClick={() => {const next=new URLSearchParams(params); next.set('taskId',r.task.id);next.set('versionId',String(r.versionId));if (r.typeCode) next.set('typeCode',r.typeCode);setParams(next)}}>{done ? '查看记录' : '审批'}</Button>}]}/>}
     <Modal className="material-approval-detail-modal" open={Boolean(taskId)} title={detail ? <Space><span>{detail.title}</span><Tag>{types.find(type => type.code === (detail.typeCode || typeCode))?.name || detail.typeCode || typeCode}</Tag></Space> : '素材审批详情'} width="min(1280px, calc(100vw - 32px))" footer={null} onCancel={() => !saving && close()}>
       {detailLoading ? <Skeleton active paragraph={{rows: 12}}/> : detailError ? <Alert type="error" showIcon title={detailError} action={<Button onClick={() => void loadDetail()}>重试</Button>}/> : detail?.snapshot && <ResourceLinkPresentation.Provider value={true}><div className="material-approval-detail">
         <aside className="material-approval-visual">

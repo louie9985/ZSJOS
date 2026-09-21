@@ -1,3 +1,5 @@
+import { contentReviewApi } from './materialApi'
+import { workOrderApi } from './workOrderApi'
 import type { NavigateFunction } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import { api, ApiError, AuthenticationError, type NotifyMessage } from './api'
@@ -91,7 +93,8 @@ const syncReadStatusBestEffort = async (detail: NotifyMessage, deps: NotifyMessa
 }
 
 const isStudentMediaBusiness = (detail: NotifyMessage) => isPositiveId(detail.bizId)
-  && ['media-account', 'content', 'positioning-card'].includes(detail.bizType || '')
+  && (['media-account', 'content', 'positioning-card', 'media_account_diagnosis', 'student_delivery_stage'].includes(detail.bizType || '')
+    || (detail.bizType === 'student_service' && (detail.sceneCode?.startsWith('media.') || detail.sceneCode === 'zsjos.student.operator_assigned' || detail.sceneCode === 'zsjos.registration.director_assigned')))
 const legacyMediaRoute = (detail: NotifyMessage) => {
   if (!isPositiveId(detail.bizId)) return null
   if (detail.bizType === 'production-ticket') return `${APP_ROUTES.MEDIA_PRODUCTION_TICKETS}?ticketId=${detail.bizId}`
@@ -99,7 +102,7 @@ const legacyMediaRoute = (detail: NotifyMessage) => {
 }
 
 export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
-  detail.actionType !== 'none' && (
+  detail.actionType === 'business_detail' && (
     isNotifyLeadActionCandidate(detail)
     || detail.sceneCode === 'zsjos.registration.task_created'
     || detail.sceneCode === 'zsjos.lead.public_pool'
@@ -108,6 +111,7 @@ export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
     || (detail.bizType === 'student' && isPositiveId(detail.bizId))
     || (detail.bizType === 'student_service' && isPositiveId(detail.bizId))
     || isStudentMediaBusiness(detail)
+    || (['content_review', 'work-order', 'work_task', 'work_plan'].includes(detail.bizType || '') && isPositiveId(detail.bizId))
     || Boolean(legacyMediaRoute(detail))
   )
 
@@ -147,6 +151,10 @@ export async function resolveNotifyLeadAction(
 export async function executeNotifyMessageAction(detail: NotifyMessage, deps: NotifyMessageActionDeps) {
   await syncReadStatusBestEffort(detail, deps)
   if (detail.actionType === 'none') return
+  if (detail.actionType !== 'business_detail') {
+    deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    return
+  }
   if (detail.sceneCode === 'zsjos.registration.task_created' && isPositiveId(detail.bizId)) {
     deps.navigate(APP_ROUTES.REGISTRATION_POOL, { state: { registrationCaseId: detail.bizId } })
     return
@@ -177,7 +185,7 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
       return
     }
   }
-  if (detail.bizType === 'student_service' && isPositiveId(detail.bizId)) {
+  if (detail.bizType === 'student_service' && isPositiveId(detail.bizId) && !isStudentMediaBusiness(detail)) {
     deps.navigate(APP_ROUTES.MY_STUDENTS, { state: { serviceRelationId: detail.bizId } })
     return
   }
@@ -189,9 +197,32 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
     try {
       const target = await api.mediaStudents.target(detail.bizType!, detail.bizId!)
       const recordKey = target.targetTab === 'accounts' ? 'accountId' : target.targetTab === 'content' ? 'contentId' : 'positioningCardId'
-      deps.navigate(`${APP_ROUTES.MEDIA_STUDENTS}?personId=${target.personId}&tab=${target.targetTab}&${recordKey}=${target.recordId}`)
+      const relation = target.serviceRelationId ? `&serviceRelationId=${target.serviceRelationId}` : ''
+      deps.navigate(`${APP_ROUTES.MEDIA_STUDENTS}?personId=${target.personId}&tab=${target.targetTab}&${recordKey}=${target.recordId}${relation}`)
     } catch {
-      deps.warn('关联记录尚未绑定到当前可访问的学员')
+      deps.warn('关联记录尚未绑定到当前可访问的学员，已打开消息详情')
+      deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    }
+    return
+  }
+  if (isPositiveId(detail.bizId) && ['content_review', 'work-order', 'work_task', 'work_plan'].includes(detail.bizType || '')) {
+    try {
+      if (detail.bizType === 'content_review') {
+        await contentReviewApi.get(detail.bizId)
+        deps.navigate(`${APP_ROUTES.CONTENT_REVIEW}?batchId=${detail.bizId}`)
+      } else if (detail.bizType === 'work-order') {
+        await workOrderApi.detail(detail.bizId)
+        deps.navigate(`${APP_ROUTES.WORK_ORDER_MINE}?workOrderId=${detail.bizId}`)
+      } else if (detail.bizType === 'work_task') {
+        const task = await api.workTask(detail.bizId)
+        deps.navigate(`${APP_ROUTES.WORK_PLANS}?${task.planId ? `planId=${task.planId}&` : ''}taskId=${task.id}`)
+      } else {
+        await api.workPlan(detail.bizId)
+        deps.navigate(`${APP_ROUTES.WORK_PLANS}?planId=${detail.bizId}`)
+      }
+    } catch {
+      deps.warn('关联业务不可访问或暂时加载失败，已打开消息详情')
+      deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
     }
     return
   }

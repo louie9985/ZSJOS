@@ -34,6 +34,7 @@ import java.util.Map;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_TIME_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mockStatic;
@@ -152,6 +153,49 @@ class LeadFollowUpServiceImplTest {
         verify(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
         verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("opportunity"), eq(50L),
                 any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    void validLeadFollowUpCompletesFirstFollowUpOfCurrentCycle() {
+        LeadDO lead = validLead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
+        lead.setCurrentAssignmentHistoryId(88L);
+        lead.setCurrentAssignmentFirstFollowUpAt(null);
+        stubSuccessfulCreate(lead);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("open");
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(lifecycleTaskService.completeFirstFollowUpTask(eq(88L), any(LocalDateTime.class))).thenReturn(true);
+        doAnswer(invocation -> {
+            invocation.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L);
+            return 1;
+        }).when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+
+        verify(lifecycleTaskService).completeFirstFollowUpTask(eq(88L), any(LocalDateTime.class));
+        assertNotNull(lead.getCurrentAssignmentFirstFollowUpAt());
+    }
+
+    @Test
+    void validLeadFollowUpKeepsRecordedFirstFollowUpWhenTaskAlreadyCompleted() {
+        LeadDO lead = validLead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
+        lead.setCurrentAssignmentHistoryId(88L);
+        lead.setCurrentAssignmentFirstFollowUpAt(null);
+        stubSuccessfulCreate(lead);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("open");
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(lifecycleTaskService.completeFirstFollowUpTask(eq(88L), any(LocalDateTime.class))).thenReturn(false);
+        doAnswer(invocation -> {
+            invocation.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L);
+            return 1;
+        }).when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+
+        assertNull(lead.getCurrentAssignmentFirstFollowUpAt());
     }
 
     private void stubSuccessfulCreate(LeadDO lead) {

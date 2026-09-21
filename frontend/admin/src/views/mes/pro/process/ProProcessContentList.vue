@@ -56,7 +56,7 @@
           <el-input v-model="formData.material" placeholder="请输入辅助材料" />
         </el-form-item>
         <el-form-item label="材料文档 URL" prop="docUrl">
-          <el-input v-model="formData.docUrl" placeholder="请输入材料文档 URL" />
+          <ResourceLinkInput v-model="formData.docUrl" placeholder="请输入材料文档 URL" />
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="formData.remark" type="textarea" placeholder="请输入备注" />
@@ -71,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { ProProcessContentApi, ProProcessContentVO } from '@/api/mes/pro/process/content'
 
 defineOptions({ name: 'ProProcessContentList' })

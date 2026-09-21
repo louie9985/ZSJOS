@@ -25,13 +25,13 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item label="支付结果的回调地址" prop="orderNotifyUrl">
-        <el-input v-model="formData.orderNotifyUrl" placeholder="请输入支付结果的回调地址" />
+        <ResourceLinkInput v-model="formData.orderNotifyUrl" placeholder="请输入支付结果的回调地址" />
       </el-form-item>
       <el-form-item label="退款结果的回调地址" prop="refundNotifyUrl">
-        <el-input v-model="formData.refundNotifyUrl" placeholder="请输入退款结果的回调地址" />
+        <ResourceLinkInput v-model="formData.refundNotifyUrl" placeholder="请输入退款结果的回调地址" />
       </el-form-item>
       <el-form-item label="转账结果的回调地址" prop="transferNotifyUrl">
-        <el-input v-model="formData.transferNotifyUrl" placeholder="请输入转账结果的回调地址" />
+        <ResourceLinkInput v-model="formData.transferNotifyUrl" placeholder="请输入转账结果的回调地址" />
       </el-form-item>
       <el-form-item label="备注" prop="remark">
         <el-input v-model="formData.remark" placeholder="请输入备注" />
@@ -45,6 +45,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import * as AppApi from '@/api/pay/app'
 import { CommonStatusEnum } from '@/utils/constants'

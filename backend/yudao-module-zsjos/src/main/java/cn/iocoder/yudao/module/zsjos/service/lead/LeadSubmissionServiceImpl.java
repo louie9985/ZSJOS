@@ -61,6 +61,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
+    @Resource private LeadContactActivationService contactActivationService;
     @Resource private LeadSubmissionIdentityService identityService;
     @Resource private LeadFollowUpRuleService followUpRuleService;
     @Lazy @Resource private LeadDuplicateReviewService duplicateReviewService;
@@ -71,6 +72,30 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
     @Resource private LeadProviderAttributionService providerAttributionService;
+
+    @Override
+    public boolean checkContact(LeadContactCheckReqVO request, Long userId) {
+        LeadSubmissionIdentityService.Resolution identity = identityService.requireOrdinarySubmitter(userId);
+        return checkContact(request, userId, identity.identity());
+    }
+
+    @Override
+    public boolean checkContact(LeadContactCheckReqVO request, Long userId,
+                                LeadSubmissionIdentityService.Identity requestedIdentity) {
+        LeadSubmissionIdentityService.Resolution identity = switch (requestedIdentity) {
+            case SALES -> {
+                identityService.requireSales(userId);
+                yield new LeadSubmissionIdentityService.Resolution(requestedIdentity, null);
+            }
+            case EDUCATION -> {
+                identityService.requireEducationSubmitter(userId);
+                yield new LeadSubmissionIdentityService.Resolution(requestedIdentity, null);
+            }
+            case NEW_MEDIA, PARTNER -> identityService.requireOrdinarySubmitter(userId);
+        };
+        return contactActivationService.activate(request.getMobile(), request.getWechatId(),
+                request.getIdempotencyKey(), userId, sourceType(identity), identity.partnerId());
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -175,6 +200,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         validateContact(mobile, wechatId);
+        if (contactActivationService.activate(mobile, wechatId, reqVO.getIdempotencyKey(), actorUserId,
+                sourceType(identity), identity.partnerId())) {
+            return LeadCreateRespVO.activated(null, null, null);
+        }
         RegionSnapshot region = validateRegion(reqVO.getProvinceCode(), reqVO.getCityCode());
         dictDataApi.validateDictDataList(DICT_SOURCE_CHANNEL, List.of(reqVO.getSourceChannel()));
         LeadCategorySnapshotService.Selection category = categorySnapshotService.requireEnabled(reqVO.getLeadCategory());
@@ -190,25 +219,14 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             requireSameEducationSource(existingReview.getSubmissionSourceType(), identity);
             return duplicateReviewResponse(existingReview);
         }
-        LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
+        LeadDuplicateMatcher.MatchResult match = duplicateMatcher.matchSubmissionWeakRules(reqVO);
         if (match.hasMatches()) {
-            if (match.strongDuplicate()) {
-                duplicateReviewMapper.insert(duplicateReview(reqVO, actorUserId, identity, category, match,
-                        DUPLICATE_REVIEW_STATUS_COMPLETED, match.strongActiveMatch(),
-                        DUPLICATE_RESULT_STRONG_REJECTED, "系统强重复拦截"));
-                throw exception(LEAD_DUPLICATE_STRONG_CONFLICT);
-            }
             LeadDuplicateReviewDO existingPending = duplicateReviewMapper.selectPendingByFingerprint(match.reviewFingerprint());
             if (existingPending != null) return LeadCreateRespVO.reviewPending(existingPending.getId());
             LeadDuplicateReviewDO review = duplicateReview(reqVO, actorUserId, identity, category, match,
                     DUPLICATE_REVIEW_STATUS_PENDING, firstCandidate(match.candidates()),
                     DUPLICATE_RESULT_SUSPECTED_CREATED, null);
             duplicateReviewMapper.insert(review);
-            if (match.crossContactOnly()
-                    && Boolean.TRUE.equals(followUpRuleService.requireEnabledRule().getDuplicateAutoResolutionEnabled())) {
-                Long matchedLeadId = newestMatchedLeadId(match.candidates());
-                return duplicateReviewService.resolveAutomatically(review.getId(), matchedLeadId, actorUserId);
-            }
             return LeadCreateRespVO.reviewPending(review.getId());
         }
 
@@ -338,7 +356,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
         notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), actorUserId,
-                lead.getSubmittedAt(), eventContext(lead, actorUserId));
+                lead.getSubmittedAt(), eventContext(lead, actorUserId, identity));
         dispatchService.start(lead, reqVO.getSpecifiedSalesUserId(), actorUserId);
         return response(leadMapper.selectById(lead.getId()), "created");
     }
@@ -565,8 +583,12 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 .orElseThrow(() -> exception(LEAD_SOURCE_CHANNEL_INVALID));
     }
 
-    private Map<String, Object> eventContext(LeadDO lead, Long actorUserId) {
+    private Map<String, Object> eventContext(LeadDO lead, Long actorUserId,
+                                            LeadSubmissionIdentityService.Resolution identity) {
         Map<String, Object> context = new LinkedHashMap<>();
+        context.put("operatorUserType", identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER
+                ? cn.iocoder.yudao.framework.common.enums.UserTypeEnum.PARTNER.getValue()
+                : cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN.getValue());
         context.put("submitterUserId", lead.getSourceUserId());
         context.put("ownerUserId", lead.getOwnerUserId());
         context.put("pendingSalesUserId", lead.getPendingAssigneeUserId());

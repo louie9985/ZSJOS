@@ -47,9 +47,20 @@ describe('global Admin embed frame', () => {
     Object.values(ADMIN_EMBED_MESSAGE).forEach(type => expect(adminBridge).toContain(type))
   })
 
-  it('mounts the iframe for PC admin_embed pages and blocks them on Mobile', () => {
+  it('mounts authorized admin_embed pages for both platforms', () => {
     expect(resolveAdminEmbedPresentation('PC', 'admin_embed')).toBe('frame')
-    expect(resolveAdminEmbedPresentation('MOBILE', 'admin_embed')).toBe('mobile-blocked')
+    expect(resolveAdminEmbedPresentation('MOBILE', 'admin_embed')).toBe('frame')
     expect(resolveAdminEmbedPresentation('MOBILE', 'native')).toBe('routes')
   })
+})
+
+it('marks Mobile embed URLs without sending tokens', () => {
+  expect(buildAdminEmbedUrl('/system/user', 'MOBILE')).toBe('/admin-embed/system/user?embed=workbench&platform=MOBILE')
+})
+
+it('retains business query and hash when adding the embed platform marker', () => {
+  expect(buildAdminEmbedUrl('/system/user?id=9#detail', 'MOBILE')).toBe(
+    '/admin-embed/system/user?id=9&embed=workbench&platform=MOBILE#detail'
+  )
+  expect(isAdminEmbedResponse({ type: ADMIN_EMBED_MESSAGE.ROUTE_CHANGED, path: '//other.test/' })).toBe(false)
 })

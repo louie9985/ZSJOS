@@ -28,6 +28,8 @@ JSON 导入仅填写表单。历史提交导入需先保存主卡草稿，按钮
 
 学员确认链接仍采用已有令牌校验与失效机制，展示课程服务名称、定位卡号及完整字段快照。字典使用历史标签、素材使用历史标题、附件使用冻结文件名，不按当前字典重解释历史。
 
+定位卡附件字段与定位访谈稿共用同一份格式白名单：文档、图片、音频、视频，每份最多 20MB、最多 20 份，扩展名与 Tika 内容探测结果不一致时拒绝入库。运营上传的学员确认凭证使用同一白名单。账号概览与“选择应用定位卡”弹窗中，来自已配置字典的字段按账号状态样式渲染为小方块（`account-value-tags`），自由文本字段保持纯文本。
+
 ## 数据与上线边界
 
 V258__positioning_service_application.sql 以 V257 对应表结构为前置，仅放宽提交 account_id 的非空约束，创建 zsjos_positioning_service_card、zsjos_positioning_application、zsjos_positioning_application_log，并新增 apply 按钮元数据。SQL 使用 utf8mb4，不写 system_role_menu，不代角色授权。

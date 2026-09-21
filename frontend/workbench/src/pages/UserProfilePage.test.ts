@@ -34,3 +34,9 @@ describe('avatar upload sequencing', () => {
     expect(isLatestAvatarUpload(1, 2)).toBe(false)
   })
 })
+
+it('keeps the Mobile namespace on enterprise WeChat binding callbacks', () => {
+  expect(buildWecomRedirectUri('https://testos.zhongshijian.top', 'MOBILE')).toBe(
+    'https://testos.zhongshijian.top/zsjos/mobile/user/profile?type=30'
+  )
+})

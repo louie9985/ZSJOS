@@ -10,16 +10,17 @@
 
 定义于 `src/styles/tokens.css`。所有自有 CSS 只引用 `var(--crm-*)` 变量。
 
-### 1.1 表面色阶（5 级深→浅）
+### 1.1 表面层级
 
 ```
-layout → sunken → chrome → container → elevated
+layout → chrome → container → elevated
+                   ↳ 子块与 container 同色（兼容名 sunken）
 ```
 
 | 级别 | 变量 | 用途 |
 |---|---|---|
 | layout | `--crm-bg-layout` | 最底层背景（内容区外） |
-| sunken | `--crm-bg-sunken` | 凹陷子区域：字段行、代码块、统计区 |
+| sunken | `--crm-bg-sunken` | 兼容旧命名的子区域底色；使用平面或外阴影，不制造凹陷 |
 | chrome | `--crm-bg-chrome` | 侧边栏、header |
 | container | `--crm-bg-container` | 卡片/面板主体 |
 | elevated | `--crm-bg-elevated` | 浮层/弹窗 |
@@ -28,12 +29,12 @@ layout → sunken → chrome → container → elevated
 
 | Level | 变量 | 场景 |
 |---|---|---|
-| 0 | — | sunken 区域无外阴影 |
+| 0 | — | 平面子块，不加阴影 |
 | 1 | `--crm-shadow` | 静态面板 |
 | 2 | `--crm-shadow-card` | 可交互卡片（默认态） |
 | 3 | `--crm-shadow-raised` | hover 抬起 |
 | 4 | `--crm-shadow-float` | 浮层 / Modal |
-| inset | `--crm-shadow-inset` | 凹陷区域内阴影 |
+| inset | `--crm-shadow-inset` | 兼容旧命名，运行时映射为标准外阴影；禁止向内暗阴影 |
 
 ### 1.3 间距
 
@@ -78,19 +79,21 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 }
 ```
 
-### 2.2 凹陷子块（sunken）
+### 2.2 凸起子块（raised）
 
-用于卡片内的字段行、统计区等内嵌区域：
+用于卡片内的字段行、统计区等内嵌区域。默认使用轻微外阴影；信息密度高或层级不需要强调时可以去掉阴影，但不得使用向内暗阴影：
 
 ```css
-.your-sunken-block {
+.your-raised-block {
   padding: 4px 8px;
   border-radius: var(--crm-radius-sm);
-  background: var(--crm-bg-sunken);
-  box-shadow: var(--crm-shadow-inset);
-  border: none;
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
+  border: 1px solid var(--crm-border);
 }
 ```
+
+`--crm-bg-sunken` 和 `--crm-shadow-inset` 仅为兼容历史类名保留。新代码应使用 `raised`、`container` 或 `box-shadow: none` 表达层级，禁止 `inset` 暗阴影、明显变暗的子块底色和“洞中洞”效果。
 
 ### 2.3 玻璃效果（glass hero/toolbar）
 
@@ -114,8 +117,8 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 
 媒体学员概览（2026-09-18 用户确认）使用 12 栏 9:3 主侧布局。顶部身份、服务与标签通栏、学员服务级工具栏保持结构；右侧统一承载服务状态、兼职账号状态和定位卡状态及当前版本操作，下方为学员档案与现有学员信息表资料。右侧自然滚动，不吸顶。定位访谈阶段、预约、记录数和材料独立标明，不与定位卡审核状态混同。
 左侧定位卡阅读采用两列短字段网格，实际长内容（超过 120 字符）、附件、参考资料通栏；不根据 textarea 类型单独判定通栏。字段名和正文采用 14px 对应的现有 lg token，字段名加粗；模板组标题加大。正文全部展开，填写提示保留，referenceFor 参考关系、附件、凭证及历史标签快照完整保留。历史版本原位展开且只读，右侧操作只作用于当前版本。编辑弹窗仍为原四列对照。详情内容不足以并排时在移动断点转为右侧信息优先的单列。
-列表选中态取消凹陷阴影，使用主色浅底、边界与侧边标记；使用现有主题 token，正文 base、标签 sm，主要容器细边界和轻外阴影。吸顶定位卡标题以实色兜底，磨砂开启时使用高遮盖度底色。详见 [字段迁移与验收](student-overview-grid.md)。
- 经后续确认，媒体学员左栏支持按钮切换完整列表（320px）和头像栏（72px），首次展开并在同一浏览器记住选择；≤768px 收起为顶部横向头像条。收起态展开与搜索按钮同排显示为无边框轻量图标，已筛选时搜索按钮高亮；展开态收起按钮置于搜索框左侧并保持同一行。搜索图标展开并聚焦原搜索框，保留筛选；收起态提供选中标记、姓名与编号提示及紧凑分页。布局切换保持列表、详情实例及编辑内容，不触发业务请求。加载、空结果及错误重试均须适配窄栏。
+列表选中态取消凹陷阴影，使用主色浅底、边界与侧边标记；字段行、统计区和预览块统一使用凸起或无阴影的平面效果，禁止凹陷显示；使用现有主题 token，正文 base、标签 sm，主要容器细边界和轻外阴影。吸顶定位卡标题以实色兜底，磨砂开启时使用高遮盖度底色。详见 [字段迁移与验收](student-overview-grid.md)。
+ 经后续确认，媒体学员左栏支持按钮切换完整列表（320px）和头像栏（72px），首次展开并在同一浏览器记住选择；≤768px 收起为顶部横向头像条。收起态展开与搜索按钮同排显示为无边框轻量图标，已筛选时搜索按钮高亮；展开态收起按钮置于搜索框左侧并保持同一行。搜索图标展开并聚焦原搜索框，保留筛选；收起态提供选中标记、姓名与编号提示。媒体学员左栏采用滚动接近底部自动追加，展开列表与收起头像栏均不显示分页器；追加失败保留列表并提供重试，追加不重载当前详情。卡片参考客资管理样式，仅展示姓名、学员编号、手机号和微信号，不展示课程、服务数量或状态。布局切换保持列表、详情实例及编辑内容，不触发业务请求。加载、空结果及错误重试均须适配窄栏。
 学员名下的每个真实媒体账号以账号昵称作为与“概览”同级的标签页；空昵称显示“未命名账号 + 账号编号”；重名使用平台与账号编号消歧。账号标签内承载原有账号维护、定位卡、内容历史和拍剪操作，新增账号入口位于概览的统一操作栏。
 定位访谈弹窗桌面端每行横向展示“字段／访谈注意／访谈确认”三等列。移动端恢复纵向排列，依次展示字段名称、访谈注意、确认选项和备注，不横向滚动。
 
@@ -173,12 +176,11 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 
 ```css
 .<feature>-page {
-  max-width: none;
   height: 100%;
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: var(--crm-page-pad);           /* guard enforced */
+  /* 页面 padding 与不限宽行为继承 .workspace-page。 */
 }
 
 .<feature>-inbox-layout {
@@ -218,7 +220,7 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
     <Typography.Title level={4}/>
     <Space>…actions…</Space>
   </div>
-  <div class="<feature>-table-area">      ← 包裹 ProTable 或自定义列表
+  <div class="<feature>-table-area">      ← 使用 BusinessTable 或非表格列表
 ```
 
 **CSS 要点：**
@@ -232,10 +234,13 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 
 如需限宽：`max-width: var(--crm-page-max-table)` (1360px) 或 `var(--crm-page-max-narrow)` (1200px)。
 
-HRM 表格统一使用 `src/components/HrmProTable.tsx`。管理主列表传入 `advanced`、稳定的
-`persistenceKey` 和 `onReload`，获得当前页搜索、刷新、列设置、密度和全屏能力；详情、
-编辑器和静态子表不传 `advanced`，避免在弹窗或抽屉中重复堆叠工具栏。服务端分页、
-导出、行选择和业务操作仍沿用页面既有 API 与权限边界。
+工作台所有业务表格统一使用 `src/components/BusinessTable`，以客资管理表格为设计基准。
+管理列表和主从页的表格模式使用完整模式，弹窗选择器、详情明细及编辑表格使用
+`mode="compact"`。列宽拖拽、列设置、密度、全屏、工具栏布局及分页样式由组件负责，
+页面通过 `filters`、`actions`、`batchActions` 插槽接入业务控件。使用唯一、稳定的
+`tableKey` 隔离展示偏好；数据、权限、排序字段映射及详情交互仍由页面负责。
+禁止业务页面直接导入 Table/ProTable 或复制表格外观 CSS。后台 Vue 和内嵌后台页面
+本次未迁移。接口、迁移兼容与验证说明见 [通用业务表格](business-table.md)。
 
 新增或修改时间列统一使用 `src/components/DateTimeText.tsx`：列表默认显示
 `YYYY-MM-DD HH:mm`，悬停展示精确到秒的完整值；日期字段显式使用 `date` 精度，审计或
@@ -342,7 +347,7 @@ kebab-case。不加 `__` / `--` (非 BEM 双下划线)。
 ## 6. 已知坑
 
 - `.workspace-page-heading` 不存在 → 用 `.page-heading`（定义在 `patterns.css`）
-- `.workspace-page` 默认 `max-width: 1440px`，主从页须覆盖为 `max-width: none; height: 100%`
+- `.workspace-page` 已提供统一页面间距与不限宽行为，主从页仅按容器需要设置 `height: 100%`，不要重复声明相同 padding/max-width
 - `[data-crm-preset="illustration"]` 预设强制 3px 边框 + 硬阴影 → 新视觉块需要尾部兼容覆盖
 - `--crm-shadow-float` 运行时与 `--crm-shadow-card` 值相同 → 浮层独立性靠 `z-index` 而非阴影区分
 - 在 glass 路径中，`--crm-glass-edge` 的零值是 `inset 0 0 0 0 transparent`，不能写 `none`
@@ -379,3 +384,7 @@ kebab-case。不加 `__` / `--` (非 BEM 双下划线)。
 账号阅读页顶部不再重复展示「自动生成 / 编导填写 / 运营填写」责任图例；字段内及维护弹窗的责任说明沿用原规则。
 
 账号阅读页移除顶部重复的账号昵称、平台及状态摘要，卡片网格顶部使用 --crm-sp-5 留白；账号维护和诊断入口保留在右侧操作区。
+
+### 链接填写
+
+内容制作、批量审核与发布登记的链接字段统一使用 `ResourceLinkInput`；账号资料依据服务端 `url` 类型接入，素材动态表单（含重复组）依据 `https-link` 类型接入。组件保留输入原文、表单事件、字段 ID、长度限制及禁用状态，允许清空；有效地址复用 `ResourceLink` 提供打开与复制预览，不请求外站元数据。必填、HTTPS 等业务校验仍由原表单和服务端负责，预览不可用不等同于表单校验失败。上传、自动生成只读链接和普通文本不转为链接输入。

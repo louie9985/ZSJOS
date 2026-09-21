@@ -164,7 +164,7 @@ describe('workbench menu conversion', () => {
     expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
   })
 
-  it('keeps material browsing on Mobile and removes PC-only production routes', () => {
+  it('keeps all authorized native material routes on Mobile', () => {
     const routes = filterRenderableMenus(buildMenuTree([
       menu({
         id: 20,
@@ -178,7 +178,7 @@ describe('workbench menu conversion', () => {
       })
     ]), MOBILE_RENDERABLE_APP_ROUTES)
 
-    expect(routes[0]?.children.map(child => child.path)).toEqual([APP_ROUTES.MATERIAL_LIBRARY])
+    expect(routes[0]?.children.map(child => child.path)).toEqual([APP_ROUTES.MATERIAL_LIBRARY, APP_ROUTES.CONTENT_PRODUCTION, APP_ROUTES.CONTENT_REVIEW])
   })
 
   it('keeps admin embeds, excludes admin-only menus, and preserves their server hierarchy', () => {

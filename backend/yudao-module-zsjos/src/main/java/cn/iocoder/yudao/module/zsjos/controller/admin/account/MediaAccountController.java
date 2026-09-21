@@ -10,7 +10,6 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountStu
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarCandidatesRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarRespVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountLegacyStageRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceRevisionRespVO;
 import java.util.List;
@@ -67,14 +66,6 @@ public class MediaAccountController {
     public CommonResult<PageResult<MediaAccountMaintenanceRevisionRespVO>> maintenanceHistory(
             @PathVariable Long id, @Valid PageParam page) {
         return success(maintenanceService.history(id, page, getLoginUserId()));
-    }
-
-    @GetMapping("/{id}/legacy-stage-history")
-    @Operation(summary = "分页查询账号原阶段记录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")
-    public CommonResult<PageResult<MediaAccountLegacyStageRespVO>> legacyStageHistory(
-            @PathVariable Long id, @Valid PageParam page) {
-        return success(maintenanceService.legacyStageHistory(id, page, getLoginUserId()));
     }
 
     @GetMapping("/calendar")

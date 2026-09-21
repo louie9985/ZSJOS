@@ -556,6 +556,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     private Map<String, Object> notifyPayload(WithdrawalDO record, List<Long> financeUsers) {
         Map<String, Object> payload = new LinkedHashMap<>(); payload.put("withdrawal.id", record.getId());
+        payload.put("withdrawal.no", record.getWithdrawalNo());
         payload.put("withdrawal.amount", record.getApplicationAmount()); payload.put("applicantUserId", record.getApplicantUserId());
         payload.put("partnerId", record.getPartnerId());
         if (StrUtil.isNotBlank(record.getRejectionReason())) payload.put(NOTIFICATION_REJECTION_REASON, record.getRejectionReason());

@@ -25,6 +25,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaAccountProfileServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Test void retiredPositioningCannotBeEditedThroughProfileEvenIfConfiguredEnabled() {
         var legacy = field("pc_account_name", "DIRECTOR", "text");
         var group = field("custom_position", "DIRECTOR", "text"); group.setGroup("POSITIONING");

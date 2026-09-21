@@ -50,6 +50,8 @@ class BusinessTaskReminderServiceTest {
     @Mock private PermissionApi permissionApi;
     @Mock private ServiceRelationMapper relationMapper;
     @Mock private BusinessTaskCommandService taskCommandService;
+    @Mock private cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi notifyBusinessEventApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper mediaAccountMapper;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(9L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -171,5 +173,19 @@ class BusinessTaskReminderServiceTest {
                 eq(2L), isNull(), eq(now), contextCaptor.capture());
         assertEquals(expectedLabel, contextCaptor.getValue().get("reminder.stage"));
         clearInvocations(publisher, stageMapper, notifyRuleApi, taskMapper);
+    }
+    @Test void diagnosisDueAndOverdueDoNotSuppressDifferentRecipientRules() {
+        var now=LocalDateTime.of(2026,9,20,12,0);
+        var task=new BusinessTaskDO();task.setId(10L);task.setBizId(11L);task.setBizType("media_account_diagnosis");
+        task.setTaskType(TASK_TYPE_ACCOUNT_DIAGNOSIS_7D);task.setAssigneeId(12L);task.setVersion(1);task.setStatus("pending");task.setDueAt(now.minusHours(1));
+        when(taskMapper.selectByIdForUpdate(10L,9L)).thenReturn(task);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(
+            new NotifyTimingRuleRespDTO(1L,"media.account.diagnosis","due",0),
+            new NotifyTimingRuleRespDTO(2L,"media.account.diagnosis","overdue",0)));
+        assertEquals(2,service.emitDueForTask(10L,now));
+        var events=ArgumentCaptor.forClass(cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi,times(2)).publish(events.capture());
+        assertEquals(java.util.Set.of(1L,2L),events.getAllValues().stream().map(e->e.getTargetRuleId()).collect(java.util.stream.Collectors.toSet()));
+        for(var event:events.getAllValues()) assertEquals(12L,event.getPayload().get("assigneeUserId"));
     }
 }

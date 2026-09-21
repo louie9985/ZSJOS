@@ -38,6 +38,54 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LeadNotifySceneProviderTest {
     @Test
+    void partnerNamesNeverResolveThroughSameIdEmployee() {
+        LeadDO lead = new LeadDO().setId(1L).setPartnerId(70L).setSourceUserId(10L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(partnerAccountMapper.selectById(10L)).thenReturn(new PartnerAccountDO().setId(10L).setPartnerId(70L));
+        var partner = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO();
+        partner.setId(70L); partner.setName("合作方测试名称");
+        when(partnerMapper.selectById(70L)).thenReturn(partner);
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED).bizId(1L)
+                .operatorUserId(10L).payload(Map.of("operatorUserType", 3)).build();
+        Map<String, Object> values = provider.resolveVariables(event, NotifyRecipientDTO.partner(10L));
+        assertEquals("合作方测试名称", values.get("operator.name"));
+        assertEquals("合作方测试名称", values.get("submitter.name"));
+        org.mockito.Mockito.verify(adminUserApi, org.mockito.Mockito.never()).getUser(10L);
+    }
+
+    @Test
+    void partnerOperatorAndEmployeeOwnerWithSameIdRemainDifferentRecipients() {
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(ACTIVATED)
+                .bizId(1L).operatorUserId(10L)
+                .payload(Map.of("operatorUserType", 3, "ownerUserId", 10L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.partner(10L), NotifyRecipientDTO.admin(10L)),
+                provider.resolveRecipients(event, Set.of(ROLE_OPERATOR, ROLE_OWNER)));
+    }
+
+    @Test
+    void unknownOperatorTypeDoesNotBecomeEmployee() {
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
+                .bizId(1L).operatorUserId(10L).payload(Map.of("operatorUserType", 99)).build();
+        assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(ROLE_OPERATOR)));
+    }
+
+    @Test
+    void activationNotifiesEducationOwnerWithoutSalesLeader() {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setOwnerIdentity(OWNER_EDUCATION));
+        var event = NotifyBusinessEvent.builder().sceneCode(ACTIVATED).bizId(1L)
+                .payload(Map.of("ownerUserId", 40L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.admin(40L)),
+                provider.resolveRecipients(event, Set.of(ROLE_OWNER, ROLE_DIRECT_LEADER)));
+    }
+
+    @Test
+    void activationWithoutOwnerHasNoRecipients() {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO());
+        var event = NotifyBusinessEvent.builder().sceneCode(ACTIVATED).bizId(1L).payload(Map.of()).build();
+        assertTrue(provider.resolveRecipients(event, Set.of(ROLE_OWNER, ROLE_DIRECT_LEADER)).isEmpty());
+    }
+
+    @Test
     void feedbackUsesFrozenTypedRecipient() {
         var event = NotifyBusinessEvent.builder().sceneCode(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE)
                 .bizId(1L).payload(Map.of("feedback.recipientType", "PARTNER", "feedback.recipientId", 90L)).build();
@@ -60,6 +108,7 @@ class LeadNotifySceneProviderTest {
     @Mock private LeadAgingPoolCycleMapper agingPoolCycleMapper;
     @Mock private LeadAssignmentService assignmentService;
     @Mock private PartnerAccountMapper partnerAccountMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper partnerMapper;
 
     @Test
     void registersAllScenesWithSceneSpecificVariables() {

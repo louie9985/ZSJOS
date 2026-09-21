@@ -1,3 +1,4 @@
+import { isMobileRoute } from './mobileRoutes'
 import {
   AUTH_CLIENT_IDS,
   AUTH_PLATFORM_SESSION_KEY,
@@ -28,7 +29,7 @@ type StoredAuthSession = {
 let initializedPlatform: AuthPlatform | undefined
 
 export function isMobileEntryPath(pathname: string) {
-  return /(?:^|\/)zsjos\/mobile(?:\/|$)/i.test(pathname)
+  return isMobileRoute(pathname)
 }
 
 export function initializeAuthPlatform(
@@ -171,7 +172,7 @@ export const migrateLegacyAuthStorage = (storage: WritableStorage = localStorage
 export function resolveAdminEmbedPresentation(
   platform: AuthPlatform,
   renderMode?: string,
-): 'frame' | 'mobile-blocked' | 'routes' {
+): 'frame' | 'routes' {
   if (renderMode !== 'admin_embed') return 'routes'
-  return platform === 'PC' ? 'frame' : 'mobile-blocked'
+  return 'frame'
 }

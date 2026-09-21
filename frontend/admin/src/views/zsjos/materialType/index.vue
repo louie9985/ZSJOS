@@ -150,13 +150,8 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
 import * as DictTypeApi from '@/api/system/dict/dict.type'
-import * as DictDataApi from '@/api/system/dict/dict.data'
-import * as UserApi from '@/api/system/user'
-import * as DeptApi from '@/api/system/dept'
-import { checkPermi } from '@/utils/permission'
 import * as MaterialApi from '@/api/zsjos/material'
 import MaterialSchemaDesigner from './components/MaterialSchemaDesigner.vue'
-import MaterialDynamicForm from '../material/components/MaterialDynamicForm.vue'
 
 defineOptions({ name: 'ZsjosMaterialType' })
 
@@ -164,7 +159,6 @@ type SchemaDesignerExpose = {
   validate: () => string
   normalizedFields: () => MaterialApi.MaterialFieldDefinition[]
 }
-type DynamicFormExpose = { validate: () => string }
 
 const message = useMessage()
 const loading = ref(false)
@@ -172,9 +166,6 @@ const error = ref('')
 const types = ref<MaterialApi.MaterialType[]>([])
 const materialDefinitions = ref<MaterialApi.MaterialProcessDefinition[]>([])
 const dictTypes = ref<DictTypeApi.DictTypeVO[]>([])
-const dictData = ref<DictDataApi.DictDataVO[]>([])
-const users = ref<UserApi.UserSimpleVO[]>([])
-const departments = ref<DeptApi.DeptVO[]>([])
 
 const typeDialogVisible = ref(false)
 const editingTypeId = ref<number>()
@@ -380,40 +371,6 @@ const fieldRulesText = (field: MaterialApi.MaterialFieldDefinition) => [
   field.maxCount ? `最多 ${field.maxCount} 项` : ''
 ].filter(Boolean).join('；') || '-'
 
-const mappingOptions = (field: MaterialApi.MaterialFieldDefinition) => {
-  const text = [
-    { label: '内容标题', value: 'title' },
-    { label: '内容选题', value: 'topic' },
-    { label: '脚本或正文', value: 'scriptText' }
-  ]
-  if (field.key === '__cover__') return [{ label: '封面首个文件', value: 'coverFileId' }]
-  if (field.type === 'image') return [
-    { label: '封面文件', value: 'coverFileIds' },
-    { label: '成品预览文件', value: 'deliverableFileIds' }
-  ]
-  if (field.type === 'video') return [{ label: '成品预览文件', value: 'deliverableFileIds' }]
-  if (field.type === 'attachment') return [
-    { label: '封面文件', value: 'coverFileIds' },
-    { label: '成品预览文件', value: 'deliverableFileIds' }
-  ]
-  if (['dict-single', 'dict-multi'].includes(field.type)) {
-    const source = {
-      zsjos_persona_type: { label: '账号类型', value: 'accountType' },
-      zsjos_material_profession: { label: '专业方向', value: 'profession' },
-      zsjos_media_account_stage: { label: '账号时期', value: 'accountStage' }
-    }[field.dictType || '']
-    return source ? [source] : []
-  }
-  if (field.type === 'datetime') return [{ label: '预计发布时间', value: 'plannedPublishAt' }]
-  if (field.type === 'https-link') return [
-    { label: '成品预览链接', value: 'deliverableUrl' },
-    { label: '引流资料链接', value: 'leadResourceUrl' }
-  ]
-  if (['text', 'textarea', 'rich-text'].includes(field.type)) {
-    return [...text, { label: '成品预览链接', value: 'deliverableUrl' }, { label: '引流资料链接', value: 'leadResourceUrl' }]
-  }
-  return []
-}
 onMounted(load)
 </script>
 

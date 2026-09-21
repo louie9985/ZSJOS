@@ -28,6 +28,7 @@ public class ContentReviewNotifyPublisher {
 
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource private ContentReviewBatchMapper batchMapper;
+    @Resource private cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi processTaskApi;
     @Resource private ContentReviewBatchItemMapper itemMapper;
     @Resource private ContentReviewRelationMapper relationMapper;
 
@@ -178,25 +179,21 @@ public class ContentReviewNotifyPublisher {
                 ));
     }
 
-    public void publishReviewTimeout(Long batchId, String currentStage, int timeoutHours) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        if (batch == null) return;
-
-        Set<Long> targetUserIds = BATCH_DIRECTOR_REVIEW.equals(batch.getStatus())
-                ? resolveDirectorUserIds(batch)
-                : resolveFinalReviewerUserIds(batch);
-
-        publish("zsjos.content_review.review_timeout", batchId,
-                "batch:" + batchId + ":timeout:" + timeoutHours,
-                null, LocalDateTime.now(),
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "timeoutHours", timeoutHours,
-                        "currentStage", currentStage,
-                        "directorUserIds", BATCH_DIRECTOR_REVIEW.equals(batch.getStatus()) ? targetUserIds : Set.of(),
-                        "finalReviewerUserIds", BATCH_FINAL_REVIEW.equals(batch.getStatus()) ? targetUserIds : Set.of()
-                ));
+    public void publishReviewTimeout(ContentReviewBatchDO batch,
+            cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO task,
+            cn.iocoder.yudao.module.system.api.notify.dto.NotifyTimingRuleRespDTO rule, LocalDateTime now) {
+        if (task.assigneeUserId() == null) return;
+        boolean director = BATCH_DIRECTOR_REVIEW.equals(batch.getStatus());
+        Map<String,Object> payload = new LinkedHashMap<>();
+        payload.put("batchNo", batch.getBatchNo());
+        payload.put("batchTitle", buildBatchTitle(batch));
+        payload.put("pendingHours", java.time.Duration.between(task.createTime(), now).toHours());
+        payload.put("directorUserIds", director ? Set.of(task.assigneeUserId()) : Set.of());
+        payload.put("finalReviewerUserIds", director ? Set.of() : Set.of(task.assigneeUserId()));
+        notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
+                .tenantId(TenantContextHolder.getRequiredTenantId()).sceneCode("zsjos.content_review.review_timeout_reminder")
+                .sourceEventKey("content-review-timeout:" + task.id() + ":" + rule.getId())
+                .targetRuleId(rule.getId()).bizType(BIZ_TYPE).bizId(batch.getId()).occurredAt(now).payload(payload).build());
     }
 
     private void publish(String sceneCode, Long batchId, String sourceEventKey, Long operatorUserId,
@@ -232,14 +229,14 @@ public class ContentReviewNotifyPublisher {
     }
 
     private Set<Long> resolveFinalReviewerUserIds(ContentReviewBatchDO batch) {
-        // 终审人需要从流程定义或配置中获取
-        // 目前简化处理：如果批次处于终审阶段，从 relationSnapshotJson 中提取
-        // 实际场景中可能需要从 BPM 候选人配置或组织架构中动态查询
         if (batch.getProcessInstanceId() == null) return Set.of();
-
-        // TODO: 从 BPM 流程实例中获取终审节点的候选人
-        // 或从批次的 relationSnapshotJson 中解析终审人信息
-        return Set.of();
+        var snapshot = batch.getContextSnapshotJson() == null ? Map.of()
+                : cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(batch.getContextSnapshotJson(), Map.class);
+        String taskKey = String.valueOf(snapshot.getOrDefault("finalTaskKey", ContentReviewConfigService.FINAL_TASK_KEY));
+        return processTaskApi.getPendingTasks(batch.getProcessInstanceId()).stream()
+                .filter(task -> taskKey.equals(task.taskDefinitionKey()))
+                .map(cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO::assigneeUserId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
     }
 
     private String buildBatchTitle(ContentReviewBatchDO batch) {

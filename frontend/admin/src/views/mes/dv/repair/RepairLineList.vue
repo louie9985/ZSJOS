@@ -51,7 +51,7 @@
           <el-input v-model="formData.malfunction" type="textarea" placeholder="请输入故障描述" />
         </el-form-item>
         <el-form-item label="故障图片" prop="malfunctionUrl">
-          <el-input v-model="formData.malfunctionUrl" placeholder="请输入故障图片 URL" />
+          <ResourceLinkInput v-model="formData.malfunctionUrl" placeholder="请输入故障图片 URL" />
         </el-form-item>
         <el-form-item label="维修描述" prop="description">
           <el-input v-model="formData.description" type="textarea" placeholder="请输入维修描述" />
@@ -69,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DvRepairLineApi } from '@/api/mes/dv/repair/line'
 import { DvSubjectApi } from '@/api/mes/dv/subject'
 

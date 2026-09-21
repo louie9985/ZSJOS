@@ -53,14 +53,14 @@ public class BusinessFileDirectUploadService {
         return file;
     }
 
-    private void validateCommon(ZsjosDirectUploadInitReqVO request, boolean imageOrVideoOnly) {
+    private void validateCommon(ZsjosDirectUploadInitReqVO request, boolean contentScene) {
         String contentType = request.getContentType() == null ? "" : request.getContentType().trim().toLowerCase(Locale.ROOT);
         boolean invalidType = contentType.isEmpty() || contentType.contains("\r") || contentType.contains("\n")
-                || imageOrVideoOnly && !(contentType.startsWith("image/") || contentType.startsWith("video/"));
+                || contentScene && !ContentAttachmentTypes.accepts(contentType);
         if (request.getSize() == null || request.getSize() <= 0 || request.getSize() > MAX_FILE_BYTES
                 || request.getName() == null || request.getName().isBlank() || request.getName().length() > 255
                 || invalidType) {
-            if (imageOrVideoOnly) {
+            if (contentScene) {
                 throw exception(CONTENT_VERSION_FILE_INVALID);
             }
             throw exception(MATERIAL_FILE_INVALID, "文件为空、类型无效或超过 1GB");

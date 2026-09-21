@@ -11,6 +11,8 @@ public class ProductionTicketRespVO {
     private Long id;
     private String ticketNo;
     private Long accountId;
+    private List<Long> accountIds;
+    private List<Map<String, Object>> accounts;
     private Long ownerOperatorUserId;
     private Long assigneeFilmingEditorUserId;
     private Long reviewerUserId;

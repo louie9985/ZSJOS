@@ -98,6 +98,13 @@ public class BusinessTaskReminderService {
                 .filter(rule -> !stageMapper.exists(task.getId(), task.getVersion(), rule.getTimingStage()))
                 .toList();
         if (applicable.isEmpty()) return 0;
+        if ("media_account_diagnosis".equals(task.getBizType()) || "student_delivery_confirmation".equals(task.getTaskType())) {
+            // Media stages may intentionally target different people/channels. Record the stage only
+            // after publishing every eligible rule; the System outbox deduplicates each rule event.
+            for (var rule : applicable) publishMediaReminder(task, rule, now);
+            for (var rule : applicable) recordStage(task, rule, now);
+            return applicable.size();
+        }
         NotifyTimingRuleRespDTO urgent = applicable.stream().max(Comparator.comparingInt(
                 rule -> urgency(rule.getTimingStage()))).orElseThrow();
         for (NotifyTimingRuleRespDTO rule : applicable) recordStage(task, rule, now);
@@ -117,17 +124,32 @@ public class BusinessTaskReminderService {
             }
             return 1;
         }
+        LeadDO lead = leadMapper.selectById(task.getBizId());
+        context.put("ownerUserId", task.getAssigneeId());
+        context.put("submitterUserId", lead == null ? null : lead.getSourceUserId());
+        notifyEventPublisher.publish(scene, task.getBizId(),
+                "business-task-reminder:" + task.getId() + ":" + urgent.getTimingStage(), urgent.getId(),
+                null, now, context);
+        return 1;
+    }
+
+    private void publishMediaReminder(BusinessTaskDO task, NotifyTimingRuleRespDTO rule, LocalDateTime now) {
+        String scene = rule.getSceneCode();
+        Map<String,Object> context = new LinkedHashMap<>();
+        context.put("reminder.stage", stageLabel(rule.getTimingStage()));
+        context.put("reminder.dueAt", task.getDueAt());
         if ("media_account_diagnosis".equals(task.getBizType())) {
             Long supervisorId = currentSupervisorForDiagnosis(task.getAssigneeId());
             var account = mediaAccountMapper.selectById(task.getBizId());
             context.put("supervisorUserId", supervisorId);
+            context.put("assigneeUserId", task.getAssigneeId());
             context.put("directorUserId", task.getAssigneeId());
             context.put("accountName", account == null || account.getNickname() == null ? "未命名账号" : account.getNickname());
             notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().tenantId(TenantContextHolder.getRequiredTenantId())
-                    .sceneCode(scene).sourceEventKey("media-account-diagnosis:" + task.getId() + ":" + urgent.getTimingStage())
-                    .targetRuleId(urgent.getId()).bizType(task.getBizType()).bizId(task.getBizId()).operatorUserId(task.getAssigneeId())
+                    .sceneCode(scene).sourceEventKey("media-account-diagnosis:" + task.getId() + ":" + task.getVersion() + ":" + rule.getTimingStage() + ":" + rule.getId())
+                    .targetRuleId(rule.getId()).bizType(task.getBizType()).bizId(task.getBizId()).operatorUserId(task.getAssigneeId())
                     .occurredAt(now).payload(context).build());
-            return 1;
+            return;
         }
         if ("student_delivery_confirmation".equals(task.getTaskType())) {
             context.put("assigneeUserId", task.getAssigneeId());
@@ -148,18 +170,11 @@ public class BusinessTaskReminderService {
                         + "&taskId=" + task.getId() + "&taskType=student_delivery_stage");
             }
             notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().tenantId(TenantContextHolder.getRequiredTenantId())
-                    .sceneCode(scene).sourceEventKey("student-delivery-reminder:" + task.getId() + ":" + urgent.getTimingStage())
-                    .targetRuleId(urgent.getId()).bizType(task.getBizType()).bizId(task.getBizId())
+                    .sceneCode(scene).sourceEventKey("student-delivery-reminder:" + task.getId() + ":" + task.getVersion() + ":" + rule.getTimingStage() + ":" + rule.getId())
+                    .targetRuleId(rule.getId()).bizType(task.getBizType()).bizId(task.getBizId())
                     .operatorUserId(task.getAssigneeId()).occurredAt(now).payload(context).build());
-            return 1;
+            return;
         }
-        LeadDO lead = leadMapper.selectById(task.getBizId());
-        context.put("ownerUserId", task.getAssigneeId());
-        context.put("submitterUserId", lead == null ? null : lead.getSourceUserId());
-        notifyEventPublisher.publish(scene, task.getBizId(),
-                "business-task-reminder:" + task.getId() + ":" + urgent.getTimingStage(), urgent.getId(),
-                null, now, context);
-        return 1;
     }
 
     private void recordStage(BusinessTaskDO task, NotifyTimingRuleRespDTO rule, LocalDateTime now) {

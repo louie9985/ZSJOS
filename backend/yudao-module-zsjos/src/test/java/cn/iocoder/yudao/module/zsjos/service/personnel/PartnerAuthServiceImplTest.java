@@ -27,6 +27,48 @@ class PartnerAuthServiceImplTest {
     @Mock private OAuth2TokenCommonApi oauth2TokenApi;
     @Mock private LoginLogApi loginLogApi;
     @Mock private ConfigApi configApi;
+    @Mock private cn.iocoder.yudao.module.system.api.social.SocialClientApi socialClientApi;
+    @Mock private cn.iocoder.yudao.module.system.api.social.SocialUserApi socialUserApi;
+
+    @Test
+    void selectsWebOnlyForExplicitInClientRequest() {
+        service.getWecomAuthorizeUrl("https://example.test/profile?wecomBind=1", true);
+        verify(socialClientApi).getWecomWebAuthorizeUrl(3, "https://example.test/profile?wecomBind=1");
+        service.getWecomAuthorizeUrl("https://example.test/login", false);
+        verify(socialClientApi).getAuthorizeUrl(30, 3, "https://example.test/login");
+    }
+
+    @Test
+    void wecomAuthorizationRetainsPartnerAudience() {
+        service.getWecomAuthorizeUrl("https://example.test/login");
+        verify(socialClientApi).getAuthorizeUrl(30, 3, "https://example.test/login");
+    }
+
+    @Test
+    void wecomLoginNeverUsesAdminBindingOrTokenIdentity() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWecomLoginReqVO();
+        request.setCode("test-code"); request.setState("test-state");
+        var social = new cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO();
+        social.setUserId(20L);
+        when(socialUserApi.getSocialUserByCode(3, 30, "test-code", "test-state")).thenReturn(social);
+        when(accountService.requireContext(20L)).thenReturn(new PartnerContext(20L, 70L));
+        when(accountService.getById(20L)).thenReturn(new PartnerAccountDO().setId(20L));
+        when(oauth2TokenApi.createAccessToken(any())).thenReturn(new OAuth2AccessTokenRespDTO().setUserId(20L));
+        service.wecomLogin(request, "127.0.0.1");
+        verify(oauth2TokenApi).createAccessToken(argThat(value -> value.getUserType() == 3
+                && Integer.valueOf(604800).equals(value.getRefreshTokenValiditySeconds())
+                && Long.valueOf(20L).equals(value.getUserId())));
+        verify(socialUserApi, never()).getSocialUserByCode(eq(2), any(), any(), any());
+    }
+
+    @Test
+    void unboundWecomCannotIssueToken() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWecomLoginReqVO();
+        request.setCode("test-code"); request.setState("test-state");
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.wecomLogin(request, "127.0.0.1"));
+        verifyNoInteractions(oauth2TokenApi, accountService);
+    }
 
     @Test
     void logoutRevokesOnlyExpectedPartnerTypeAndWritesAudit() {

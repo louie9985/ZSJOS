@@ -9,10 +9,6 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 @Mapper
 public interface AccountStageLogMapper extends BaseMapperX<AccountStageLogDO> {
-    default AccountStageLogDO selectByIdempotencyKey(String key) {
-        return selectOne(new LambdaQueryWrapperX<AccountStageLogDO>().eq(AccountStageLogDO::getIdempotencyKey, key));
-    }
-
     default PageResult<AccountStageLogDO> selectPageByAccountId(PageParam page, Long accountId) {
         return selectPage(page, new LambdaQueryWrapperX<AccountStageLogDO>()
                 .eq(AccountStageLogDO::getAccountId, accountId)

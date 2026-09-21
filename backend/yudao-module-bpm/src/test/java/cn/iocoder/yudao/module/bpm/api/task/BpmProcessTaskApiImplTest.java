@@ -206,4 +206,15 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
         reqDTO.setProcessDefinitionKey("zsjos_lead_appeal_review");
         return reqDTO;
     }
+    @Test
+    void pendingSnapshotRetainsEveryLiveAssignmentIncludingCountersign() {
+        Task main = mock(Task.class), child = mock(Task.class);
+        when(main.getId()).thenReturn("main"); when(child.getId()).thenReturn("child");
+        when(main.getAssignee()).thenReturn("11"); when(child.getAssignee()).thenReturn("12");
+        when(main.getTaskDefinitionKey()).thenReturn("final"); when(child.getTaskDefinitionKey()).thenReturn("final");
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("instance"))).thenReturn(List.of(main, child));
+        var result = processTaskApi.getPendingTasks("instance");
+        assertEquals(List.of(11L,12L), result.stream().map(cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO::assigneeUserId).toList());
+        assertTrue(processTaskApi.getPendingTasks(null).isEmpty());
+    }
 }

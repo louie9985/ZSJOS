@@ -27,7 +27,7 @@ describe('global inbox layout mode', () => {
         ? `${source}\n${readFileSync(new URL('../components/SalesOrderTableColumns.tsx', root), 'utf8')}`
         : source
       if (page !== 'MessageInboxPage.tsx') expect(source).toContain('useInboxTableLayout')
-      expect(source).toContain('ProTable')
+      expect(source).toContain('BusinessTable')
       expect(source).toContain('columnsState')
       expect(detailActionSource).toContain('详细')
     }
@@ -36,12 +36,12 @@ describe('global inbox layout mode', () => {
   it('keeps the customer table configurable and reuses the full detail surface', () => {
     const lead = readFileSync(new URL('LeadManagementPage.tsx', root), 'utf8')
     const detail = readFileSync(new URL('../components/LeadDetail.tsx', root), 'utf8')
-    expect(lead).toContain('ProTable')
+    expect(lead).toContain('BusinessTable')
     expect(lead).toContain('columnsState')
     expect(lead).toContain('LeadDetail')
     expect(lead).toContain('detailContent')
-    expect(lead).toContain('toolBarRender')
-    expect(lead).toContain('lead-management-table-filter-toolbar')
+    expect(lead).toContain('filters={')
+    expect(lead).toContain('batchActions={')
     expect(lead).toContain('AdvancedFilterToolbar scene="lead" pageKey="lead_management"')
     expectSourceToContainTokens(detail, "if (tab === 'follow-ups')")
     expectSourceToContainTokens(detail, "if (tab === 'appeals')")

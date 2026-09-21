@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -53,7 +54,7 @@ import { parseLeadDetailTab, shouldBlockLeadSwitch } from '../services/leadFollo
 import { formatTimestamp } from '../services/time'
 import { useRealtimeEvent } from '../components/RealtimeProvider'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable, type ProColumns } from '@ant-design/pro-components'
+import { type ProColumns } from '@ant-design/pro-components'
 import type { TableProps } from 'antd'
 import type { TableRowSelection } from 'antd/es/table/interface'
 import {
@@ -65,8 +66,6 @@ import {
 } from '../services/leadInboxUnseen'
 
 const PAGE_SIZE = 20
-const LEAD_TABLE_COLUMN_MIN_WIDTH = 80
-const LEAD_TABLE_COLUMN_WIDTHS_KEY = 'crm-lead-management-table-column-widths'
 type LeadAudience = 'all'
 type LeadSimpleStatusSelection = 'all' | LeadSimpleStatus
 type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean; pageSize?: number }
@@ -102,47 +101,6 @@ const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
   convertedAt: 'convertedAt',
   remark: 'remark',
   updateTime: 'updateTime',
-}
-
-function clampLeadTableColumnWidth(width: number) {
-  return Math.max(LEAD_TABLE_COLUMN_MIN_WIDTH, Math.round(width))
-}
-
-function readLeadTableColumnWidths(): Record<string, number> {
-  try {
-    const stored = window.localStorage.getItem(LEAD_TABLE_COLUMN_WIDTHS_KEY)
-    if (!stored) return {}
-    const parsed = JSON.parse(stored) as Record<string, unknown>
-    return Object.fromEntries(Object.entries(parsed)
-      .filter((entry): entry is [string, number] => Number.isFinite(entry[1]))
-      .map(([key, width]) => [key, clampLeadTableColumnWidth(width)]))
-  } catch {
-    return {}
-  }
-}
-
-function isLeadTableResizeEdge(element: HTMLElement, clientX: number) {
-  return element.getBoundingClientRect().right - clientX <= 12
-}
-
-function startLeadTableColumnResize(event: React.PointerEvent<HTMLElement>, width: number,
-                                    onResize: (width: number) => void) {
-  if (!isLeadTableResizeEdge(event.currentTarget, event.clientX)) return
-  event.preventDefault()
-  event.stopPropagation()
-  const startX = event.clientX
-  const startWidth = width
-  const handlePointerMove = (moveEvent: PointerEvent) => {
-    onResize(clampLeadTableColumnWidth(startWidth + moveEvent.clientX - startX))
-  }
-  const finishResize = () => {
-    window.removeEventListener('pointermove', handlePointerMove)
-    window.removeEventListener('pointerup', finishResize)
-    window.removeEventListener('pointercancel', finishResize)
-  }
-  window.addEventListener('pointermove', handlePointerMove)
-  window.addEventListener('pointerup', finishResize)
-  window.addEventListener('pointercancel', finishResize)
 }
 
 const LEAD_BATCH_ACTIONS: Array<{ type: LeadBatchFormAction; label: string; permissions: string[]; icon: React.ReactNode; danger?: boolean }> = [
@@ -222,7 +180,6 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [leadPageSize, setLeadPageSize] = useState(PAGE_SIZE)
   const [sortField, setSortField] = useState<LeadSortField>()
   const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>()
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(readLeadTableColumnWidths)
   const [initialLoading, setInitialLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [initialError, setInitialError] = useState('')
@@ -265,13 +222,6 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   }, [])
 
   useEffect(() => { clearLeadSelection() }, [advancedFilter, clearLeadSelection, keyword, simpleStatus])
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LEAD_TABLE_COLUMN_WIDTHS_KEY, JSON.stringify(columnWidths))
-    } catch {
-      // Table resizing remains usable when browser storage is unavailable.
-    }
-  }, [columnWidths])
 
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
@@ -569,33 +519,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const leadTableColumns: ProColumns<ManagedLead>[] = leadTableColumnSource.map(column => {
     const columnKey = String(column.key)
     const backendSortField = LEAD_SORT_FIELD_BY_COLUMN_KEY[columnKey]
-    const width = columnWidths[columnKey] ?? Number(column.width ?? 140)
     return {
       ...column,
-      width,
-      ellipsis: column.ellipsis ?? true,
       sorter: backendSortField ? true : undefined,
       sortOrder: backendSortField === sortField ? sortOrder : null,
-      onHeaderCell: columnKey === 'action' ? column.onHeaderCell : () => ({
-        className: 'lead-table-resizable-header',
-        onPointerMove: event => {
-          event.currentTarget.style.cursor = isLeadTableResizeEdge(event.currentTarget, event.clientX)
-            ? 'col-resize'
-            : ''
-        },
-        onPointerLeave: event => { event.currentTarget.style.cursor = '' },
-        onPointerDownCapture: event => startLeadTableColumnResize(event, width, nextWidth => {
-          setColumnWidths(current => ({ ...current, [columnKey]: nextWidth }))
-        }),
-        onClickCapture: event => {
-          if (!isLeadTableResizeEdge(event.currentTarget, event.clientX)) return
-          event.preventDefault()
-          event.stopPropagation()
-        },
-      }),
     }
   })
-  const leadTableScrollWidth = leadTableColumns.reduce((totalWidth, column) => totalWidth + Number(column.width ?? 140), 0)
 
   const handleLeadTableChange: TableProps<ManagedLead>['onChange'] = (_pagination, _filters, sorter, extra) => {
     if (extra.action !== 'sort') return
@@ -688,24 +617,18 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     </header>
     <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
       {useTableLayout ? <>
-        <ProTable<ManagedLead>
+        <BusinessTable<ManagedLead> tableKey="lead-management-page-1"
           className="lead-management-table"
           rowKey="id"
-          search={false}
-          toolBarRender={() => [
-            <div key="lead-table-toolbar-left" className="lead-management-table-toolbar-left">
-              <Space className="lead-management-batch-toolbar" wrap>
-                <Typography.Text type="secondary">已选 {selectedRowKeys.length} 条</Typography.Text>
-                <Dropdown menu={{ items: batchMenuItems }} disabled={!selectedRowKeys.length || !batchMenuItems.length}>
-                  <Button icon={<DownOutlined />} disabled={!selectedRowKeys.length || !batchMenuItems.length}>批量操作</Button>
-                </Dropdown>
-              </Space>
-              <div className="lead-management-table-filter-toolbar">
-                <AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
-              </div>
-            </div>
-          ]}
-          options={{ density: true, fullScreen: true, setting: true, reload: () => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current) } }}
+
+          batchActions={<Dropdown menu={{ items: batchMenuItems }} disabled={!selectedRowKeys.length || !batchMenuItems.length}>
+            <Button icon={<DownOutlined />} disabled={!selectedRowKeys.length || !batchMenuItems.length}>批量操作</Button>
+          </Dropdown>}
+          filters={<AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>}
+          onReload={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current) }}
+          error={initialError}
+          unauthorized={Boolean(initialError && isLeadInboxUnauthorized(initialError))}
+          widthPersistenceKey="crm-lead-management-table-column-widths"
           columnsState={{ persistenceKey: 'crm-lead-management-table-columns', persistenceType: 'localStorage' }}
           loading={initialLoading}
           dataSource={items}
@@ -722,13 +645,11 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
                 sizeChanged ? { pageSize: nextPageSize } : undefined)
             },
           }}
-          scroll={{ x: leadTableScrollWidth }}
           locale={{ emptyText: initialError ? '客资列表加载失败' : '当前筛选下暂无客资' }}
           columns={leadTableColumns}
           onChange={handleLeadTableChange}
           rowSelection={leadRowSelection}
-          tableAlertRender={false}
-          tableAlertOptionRender={false}
+
         />
       </> : <>
       <aside className="lead-inbox-list-pane">

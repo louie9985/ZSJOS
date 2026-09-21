@@ -155,6 +155,28 @@ class ContentVersionServiceTest {
     }
 
     @Test
+    void revisionCanClearAttachmentsWithoutChangingHistoricalVersion() {
+        ContentDO content = content(CONTENT_REVISING, 1, 3);
+        ContentVersionDO source = version(100L).setDeliverableSnapshotJson("[12]")
+                .setFrozenAt(LocalDateTime.of(2026, 9, 8, 9, 0)).setReviewDecision("rejected");
+        when(contentMapper.selectByIdForUpdate(CONTENT_ID, TENANT_ID)).thenReturn(content);
+        when(mapper.selectByContentAndVersionNoForUpdate(CONTENT_ID, 1, TENANT_ID)).thenReturn(source);
+        when(fileMapper.selectByVersionId(100L)).thenReturn(List.of(file(2L, 100L, "deliverable", 1, 12L, 31L)));
+        when(contentService.advanceCurrentVersion(CONTENT_ID, 3, 2)).thenReturn(1);
+        ContentVersionSaveReqVO changes = new ContentVersionSaveReqVO();
+        changes.setDeliverableSnapshotJson("[]");
+
+        service.copyForReview(source, changes, USER_ID);
+
+        ArgumentCaptor<ContentVersionDO> captor = ArgumentCaptor.forClass(ContentVersionDO.class);
+        verify(mapper).insert(captor.capture());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getDeliverableSnapshotJson());
+        assertEquals("[12]", source.getDeliverableSnapshotJson());
+        verify(fileMapper, never()).insertBatch(org.mockito.ArgumentMatchers.<List<ContentVersionFileDO>>any());
+        verifyNoInteractions(fileApi);
+    }
+
+    @Test
     void rejectsReusingAnInheritedFileUnderAnotherField() {
         ContentDO content = content(CONTENT_REVISING, 1, 3);
         ContentVersionDO current = version(100L).setReviewDecision("rejected");
@@ -168,6 +190,39 @@ class ContentVersionServiceTest {
         assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
         verify(mapper, never()).insert(any(ContentVersionDO.class));
         verifyNoInteractions(fileApi);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"application/pdf", "application/msword",
+            "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"})
+    void bindsReviewDocumentsFromAuthoritativeFileMetadata(String type) {
+        mockInitialContent();
+        when(fileApi.getFileInfo(90L)).thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO(
+                90L, 1L, "review.pdf", "zsjos/content/" + USER_ID + "/file", "https://files.test/file",
+                type, 20L, String.valueOf(USER_ID)));
+        ContentVersionSaveReqVO request = request(null);
+        request.setDeliverableSnapshotJson("[{\"id\":90,\"name\":\"untrusted-name\"}]");
+        service.create(request, USER_ID);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ContentVersionFileDO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(fileMapper).insertBatch(captor.capture());
+        assertEquals("review.pdf", captor.getValue().getFirst().getOriginalName());
+        assertEquals(type, captor.getValue().getFirst().getContentType());
+    }
+
+    @Test
+    void rejectsReviewDocumentOwnedByAnotherUploader() {
+        when(contentMapper.selectByIdForUpdate(CONTENT_ID, TENANT_ID)).thenReturn(content(CONTENT_REVISING, 0, 3));
+        when(fileApi.getFileInfo(90L)).thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO(
+                90L, 1L, "review.pdf", "zsjos/content/999/file", "https://files.test/file",
+                "application/pdf", 20L, "999"));
+        ContentVersionSaveReqVO request = request(null);
+        request.setDeliverableSnapshotJson("[90]");
+        assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
+        verify(mapper, never()).insert(any(ContentVersionDO.class));
     }
 
     @Test

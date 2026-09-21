@@ -220,12 +220,18 @@ The PC Workbench and Vue Admin share the same-origin `localStorage` keys `ACCESS
 `MOBILE_ACCESS_TOKEN`, `MOBILE_REFRESH_TOKEN`, `MOBILE_CLIENT_ID`, and
 `MOBILE_EXPIRES_TIME` keys, so the same browser can retain one PC/Admin session and one Mobile
 session without one login overwriting the other. The Workbench authentication platform is
-initialized once at page startup. Entering through `/zsjos/mobile` pins that tab to the Mobile
-session in `sessionStorage`; subsequent server-owned menu navigation in the same tab remains
-Mobile even though menu URLs do not repeat the entry prefix. A newly opened ordinary Workbench or
-Admin tab defaults to PC. If an already-running PC Workbench page navigates to `/zsjos/mobile`, it
-marks the tab as Mobile and performs a full document reload instead of hot-switching authentication
-state.
+initialized once at page startup. `/zsjos/mobile` is the persistent Mobile router basename.
+The complete canonical server-owned route follows that prefix, for example
+`/zsjos/mobile/zsjos/tasks/today` and `/zsjos/mobile/bpm/task/todo`. Menu metadata and backend
+permission identifiers remain unchanged; React Router strips the basename for route matching
+and adds it to navigation and links. Copying a Mobile URL into a fresh tab preserves the platform
+without relying on a preexisting session marker. Query strings and fragments survive navigation.
+Older tabs with a Mobile session marker and an unprefixed URL are normalized before router startup.
+A newly opened ordinary Workbench or Admin tab defaults to PC. Entering Mobile from a running PC
+page reloads the document to initialize the separate authentication context. Login returns to an
+explicit deep link; only the root entry defaults to the authorized home. All supported native
+Workbench routes, including content production and review, consume the same server-authorized
+menu set on Mobile and PC; this does not grant additional permissions or expose Admin-only pages.
 
 Existing Workbench keys are migrated on first load by treating the PC, Mobile, and legacy lowercase
 key families atomically. A complete legacy Mobile session moves to the Mobile slot unless a valid
@@ -238,8 +244,17 @@ session keeps its current route on ordinary refresh, while a fresh successful lo
 the authenticated home or explicit return target. A refresh failure or ordinary logout clears only
 that platform. When one PC context receives a 401, it first checks whether the shared PC access
 token has changed before starting a refresh, which prevents an embedded Admin page from replacing a
-token refreshed by the PC Workbench context. Mobile never reads or writes the PC/Admin slot and
-does not render `admin_embed` pages; those pages direct the user to the computer entry.
+token refreshed by the PC Workbench context. Mobile never reads or writes the PC/Admin slot. Authorized `admin_embed` pages now render on
+Mobile with an immutable Mobile authentication context: iframe startup carries only
+`platform=MOBILE`, never tokens. The same-origin Mobile parent URL also preserves that context
+across iframe reloads after query parameters have changed. Admin reads and refreshes the
+`MOBILE_*` token family without a PC/legacy fallback and isolates its Mobile user/menu/visit-tenant
+cache keys. Mobile embed logout or session expiry returns to the outer Mobile login while retaining
+its deep link; PC credentials and impersonation context are not reused. Deploy the matching Admin embed bundle first (or publish both atomically), then the Workbench
+bundle; never enable Mobile embeds against the old PC-only Admin build. Business query strings
+and fragments round-trip through the iframe bridge; transport-only embed/platform parameters
+are excluded from the outer Mobile URL. `admin_only` pages still require the administrator runtime; this change does
+not convert server-owned render modes or grant additional menu permissions.
 
 The Today Tasks page may show the ZSJOS business-task panel to users with
 `zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
@@ -795,6 +810,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - `zsjos:sales-order:create` exposes direct order entry only when the backend `availableActions` projection enables `ENTER_DEAL`; the Service rechecks current ownership, valid qualification, suspension, opportunity state, active-order uniqueness and enabled SKU state under a tenant-scoped row lock.
 - Sales-order field options come from System dictionaries and the enabled ZSJOS product/SKU catalog. The workbench does not keep static business options or infer product hierarchy from labels.
 - `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. New approval rounds snapshot all enabled users in each root department and its children, including department leaders; department names, role names and frontend menus are not reviewer sources. Submission fails as invalid approval configuration only when either center has no enabled user.
+- System 部门 API 的单根部门与集合两个子部门查询入口均显式关闭调用方数据范围过滤；单根入口不能依赖接口默认方法内部转调集合入口的代理注解。此边界仅用于跨模块组织解析，保留租户和逻辑删除规则，不扩大销售的业务查询权限。
 - 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - 主管加签申请使用 `zsjos.sales_order.supervisor_requested` 只通知指定销售主管；主管决定使用 `zsjos.sales_order.supervisor_decided` 只通知加签申请人。消息携带订单号、申请中心、申请人、主管、原因、决定和受控任务定位字段，不广播给双中心其他审批人。V093 仅为缺失租户规则补建默认模板和站内信规则，不覆盖管理员配置。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.

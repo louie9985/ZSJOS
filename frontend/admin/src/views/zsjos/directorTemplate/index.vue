@@ -19,7 +19,24 @@
     <el-tabs v-else v-model="selectedId" @tab-change="selectTemplate">
       <el-tab-pane v-for="item in templates" :key="item.id" :name="item.id" :label="item.name" />
     </el-tabs>
-    <div v-if="current" v-loading="loading" class="designer">
+    <el-alert
+      v-if="positioning && previewVersion"
+      class="mb-16px"
+      :closable="false"
+      type="info"
+      :title="`正在预览：V${previewVersion.versionNo} · ${viewingHistory ? '版本查看（只读）' : previewVersion.status === 'draft' ? '草稿（未发布）' : '已发布（只读）'}`"
+      :description="
+        current?.published
+          ? `新建定位卡使用已发布 V${current.published.versionNo}；已有定位卡保留原版本快照。`
+          : '尚无已发布版本；保存草稿后需发布才能用于新建定位卡。'
+      "
+    />
+    <div
+      v-if="current"
+      v-loading="loading"
+      class="designer"
+      :class="{ 'positioning-designer': positioning }"
+    >
       <section class="field-list">
         <div class="section-title"
           ><strong>字段列表</strong
@@ -87,14 +104,34 @@
                 :value="item.type" /></el-select
             ><div class="dict-preview"
               >当前启用项 {{ dictCount }} 个<span v-if="dictError">，加载失败，请重试</span></div
-          ></el-form-item
+            ></el-form-item
           >
           <template v-if="positioning && activeField?.type === 'material_picker'">
-            <el-form-item label="素材类型"><el-select v-model="activeField.materialTypeCode" class="w-100%"><el-option label="爆款账号" value="viral_account" /><el-option label="爆款内容" value="viral_content" /></el-select></el-form-item>
-            <el-form-item label="默认平台字典值"><el-input v-model="activeField.defaultPlatform" /></el-form-item>
-            <el-form-item label="默认阶段字典值"><el-input v-model="activeField.defaultStage" /></el-form-item>
-            <el-form-item label="推荐数量提示"><el-input v-model="activeField.recommendedCount" /></el-form-item>
-            <el-form-item label="参考字段关联"><el-select v-model="activeField.referenceFor" clearable class="w-100%"><el-option v-for="target in fields.filter((x) => x.key !== activeField.key && x.type !== 'material_picker')" :key="target.key" :label="target.title" :value="target.key" /></el-select></el-form-item>
+            <el-form-item label="素材类型"
+              ><el-select v-model="activeField.materialTypeCode" class="w-100%"
+                ><el-option label="爆款账号" value="viral_account" /><el-option
+                  label="爆款内容"
+                  value="viral_content" /></el-select
+            ></el-form-item>
+            <el-form-item label="默认平台字典值"
+              ><el-input v-model="activeField.defaultPlatform"
+            /></el-form-item>
+            <el-form-item label="默认阶段字典值"
+              ><el-input v-model="activeField.defaultStage"
+            /></el-form-item>
+            <el-form-item label="推荐数量提示"
+              ><el-input v-model="activeField.recommendedCount"
+            /></el-form-item>
+            <el-form-item label="参考字段关联"
+              ><el-select v-model="activeField.referenceFor" clearable class="w-100%"
+                ><el-option
+                  v-for="target in fields.filter(
+                    (x) => x.key !== activeField.key && x.type !== 'material_picker'
+                  )"
+                  :key="target.key"
+                  :label="target.title"
+                  :value="target.key" /></el-select
+            ></el-form-item>
             <el-switch v-model="activeField.filterAdjustable" active-text="允许调整筛选" />
           </template>
           <el-form-item label="分组"><el-input v-model="activeField.group" /></el-form-item>
@@ -130,7 +167,7 @@
       </section>
       <section class="preview"
         ><div class="section-title"
-          ><strong>{{ !positioning ? '三列访谈卡预览' : '表单预览' }}</strong
+          ><strong>{{ !positioning ? '三列访谈卡预览' : '四列定位卡预览' }}</strong
           ><el-radio-group v-model="previewMode" size="small"
             ><el-radio-button value="desktop">桌面</el-radio-button
             ><el-radio-button value="mobile">移动</el-radio-button></el-radio-group
@@ -166,21 +203,12 @@
               ></div
             ></template
           >
-          <el-form v-else label-position="top"
-            ><el-form-item
-              v-for="field in fields.filter((x) => x.enabled)"
-              :key="field.key"
-              :label="field.title"
-              :required="field.required"
-              ><el-input disabled placeholder="预览控件" /><div
-                v-if="field.description?.trim()"
-                class="field-remark"
-                >{{ field.description }}</div
-              ></el-form-item
-            ></el-form
-          ></div
-        ></section
-      >
+          <PositioningTemplatePreview
+            v-else
+            :fields="fields"
+            :mobile="previewMode === 'mobile'"
+          /> </div
+      ></section>
     </div>
     <el-table v-if="current" :data="current.versions" class="mt-16px"
       ><el-table-column prop="versionNo" label="版本" /><el-table-column
@@ -216,6 +244,7 @@
 </template>
 <script setup lang="ts">
 import * as Api from '@/api/zsjos/director'
+import PositioningTemplatePreview from './PositioningTemplatePreview.vue'
 import { hasPermission } from '@/directives/permission/hasPermi'
 import * as DictTypeApi from '@/api/system/dict/dict.type'
 import * as DictDataApi from '@/api/system/dict/dict.data'
@@ -248,6 +277,7 @@ const loading = ref(false),
   dictTypes = ref<any[]>([]),
   dictCount = ref(0),
   dictError = ref(false)
+const previewVersion = ref<Api.TemplateVersion>()
 const current = computed(() => templates.value.find((x) => x.id === selectedId.value))
 const editable = computed(
   () =>
@@ -277,11 +307,13 @@ const fieldTypes = [
 const sync = () => {
   viewingHistory.value = false
   const v = current.value?.draft || current.value?.published
+  previewVersion.value = v
   fields.value = (v?.fields || []).map((x) => ({ ...x }))
   selectedIndex.value = 0
   void previewDict()
 }
 const viewVersion = (v: Api.TemplateVersion) => {
+  previewVersion.value = v
   viewingHistory.value = true
   fields.value = v.fields.map((x) => ({ ...x }))
   selectedIndex.value = 0
@@ -433,6 +465,18 @@ onMounted(load)
   gap: 16px;
 }
 
+.positioning-designer {
+  grid-template-columns: minmax(250px, 1fr) minmax(280px, 2fr);
+}
+
+.positioning-designer .preview {
+  grid-column: 1 / -1;
+}
+
+.designer > section {
+  min-width: 0;
+}
+
 .field-list,
 .properties,
 .preview {
@@ -541,11 +585,17 @@ onMounted(load)
 }
 
 @media (width <= 1000px) {
+  .header-row,
+  .section-title {
+    flex-wrap: wrap;
+  }
+
   .footer-actions :deep(.el-button) {
     margin-left: 0;
   }
 
-  .designer {
+  .designer,
+  .positioning-designer {
     grid-template-columns: 1fr;
   }
 

@@ -30,6 +30,7 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
   if (loading) return <><Skeleton active />{statusTarget && statusArea(<Skeleton active title={false} paragraph={{ rows: 2 }} />)}</>
   if (error) return statusArea(<Alert type="error" message={error} action={<Button onClick={() => setRetry(value => value + 1)}>重试</Button>} />)
   const choose = () => { setSelected(options?.submissionId); setRequestKey(crypto.randomUUID()); setSelectOpen(true) }
+  const selectedCard = options?.candidates.find(card => card.submissionId === selected)
   const apply = () => {
     if (!selected || !options || busy) return
     modal.confirm({ title: '应用此定位卡版本？', content: '账号及后续新工单将使用所选版本，已创建工单保留原快照。',
@@ -53,9 +54,22 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
       history={hideHistory ? undefined : <AccountPositioningHistory key={accountId} relationId={serviceRelationId || data?.effective?.serviceRelationId} canReadInterview={canReadInterview} />} />
     <PositioningDialog title="选择已确认定位卡版本" open={selectOpen} mask={{ closable: false }} keyboard={false}
       onCancel={() => { if (!busy) setSelectOpen(false) }} onOk={apply} okText="应用所选版本" confirmLoading={busy} okButtonProps={{ disabled: !selected || selected === options?.submissionId }}>
-      {options?.candidates.length ? <Radio.Group value={selected} onChange={e => { setSelected(e.target.value); setRequestKey(crypto.randomUUID()) }}>
-        <Space orientation="vertical">{options.candidates.map(card => <div key={card.submissionId}><Radio value={card.submissionId}>{card.cardNo} · 第 {card.submissionNo} 次提交 · 确认于 {card.studentDecidedAt ? String(card.studentDecidedAt) : '历史未记录'}</Radio>{selected === card.submissionId && <CardSnapshot card={card} />}</div>)}</Space>
-      </Radio.Group> : <Empty description="暂无已确认版本，请先完成定位卡审核与学员确认" />}
+      {options?.candidates.length ? <div className="positioning-version-sheet">
+        <div className="positioning-version-picker">
+          <Radio.Group className="positioning-version-options" value={selected} onChange={e => { setSelected(e.target.value); setRequestKey(crypto.randomUUID()) }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>{options.candidates.map(card =>
+              <Radio key={card.submissionId} value={card.submissionId}>
+                {card.cardNo} · 第 {card.submissionNo} 次提交 · 确认于 {card.studentDecidedAt ? String(card.studentDecidedAt) : '历史未记录'}
+              </Radio>)}</Space>
+          </Radio.Group>
+          {/* The preview lives outside the radio group: antd renders that group as an inline-flex
+              box, which would collapse the card snapshot and break its grid and container queries. */}
+          <div className="positioning-version-preview">
+            {selectedCard ? <CardSnapshot card={selectedCard} />
+              : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择要预览的版本" />}
+          </div>
+        </div>
+      </div> : <Empty description="暂无已确认版本，请先完成定位卡审核与学员确认" />}
     </PositioningDialog>
   </Space>
 }

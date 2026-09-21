@@ -411,3 +411,810 @@
 - Verification evidence: Maven reactor 测试在 yudao-common testCompile 因无法创建测试输出目录中止；改用现有依赖与 target/classes，在 `/tmp/zsjos-s3-check-bcszpco8` javac 编译目标生产类和测试，JUnit Launcher 执行 7 项通过、6 项外部存储集成测试按原注解跳过。覆盖 COS 自定义域名、两个 PUT 入口、签名期限/请求头、公开读取域名、path-style 私有 GET、默认桶域名。Workbench `npm test -- src/services/directUpload.test.ts --configLoader runner` 2 项通过（默认配置打包因 .vite-temp 无写权限失败，runner 成功绕过）。Admin `useUpload.ts` 已核对直接 PUT 后端返回 uploadUrl，与旧入口测试匹配；浏览器实测未执行。`git diff --check` 通过。
 - Dependency or integration impact: 无新增依赖，无前端/认证/权限接口格式变更；未提交、部署、重启或覆盖现有 jar。存储 endpoint 必须可被浏览器访问且允许 CORS。
 - Remaining work: 经用户另行明确授权后构建并部署测试服务、重启并验证 Admin/Workbench 实际上传、确认和预览；当前运行服务尚未加载修复。完整 Maven reactor 验证仍受既有输出目录问题阻断。
+
+## Workstream Registration - 2026-09-20T10:36:55.417592+08:00
+
+- Workstream ID: `test-aging-pool-filters`; Owner: Codex `/root`。
+- Goal: 公海池常驻筛选栏复用客资管理样式，新增归属我的和我跟进的筛选。
+- Non-goals: 不变更授权范围、数据库、共享服务或部署，不新增依赖。
+- Environment: test；Branch: main；Worktree: /opt/zsjos；Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6；Target branch / Integration order: None。
+- Ownership scope: Workbench LeadAgingPoolPage.tsx、services/api.ts、公海池样式及相关测试；后端 LeadAgingPoolPageReqVO、LeadAgingPoolCycleMapper、LeadAgingPoolServiceImpl、LeadConstants 及公海池相关测试；docs/api/zsjos-lead-aging-pool.md；handoff/test_main.md。
+- Dependencies: 现有公海池权限、服务端筛选配置和 A/B 业务关系；无新依赖。
+- Verification plan: Workbench 定向测试与类型检查、后端筛选 SQL/服务测试及编译，核对 Admin 既有调用兼容性；检查浏览器可用性并验证受影响宽度，无法执行的检查单独记录。
+
+## Delivery Entry - 2026-09-20T10:42:16.944824+08:00
+
+- Workstream ID: `test-aging-pool-filters`; Owner / Branch / Worktree: 同本轮登记；HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`。
+- User goal: 公海池常驻筛选栏与客资管理一致，新增“归属我的”“我跟进的”。
+- Key decisions: 复用 lead-simple-status-shell；常驻选项单选并回到第一页；归属我的对应当前正式归属 A，我跟进的按当前协同 B 实现（已向用户提出语义澄清，暂无回复，采用已说明默认假设）；关系条件由服务端绑定登录用户，与现有范围取交集，manage-all 不绕过个人过滤。高级筛选不隐藏常驻栏，状态和高级条件取交集。
+- Result: 完成前端样式、请求参数、后端分页过滤、API 文档与回归测试；Admin 未传 relationScope 的现有 GET/POST 调用和响应格式保持兼容。
+- Changed files: Workbench src/pages/LeadAgingPoolPage.tsx、src/pages/lead-aging-pool.guard.test.ts、src/services/api.ts、src/styles/pages/aging-pool.css；后端 LeadConstants.java、LeadAgingPoolPageReqVO.java、LeadAgingPoolCycleMapper.java、LeadAgingPoolServiceImpl.java、LeadAgingPoolCycleMapperTest.java、LeadAgingPoolServiceImplTest.java；docs/api/zsjos-lead-aging-pool.md；handoff/test_main.md。
+- Verification evidence: npm run typecheck 通过；Vitest 定向页面及样式检查 30 项通过；Maven reactor compile 在 zsjos target/classes/META-INF/spring-configuration-metadata.json 写权限处失败。使用现有依赖、显式 Lombok processor 在 /tmp/zsjos-aging-check-h536n8me 编译本次 4 个生产文件及 2 个测试文件成功，统一 JUnit 6.0.3 后执行 10 项测试全部通过，覆盖个人关系 SQL、授权范围交集、空高级结果、manage-all 登录用户传递、状态与高级筛选交集、Admin 不传新增字段兼容及既有公海业务。git diff --check 通过。
+- Dependency or integration impact: 无新依赖、SQL、权限分配、服务变更、提交或部署；需前后端一同部署后新关系筛选才生效。Admin 消费者只读核对调用契约，并由缺省参数后端测试验证兼容。
+- Remaining work: 完整 Maven 编译受已有构建输出目录权限限制；环境未提供可用浏览器及登录会话，桌面/移动视觉、实际点击切换与真实 API 联调尚未验证。当前运行服务未加载变更，不宣称页面已上线或完成浏览器验收。
+
+## Workstream Registration - 2026-09-20T10:56:27.218220+08:00
+
+- Workstream ID: `test-lead-contact-activation`; Owner: Codex `/root`.
+- Goal: 第一页联系方式查重命中全部激活提醒，提交兜底复用，交叉命中视为强重复。
+- Non-goals: 不改客资状态、归属或编辑联系方式规则，不部署、不写共享数据库、不新增依赖。
+- Environment: test（/etc/zsjos/agent-environment）；Branch: main；Worktree: /opt/zsjos；Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6；Target branch / Integration order: None。
+- Ownership scope: 后端 Lead 提交 Controller/VO/Service、联系方式激活 Service、Lead/Activation Mapper、通知场景及相关测试；Workbench LeadSubmissionPage、services/api.ts 及相关测试；Admin/H5 提交结果文案；docs/api/zsjos-lead-submission-dispatch.md、docs/business/lead-order-state-machine.md；handoff/test_main.md。
+- Dependencies: 复用现有激活表、通知框架、提交权限。公海筛选工作已交付，保留其 services/api.ts 等全部既有改动。
+- Verification plan: 后端匹配/多客资/幂等/通知/接口权限测试与编译；Workbench 类型检查和定向测试；核对三端提交响应；浏览器可用时验证桌面及移动流程，否则记录未验证项。
+
+## Workstream Registration - 2026-09-20 11:02:00 +08:00
+
+- Workstream ID: `test-media-student-production-ticket-launch`; Owner: Codex `/root`。
+- Goal: 在学员概览提供“发起剪辑设计工单”和“发起拍摄外勤工单”，从当前学员已授权账号中选择一个或多个账号，并将账号主页链接和封面快照带入各自的拍剪工单。
+- Non-goals: 不改变账号、模板、角色或菜单授权数据；不执行测试数据库写入、迁移、部署或服务重启；不新增依赖。
+- Environment: test；Branch: main；Worktree: /opt/zsjos；Base commit: `050f43dd0dcc996ce468efafa4715870264dafd6`；Target branch / Integration order: None。
+- Ownership scope: `frontend/workbench/src/pages/MediaStudentsPage.tsx` 及其直接测试；`backend/yudao-module-zsjos` 的拍剪工单服务与直接测试；工单 API 文档；`handoff/test_main.md`（仅追加）。
+- Dependencies: 现有学员详情授权账号投影、账号资料快照、账号资料读取 API、通用工单模板、拍剪单据状态机与 Workbench 资源链接组件；不引入新的数据源。
+- Verification plan: Workbench 定向测试、类型检查；拍剪服务定向测试和模块编译；检查账号链接的服务端覆盖、封面快照、逐账号创建与失败反馈；`git diff --check`。无登录浏览器会话时记录真实交互未验证。
+
+## Workstream Registration - 2026-09-20 11:30:00 +08:00
+
+- Workstream ID: `test-partner-inbox-overview`; Owner: Codex `/root`.
+- Goal: 兼职管理收件箱与学员管理对齐，补齐头像、收起/搜索、表格视图、概览与客资明细。
+- Non-goals: 不变更后端、权限、数据库、共享服务，不新增依赖、不部署。
+- Environment: test；Branch: main；Worktree: /opt/zsjos；Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6；Target branch / Integration order: None。
+- Ownership scope: frontend/workbench/src/pages/SubordinatePartnerPage.tsx、styles/pages/subordinate-partner.css、pages/subordinate-partner.guard.test.ts、test/partner-inbox.*；docs/api/zsjos-subordinate-partners.md；handoff/test_main.md（追加）。
+- Dependencies: 现有 managementApi、SubjectAvatar、InboxAvatarRail；保留全部既有其他工作区改动。
+- Verification plan: 定向测试、类型检查、scoped diff；探测现有浏览器工具并验证桌面/移动交互，可用性限制如实记录。
+
+## Delivery Entry - 2026-09-20 11:18:00 +08:00
+
+- Workstream ID: `test-lead-contact-activation`; Branch / Worktree: `main` / `/opt/zsjos`; HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`。
+- User goal: 第一页手机号/微信号查重，命中全部客资激活提醒；交叉联系方式按强重复；多客资分别处理，无负责人统一展示。
+- Key decisions: 新增普通、销售自拓、教务自拓三个联系方式查重入口；同字段和交叉字段均走 LeadActivation；逐 Lead 加锁、请求身份隔离和幂等；不改变历史 Lead 状态或归属；无负责人仍保存激活；最终提交再次执行联系方式激活，未命中才进入既有弱重复规则。
+- Result: 后端、Workbench、Admin、H5 和相关 API/业务文档已完成；保留同一工作树其他工作流修改。
+- Changed files: LeadContactCheckReqVO、LeadContactActivationService、LeadSubmissionController/Service/Impl、LeadMapper、LeadDuplicateMatcher、LeadNotifySceneProvider 及测试；Workbench LeadSubmissionPage、api、guard test；Admin/H5 提交结果文案；提交 API 与状态机文档；handoff/test_main.md。
+- Verification evidence: 独立 javac 编译本次后端生产类和测试类通过；统一 JUnit 6.0.3 执行 72 项后端定向测试全部通过；Workbench 提交 guard 7 项通过，Workbench `npm run typecheck` 通过；H5 `vue-tsc --noEmit` 通过；Admin `pnpm ts:check` 仍被既有 ElMessageBox、AdvancedFilterTemplate 和 materialType 未使用符号错误阻断；`git diff --check` 通过。
+- Dependency or integration impact: 无新依赖、数据库写入、部署、服务启停、提交或推送；复用现有 LeadActivation 表、通知框架和提交权限；主管/销售/教务收件人仍由通知规则解析。
+- Remaining work: 未执行真实浏览器、数据库并发、真实 API 和通知送达验证；当前运行服务未加载变更。Admin 全量类型检查的既有错误未在本任务内修复。
+
+## Delivery Entry - 2026-09-20T11:06:53+08:00
+
+- Workstream ID: `test-media-student-production-ticket-launch`; Owner: Codex `/root`。
+- Branch / Worktree / HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6（未变）。
+- User goal: 学员概览新增两类工单入口，必选一个或多个名下账号，自动带入主页链接和封面，使用通用链接组件。
+- Key decisions: 撤回本轮未经确认的逐账号拆单草稿；多账号是否合并一单需用户明确，现有单账号模型不能替代业务决定。共享工作树另有活动写入任务，暂停本任务修改以遵守串行规则。前述登记中的逐账号创建仅为已撤回的假设，不构成批准合同。
+- Result: 已确认概览操作栏、服务端模板目录、账号资料 homepage_url/cover 和 ResourceLink 的复用位置；没有交付功能实现。
+- Changed files: 仅 handoff/test_main.md 本轮追加；本轮五个功能/测试/文档文件已恢复至修改前 HEAD 内容，其他任务改动保留。
+- Verification evidence: 草稿 typecheck 未通过；Maven 因既有 target/classes/META-INF/spring-configuration-metadata.json 写权限失败，测试未执行。撤回后核对五个文件无差异；无真实发单、浏览器或数据库写入。
+- Dependency or integration impact: None；未提交、部署、重启或变更授权。
+- Remaining work: 确认多账号工单语义，待共享工作树写入任务串行交接后实现并验证。
+
+## Workstream Registration - 2026-09-20 11:40:00 +08:00
+
+- Workstream ID: `test-media-student-production-ticket-multi-account`; Owner: Codex `/root`。
+- Goal: 按用户确认，一张剪辑设计或拍摄外勤工单关联多个同一学员账号，并冻结账号主页链接和封面图快照。
+- Non-goals: 不拆分为多张工单，不修改账号、角色或菜单授权数据，不执行测试数据库迁移、部署或服务重启，不新增依赖。
+- Environment: test；Branch: main；Worktree: /opt/zsjos；Base commit: `050f43dd0dcc996ce468efafa4715870264dafd6`；Target branch / Integration order: None。
+- Ownership scope: 拍剪工单请求/服务/持久化、统一工单信封、V265 迁移、学员概览页面及直接测试、工单 API 文档、`handoff/test_main.md`（仅追加）。
+- Dependencies: 现有媒体账号对象权限、账号资料 `homepage_url`/`cover` 快照、通用工单中心、ResourceLink；无新依赖。
+- Verification plan: 定向前端测试与 typecheck；拍剪服务测试与模块编译；检查同学员约束、链接服务端覆盖、封面/账号快照和单账号兼容；`git diff --check`。无登录浏览器会话时不宣称实际交互通过。
+
+## Delivery Entry - 2026-09-20 11:20:00 +08:00
+
+- Workstream ID: `test-media-student-production-ticket-multi-account`; Owner: Codex `/root`。
+- Branch / Worktree / HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6（未变）。
+- User goal: 一张剪辑设计或拍摄外勤工单包含多个该学员账号。
+- Key decisions: `accountId` 保留首账号兼容用途；新增 `accountIds` 和 `studentPersonId`，服务端逐账号校验对象权限与学员归属，冻结账号 ID、昵称、平台、主页链接和封面文件 ID；`account_link` 用服务端账号主页链接列表覆盖。单个账号旧请求仍可继续使用。
+- Result: 学员概览增加两类发起按钮与多选账号；选择项显示昵称-平台，主页链接使用 ResourceLink、封面图预览；一条请求创建一张多账号拍剪工单。V265 新增拍剪单账号集合和快照 JSON 列；查询按主账号或账号集合匹配。
+- Changed files: ProductionTicket 请求/响应 VO、DO、Mapper、Service；V265 迁移；Workbench MediaStudentsPage、api 类型和守卫测试；generic-work-order-center API 文档；本 handoff 记录。
+- Verification evidence: `npm run typecheck` 通过；`git diff --check` 通过。Vitest 默认配置加载因 `frontend/workbench/node_modules/.vite-temp` 写权限失败；Maven compile 因既有 `target/classes/META-INF/spring-configuration-metadata.json` 写权限失败，未执行服务测试。未执行浏览器、真实登录 API、数据库迁移或共享数据库写入。
+- Dependency or integration impact: 无新增依赖、角色授权、部署或服务变更。发布时须先应用 V265 再部署后端和 Workbench；当前运行服务未加载本轮代码。
+- Remaining work: 在可写构建输出环境运行前端守卫测试与拍剪服务测试；使用两账号同学员的登录会话验证创建、接收和详情快照；执行受控升级迁移验证后再发布。
+
+## Delivery Entry - 2026-09-20 11:21:00 +08:00
+
+- Workstream ID: `test-media-student-production-ticket-multi-account`; Owner: Codex `/root`。
+- Branch / Worktree / HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6（未变）。
+- User goal: 一张拍剪工单关联多个同学员账号。
+- Key decisions: 保留上一条交付中的数据和兼容方案；前端恢复定位卡交接快照展示，满足既有拍剪创建页面合同。
+- Result: 受影响 Workbench 页面可通过类型检查和守卫测试；无需改变已实现的账号集合、主页链接或封面快照路径。
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx` 与 `handoff/test_main.md` 本条追加；其余本工作流文件见上一条。
+- Verification evidence: `npm run typecheck` 通过；`npm test -- src/pages/media-students.guard.test.ts src/pages/production-ticket-positioning.guard.test.ts --run --configLoader runner` 通过，2 个文件共 5 项测试。`git diff --check` 通过。
+- Dependency or integration impact: None；未执行数据库迁移、部署、重启、提交或推送。
+- Remaining work: 后端 Maven 仍受既有 target 元数据写权限阻断；真实两账号登录流、受控 V265 升级验证和浏览器验收待后续环境完成。
+
+## Delivery Entry - 2026-09-20T11:09:30.205737+08:00
+
+- Workstream ID: `test-lead-contact-activation`; Owner / Branch / Worktree: 同本轮登记；HEAD unchanged: 050f43dd0dcc996ce468efafa4715870264dafd6。
+- User goal: 第一页手机号/微信号查重，所有联系方式命中客资均激活并按归属提醒，无负责人统一展示。
+- Key decisions: 新增受既有提交权限控制的 contact-check；全部同字段/交叉联系方式及已关闭客资参与提交激活，逐 Lead 加锁和幂等；复用 LeadActivation/ACTIVATED 通知；不改状态归属、不返回历史详情；编辑联系方式沿用原匹配规则。
+- Result: 第一版后端和三端响应文案已实现；工作区检测到另两个新注册文件修改任务，已暂停业务文件写入并请求用户串行协调。本条仅追加交接元数据，当前任务未完成。
+- Changed files: LeadContactCheckReqVO.java、LeadSubmissionController.java、LeadSubmissionService.java、LeadSubmissionServiceImpl.java、LeadContactActivationService.java、LeadDuplicateMatcher.java、LeadMapper.java、LeadNotifySceneProvider.java 及 4 个相关测试；Workbench LeadSubmissionPage.tsx/services/api.ts；Admin LeadCreateDialog.vue；H5 lead/submit.vue；handoff/test_main.md。保留其他任务全部改动。
+- Verification evidence: /tmp/zsjos-contact-check-l6x5v003 中 javac 编译目标生产类和测试成功，统一已有 JUnit 6.0.3 后 72 项测试通过（含 Mapper SQL、提交、匹配、编辑、通知与权限注解）；Workbench 三步原有 guard 6 项通过；H5 vue-tsc 通过；Workbench 类型检查受并发 MediaStudentsPage ticketContext 错误阻断；Admin pnpm ts:check 受既有 ElMessageBox/AdvancedFilterTemplate 等无关错误阻断；git diff --check 通过。
+- Dependency or integration impact: 无新依赖、数据库写入、部署、服务启停、Git 提交或推送；复用已有 owner 激活通知规则，主管接收由规则配置决定。
+- Remaining work: 待并发工作流结束后同步 API/状态机文档、补充新查重 UI 与提交匹配范围测试、复查身份/通知/幂等边界；浏览器和真实 API/通知送达、事务并发数据库验证未执行；完整 Maven 未重跑（已有 target 写权限问题，使用独立编译目录）。当前运行服务未加载变更，不能宣称完成交付。
+
+## Registration Update - 2026-09-20T11:11:29.494548+08:00
+
+- Workstream ID: `test-partner-inbox-overview`; 原登记标题时间误填为 11:30，实际登记在本次实施开始前（约 11:07）。本更新按实际时间追加，保留原记录。
+- Scope update: 增加 frontend/workbench/docs/ui-guidelines.md，仅同步主从页示例与其引用的现行样式 guard 对公共页面 padding/max-width 的约束；其余登记不变。
+
+## Registration Update - 2026-09-20T11:52:00+08:00
+
+- Workstream ID: `test-workbench-raised-surface-style`; Owner: Codex `/root`。
+- Goal: 将 Workbench UI 规范和现有凹陷子块统一调整为凸起或无阴影的表面效果。
+- Non-goals: 不改变业务逻辑、接口、权限、主题选择器、数据库、依赖或外部服务；不覆盖其他工作流未提交修改。
+- Environment: test；Branch: main；Worktree: /opt/zsjos；Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6；Target branch / Integration order: None。
+- Ownership scope: `frontend/workbench/docs/ui-guidelines.md`、Workbench surface tokens/theme mapping、Workbench styles and Bootstrap preset affected by inset shadows；`handoff/test_main.md`（仅追加）。
+- Dependencies: 复用现有 Ant Design shadow tokens 和 CSS 变量，不新增依赖；保留其他工作流已修改文件内容。
+- Verification plan: Workbench styles guard、theme token tests、TypeScript typecheck/build（如环境允许）、`git diff --check`；无登录会话时记录浏览器视觉验证未执行。
+
+## Delivery Entry - 2026-09-20T11:19:10+08:00
+
+- Workstream ID: `test-workbench-raised-surface-style`; Owner / Branch / Worktree: Codex `/root` / main / `/opt/zsjos`; HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`。
+- User goal: 将 Workbench UI 规范和检出的凹陷组件样式改为凸起或无阴影效果，拒绝凹陷显示。
+- Key decisions: 用户本轮明确要求优先于既有“凹陷子块”规范；保留 `--crm-bg-sunken` 与 `--crm-shadow-inset` 历史变量名以避免大范围组件改名，但分别映射为容器底色和标准外阴影；Bootstrap 主题直接内阴影改为 Ant Design 外阴影；审批辅助卡文案同步为平面无阴影。
+- Result: 24 个复用 `--crm-shadow-inset` 的业务样式位置通过主题映射统一变为微凸；默认 token、玻璃 token bridge、UI guidelines 和受影响主题样式已同步；选中态侧边标记/描边等结构性 inset 保留，不属于凹陷暗阴影。
+- Changed files: `frontend/workbench/docs/ui-guidelines.md`; `frontend/workbench/src/styles/tokens.css`; `frontend/workbench/src/components/Theme/themeTokens.ts`; `frontend/workbench/src/components/Theme/themeTokens.presets.test.ts`; `frontend/workbench/src/components/Theme/presets/bootstrapTheme.ts`; `frontend/workbench/src/styles/pages/bpm-approval-center.css`; `handoff/test_main.md`。保留工作树其他任务改动。
+- Verification evidence: Workbench `npm run typecheck` 通过；使用独立 `/tmp` Vitest 配置运行 styles guard 与 theme token 测试，3 个测试文件、46 项通过；`git diff --check` 通过。默认 Vitest 配置因 `node_modules/.vite-temp` 权限不足未直接使用，已用独立缓存目录完成等价测试。浏览器视觉验证未执行，环境无 Chromium/Firefox/Playwright。
+- Dependency or integration impact: 无新增依赖、数据库或外部服务变更；主题变量兼容既有 CSS 调用，影响全部 Workbench preset 的子块阴影方向。
+- Remaining work: 需要在有浏览器会话的环境复核浅色/暗色及玻璃背景下的真实视觉层次；直接写死的 `inset` 侧边标记、选中描边和玻璃高光仍按其非凹陷语义保留。
+
+## Delivery Entry - 2026-09-20T11:12:38.456278+08:00
+
+- Workstream ID: `test-partner-inbox-overview`; Owner / Branch / Worktree: 同登记；HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`。
+- User goal: 补齐兼职管理收件箱、表格样式与头像/搜索/收起对齐；点击兼职进入概览，客资明细可查看详情。
+- Key decisions: 复用 SubjectAvatar 与 InboxAvatarRail；共享现有服务端分页数据支持收件箱/表格；概览总量取 total，本页指标标注分页口径；客资编号和分类/归属快照沿用已有契约，现有管理权限不变。
+- Result: 完成左栏卡片、收起头像栏、搜索和滚动条宽度对齐、桌面/移动响应布局、兼职表格、概览和客资明细表格；详情内保留兼职列表，返回保留分页。列表请求失败时清除失效选择。同步 API 展示说明及公共页面间距规范示例。
+- Changed files: `frontend/workbench/src/pages/SubordinatePartnerPage.tsx`、`frontend/workbench/src/styles/pages/subordinate-partner.css`、`frontend/workbench/docs/ui-guidelines.md`、`docs/api/zsjos-subordinate-partners.md`、`handoff/test_main.md`。保留全部既有其他修改。
+- Verification evidence: `npm run typecheck` 通过；`npm test -- src/pages/subordinate-partner.guard.test.ts --configLoader runner` 对应 3 项通过；`npm test -- src/styles/styles.guard.test.ts --configLoader runner` 28 项通过；scoped `git diff --check` 通过。样式初检揭示公共页面重复 padding/max-width 与动态滚动条间距校验问题，修正后全部通过。
+- Dependency or integration impact: None；无新增依赖、后端/共享接口改动、数据库/共享服务操作、提交或部署。仅工作台展示调整，不影响 Admin 调用契约。
+- Remaining work: 环境缺少浏览器可执行文件与 Playwright，真实桌面/移动视觉、搜索/折叠/分页/详情点击以及真实授权 API 联调未验证；现有测试为静态 guard，不替代浏览器验收。构建输入/依赖/路由未变，本次未执行发布构建。运行服务未加载本次改动。
+
+## Registration Correction - 2026-09-20T11:19:59+08:00
+
+- Workstream ID: `test-workbench-raised-surface-style`。前述登记标题 `11:52:00` 为误填，实际登记约在 `11:14`、本轮首次功能文件变更之前；保留原记录，仅追加更正。验证范围包含 `themeTokens.presets.test.ts` 的旧玻璃阴影差异断言更新。无 bundling、依赖、路由、资源或构建配置变更，生产构建不适用；桌面和移动视觉检查仍未完成。
+
+## Delivery Entry - 2026-09-20T11:20:59.649445+08:00
+
+- Workstream ID: `test-partner-inbox-overview`; Owner / Branch / Worktree: 沿用登记（Codex /root，main，/opt/zsjos）；HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`；Environment: test。
+- User goal: 调整兼职概览分页统计，并核实表格是否使用通用组件。
+- Key decisions: 移除本页客资数和本页已分配销售数；仅显示服务端 total 对应全部客资数，明细继续分页。表格使用 Ant Design Table，未使用 ProTable 或项目二次封装，本轮不扩展表格能力。
+- Result: 统计卡改为单列，说明全部客资统计口径；同步接口展示文档；不添加后端不存在的全量指标。
+- Changed files: frontend/workbench/src/pages/SubordinatePartnerPage.tsx；frontend/workbench/src/styles/pages/subordinate-partner.css；docs/api/zsjos-subordinate-partners.md；handoff/test_main.md（追加）。保留其他既有改动。
+- Verification evidence: npm run typecheck 通过；兼职页面 guard 3 项和 styles guard 28 项全部通过；scoped git diff --check 通过；检查概览不再依赖 leads.length 或本页销售数量。
+- Dependency or integration impact: None；无新依赖、接口改动、共享服务操作、提交或部署。
+- Remaining work: 环境仍无可用浏览器/Playwright，桌面/移动视觉未验证；未部署，运行服务尚未加载修改。
+
+## Delivery Entry - 2026-09-20T11:23:50.122967+08:00
+
+- Workstream ID: `test-partner-inbox-overview`; Owner / Branch / Worktree: 沿用登记（Codex /root，main，/opt/zsjos）；HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`；Environment: test。
+- User goal: 兼职管理使用 ProTable。
+- Key decisions: 复用已安装 @ant-design/pro-components；兼职列表与客资明细启用刷新、密度、全屏和独立持久化列设置，保留原服务端搜索和每页 20 条分页；归属历史为无额外工具栏的紧凑 ProTable。
+- Result: 三处 Table 已迁移；显式 ProColumns 类型；渲染从类型明确的记录读取状态、时间与空值字段，保留 leadNo 和历史快照语义；同步展示文档。
+- Changed files: frontend/workbench/src/pages/SubordinatePartnerPage.tsx；docs/api/zsjos-subordinate-partners.md；handoff/test_main.md（追加）。
+- Verification evidence: 最终 npm run typecheck 通过；兼职 guard 3 项通过；最终 Vite production build 通过，产物位于 /tmp/zsjos-partner-protable-build-final-20260920，已有大体积 chunk 警告；scoped git diff --check 通过。初始 Card bodyStyle 类型不兼容，改为当前版本 styles.body 后复验成功。
+- Dependency or integration impact: None；无新依赖、接口/权限改动、共享服务操作、提交或部署；不覆盖运行环境产物。
+- Remaining work: 无可用浏览器，实际列设置、全屏、密度切换及桌面/移动视觉未验证；运行环境尚未部署此修改。
+
+## Registration Update - 2026-09-20T11:31:03.013494+08:00
+
+- Workstream ID: `test-production-ticket-compile-fix`; Owner: Codex `/root`。
+- Goal: 修复 ProductionTicketService 账号快照解析泛型编译错误；Non-goals: 不改变业务契约、不部署或启停服务。
+- Environment: test（/etc/zsjos/agent-environment）；Branch: main；Worktree: /opt/zsjos；Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6；Target branch / Integration order: None。
+- Ownership scope: 接续已交付多账号工单工作，仅修改 ProductionTicketService.java 的 parseAccountSnapshots 及 import；handoff/test_main.md 仅追加。保留全部既有修改。
+- Dependencies: 复用现有 JsonUtils 与 Jackson TypeReference，无新增依赖。
+- Verification plan: Maven ZSJOS 模块及依赖 compile，scoped diff 检查。
+
+## Delivery Entry - 2026-09-20T11:31:52.450234+08:00
+
+- Workstream ID: `test-production-ticket-compile-fix`; Owner / Branch / Worktree: 同登记；HEAD unchanged: 050f43dd0dcc996ce468efafa4715870264dafd6。
+- User goal: 修复部署时后端编译错误。
+- Key decisions: 使用现有 tools.jackson.core.type.TypeReference 保留 List<Map<String, Object>> 完整泛型，移除该方法无效的 SuppressWarnings；空值处理不变。
+- Result: 泛型编译错误已修复；保留其他未提交业务改动。
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/production/ProductionTicketService.java；handoff/test_main.md。
+- Verification evidence: sudo -n mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile 成功（BUILD SUCCESS，28.520 s）；日志 /tmp/zsjos-ticket-compile-fix.log；scoped git diff --check 通过。因已有 target 为 root 所有，编译使用 sudo。
+- Dependency or integration impact: None；无新增依赖、业务契约或数据库变更，无部署或服务启停。
+- Remaining work: 尚未重新部署及验证运行时启动；编译验证未运行测试。
+
+## Registration - 2026-09-20 V265 migration recovery
+
+- Workstream ID: test-v265-mysql-recovery; Owner: Codex /root.
+- Environment: test (/etc/zsjos/agent-environment); Branch: main; Worktree: /opt/zsjos; Base commit: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Correct failed V265 SQL and redeploy/restart the runtime explicitly authorized by the user.
+- Non-goals: Other business changes, historical migration rewrites, dependency changes.
+- Ownership scope: script/sql/mysql/migrations/V265__production_ticket_multi_account.sql; handoff/test_main.md (append only). Preserve existing work.
+- Dependencies: Existing MySQL 8.4 runtime and deploy-production.sh with /opt/zsjos-runtime configuration. V265 confirmed unapplied.
+- Verification plan: Isolated MySQL execution from prerequisite table structures, repeat execution and version/column inspection; deployment migration, read-only schema verification and backend health.
+- Target branch / Integration order: None.
+
+## Registration Update - V265 schema verification recovery
+
+- Workstream: test-v265-mysql-recovery; unchanged owner/context.
+- Evidence: corrected V265 applied, but post-migration verification rejected its columns because desired schema omitted them.
+- Scope extended to script/sql/mysql/schema/core.sql and matching script/sql/mysql/00-bootstrap-schema.sql; only the two V265 column declarations. Fresh baseline is updated for future databases, not executed against the existing runtime.
+- Verification extended to existing controlled test-fresh/test-upgrade commands and runtime schema comparison. Resume already-built release after successful verification.
+
+## Delivery Entry - 2026-09-20T13:27:28.667396+08:00
+
+- Workstream ID: test-v265-mysql-recovery; Owner / Branch / Worktree: Codex /root / main / /opt/zsjos; HEAD unchanged: 050f43dd0dcc996ce468efafa4715870264dafd6; Environment: test.
+- User goal: Fix deployment failure and restart the same runtime using /opt/zsjos-runtime configuration.
+- Key decisions: Correct previously unapplied V265 with information_schema checks and prepared ALTER statements; retain repeatability. Synchronize two nullable JSON columns in desired schema and fresh baseline after runtime verifier exposed omitted declarations. Existing runtime receives V265 only, never bootstrap. No business data backfill or permission edits. Reuse completed build for installation/start after schema verification.
+- Result: Release 2026.09.20-132029-050f43dd installed; zsjos-backend.service active/running; application startup completed in 43.19 seconds; health HTTP 200 and UP. Runtime core V265 registered in both ledgers; both columns JSON nullable. Backup created before migration: migrator /backups/zsjos-20260920-132354.sql.
+- Changed files: script/sql/mysql/migrations/V265__production_ticket_multi_account.sql; script/sql/mysql/schema/core.sql; script/sql/mysql/00-bootstrap-schema.sql; handoff/test_main.md. Preserved unrelated existing changes.
+- Verification evidence: Isolated mysql:8 executed V265 twice against structures copied from actual V264 tables, confirming both JSON columns and one V265 record per ledger. Static check and git diff --check passed. Backend/Admin/Workbench/H5 release builds passed. Runtime db-verify passed structural drift checks; existing data-grade FAIL warnings remain warn-only. Read-only runtime column/ledger checks agree with isolated result. Logs: /tmp/zsjos-v265-redeploy.log, /tmp/zsjos-v265-verify.log, /tmp/zsjos-v265-start.log.
+- Verification limitations: test-fresh and test-upgrade both blocked by pre-existing bootstrap syntax error at zsjos_student_delivery_config (missing semicolon before next CREATE TABLE; reproduced in HEAD). Full fresh/upgrade acceptance is therefore NOT verified; no unrelated repair undertaken. Start wrapper exited on its first failed health probe because existing health() calls exit; independently confirmed later successful startup and HTTP 200/UP.
+- Dependency or integration impact: No new dependencies, commits or branches. Authorized existing runtime migration, release installation and backend start completed. Disposable isolated MySQL container removed.
+- Remaining work: Independently repair existing fresh-bootstrap syntax error and rerun full initialization tests; investigate existing data-grade warnings separately. No remaining blocker for the requested runtime restart.
+
+## Workstream Registration - 2026-09-20T13:30:48+08:00
+
+- Workstream ID: `test-media-screen-imported-partner-attribution`; Owner: Codex `/root`.
+- Goal: Make imported Partner Lead performance visible on the media-screen companion ranking by backfilling the current confirmed Partner-to-employee attribution into missing Lead contribution snapshots.
+- Non-goals: Do not alter Lead status, counted time, provider identity, ownership records, orders, role permissions, or existing media-screen daily snapshots; do not deploy, restart, or write the shared test database in this source-change turn.
+- Environment: test (`/etc/zsjos/agent-environment`); Branch: main; Worktree: `/opt/zsjos`; Base commit: `050f43dd0dcc996ce468efafa4715870264dafd6`; Target branch / Integration order: None.
+- Ownership scope: `script/sql/mysql/migrations/V266__backfill_imported_partner_media_attribution.sql`; `script/sql/mysql/tools/test_imported_partner_media_attribution.py`; `docs/api/media-screen-public-api.md`; `handoff/test_main.md` (append only).
+- Dependencies: Existing `zsjos_partner_ownership`, System user/department facts, Lead contribution snapshot contract, MySQL 8; no new dependency. The migration is after existing V265 and only applies rows carrying the `legacy-parttimecrm-%` import marker.
+- Verification plan: Run a disposable MySQL replay twice with matching/nonmatching tenant, ownership, user status, department and import-marker fixtures; assert snapshot values, preserved Lead business fields, no broad update, version ledgers and UTF-8 descriptions. Then run migration discovery and scoped diff checks. Shared test execution needs a separately recorded write operation and post-write API/query verification.
+
+## Delivery Entry - 2026-09-20T13:35:44+08:00
+
+- Workstream ID: `test-media-screen-imported-partner-attribution`; Owner / Branch / Worktree: Codex `/root` / `main` / `/opt/zsjos`; HEAD unchanged: `050f43dd0dcc996ce468efafa4715870264dafd6`; Environment: test.
+- User goal: Verify imported Partner data eligibility and backfill its historical performance to the current confirmed new-media operators for the media-screen companion ranking.
+- Key decisions: V266 is a narrow import exception: it only matches `legacy-parttimecrm-%` Partner Leads with a non-null counted time and both contribution snapshots absent, then joins same-tenant current live Partner ownership, enabled employee and live department. It preserves all Lead business fields and daily screen snapshots. The 55 legacy rows whose current attribution cannot be established remain unmodified.
+- Execution result: Shared test database V266 executed once and recorded in both Core version ledgers. It backfilled 461 Leads across 60 Partners to 6 operators in department 1013; 193 are in the current month. The public stats endpoint, after its 15-second natural cache expiry, returns a companion department with 6 members, month total 193, effective 149 and week 71.
+- Changed files: `script/sql/mysql/migrations/V266__backfill_imported_partner_media_attribution.sql`; `script/sql/mysql/tools/test_imported_partner_media_attribution.py`; `docs/api/media-screen-public-api.md`; `handoff/test_main.md`.
+- Verification evidence: Disposable MySQL replay passed, including tenant isolation, import-marker exclusion, missing ownership, disabled employee, existing snapshots, idempotent replay, UTF-8 version label and business-field preservation. Migration sequence discovery reports continuous V001-V266; scoped `git diff --check` passed. Post-write query reports 461 V266 rows, no dangling employee/department references and no null status/counted time/provider type. Public API verification returned the companion ranking above.
+- Backup and recovery: The first pre-write `mysqldump` used a joined subquery and failed its lock-table check; the shell did not stop before running V266. All affected pre-write contribution user/department snapshots were deterministically NULL by the migration predicate. A post-apply full-row backup of exactly 461 V266 rows was then created at `/opt/zsjos-runtime/backups/v266-imported-partner-media-attribution-postapply-20260920-133400.sql` (336,976 bytes); recovery requires a reviewed scoped update that clears the six contribution snapshot fields for these V266 rows, then uses that backup for the post-apply row state. No data outside the 461 matching rows was written.
+- Dependency or integration impact: No new dependencies, branches, commits, deployment or service restart. Existing historical daily snapshot pages and yesterday champion intentionally retain their frozen values; realtime, trend and 14-day series use the repaired Lead snapshots.
+- Remaining work: Review the 55 unmatched imported rows before assigning an authoritative Partner ownership; do not infer an operator for them. If historical daily snapshot pages also must display the reassigned performance, a separately approved snapshot-reconstruction operation is required.
+
+## Registration Update - 2026-09-20T13:42:12+08:00
+
+- Workstream: test-media-screen-imported-partner-attribution; Owner / branch / worktree / HEAD unchanged; environment test.
+- Goal: Show currently assigned enabled Partners with zero metrics under their active in-scope operator in realtime companion details, including operators with no contribution rows.
+- Scope: MediaScreenQueryService.java, MediaScreenQueryServiceTest.java, docs/api/media-screen-public-api.md, this handoff. No database, deployment or service changes; preserve other work.
+- Dependencies: existing PartnerOwnershipMapper and PartnerMapper, no new libraries. Target branch / integration: None.
+- Verification: focused service tests and compilation; inspect existing frontend zero rendering; historical snapshots retain frozen membership.
+
+## Delivery Entry - 2026-09-20T13:44:46+08:00
+
+- Workstream: test-media-screen-imported-partner-attribution; Owner / branch / worktree: Codex /root / main / /opt/zsjos; HEAD unchanged: 050f43dd0dcc996ce468efafa4715870264dafd6; environment test.
+- User goal: 数据全为 0 的兼职也显示在对应运营名下兼职明细。
+- Decisions/result: Realtime companion details now supplement contribution rows with current ownership for enabled Partners under active in-scope operators, explicitly restricting ownership lookup to the requested tenant and roster. Operators without any contribution rows are included when they own an enabled Partner. Four primitive metric fields default to zero. Existing contribution names/attribution and totals are preserved; duplicate supplementation is prevented. Disabled Partners remain hidden; frozen history unchanged.
+- Changed files: MediaScreenQueryService.java; MediaScreenQueryServiceTest.java; docs/api/media-screen-public-api.md; handoff/test_main.md. Preserved existing modifications.
+- Verification: sudo -n mvn -f backend/pom.xml -pl yudao-module-zsjos -am -Dtest=MediaScreenQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test: BUILD SUCCESS, 7 tests passed; log /tmp/zsjos-media-zero-test.log. Covers zero members/details, disabled filtering, no duplicate counts and reassignment retaining historical contributions. git diff --check passed. Existing adapter.ts and PartTimeDetailsPopover render zero values without filtering.
+- Limitations: frontend npm test blocked by installed Node lacking --experimental-strip-types; no browser or deployed API verification of new code. No frontend source or layout changes. Current running backend still uses previous implementation.
+- Dependency/integration impact: existing mappers only, no new dependency, database writes, deployment, service restart, commits or branch operations. No API field changes.
+- Remaining work: Deploy backend through an authorized release and verify realtime details after cache expiry. Historical daily snapshots intentionally retain their frozen lists.
+
+## Workstream Registration - 2026-09-20 (deployment frontend artifacts)
+
+- Workstream ID: test-deploy-embed-media-build; Owner: Codex `/root`.
+- Goal: Build and install fresh admin-embed and media-screen artifacts with the existing release script.
+- Non-goals: No deployment, database operations, service restart, dependency additions or unrelated edits.
+- Environment: test (`/etc/zsjos/agent-environment`); Branch: main; Worktree: `/opt/zsjos`; Base commit: `050f43dd0dcc996ce468efafa4715870264dafd6`; Target branch / Integration order: None.
+- Ownership scope: `script/shell/deploy-production.sh`; `docs/operations/production-deployment.md`; `docs/operations/media-screen-deployment.md`; `handoff/test_main.md` (append only).
+- Dependencies: Existing pnpm Admin and npm media-screen toolchains; existing release layout. Preserve all pre-existing changes.
+- Verification plan: Bash syntax, isolated stub build/install/failure checks, actual frontend production builds in temporary output directories, asset path/PMS registration checks and scoped diff checks. No active release changes.
+
+## Delivery Entry - 2026-09-20T13:59:22+08:00
+
+- Workstream ID: test-deploy-embed-media-build; Owner: Codex `/root`; Environment: test.
+- Branch / Worktree / HEAD: main / `/opt/zsjos` / `050f43dd0dcc996ce468efafa4715870264dafd6` (unchanged).
+- User goal: Include admin-embed and media-screen in the startup/release script's build flow.
+- Key decisions: Keep start/restart as backend lifecycle commands; build/deploy now produce five frontend artifacts. Admin dependency installation is shared; separate production builds use dist-prod and dist-embed with an explicit /admin-embed/ base. Media-screen uses existing npm lockfile and explicit deployment tenant/API environment with mock disabled. Install copies both fresh artifacts instead of carrying over old releases.
+- Execution result: Updated script, help and directly affected deployment documentation. Reported and corrected the documented deployment order to match current script behavior; database and service lifecycle implementation unchanged.
+- Changed files: `script/shell/deploy-production.sh`; `docs/operations/production-deployment.md`; `docs/operations/media-screen-deployment.md`; `handoff/test_main.md` (append only). Preserved unrelated existing modifications.
+- Verification evidence: Bash syntax and scoped git diff --check passed. Temporary stub harness `/tmp/zsjos-embed-media-check/verify.py` passed five-artifact build/install, explicit embed base, single Admin install, build failure abort and missing-artifact no-switch cases. Actual Admin embed production build passed (65 seconds), media-screen npm production build including TypeScript checks passed. Outputs isolated under `/tmp/zsjos-embed-media-check`; HTML local asset references resolved for both artifacts; embedded registry contains 77 PMS Vue components including project list and workbench. Logs: admin.log and media.log in that directory.
+- Dependency / integration impact: No dependency additions, commits, branches, database writes, deployments or service restarts. Media build requires deployment VITE_MEDIA_SCREEN_TENANT_ID (already configured in this environment).
+- Remaining work / limitations: Active release remains unchanged. No live browser verification or complete backend/five-frontend deploy was performed; deployment and post-release PMS/media-screen validation remain separate operations. Existing Vite NODE_ENV configuration warning did not block build.
+
+## Registration Update - 2026-09-20 (release retention)
+
+- Workstream: test-deploy-embed-media-build; owner Codex `/root`; environment test; branch/main, worktree `/opt/zsjos`, HEAD unchanged from registration.
+- Goal: After successful deploy health verification retain current and previous-release, remove other recognized release directories; fail closed on invalid protection paths. User confirmed this script change; no live cleanup/deployment this turn.
+- Scope addition: `script/shell/tests/test_release_retention.py`; existing script, production deployment documentation and append-only handoff remain owned here.
+- Verification: Isolated temporary release trees and stub deploy functions cover retention, path protection, failed/slow startup, failure before health, and non-deploy commands; Bash syntax and scoped diffs. No new dependencies.
+- Non-goals/dependencies/integration: No database, service, shared release or branch changes; existing Bash/coreutils/Python only; integration None.
+
+## Delivery Entry - 2026-09-20T14:09:49+08:00
+
+- Workstream: test-deploy-embed-media-build; Owner: Codex `/root`; Environment: test.
+- Branch / Worktree / HEAD: main / `/opt/zsjos` / `050f43dd0dcc996ce468efafa4715870264dafd6` (unchanged).
+- User goal: Retain current and previous release after successful startup, automatically clean older versions; user confirmed script modification.
+- Decisions/result: Deploy now runs cleanup only after HTTP 200 health verification. Fixed health probe failure to return rather than exit so existing retries work. Retention follows current symlink and previous-release path file, never mtime. Validate both references, expected current version, direct-child boundaries and retained artifact structure before deleting recognized historical release directories. Preserve unrecognized directories, symlinks, standalone checksums and configured source/log/backup paths; reject mount-point candidates and avoid crossing filesystems. Missing references (including first deployment) fail closed. start/restart/rollback do not clean. Cleanup failure returns nonzero without stopping the healthy process.
+- Changed files: `script/shell/deploy-production.sh`; `script/shell/tests/test_release_retention.py`; `docs/operations/production-deployment.md`; `handoff/test_main.md` (append only). Earlier frontend-build changes and unrelated work preserved.
+- Verification: `python3 -B -m unittest discover -s script/shell/tests -v` passed all 9 tests with temporary fixtures, including actual fixture deletion, idempotence, reference-based retention, symlink/path/mount protection, incomplete/missing retention targets, health retry then success, upstream/health failures, cleanup failure propagation and start/restart exclusion. Bash syntax and scoped diff checks passed. No live deployment, service operation, database change or shared-release deletion occurred.
+- Dependency/integration impact: Existing Bash/coreutils/find/mountpoint runtime; added tool preflight checks, no package dependencies or branch/commit operations. Integration None.
+- Remaining work/limitations: New cleanup will run on the next authorized successful deploy. Live service startup and cleanup intentionally unexecuted; isolated tests verify behavior. Deleted older releases have no automatic backup; retain required archives beforehand. Independent logs/backups and unrecognized release-root entries are intentionally outside deletion scope.
+
+## Workstream Registration - 2026-09-20T14:16:24+08:00
+
+- Workstream ID: test-account-kz-cleanup; Owner: Codex /root; environment: test from /etc/zsjos/agent-environment.
+- Goal: Physically remove 13 confirmed test ADMIN accounts and their KZ Lead chains; user additionally confirmed two no-Lead test orders and two finance-test feedback records.
+- Non-goals: No production access, schema/migration changes, unrelated account/business deletion, role-menu changes, attachment blob deletion, service restart, branch/commit/deployment operations.
+- Branch / worktree / base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6. Target branch / integration order: None.
+- Ownership scope: handoff/test_main.md append only; scoped tenant-1 runtime database cleanup and private recovery artifacts under /opt/zsjos-runtime/backups/test-account-cleanup-20260920.
+- Dependencies: existing Docker MySQL/Redis tools and Python standard library; preserve all unrelated worktree changes.
+- Verification plan: full pre-change backup, exact row manifests, isolated scoped replay/rollback/idempotence, transaction assertions, retained-row checksums, account/Lead/descendant zero-count checks and targeted cache/session inspection. Shared-test deletion is explicitly authorized by the current user request and follow-up confirmation.
+
+## Delivery Entry - 2026-09-20T14:22:13+08:00
+
+- Workstream: test-account-kz-cleanup; owner/environment/branch/worktree: Codex /root / test / main / /opt/zsjos; HEAD unchanged: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- User goal: Physically remove the confirmed test accounts and associated KZ Lead records; follow-up explicitly authorized the two no-Lead test orders and finance feedback.
+- Decisions/result: Removed 13 ADMIN test identities, 46 related KZ Leads, 15 orders, 2 Partner identities with 2 Partner login accounts, 2 feedbacks and their 2 work orders, plus scoped child data/settings: 1,276 rows in 59 tables, tenant 1 only. Explicit typed relationships determine scope; unrelated KZ Leads are preserved. No role-menu assignments, schema, audit logs or physical uploaded files changed.
+- Changed repository files: handoff/test_main.md (append only). Runtime artifacts: private backup directory /opt/zsjos-runtime/backups/test-account-cleanup-20260920 containing full backup, scoped row restore SQL, exact manifest, executed SQL, rehearsal SQL and verification.
+- Verification: Full pre-change mysqldump succeeded (536,260,094 bytes); scoped restore dump succeeded (622,051 bytes). Temporary full-table rehearsal passed exact deletion, second-run no-op, retained-row count/CRC sum/CRC XOR comparison and rollback restoration. Live transaction passed the same expected-count and retained-row guards; postcommit all 59 target table scopes are zero. Named accounts remaining: 0. Tenant Leads remaining: 4,537, including 6 unrelated KZ Leads and all 4,528 live Leads. Target process references have zero runtime/history instances; no target OAuth DB rows or cached access tokens/role entries were found.
+- Dependency/integration impact: None; existing MySQL/Python/Redis tooling only, no service operation, branch/commit/push/deployment. Source bootstrap/migrations do not seed these runtime identities; no migration rewrite needed.
+- Recovery/limitations: Restore only scoped rows after collision/dependency review; full backup is not authorization to overwrite the active database. Historical audit operator references and file metadata intentionally remain. Existing orphan registration 9 references already absent order 19 and has no traceable KZ chain; preserved instead of expanding deletion. No browser verification; database mutation and cached identity inspection are the applicable checks.
+- Remaining work: None within confirmed exact deletion scope; any broader orphan/audit/file cleanup needs its own identified scope.
+
+## Registration Update - 2026-09-20T14:39:57+08:00
+
+- Workstream: test-account-kz-cleanup; owner Codex /root; environment test; main / /opt/zsjos / HEAD 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- Scope extension: user confirmed nine additional named test identities and all their associated dirty business records, including four completed content acceptance tasks. Preserve unrelated accounts/data and existing worktree changes.
+- Ownership: handoff/test_main.md append only; exact tenant-1 database row cleanup and private artifacts /opt/zsjos-runtime/backups/test-account-cleanup2-20260920.
+- Verification: refresh association audit, full/scoped backups, temporary-table deletion/repeat/rollback rehearsal, live transaction retained-row guards, postcommit zero target scopes and scoped session checks. No schema, role-menu, service, file-blob, dependency, branch or deployment operations. Integration None.
+
+## Workstream Registration - 2026-09-20 (operation log names)
+
+- ID: test-operation-log-names; Owner: Codex `/root`; Environment: test (environment file).
+- Goal: Populate operation log userName through existing System user service for page/detail/export. Non-goals: deployment, database changes, authentication or permission changes.
+- Branch: main; Worktree: `/opt/zsjos`; Base: `050f43dd0dcc996ce468efafa4715870264dafd6`; Target branch / integration order: None.
+- Ownership: System OperateLogController.java, OperateLogRespVO.java, controller/admin/logger/OperateLogControllerTest.java; docs/api/system-operation-log.md; handoff/test_main.md append only. Preserve unrelated changes.
+- Dependencies: existing System user service and test facilities; no new dependencies.
+- Verification: focused controller tests for list/detail/export, missing users and typed identities; module compilation, frontend consumer contract inspection, scoped diff checks.
+
+## Delivery Entry - 2026-09-20T14:43:42+08:00
+
+- Workstream: test-operation-log-names; Owner: Codex `/root`; Environment: test.
+- Branch / worktree / HEAD: main / `/opt/zsjos` / `050f43dd0dcc996ce468efafa4715870264dafd6` (unchanged).
+- User goal: Show operation log operator names.
+- Decisions/result: System page, detail and export explicitly populate userName from existing AdminUserService in one batch. Removed Easy-Trans dependency from this response path; only ADMIN identities resolve against System users, missing/deleted/unknown identities remain unset. Current nickname, not historical snapshot.
+- Changed files: System controller/admin/logger/OperateLogController.java and vo/operatelog/OperateLogRespVO.java; controller/admin/logger/OperateLogControllerTest.java; docs/api/system-operation-log.md; handoff/test_main.md.
+- Verification: Focused Maven reactor test passed in writable temporary backend copy `/tmp/zsjos-operation-log-d77o_opk/backend` (4 tests, zero failures/errors), including repeated/missing IDs, MEMBER/PARTNER/unknown type separation, null IDs, empty page, absent detail, detail name and exported names. Module and dependency compilation passed. Original attempt was blocked by root-owned target metadata; isolated copy avoided permission changes. Scoped diff check passed. Vue list/detail consume existing userName; no independent System operation log consumer found in Workbench.
+- Dependencies/integration: None; no dependencies added, permissions or tenant interception changed, database writes, commits or deployment.
+- Remaining work: Deployment and real HTTP/browser verification of the running application; tests verify controller contracts with mocked services, not live data.
+
+## Delivery Entry - 2026-09-20T14:43:49+08:00
+
+- Workstream: test-account-kz-cleanup; owner/environment: Codex /root / test; branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Remove the nine additionally named test identities and all their associated dirty business data; user explicitly confirmed the non-KZ content tasks and associated business scope.
+- Decisions/result: Physically removed 109 exact rows across 20 tenant-1 tables: 9 ADMIN accounts, 2 Partner profiles with 2 Partner accounts, 6 related KZ Leads, 6 exclusive persons/contact claims, 2 feedbacks and 2 work orders, 4 content tasks, 37 business events and scoped invitation/ownership/history child rows. Four content source records were already absent. Shared dictionaries/templates/configuration and other users were not deleted merely because a test user created/updated them. Audit logs and uploaded file objects preserved.
+- Changed repository files: handoff/test_main.md append only; private runtime artifacts at /opt/zsjos-runtime/backups/test-account-cleanup2-20260920.
+- Verification: Full pre-change backup succeeded (536,983,575 bytes), scoped row restore backup succeeded (69,508 bytes). Rehearsal on temporary full-table copies passed exact deletion, repeat no-op, rollback restoration and retained-row checks. Live transaction passed expected counts and retained count/CRC sum/CRC XOR assertions; postcommit all 20 target scopes zero, named accounts zero. Tenant Leads now 4,531 total, 4,528 live and zero KZ; live Lead count unchanged. No target OAuth DB/cache entries, runtime assignees, department leaders, BPM group/manager/starter configuration references or referenced process instances. Five enabled super-admin memberships outside target scope existed at preflight.
+- Dependency/integration impact: None; no schema/migration, role-menu, service, deployment, commit or branch operation. Existing unrelated repository edits preserved.
+- Recovery: before.sql plus manifest.json, restore-deleted-rows.sql, executed deletion SQL, rehearsal SQL and verification.txt are private recovery evidence. Restore scoped rows only after collision and subsequent-write review; do not overwrite the shared database wholesale.
+- Remaining work/limitations: None in confirmed scope. Historical audit and shared configuration creator/updater references intentionally remain; physical files are retained. No browser check applicable to the direct data-only operation.
+
+## Workstream Registration - 2026-09-20T14:54:10+08:00
+
+- Workstream ID: test-link-input-unification; Owner: Codex /root; environment: test.
+- Goal: Scan frontend link-entry forms and use a reusable link input with existing ResourceLink presentation.
+- Non-goals: No API/schema/permission changes, new dependencies, deployment or service changes.
+- Branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6. Target branch/integration order: None.
+- Ownership scope: frontend/workbench/src/components/ResourceLinkInput.tsx and tests; AccountProfileTextInput.tsx; AccountProfilePanel.tsx; ViralAccountMaterialForm.tsx; ContentApprovalDraft.tsx; pages/ContentProductionPage.tsx; pages/ContentReviewBatchPage.tsx; docs/ui-guidelines.md; handoff/test_main.md append only. Other frontend scan is read-only pending scope clarification.
+- Dependencies: Existing Ant Design/ResourceLink/Vitest only; preserve existing user changes.
+- Verification plan: focused component and form tests, TypeScript check, browser interaction at desktop/mobile where tooling available, scoped diff and remaining-field audit.
+
+### Registration scope update — test-link-input-unification
+
+- Scope: Include frontend/admin/src/components/ResourceLinkInput/index.vue and README.md; existing AppLinkInput/index.vue; HTTP request setting components and Vue views with manually entered HTTP/link fields (IM, MP, MES, AI, Pay, Mall, SMS, ZSJOS material, IoT HTTP). Preserve specialized URI lists, connection strings and uploads. H5/media-screen scan only: no manual link fields found.
+- Verification: Vue SFC compilation and scoped lint, available typecheck, same link safety/forwarded control behavior. No dependency or contract changes; separate framework components avoid a new shared package/build integration.
+
+## Delivery Entry - 2026-09-20T15:35:02+08:00
+
+- Workstream: test-link-input-unification; Owner: Codex /root; environment test; branch/worktree: main / /opt/zsjos; HEAD: 050f43dd0dcc996ce468efafa4715870264dafd6 (unchanged).
+- User goal: Scan all link-entry forms and replace with common link components; follow-up explicitly excludes Maven verification, which was not executed.
+- Decisions/result: React ResourceLinkInput preserves input/Form props, refs, raw values and business validation while reusing ResourceLink preview/copy. Replaced 10 fixed content/draft/review/publication input sites plus server-typed account URL and material https-link inputs including repeat groups. Vue ResourceLinkInput is used at 21 sites across 17 callers, including existing AppLinkInput, which retains its selector, plus material dynamic fields. Vue forwards model/attributes/events/slots and safely previews HTTP(S); IoT split protocol retains original model and passes composed previewValue. H5/media-screen scan found no manual webpage-link entry. Technical connection strings, OAuth multi-value URI selectors, upload controls and generated read-only links keep their specialized controls. No business rules, APIs or persisted data changed.
+- Changed files: `frontend/admin/src/components/AppLinkInput/index.vue`, `frontend/admin/src/components/SimpleProcessDesignerV2/src/nodes-config/components/HttpRequestSetting.vue`, `frontend/admin/src/components/bpmnProcessDesigner/package/penal/task/task-components/ServiceTask.vue`, `frontend/admin/src/views/ai/model/apiKey/ApiKeyForm.vue`, `frontend/admin/src/views/im/manager/channel/material/ChannelMaterialForm.vue`, `frontend/admin/src/views/iot/rule/data/sink/config/HttpConfigForm.vue`, `frontend/admin/src/views/mall/promotion/banner/BannerForm.vue`, `frontend/admin/src/views/mes/dv/repair/RepairLineList.vue`, `frontend/admin/src/views/mes/pro/process/ProProcessContentList.vue`, `frontend/admin/src/views/mes/qc/template/TemplateIndicatorList.vue`, `frontend/admin/src/views/mp/components/wx-reply/components/TabMusic.vue`, `frontend/admin/src/views/mp/draft/components/NewsForm.vue`, `frontend/admin/src/views/mp/menu/components/MenuEditor.vue`, `frontend/admin/src/views/mp/messageTemplate/MessageTemplateSendForm.vue`, `frontend/admin/src/views/pay/app/components/AppForm.vue`, `frontend/admin/src/views/system/sms/channel/SmsChannelForm.vue`, `frontend/admin/src/views/zsjos/material/components/MaterialValueField.vue`, `frontend/admin/src/components/ResourceLinkInput/index.vue`, `frontend/workbench/src/components/ResourceLinkInput.tsx`, `frontend/workbench/src/components/ResourceLinkInput.test.tsx`, `frontend/workbench/src/components/AccountProfilePanel.tsx`, `frontend/workbench/src/components/AccountProfileTextInput.tsx`, `frontend/workbench/src/components/ContentApprovalDraft.tsx`, `frontend/workbench/src/components/ViralAccountMaterialForm.tsx`, `frontend/workbench/src/pages/ContentProductionPage.tsx`, `frontend/workbench/src/pages/ContentReviewBatchPage.tsx`, `frontend/workbench/docs/ui-guidelines.md`, `frontend/admin/src/components/ResourceLinkInput/README.md`, `handoff/test_main.md`. Existing unrelated changes, including UI guidelines edits, were preserved.
+- Verification: Workbench npm run typecheck passed including final new tests; npm test -- ResourceLink ViralAccountMaterialForm mediaAccountProfile --configLoader runner --cache=false passed 4 files / 39 tests. Initial default test startup hit EACCES on existing node_modules/.vite-temp; runner/no-cache succeeded without changing permissions. All 18 affected Vue scripts/templates compile via existing vue/compiler-sfc; scoped pnpm exec eslint --no-cache passes after fixing the new slot closing tag. Vue SSR checks pass safe/unsafe previews, disabled/maxLength and protocol-prefix slot; an input-boundary stub verifies exact raw model, id and update-event forwarding. Element Plus SSR omits native value/id until client setup, so SSR alone does not verify live input behavior. Scoped/full diff whitespace checks passed.
+- Dependency/integration impact: None; existing frontend libraries only, separate React/Vue adapters and no new package/build dependency; no service operation, database change, branch change, commit, push or deployment.
+- Remaining verification/limitations: Real browser desktop/mobile form editing, clearing/reset, immediate save, focus and preview/copy interactions remain unverified because no browser executable/automation tooling was available. Full Admin pnpm ts:check started but its execution session was interrupted before a result; do not treat targeted compile/lint as full Admin typechecking. No production build required for this source-only form change (no asset/route/dependency/build wiring changed). Maven explicitly not run.
+
+## Workstream Registration - 2026-09-20T15:35:55+08:00
+
+- ID: test-business-table-unification; Owner: Codex /root; Environment: test.
+- Goal: Extract Lead Management table into BusinessTable and migrate all Workbench tabular views, including inbox table mode, selectors, detail and editable tables.
+- Non-goals: Backend/API/database/permission changes, dependencies, service/deployment operations, branches/commits. Do not execute Maven; user handles Maven manually. Vue Admin expansion pending user scope response.
+- Branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6; target branch/integration order: None.
+- Ownership: frontend/workbench/src/components/BusinessTable/**; affected table consumers in src/pages and src/components; src/styles/components/business-table.css, affected table styles and index.css; affected tests and browser fixture; frontend/workbench/AGENTS.md and docs/ui-guidelines.md, docs/business-table.md; handoff/test_main.md append only. Preserve pre-existing edits, especially SubordinatePartnerPage and ui-guidelines.
+- Dependencies: existing React/Ant Design/Pro Components/Vitest only.
+- Verification: focused logic and contract tests, table-entry guard, TypeScript, production build, real-browser desktop/mobile interaction and theme checks where available; no mvn commands.
+
+### Scope confirmation — test-business-table-unification
+
+- User explicitly limits this task to frontend/workbench; Vue Admin and embedded Admin pages are deferred. No Maven commands. Other registered scope and verification unchanged.
+
+## Workstream Registration - 2026-09-20T15:42:22.694012+08:00
+
+- ID: test-user-relation-multi-post; Owner: Codex /root; Environment: test.
+- Goal: Support multiple configured source/target posts for user relation scenes, with union eligibility and legacy single-post compatibility.
+- Non-goals: Work-order scenes, permission grants, relation reassignment, shared database writes or deployment. Permission-mode extension pending user clarification.
+- Branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6; target branch/integration: None.
+- Ownership: userrelation scene VO/DO/service and tests; LeadAssignmentServiceImpl and focused tests; Admin userRelation API/form/list; Workbench managementApi and UserRelationPage section of ManagementPages (preserve existing BusinessTable changes); new V267 migration; docs/api/user-relation-multi-post.md; handoff/test_main.md append only. Current turn is serialized; no parallel file editing delegated.
+- Dependencies: existing System Post API, persistence and frontend libraries; no new dependencies.
+- Verification: focused backend tests/compile, both frontend static checks, browser if available, controlled SQL verification if available; shared test database application requires explicit authorization.
+
+### Registration scope update — test-user-relation-multi-post
+
+- Include Workbench services/managementApi.test.ts for shared array request/response contract checks; other scope unchanged.
+
+## Delivery Entry - 2026-09-20T16:22:21+08:00
+
+- Workstream: test-user-relation-multi-post; Owner: Codex /root; Environment: test.
+- Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Allow multiple posts when configuring user relation scenes; continuation resumes the same scope.
+- Decisions/result: Both Vue Admin and React Workbench select source/target post arrays from System Post API. Backend validates every code, deduplicates selected posts and candidate users, and keeps source department scope and enabled target requirements. Null arrays read legacy single-post values; explicit empty arrays never revive old eligibility. Existing permission-mode and Partner-scene rules retained; permission-mode extension was not confirmed. Existing unrelated BusinessTable changes preserved.
+- Changed files: backend userrelation scene SaveReqVO/RespVO, UserRelationSceneDO, UserRelationSceneServiceImpl, LeadAssignmentServiceImpl, UserRelationSceneServiceImplTest and LeadAssignmentServiceImplTest; frontend/admin src/api/zsjos/userRelation/index.ts and views/zsjos/userRelation/SceneForm.vue/index.vue; frontend/workbench src/services/managementApi.ts and managementApi.test.ts, src/pages/ManagementPages.tsx (UserRelationPage only); script/sql/mysql/migrations/V267__user_relation_multi_post.sql; docs/api/user-relation-multi-post.md; handoff/test_main.md.
+- Verification: Final isolated Maven reactor compile/test passed 19 tests (9 relation eligibility/scope, 10 scene validation/response), zero failures/errors; /tmp/zsjos-relation-final-maven.log and /tmp/zsjos-relation-final-k7ne7czi/backend. Original repository Maven attempt hit existing root-owned target permissions; temporary copy avoided permission changes. Initial 17-test run passed; interruption removed temporary artifacts, so final two added tests were rerun with all 19 passing. Workbench typecheck passed before interruption; new array API contract test and 4 management-access tests passed. Existing log paging test fails because it expects sceneCode while unchanged API sends scene; left unchanged. Scoped Admin ESLint and both changed Vue SFC script/template compilation passed. Scoped diff checks passed.
+- SQL verification: Before interruption, copied only three table schemas read-only from test database zsjos (V265/V266 present, V267 absent, 8 scene rows). On a dedicated no-network MySQL 8.4 container, applied V267 twice to this prerequisite plus isolated synthetic fixture. Verified both nullable JSON columns, one version record in each table, unchanged legacy fields and Chinese HEX. Shared database never written; test container and prior /tmp evidence no longer present after environment interruption. Results were observed in this conversation; no full fresh-chain/release verification claimed.
+- Dependencies/integration: No new libraries, grants, production changes, commits or deployment. Apply additive V267 before deploying backend and both frontend consumers together; old clients see only first compatibility post and must not edit multi-post configurations. Migration does not modify existing scene rows or relations.
+- Remaining work: Obtain explicit authorization to apply V267 to shared test zsjos database (zsjos_user_relation_scene plus version metadata), then deployment authorization separately. Full Admin typecheck was interrupted without a result and remains unverified. Real browser interaction and live API/tenant tests remain unverified because no browser executable was available and new code/schema were not deployed. These are not covered by SFC compile or mocked service tests.
+
+## Delivery Entry - 2026-09-20T16:32:17+08:00
+
+- Workstream: test-business-table-unification; Owner/environment: Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Extract Lead Management table design, migrate all Workbench tables including existing table modes. Explicitly exclude Vue Admin/embedded Admin; do not execute Maven.
+- Decisions/result: BusinessTable wraps existing ProTable with full/compact modes, filters/actions/batch slots, column resizing and preference compatibility, common pagination/state handling and theme-driven styles. Migrated 46 tables across 24 consumer files, including raw positioning interview editor. Preserved APIs, permissions and business renderers; native-column adapter retains raw-value semantics. Removed duplicated Lead/Student resize implementations; fixed-size Student pagination no longer offers an ineffective page-size control. Updated Workbench rules from absent HrmProTable to the approved universal entry.
+- Changed files: frontend/workbench/src/components/BusinessTable/ (implementation and two tests); 18 table page files (AnnouncementCenterPage, BpmApprovalCenterPage, ConfigurationPages, EamAssetPage, ExportTaskPage, LeadAppealPage, LeadAssignmentPage, LeadComplaintPage, LeadDuplicateReviewPage, LeadManagementPage, ManagementPages, MaterialApprovalPage, MessageInboxPage, MySalesOrderPage, RegistrationPages, SalesOrderApprovalPage, SubordinatePartnerPage, SubordinateSalesPage); six consumers (MaterialSelectorModal, PositioningCardMaterialPicker, PositioningInterviewDialog, SalesOrderDetailCards, SalesOrderSupervisorInbox, StudentPartnerBindingDialog); five affected page guard tests; styles/components/business-table.css, business-inbox.css, styles/index.css, pages/lead-management.css and media-students.css; workbench AGENTS.md, docs/ui-guidelines.md and docs/business-table.md; test/business-table.html, business-table.tsx, business-table-browser.mjs; this handoff append. Existing edits in shared files preserved.
+- Verification: TypeScript passed. Production Vite build passed on final source (17.90s; existing large-chunk warning); outputs only /tmp/zsjos-table-verified-build. Focused suite 56/56 passed; after final CSS changes component/entry/style suite 35/35 passed; final native-value correction component suite 6/6 passed. Full suite: 733 passed with unrelated managementApi sceneCode-versus-scene failure and entry-scan default-timeout under host load; entry timeout adjusted and focused rerun passed. git diff --check passed. No Maven executed.
+- Browser: temporary Chromium 131 CDP script passed resize/persistence/sort isolation, cross-page selection/pagination, retry/denial, column hide, fullscreen, dark/large theme, 1280px desktop/390px mobile body/table bounds, and isolated real Lead/Student page components. Screenshots inspected; browser produced no page exceptions. Browser font environment lacks Chinese glyphs, so full Chinese typography remains unverified. Real authenticated business operations and exhaustive per-page browser walkthrough not performed; fixtures forbid business writes.
+- Environment handling: existing node_modules/.vite-temp is not writable; used /tmp config/cache/build paths. Temporary browser binary downloaded into /tmp without package/dependency changes. User relation workstream's later changes were preserved and inspected, not overwritten.
+- Dependencies/integration: None; no backend/database/service deployment, dependency, branch, commit or publication operations. Vue Admin deferred by user.
+- Remaining work: Manual normal-font visual acceptance and deployed authenticated smoke test; existing management API test mismatch belongs to its own workstream. Maven left entirely to user, not applicable to this frontend-only change.
+
+## Registration scope update — test-user-relation-multi-post — 2026-09-20T16:43:28+08:00
+
+- Owner/environment/branch/worktree/HEAD: Codex /root / test / main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- Goal: Resolve reported V267 unexpected-column drift by synchronizing the desired and fresh schema with the existing additive migration.
+- Ownership added: script/sql/mysql/schema/core.sql; script/sql/mysql/00-bootstrap-schema.sql; docs/api/user-relation-multi-post.md; handoff/test_main.md append only. Preserve existing production-ticket schema edits.
+- Non-goals: Shared database writes, migration/checksum rewrites, permission changes, deployment, commits or unrelated changes. Dependencies/integration: None.
+- Verification plan: static migration checks; controlled fresh initialization and scoped V266-to-V267 upgrade/repeatability; read-only test database schema comparison and migration plan. Existing registration metadata otherwise unchanged.
+
+
+## Delivery Entry - 2026-09-20T16:45:20+08:00
+
+- Workstream: test-user-relation-multi-post; owner/environment: Codex /root / test; branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Resolve migration BLOCKED status reporting unexpected `source_post_codes` and `target_post_codes` columns.
+- Decisions/result: Synchronized both additive V267 JSON columns into desired `schema/core.sql` and fresh `00-bootstrap-schema.sql`; V267 migration and version ordering remain unchanged. Updated multi-post API documentation to describe baseline/drift alignment and preserve rollback constraints. Existing unrelated edits preserved.
+- Changed files: `script/sql/mysql/schema/core.sql`, `script/sql/mysql/00-bootstrap-schema.sql`, `docs/api/user-relation-multi-post.md`, `handoff/test_main.md`.
+- Verification: `zsjos_db.py check` passed static manifest/order/schema checks. Read-only live inspection confirmed core V267, zero pending migrations, both columns JSON nullable with expected UTF-8 comments and no scene-column drift. Controlled MySQL test created both fresh scene definitions, replayed V267 twice from a V266-shaped table, verified version rows, legacy data preservation and Chinese HEX; all passed. `git diff --check` passed. Full fresh test remains unverified because existing bootstrap SQL has a missing semicolon before `zsjos_student_delivery_defer`.
+- Dependency/integration impact: None; no database writes, permission changes, service/deployment, dependency, branch, commit or publication operation. Live overall drift remains blocked by pre-existing unexpected backup table `zsjos_tmp_owner_backup_20260920`; this task did not delete it.
+- Remaining work: Remove or formally allow the unrelated backup table through its own approved scope, and repair/verify the pre-existing bootstrap semicolon separately before claiming full migration readiness.
+
+## Registration — test-positioning-template-preview — 2026-09-20T18:19:00+08:00
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base/HEAD: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Align Admin positioning template preview with Workbench four-column editing presentation; identify draft/published/history preview explicitly.
+- Non-goals: Template data/version publication, route/API/permission changes, Workbench changes, deployment or shared service operations.
+- Ownership: frontend/admin/src/views/zsjos/directorTemplate/**; docs/api/registration-fulfillment-api.md (preview documentation only); handoff/test_main.md (append only). Existing unrelated changes preserved.
+- Dependencies: Existing Vue/Element Plus tooling only. Target branch/integration order: None.
+- Verification plan: Scoped lint/SFC checks, production build into temporary output, desktop/mobile browser preview checks where environment supports them; scoped diff check.
+
+## Delivery Entry — 2026-09-20T18:28:30+08:00
+
+- Workstream: test-positioning-template-preview; owner/environment: Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Update the Admin positioning template page after diagnosis found its generic preview had not followed Workbench layout changes.
+- Key decisions/result: Added a Vue-owned four-column read-only preview (item, guidance, planned delivery, reference materials), responsive stacked mobile mode, enabled/sorted fields and referenceFor grouping. Orphan references remain visible during configuration. Controls reflect field categories without inventing business/dictionary options. Preview spans the designer width. Explicit draft/published/history preview identity and published version guidance apply only to positioning; route/API/data/publication semantics unchanged.
+- Changed files: frontend/admin/src/views/zsjos/directorTemplate/index.vue; new PositioningTemplatePreview.vue in the same directory; docs/api/registration-fulfillment-api.md; handoff/test_main.md append only.
+- Verification: Scoped ESLint, Stylelint, Prettier and git diff checks passed. Final production Vite build passed (1m17s), output /tmp/zsjos-positioning-preview-final, log /tmp/zsjos-positioning-preview-final.log. Full vue-tsc with prescribed 8GB memory completed with 24 errors in unrelated files (missing ElMessageBox declarations and unused variables); neither changed Vue file reported errors. Initial default-memory typecheck exhausted heap, then reran with 8GB.
+- Browser evidence: Chromium fixture mounts the actual Admin page and preview with isolated template API responses; verified four desktop columns, enabled/reference/orphan rendering, draft/history/current switching, mobile preview and 390px no-overflow, with no runtime exceptions. Desktop 1440px and mobile 390px screenshots inspected at /tmp/zsjos-positioning-desktop.png and /tmp/zsjos-positioning-mobile.png. Fixture-only Chinese font loaded for visual checks. Test harness /tmp/zsjos-positioning-fixture/browser.mjs; no real business writes. Temporary tooling did not change dependencies.
+- Dependencies/integration impact: None; no backend, SQL, permissions, commits, deployment or shared service changes. Existing unrelated work preserved.
+- Remaining work: Deployment to testos.zhongshijian.top Admin frontend requires explicit publication authorization under AGENTS.md section 4. Authenticated deployed smoke check remains pending that deployment; full Admin typecheck remains failing on unrelated files.
+
+## Registration — test-student-list-scroll — 2026-09-20
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: My Students continuous list loading and Lead Management card styling with identity/contact and authoritative coaching status.
+- Non-goals: Detail layout, course display, database/service/deployment operations and unrelated changes.
+- Ownership: frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/styles/pages/media-students.css; frontend/workbench/src/pages/media-students*.test.*; frontend/workbench/docs/ui-guidelines.md; handoff/test_main.md append only. Existing changes preserved.
+- Dependencies: Existing frontend APIs; account-level status aggregation decision pending. Target branch/integration order: None.
+- Verification: Focused tests, TypeScript and desktop/mobile browser fixture; status wiring scope to be registered after authoritative source review.
+
+## Registration — test-approved-single-lead-cleanup — 2026-09-20T18:35:37+08:00
+
+- Owner/environment: Codex /root / test; branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Execute explicitly confirmed permanent cleanup of Lead KZ202609201739000001 and its exclusive related records and object attachment in test database zsjos, tenant 1.
+- Non-goals: Other leads/accounts, schema/source changes, service lifecycle, production, commits/publication.
+- Ownership: handoff/test_main.md append only; controlled database rows and one exclusive S3 object; restricted recovery artifacts outside repository at /var/backups/zsjos/lead-cleanup/KZ202609201739000001/.
+- Dependencies: Existing Docker MySQL client and Python boto3; no added dependencies. Target branch/integration order: None.
+- Verification: Revalidate target/counts and exclusive references; backup selected rows and object with checksums; guarded transactional database deletion; verify zero remaining scoped rows and S3 absence, compare unrelated row counts. Preserve all existing repository changes.
+
+## Delivery Entry — 2026-09-20T18:39:27+08:00
+
+- Workstream: test-approved-single-lead-cleanup; owner/environment: Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Permanently delete confirmed Lead KZ202609201739000001 and exclusive related records from test zsjos, tenant 1. Explicit user confirmation covered listed database rows and S3 attachment.
+- Decisions/result: Removed 18 rows across 9 tables: zsjos_lead, zsjos_person, zsjos_person_contact_claim, zsjos_lead_assignment_history, zsjos_lead_intended_product, zsjos_lead_attachment and infra_file (one each), system_notify_message (8), system_notify_business_outbox (3); deleted one exclusive S3 object. Tenant predicates retained; tenantless infra_file used exact exclusive identity. No schema/config/account/permission changes.
+- Changed repository files: handoff/test_main.md append only; all existing unrelated edits preserved. Execution/recovery artifacts are outside repository.
+- Verification: Rechecked latest submitter record and direct Lead/person/file references, generic task/form/work-order/payment/log relations and notification deliveries. Restricted SQL dumps verified by checksums and row counts, then loaded into temporary tables; compared every column to locked live rows within the guarded serializable deletion transaction. First attempt failed before deletion on path collation comparison; corrected guard to byte comparison without schema changes, rerun committed. Post-check: every scoped row and checked relationship absent, all 9 affected-table totals reduced exactly by approved counts, S3 HEAD returned 404. Backup object size and SHA-256 verified.
+- Recovery/evidence: /var/backups/zsjos/lead-cleanup/KZ202609201739000001/ (directory 0700, files 0600) contains per-table SQL, attachment binary and restore metadata, checksum manifest, guarded deletion SQL, commit marker, verification.json and RECOVERY.txt. Backups contain sensitive data and remain outside version control. Restore order and explicit recovery authorization requirement documented there.
+- Dependencies/integration impact: None; used existing MySQL tools and boto3. No added dependencies, service restart, deployment, branch or commit operation. No schema migration was applicable to this one-record operational cleanup.
+- Remaining work: None for approved cleanup. Recovery backups intentionally retained; external messages already delivered to third-party channels cannot be recalled by this operation. S3 verification establishes current object absence, not historical version erasure.
+
+## Registration update — test-student-list-scroll — 2026-09-20T18:40:00+08:00
+
+- Existing registration metadata unchanged. User withdrew status display after account-level ownership review; final scope is name, student business number, mobile, WeChat and continuous loading. No status/backend/API work required. Dependencies: None beyond existing frontend APIs.
+
+## Delivery Entry — 2026-09-20T18:40:00+08:00
+
+- Workstream/owner/environment: test-student-list-scroll / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Reference Lead Management left cards, show name/student number/mobile/WeChat, omit course/service count/status, replace pagination with lazy loading. Detail layout unchanged.
+- Decisions/result: Existing paged API remains authoritative; IntersectionObserver appends the next batch, deduplicates identities, rejects stale list responses, preserves selection/detail on append, and provides retry/end states. Search resets paging; collapsed avatar rail shares continuous loading. Own list navigation no longer resets the list. External deep links retain detail navigation. Cards reuse Lead Management base styling and place name/number across the full header width.
+- Changed files: frontend/workbench/src/pages/MediaStudentsPage.tsx; frontend/workbench/src/styles/pages/media-students.css; frontend/workbench/docs/ui-guidelines.md; handoff/test_main.md. Pre-existing unrelated edits preserved.
+- Verification: TypeScript check passed; focused media-students guard/account-tab tests 8/8 passed; scoped diff check passed. Actual MediaStudentsPage production fixture build passed. Chromium fixture verified 20→40→45 append, append failure/retry, retained selected student, no pagination/course count, WeChat display, collapse/expand, real keyboard search, denied/empty states, desktop 1440px and mobile 390px bounds with no browser exceptions. Temporary evidence: /tmp/zsjos-student-list/{entry.tsx,browser.mjs,build.log}; screenshots /tmp/zsjos-table-student-list-{desktop,mobile}.png.
+- Verification limitation: Browser system fonts lack full Chinese coverage; fixture subset font confirms some Chinese labels, full Chinese typography remains unverified (full font download timed out). Real authenticated deployed API smoke and publication not performed. No bundling/dependency/route changes; full application release build not required for this local UI change.
+- Dependencies/integration: None. No backend/database, permissions, shared services, dependencies, branches, commits or publication operations.
+- Remaining work: Normal-font visual acceptance and deployed authenticated smoke following separately authorized publication.
+
+## Registration — test-director-operator-notifications — 2026-09-20T23:11:09+08:00
+
+- Owner/environment: Codex /root / test; branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Complete director/operator notification triggers, recipient resolution, configurable defaults, reminder scheduling and authorized message navigation identified in the read-only audit.
+- Non-goals: Business workflow redesign, permission assignments, historical message replay, new dependencies, deployment/service operations or shared database writes without separate authorization.
+- Ownership: backend/yudao-module-zsjos notification providers/publishers and related media, positioning, positioninginterview, studentcontact, account, delivery, contentreview, task services/controllers/VOs/tests; existing BPM public task read boundary if needed; frontend/workbench notification actions and related routing tests; frontend/admin notification consumers only if affected; script/sql/mysql notification migration and scoped verification; directly affected API/notification documentation; handoff/test_main.md append only. Preserve existing changes, no concurrent file-changing agents.
+- Dependencies: Existing System notification/outbox, BPM public APIs and current business relationships. Target branch/integration order: None.
+- Verification: Focused recipient/trigger/idempotency/reminder/authorization tests, backend compilation, frontend tests/typecheck/build and browser fixture, isolated SQL replay/repeatability/UTF-8 and scoped read-only comparison. Shared test database synchronization and runtime delivery remain separately controlled.
+
+## Registration update — test-director-operator-notifications — 2026-09-20T23:36:00+08:00
+
+- Existing registration metadata unchanged. Explicit scope additions: BPM BpmProcessTaskApi/Impl, additive pending-task DTO and focused API test; Workbench ContentReviewBatchPage, WorkOrderCenterPage, WorkPlanPage and api.ts for notification deep links; ZSJOS MediaStudentService target VO and permission tests; WorkPlanNotifySceneProvider for correct plan-vs-task variable namespace. All are directly required notification consumers. No dependency additions. Defaults assumed after optional preference question: in-app; interview advance 60 minutes and live BPM review overdue 1440 minutes, configurable; student link sharing stays manual.
+
+## Delivery Entry — 2026-09-20T23:49:40+08:00
+
+- Workstream/owner/environment: test-director-operator-notifications / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Completely fill director/operator business notifications following the read-only coverage audit.
+- Decisions/result: Added collaborator handover, interview scheduling/completion, positioning approval/link-ready/effective/revision/application, account creation, diagnosis completion, delivery completion and content publication events. Manual student link sharing remains manual; no tokens in notifications. Fixed assignee/supervisor role filtering and diagnosis payload; media timing sends all eligible rules without suppressing distinct recipients. Added configured interview/review reminders and tenant initializer; BPM exposes additive tenant-scoped live task assignments. V269 covers 59 in-app scene defaults, preserves custom/disabled rules and historical messages, adds assignee due only beside untouched V216 supervisor default. Corrected stageCode contract and work-plan summary namespace. Workbench checks real APIs, opens exact batches/orders/plans and resolves service/unbound positioning/diagnosis/delivery targets; unsupported/denied actions fall back to message detail.
+- Changed files: BPM api/task/BpmProcessTaskApi.java, BpmProcessTaskApiImpl.java, dto/BpmPendingTaskRespDTO.java and API test; ZSJOS enums/MediaNotificationScenes.java, media/MediaNotifySceneProvider.java and new MediaCollaborationNotifyPublisher, MediaNotificationReminderScheduler, MediaNotificationTenantInitializer; related account/MediaAccountService and MediaAccountProfileService, positioning/PositioningCardService/PositioningConfirmationService/PositioningEvidenceService/PositioningAssignmentService, positioninginterview/PositioningInterviewService, studentcontact/StudentContactServiceImpl, content/ContentService, contentreview/ContentReviewNotifyPublisher/ContentReviewNotifySceneProvider, delivery/StudentDeliverySubmissionServiceImpl, task/BusinessTaskReminderService, registration/MediaStudentService and target VO, workplan/WorkPlanNotifySceneProvider; focused tests in these scopes. Workbench services/api.ts, notifyMessageAction.ts/test, pages/ContentReviewBatchPage.tsx, WorkOrderCenterPage.tsx, WorkPlanPage.tsx. SQL migrations/V269__director_operator_notifications.sql and tools/test_director_operator_notifications.py. docs/api/director-operator-notifications.md, system-business-notifications.md, historical director matrix and two module content-review notification guides; this handoff append only. Existing user edits retained.
+- Verification: Isolated source copy /tmp/zsjos-notify-check/backend Maven reactor with Java 25: 193 focused tests, zero failures/errors; repository Java source bytes match tested copy. Workbench typecheck and production build passed, output /tmp/zsjos-notify-workbench-dist; 32 notification tests passed. Chromium mounted real React batch/order pages with synthetic transport: exact record outside first list page, message clicks, permission-denied fallback and desktop/mobile execution, no exceptions. Evidence /tmp/zsjos-notify-browser/result.log. Isolated MySQL replay passed V269 defaults, existing custom/disabled tenants, relational template matching, Chinese HEX, version marker and repeatability; no shared DB writes. Read-only test zsjos tenant 1 comparison: 41 missing in-app scene rules plus expected diagnosis-assignee rule addition. Scoped diff and documentation links passed.
+- Verification caveats: Shared target directories caused permissions/incremental compilation interference; final successful backend verification used isolated source copy, frontend build used temporary output. Corrected stale confirmation test assertion to student_evidence_pending per existing business contract. Browser fixture initially had incomplete API snapshots/overlay interactions; corrected fixture and reran successfully. Existing chunk-size warnings remain. No authenticated shared runtime/real notification delivery or backend restart was performed; additive BPM API does not change existing frontend contracts, Admin keeps existing message-detail fallback.
+- Dependencies/integration: No new npm/Maven dependencies, role grants, branch/worktree operations, commits, pushes, deployment or shared services changed. V269 is a forward upgrade after V268; do not rewrite historical deployed migrations.
+- Remaining work: Separate authorization requested for test zsjos configuration synchronization, with backup under /var/backups/zsjos/director-operator-notifications/; no authorization received at delivery time. Shared DB remains unchanged. Deploy matching backend/Workbench and run authenticated notification smoke after separate deployment approval. Historical 15 failed diagnosis outbox events deliberately not replayed.
+
+## Registration update — test-director-operator-notifications — 2026-09-21T00:00:34.789646+08:00
+
+- Existing owner/branch/worktree/base unchanged. User explicitly authorized V269 configuration synchronization to test zsjos tenant 1 and configuration backup under /var/backups/zsjos/director-operator-notifications/. Scope excludes other migrations, deployment/restart, permissions and historical replay. Additional read-only scope: WeCom/in-app rule parity and H5 partner notification consumers. Verification: preflight version/runtime prerequisites, restricted backup integrity, scoped configuration and UTF-8 checks if execution becomes eligible.
+
+## Delivery Entry — 2026-09-21T00:01:28.363730+08:00
+
+- Workstream/owner/environment: test-director-operator-notifications / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Execute authorized V269 test configuration synchronization and audit WeCom/in-app parity plus H5 business notifications.
+- Decisions/result: V269 authorization retained. Preflight found both core version tables at V267, missing V268, and deployed runtime JAR lacks MediaNotificationReminderScheduler. V269 explicitly requires V268 and matching backend; database execution paused without expanding authorization to unrelated schema changes or deployment. No SQL writes, notification sends, replay, service changes or permission changes performed.
+- Backup: /var/backups/zsjos/director-operator-notifications/20260921-000034/; tenant-1 rules, global templates, two version tables; restricted directory/files 0700/0600, four nonempty dumps with verified SHA-256 manifest. Refresh before eventual execution; restoration needs scoped review.
+- Read-only verification: tenant 1 has 96 enabled in_app rules, 92 enabled wecom rules, one disabled each. All 92 enabled wecom rules have an in_app peer with identical recipients, specified users, action and timing; linked templates enabled. Four enabled in_app scenes lack enabled wecom rules: zsjos.lead.submitter_feedback_created, zsjos.lead.submitter_supplemented, media.account.diagnosis, student.delivery.confirmation. V269 covers 59 scenes, only 16 currently have enabled WeCom rules (43 missing); V269 does not add WeCom. Tenant WeCom channel enabled. Partner accounts 121, push enabled 0; persisted tenant messages only ADMIN (633), no PARTNER messages. Aggregate evidence only, no personal data emitted.
+- Code audit: channels are independently configured; WeCom send does not persist an in_app message automatically and is not protected by the in_app durable outbox guarantee. H5 PARTNER-scoped message list/detail/read/unread APIs and profile WeCom binding/preferences exist. H5 details support lead, sales_order list fallback, cashback, withdrawal, feedback; WeCom partner target resolver supports lead/cashback/withdrawal/feedback, other targets fall back to inbox. Employee media workflows are not H5 partner workflows. H5 messages refresh on navigation/pull refresh; no WebSocket live notification consumer found. Actual WeCom sends/H5 authenticated runtime delivery not tested.
+- Changed repository files: handoff/test_main.md append only. Verification: source inspection, deployed JAR class inspection, current database aggregate/configuration comparisons, backup integrity and scoped diff check. No application edits; prior implementation tests unchanged and not rerun.
+- Dependencies/integration impact: Requires separately scoped V268 schema change and matching application deployment before V269; existing V269 approval remains valid. No new dependency or Git operation.
+- Remaining work: Resolve migration/runtime prerequisites, refresh backup, execute authorized V269 and verify additions, preservation, UTF-8 HEX and versions. WeCom expansion/partner preference changes and live delivery were not authorized by this audit request.
+
+## Registration update — test-director-operator-notifications — 2026-09-21T00:16:19.563262+08:00
+
+- User confirmed V269 (not applied V267) as the script to extend with WeCom defaults. Scope: V269, its isolated SQL tests, directly affected notification docs and this log. Add missing business WeCom templates/rules from authoritative in_app sources after existing V269 defaults; preserve any existing per-scene WeCom rules including disabled/custom rules, tenant channel/user preferences and historical messages. No deployment/shared DB execution until prior prerequisites are met. Verification: isolated execution, rule parity, administrator/template preservation, multiple-source rules, UTF-8 HEX, idempotency and read-only impact comparison. Existing metadata unchanged.
+
+## Delivery Entry — 2026-09-21T00:18:41.339971+08:00
+
+- Workstream/owner/environment: test-director-operator-notifications / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Confirmed unapplied V269 as the migration in which to complete WeCom alongside in_app notifications.
+- Decisions/result: Extended V269 after its 59 in_app defaults with business template mirroring using existing V177 code naming and source-preserving fields, then one set-based insert copying all source rules for tenant/scenes without any existing WeCom rule. Scope also covers post-V177 business scenarios such as lead feedback. Existing WeCom scenes, disabled rules and same-code templates are preserved; all recipients, specified users, timing, action and status are copied. No channel/account preferences, permissions, historical messages or delivery machinery changed. New tenant initializer can reuse matching templates through existing System initialization; channels remain independently maintained.
+- Changed files: script/sql/mysql/migrations/V269__director_operator_notifications.sql; script/sql/mysql/tools/test_director_operator_notifications.py; docs/api/director-operator-notifications.md; docs/api/system-business-notifications.md; handoff/test_main.md append only.
+- Verification: python3 script/sql/mysql/tools/test_director_operator_notifications.py passed in isolated MySQL (14.905s), log /tmp/zsjos-notify-wecom-sql.log. Verified multi-tenant preservation, existing custom template bytes, disabled WeCom rule preservation, multiple timing/recipient rules copied together, source status including disabled copied, rule/template channel and scene match, default template availability for new tenant initialization, Chinese title HEX, repeat execution exact configuration equality and V269 record. Initial test fixture omitted mandatory summary; fixture corrected without schema changes before final passing run. Scoped UTF-8/whitespace and diff checks passed. No Java/frontend behavior changed, so earlier runtime tests were not rerun.
+- Dependencies/integration impact: None added; unchanged V268/matching-backend prerequisites. Shared test database remains untouched and existing authorized synchronization awaits these prerequisites; no deployment, restart, branch, commit or actual message send.
+- Remaining work: Refresh actual configuration/backup and execute V269 when prerequisites are met; verify live additions/UTF-8/version state and authenticated delivery. Real WeCom delivery and H5 end-to-end remain unverified; this script does not enable partner push preferences or add H5 employee workflows.
+
+## Registration — test-partner-wecom-foundation — 2026-09-21T01:06:17.123258+08:00
+
+- Owner/environment: Codex /root / test. Branch/worktree/base: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: First-priority Partner notification identity and WeCom authorization repair following user approval.
+- Non-goals: New notification policy, SQL/configuration writes, preference changes, actual sends, deployment/restart, commits.
+- Ownership: LeadSubmissionServiceImpl, LeadContactActivationService, LeadNotifySceneProvider and focused tests; System SocialClientServiceImpl, error constants, focused social tests; frontend/h5/docs/login.md, docs/api/system-business-notifications.md; this handoff append only. Existing edits preserved; one file-changing owner.
+- Dependencies: Existing tenant SocialClient configuration and typed Partner identities; no added dependency. Target branch/integration order: None.
+- Verification: Typed operator collision tests and publisher assertions; Partner fallback/override/disabled/missing plus ADMIN/MEMBER social regression tests; focused Maven checks, diff checks. Runtime activation requires separately authorized deployment; no real-account tests or external sends.
+
+## Delivery Entry — 2026-09-21T01:14:34.779474+08:00
+
+- Workstream/owner/environment: test-partner-wecom-foundation / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Repair first-priority Partner WeCom entry and notification identity issues after full-flow audit.
+- Decisions/result: Creation and contact-activation events freeze operator user type; notification recipient resolution preserves PARTNER versus ADMIN even for identical numeric IDs, rejects explicit unknown types, and retains legacy employee event compatibility. Partner operator/submitter labels resolve through Partner data with existing submitter masking. Partner WeCom authorization uses dedicated tenant application when configured, otherwise enabled complete tenant ADMIN application, retaining PARTNER binding/token identities. Disabled/incomplete dedicated configuration is not bypassed; unavailable application returns stable actionable error. No account preferences changed.
+- Changed files: ZSJOS service/lead/LeadSubmissionServiceImpl.java, LeadContactActivationService.java, LeadNotifySceneProvider.java and their tests; personnel PartnerAuthServiceImplTest.java, PartnerProfileServiceImplTest.java; System SocialClientServiceImpl.java, ErrorCodeConstants.java, SocialClientServiceImplTest.java; frontend/h5/docs/login.md; docs/api/system-business-notifications.md; handoff/test_main.md. Prior unrelated edits preserved.
+- Verification: Focused Maven reactor compilation and six test classes passed 94 tests, zero failures/errors/skips; final log /tmp/zsjos-partner-wecom-tests.log. Covers application fallback/override/missing/disabled/incomplete and ADMIN/MEMBER regression, typed token/binding, unbound push rejection, operator ID collision, Partner display-name source, creation/activation event type. Initial build blocked by root-owned existing target metadata; reused sudo Maven with existing dependency repository, no chmod/cleanup. Corrected missing import and old reflective test signature before final pass. Scoped UTF-8 and git diff --check passed.
+- Dependencies/integration impact: No new dependencies, SQL, shared database writes, actual sends, service lifecycle, branch, commit or publication operations. H5/admin/workbench runtime consumers unchanged; shared social service regression verifies ADMIN and MEMBER retain prior credential selection.
+- Remaining work: Runtime deployment and dedicated-account WeCom bind/login/delivery/click acceptance unverified because no deployment or real-account mutation/send authorization. This first batch does not complete missing withdrawal/feedback rules, click-ticket recovery/order navigation or durable external delivery; no whole-chain completion claimed.
+
+## Registration update — test-partner-wecom-foundation — 2026-09-21T01:18:59.737112+08:00
+
+- Existing owner/environment/branch/worktree/base unchanged. User requested continuation. Scope added: unapplied V269 withdrawal defaults and isolated SQL tests; WithdrawalNotifySceneProvider, WithdrawalServiceImpl, new withdrawal tenant initializer and focused tests; WecomClickTicketService and focused tests; directly affected notification docs.
+- Goal: Complete five existing withdrawal scenes through default rules and new-tenant initialization; verify feedback/supplement WeCom mirroring; resolve Partner sales-order notifications to their authorized lead instead of generic inbox.
+- Contract boundary: Architecture explicitly requires one-time short-lived click tickets; retain that behavior in this batch. No new scene policy, arbitrary links, sends, SQL writes to shared test or deployment. V268/V269 remain absent in test database; earlier approved synchronization remains blocked by matching runtime prerequisites.
+- Verification: Isolated MySQL execution/preservation/UTF-8 HEX/repeatability and scoped comparison; Java recipient/default/payload tests and click ticket target/one-time/invalid/missing ownership tests. Both existing ADMIN and Partner ticket audiences covered; existing H5 lead route reused without frontend changes.
+
+## Delivery Entry — 2026-09-21T01:25:20.211059+08:00
+
+- Workstream/owner/environment: test-partner-wecom-foundation / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Continue Partner WeCom fixes with missing notification defaults and usable sales-order destinations.
+- Decisions/result: Added five existing withdrawal scene defaults before V269 WeCom mirroring, using business withdrawal number, amount and rejection reason. Finance receives submission/weekly summary; applicants and finance receive approval/rejection/payout results. New tenants use existing System default-rule API and matching WeCom templates. Existing disabled/custom configuration, account preferences and historical messages preserved. Partner sales-order tickets snapshot only an owned associated Lead destination; missing/mismatched relations fall back to inbox and authenticated detail rechecks ownership. ADMIN routing unchanged. One-time short-lived tickets retained per architecture contract.
+- Changed files: V269__director_operator_notifications.sql; test_director_operator_notifications.py; WithdrawalNotificationTenantInitializer.java (new), WithdrawalNotifySceneProvider.java, WithdrawalServiceImpl.java; WecomClickTicketService.java; WithdrawalNotificationDefaultsTest.java (new), WithdrawalServiceImplTest.java, WecomClickTicketServiceTest.java (new); docs/api/system-business-notifications.md, docs/api/director-operator-notifications.md; handoff/test_main.md. Existing unrelated edits preserved.
+- Verification: 19 focused Java tests passed across four classes; includes typed applicant/finance collision, absent Partner account, new-tenant context restoration, workflow payload business number/reason, order ownership/missing fallback, ADMIN/Partner routing, and one-time TTL regression. Reactor compilation passed. Latest withdrawal payload assertions separately recompiled and rerun after initial test run; all seven passed. Logs: /tmp/zsjos-partner-notification-tests.log and /tmp/zsjos-withdrawal-payload-tests.log. Isolated MySQL V269 replay passed (17.055s): all five scenes dual-channel, exact recipients, custom disabled rule preservation, Lead feedback/supplement mirroring, Chinese HEX, template-rule relationships, version record and unchanged rerun. Log: /tmp/zsjos-partner-notification-sql.log. Scoped diff check passed.
+- Dependencies/integration impact: No new dependency, grants, shared database writes, actual sends, deployment, service restart, branch, commit or publication. SQL uses existing V269/V268 prerequisite chain; no new numbered migration. Read-only test database comparison still shows no withdrawal templates/rules, feedback/supplement in_app only, and no V268/V269 version records. Therefore source change is ready but shared synchronization and actual delivery remain incomplete. Existing V269 authorization does not bypass runtime/V268 prerequisites or automatically authorize newly expanded synchronization scope.
+- Remaining work: Deploy reviewed matching runtime and resolve migration prerequisites before separately scoped shared synchronization/real-account acceptance. Durable WeCom retries and in_app sales-order precise navigation remain outside this batch. Reusable/longer-lived ticket behavior requires explicit resolution of the existing architecture contract before changing it. Existing live configuration is not represented as fixed.
+
+## Registration update — test-partner-wecom-foundation — 2026-09-21T01:31:49.219261+08:00
+
+- Existing owner/environment/branch/worktree/base unchanged. User authorized continuation with reliable WeCom delivery and H5 in-app sales-order navigation.
+- Scope: System notify event API, processor, outbox service/mapper, WeCom adapter, additive durable payload DTO/service and query VO/controller endpoint/tests; ZSJOS Partner message controller/VO/order target service/tests; H5 message API/detail and focused browser tests; directly affected notification/API docs and this record. Existing edits preserved.
+- Design: Reuse outbox JSON payload in a versioned WeCom envelope, frozen rendered per-recipient state and fenced checkpoints, no schema/dependency additions. Confirmed successes are not resent; interrupted/ambiguous sends become uncertain terminal failures for inspection. Rule/tenant configuration remains authoritative. Add authorized tenant-scoped delivery query without exposing content/tokens. Partner message detail projects an owned order's Lead destination.
+- Non-goals: New notification business policy, changes to one-time ticket contract, real sends/preferences/shared configuration, deployment/restart, commits.
+- Verification: Processor/outbox/adapter recipient isolation, retries, uncertainty, fencing, statuses, query permission/tenant and no-payload tests; Partner target owner/deleted/missing/action tests; H5 type/build and actual browser success/failure/denied navigation. SQL schema checks are inapplicable; existing MySQL outbox checkpoint/query contract tested in isolation if available.
+
+## Delivery Entry — 2026-09-21T01:59:31.442790+08:00
+
+- Workstream/owner/environment: test-partner-wecom-foundation / Codex /root / test. Branch/worktree/HEAD: main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged; existing registration applies.
+- User goal: Continue reliable WeCom delivery and precise Partner H5 in-app sales-order navigation.
+- Decisions/result: WeCom now joins the existing transactional System outbox using a versioned JSON envelope, frozen typed/rendered recipient snapshots and click URLs. Fenced tenant/token/unexpired-lease checkpoints persist send intent/results; replay skips successful/permanent outcomes, preserves uncertain interrupted sends without blind resend, and processes remaining recipients after failure. Explicit transient provider rejection retries; invalid-token rejection can refresh once. Pre-POST lookup failure remains safely retryable; timeout/malformed POST response becomes uncertain. Dedicated disabled application no longer falls back, aligning the already-approved auth contract. Workers re-read after claim and calculate a fresh lease per row. Jackson 3 builder compatibility and legacy null payload support verified; malformed payload parsing does not log original content. publishConfirmed explicitly documents WeCom durable queue acceptance, not provider delivery.
+- Query/navigation: Added tenant-scoped permission-protected delivery-page API returning safe status/error projections, with no bodies/tickets/payload. Existing Admin/Workbench rule and message contracts unchanged; no new UI or grants. Partner detail authorizes the typed stored message before resolving the order's owned Lead; H5 uses the exact destination or shows unavailable explanation. Existing route/object checks and one-time 30-minute WeCom tickets remain in effect.
+- Changed files: System api/notify/NotifyBusinessEventApi.java, NotifyBusinessEventApiImpl.java, dto/NotifyDeliveryContext.java; service/notify/NotifyBusinessEventProcessor.java, NotifyBusinessOutboxService.java, WecomNotifyChannelAdapter.java, new WecomOutboxPayload.java, WecomOutboxDeliveryService.java, NotifyDeliveryQueryService.java; dal/mysql/notify/NotifyBusinessOutboxMapper.java; controller/admin/notify/NotifyRuleController.java and new delivery request/response VOs; six corresponding System test classes. ZSJOS PartnerAppMessageController.java, new PartnerNotifyMessageRespVO.java, PartnerNotificationTargetService.java and two focused tests. H5 src/api/message.ts, src/pages/messages/detail.vue, tests/message-navigation-browser.mjs, 兼职端API接口.md; docs/api/system-business-notifications.md, docs/api/director-operator-notifications.md; this record append only. Unrelated edits preserved.
+- Verification: 40 focused Java tests across eight classes passed without failures/errors/skips. Full ZSJOS reactor test/compilation log /tmp/zsjos-reliable-tests.log; final System regression after silent JSON parsing changes /tmp/zsjos-reliable-system-final.log. Covers per-recipient retry/deduplication/typed collision, interrupted send, lost lease, disabled rule/application, invalid recipient, token refresh/body stability, frozen template, fresh claim snapshot, null payload, safe projection, tenant predicates and actual method-security allowed/denied invocation, Partner message ownership/action/target cases. Initial failures exposed Jackson 3 incompatibility; corrected it plus test fixture wiring/stubbing. Final null-payload rerun also refreshed a stale class compiled before its source edit.
+- Additional evidence: Isolated MySQL ran SQL extracted from the actual mapper, verifying due-time claim, tenant/token/expiry fencing, takeover and payload preservation; /tmp/zsjos-wecom-outbox-sql.log (script /tmp/zsjos-wecom-outbox-sql.py). No schema migration changed. H5 vue-tsc and production bundle passed (/tmp/zsjos-h5-type.log, /tmp/zsjos-h5-build.log); real Chromium exercised synthetic-only APIs at desktop 1440 and mobile 390: exact order navigation, unavailable relation, message-only action, error/retry, unauthorized route, no runtime exceptions (/tmp/zsjos-h5-browser.log). Screenshots inspected at both widths; temporary test-only CJK font addressed missing host fonts without product/dependency changes. Scoped diff/UTF-8/whitespace checks passed.
+- Dependencies/integration impact: None added. No shared DB writes, real notification sends, preference changes, deployment/restart, branch/commit/push or publication. Runtime wiring/live endpoint smoke remains unverified because current shared service was not replaced or restarted. Existing V268/matching-runtime prerequisites still block earlier V269 synchronization; no live configuration fix is claimed.
+- Remaining work: Reviewed deployment, prerequisite-compatible shared SQL synchronization and dedicated-account real WeCom bind/login/send/click acceptance require their separately scoped authorization. Uncertain sends deliberately require investigation and are not automatically replayed. This delivery provides backend status query, not an operations UI; whole-chain live delivery is not claimed complete.
+
+## Registration update — test-partner-wecom-config — 2026-09-21
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base/HEAD: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Complete user_type=3 dictionary and move tenant 1 social client record 2 (AgentId 1000051) from MEMBER to PARTNER, as explicitly authorized by user.
+- Non-goals: ADMIN application, credentials, account bindings, grants, deployment, restart, commits, unrelated existing work.
+- Ownership: script/sql/mysql/03-bootstrap-dictionary-types.sql; frontend/h5/docs/login.md; handoff/test_main.md; scoped test database configuration above.
+- Dependencies: Existing System dictionary and PARTNER social client selection; no new dependency. Target branch/integration order: None.
+- Verification: Execute dictionary SQL in isolated temporary tables and repeat; scoped backup and transaction; UTF-8 HEX; unchanged ADMIN config; real Partner authorization login/bind URLs. No baseline chain/order/schema change.
+
+## Delivery Entry — 2026-09-21 03:21 +08:00 — test-partner-wecom-config
+
+- Branch/worktree/owner/environment: registration unchanged; HEAD 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Complete Partner dictionary option and directly adjust AgentId 1000051 application settings.
+- Decisions/result: Added missing active System user_type=3 (兼职合作方); tenant 1 social client record 2 changed MEMBER=1 to PARTNER=3 and removed leading AgentId space. ADMIN record 1/1000062 unchanged. Credentials, account bindings and permissions untouched. User explicitly authorized these shared test configuration writes.
+- Changed files: script/sql/mysql/03-bootstrap-dictionary-types.sql (missing enum seed only); frontend/h5/docs/login.md; handoff/test_main.md. No migration version/order/schema/checksum records changed.
+- Verification: Changed SQL block and complete dictionary seed executed twice successfully in isolated codex_partner_dict_20260921_0319 schema; exactly one active value 3. UTF-8 client and HEX(label)=E585BCE8818CE59088E4BD9CE696B9 match test database. Transaction updated exactly one social client. Real HTTPS login and bind authorization endpoints both return AgentId 1000051 and expected testpartos callbacks. Scoped git diff --check passed. Initial temporary-table harness failed due to MySQL temporary self-reference restriction, before live writes; switched to isolated ordinary tables successfully.
+- Recovery: Restricted field-only backup /opt/zsjos-runtime/backups/partner-wecom-config-20260921-0319.tsv (0600); restore record 2 previous type/AgentId if separately authorized, disable newly inserted dictionary entry only after consumer review. No credentials in backup. Isolated validation schema retained; no destructive cleanup.
+- Dependencies/integration impact: No dependency, frontend static option, backend code, restart, deployment, commit or push. Existing deployments must review baseline checksum handling; no automatic reconciliation. Full bootstrap/upgrade chain not run for this scoped dictionary correction with unchanged chain/schema. Existing unrelated dictionary duplicates preserved.
+- Remaining work: Actual user login/binding and WeCom-side callback configuration require interactive acceptance; no completed binding claimed. Admin cached dictionary may require refresh after cache expiry or re-login. No real account binding or messages performed.
+
+## Registration — test-partner-wecom-web-oauth — 2026-09-21
+- Owner/environment: Codex /root / test; branch/worktree/HEAD main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- Goal: Partner H5 WeCom in-client webpage authorization after consent, external QR retained.
+- Scope: System SocialClient API/service and focused tests; Partner auth controller/service and tests; H5 auth API/login page/tests; H5 login documentation; this log.
+- Non-goals: dependencies, database, account binding changes, ADMIN/Workbench behavior, deployment/restart, commits.
+- Dependencies: Existing JustAuth shared enterprise code exchange/state validation and tenant application selection. Target branch/integration order None.
+- Verification: focused Java tests/compile; H5 build and browser consent/UA/login/bind checks. Real WeCom acceptance requires deployed code and actual client.
+
+## Delivery Entry — 2026-09-21 03:34 +08:00 — test-partner-wecom-web-oauth
+- Owner/environment/branch/worktree/HEAD: registration unchanged; HEAD 050f43dd0dcc996ce468efafa4715870264dafd6.
+- User goal: Use in-client webpage authorization for Partner H5 login/binding after consent, retaining external QR login.
+- Decisions/result: Add optional inWecom (default false) at Partner authorize endpoint. H5 shared auth API detects wxwork for both login/bind. System web URL generation preserves existing enterprise application's registered state, encoded callback and identity namespace, adds snsapi_base OAuth endpoint. Existing JustAuth enterprise code exchange, tenant config, typed Partner binding and token validation reused. Removed automatic agreement bypass; explicit user action starts login.
+- Changed files: System api/social/SocialClientApi.java and Impl; service/social/SocialClientService.java and Impl; SocialClientServiceImplTest.java; ZSJOS PartnerAppAuthController.java, PartnerAuthService.java and Impl, PartnerAuthServiceImplTest.java; frontend/h5/src/api/auth.ts, src/pages/login/index.vue, tests/wecom-authorization-browser.mjs, docs/login.md; handoff/test_main.md. Existing unrelated edits preserved.
+- Verification: Maven reactor compile and 48 focused tests passed (34 social client, 8 Partner auth, 6 Partner profile), including existing ADMIN/MEMBER selection regressions and new URL/state/encoding/mode checks; /tmp/zsjos-web-oauth-tests.log. H5 vue-tsc and production build passed to /tmp/zsjos-web-oauth-dist; /tmp/zsjos-web-oauth-h5.log. Original dist output permission blocked first build; isolated output resolved without changing permissions or deploying.
+- Browser evidence: Real headless Chromium with synthetic APIs ran mobile wxwork and desktop browser login/bind; no automatic redirect, consent cancellation, authorization failure/retry, correct callback/mode, no runtime exceptions. /tmp/zsjos-web-oauth-browser-pass.log. Harness was corrected for dialog/toast animation timing and document replacement; initial stale bundle run discarded. No visual layout changed.
+- Dependency/integration impact: No new dependencies, SQL, shared config, credential, actual account binding, service restart, deployment, commit/push. Existing ADMIN and Workbench endpoints still call unchanged getAuthorizeUrl behavior; optional Partner parameter is backward compatible. Scoped diff check passed.
+- Remaining work: Deploy matching backend/H5 with separate authorization; mobile WeCom end-to-end code exchange/login/binding and app webpage trusted domain/visibility acceptance cannot be proven with synthetic tests. Live service remains unchanged by this turn.
+
+## Registration — test-mobile-route-prefix — 2026-09-21
+- Owner/environment: Codex /root / test; branch main; worktree /opt/zsjos; base/HEAD 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Persist Mobile URL namespace through navigation, deep links, login and refresh; open authorized native Workbench pages on Mobile.
+- Non-goals: backend/session lifetime changes, real permissions, deployments, database writes, dependencies, commits. Admin embed scope awaits user clarification.
+- Ownership: frontend/workbench/src/main.tsx, constants.ts, services/authSession.ts and tests, services/mobileRoutes.ts and tests, services/menu.test.ts, layouts/RouteHost.tsx and route guard tests, pages/WorkOrderCenterPage.tsx and UserProfilePage.tsx/tests, components/ViralContentMaterialForm.tsx; scoped browser harness under frontend/workbench/test; docs/architecture/data-and-permission-flow.md; handoff/test_main.md.
+- Dependencies: existing React Router basename and server-owned menu contracts. No package addition. Target branch/integration order: None.
+- Verification: focused route/session/menu tests, typecheck, production build into /tmp, isolated real Chromium desktop/mobile navigation and authorization checks. No real account login or shared deployment.
+
+### Registration update — test-mobile-route-prefix — 2026-09-21 10:34 +08:00
+- User explicitly includes authorized Vue admin_embed pages on Mobile. Extend ownership to Workbench layouts/AdminEmbedPage.tsx/tests; Admin src/utils/workbenchAuth.ts, auth.ts, hooks/web/useCache.ts, config/axios/service.ts, permission.ts, utils/impersonation.ts and focused tests; browser fixtures for both consumers. Other registration metadata unchanged.
+- Verify isolated Mobile token/client/user-menu cache, same-origin route bridge, refresh/logout and denied states in both runtimes; build both frontends. Do not copy Mobile tokens into PC keys or change backend grants. Admin-only menus remain outside the server-authorized Workbench projection.
+
+## Registration update — test-partner-wecom-login-guidance — 2026-09-21
+- Owner/environment: Codex /root / test; main / /opt/zsjos / HEAD unchanged from previous registration.
+- Goal: Explicit unbound WeCom popup and password-login guidance; seven-day remembered session verified against existing backend configuration.
+- Scope: H5 auth API/request/composable/login and focused browser tests/docs; System Partner-only enterprise identity request/factory/service and tests; Partner auth token tests; this handoff.
+- Prerequisite: Remove Partner login/bind dependency on contact-detail API so unbound detection works. Non-goals: other account bindings, ADMIN behavior, dependencies, SQL, deployment/restart, commits.
+- Verification: focused Java identity/token/regression tests, H5 type/build/browser unbound vs other errors, refresh success/expiry. Target branch/integration order None.
+- Scope refinement: System OAuth2TokenServiceImpl and its existing tests: cap PARTNER access-token expiry at the original refresh deadline so a refresh near day seven cannot extend the remembered session; ADMIN/MEMBER issuance unchanged.
+- Scope refinement: Admin src/store/modules/user.ts and utils/workbenchEmbedBridge.ts are included to reject stale Mobile permission-cache fallback and preserve business query/hash through iframe navigation; Workbench embed URL and bridge tests cover the same contract.
+
+## Delivery Entry — 2026-09-21 10:39 +08:00 — test-partner-wecom-login-guidance
+- Owner/environment/branch/worktree: Codex /root / test / main / /opt/zsjos; HEAD unchanged 050f43dd0dcc996ce468efafa4715870264dafd6.
+- User goal: Unbound/new Partner WeCom users receive popup guiding password login; remember login seven days.
+- Decisions/result: Dedicated 1900000018 popup explains password login then profile binding and first-time activation. Only this code suppresses generic toast; other authorization errors retain their distinction. Callback query cleared on failure, destination retained. No auto-account creation or phone-number matching. Existing remember-days=7 and mobile 7200/604800 settings verified read-only; no DB write. PARTNER access expiry capped by original refresh expiry, avoiding an extra access-token lifetime after the seventh day.
+- Prerequisite fix: Partner-only JustAuth identity adapter obtains UserId without member contact-detail API; shared state validation/cache, effective tenant application and original identity namespace preserved. Non-members/upstream failures rejected. ADMIN/MEMBER use original flow. Auth log no longer serializes code/state/token/user payloads. Binding conflict semantics not changed in this task.
+- Changed files: System framework/justauth/core/AuthWecomIdentityRequest.java (new), AuthRequestFactory.java, service/social/SocialClientServiceImpl.java, service/oauth2/OAuth2TokenServiceImpl.java; tests AuthWecomIdentityRequestTest.java (new), SocialClientServiceImplTest.java, OAuth2TokenServiceImplTest.java; ZSJOS PartnerAuthServiceImplTest.java; frontend/h5/src/api/auth.ts, api/request.ts, composables/useAuth.ts, pages/login/index.vue, tests/wecom-unbound-browser.mjs (new), docs/login.md; handoff/test_main.md. Prior unrelated changes preserved.
+- Verification: Final Maven reactor passed 71 tests (35 social, 19 OAuth, 3 identity adapter, 8 Partner auth, 6 profile), no failures/errors/skips; /tmp/zsjos-login-guidance-java-final.log. Covers identity-only success, nonmember/error rejection, invalid state, configured 604800 issuance, refresh deadline and existing ADMIN/MEMBER regressions. Fixed test generic type; stale incremental class from editing during initial compilation was detected by deadline test, source touched and full affected compilation rerun successfully.
+- Frontend verification: vue-tsc + production build passed to /tmp/zsjos-login-guidance-dist; /tmp/zsjos-login-guidance-build.log. Real Chromium synthetic API tests passed unbound popup/acknowledgement, callback replay prevention, other-error distinction, automatic refresh and expired-session clearing; /tmp/zsjos-login-guidance-browser.log. Existing in-client/external login/bind consent/retry browser suite passed against same bundle; /tmp/zsjos-login-guidance-auth-regression.log. Mobile 390 and desktop 1440 screenshots inspected; temporary test-only CJK font used because host has no Chinese font. git diff --check passed.
+- Dependencies/integration impact: No new dependency, shared DB/config mutation, account operation, runtime restart/deployment, commit or push. New adapter selected only for PARTNER, expiry cap only for PARTNER; Admin and Workbench shared ADMIN contract unchanged, regression-tested at service boundary. No seven-day plaintext password persistence.
+- Remaining work: Deploy matching backend and H5 under separately authorized service/deployment scope, then real mobile WeCom acceptance. Synthetic tests cannot validate live corporate credentials/member visibility; identity endpoint may still return genuine 60011 for application permission problems. Existing issued tokens are not retroactively capped; new issuance/refresh applies cap. Live service not changed in this turn.
+
+## Delivery Entry — 2026-09-21 10:43 +08:00 — test-mobile-route-prefix
+- Owner/environment/branch/worktree: Codex /root / test / main / /opt/zsjos; HEAD unchanged 050f43dd0dcc996ce468efafa4715870264dafd6.
+- User goal: Keep Mobile in employee URLs through all navigation and allow authorized native and Vue admin_embed pages on Mobile; user explicitly confirmed inclusion of embedded management pages.
+- Decisions/result: `/zsjos/mobile` is a React Router basename, followed by the complete canonical server route (e.g. `/zsjos/mobile/zsjos/tasks/today`, `/zsjos/mobile/system/notice`). Menu/permission metadata stays server-owned. Old marked Mobile tabs normalize before router mount; copied links identify Mobile without sessionStorage. Login preserves deep-link query/hash. Native content production/review restrictions removed. Ordinary links and WeCom binding callback retain the platform prefix. Admin embeds now support both platforms and preserve business query/hash through the same-origin bridge; no tokens are sent through URLs or messages.
+- Authentication boundaries: Mobile Admin uses only MOBILE token keys/client and separate user/menu/visit-tenant caches; no PC/legacy-token fallback or PC impersonation context. Mobile permission loading rejects cached-data fallback on request failure. Expired/missing Mobile embed authentication returns to the outer Mobile login. Backend authorization/grants and standalone PC behavior remain unchanged. Reused existing framework adapters/test runner; no shared package or dependency added.
+- Changed Workbench files: src/main.tsx, constants.ts, services/authSession.ts, new services/mobileRoutes.ts and mobileRoutes.test.ts, services/menu.test.ts, layouts/RouteHost.tsx, layouts/pc-only-routes.guard.test.ts, layouts/AdminEmbedPage.tsx and test, pages/WorkOrderCenterPage.tsx, pages/UserProfilePage.tsx and test, components/ViralContentMaterialForm.tsx; new test/mobile-routes-browser.mjs.
+- Changed Admin files: new src/utils/workbenchAuth.ts; src/utils/auth.ts, impersonation.ts, workbenchEmbedBridge.ts; src/hooks/web/useCache.ts; src/config/axios/service.ts; src/permission.ts; src/store/modules/user.ts; new tests/workbenchAuth.test.ts and workbenchAuth.vitest.config.mjs. Documentation: docs/architecture/data-and-permission-flow.md and this append-only record. Existing unrelated changes preserved.
+- Verification: 61 Workbench focused tests plus 4 Admin token/cache tests passed (65 total). Workbench npm typecheck and final Admin vue-tsc with 8GB heap passed; Admin final incremental recheck exited 0 after the last source changes. Both production bundles passed to /tmp/zsjos-mobile-dist and /tmp/zsjos-mobile-admin-dist. Logs: /tmp/zsjos-mobile-unit.log, /tmp/zsjos-mobile-admin-unit.log, /tmp/zsjos-mobile-type.log, /tmp/zsjos-mobile-admin-type.log, /tmp/zsjos-mobile-build.log, /tmp/zsjos-mobile-admin-build.log. Existing Vite temp-directory permissions were handled with a /tmp config; first Admin typecheck exceeded default heap and was rerun using the project's 8GB setting. No shared directory permissions changed.
+- Browser evidence: Real Chromium against both built frontends with isolated synthetic APIs passed Mobile entry/login, menu/back/forward, reload, fresh-tab copied link, query/hash/login return, native production/review, error/retry, denied menus/actions, refresh/logout isolation, real Vue Mobile/PC embeds, iframe route bridge/query preservation, Mobile iframe refresh and expiry return. /tmp/zsjos-mobile-browser.log; screenshots /tmp/zsjos-mobile-{production-390,review-390,review-1440,embed-390,embed-1440}.png inspected. Test-only CJK font used for host font limitations. Harness timing was corrected to await actual iframe refresh rather than its old DOM. No live account/business requests. Read-only GETs to the test site's Mobile root/native/BPM deep paths returned HTTP 200 HTML, confirming current SPA fallback. Scoped diff and new-file UTF-8/whitespace checks passed.
+- Reproduction: Admin focused tests reuse the installed Workbench runner via `pnpm exec node ../workbench/node_modules/vitest/vitest.mjs run --config tests/workbenchAuth.vitest.config.mjs` from frontend/admin. Browser harness requires MOBILE_TEST_CHROME and built bundle locations; optional MOBILE_TEST_FONT supplies CJK glyphs without changing product assets.
+- Dependencies/integration impact: None added. No database, real permissions, external state, service restart, deployment, Git branch/commit/push change. Deploy matching Admin embed first (or both atomically), then Workbench; old Admin bundles still use PC credentials and must not serve new Mobile embeds. Bundles reflect the existing worktree, including earlier unrelated frontend changes, so publication requires review of that full delivery scope.
+- Remaining work: Separately authorized paired frontend deployment and real-account acceptance on testos.zhongshijian.top. Complex management tables retain their existing horizontal scrolling on small screens; not every business form received a mobile layout redesign. This fixes platform/routing continuity, not a claim that all previously reported short-session failures are diagnosed or fixed. Admin-only menus remain excluded from Workbench under the existing server contract.
+
+## Registration scope update — test-positioning-template-preview — 2026-09-21 11:34 +08:00
+
+- Owner/environment/branch/worktree/HEAD: Codex /root / test / main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User confirmed the 47 supplied fields as the desired template after explicit discussion of synchronizing the shared test database. Goal: publish the existing canonical 47-field definition for tenant 1 default template 2 and retire its obsolete 15-field draft so Admin and new business cards agree.
+- Scope: read-only backups and controlled data correction in zsjos_director_form_template / zsjos_director_form_template_version (tenant 1, template 2); handoff/test_main.md append only. SQL definition source remains script/sql/mysql/positioning-single-source.sql; no source baseline/checksum rewrite.
+- Non-goals: Deleting linked delivery plans/stages or historical business cards; touching the separately created template 52; changing dictionaries, account profiles, permissions, migration records, or deploying frontends/backend. Prior proposed delivery-plan expansion has not been confirmed.
+- Dependencies/integration: None. Target branch/integration order: None.
+- Verification: fresh scoped backup, guarded transactional SQL generated from the existing canonical source, isolated MySQL execution and repeatability, old version bytes and unrelated template preservation, live UTF-8/HEX and exact 47-field comparison, both consumers' published/draft selection contract review.
+
+## Registration execution update — test-positioning-template-preview — 2026-09-21 11:40 +08:00
+
+- User explicitly overrides backup and isolated verification for this operation: no backup, no isolation environment, no new tables. Proceed directly against the authorized existing tenant 1 default template 2 using a guarded transaction and read-after-write verification. No new backup or verification database will be created. The previous turn's pre-existing backup is not changed or deleted.
+- Scope and owner remain as registered; preserve business cards, linked delivery data and separate template 52. Canonical 47-field source is unchanged. Verification uses row locks, exact old-field signature, exact new-field equality, repeatability and scoped before/after fingerprints of unrelated rows; no schema or checksum changes.
+
+## Delivery Entry — 2026-09-21 11:40:38 +08:00 — test-positioning-template-preview
+
+- Owner/environment/branch/worktree/HEAD: Codex /root / test / main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged. Timestamp correction: preceding execution-update entry labeled 11:40 was actually appended at 11:38:30; its content and authorization remain unchanged.
+- User goal: Activate exactly the confirmed 47 positioning fields. User explicitly directed no new backup, no isolated environment and no new tables.
+- Decisions/result: Direct guarded transaction on existing test database zsjos, tenant 1 default template 2. Published V3 (version row 57) with the exact 47 definitions from script/sql/mysql/positioning-single-source.sql (37 main fields and 10 references). Archived old published V1/id2 and old draft V2/id54 without rewriting their field JSON; default published_version_id now 57. No draft remains under template 2, so Admin's draft-first logic now resolves the same published template as Workbench new-card creation. No frontend/backend deployment or restart required for this database-owned configuration.
+- Scope preserved: Separate template 52 and all other templates unchanged. Existing 3 business cards, submissions, service-card mappings, applications, delivery plan/stage unchanged. Earlier proposed delivery-plan deletion expansion remains unconfirmed. No account profile, dictionary, permission, migration/checksum, schema or runtime change; no new backup/isolation/table created.
+- Changed repository files: handoff/test_main.md append only. Database rows: template 2 metadata; version 2 and 54 status/audit/version; inserted version 57. Canonical SQL source already contains the agreed fields and was not modified. Execution script /tmp/zsjos-sync-positioning-47.py; executed statements /tmp/zsjos-sync-positioning-47-executed.sql (technical selectors and template definitions only).
+- Verification: Exact canonical JSON equality; count 47/37/10; obsolete recommendedMatchRate absent; published V3 pointer verified; draft count zero; representative Chinese label HEX equals expected UTF-8; old JSON SHA256 unchanged; unrelated template fingerprints and relevant business table checksums unchanged. Repeated execution returned already synchronized with no writes. Both consumer source paths reviewed: Admin chooses draft || published, Workbench published-template API selects enabled default and its published version. First transaction rolled back when marker SELECT reset ROW_COUNT; checking ROW_COUNT in the same statement batch fixed the verifier, then transaction succeeded. Rolled-back insertion left only an unused auto-increment gap, no retained row.
+- Dependency/integration impact: None; no package, branch, commit or publication action. Read-only live response/browser verification under a logged-in user was not performed; evidence is database plus existing consumer contract inspection, not authenticated browser acceptance.
+- Remaining work: Refresh/reopen the default template/new-card form. Existing cards still preserve their old immutable snapshots; removing their linked delivery records remains outside confirmed scope. Separate nondefault draft template 52 still retains its owner's original 15 fields and was not overwritten.
+
+## Registration — test-content-review-attachments — 2026-09-21 11:47:15 +08:00
+
+- Owner: Codex /root; environment test; branch main; worktree /opt/zsjos; base/HEAD 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Implement per-work review attachments, file/drop/clipboard input, deferred upload, draft/revision persistence and responsive UI.
+- Non-goals: database writes, deployment/restart, dependencies, permissions assignments, branch/commit/publication operations.
+- Ownership: Workbench ContentApprovalDraft, ContentReviewBatchPage, MediaStudentsPage, new ContentReviewAttachments component/service/styles/tests and scoped browser fixtures; content review service request types as needed; ZSJOS ContentVersionService, ContentReviewBatchService, BusinessFileDirectUploadService and focused attachment type helper/tests; docs/api/content-review-batch.md; handoff/test_main.md. Preserve existing unrelated changes.
+- Dependencies: existing Infra direct upload, content-version file bindings, BPM attachment projection, deferredUpload and clipboardImage utilities. Target branch/integration order: None.
+- Verification: focused frontend/backend tests, typecheck and compile, isolated browser desktop/mobile and upload/retry/paste flows; verify existing approval attachment consumer contract. Shared authenticated endpoint checks reported separately.
+
+## Registration scope update — test-positioning-template-preview — 2026-09-21 11:48 +08:00
+
+- User explicitly authorized removal of the old drafts and published/confirmed positioning records created over September 20–21 so all cards can be filled again; prior explicit no-backup/no-isolation/no-new-table direction remains applicable.
+- Scope: test zsjos tenant 1 cards 2,3,4 (old template version 2, created 2026-09-20/21), submission 2 and linked confirmation/service-card/application/log rows; derived delivery plan 1 and waiting stage 1 with zero submissions/defers; account 6 _diagnosisContext source metadata only (source submission 2). Preserve all account fields and snapshots, profile audit entries, students/accounts, canonical 47-field V3 and all template definitions.
+- Execution: guarded existing-table transaction, children before parent, exact IDs plus tenant and date/template guards, repeated no-op verification. No backup; pre-commit rollback only, no post-commit recovery artifact. No schema, permissions, service or deployment changes. Ownership adds only this live scoped cleanup and append-only handoff; owner/branch/worktree/HEAD unchanged.
+- Verification: row locks and expected counts; abort on BPM/production-ticket/stage-submission/defer/new references; retained business/template fingerprints; no dangling target references and second-run no-op. No personal values written to reports.
+
+## Delivery Entry — 2026-09-21 11:47:43 +08:00 — test-positioning-template-preview
+
+- Owner/environment/branch/worktree/HEAD: Codex /root / test / main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged. Previous scope-update label 11:48 was approximate and preceded this delivery; execution clock is this entry's timestamp.
+- User goal: Delete the old recent draft and published/confirmed cards so all positioning cards can be filled afresh. Existing explicit no-backup/no-isolation/no-new-table direction followed.
+- Result: Committed one guarded tenant-1 transaction deleting old-template cards 2,3,4 (created September 20–21), submission 2, one confirmation link, three service-card bindings, one application and one application log; removed derived delivery plan 1 and its single WAITING stage 1 (no submissions/defers/completed work). Account 6 retained; only _diagnosisContext source metadata pointing to removed submission 2 cleared and optimistic version advanced. Existing account field values and snapshot bytes preserved, as were profile audit history, students, accounts and all template definitions. Canonical published V3 with 47 fields remains effective. Template configuration drafts are distinct from business cards and were not deleted.
+- Verification: Locked exact card/date/template IDs and related rows; required no BPM process, execution/version rows, production references, stage submissions/defers or account card-pointer references. Expected deletion counts all matched. Post-commit all scoped rows absent; tenant active cards/submissions/service bindings/applications all zero. Retained table checksums and non-context account field/snapshot fingerprints unchanged. Repeat execution returned already cleared/no writes. Live published template still has 47 fields. No logged-in browser acceptance performed; verified database and source contracts.
+- Changed repository files: handoff/test_main.md append only. Operational SQL and guarded executor retained under /tmp/zsjos-cleanup-positioning-executed.sql and /tmp/zsjos-cleanup-positioning.py without business payloads. No schema, dependency, permissions, commits, deployment or external notifications performed.
+- Recovery: No new backup by user instruction; transaction rollback protected pre-commit errors only. Deleted records have no recovery artifact from this operation. Unrelated earlier backup files left untouched.
+- Remaining work: Users should refresh/reopen the media student workspace and create cards using the new 47-field template. Historical profile/audit entries remain as audit history; template 52's separate configuration draft remains untouched.
+
+## Delivery Entry — 2026-09-21 12:03:02 +08:00 — test-content-review-attachments
+
+- Owner/environment/branch/worktree: Codex /root / test / main / /opt/zsjos; HEAD unchanged 050f43dd0dcc996ce468efafa4715870264dafd6; fixed metadata refers to registration above.
+- User goal: Implement review attachment uploads and clipboard image paste with workbench UI styling.
+- Decisions/result: Per-work optional 20 attachments plus one image cover; file multi-select/drop, scoped paste event and Clipboard API button; deferred uploads on save, failure blocks business command, successful uploads reused on retry; covers/attachments restored for drafts; explicit empty array clears only the new version; rejected revisions retain source IDs and historical files. Added RESUBMIT action using server-returned action and existing endpoint. Responsive themed file cards, document downloads, image preview; document MIME types accepted at both upload and binding boundaries. No schema, shared state, permissions grants, dependency, deployment or branch operation.
+- Changed files: frontend/workbench/src/components/ContentApprovalDraft.tsx, ContentReviewAttachments.tsx (new); src/pages/MediaStudentsPage.tsx, ContentReviewBatchPage.tsx; src/services/materialApi.ts, contentReviewAttachments.ts/test.ts (new); src/styles/components/content-review-attachments.css (new); test/content-review-attachments.html, .tsx, -browser.mjs (new). ZSJOS service/content/ContentVersionService.java, service/contentreview/ContentReviewBatchService.java, service/file/BusinessFileDirectUploadService.java, ContentAttachmentTypes.java (new), tests for ContentVersionService and BusinessFileDirectUploadService. docs/api/content-review-batch.md; handoff/test_main.md. Existing unrelated worktree edits preserved.
+- Verification: Workbench typecheck passed; 14 focused frontend tests passed (attachments, deferred upload, clipboard). Maven reactor focused test run passed 22 tests (version documents/ownership/history/clear, direct upload, controller permission); /tmp/content-attachments-java.log. Final production build passed to /tmp/zsjos-content-attachments-dist, /tmp/content-attachments-build-final.log; existing large-chunk advisory remains. Scoped git diff --check passed.
+- Browser evidence: Real isolated Chromium at 1280x1000 and 390x844; synthetic transport only. Passed scoped paste/multi-file selection, no pre-save upload, failure prevention/retry/success reuse, empty arrays, actual draft editor removal and actual rejected editor source retention. /tmp/content-attachments-browser-final.log; desktop/mobile PNGs at /tmp/zsjos-content-attachments-desktop.png and /tmp/zsjos-content-attachments-mobile.png inspected with CJK font loaded from existing temporary font. Browser tests use generated paste events, not OS clipboard; clipboard permission/error behavior additionally covered by existing utility tests.
+- Verification adjustments: Existing root-owned Maven/Vite output directories blocked ordinary execution, used existing sudo for local build/test processes. Browser editor check initially used an inaccurate mobile pointer position; switching to semantic button activation passed. Final revision source retrieval fixed before final browser/build.
+- Dependencies/integration: None; no new npm/Maven packages, no commits or publication. Existing BPM attachment payload unchanged; React attachment projection supports non-image download. No new Vue submission consumer.
+- Remaining risks: No authenticated shared test/COS end-to-end upload, deployed API or cross-tenant live requests; no deployment/restart authorized or performed. Existing production-material auto-collection maps deliverables to a video-only field and may reject mixed image/document review attachments when collection is selected; preserved that separate contract, documented limitation instead of changing administrator templates or dropping files. Normal review without collection is unaffected.
+
+## Registration — test-order-reviewer-dept-scope — 2026-09-21
+
+- Owner: Codex /root; environment: test; branch/worktree: main / /opt/zsjos; HEAD/base: 050f43dd0dcc996ce468efafa4715870264dafd6.
+- Goal: Fix order approval reviewers resolving empty for SELF-scoped sales when reviewers live in child departments. Preserve the existing uncommitted collection-overload annotation.
+- Ownership: backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/api/dept/DeptApiImpl.java; corresponding api/dept/DeptApiImplTest.java; docs/architecture/data-and-permission-flow.md (order approval section); handoff/test_main.md append only.
+- Non-goals: Permission grants, tenant bypass, database changes, frontend changes, other workstreams, deployment/restart without explicit authorization. Target integration/order/dependencies: None; existing Spring/JUnit/Mockito facilities only.
+- Verification: Actual Spring advisor regression on both overloads, context restoration on success/failure and tenant-context preservation; compile focused source/tests against current runtime dependencies; related order reviewer tests. Root-owned Maven target must not be overwritten.
+
+## Delivery Entry — 2026-09-21 12:07 +08:00 — test-order-reviewer-dept-scope
+
+- Owner/environment/branch/worktree/HEAD: Codex /root / test / main / /opt/zsjos / 050f43dd0dcc996ce468efafa4715870264dafd6 unchanged.
+- User goal: Fix sales order submission incorrectly reporting missing registration/finance approvers.
+- Result: DeptApiImpl explicitly overrides and annotates getChildDeptList(Long) with DataPermission(enable=false). Interface default-method self-invocation previously bypassed the annotated collection overload, leaving child-department lookup under sales SELF scope; both configured centers have their users in child departments. Existing uncommitted collection-overload annotation preserved. Tenant/logical-delete behavior and sales business permission scope unchanged.
+- Files: DeptApiImpl.java; DeptApiImplTest.java (actual Spring ProxyFactory/advisor regression); docs/architecture/data-and-permission-flow.md; handoff/test_main.md append only.
+- Verification: Focused javac compilation against current deployed dependency jars and installed JUnit/Mockito succeeded. JUnit Platform ran 7 tests (2 department API + 5 existing order permission tests), all passed. New regression executed against unmodified deployed DeptApiImpl fails expected child [1031] vs empty, and passes with patched class. Covers both overloads, caller context restoration after success/exception and unchanged tenant context; related tests cover disabled reviewer exclusion and order scope denial. Logs/executor: /tmp/zsjos-order-scope-tests.log, /tmp/zsjos-order-scope-diagnosis/run-tests.py, regression-before.log. Scoped diff check passed. During test refinement explicit Collection<Long> matcher type resolved Java overload ambiguity; final source compiled and passed.
+- Build scope: No full Maven reactor/package/startup performed; existing target is root-owned. Focused source and test compilation used /tmp outputs without modifying dependencies or permissions. No frontend changes or public API contract changes; shared internal department API behavior tested at its actual proxy boundary.
+- Integration/remaining: Not deployed; current test service still uses old class. Backend publication and restart of testos test service require explicit authorization under root AGENTS.md section 4. Deployment must use the repository's normal packaging/release flow and verify a sales submission afterward; actual order creation was not performed as a diagnostic test. No database, grants, branch, commit, push, service or deployment operations performed.

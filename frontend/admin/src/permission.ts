@@ -1,3 +1,4 @@
+import { isMobileWorkbench, returnToMobileWorkbench } from '@/utils/workbenchAuth'
 import router from './router'
 import type { RouteRecordRaw } from 'vue-router'
 import { isRelogin } from '@/config/axios/service'
@@ -67,6 +68,10 @@ router.beforeEach(async (to, from) => {
         return { ...parseRouteLocation(redirect), replace: true }
       }
     } else {
+      if (isMobileWorkbench) {
+        returnToMobileWorkbench()
+        return false
+      }
       if (
         whiteList.includes(to.path) ||
         whiteListPrefixes.some((path) => to.path === path || to.path.startsWith(`${path}/`))

@@ -1,11 +1,12 @@
+import { prepareContentReviewWorks } from '../services/contentReviewAttachments'
 import AccountPositioningHistory from '../components/AccountPositioningHistory'
 import StudentOverviewBackground from '../components/StudentOverviewBackground'
 import PositioningDialog from '../components/PositioningDialog'
 import StudentPartnerBindingDialog from '../components/StudentPartnerBindingDialog'
 import PositioningSnapshot from '../components/PositioningSnapshot'
-import { LeftOutlined, RightOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined, ExclamationCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
+import { MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined, ExclamationCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
   SendOutlined, UploadOutlined, UserSwitchOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Cascader, Checkbox, DatePicker, Empty, Form, Input, InputNumber, Modal, Pagination, Radio, Select, Skeleton, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
+import { Alert, App, Button, Cascader, Checkbox, DatePicker, Empty, Form, Image, Input, InputNumber, Modal, Radio, Select, Skeleton, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
 import type { InputRef } from 'antd'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
@@ -19,6 +20,8 @@ import ServicePositioningCard from '../components/ServicePositioningCard'
 import AccountMaintenancePanel from '../components/AccountMaintenancePanel'
 import ProductionTicketPositioningCard from '../components/ProductionTicketPositioningCard'
 import WorkOrderAttachmentPicker from '../components/WorkOrderAttachmentPicker'
+import ResourceLink from '../components/ResourceLink'
+import ResourceLinkInput from '../components/ResourceLinkInput'
 import { ApiError, api, type AreaNode, type DictData, type DirectorTemplateSnapshot, type MediaStudentDetail, type MyStudent, type PositioningCard, type PositioningCardImportSource, type ProductionTicketCreateContext, type StudentContactContext, type StudyPlanner } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { hasPermission } from '../services/managementAccess'
@@ -33,6 +36,7 @@ import PositioningCardMaterialPicker from '../components/PositioningCardMaterial
 import PositioningCardAttachments from '../components/PositioningCardAttachments'
 import PositioningCardFields from '../components/PositioningCardFields'
 import PositioningInterviewDialog from '../components/PositioningInterviewDialog'
+import { accountProfileApi, type AccountProfile } from '../services/mediaAccountProfile'
 import { StudentPlannerOperations } from './RegistrationPages'
 import { positioningInterviewApi, type InterviewContext } from '../services/positioningInterviewApi'
 import { PositioningManualSave, isPendingPositioningFile } from '../services/positioningManualSave'
@@ -179,6 +183,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     try { return localStorage.getItem(LIST_COLLAPSED_KEY) === 'true' } catch { return false }
   })
   const listScrollRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const listBusy = useRef(false)
+  const listSelectionNavigation = useRef(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [moreError, setMoreError] = useState('')
   const searchRef = useRef<InputRef>(null)
   const focusSearch = useRef(false)
   const listPositions = useRef({ expanded: { top: 0, left: 0 }, collapsed: { top: 0, left: 0 } })
@@ -200,7 +209,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const updateMissing = useCallback((id: number, count: number) => setAccountMissing(current => current[id] === count ? current : { ...current, [id]: count }), [])
   const [maintenanceEditorAccountId, setMaintenanceEditorAccountId] = useState<number>()
   const [selectedId, setSelectedId] = useState<number>()
-  const [keyword, setKeyword] = useState(''), [search, setSearch] = useState(''), [pageNo, setPageNo] = useState(1), [total, setTotal] = useState(0)
+  const [keyword, setKeyword] = useState(''), [search, setSearch] = useState(''), [pageNo, setPageNo] = useState(1)
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
@@ -226,7 +235,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [positioningJsonError, setPositioningJsonError] = useState('')
   const [positioningJsonSaving, setPositioningJsonSaving] = useState(false)
   const [positioningDetail, setPositioningDetail] = useState<PositioningCard>()
-  const [ticketContext, setTicketContext] = useState<ProductionTicketCreateContext>(), [ticketContextLoading, setTicketContextLoading] = useState(false), [ticketContextError, setTicketContextError] = useState(''), [ticketOpen, setTicketOpen] = useState(false), [ticketSaving, setTicketSaving] = useState(false), [ticketTemplates, setTicketTemplates] = useState<WorkOrderTemplate[]>([]), [ticketDepartments, setTicketDepartments] = useState<WorkOrderDepartment[]>([]), [ticketTargetDepartments, setTicketTargetDepartments] = useState<WorkOrderDepartment[]>([]), [ticketUsers, setTicketUsers] = useState<Array<{ id: number; nickname: string }>>([]), [ticketDictionaries, setTicketDictionaries] = useState<Array<{ dictType: string; value: string; label: string }>>([]), [ticketFiles, setTicketFiles] = useState<WorkOrderFile[]>([]), [ticketAccountId, setTicketAccountId] = useState<number>()
+  const [ticketContext, setTicketContext] = useState<ProductionTicketCreateContext>(), [ticketContextLoading, setTicketContextLoading] = useState(false), [ticketContextError, setTicketContextError] = useState(''), [ticketOpen, setTicketOpen] = useState(false), [ticketSaving, setTicketSaving] = useState(false), [ticketTemplates, setTicketTemplates] = useState<WorkOrderTemplate[]>([]), [ticketDepartments, setTicketDepartments] = useState<WorkOrderDepartment[]>([]), [ticketTargetDepartments, setTicketTargetDepartments] = useState<WorkOrderDepartment[]>([]), [ticketUsers, setTicketUsers] = useState<Array<{ id: number; nickname: string }>>([]), [ticketDictionaries, setTicketDictionaries] = useState<Array<{ dictType: string; value: string; label: string }>>([]), [ticketFiles, setTicketFiles] = useState<WorkOrderFile[]>([]), [ticketAccountId, setTicketAccountId] = useState<number>(), [ticketAccountIds, setTicketAccountIds] = useState<number[]>([]), [ticketProfiles, setTicketProfiles] = useState<Record<number, AccountProfile>>({})
   const [shareLink, setShareLink] = useState<string>()
   const [studentInvitation, setStudentInvitation] = useState<PartnerStudentInvitation>()
   const [bindingStudent, setBindingStudent] = useState<{ id: number; name: string }>()
@@ -316,27 +325,65 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     catch (cause) { if (run === detailRun.current) { setDetail(undefined); setDetailError(cause instanceof ApiError && cause.code === 403 ? '无权查看该学员' : errorText(cause)) } }
     finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [params])
-  const loadPage = useCallback(async (targetPage: number, preferred?: number) => {
-    const run = ++listRun.current; setLoading(true); setError('')
-    try { const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined }); if (run !== listRun.current) return
-      setRows(result.list); setTotal(result.total); setPageNo(targetPage); const target = preferred || Number(params.get('personId')) || result.list[0]?.personId
-      if (target) await loadDetail(target, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined); else setDetail(undefined)
-    } catch (cause) { if (run === listRun.current) { setRows([]); setDetail(undefined); setError(errorText(cause)) } } finally { if (run === listRun.current) setLoading(false) }
+  const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false) => {
+    if (append && listBusy.current) return
+    listBusy.current = true
+    const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
+    try {
+      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined })
+      if (run !== listRun.current) return
+      setRows(current => append ? [...current, ...result.list.filter(row => !current.some(existing => existing.personId === row.personId))] : result.list)
+      setPageNo(targetPage); setHasMore(result.list.length > 0 && targetPage * PAGE_SIZE < result.total)
+      // Appending students must not reload the selected detail or discard its editor state.
+      if (!append) {
+        listScrollRef.current?.scrollTo({ top: 0, left: 0 })
+        const target = preferred || Number(params.get('personId')) || result.list[0]?.personId
+        if (target) await loadDetail(target, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
+        else { setDetail(undefined); setSelectedId(undefined) }
+      }
+    } catch (cause) {
+      if (run === listRun.current) {
+        if (append) setMoreError(errorText(cause))
+        else { setRows([]); setDetail(undefined); setError(errorText(cause)) }
+      }
+    } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
   }, [keyword, loadDetail, params])
   useEffect(() => { void loadPage(1) }, [keyword])
   useEffect(() => {
-    if (location.key !== initialLocationKey.current) void loadPage(1, Number(params.get('personId')) || undefined)
-  }, [location.key, loadPage, params])
+    if (location.key === initialLocationKey.current) return
+    initialLocationKey.current = location.key
+    if (listSelectionNavigation.current) { listSelectionNavigation.current = false; return }
+    const linkedId = Number(params.get('personId')) || undefined
+    if (linkedId) void loadDetail(linkedId, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
+  }, [location.key, params, selectedId, loadDetail])
+  useEffect(() => {
+    if (loading || error || moreError || !rows.length || !hasMore) return
+    const target = loadMoreRef.current
+    if (!target) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadPage(pageNo + 1, undefined, true)
+    }, { root: listScrollRef.current, rootMargin: '160px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [loading, error, moreError, rows.length, hasMore, pageNo, loadPage, listCollapsed])
   useEffect(() => () => autoSaveCoordinator.current?.dispose(), [])
 
   const loadTicketContext = async (accountId: number, sceneCode: string) => { setTicketContext(undefined); setTicketContextError(''); setTicketContextLoading(true); try { const [context, targetDepartments] = await Promise.all([api.productionTicket.createContext(accountId, sceneCode), workOrderApi.candidateDepartments(sceneCode)]); setTicketContext(context); setTicketTargetDepartments(targetDepartments.list.map(dept => ({ id: dept.id, name: dept.name }))); const assignmentType = context.allowedAssignmentTypes.includes('PERSON') ? 'PERSON' : 'DEPARTMENT'; ticketForm.setFieldsValue({ sceneCode, assignmentType, assigneeUserId: undefined, targetDeptId: undefined }) } catch (cause) { setTicketContextError(errorText(cause)) } finally { setTicketContextLoading(false) } }
-  const openTicket = async (accountId: number) => {
-    setTicketOpen(true); setTicketAccountId(accountId); setTicketContext(undefined); setTicketContextError(''); setTicketContextLoading(true); setTicketFiles([]); ticketForm.resetFields()
-    try { const [catalog, departments, users, dictionaries] = await Promise.all([workOrderApi.templates(), workOrderApi.departments(), workOrderApi.users(), workOrderApi.dictionaries()]); const templates = (catalog.list || []).filter(item => item.processorType === 'PRODUCTION_TICKET'); setTicketTemplates(templates); setTicketDepartments(departments); setTicketUsers(users); setTicketDictionaries(dictionaries); if (!templates.length) setTicketContextError('当前没有已发布且你可发起的拍剪工单模板'); else await loadTicketContext(accountId, templates[0].code) } catch (cause) { setTicketContextError(errorText(cause)); setTicketContextLoading(false) }
+  const openTicket = async (sceneCode: 'media_design_edit' | 'filming_field_work') => {
+    setTicketOpen(true); setTicketAccountId(undefined); setTicketAccountIds([]); setTicketProfiles({}); setTicketContext(undefined); setTicketContextError(''); setTicketContextLoading(true); setTicketFiles([]); ticketForm.resetFields()
+    try { const [catalog, departments, users, dictionaries] = await Promise.all([workOrderApi.templates(), workOrderApi.departments(), workOrderApi.users(), workOrderApi.dictionaries()]); const templates = (catalog.list || []).filter(item => item.code === sceneCode && item.processorType === 'PRODUCTION_TICKET'); setTicketTemplates(templates); setTicketDepartments(departments); setTicketUsers(users); setTicketDictionaries(dictionaries); if (!templates.length) setTicketContextError('当前没有已发布且你可发起的该类型工单模板'); else ticketForm.setFieldsValue({ sceneCode, accountIds: [] }) } catch (cause) { setTicketContextError(errorText(cause)) } finally { setTicketContextLoading(false) }
+  }
+  const selectTicketAccounts = async (accountIds: number[]) => {
+    setTicketAccountIds(accountIds); setTicketAccountId(accountIds[0]); setTicketContext(undefined); setTicketContextError('')
+    if (!accountIds.length || !ticketTemplates[0]) return
+    setTicketContextLoading(true)
+    try { const profiles = await Promise.all(accountIds.map(async id => [id, await accountProfileApi.get(id)] as const)); setTicketProfiles(Object.fromEntries(profiles)); await loadTicketContext(accountIds[0], ticketTemplates[0].code) }
+    catch (cause) { setTicketContextError(errorText(cause)); setTicketContextLoading(false) }
   }
   const createTicket = async () => {
-    if (!ticketContext?.canCreate) return
-    try { const values = await ticketForm.validateFields(); const dynamicValues = Object.fromEntries((ticketContext.fields || []).map(field => { const value = values[field.key]; return [field.key, dayjs.isDayjs(value) ? (field.type === 'date' ? value.format('YYYY-MM-DD') : value.format('YYYY-MM-DDTHH:mm:ss')) : value] })); setTicketSaving(true); await api.productionTicket.create({ sceneCode: String(values.sceneCode), accountId: ticketContext.accountId, assigneeUserId: values.assignmentType === 'PERSON' ? Number(values.assigneeUserId) : undefined, targetDeptId: values.assignmentType === 'DEPARTMENT' ? Number(values.targetDeptId) : undefined, operatorRemark: String(values.operatorRemark || ''), values: dynamicValues, attachmentIds: ticketFiles.map(file => file.id) }); message.success(values.assignmentType === 'PERSON' ? '工单已派发，等待剪拍专员接单' : '工单已进入指定部门候选池'); setTicketOpen(false); setTicketFiles([]); if (detail) await loadDetail(detail.student.personId, selectedServiceId, ticketContext.accountId) } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) } finally { setTicketSaving(false) }
+    const context = ticketContext
+    if (!context || !ticketAccountIds.length || !detail) return
+    try { const values = await ticketForm.validateFields(); const dynamicValues = Object.fromEntries((context.fields || []).filter(field => field.key !== 'account_link').map(field => { const value = values[field.key]; return [field.key, dayjs.isDayjs(value) ? (field.type === 'date' ? value.format('YYYY-MM-DD') : value.format('YYYY-MM-DDTHH:mm:ss')) : value] })); setTicketSaving(true); await api.productionTicket.create({ sceneCode: String(values.sceneCode), accountId: ticketAccountIds[0], accountIds: ticketAccountIds, studentPersonId: detail.student.personId, assigneeUserId: values.assignmentType === 'PERSON' ? Number(values.assigneeUserId) : undefined, targetDeptId: values.assignmentType === 'DEPARTMENT' ? Number(values.targetDeptId) : undefined, operatorRemark: String(values.operatorRemark || ''), values: dynamicValues, attachmentIds: ticketFiles.map(file => file.id) }); message.success('工单已发起'); setTicketOpen(false); setTicketFiles([]); await loadDetail(detail.student.personId, selectedServiceId, ticketAccountIds[0]) } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) } finally { setTicketSaving(false) }
   }
   const selectedService = detail?.student.services.find(item => item.serviceRelationId === selectedServiceId) || detail?.student.services[0]
   const resetAutoSave = () => {
@@ -390,7 +437,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         const existingCard = positioningDraftId ? await api.positioningCard.get(positioningDraftId) : overview.current
         if (existingCard && (existingCard.serviceRelationId !== selectedService.serviceRelationId || existingCard.status !== 'co_creating' || existingCard.id !== overview.masterCardId)) throw new Error('当前定位卡不可填写，请刷新定位卡区后重试')
         setPositioningCanSubmit(overview.canSubmit)
-        const latestTemplate = await api.positioningCard.publishedTemplate(existingCard?.templateId)
+        const latestTemplate = await api.positioningCard.publishedTemplate()
         const template = existingCard ? mergePositioningDraftTemplate(latestTemplate, existingCard) : latestTemplate
         if (!autoSaveCoordinator.current!.isCurrent(session)) return
         if (existingCard) positioningDraft.current = { id: existingCard.id, version: existingCard.version }
@@ -581,6 +628,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     autoSaveCoordinator.current!.schedule(draftSaveTask())
   }
   const closeDialog = async () => {
+    if (dialog === 'content' && saving) return
     if (dialog === 'positioning') {
       if (positioningLock.current || !await confirmDiscardPositioning()) return
       setPositioningJsonOpen(false); setPositioningImportOpen(false); setDialog(undefined); return
@@ -612,17 +660,18 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         return
     } catch (cause) { message.error(errorText(cause)) } finally { setSaving(false) }
   }
-  const submit = async (submitContent = contentSubmitAfterSave) => { if (!detail || !dialog) return
+  const submit = async (submitContent = contentSubmitAfterSave) => { if (!detail || !dialog || saving) return
     try {
       if (dialog === 'positioning') { await savePositioning(true); return }
       const values = await form.validateFields(); setSaving(true)
       if (dialog === 'content') {
-        const works = Array.isArray(values.works) ? (values.works as Array<Record<string, unknown>>).map(work => ({
+        const preparedWorks = await prepareContentReviewWorks(Array.isArray(values.works) ? values.works : [], (index, field, items) => form.setFieldValue(['works', index, field], items))
+        const works = preparedWorks.map(work => ({
           ...work,
           plannedPublishAt: work.plannedPublishAt ? dayjs(work.plannedPublishAt as never).format('YYYY-MM-DDTHH:mm:ss') : undefined,
           purposeLabelSnapshot: contentPurposes.find(item => item.value === work.purposeValue)?.label || '',
           formatLabelSnapshot: contentFormats.find(item => item.value === work.formatValue)?.label || '',
-        })) : []
+        }))
         const batchId = await contentReviewApi.createFromStudent({
           studentPersonId: detail.student.personId,
           accountIds: Array.isArray(values.accountIds) ? (values.accountIds as unknown[]).map(Number).filter(Number.isFinite) : [],
@@ -751,6 +800,10 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   // 内容审批由运营发起；编导只负责后续逐条审核。
   const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:submit') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => void open('content') }] : []
   const overviewAccountActions: ToolbarAction[] = [
+    ...(hasPermission(permissions, 'zsjos:production-ticket:create') ? [
+      { key: 'CREATE_MEDIA_DESIGN_EDIT_TICKET', icon: <EditOutlined />, label: '发起剪辑设计工单', onClick: () => void openTicket('media_design_edit'), disabled: saving },
+      { key: 'CREATE_FILMING_FIELD_WORK_TICKET', icon: <PlayCircleOutlined />, label: '发起拍摄外勤工单', onClick: () => void openTicket('filming_field_work'), disabled: saving },
+    ] : []),
     ...(hasPermission(permissions, 'zsjos:partner:manage-all') && detail && !invitationContext?.opened ? [{
       key: 'BIND_EXISTING_STUDENT_PARTNER', icon: <LinkOutlined />, label: '绑定已有兼职账号',
       onClick: () => setBindingStudent({ id: detail.student.personId, name: detail.student.name || '未填写姓名' }), disabled: saving,
@@ -870,7 +923,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   </StudentPlannerOperations> : <Empty description="当前学员暂无可用服务关系" />
 
   return <section className="workspace-page media-students-page">
-    <header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button aria-label="刷新学员" icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)} /></Tooltip></header>
+    <header className="media-students-filter-shell"><Typography.Title level={4}>我的学员</Typography.Title><Tooltip title="刷新"><Button aria-label="刷新学员" icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
     <div className={`media-students-inbox-layout${listCollapsed ? ' is-list-collapsed' : ''}`}>
       <aside className="media-students-list-pane" aria-label="学员列表">
         <div className="media-students-toolbar">
@@ -879,20 +932,19 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           {listCollapsed && <Tooltip title={keyword ? '搜索学员（已筛选）' : '搜索学员'}><Button size="small" aria-label="搜索学员" type={keyword ? 'primary' : 'text'} icon={<SearchOutlined />} onClick={() => changeListCollapsed(false, true)} /></Tooltip>}
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
-        {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(pageNo, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
+        {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
         <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
           {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <Tooltip key={x.personId} title={listCollapsed ? `${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}>
-            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}>
+            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`lead-inbox-item media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { listSelectionNavigation.current = true; setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}>
               <NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" />
-              <span className="media-students-item-copy"><strong>{x.name || '未填写姓名'}</strong><span>{x.personNo || '暂无学员编号'}</span><span>{x.mobile || '无手机号'} · {x.services.length} 项服务</span></span>
+              <span className="media-students-item-copy"><span className="media-students-item-heading"><strong title={x.name}>{x.name || '未填写姓名'}</strong><span title={x.personNo}>{x.personNo || '暂无学员编号'}</span></span><span title={x.mobile}>手机：{x.mobile || '未填写'}</span><span title={x.wechatId}>微信：{x.wechatId || '未填写'}</span></span>
             </button>
           </Tooltip>) : !error && (listCollapsed ? <Tooltip title="暂无可见学员"><span className="media-students-rail-empty" role="status">暂无<br />学员</span></Tooltip> : <Empty description="暂无可见学员" />)}
+          <div ref={loadMoreRef} className="media-students-load-more" role="status">
+            {moreError ? <><span>{!listCollapsed && moreError}</span><Button size="small" aria-label="重试加载更多学员" onClick={() => void loadPage(pageNo + 1, undefined, true)}>重试</Button></>
+              : loading && rows.length > 0 ? '加载中…' : rows.length > 0 && !hasMore ? (listCollapsed ? '到底了' : '已全部加载') : null}
+          </div>
         </div>
-        {total > PAGE_SIZE && (listCollapsed ? <nav className="media-students-rail-pagination" aria-label="学员分页">
-          <Tooltip title="上一页"><Button aria-label="上一页学员" icon={<LeftOutlined />} disabled={loading || pageNo <= 1} onClick={() => void loadPage(pageNo - 1)} /></Tooltip>
-          <span aria-label={`第 ${pageNo} 页，共 ${Math.ceil(total / PAGE_SIZE)} 页`}>{pageNo}/{Math.ceil(total / PAGE_SIZE)}</span>
-          <Tooltip title="下一页"><Button aria-label="下一页学员" icon={<RightOutlined />} disabled={loading || pageNo >= Math.ceil(total / PAGE_SIZE)} onClick={() => void loadPage(pageNo + 1)} /></Tooltip>
-        </nav> : <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} disabled={loading} onChange={value => void loadPage(value)} />)}
       </aside>
       <main className="media-students-detail-pane">{body}</main>
     </div>
@@ -903,7 +955,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         {dialog === 'positioning' && !positioningCanSubmit && <Alert type="info" message="提交前请指派课程服务责任运营，并确认你拥有提交审核权限" />}
         {dialog === 'positioning' && <Space orientation="vertical" style={{ width: '100%' }}><Typography.Text type="secondary">{saving ? '正在保存草稿…' : positioningDirty ? '有未保存的修改' : '修改后请点击保存草稿'}</Typography.Text>{positioningSaveError && <Alert type="error" showIcon message={positioningSaveError} action={positioningConflict ? <Space><Button onClick={() => void copyPositioningValues()}>复制当前内容</Button><Button onClick={() => void reloadPositioning()}>重新加载</Button></Space> : undefined} />}</Space>}
         {dialog === 'account' && <Alert type="info" showIcon message="创建空白账号" description="账号归属当前学员，业务资料全部留空。创建后自动打开账号表，由编导与运营分别补充负责字段。" />}
-        {dialog === 'content' && <ContentApprovalDraft accounts={detail?.accounts || []} purposeOptions={contentPurposes.map(x => ({ value: x.value, label: x.label }))} formatOptions={contentFormats.map(x => ({ value: x.value, label: x.label }))} />}
+        {dialog === 'content' && <ContentApprovalDraft disabled={saving} accounts={detail?.accounts || []} purposeOptions={contentPurposes.map(x => ({ value: x.value, label: x.label }))} formatOptions={contentFormats.map(x => ({ value: x.value, label: x.label }))} />}
         {dialog === 'positioning' && <><div className="media-students-positioning-toolbar"><Space wrap><Button icon={<UploadOutlined />} disabled={positioningBusy} onClick={() => { setPositioningJsonText(''); setPositioningJsonFileName(''); setPositioningJsonPreview(undefined); setPositioningJsonError(''); setPositioningJsonOpen(true) }}>导入 JSON</Button>{hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />} title={!positioningDraft.current?.id ? '请先保存草稿，再导入历史版本' : undefined} disabled={positioningBusy || !positioningDraft.current?.id} onClick={() => { setPositioningImportOpen(true); if (!positioningImportSources.length && !positioningImportLoading) void loadPositioningImportSources() }}>导入现有定位卡</Button>}</Space></div><PositioningCardFields fields={positioningTemplate?.fields || []} render={directorField} /></>}
         {dialog === 'precheck' && <><Alert type="info" showIcon message="核对学员、订单和服务归属后，预约定位访谈。"/><Form.Item name="confirmed" valuePropName="checked" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请确认资料无误'))}]}><Checkbox>已确认资料无误</Checkbox></Form.Item><Form.Item name="interviewAt" label="定位访谈预约时间（北京时间）" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false?Promise.resolve():!v?Promise.reject(new Error('请选择定位访谈预约时间')):dayjs(v).isAfter(dayjs())?Promise.resolve():Promise.reject(new Error('定位访谈预约时间必须晚于当前北京时间'))}]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>确认完成资料预审</Checkbox></Form.Item></>}
         {dialog === 'operator' && <><Form.Item name="userId" label="运营负责人" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={operatorCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>{directorContext?.operatorAssignmentConflict && <Form.Item name="correctionReason" label="统一归属说明" rules={[{ required: true, max: 500 }]}><Input.TextArea rows={3} /></Form.Item>}</>}
@@ -933,8 +985,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         </div>}
       </div>
     </PositioningDialog>
-    <Modal width="min(1040px, calc(100vw - 32px))" title="发起拍剪工单" open={ticketOpen} onCancel={() => setTicketOpen(false)} onOk={() => void createTicket()} okText="确认发起" okButtonProps={{ disabled: !ticketContext?.canCreate || Boolean(ticketContextError) }} confirmLoading={ticketSaving}>
-      {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} action={<Button size="small" onClick={() => ticketAccountId && void openTicket(ticketAccountId)}>重试</Button>} /> : ticketContext ? <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" label="工单模板" rules={[{ required: true }]}><Select options={ticketTemplates.map(item => ({ value: item.code, label: item.name }))} onChange={code => ticketAccountId && void loadTicketContext(ticketAccountId, code)} /></Form.Item><DetailFieldGrid columns={2} items={[{ key: 'student', label: '学员姓名', value: ticketContext.studentName || '未记录' }, { key: 'account', label: '第三方账号', value: `${ticketContext.platformLabel || '平台未记录'} · ${ticketContext.accountName || ticketContext.accountNo || '账号未记录'}` }, ...(ticketContext.accountFields || []).map(field => ({ key: field.key, label: field.label, value: field.displayValue || String(field.value ?? '未记录') }))]} />{ticketContext.canCreate ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true, message: '请选择接收部门' }]}><Select showSearch optionFilterProp="label" options={ticketTargetDepartments.map(dept => ({ value: dept.id, label: dept.name }))} /></Form.Item> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true, message: '请选择剪拍专员' }]}><Select showSearch optionFilterProp="label" options={ticketContext.assigneeCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : undefined}>{field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'user' ? <Select showSearch optionFilterProp="label" options={ticketUsers.map(item => ({ value: item.id, label: item.nickname }))} /> : field.type === 'department' ? <Select showSearch optionFilterProp="label" options={ticketDepartments.map(item => ({ value: item.id, label: item.name }))} /> : field.type === 'dictionary' ? <Select options={ticketDictionaries.filter(item => item.dictType === field.dictionaryType).map(item => ({ value: item.value, label: item.label }))} /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true, message: '请填写运营备注' }, { max: 500, message: '运营备注不能超过 500 字' }]}><Input.TextArea rows={4} maxLength={500} showCount placeholder="补充拍摄重点、剪辑要求或其他交接事项" /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="warning" showIcon message={ticketContext.unavailableReason || '当前账号不可发起拍剪工单'} />}</Form> : null}
+    <Modal width="min(1040px, calc(100vw - 32px))" title={`发起${ticketTemplates[0]?.name || '拍剪工单'}`} open={ticketOpen} onCancel={() => setTicketOpen(false)} onOk={() => void createTicket()} okText="确认发起" okButtonProps={{ disabled: !ticketContext || Boolean(ticketContextError) || !ticketAccountIds.length }} confirmLoading={ticketSaving}>
+      {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} /> : <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" hidden><Input /></Form.Item><Form.Item name="accountIds" label="关联账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个该学员名下的账号' }]}><Select mode="multiple" showSearch optionFilterProp="label" options={(detail?.accounts || []).map(account => ({ value: account.id, label: `${account.nickname || account.accountNo} - ${account.platformLabel || '平台未记录'}` }))} onChange={ids => void selectTicketAccounts(ids.map(Number))} /></Form.Item>{ticketAccountIds.map(id => { const profile = ticketProfiles[id]; const account = detail?.accounts.find(item => item.id === id); const homepageUrl = profile?.values.homepage_url; return <DetailFieldGrid key={id} columns={2} items={[{ key: 'account', label: '账号', value: `${account?.nickname || account?.accountNo || '账号'} - ${account?.platformLabel || '平台未记录'}` }, { key: 'homepage', label: '账号主页链接', value: typeof homepageUrl === 'string' && homepageUrl ? <ResourceLink href={homepageUrl} /> : '未填写' }, { key: 'cover', label: '主页封面图', value: profile?.files.cover?.previewUrl ? <Image width={120} src={profile.files.cover.previewUrl} /> : '未上传' }]} /> })}{ticketContext ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true }]}><Select options={ticketTargetDepartments.map(item => ({ value: item.id, label: item.name }))} /></Form.Item> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true }]}><Select options={ticketContext.assigneeCandidates.map(item => ({ value: item.id, label: item.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).filter(field => field.key !== 'account_link').map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true }] : undefined}>{field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'url' ? <ResourceLinkInput /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="info" showIcon message="请选择账号后加载工单上下文。" />}</Form>}
     </Modal>
     <PositioningDialog title="定位卡内容" open={Boolean(positioningDetail)} footer={null} onCancel={() => setPositioningDetail(undefined)}>{positioningDetail && <PositioningSnapshot card={positioningDetail} />}</PositioningDialog>
     <Modal title="兼职账号邀请码" open={Boolean(studentInvitation)} onCancel={() => setStudentInvitation(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => void copyStudentInvitationCode()}>复制邀请码</Button>}>
@@ -953,10 +1005,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     <Modal title="学员确认链接" open={Boolean(shareLink)} onCancel={() => setShareLink(undefined)} footer={<Button type="primary" icon={<CopyOutlined />} onClick={() => shareLink && void navigator.clipboard.writeText(shareLink)}>复制链接</Button>}><Alert type="success" showIcon icon={<LinkOutlined />} message="链接已生成" description={shareLink} /></Modal>
   </section>
 }
-
-
-
-
 
 
 

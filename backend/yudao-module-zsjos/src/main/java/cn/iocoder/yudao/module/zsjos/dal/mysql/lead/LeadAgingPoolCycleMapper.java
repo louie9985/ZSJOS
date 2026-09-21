@@ -29,7 +29,7 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
     default PageResult<LeadAgingPoolCycleDO> selectPage(LeadAgingPoolPageReqVO reqVO, List<Long> scopedOwnerUserIds,
                                                         Long participantUserId,
                                                         List<String> configuredStatuses, boolean matchNone,
-                                                        List<Long> matchedLeadIds) {
+                                                        List<Long> matchedLeadIds, Long currentUserId) {
         LambdaQueryWrapperX<LeadAgingPoolCycleDO> query = new LambdaQueryWrapperX<>();
         if (participantUserId != null) {
             query.and(scope -> {
@@ -39,6 +39,12 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
                 scope.eq(LeadAgingPoolCycleDO::getOriginalOwnerUserId, participantUserId)
                         .or().eq(LeadAgingPoolCycleDO::getCollaboratorUserId, participantUserId);
             });
+        }
+        // Personal filters narrow the authorized scope, including for manage-all callers.
+        if (AGING_POOL_RELATION_OWNED.equals(reqVO.getRelationScope())) {
+            query.eq(LeadAgingPoolCycleDO::getOriginalOwnerUserId, currentUserId);
+        } else if (AGING_POOL_RELATION_FOLLOWING.equals(reqVO.getRelationScope())) {
+            query.eq(LeadAgingPoolCycleDO::getCollaboratorUserId, currentUserId);
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
             query.exists("SELECT 1 FROM zsjos_lead l WHERE l.id = zsjos_lead_aging_pool_cycle.lead_id " +

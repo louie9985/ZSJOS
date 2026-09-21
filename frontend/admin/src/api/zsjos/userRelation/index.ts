@@ -8,7 +8,9 @@ export interface UserRelationSceneVO {
   sourceLabel: string
   targetLabel: string
   sourceType?: 'system_user' | 'partner'
-  sourcePostCode: string
+  sourcePostCode?: string
+  sourcePostCodes?: string[]
+  targetPostCodes?: string[]
   targetPostCode?: string
   targetEligibilityType: 'post' | 'permission'
   targetPermissionCode?: string

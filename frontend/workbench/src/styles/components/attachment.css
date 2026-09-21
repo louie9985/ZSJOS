@@ -100,3 +100,80 @@
 .sales-order-course-picker .ant-cascader,.sales-order-course-picker .ant-select {
   width: 100%;
 }
+
+/* Shared positioning attachment picker: documents, images, audio and video in one control. */
+.positioning-attachment-picker {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.positioning-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
+  gap: var(--crm-sp-3);
+  min-width: 0;
+}
+
+.positioning-attachment-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-2);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-container);
+}
+
+.positioning-attachment-thumb {
+  display: grid;
+  width: 100%;
+  height: 88px;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-layout);
+  cursor: pointer;
+}
+
+.positioning-attachment-thumb:disabled {
+  cursor: default;
+}
+
+.positioning-attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.positioning-attachment-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  font-size: var(--crm-font-sm);
+}
+
+.positioning-attachment-meta span {
+  overflow-wrap: anywhere;
+}
+
+.positioning-attachment-meta small {
+  color: var(--crm-text-secondary);
+}
+
+.positioning-attachment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--crm-sp-1);
+}
+
+.positioning-attachment-preview {
+  width: 100%;
+  height: 65vh;
+  border: none;
+}

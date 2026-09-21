@@ -160,8 +160,6 @@ export const getLead = (id: number): Promise<LeadManagementVO> =>
 export const getVisibleUsers = (): Promise<VisibleUserVO[]> =>
   request.get({ url: '/zsjos/lead/visible-users' })
 
-export const judgeValid = (id: number, idempotencyKey: string) => request.post({ url: `/zsjos/lead/${id}/judge-valid`, data: { idempotencyKey } })
-export const judgeInvalid = (id: number, data: { reasonCode: string; description: string; idempotencyKey: string }) => request.post({ url: `/zsjos/lead/${id}/judge-invalid`, data })
 export const getTransferCandidates = (id: number): Promise<LeadTransferCandidateVO[]> => request.get({ url: `/zsjos/lead/${id}/transfer-candidates` })
 export const restoreLead = (id: number, data: { reason: string; idempotencyKey: string }) => request.post({ url: `/zsjos/lead/${id}/restore`, data })
 export const transferLead = (id: number, data: { salesUserId: number; reason: string; idempotencyKey: string }) => request.post({ url: `/zsjos/lead/${id}/transfer`, data })

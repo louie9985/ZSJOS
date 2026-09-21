@@ -31,8 +31,8 @@
       </el-row>
       <el-row :gutter="16">
         <el-col :span="12">
-          <el-form-item v-if="formData.sourceType !== 'partner'" label="来源岗位" prop="sourcePostCode">
-            <el-select v-model="formData.sourcePostCode" filterable placeholder="请选择来源岗位">
+          <el-form-item v-if="formData.sourceType !== 'partner'" label="来源岗位" prop="sourcePostCodes">
+            <el-select v-model="formData.sourcePostCodes" multiple filterable placeholder="请选择来源岗位">
               <el-option
                 v-for="post in postOptions"
                 :key="post.code"
@@ -49,8 +49,8 @@
           <el-form-item v-if="formData.sourceType !== 'partner'" label="目标资格" prop="targetEligibilityType">
             <el-segmented v-model="formData.targetEligibilityType" :options="[{ label: '岗位', value: 'post' }, { label: '功能权限', value: 'permission' }]" />
           </el-form-item>
-          <el-form-item v-if="formData.targetEligibilityType === 'post'" label="目标岗位" prop="targetPostCode">
-            <el-select v-model="formData.targetPostCode" filterable placeholder="请选择目标岗位">
+          <el-form-item v-if="formData.targetEligibilityType === 'post'" label="目标岗位" prop="targetPostCodes">
+            <el-select v-model="formData.targetPostCodes" multiple filterable placeholder="请选择目标岗位">
               <el-option
                 v-for="post in postOptions"
                 :key="post.code"
@@ -119,8 +119,8 @@ const formData = ref<UserRelationApi.UserRelationSceneVO>({
   sourceLabel: '',
   targetLabel: '',
   sourceType: 'system_user',
-  sourcePostCode: '',
-  targetPostCode: '',
+  sourcePostCodes: [],
+  targetPostCodes: [],
   targetEligibilityType: 'post',
   targetPermissionCode: '',
   status: 0,
@@ -138,8 +138,8 @@ const formRules = reactive({
   ],
   sourceLabel: [{ required: true, message: '来源称谓不能为空', trigger: 'blur' }],
   targetLabel: [{ required: true, message: '目标称谓不能为空', trigger: 'blur' }],
-  sourcePostCode: [{ validator: (_: unknown, value: string) => formData.value.sourceType === 'partner' || value ? Promise.resolve() : Promise.reject(new Error('请选择来源岗位')), trigger: 'change' }],
-  targetPostCode: [{ validator: (_: unknown, value: string) => formData.value.targetEligibilityType !== 'post' || value ? Promise.resolve() : Promise.reject(new Error('请选择目标岗位')), trigger: 'change' }],
+  sourcePostCodes: [{ validator: (_: unknown, value: string[]) => formData.value.sourceType === 'partner' || value?.length ? Promise.resolve() : Promise.reject(new Error('请选择来源岗位')), trigger: 'change' }],
+  targetPostCodes: [{ validator: (_: unknown, value: string[]) => formData.value.targetEligibilityType !== 'post' || value?.length ? Promise.resolve() : Promise.reject(new Error('请选择目标岗位')), trigger: 'change' }],
   targetPermissionCode: [{ validator: (_: unknown, value: string) => formData.value.targetEligibilityType !== 'permission' || value?.trim() ? Promise.resolve() : Promise.reject(new Error('请输入目标权限码')), trigger: 'blur' }],
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 })
@@ -151,14 +151,22 @@ const open = async (type: 'create' | 'update', id?: number) => {
   dialogTitle.value = type === 'create' ? '新增用户关系场景' : '修改用户关系场景'
   formType.value = type
   resetForm()
-  postOptions.value = await PostApi.getSimplePostList()
-  if (id) {
-    formLoading.value = true
-    try {
-      formData.value = await UserRelationApi.getScene(id)
-    } finally {
-      formLoading.value = false
+  formLoading.value = true
+  try {
+    postOptions.value = await PostApi.getSimplePostList()
+    if (id) {
+      const scene = await UserRelationApi.getScene(id)
+      formData.value = {
+        ...scene,
+        sourcePostCodes: scene.sourcePostCodes ?? (scene.sourcePostCode ? [scene.sourcePostCode] : []),
+        targetPostCodes: scene.targetPostCodes ?? (scene.targetPostCode ? [scene.targetPostCode] : [])
+      }
     }
+  } catch (error) {
+    dialogVisible.value = false
+    throw error
+  } finally {
+    formLoading.value = false
   }
 }
 defineExpose({ open })
@@ -194,8 +202,8 @@ const resetForm = () => {
     sourceLabel: '',
     targetLabel: '',
     sourceType: 'system_user',
-    sourcePostCode: '',
-    targetPostCode: '',
+    sourcePostCodes: [],
+    targetPostCodes: [],
     targetEligibilityType: 'post',
     targetPermissionCode: '',
     status: 0,

@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentVersionFileMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentVersionMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.file.BusinessFileDirectUploadService;
+import cn.iocoder.yudao.module.zsjos.service.file.ContentAttachmentTypes;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -146,7 +147,9 @@ public class ContentVersionService {
         req.setTitleSnapshot(changes.getTitleSnapshot() != null ? changes.getTitleSnapshot() : source.getTitleSnapshot());
         req.setTopicSnapshot(source.getTopicSnapshot());
         req.setCoverSnapshotJson(changes.getCoverSnapshotJson() != null ? changes.getCoverSnapshotJson() : source.getCoverSnapshotJson());
-        req.setDeliverableSnapshotJson(source.getDeliverableSnapshotJson());
+        // Omitted preserves history; an explicit empty array removes attachments only in the new version.
+        req.setDeliverableSnapshotJson(changes.getDeliverableSnapshotJson() != null
+                ? changes.getDeliverableSnapshotJson() : source.getDeliverableSnapshotJson());
         req.setDeliverableUrl(source.getDeliverableUrl());
         req.setScriptText(changes.getScriptText() != null ? changes.getScriptText() : source.getScriptText());
         req.setPurposeValue(changes.getPurposeValue() != null ? changes.getPurposeValue() : source.getPurposeValue());
@@ -250,7 +253,9 @@ public class ContentVersionService {
         if (json == null || json.isBlank()) return new BoundFiles(null, List.of());
         LinkedHashSet<Long> ids = new LinkedHashSet<>();
         try {
-            collectFileIds(JsonUtils.parseTree(json), ids);
+            var node = JsonUtils.parseTree(json);
+            if (node != null && node.isArray() && node.isEmpty()) return new BoundFiles(null, List.of());
+            collectFileIds(node, ids);
         } catch (RuntimeException error) {
             throw exception(CONTENT_VERSION_FILE_INVALID);
         }
@@ -297,7 +302,7 @@ public class ContentVersionService {
     private void validateFileMetadata(FileInfoRespDTO file, boolean imageOnly) {
         String contentType = Objects.toString(file.getType(), "").toLowerCase(Locale.ROOT);
         boolean acceptedType = imageOnly ? contentType.startsWith("image/")
-                : contentType.startsWith("image/") || contentType.startsWith("video/");
+                : ContentAttachmentTypes.accepts(contentType);
         if (file.getSize() == null || file.getSize() < 0 || file.getSize() > MAX_CONTENT_FILE_BYTES
                 || !acceptedType) {
             throw exception(CONTENT_VERSION_FILE_INVALID);

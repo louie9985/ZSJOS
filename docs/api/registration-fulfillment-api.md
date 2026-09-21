@@ -252,6 +252,11 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 模板字段的可选 `description`（最多 500 字）作为填写指导随版本保存；历史字典选项保留
 选择时的标签，发布新模板不会迁移已有草稿或重写历史记录。
 
+Admin 定位卡模板配置预览使用与 Workbench 填写界面对应的四列：定位卡项目、填写提示、
+计划交付内容确定、参考账号与爆款；按字段排序、启用状态及 `referenceFor` 展示，移动端折叠为纵向卡片。
+预览控件只读，不生成业务数据或虚构字典选项；关联目标停用或编辑中缺失时，参考字段仍显示以便修正。
+页面明确标注预览版本及草稿／只读状态，并显示新建业务卡使用的已发布版本；修改预览不等于发布模板。
+
 定位卡复用导入使用以下接口，并同时要求 `zsjos:positioning-card:create` 与
 `zsjos:positioning-card:query`：
 

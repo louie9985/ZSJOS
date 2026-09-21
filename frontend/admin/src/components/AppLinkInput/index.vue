@@ -1,12 +1,13 @@
 <template>
-  <el-input v-model="appLink" placeholder="输入或选择链接">
+  <ResourceLinkInput v-model="appLink" placeholder="输入或选择链接">
     <template #append>
       <el-button @click="handleOpenDialog">选择</el-button>
     </template>
-  </el-input>
+  </ResourceLinkInput>
   <AppLinkSelectDialog ref="dialogRef" @change="handleLinkSelected" />
 </template>
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { propTypes } from '@/utils/propTypes'
 
 // APP 链接输入框

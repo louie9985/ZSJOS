@@ -28,9 +28,8 @@
 ## 历史查询
 
 - `GET /zsjos/media-account/{id}/maintenance-history?pageNo=1&pageSize=20`：需要 `zsjos:media-account:query` 或 `zsjos:media-account:maintenance`，返回完整维护快照、`revisionNo`、`changedFields`、操作人和操作时间。
-- `GET /zsjos/media-account/{id}/legacy-stage-history?pageNo=1&pageSize=20`：需要 `zsjos:media-account:query` 或 `zsjos:media-account:maintenance`，只读返回原 S0-S6 阶段日志。
 
-两个接口都叠加账号对象读取权限。账号响应仅在功能权限和对象权限同时通过时返回 `VIEW_ACCOUNT_HISTORY`；Workbench 以该服务端能力决定是否加载和展示历史。维护版本不提供删除或恢复命令，原阶段日志不被改写。
+该接口叠加账号对象读取权限。账号响应仅在功能权限和对象权限同时通过时返回 `VIEW_ACCOUNT_HISTORY`；Workbench 以该服务端能力决定是否加载和展示历史。维护版本不提供删除或恢复命令。
 
 ## 账号日历
 
@@ -70,4 +69,4 @@
 
 ## 已移除的旧阶段流转
 
-`POST /zsjos/media-account/{id}/advance-stage` 和 `rollback-stage` 已从运行时 Controller 和 Service 移除，旧客户端请求按标准路由不存在处理（404）。阶段不再通过推进或回退命令改变，只能在上述状态维护接口中作为普通字典字段自由选择。原阶段日志仍通过 `legacy-stage-history` 只读保留。
+`POST /zsjos/media-account/{id}/advance-stage` 和 `rollback-stage` 已从运行时 Controller 和 Service 移除，旧客户端请求按标准路由不存在处理（404）。阶段不再通过推进或回退命令改变，只能在上述状态维护接口中作为普通字典字段自由选择。原有的 S0-S6 阶段日志查询接口 `legacy-stage-history` 已一并移除，阶段历史由 `maintenance-history` 承载。

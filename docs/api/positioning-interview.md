@@ -39,7 +39,10 @@ studentName/studentNo、interviewAt、completedAt、legacyInterviewSnapshotJson�
 CLIENT_REFUSED（客户拒绝回答），初始为空。客户端使用服务端状态标签。
 普通启用必填行必须选择状态；学员姓名／编号是只读系统值，采集时间是日期控件。
 “未沟通”及“客户拒绝回答”允许完成，完成必须有至少一份本次访谈稿；已沟通项共同引用本轮稿件。
-支持 pdf/doc/docx/txt/md/rtf，每份最多 20MB，最多 20 份引用。文件校验创建者、学生、租户及业务目录。
+支持文档（pdf/doc/docx/xls/xlsx/ppt/pptx/csv/txt/md/rtf）、图片（jpg/jpeg/png/webp/gif/bmp/heic/heif）、
+音频（mp3/wav/m4a/aac/flac/ogg/amr）与视频（mp4/mov/webm/mkv/avi），每份最多 20MB，最多 20 份引用。
+入库前同时校验扩展名白名单与 Tika 内容探测结果，伪装成受支持扩展名的内容按 004 拒绝；入库 MIME 取探测结果而非客户端声明。
+文件校验创建者、学生、租户及业务目录。
 完成保存字段与状态标签、模板定义、系统值及文件元数据快照；历史不读取当前字典补造标签。
 
 稳定错误：1900090001 表单校验；002 状态；003 版本冲突；004 文件归属；005 缺少稿件；006 幂等冲突。

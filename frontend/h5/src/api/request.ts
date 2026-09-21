@@ -7,6 +7,7 @@ import router from '@/router'
 declare module 'axios' {
   interface AxiosRequestConfig {
     _skipAuthRefresh?: boolean
+    _handledBusinessCodes?: number[]
   }
 }
 
@@ -126,7 +127,9 @@ request.interceptors.response.use(
     }
 
     // 业务错误
-    showToast({ message: msg || '操作失败', type: 'fail' })
+    if (!response.config._handledBusinessCodes?.includes(code)) {
+      showToast({ message: msg || '操作失败', type: 'fail' })
+    }
     return Promise.reject(new ApiBusinessError(code, msg || '业务错误'))
   },
   async (error) => {

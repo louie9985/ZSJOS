@@ -348,6 +348,7 @@ export const contentReviewApi = {
     accountSnapshots?: Record<string, Record<string, unknown>>
     works?: Array<{
       coverFileId?: number
+      deliverableSnapshotJson?: string
       purposeValue?: string
       purposeLabelSnapshot?: string
       formatValue?: string

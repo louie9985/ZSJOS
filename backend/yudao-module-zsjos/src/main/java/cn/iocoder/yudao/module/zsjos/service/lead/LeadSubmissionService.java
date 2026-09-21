@@ -7,6 +7,10 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAss
 import java.util.List;
 
 public interface LeadSubmissionService {
+    boolean checkContact(cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO request,
+                         Long userId);
+    boolean checkContact(cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO request,
+                         Long userId, LeadSubmissionIdentityService.Identity identity);
     LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId);
     LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId);
     LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId);

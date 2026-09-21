@@ -39,6 +39,13 @@ describe('lead submission stepped form', () => {
     expect(pageSource).toContain('onConfirm={submit}')
   })
 
+  it('offers first-step contact activation and blocks navigation after a match', () => {
+    expectSourceToContainTokens(pageSource, 'api.checkLeadContact')
+    expectSourceToContainTokens(pageSource, 'api.checkSelfSourcedLeadContact')
+    expectSourceToContainTokens(pageSource, "'客资已存在，已激活提醒'")
+    expectSourceToContainTokens(pageSource, 'currentContactResult?.matched')
+  })
+
   it('shows the selected customer region before the final submit confirmation opens', () => {
     expectSourceToContainTokens(pageSource, 'const path: string[] = summary?.regionPath || []')
     expectSourceNotToContainTokens(pageSource, 'const path: string[] = pendingValues?.regionPath || []')

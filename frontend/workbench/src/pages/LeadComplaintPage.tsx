@@ -1,6 +1,7 @@
+import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Avatar, Button, Drawer, Empty, Form, Image, Input, Modal, Pagination, Segmented, Space, Spin, Tag, Typography, message } from 'antd'
-import { ProTable } from '@ant-design/pro-components'
+
 import { CheckOutlined } from '@ant-design/icons'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { api, type LeadComplaint } from '../services/api'
@@ -110,7 +111,7 @@ export default function LeadComplaintPage() {
   ]
   return <section className={`workspace-page business-inbox-page lead-complaint-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar"><div className="business-inbox-scope-row"><Segmented value={status} onChange={value => { setStatus(value as typeof status); setPage(1); setDrawerOpen(false) }} options={[{ label: '待处理', value: 'pending' }, { label: '已处理', value: 'handled' }]}/></div></header>
-    {useTableLayout ? <div className="business-inbox-table-shell"><ProTable<LeadComplaint> rowKey="id" search={false} options={{ density: true, fullScreen: true, setting: true }} loading={loading} dataSource={items} pagination={{ current: page, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: setPage }} onRow={item => ({ onClick: () => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) } })} columns={tableColumns} /></div> : <div className="business-inbox-layout">
+    {useTableLayout ? <div className="business-inbox-table-shell"><BusinessTable<LeadComplaint> tableKey="lead-complaint-page-1" error={error} onReload={() => void load()} rowKey="id"   loading={loading} dataSource={items} pagination={{ current: page, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: setPage }} onRow={item => ({ onClick: () => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) } })} columns={tableColumns} /></div> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
         {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
         <div className="business-inbox-scroll">

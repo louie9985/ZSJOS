@@ -36,6 +36,28 @@ class NotifyBusinessEventProcessorTest {
     @Mock
     private NotifySceneProvider provider;
 
+    @Test void preparesTypedRenderedWecomSnapshot() {
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L).build();
+        var rule = NotifyRuleDO.builder().id(20L).templateId(30L).channelCode("wecom")
+                .recipientRoles(List.of()).specifiedUserIds(List.of(100L)).actionType("business_detail").build();
+        var template = NotifyTemplateDO.builder().id(30L).sceneCode("test.scene").channelCode("wecom")
+                .status(0).title("title").content("body").build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
+        when(provider.resolveRecipients(event, Set.of())).thenReturn(Set.of());
+        var vars = java.util.Map.<String,Object>of("snapshot", "historical");
+        when(provider.resolveVariables(event, NotifyRecipientDTO.admin(100L))).thenReturn(vars);
+        when(notifyTemplateService.formatNotifyTemplateContent("title", vars)).thenReturn("frozen title");
+        when(notifyTemplateService.formatNotifyTemplateContent("body", vars)).thenReturn("frozen body");
+        var prepared = processor.prepareWecom(event);
+        org.junit.jupiter.api.Assertions.assertNull(prepared.failure());
+        org.junit.jupiter.api.Assertions.assertEquals("frozen body", prepared.recipients().get(0).getContent());
+        org.junit.jupiter.api.Assertions.assertEquals(2, prepared.recipients().get(0).getUserType());
+        template.setStatus(1);
+        org.junit.jupiter.api.Assertions.assertEquals("NOTIFY_TEMPLATE_INVALID", processor.prepareWecom(event).failure().getErrorCode());
+    }
+
     @Test
     void processContinuesAfterOneRecipientFails() {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder()

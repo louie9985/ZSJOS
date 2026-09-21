@@ -15,6 +15,8 @@ import jakarta.validation.constraints.NotEmpty;
  */
 public interface BpmProcessTaskApi {
 
+    java.util.List<cn.iocoder.yudao.module.bpm.api.task.dto.BpmPendingTaskRespDTO> getPendingTasks(String processInstanceId);
+
     java.util.List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId,
                                                                          java.util.Set<String> taskDefinitionKeys);
 

@@ -232,14 +232,9 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.CONTENT_REVIEW
 ])
 
-export const PC_ONLY_NATIVE_ROUTES: ReadonlySet<string> = new Set([
-  APP_ROUTES.CONTENT_PRODUCTION,
-  APP_ROUTES.CONTENT_REVIEW
-])
-
-export const MOBILE_RENDERABLE_APP_ROUTES: ReadonlySet<string> = new Set(
-  [...RENDERABLE_APP_ROUTES].filter(path => !PC_ONLY_NATIVE_ROUTES.has(path))
-)
+// Mobile is a URL namespace, not a separate server-owned page/permission tree.
+export const MOBILE_ROUTE_BASE = '/zsjos/mobile'
+export const MOBILE_RENDERABLE_APP_ROUTES = RENDERABLE_APP_ROUTES
 
 // ========== Dictionaries ==========
 

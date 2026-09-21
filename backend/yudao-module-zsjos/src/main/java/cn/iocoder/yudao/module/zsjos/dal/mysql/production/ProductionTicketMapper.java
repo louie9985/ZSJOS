@@ -9,18 +9,21 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTi
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Mapper
 public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> {
     default List<ProductionTicketDO> selectByAccountIds(Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ProductionTicketDO>()
-                .in(ProductionTicketDO::getAccountId, accountIds)
+                .and(query -> accountIds.forEach(accountId -> query.eq(ProductionTicketDO::getAccountId, accountId)
+                        .or().apply("JSON_CONTAINS(account_ids_json, JSON_ARRAY({0}))", accountId)))
                 .orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId));
     }
     default List<ProductionTicketDO> selectRecentByAccountIds(Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
-        return selectList(new LambdaQueryWrapperX<ProductionTicketDO>().in(ProductionTicketDO::getAccountId, accountIds)
+        return selectList(new LambdaQueryWrapperX<ProductionTicketDO>().and(query -> accountIds.forEach(accountId -> query.eq(ProductionTicketDO::getAccountId, accountId)
+                        .or().apply("JSON_CONTAINS(account_ids_json, JSON_ARRAY({0}))", accountId)))
                 .orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId)
                 .last("LIMIT 100"));
     }

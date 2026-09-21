@@ -89,6 +89,12 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
     }
 
     @Override
+    public String getWecomAuthorizeUrl(String redirectUri, boolean inWecom) {
+        return inWecom ? socialClientApi.getWecomWebAuthorizeUrl(UserTypeEnum.PARTNER.getValue(), redirectUri)
+                : getWecomAuthorizeUrl(redirectUri);
+    }
+
+    @Override
     public PartnerLoginRespVO wecomLogin(PartnerWecomLoginReqVO reqVO, String loginIp) {
         SocialUserRespDTO socialUser = socialUserApi.getSocialUserByCode(UserTypeEnum.PARTNER.getValue(),
                 SocialTypeEnum.WECHAT_ENTERPRISE.getType(), reqVO.getCode(), reqVO.getState());

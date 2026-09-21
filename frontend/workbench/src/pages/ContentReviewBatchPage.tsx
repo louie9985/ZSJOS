@@ -1,3 +1,6 @@
+import ContentReviewAttachments from '../components/ContentReviewAttachments'
+import { prepareContentReviewWorks, restoreContentReviewFiles } from '../services/contentReviewAttachments'
+import ResourceLinkInput from '../components/ResourceLinkInput'
 import {
   ClockCircleOutlined,
   CloseCircleOutlined,
@@ -30,6 +33,7 @@ import {
   Typography
 } from 'antd'
 import dayjs from 'dayjs'
+import { useLocation } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
 import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
@@ -145,7 +149,7 @@ function ReviewFiles({ item }: { item: ContentReviewItem }) {
   const files = item.files?.filter(file => file.fieldKey !== 'cover') ?? []
   if (!files.length) return null
   return <div className="content-review-media">{files.map(file => {
-    const label = '成品'
+    const label = '审核附件'
     if (file.contentType.startsWith('image/') && file.previewUrl) {
       return <div className="content-review-media-item" key={file.id}>
         <Image width={128} height={84} src={file.previewUrl} alt={`${label}：${file.originalName}`} />
@@ -311,7 +315,7 @@ function DecisionEditor({ batch, item, stage, onSaved }: {
   </div>
 }
 
-function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentReviewBatch; open: boolean; onClose: () => void; onSaved: (id: number) => void }) {
+export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentReviewBatch; open: boolean; onClose: () => void; onSaved: (id: number) => void }) {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -320,7 +324,6 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
   const [platformOptions, setPlatformOptions] = useState<Array<{ value: string; label: string }>>([])
   const [stageOptions, setStageOptions] = useState<Array<{ value: string; label: string }>>([])
   const [statusOptions, setStatusOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [uploading, setUploading] = useState<number>()
   const [materialPickerIndex, setMaterialPickerIndex] = useState<number>()
   const [materialsByWork, setMaterialsByWork] = useState<Record<number, Material[]>>({})
   useEffect(() => {
@@ -337,8 +340,8 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
     if (!open) return
     const snapshots = Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []
     form.setFieldsValue({ accountSnapshots: Object.fromEntries(snapshots.map((snapshot: Record<string, unknown>) => [String(snapshot.id), snapshot])), works: batch.items.map(item => ({
-      sourceContentId: item.contentId,
-      sourceVersionId: item.contentVersionId,
+      sourceContentId: batch.status === 'DRAFT' ? undefined : item.contentId,
+      sourceVersionId: batch.status === 'DRAFT' ? undefined : item.contentVersionId,
       title: item.contentSnapshot.titleSnapshot || item.contentSnapshot.title,
       scriptText: item.contentSnapshot.scriptText,
       plannedPublishAt: item.contentSnapshot.plannedPublishAt ? dayjs(String(item.contentSnapshot.plannedPublishAt)) : undefined,
@@ -351,6 +354,8 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
       commentHook: item.contentSnapshot.commentHook,
       referenceContentVersionId: item.contentSnapshot.referenceContentVersionId,
       referenceWorkUrl: item.contentSnapshot.referenceWorkUrl,
+      coverItems: restoreContentReviewFiles(item.files, 'cover'),
+      attachmentItems: restoreContentReviewFiles(item.files, 'deliverable'),
       coverFileId: item.files?.find(file => file.fieldKey === 'cover')?.infraFileId
     })) })
     // 参考素材按快照回填，审批期间的素材改动不影响已提交内容。
@@ -367,22 +372,27 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
   }, [batch, form, open])
   const accountSnapshotRows = (Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
   const save = async () => {
+    if (loading) return
     try {
-      const values = await form.validateFields()
+      await form.validateFields()
+      // Preserve source version identifiers and untouched snapshots during revision.
+      const values = form.getFieldsValue(true)
       setLoading(true)
-      const id = await contentReviewApi.saveStudentDraft(batch.id, {
+      const works = await prepareContentReviewWorks(values.works, (index, field, items) => form.setFieldValue(['works', index, field], items))
+      const saveDraftRequest = batch.availableActions.includes('RESUBMIT') ? contentReviewApi.resubmitFromStudent : contentReviewApi.saveStudentDraft
+      const id = await saveDraftRequest(batch.id, {
         studentPersonId: batch.studentPersonId!,
         accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
         accountSnapshots: values.accountSnapshots,
-        works: values.works.map((work: Record<string, unknown>) => ({ ...work, plannedPublishAt: work.plannedPublishAt ? (work.plannedPublishAt as dayjs.Dayjs).format('YYYY-MM-DDTHH:mm:ss') : undefined }))
+        works: works.map((work: Record<string, unknown>) => ({ ...work, plannedPublishAt: work.plannedPublishAt ? (work.plannedPublishAt as dayjs.Dayjs).format('YYYY-MM-DDTHH:mm:ss') : undefined }))
       })
       message.success('草稿已保存')
       onClose(); onSaved(id)
     } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) }
     finally { setLoading(false) }
   }
-  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={onClose} onOk={() => void save()} confirmLoading={loading} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
-    <Form form={form} layout="vertical">
+  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={() => { if (!loading) onClose() }} closable={!loading} keyboard={!loading} cancelButtonProps={{ disabled: loading }} onOk={() => void save()} confirmLoading={loading} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
+    <Form form={form} layout="vertical" disabled={loading}>
       <Typography.Text strong>账号资料快照</Typography.Text>
       <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>{accountSnapshotRows.map(snapshot => { const id = String(snapshot.id); return <Card key={id} size="small" title={`账号 ${id}`}>
         <Form.Item name={['accountSnapshots', id, 'nickname']} label="账号名称"><Input /></Form.Item>
@@ -395,15 +405,16 @@ function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentRevi
         <Form.Item name={['accountSnapshots', id, 'bottleneckLabel']} label="当前瓶颈"><Input /></Form.Item>
         <Form.Item name={['accountSnapshots', id, 'operatorName']} label="责任运营人员"><Input /></Form.Item>
       </Card>})}</Space>
-      <Form.List name="works">{(fields, { add, remove, move }) => <Space direction="vertical" style={{ width: '100%' }}>{fields.map((field, index) => <Card key={field.key} size="small" title={<Space>作品 {index + 1}<Button size="small" disabled={index === 0} onClick={() => move(index, index - 1)}>上移</Button><Button size="small" disabled={index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>{fields.length > 1 && <Button danger size="small" onClick={() => remove(field.name)}>删除</Button>}</Space>}>
-        <Form.Item {...field} name={[field.name, 'coverFileId']} label="作品封面图" rules={[{ required: true, message: '请上传封面图' }]}><Space direction="vertical"><Space><Button loading={uploading === index} onClick={() => document.getElementById(`draft-cover-${batch.id}-${field.key}`)?.click()}>上传封面</Button><input id={`draft-cover-${batch.id}-${field.key}`} type="file" accept="image/*" hidden onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setUploading(index); try { const uploaded = await api.mediaContent.uploadVersionFile(file); form.setFieldValue(['works', field.name, 'coverFileId'], uploaded.fileId); form.setFieldValue(['works', field.name, 'coverPreviewUrl'], uploaded.previewUrl || URL.createObjectURL(file)); message.success('封面已上传') } catch (cause) { message.error(errorText(cause)) } finally { setUploading(undefined); event.target.value = '' } }} /></Space><Form.Item noStyle shouldUpdate>{() => { const url = form.getFieldValue(['works', field.name, 'coverPreviewUrl']); return url ? <Image width={160} src={url} alt="作品封面预览" /> : null }}</Form.Item></Space></Form.Item>
+      <Form.List name="works">{(fields, { add, remove, move }) => <Space direction="vertical" style={{ width: '100%' }}>{fields.map((field, index) => <Card key={field.key} size="small" title={<Space>作品 {index + 1}<Button size="small" disabled={loading || index === 0} onClick={() => move(index, index - 1)}>上移</Button><Button size="small" disabled={loading || index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>{fields.length > 1 && <Button danger size="small" onClick={() => remove(field.name)}>删除</Button>}</Space>}>
+        <ContentReviewAttachments index={field.name} cover disabled={loading} />
+        <ContentReviewAttachments index={field.name} disabled={loading} />
         <Form.Item {...field} name={[field.name, 'title']} label="发布标题" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
         <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, message: '请输入正文' }]}><Input.TextArea rows={6} /></Form.Item>
         <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select options={purposeOptions} onChange={value => form.setFieldValue(['works', field.name, 'purposeLabelSnapshot'], purposeOptions.find(item => item.value === value)?.label)} /></Form.Item>
         <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select options={formatOptions} onChange={value => form.setFieldValue(['works', field.name, 'formatLabelSnapshot'], formatOptions.find(item => item.value === value)?.label)} /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><Input /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><Input /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接"><Input placeholder="https:// 参考作品链接" allowClear /></Form.Item>
+        <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><ResourceLinkInput /></Form.Item>
+        <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><ResourceLinkInput /></Form.Item>
+        <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接"><ResourceLinkInput placeholder="https:// 参考作品链接" allowClear /></Form.Item>
         <Form.Item label="参考素材" extra="从素材库浏览并多选，审批人可在审批详情中查看。">
           <Space direction="vertical" style={{ width: '100%' }}>
             <Button onClick={() => setMaterialPickerIndex(field.name)}>素材浏览 · 选择参考素材</Button>
@@ -473,6 +484,8 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [historyLoading, setHistoryLoading] = useState(false)
   const [publishForm] = Form.useForm<{ platformUrl: string; publishedAt: dayjs.Dayjs }>()
 
+  const location = useLocation()
+  const linkedBatchId = Number(new URLSearchParams(location.search).get('batchId')) || undefined
   const loadDetail = useCallback(async (id: number) => {
     setSelectedId(id)
     setDetailLoading(true)
@@ -491,15 +504,15 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       setRows(result.list)
       setTotal(result.total)
       setPage(targetPage)
-      const nextId = result.list.some(item => item.id === preferredId) ? preferredId : result.list[0]?.id
+      const nextId = preferredId ?? linkedBatchId ?? result.list[0]?.id
       if (nextId) await loadDetail(nextId)
       else { setSelectedId(undefined); setSelected(undefined) }
     } catch (cause) {
       setRows([]); setSelected(undefined); setSelectedId(undefined); setError(errorText(cause))
     } finally { setLoading(false) }
-  }, [keyword, loadDetail, mine, status])
+  }, [keyword, loadDetail, mine, status, linkedBatchId])
 
-  useEffect(() => { void load(1) }, [keyword, status, mine])
+  useEffect(() => { void load(1) }, [keyword, status, mine, linkedBatchId])
   useEffect(() => {
     // 加签、转办、委派、抄送需要人员候选；无处理权限时不请求。
     if (!hasPermission(permissions, 'bpm:task:update')) return
@@ -684,6 +697,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
             </div><Space wrap>
               {selected.studentPersonId && <Button onClick={() => void showHistory()}>查看历史轮次</Button>}
               {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
+              {selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改并保存新草稿</Button>}
               {selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
               {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
             </Space></div>
@@ -800,7 +814,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           { required: true, message: '请输入平台链接' },
           { type: 'url', message: '请输入有效链接' },
           { pattern: /^https:\/\//i, message: '平台链接必须使用 HTTPS' }
-        ]}><Input /></Form.Item>
+        ]}><ResourceLinkInput /></Form.Item>
         <Form.Item name="publishedAt" label="发布时间" rules={[{ required: true, message: '请选择发布时间' }]}
           initialValue={dayjs()}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
       </Form>

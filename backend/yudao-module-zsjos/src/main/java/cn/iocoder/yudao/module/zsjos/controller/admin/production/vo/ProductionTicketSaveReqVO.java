@@ -8,7 +8,10 @@ import lombok.Data;
 @Data
 public class ProductionTicketSaveReqVO {
     @NotBlank @Size(max = 64) private String sceneCode;
-    @NotNull private Long accountId;
+    /** Legacy primary account. New callers submit accountIds. */
+    private Long accountId;
+    @Size(min = 1, max = 20) private java.util.List<@NotNull Long> accountIds;
+    private Long studentPersonId;
     private Long assigneeUserId;
     private Long targetDeptId;
     @Size(max = 500) private String operatorRemark;

@@ -66,7 +66,7 @@
       title="高级筛选字段目录加载失败"
     >
       <template #default>
-        <el-button link type="primary" @click="loadCatalog">重试</el-button>
+        <el-button link type="primary" @click="loadCatalog()">重试</el-button>
       </template>
     </el-alert>
 
@@ -177,7 +177,7 @@
             :closable="false"
           >
             <template #default>
-              <el-button link type="primary" @click="loadCatalog">重试</el-button>
+              <el-button link type="primary" @click="loadCatalog()">重试</el-button>
             </template>
           </el-alert>
           <el-empty v-else-if="!fields.length" description="当前场景没有可用筛选字段" />

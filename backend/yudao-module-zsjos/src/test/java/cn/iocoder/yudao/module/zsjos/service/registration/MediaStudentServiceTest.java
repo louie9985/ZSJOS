@@ -39,6 +39,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
     @InjectMocks private MediaStudentService service;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryStageMapper deliveryStages;
+    @Mock private StudentServiceObjectPermissionProvider servicePermissions;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;
     @Mock private MyStudentService myStudentService;
     @Mock private MediaAccountMapper accountMapper;
     @Mock private PositioningCardMapper positioningMapper;
@@ -200,5 +203,21 @@ class MediaStudentServiceTest {
         assertFalse(effectiveProjection.getLatestRound());
         assertFalse(effectiveProjection.getCurrent());
         assertTrue(effectiveProjection.getEffective());
+    }
+    @Test void unboundPositioningNotificationResolvesStudentAndCourseAfterObjectCheck() {
+        var card=new PositioningCardRespVO();card.setId(9L);card.setStudentPersonId(4L);card.setServiceRelationId(5L);
+        when(positioningService.get(9L,1L)).thenReturn(card);
+        var subject=spy(service);doReturn(new MediaStudentDetailRespVO()).when(subject).getDetail(1L,4L);
+        var target=subject.resolveTarget(1L,"positioning-card",9L);
+        assertEquals(4L,target.getPersonId());assertEquals(5L,target.getServiceRelationId());
+        verify(positioningService).get(9L,1L);
+    }
+    @Test void diagnosisAndDeliveryTargetsRequireAccountObjectAccess() {
+        var stage=new cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryStageDO();stage.setAccountId(7L);
+        when(deliveryStages.selectById(9L)).thenReturn(stage);
+        when(accountService.get(7L,1L)).thenThrow(new IllegalStateException("denied"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,()->service.resolveTarget(1L,"student_delivery_stage",9L));
+        verify(accountService).get(7L,1L);
+        verifyNoInteractions(myStudentService);
     }
 }

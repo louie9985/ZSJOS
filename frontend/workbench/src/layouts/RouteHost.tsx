@@ -1,5 +1,5 @@
 import { Card, Result, Typography } from 'antd'
-import { APP_ROUTES, PC_ONLY_NATIVE_ROUTES, type AuthPlatform } from '../constants'
+import { APP_ROUTES, type AuthPlatform } from '../constants'
 import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from '../services/menuComponentRegistry'
 import type { WorkbenchMenu } from '../services/api'
 import { Navigate, useLocation } from 'react-router-dom'
@@ -71,7 +71,7 @@ interface RouteHostProps {
  * 根据当前菜单路径/组件名渲染对应业务页面。
  * 未迁移的菜单显示占位提示。
  */
-export default function RouteHost({ menu, permissions, roles, authPlatform, onOpenAssignment }: RouteHostProps) {
+export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
 
   // BPM 审批中心：通过 location.pathname 判断，因为 /bpm/task/done 可能没有对应的 menu
@@ -80,9 +80,6 @@ export default function RouteHost({ menu, permissions, roles, authPlatform, onOp
   }
 
   if (menu?.path === APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE) return <DirectorTemplateConfigPage permissions={permissions} />
-  if (authPlatform === 'MOBILE' && PC_ONLY_NATIVE_ROUTES.has(menu?.path || location.pathname)) {
-    return <Result status="info" title="请使用电脑端访问" subTitle="内容生产和内容审核仅支持电脑端操作。" />
-  }
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>

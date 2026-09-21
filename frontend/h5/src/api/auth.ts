@@ -1,4 +1,7 @@
+import { isInWecom } from '@/utils/wecom'
 import request from './request'
+
+export const PARTNER_WECOM_NOT_BOUND = 1900000018
 
 export interface LoginParams {
   mobile: string
@@ -57,7 +60,7 @@ export function activate(data: ActivateParams) {
 /** 企业微信授权地址 */
 export function wecomAuthorizeUrl(redirectUri: string) {
   return request.get<never, string>('/zsjos/auth/wecom-authorize-url', {
-    params: { redirectUri }
+    params: { redirectUri, inWecom: isInWecom() }
   })
 }
 
@@ -66,7 +69,7 @@ export function wecomLogin(data: WecomLoginParams) {
   return request.post<never, LoginResult>('/zsjos/auth/wecom-login', {
     ...data,
     platform: data.platform || 'MOBILE'
-  })
+  }, { _handledBusinessCodes: [PARTNER_WECOM_NOT_BOUND] })
 }
 
 /** 退出登录 */

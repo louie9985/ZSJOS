@@ -1,4 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.delivery;
+
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.delivery.vo.StudentDeliverySubmissionReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.*;
@@ -9,7 +11,8 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 @Service public class StudentDeliverySubmissionServiceImpl implements StudentDeliverySubmissionService {
- @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper accounts;
+     @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
+@Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper accounts;
  @Resource private DeliveryPositioningSource sources;
  @Resource private StudentDeliveryPlanMapper plans;
  @Resource private StudentDeliverySubmissionMapper submissionMapper; @Resource private StudentDeliveryStageMapper stageMapper;
@@ -39,6 +42,8 @@ import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
   submissionMapper.insert(row);
   stage.setStatus("COMPLETED").setCompletedAt(now).setCompletedBy(operator).setVersion(stage.getVersion()+1);stageMapper.updateById(stage);
   taskService.completeByKey("student-delivery:"+stage.getPlanId()+":"+stage.getStageCode(),now);
+  collaborationNotify.account(STUDENT_DELIVERY_COMPLETED, accounts.selectById(stage.getAccountId()), operator,
+      "delivery-completed:"+stage.getId(), java.util.Map.of("stageCode", stage.getStageCode()));
   planService.createNextStages(stage.getPlanId(),stage.getAccountId(),stage.getDirectorUserId(),stage.getStageCode(),now);return row;
  }
  private RuntimeException error(cn.iocoder.yudao.framework.common.exception.ErrorCode code) {return cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(code);}

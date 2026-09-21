@@ -37,24 +37,48 @@ public class NotifyBusinessEventApiImpl implements NotifyBusinessEventApi {
                     .filter(rule -> normalized.getTargetRuleId() == null
                             || normalized.getTargetRuleId().equals(rule.getId()))
                     .toList();
-            var inAppRules = rules.stream()
+            var durableRules = rules.stream()
                     .filter(rule -> rule.getChannelCode() == null || rule.getChannelCode().isBlank()
-                            || NotifyChannelType.IN_APP.equals(rule.getChannelCode()))
+                            || NotifyChannelType.IN_APP.equals(rule.getChannelCode())
+                            || NotifyChannelType.WECOM.equals(rule.getChannelCode()))
                     .toList();
-            if (!inAppRules.isEmpty()) {
-                outboxService.enqueue(normalized, inAppRules);
+            if (!durableRules.isEmpty()) {
+                outboxService.enqueue(normalized, durableRules);
             }
             rules.stream()
                     .filter(rule -> rule.getChannelCode() != null && !rule.getChannelCode().isBlank())
                     .filter(rule -> !NotifyChannelType.IN_APP.equals(rule.getChannelCode()))
+                    .filter(rule -> !NotifyChannelType.WECOM.equals(rule.getChannelCode()))
                     .filter(rule -> !NotifyChannelType.WEBSOCKET.equals(rule.getChannelCode()))
                     .forEach(rule -> applicationEventPublisher.publishEvent(copyForRule(normalized, rule.getId())));
         });
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRED)
     public NotifySendResult publishConfirmed(NotifyBusinessEvent event) {
-        return eventProcessor.processConfirmed(normalize(event));
+        NotifyBusinessEvent normalized = normalize(event);
+        java.util.concurrent.atomic.AtomicReference<NotifySendResult> result = new java.util.concurrent.atomic.AtomicReference<>();
+        TenantUtils.execute(normalized.getTenantId(), () -> {
+            var rules = notifyRuleService.getEnabledRules(normalized.getSceneCode()).stream()
+                    .filter(rule -> normalized.getTargetRuleId() == null || normalized.getTargetRuleId().equals(rule.getId()))
+                    .toList();
+            if (rules.stream().noneMatch(rule -> NotifyChannelType.WECOM.equals(rule.getChannelCode()))) {
+                result.set(eventProcessor.processConfirmed(normalized));
+                return;
+            }
+            for (var rule : rules) {
+                if (NotifyChannelType.WECOM.equals(rule.getChannelCode())) {
+                    outboxService.enqueue(copyForRule(normalized, rule.getId()), java.util.List.of(rule));
+                } else {
+                    NotifySendResult delivered = eventProcessor.processConfirmed(copyForRule(normalized, rule.getId()));
+                    if (!delivered.isSuccess()) { result.set(delivered); return; }
+                }
+            }
+            // For WeCom, confirmation means durable acceptance, never an assertion of provider delivery.
+            result.set(NotifySendResult.success("WECOM_QUEUED"));
+        });
+        return result.get();
     }
 
     private NotifyBusinessEvent normalize(NotifyBusinessEvent event) {

@@ -108,6 +108,8 @@ public interface LeadConstants {
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";
     String INBOX_AUDIENCE_AGING_POOL = "agingPool";
+    String AGING_POOL_RELATION_OWNED = "owned";
+    String AGING_POOL_RELATION_FOLLOWING = "following";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
     String PERMISSION_SUBMIT_SPECIFY = "zsjos:lead:submit:specify";

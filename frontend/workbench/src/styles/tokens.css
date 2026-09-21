@@ -32,15 +32,13 @@
   --crm-color-error-bg: #fff2f0;
   --crm-color-error-border: #ffccc7;
 
-  /* ---- 表面色阶（由深到浅，形成 5 级视觉层次）----
-   * layout → sunken → chrome → container → elevated
-   * 每级色差 ~3-5%，肉眼可辨但不突兀                   */
+  /* ---- 表面层级：子块与容器同色，依靠外阴影或描边表达微凸层级 ---- */
   --crm-bg-layout: #edeef0;
   --crm-bg-chrome: #fafafb;
   --crm-bg-container: #ffffff;
   --crm-bg-elevated: #ffffff;
   --crm-bg-overlay: #ffffff;
-  --crm-bg-sunken: #f3f4f6;
+  --crm-bg-sunken: var(--crm-bg-container);
   --crm-bg-mask: rgba(0, 0, 0, 0.45);
 
   /* ---- 描边（仅用于结构分隔线，不做卡片边缘）---- */
@@ -58,7 +56,7 @@
   --crm-fill-quaternary: rgba(0, 0, 0, 0.02);
 
   /* ---- 阴影：elevation 体系 ----
-   * level-0: 无阴影（sunken 凹陷区域用 inset）
+   * level-0: 无阴影；字段和统计子块默认使用平面或标准外阴影
    * level-1 (shadow): 静态面板
    * level-2 (shadow-card): 可交互卡片
    * level-3 (shadow-raised): hover 抬起
@@ -73,7 +71,8 @@
   --crm-shadow-float:
     0 12px 32px -4px rgba(0, 0, 0, 0.12),
     0 4px 12px -2px rgba(0, 0, 0, 0.06);
-  --crm-shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  /* 保留变量名以兼容既有组件，但禁止向内暗阴影造成凹陷观感。 */
+  --crm-shadow-inset: var(--crm-shadow);
 
   /* ---- 玻璃：模糊半径与边缘高光 ----
    * 兜底为「无玻璃」，运行时由 ThemeVars 依 glassBlur 覆盖。

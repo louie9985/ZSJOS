@@ -122,23 +122,35 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
                 throw exception(USER_RELATION_SCENE_ELIGIBILITY_INVALID);
             }
             reqVO.setSourcePostCode(null);
+            reqVO.setSourcePostCodes(List.of());
             reqVO.setTargetEligibilityType("permission");
             reqVO.setTargetPermissionCode(cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PERMISSION_ACCEPT);
-        } else if (cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PARTNER_SCENE.equals(reqVO.getCode())
-                || isBlank(reqVO.getSourcePostCode()) || postApi.getPostByCode(reqVO.getSourcePostCode()) == null) {
-            throw exception(USER_RELATION_SCENE_POST_INVALID);
+        } else {
+            if (cn.iocoder.yudao.module.zsjos.enums.LeadAssignmentConstants.PARTNER_SCENE.equals(reqVO.getCode())) {
+                throw exception(USER_RELATION_SCENE_POST_INVALID);
+            }
+            reqVO.setSourcePostCodes(validatePosts(reqVO.getSourcePostCodes(), reqVO.getSourcePostCode()));
+            reqVO.setSourcePostCode(reqVO.getSourcePostCodes().get(0));
         }
         if ("permission".equals(reqVO.getTargetEligibilityType())) {
             if (isBlank(reqVO.getTargetPermissionCode())) {
                 throw exception(USER_RELATION_SCENE_ELIGIBILITY_INVALID);
             }
             reqVO.setTargetPostCode(null);
+            reqVO.setTargetPostCodes(List.of());
             return;
         }
-        if (postApi.getPostByCode(reqVO.getTargetPostCode()) == null) {
-            throw exception(USER_RELATION_SCENE_POST_INVALID);
-        }
+        reqVO.setTargetPostCodes(validatePosts(reqVO.getTargetPostCodes(), reqVO.getTargetPostCode()));
+        reqVO.setTargetPostCode(reqVO.getTargetPostCodes().get(0));
         reqVO.setTargetPermissionCode(null);
     }
 
+    private List<String> validatePosts(List<String> codes, String legacyCode) {
+        List<String> selected = codes != null ? codes : isBlank(legacyCode) ? List.of() : List.of(legacyCode);
+        if (selected.isEmpty() || selected.stream().anyMatch(code -> isBlank(code)
+                || postApi.getPostByCode(code) == null)) {
+            throw exception(USER_RELATION_SCENE_POST_INVALID);
+        }
+        return selected.stream().distinct().toList();
+    }
 }

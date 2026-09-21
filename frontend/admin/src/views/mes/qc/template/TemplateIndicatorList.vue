@@ -128,7 +128,7 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="说明图URL" prop="docUrl">
-              <el-input v-model="formData.docUrl" placeholder="请输入说明图URL" />
+              <ResourceLinkInput v-model="formData.docUrl" placeholder="请输入说明图URL" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -149,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DICT_TYPE } from '@/utils/dict'
 import {
   QcTemplateIndicatorApi,

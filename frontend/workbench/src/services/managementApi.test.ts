@@ -20,4 +20,15 @@ describe('management API paging', () => {
       params: { sceneCode: 'sales-manager', pageNo: 4, pageSize: 20 }
     })
   })
+  it('preserves all configured posts through save and detail response', async () => {
+    const scene = { id: 7, name: '多岗位场景', code: 'multi_post', sourceLabel: '来源', targetLabel: '目标',
+      sourcePostCodes: ['source_a', 'source_b'], targetPostCodes: ['target_a', 'target_b'],
+      targetEligibilityType: 'post' as const, status: 0 }
+    const put = vi.spyOn(http, 'put').mockResolvedValue({ data: { code: 0, data: true } })
+    vi.spyOn(http, 'get').mockResolvedValue({ data: { code: 0, data: scene } })
+    await managementApi.updateRelationScene(scene)
+    expect(put).toHaveBeenCalledWith('/zsjos/user-relation/scene/update', scene)
+    expect(await managementApi.relationScene(7)).toEqual(scene)
+  })
+
 })

@@ -46,7 +46,7 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item label="请求地址" key="http-url" prop="requestUrl">
-        <el-input v-model="httpTaskForm.requestUrl" clearable />
+        <ResourceLinkInput v-model="httpTaskForm.requestUrl" clearable />
       </el-form-item>
       <el-form-item label="请求头" key="http-headers">
         <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%">
@@ -99,6 +99,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { Edit } from '@element-plus/icons-vue'
 import { updateElementExtensions } from '@/components/bpmnProcessDesigner/package/utils'
 import HttpHeaderEditor from './HttpHeaderEditor.vue'

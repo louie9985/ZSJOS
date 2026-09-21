@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
 
     @InjectMocks private ContentService service;
     @Mock private ContentMapper mapper;

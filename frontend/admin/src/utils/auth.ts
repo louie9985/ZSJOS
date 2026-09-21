@@ -1,12 +1,13 @@
+import { isMobileWorkbench } from '@/utils/workbenchAuth'
 import { useCache, CACHE_KEY } from '@/hooks/web/useCache'
 import { TokenType } from '@/api/login/types'
 import { decrypt, encrypt } from '@/utils/jsencrypt'
 
 const { wsCache } = useCache()
 
-const AccessTokenKey = 'ACCESS_TOKEN'
-const RefreshTokenKey = 'REFRESH_TOKEN'
-const ClientIdKey = 'CLIENT_ID'
+const AccessTokenKey = isMobileWorkbench ? 'MOBILE_ACCESS_TOKEN' : 'ACCESS_TOKEN'
+const RefreshTokenKey = isMobileWorkbench ? 'MOBILE_REFRESH_TOKEN' : 'REFRESH_TOKEN'
+const ClientIdKey = isMobileWorkbench ? 'MOBILE_CLIENT_ID' : 'CLIENT_ID'
 
 // Workbench 与 Admin 同源共享的明文 localStorage 协议。旧版 wsCache 数据继续作为迁移回退。
 const sharedStorage = localStorage
@@ -36,6 +37,7 @@ const readShared = (key: string, legacyKey: string) => {
 
 // 获取token
 export const getAccessToken = () => {
+  if (isMobileWorkbench) return sharedStorage.getItem(AccessTokenKey) || undefined
   return (
     readShared(AccessTokenKey, legacyAccessTokenKey) ||
     wsCache.get(AccessTokenKey) ||
@@ -45,17 +47,22 @@ export const getAccessToken = () => {
 
 // 刷新token
 export const getRefreshToken = () => {
+  if (isMobileWorkbench) return sharedStorage.getItem(RefreshTokenKey) || undefined
   return readShared(RefreshTokenKey, legacyRefreshTokenKey) || wsCache.get(RefreshTokenKey)
 }
 
-export const getClientId = () =>
-  readShared(ClientIdKey, legacyClientIdKey) || wsCache.get(ClientIdKey)
+export const getClientId = () => isMobileWorkbench
+  ? 'zsjos-mobile'
+  : readShared(ClientIdKey, legacyClientIdKey) || wsCache.get(ClientIdKey)
 
 // 设置token
 export const setToken = (token: TokenType) => {
+  if (isMobileWorkbench && token.clientId && token.clientId !== 'zsjos-mobile') {
+    throw new Error('登录端类型不匹配，请从手机工作台重新登录')
+  }
   sharedStorage.setItem(RefreshTokenKey, token.refreshToken)
   sharedStorage.setItem(AccessTokenKey, token.accessToken)
-  sharedStorage.setItem(ClientIdKey, token.clientId || 'zsjos-pc')
+  sharedStorage.setItem(ClientIdKey, token.clientId || (isMobileWorkbench ? 'zsjos-mobile' : 'zsjos-pc'))
 }
 
 // 删除token
@@ -63,6 +70,10 @@ export const removeToken = () => {
   sharedStorage.removeItem(AccessTokenKey)
   sharedStorage.removeItem(RefreshTokenKey)
   sharedStorage.removeItem(ClientIdKey)
+  if (isMobileWorkbench) {
+    sharedStorage.removeItem('MOBILE_EXPIRES_TIME')
+    return
+  }
   sharedStorage.removeItem(legacyAccessTokenKey)
   sharedStorage.removeItem(legacyRefreshTokenKey)
   sharedStorage.removeItem(legacyClientIdKey)

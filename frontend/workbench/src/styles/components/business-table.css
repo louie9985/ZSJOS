@@ -1,0 +1,57 @@
+/* All tabular surfaces use the Lead Management design and active theme tokens. */
+.business-table {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--crm-radius-lg);
+}
+.business-table--full { flex: 1; }
+.business-table-error { margin-bottom: var(--crm-gap-sm); }
+.business-table .ant-table-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+.business-table .ant-table-cell:not(.ant-table-cell-ellipsis) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.business-table .business-table-action-cell { white-space: nowrap; }
+.business-table-resizable-header { touch-action: pan-y; }
+.business-table .ant-pro-table-list-toolbar-container {
+  gap: var(--crm-gap-sm);
+  flex-wrap: wrap;
+}
+.business-table .ant-pro-table-list-toolbar-right {
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.business-table .ant-pro-table-list-toolbar-right > .ant-space {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.business-table-toolbar {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-gap-sm);
+}
+.business-table-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crm-gap-sm); flex: 1 1 320px; min-width: 0; }
+.business-table-filters .advanced-filter-toolbar { width: 100%; }
+.business-table-batch { flex: none; white-space: nowrap; }
+.business-table-actions { flex: none; }
+.business-table .ant-table-pagination { gap: var(--crm-sp-1); flex-wrap: wrap; }
+@media (max-width: 768px) {
+  .business-table-filters { flex-basis: 100%; }
+  .business-table .ant-pro-table-list-toolbar-right { width: 100%; }
+}
+
+/* ProTable wraps supplied toolbar actions in an unclassified flex container. */
+.business-table .ant-pro-table-list-toolbar-right > div:has(> .business-table-toolbar) {
+  flex: 1;
+  min-width: 0;
+}

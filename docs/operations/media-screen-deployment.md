@@ -98,6 +98,13 @@ location /public-api/ {
 
 ## 4. 部署顺序
 
+统一发布脚本 `script/shell/deploy-production.sh` 的 `build` / `deploy` 已包含媒体大屏的
+`npm ci` 和生产构建；`deploy` 将本次 `frontend/media-screen/dist` 安装至 release 的
+`media-screen/`，不再沿用旧包。部署环境必须提供 `VITE_MEDIA_SCREEN_TENANT_ID`，
+API 地址与前缀可通过 `VITE_MEDIA_SCREEN_API_BASE_URL` / `VITE_MEDIA_SCREEN_API_PREFIX`
+配置，mock 在构建时强制关闭。详见 [统一发布流程](production-deployment.md)。
+
+
 1. 确认目标后端制品包含 `MediaScreenController`、`MediaScreenAccessFilter` 和快照调度器，并确认配置前缀为 `yudao.media-screen`。
 2. 在受控数据库按顺序应用 V141、V143。执行 V141 前确认旧 v1 快照表为空并备份旧 DDL；迁移只回填 Lead 中已有字段能证明的 ID 与计数时间，不补当前名称、组织或 Partner 关系，也不生成历史快照。
 3. 确认目标租户 ID、三个新媒体部门 ID、前端或代理的实际出口 IP、代理链和所需 CIDR，执行双人复核。

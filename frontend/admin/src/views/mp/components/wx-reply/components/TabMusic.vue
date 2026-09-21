@@ -57,13 +57,14 @@
       </el-col>
     </el-row>
     <div style="margin: 20px 0"></div>
-    <el-input v-model="reply.musicUrl" placeholder="请输入音乐链接" />
+    <ResourceLinkInput v-model="reply.musicUrl" placeholder="请输入音乐链接" />
     <div style="margin: 20px 0"></div>
-    <el-input v-model="reply.hqMusicUrl" placeholder="请输入高质量音乐链接" />
+    <ResourceLinkInput v-model="reply.hqMusicUrl" placeholder="请输入高质量音乐链接" />
   </div>
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import WxMaterialSelect from '@/views/mp/components/wx-material-select'
 import type { UploadRawFile } from 'element-plus'
 import { UploadType, useBeforeUpload } from '@/views/mp/hooks/useUpload'

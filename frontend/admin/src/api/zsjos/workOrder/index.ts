@@ -66,8 +66,6 @@ export const getWorkOrderScenePage = (params: {
   code?: string
   name?: string
 }) => request.get({ url: '/zsjos/work-order/scene/page', params })
-export const getWorkOrderScene = (code: string) =>
-  request.get<WorkOrderScene>({ url: '/zsjos/work-order/scene/get', params: { code } })
 export const createWorkOrderScene = (data: WorkOrderScene) =>
   request.post({ url: '/zsjos/work-order/scene/create', data })
 export const updateWorkOrderScene = (data: WorkOrderScene) =>

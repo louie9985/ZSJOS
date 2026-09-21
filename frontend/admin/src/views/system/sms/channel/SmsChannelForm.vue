@@ -41,7 +41,7 @@
         <el-input v-model="formData.apiSecret" placeholder="请输入短信 API 的密钥" />
       </el-form-item>
       <el-form-item label="短信发送回调 URL" prop="callbackUrl">
-        <el-input v-model="formData.callbackUrl" placeholder="请输入短信发送回调 URL" />
+        <ResourceLinkInput v-model="formData.callbackUrl" placeholder="请输入短信发送回调 URL" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -51,6 +51,7 @@
   </Dialog>
 </template>
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DICT_TYPE, getIntDictOptions, getStrDictOptions } from '@/utils/dict'
 import * as SmsChannelApi from '@/api/system/sms/smsChannel'
 import { CommonStatusEnum } from '@/utils/constants'

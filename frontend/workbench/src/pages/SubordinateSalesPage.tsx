@@ -1,25 +1,6 @@
+import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Button,
-  Empty,
-  Form,
-  Input,
-  List,
-  Modal,
-  Popover,
-  Select,
-  Skeleton,
-  Space,
-  Statistic,
-  Switch,
-  Table,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-  message,
-} from "antd";
+import { Alert, Button, Empty, Form, Input, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import {
   ArrowLeftOutlined,
@@ -596,7 +577,7 @@ function SalesDetail({
                     }
                   />
                 )}
-                <Table
+                <BusinessTable tableKey="subordinate-sales-page-1" columnMode="native"
                   rowKey="id"
                   loading={loading}
                   rowSelection={rowSelection}
@@ -641,7 +622,7 @@ function SalesDetail({
                     }
                   />
                 )}
-                <Table
+                <BusinessTable tableKey="subordinate-sales-page-2" columnMode="native"
                   rowKey="id"
                   loading={loading}
                   columns={taskColumns}

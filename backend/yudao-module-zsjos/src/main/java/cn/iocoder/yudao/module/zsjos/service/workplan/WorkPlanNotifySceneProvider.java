@@ -51,7 +51,7 @@ public class WorkPlanNotifySceneProvider implements NotifySceneProvider {
     @Override
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         Map<String, Object> values = new LinkedHashMap<>();
-        WorkTaskDO task = taskMapper.selectById(event.getBizId());
+        WorkTaskDO task = "work_task".equals(event.getBizType()) ? taskMapper.selectById(event.getBizId()) : null;
         if (task != null) {
             values.put("task.id", task.getId()); values.put("task.title", task.getTitle()); values.put("task.status", task.getStatus());
             values.put("task.dueAt", task.getDueAt()); values.put("task.remindAt", task.getRemindAt());

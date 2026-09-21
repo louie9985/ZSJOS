@@ -17,6 +17,8 @@ public class ProductionTicketDO extends TenantBaseDO {
     @TableId private Long id;
     private String ticketNo;
     private Long accountId;
+    private String accountIdsJson;
+    private String accountSnapshotJson;
     private Long ownerOperatorUserId;
     private Long assigneeFilmingEditorUserId;
     private Long reviewerUserId;

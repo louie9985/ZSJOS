@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MediaAccountServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @InjectMocks private MediaAccountService service;
     @Mock private MediaAccountMapper mapper;
     @Mock private MediaAccountNumberService numberService;

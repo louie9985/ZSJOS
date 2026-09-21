@@ -63,8 +63,10 @@ class ZsjosAuditCoverageTest {
         // application-options、select-master、apply + 需求反馈审批人视角 GET。
         // 计数变动必须逐条核对过分类：GET 新增项均已由上面的 mustAudit 断言逐方法校验，
         // POST 新增项要么被判定需审计，要么显式标了 READ_ONLY。
-        assertEquals(314, getCount, "Review GET audit classification when endpoint inventory changes");
-        assertEquals(304, postCount, "Review POST audit classification when endpoint inventory changes");
+        // 324/312 = 上述基线叠加后续新增端点，并移除退役的账号原阶段记录只读端点
+        // （GET /zsjos/media-account/{id}/legacy-stage-history）。
+        assertEquals(324, getCount, "Review GET audit classification when endpoint inventory changes");
+        assertEquals(312, postCount, "Review POST audit classification when endpoint inventory changes");
         assertEquals(34, readOnlyPostCount, "Every POST viewing endpoint must remain explicitly classified");
         assertEquals(93, putCount, "Review PUT audit classification when endpoint inventory changes");
         assertEquals(16, deleteCount, "Review DELETE audit classification when endpoint inventory changes");

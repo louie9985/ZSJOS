@@ -272,6 +272,12 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         if (!Objects.equals(record.getCategoryBefore(), categoryAfter)) {
             lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
         }
+        // 首次跟进任务按归属周期建键，与客资路径同源；valid 客资的跟进同样要完成本周期首跟，
+        // 否则时效进度会一直显示已超时，且有效性判定会被首跟校验挡住。
+        if (lifecycleTaskService.completeFirstFollowUpTask(
+                lead.getCurrentAssignmentHistoryId(), occurredAt)) {
+            lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
+        }
         lead.setLastFollowUpAt(occurredAt); LeadMapper.advanceActivity(lead, occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);

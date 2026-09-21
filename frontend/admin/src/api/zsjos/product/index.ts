@@ -147,8 +147,6 @@ export const saveProductAttrs = (spuId: number, attrs: ProductAttrVO[]) =>
   request.put({ url: '/zsjos/product/sku/attrs', data: { spuId, attrs } })
 export const getSkuList = (spuId: number) =>
   request.get({ url: `/zsjos/product/sku/list?spuId=${spuId}` })
-export const createSku = (data: ProductSkuSaveReqVO) =>
-  request.post({ url: '/zsjos/product/sku/create', data })
 export const generateSkus = (spuId: number) =>
   request.post({ url: `/zsjos/product/sku/generate?spuId=${spuId}` })
 export const updateSku = (data: ProductSkuSaveReqVO) =>

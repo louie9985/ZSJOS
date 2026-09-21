@@ -181,6 +181,7 @@
   </Dialog>
 </template>
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus'
 import * as Api from '@/api/zsjos/withdrawal'
 import * as CashbackApi from '@/api/zsjos/cashback'
 import * as ExportTaskApi from '@/api/zsjos/exportTask'

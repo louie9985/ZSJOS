@@ -10,6 +10,7 @@ public interface PartnerAuthService {
     PartnerLoginRespVO login(PartnerLoginReqVO reqVO, String loginIp);
     PartnerLoginRespVO activate(PartnerActivateReqVO reqVO, String loginIp);
     String getWecomAuthorizeUrl(String redirectUri);
+    String getWecomAuthorizeUrl(String redirectUri, boolean inWecom);
     PartnerLoginRespVO wecomLogin(PartnerWecomLoginReqVO reqVO, String loginIp);
     PartnerLoginRespVO refresh(String refreshToken, String clientId);
     void logout(String accessToken);

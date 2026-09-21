@@ -5,6 +5,9 @@ import type {
   AdvancedFilterTemplateSaveReq
 } from '../advancedFilter'
 
+// 供 `import * as TemplateApi` 的命名空间消费方引用模板类型
+export type { AdvancedFilterScene, AdvancedFilterTemplate, AdvancedFilterTemplateSaveReq }
+
 export const getSystemTemplateList = (scene: AdvancedFilterScene, pageKey: string) =>
   request.get<AdvancedFilterTemplate[]>({
     url: '/zsjos/advanced-filter-template/system-list',

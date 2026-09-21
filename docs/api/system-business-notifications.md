@@ -31,14 +31,41 @@ and rule present when the migration runs. It preserves the source rule's status,
 and timing fields, is repeatable, and does not enable the tenant WeCom channel or user push preference.
 Generated rules affect only future business events; historical in-app messages are not re-sent.
 
-`in_app` rules use `system_notify_business_outbox` and join the publishing business transaction.
+`in_app` and `wecom` rules use `system_notify_business_outbox` and join the publishing business transaction.
 The unique boundary is tenant + source event key + target rule. Workers claim rows with a unique
 `claim_token`; completion and failure updates must still own that token, so an expired worker cannot
 overwrite a newer claim. Retryable failures use 1, 5, and 30 second delays; permanent failures stop
 immediately. Successful rows are retained for 30 days, failed rows for 90 days, and rendered in-app
 messages for three years. WebSocket delivery remains an after-commit invalidation emitted from the
-persisted in-app message. Other configured channels remain after-commit best effort and are not
-covered by the durable delivery guarantee.
+persisted in-app message. SMS and other external channels remain after-commit best effort.
+
+WeCom uses the existing payload JSON with `deliveryFormat=wecom-outbox-v1`; no schema change is
+required. The first worker freezes typed recipients and rendered content, and prepares each click
+URL before sending. Recipient checkpoints require the current tenant, claim token and an unexpired
+lease, and renew the lease. A successful or permanently failed recipient is never resent because
+another recipient failed. Disabled rules stop pending delivery; current channel/application settings
+and recipient push preferences are still checked at send time. An explicitly disabled dedicated
+application does not fall back to the ADMIN application.
+
+Recipient states are `pending`, `sending`, `succeeded`, `skipped`, `failed`, and `uncertain`.
+Unbound/opted-out recipients are `skipped`, not provider-confirmed delivery. Explicit transient
+provider rejection follows the outbox retry schedule; explicit invalid-token rejection may refresh
+and resend once. POST timeout, malformed response, or interrupted `sending` becomes `uncertain`
+and is not automatically resent, because provider acceptance cannot safely be excluded. This
+prevents blind duplicate sends but does not promise exactly-once delivery or automatic recovery
+of uncertain sends. The one-time 30-minute click-ticket contract is unchanged.
+
+For `publishConfirmed`, WeCom success (`externalId=WECOM_QUEUED`) confirms durable queue acceptance,
+not provider delivery. Scheduled reminder deduplication records that acceptance. Inspect the outbox
+for eventual delivery results. Other channels retain their existing confirmation behavior.
+
+`GET /system/notify-rule/delivery-page` requires `system:notify-rule:query` and the current tenant.
+It accepts `pageNo`, `pageSize`, `ruleId`, `sceneCode`, and outbox `status` (`pending`, `processing`,
+`succeeded`, `failed`). It returns channel, rule, timestamps, retry count, sanitized error code and
+per-recipient typed ID/status/attempt count/error code. Message bodies, original business payloads,
+provider credentials and click tickets are never returned. This additive API does not change existing
+Admin or Workbench rule/message response contracts or assign permissions. No delivery-management UI
+or automatic/manual resend command is introduced.
 
 ## HTTP APIs
 
@@ -125,3 +152,29 @@ Applied V085 databases are repaired only by forward migration V087; V085 is not 
 
 两个 scene 提供 `assist.requestId`、`assist.problem`、`assist.expectedAssistance`、
 `assist.remark`、`assist.attachmentNames` 变量，并继续使用 `lead.no` 作为用户可见客资编号。
+
+## 编导与运营通知补全
+
+场景、默认接收人、可配置提醒和双端消费边界见 [编导与运营业务通知](director-operator-notifications.md)。V269 增加缺失站内配置，并为尚无企微规则的业务场景复制站内规则及模板；保留已有企微场景配置（含停用规则）、个人推送偏好及历史消息。两个渠道仍独立投递、独立维护，不提供自动送达同步保证。
+
+### Partner operator identity
+
+Lead creation (including approved duplicate submissions) and contact activation freeze `operatorUserType` in the event payload from the authenticated submission identity. Operator recipients retain PARTNER account IDs or ADMIN user IDs even when their numeric values coincide. Explicit unknown types are not converted to ADMIN; legacy employee events without the field retain their existing interpretation. Partner operator and submitter display names resolve through Partner accounts and Partner records, never through a same-number employee. Historical rendered messages and deliveries are not rewritten or replayed.
+
+### Withdrawal and Partner WeCom destinations
+
+Unapplied V269 additionally supplies defaults for the five existing withdrawal scenes. `submitted` and `finance_reminder` target `finance`; `approved`, `rejected`, and `paid` target `applicant` and `finance`. Existing rules, including disabled rules, remain authoritative. The finance summary uses `none`; record-specific rules use `business_detail`. New templates use the business `withdrawal.no`, amount, and rejection reason where applicable; `withdrawal.id` remains a compatibility-only internal ID. New tenants initialize these defaults through System's existing API, including matching WeCom templates. No cancellation or cashback-maturity notification policy is introduced.
+
+The same V269 WeCom mirroring covers existing Lead submitter-feedback and supplement rules; no second copy or unconditional enablement is added. Shared test execution remains gated by V268, matching runtime deployment, refreshed configuration backup and scoped authorization; source and isolated SQL verification do not constitute test-server synchronization.
+
+Partner `sales_order` WeCom business-detail tickets freeze the order's associated Lead ID only when that Lead belongs to the recipient's Partner account. They open the existing `/lead/{id}` H5 route, whose authenticated detail API rechecks current ownership and projects visible order records. Missing orders, missing links and mismatched ownership fall back to the message center. ADMIN destinations are unchanged. One-time consumption and configured short ticket TTL remain unchanged; the H5 in-app sales-order message still uses its existing list fallback.
+
+### Partner in-app sales-order navigation
+
+Partner message detail first authorizes the stored message against the current PARTNER account.
+For `actionType=business_detail` and `bizType=sales_order`, the ZSJOS target service returns
+`businessTarget=/lead/{id}` only when the order's Lead belongs to the authenticated Partner.
+Missing/deleted/foreign relationships yield no target and a `targetUnavailableReason`; the H5 stays
+on the readable message with that explanation. `message_detail` and `none` never expose a business
+action. Normal route permission and authenticated Lead detail ownership checks remain in force.
+Internal IDs appear only in technical routes, never as the displayed 客资编号.

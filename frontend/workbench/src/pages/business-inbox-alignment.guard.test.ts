@@ -107,7 +107,7 @@ describe('business inbox alignment', () => {
     expect(messageInbox).toContain('message-inbox-table-shell')
     expect(messageInbox).toContain('message-inbox-table-drawer')
     expect(messageInbox).toContain('message-inbox-load-more')
-    expect(messageInbox).toContain('ProTable')
+    expect(messageInbox).toContain('BusinessTable')
     expect(messageInbox).toContain('columnsState')
 
     expect(styles).toMatch(/\.message-center-item \{[^}]*flex: none;/)

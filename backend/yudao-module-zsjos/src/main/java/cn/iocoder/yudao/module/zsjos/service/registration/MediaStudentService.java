@@ -47,6 +47,9 @@ public class MediaStudentService {
     @Resource private PositioningCardService positioningService;
     @Resource private MediaStudentTalkRecordMapper talkRecordMapper;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryStageMapper deliveryStages;
+    @Resource private StudentServiceObjectPermissionProvider servicePermissions;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;
     @Resource private PermissionApi permissionApi;
 
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
@@ -332,6 +335,22 @@ public class MediaStudentService {
     public MediaStudentTargetRespVO resolveTarget(Long userId, String bizType, Long bizId) {
         MediaAccountDO account;
         String tab;
+        if ("student_service".equals(bizType)) {
+            servicePermissions.check(bizId, "read", userId);
+            var relation = relationMapper.selectById(bizId);
+            if (relation == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+            getDetail(userId, relation.getPersonId());
+            var target = new MediaStudentTargetRespVO(relation.getPersonId(), "overview", bizId);
+            target.setServiceRelationId(bizId);
+            return target;
+        }
+        if ("media_account_diagnosis".equals(bizType)) bizType = "media-account";
+        if ("student_delivery_stage".equals(bizType)) {
+            var stage = deliveryStages.selectById(bizId);
+            if (stage == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+            bizId = stage.getAccountId();
+            bizType = "media-account";
+        }
         if ("media-account".equals(bizType)) {
             accountService.get(bizId, userId);
             account = accountMapper.selectById(bizId);
@@ -342,8 +361,11 @@ public class MediaStudentService {
             tab = "content";
         } else if ("positioning-card".equals(bizType)) {
             var card = positioningService.get(bizId, userId);
-            account = accountMapper.selectById(card.getAccountId());
-            tab = "positioning";
+            if (card.getStudentPersonId() == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+            getDetail(userId, card.getStudentPersonId());
+            var target = new MediaStudentTargetRespVO(card.getStudentPersonId(), "positioning", bizId);
+            target.setServiceRelationId(card.getServiceRelationId());
+            return target;
         } else {
             throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
         }

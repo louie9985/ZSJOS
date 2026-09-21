@@ -78,6 +78,41 @@ class LeadAssignmentServiceImplTest {
     }
 
     @Test
+    void savingSourceFromAdditionalPostStillRequiresManagementScope() {
+        var scene = leadScene();
+        scene.setSourcePostCodes(List.of("first_source", "second_source"));
+        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
+        when(postApi.getPostByCode("first_source")).thenReturn(post(11L));
+        when(postApi.getPostByCode("second_source")).thenReturn(post(13L));
+        when(adminUserApi.getUserListByPostIds(Set.of(11L, 13L))).thenReturn(List.of(sourceUser));
+        when(permissionApi.hasAnyPermissions(OPERATOR_ID, PERMISSION_MANAGE_ALL)).thenReturn(false);
+        assertEquals(LEAD_ASSIGNMENT_SCOPE_DENIED.getCode(), assertThrows(ServiceException.class,
+                () -> service.saveRelations(saveReq(MODE_APPEND, Set.of(2L)), OPERATOR_ID)).getCode());
+        verify(relationMapper, never()).insert(any(LeadAssignmentRelationDO.class));
+    }
+
+    @Test
+    void multipleTargetPostsUnionUsersAndExcludeDisabledPostsAndUsers() {
+        var scene = leadScene();
+        scene.setTargetPostCodes(List.of("first", "second", "disabled", "missing"));
+        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
+        when(postApi.getPostByCode("first")).thenReturn(post(12L));
+        when(postApi.getPostByCode("second")).thenReturn(post(13L));
+        var disabledPost = post(14L);
+        disabledPost.setStatus(CommonStatusEnum.DISABLE.getStatus());
+        when(postApi.getPostByCode("disabled")).thenReturn(disabledPost);
+        var first = user(2L, 20L, "候选一", 0);
+        var second = user(3L, 20L, "候选二", 0);
+        when(adminUserApi.getUserListByPostIds(Set.of(12L, 13L)))
+                .thenReturn(List.of(first, second, first, user(4L, 20L, "停用候选", 1)));
+        when(relationMapper.selectListBySourceUserIds(SCENE, Set.of(1L))).thenReturn(List.of(
+                relation(1L, 2L, 0), relation(1L, 3L, 0), relation(1L, 4L, 0)));
+        when(deptApi.getDeptMap(Set.of(20L))).thenReturn(Map.of(20L, dept(20L)));
+        assertEquals(List.of(2L, 3L), service.getAssignableSalesUsers(1L).stream()
+                .map(LeadAssignmentUserRespVO::getId).toList());
+    }
+
+    @Test
     void getAssignableSalesUsersReturnsOnlyActiveBoundSales() {
         AdminUserRespDTO enabledSales = user(2L, 20L, "销售甲", CommonStatusEnum.ENABLE.getStatus());
         AdminUserRespDTO disabledSales = user(3L, 20L, "销售乙", CommonStatusEnum.DISABLE.getStatus());

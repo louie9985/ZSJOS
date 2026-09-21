@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -28,7 +29,7 @@ import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable } from '@ant-design/pro-components'
+
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const statusLabel: Record<string, string> = {
@@ -276,11 +277,10 @@ export default function LeadAppealPage() {
         />
       </div>
     </header>
-    {useTableLayout ? <><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="lead_appeal" pageKey="lead_appeal" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<LeadAppeal>
+    {useTableLayout ? <><BusinessTable<LeadAppeal> filters={<><AdvancedFilterToolbar scene="lead_appeal" pageKey="lead_appeal" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="lead-appeal-page-1" error={error} onReload={() => void load()}
       className="business-inbox-table"
       rowKey="id"
-      search={false}
-      options={{ density: true, fullScreen: true, setting: true }}
+
       columnsState={{ persistenceKey: 'crm-lead-appeal-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}

@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { showToast, showConfirmDialog } from 'vant'
+import { showToast, showConfirmDialog, showDialog } from 'vant'
 import { useAuth } from '@/composables/useAuth'
 import { wecomAuthorizeUrl } from '@/api/auth'
-import { isInWecom } from '@/utils/wecom'
 
 const router = useRouter()
 const route = useRoute()
-const { loading, error, loginWithPassword, activateWithInvite, loginWithWecom, initAuth } = useAuth()
-const wecomAutoLoginKey = 'zsjos_h5_wecom_auto_login_started'
+const { loading, error, wecomUnbound, loginWithPassword, activateWithInvite, loginWithWecom, initAuth } = useAuth()
 
 const mobile = ref('')
 const password = ref('')
@@ -46,24 +44,24 @@ function buildWecomRedirectUri() {
   return url.toString()
 }
 
-function shouldAutoStartWecomLogin() {
-  return isInWecom()
-    && !(route.query.code && route.query.state)
-    && window.sessionStorage.getItem(wecomAutoLoginKey) !== '1'
-}
-
-function clearWecomAutoLoginMarker() {
-  window.sessionStorage.removeItem(wecomAutoLoginKey)
-}
-
 onMounted(async () => {
   const code = (route.query.code as string | undefined)?.trim()
   const state = (route.query.state as string | undefined)?.trim()
   if (code && state) {
-    clearWecomAutoLoginMarker()
     const success = await loginWithWecom(code, state)
     if (success) {
       router.replace(redirectPath())
+    } else {
+      const redirect = redirectPath()
+      await router.replace({ path: '/login', query: { redirect } })
+      if (wecomUnbound.value) {
+        mode.value = 'login'
+        await showDialog({
+          title: '尚未绑定企业微信',
+          message: '请先使用兼职账号和密码登录，再到“我的 → 企业微信 → 去绑定”完成绑定。新用户请先点击“首次使用？激活账号”。',
+          confirmButtonText: '使用账号密码登录'
+        })
+      }
     }
     return
   }
@@ -74,9 +72,6 @@ onMounted(async () => {
     return
   }
 
-  if (shouldAutoStartWecomLogin()) {
-    await handleWecomLogin({ skipAgreement: true })
-  }
 })
 
 async function handleLogin() {
@@ -115,10 +110,9 @@ async function handleActivate() {
   }
 }
 
-async function handleWecomLogin(options?: { skipAgreement?: boolean }) {
-  if (!options?.skipAgreement && !(await ensureAgreement())) return
+async function handleWecomLogin() {
+  if (!(await ensureAgreement())) return
   try {
-    window.sessionStorage.setItem(wecomAutoLoginKey, '1')
     window.location.href = await wecomAuthorizeUrl(buildWecomRedirectUri())
   } catch (cause) {
     showToast(cause instanceof Error ? cause.message : '企业微信授权失败')

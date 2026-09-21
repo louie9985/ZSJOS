@@ -12,6 +12,8 @@ export interface MessageItem {
   actionType?: 'none' | 'message_detail' | 'business_detail'
   bizType?: string
   bizId?: number
+  businessTarget?: string
+  targetUnavailableReason?: string
   readStatus: boolean
   readTime?: ApiDateValue
   createTime: ApiDateValue

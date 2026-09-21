@@ -56,6 +56,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class StudentContactServiceImplTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
 
     @InjectMocks private StudentContactServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;

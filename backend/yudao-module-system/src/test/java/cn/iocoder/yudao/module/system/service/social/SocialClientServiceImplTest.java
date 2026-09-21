@@ -76,6 +76,23 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
     private WxMaProperties wxMaProperties;
 
     @Test
+    public void webAuthorizationKeepsStateAndEncodesCallbackOnce() {
+        SocialClientServiceImpl service = spy(socialClientService);
+        String callback = "https://partner.example/profile?wecomBind=1&redirect=%2Fhome";
+        doReturn("https://open.work.weixin.qq.com/wwopen/sso/qrConnect?appid=corp&agentid=51"
+                + "&redirect_uri=" + cn.iocoder.yudao.framework.common.util.http.HttpUtils.encodeUtf8(callback)
+                + "&state=registered-state").when(service).getAuthorizeUrl(30, 3, callback);
+        String url = service.getWecomWebAuthorizeUrl(3, callback);
+        assertTrue(url.startsWith("https://open.weixin.qq.com/connect/oauth2/authorize?"));
+        assertTrue(url.endsWith("&response_type=code&scope=snsapi_base#wechat_redirect"));
+        assertTrue(url.contains("&state=registered-state"));
+        assertTrue(url.contains("&agentid=51&"));
+        String encoded = java.util.Arrays.stream(java.net.URI.create(url).getRawQuery().split("&"))
+                .filter(value -> value.startsWith("redirect_uri=")).findFirst().orElseThrow().substring(13);
+        assertEquals(callback, java.net.URLDecoder.decode(encoded, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
     public void testGetAuthorizeUrl() {
         try (MockedStatic<AuthStateUtils> authStateUtilsMock = mockStatic(AuthStateUtils.class)) {
             // 准备参数
@@ -209,6 +226,98 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
         verify(authConfig).setClientId(client.getClientId());
         verify(authConfig).setClientSecret(client.getClientSecret());
         verify(authConfig).setAgentId(client.getAgentId());
+    }
+
+    @Test
+    public void partnerWecomUsesTenantAdminApplicationWhenDedicatedClientIsAbsent() {
+        SocialClientDO admin = insertWecomClient(UserTypeEnum.ADMIN, 0);
+        assertWecomCredentials(UserTypeEnum.PARTNER, admin);
+    }
+
+    @Test
+    public void dedicatedPartnerWecomApplicationTakesPrecedence() {
+        insertWecomClient(UserTypeEnum.ADMIN, 0);
+        SocialClientDO partner = insertWecomClient(UserTypeEnum.PARTNER, 0);
+        assertWecomCredentials(UserTypeEnum.PARTNER, partner);
+    }
+
+    @Test
+    public void disabledPartnerApplicationDoesNotFallBackToAdmin() {
+        insertWecomClient(UserTypeEnum.ADMIN, 0);
+        insertWecomClient(UserTypeEnum.PARTNER, 1);
+        assertPartnerWecomUnavailable();
+    }
+
+    @Test
+    public void partnerWecomWithoutTenantApplicationFailsWithActionableError() {
+        assertPartnerWecomUnavailable();
+    }
+
+    @Test
+    public void disabledSharedApplicationCannotAuthorizePartner() {
+        insertWecomClient(UserTypeEnum.ADMIN, 1);
+        assertPartnerWecomUnavailable();
+    }
+
+    @Test
+    public void incompleteDedicatedApplicationDoesNotFallBack() {
+        insertWecomClient(UserTypeEnum.ADMIN, 0);
+        SocialClientDO partner = insertWecomClient(UserTypeEnum.PARTNER, 0);
+        partner.setAgentId("");
+        socialClientMapper.updateById(partner);
+        assertPartnerWecomUnavailable();
+    }
+
+    @Test
+    public void adminAndMemberKeepTheirOwnWecomApplications() {
+        SocialClientDO admin = insertWecomClient(UserTypeEnum.ADMIN, 0);
+        SocialClientDO member = insertWecomClient(UserTypeEnum.MEMBER, 0);
+        assertWecomCredentials(UserTypeEnum.ADMIN, admin);
+        assertWecomCredentials(UserTypeEnum.MEMBER, member);
+    }
+
+    private SocialClientDO insertWecomClient(UserTypeEnum type, int status) {
+        SocialClientDO client = randomPojo(SocialClientDO.class, value -> value
+                .setUserType(type.getValue()).setSocialType(SocialTypeEnum.WECHAT_ENTERPRISE.getType())
+                .setStatus(status).setAgentId("1000001"));
+        socialClientMapper.insert(client);
+        return client;
+    }
+
+    private void assertPartnerWecomUnavailable() {
+        assertServiceException(() -> socialClientService.buildAuthRequest(
+                SocialTypeEnum.WECHAT_ENTERPRISE.getType(), UserTypeEnum.PARTNER.getValue()),
+                SOCIAL_CLIENT_PARTNER_WECOM_UNAVAILABLE);
+        verifyNoInteractions(authRequestFactory);
+    }
+
+    private void assertWecomCredentials(UserTypeEnum type, SocialClientDO expected) {
+        AuthConfig config = mock(AuthConfig.class);
+        AuthRequest request = mock(AuthRequest.class);
+        when(authRequestFactory.get(eq("WECHAT_ENTERPRISE"), any())).thenAnswer(invocation -> {
+            java.util.function.Consumer<AuthConfig> configurer = invocation.getArgument(1);
+            configurer.accept(config);
+            return request;
+        });
+        assertSame(request, socialClientService.buildAuthRequest(SocialTypeEnum.WECHAT_ENTERPRISE.getType(),
+                type.getValue()));
+        verify(config).setClientId(expected.getClientId());
+        verify(config).setClientSecret(expected.getClientSecret());
+        verify(config).setAgentId(expected.getAgentId());
+        verify(authRequestFactory, never()).get("WECHAT_ENTERPRISE");
+    }
+
+    @Test
+    public void partnerCallbackUsesIdentityOnlyRequest() {
+        insertWecomClient(UserTypeEnum.PARTNER, 0);
+        AuthRequest configured = mock(AuthRequest.class);
+        AuthRequest identityOnly = mock(AuthRequest.class);
+        when(authRequestFactory.get(eq("WECHAT_ENTERPRISE"), any())).thenReturn(configured);
+        when(authRequestFactory.withWecomIdentityOnly(configured)).thenReturn(identityOnly);
+        AuthUser user = AuthUser.builder().uuid("fixture-member").build();
+        when(identityOnly.login(any())).thenReturn(AuthResponse.<AuthUser>builder().code(2000).data(user).build());
+        assertSame(user, socialClientService.getAuthUser(30, 3, "fixture-code", "fixture-state"));
+        verify(configured, never()).login(any());
     }
 
     // =================== 微信公众号独有 ===================

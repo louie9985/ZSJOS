@@ -300,6 +300,7 @@ public class ContentReviewBatchService {
                 changes.setReferenceContentVersionId(work.getReferenceContentVersionId());
                 changes.setReferenceWorkUrl(work.getReferenceWorkUrl());
                 changes.setMaterialRefsJson(referenceMaterialRefsJson(work));
+                changes.setDeliverableSnapshotJson(work.getDeliverableSnapshotJson());
                 changes.setPlannedPublishAt(work.getPlannedPublishAt());
                 Long versionId = contentVersionService.copyForReview(source, changes, userId);
                 contentIds.add(source.getContentId()); versionIds.add(versionId);

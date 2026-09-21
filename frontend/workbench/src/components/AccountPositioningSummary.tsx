@@ -12,10 +12,15 @@ export default function AccountPositioningSummary({ card, studentName, studentCo
       {identity ? '学员资料' : '定位卡同步'}</Tag></div>
     <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minWidth: 0 }}>{content}</div>
   </div>
+  // Configured dictionary fields mirror the account-status chips so both sheets read the same way.
+  const value = (row: { key: string; value: string; tags: string[] }) => row.tags.length
+    ? <span className="account-value-tags">{row.tags.map((label, index) =>
+        <Tag key={`${index}-${label}`} className="account-value-tag" color="blue">{label}</Tag>)}</span>
+    : row.value
   return <div className="account-positioning-summary" style={{ minWidth: 0, width: '100%' }}>
     {row('student_name', '学员姓名', studentName || '未记录', true)}
     {row('contact', '联系方式', studentContact || '未记录', true)}
-    {accountPositioningSummary(card).map(field => row(field.key, field.label, field.value))}
+    {accountPositioningSummary(card).map(field => row(field.key, field.label, value(field)))}
     {history && <div className="account-profile-row" data-positioning-summary-key="positioning_history">
       <div><Typography.Text>历史定位、采访记录</Typography.Text></div>
       <div>{history}</div>

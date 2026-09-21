@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioninginterview;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
@@ -15,6 +17,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMappe
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
+import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningAttachmentTypes;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
@@ -34,7 +37,8 @@ public class PositioningInterviewService {
  public static final String COMPLETE="zsjos:student:positioning-interview-complete";
  public static final Map<String,String> STATUSES;
  static { Map<String,String> m=new LinkedHashMap<>(); m.put("COMMUNICATED_DOCUMENT","已沟通，见文稿");m.put("NOT_COMMUNICATED","未沟通");m.put("CLIENT_REFUSED","客户拒绝回答");STATUSES=Collections.unmodifiableMap(m); }
- @Resource private PositioningInterviewMapper mapper;
+     @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
+@Resource private PositioningInterviewMapper mapper;
  @Resource private PositioningInterviewItemMapper itemMapper;
  @Resource private PositioningInterviewAttachmentMapper attachmentMapper;
  @Resource private ServiceRelationMapper relationMapper;
@@ -157,6 +161,7 @@ public class PositioningInterviewService {
    relation.setDirectorStage("positioning_interview_completed");
    relation.setVersion((relation.getVersion()==null?0:relation.getVersion())+1);
    relationMapper.updateById(relation);
+   collaborationNotify.student(MEDIA_STUDENT_INTERVIEW_COMPLETED, relation, userId, "interview-completed:"+row.getId());
   }
   return project(relation,row,userId);
  }
@@ -208,12 +213,14 @@ public class PositioningInterviewService {
   relation=validateAuthorization(relationMapper.selectByIdForUpdate(relationId,TenantContextHolder.getRequiredTenantId()),userId);
   var existing=current(relation.getId(),relation.getPersonId());if(!ready(relation)||existing!=null&&"completed".equals(existing.getStatus()))throw exception(POSITIONING_INTERVIEW_STATE);
   String name=file==null?null:file.getOriginalFilename();
-  if(file==null||file.isEmpty()||file.getSize()>20L*1024*1024||name==null
-   ||!name.toLowerCase(Locale.ROOT).matches(".*\\.(pdf|doc|docx|txt|md|rtf)$"))throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
+  byte[] content=file==null||file.isEmpty()?null:file.getBytes();
+  // 允许文档、图片、音频、视频；以探测结果为准，避免客户端伪造 Content-Type。
+  String detected=PositioningAttachmentTypes.detectAllowed(name,content);
+  if(file==null||file.isEmpty()||file.getSize()>20L*1024*1024||detected==null)throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
   String directory=directory(relationId,relation.getPersonId(),userId);
-  var info=fileApi.createFileInfo(file.getBytes(),name,directory,file.getContentType());
+  var info=fileApi.createFileInfo(content,name,directory,detected);
   var row=new PositioningInterviewAttachmentDO();row.setStudentPersonId(relation.getPersonId());row.setFileId(info.getId());row.setFileName(name);row.setFileSize(file.getSize());
-  row.setMimeType(file.getContentType());row.setUploadedBy(userId);row.setDirectory(directory);attachmentMapper.insert(row);return attachment(row);
+  row.setMimeType(detected);row.setUploadedBy(userId);row.setDirectory(directory);attachmentMapper.insert(row);return attachment(row);
  }
  private Attachment attachment(PositioningInterviewAttachmentDO row){Attachment a=new Attachment();a.setFileId(row.getFileId());a.setFileName(row.getFileName());a.setMimeType(row.getMimeType());a.setFileSize(row.getFileSize());return a;}
  @ZsjosPermission(bizType="student-service",bizId="#relationId",action="director-interview")

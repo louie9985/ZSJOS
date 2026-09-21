@@ -1,10 +1,11 @@
-import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Card, DatePicker, Form, Input, Select, Space, Tag, Typography, Upload } from 'antd'
+import ContentReviewAttachments from './ContentReviewAttachments'
+import ResourceLinkInput from './ResourceLinkInput'
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, DatePicker, Form, Input, Select, Space, Tag, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useState } from 'react'
-import { api } from '../services/api'
-import { materialApi, type Material } from '../services/materialApi'
+import { type Material } from '../services/materialApi'
 import MaterialSelectorModal from './MaterialSelectorModal'
 
 export type ContentApprovalAccount = {
@@ -74,41 +75,13 @@ const toReferenceMaterials = (materials: Material[]): ContentApprovalReferenceMa
   coverPreviewUrl: material.coverPreviewUrl,
 }))
 
-function CoverUploadField({ name }: { name: (string | number)[] }) {
-  const form = Form.useFormInstance()
-  const { message } = App.useApp()
-  const [uploading, setUploading] = useState(false)
-  const [localPreviewUrl, setLocalPreviewUrl] = useState<string>()
-  const previewUrl = Form.useWatch(['works', ...name, 'coverPreviewUrl'], form) as string | undefined
-  const handleUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const uploaded = await api.mediaContent.uploadVersionFile(file)
-      form.setFieldValue(['works', ...name, 'coverFileId'], uploaded.fileId)
-      const preview = uploaded.previewUrl || URL.createObjectURL(file)
-      setLocalPreviewUrl(preview)
-      form.setFieldValue(['works', ...name, 'coverPreviewUrl'], preview)
-      message.success('封面图已上传')
-    } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : '封面图上传失败，请重试')
-    } finally {
-      setUploading(false)
-    }
-  }
-  return <Space direction="vertical" size={6}>
-    <Upload accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void handleUpload(file); return Upload.LIST_IGNORE }} disabled={uploading}>
-      <Button icon={<UploadOutlined />} loading={uploading}>上传封面图</Button>
-    </Upload>
-    {(previewUrl || localPreviewUrl) && <Space align="start"><img src={previewUrl || localPreviewUrl} alt="作品封面预览" style={{ width: 160, maxHeight: 100, objectFit: 'cover', borderRadius: 6 }} /><Button danger icon={<DeleteOutlined />} onClick={() => { setLocalPreviewUrl(undefined); form.setFieldValue(['works', ...name, 'coverFileId'], undefined); form.setFieldValue(['works', ...name, 'coverPreviewUrl'], undefined) }}>删除图片</Button></Space>}
-    <Typography.Text type="secondary">支持 JPG、PNG 等图片格式，提交审批前必须上传。</Typography.Text>
-  </Space>
-}
-
 export default function ContentApprovalDraft({
+  disabled = false,
   accounts = [],
   purposeOptions,
   formatOptions,
 }: {
+  disabled?: boolean
   accounts?: ContentApprovalAccount[]
   purposeOptions: Option[]
   formatOptions: Option[]
@@ -141,31 +114,29 @@ export default function ContentApprovalDraft({
     <Form.List name="works" initialValue={[{}]}>
       {(fields, { add, remove, move }) => <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {fields.map((field, index) => {
-          const workName = [field.name]
           return <Card key={field.key} size="small" title={<Space><span>作品 {index + 1}</span><Tag color="blue">逐件审批</Tag></Space>} extra={<Space size={4}>
-            <Button type="text" size="small" disabled={index === 0} onClick={() => move(index, index - 1)}>上移</Button>
-            <Button type="text" size="small" disabled={index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>
+            <Button type="text" size="small" disabled={disabled || index === 0} onClick={() => move(index, index - 1)}>上移</Button>
+            <Button type="text" size="small" disabled={disabled || index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>
             {fields.length > 1 && <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(field.name)}>删除</Button>}
           </Space>}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-              <Form.Item {...field} name={[field.name, 'coverFileId']} label="作品封面图" rules={[{ required: true, message: '请上传作品封面图' }]}>
-                <CoverUploadField name={workName} />
-              </Form.Item>
+            <div className="content-approval-draft-grid">
+              <ContentReviewAttachments index={field.name} cover disabled={disabled} />
               <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }, { validator: (_, value: Dayjs | undefined) => !value || !value.isBefore(now, 'minute') ? Promise.resolve() : Promise.reject(new Error('预计发布时间不能早于当前时间')) }]}>
                 <DatePicker showTime style={{ width: '100%' }} disabledDate={date => date.isBefore(dayjs(), 'minute')} />
               </Form.Item>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <div className="content-approval-draft-grid">
               <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select options={purposeOptions} /></Form.Item>
               <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select options={formatOptions} /></Form.Item>
             </div>
             <Form.Item {...field} name={[field.name, 'title']} label="发布标题" rules={[{ required: true, whitespace: true, message: '请输入发布标题' }, { max: 200, message: '发布标题不能超过 200 字' }]}><Input showCount maxLength={200} /></Form.Item>
             <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, whitespace: true, message: '请输入正文文稿' }]}><Input.TextArea rows={7} showCount maxLength={10000} /></Form.Item>
-            <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><Input placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
-            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><Input placeholder="可点击下载的资料链接" /></Form.Item>
+            <ContentReviewAttachments index={field.name} disabled={disabled} />
+            <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><ResourceLinkInput placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
+            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
             <Form.Item {...field} name={[field.name, 'commentHook']} label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
             <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接" extra="直接填写参考作品的链接，可留空。">
-              <Input placeholder="https:// 参考作品链接" allowClear />
+              <ResourceLinkInput placeholder="https:// 参考作品链接" allowClear />
             </Form.Item>
             <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>

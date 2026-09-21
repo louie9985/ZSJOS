@@ -10,10 +10,6 @@
 .media-students-profile-card { min-width: 0; }
 .media-students-summary-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--crm-gap); }
 .media-students-summary-fields dd { margin: 0; overflow-wrap: anywhere; }
-.positioning-interview-table-scroll { width: 100%; min-width: 0; }
-.positioning-interview-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
-.positioning-interview-table th, .positioning-interview-table td { width: 33.333%; padding: var(--crm-card-pad); border: 1px solid var(--crm-border); vertical-align: top; text-align: left; overflow-wrap: anywhere; }
-.positioning-interview-table thead { background: var(--crm-bg-sunken); }
 .positioning-interview-table .ant-radio-group, .positioning-interview-table .ant-space, .positioning-interview-table .ant-picker { width: 100%; min-width: 0; }
 .positioning-interview-table .ant-space-item, .positioning-interview-table .ant-picker-input { min-width: 0; }
 .positioning-interview-table .ant-radio-wrapper { margin-inline-end: 0; white-space: normal; align-items: flex-start; }
@@ -24,10 +20,6 @@
 @media (max-width: 768px) {
   .media-students-profile-card .lead-profile-fields,
   .media-students-profile-card .lead-profile-meta { grid-template-columns: minmax(0, 1fr); }
-  .positioning-interview-table thead { display: none; }
-  .positioning-interview-table, .positioning-interview-table tbody, .positioning-interview-table tr { display: block; width: 100%; }
-  .positioning-interview-table tr { margin-bottom: var(--crm-gap); border: 1px solid var(--crm-border); }
-  .positioning-interview-table th, .positioning-interview-table td { display: block; box-sizing: border-box; width: 100%; border: none; padding: var(--crm-sp-3); }
 }
 
 .media-students-filter-shell,
@@ -557,6 +549,17 @@
 .account-positioning-status-version .ant-tag { margin: 0; }
 .account-positioning-status-hint { color: var(--crm-color-primary); font-size: var(--crm-font-sm); line-height: 1.7; }
 .account-positioning-status .ant-btn { min-height: 32px; height: auto; white-space: normal; border-radius: var(--crm-radius-md); font-size: var(--crm-font-base); }
+/* Version chooser: the candidate list is a side rail and the snapshot gets the remaining width,
+   so the reading grid keeps its own container query instead of collapsing inside the radio group. */
+.positioning-version-sheet { container-type: inline-size; }
+.positioning-version-picker { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: var(--crm-sp-5); align-items: start; }
+.positioning-version-picker .positioning-version-options { display: flex; min-width: 0; flex-direction: column; }
+.positioning-version-picker .positioning-version-options .ant-space { min-width: 0; width: 100%; }
+.positioning-version-picker .positioning-version-options .ant-radio-wrapper { align-items: flex-start; margin-inline-end: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.7; }
+.positioning-version-preview { min-width: 0; overflow-x: hidden; }
+@container (max-width: 900px) {
+  .positioning-version-picker { grid-template-columns: minmax(0, 1fr); }
+}
 .account-profile-sidebar-actions .ant-btn { width: 100%; white-space: normal; height: auto; min-height: 32px; border-radius: var(--crm-radius-md); font-size: var(--crm-font-base); }
 /* 三板块是 grid 的直接子项，各自定高内滚。 */
 .account-profile-sections { display: contents; }
@@ -938,3 +941,11 @@
 @media (max-width: 768px) {
   .positioning-reading-grid, .positioning-feedback-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Match Lead Management cards while keeping the student identity and contacts full width. */
+.media-students-item.lead-inbox-item { flex: none; align-items: flex-start; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-lg); background: var(--crm-bg-container); box-shadow: var(--crm-shadow); font: inherit; }
+.media-students-item.lead-inbox-item.active { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); }
+.media-students-item-copy > .media-students-item-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--crm-sp-2); color: var(--crm-text); }
+.media-students-item-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.media-students-item-heading > span { flex: none; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.media-students-load-more { flex: none; padding: var(--crm-sp-2); text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; }

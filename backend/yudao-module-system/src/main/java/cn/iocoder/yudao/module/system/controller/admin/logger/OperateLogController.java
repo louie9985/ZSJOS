@@ -6,12 +6,13 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
-import cn.iocoder.yudao.framework.translate.core.TranslateUtils;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.operatelog.OperateLogPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.operatelog.OperateLogRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.OperateLogDO;
 import cn.iocoder.yudao.module.system.service.logger.OperateLogService;
-import org.dromara.core.trans.anno.TransMethodResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -40,34 +44,64 @@ public class OperateLogController {
     @Resource
     private OperateLogService operateLogService;
 
+    @Resource
+    private AdminUserService adminUserService;
+
     @GetMapping("/get")
     @Operation(summary = "查看操作日志")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('system:operate-log:query')")
     public CommonResult<OperateLogRespVO> getOperateLog(@RequestParam("id") Long id) {
         OperateLogDO operateLog = operateLogService.getOperateLog(id);
-        return success(BeanUtils.toBean(operateLog, OperateLogRespVO.class));
+        OperateLogRespVO result = BeanUtils.toBean(operateLog, OperateLogRespVO.class);
+        if (result != null) {
+            fillUserNames(List.of(result));
+        }
+        return success(result);
     }
 
     @GetMapping("/page")
     @Operation(summary = "查看操作日志分页列表")
     @PreAuthorize("@ss.hasPermission('system:operate-log:query')")
-    @TransMethodResult
     public CommonResult<PageResult<OperateLogRespVO>> pageOperateLog(@Valid OperateLogPageReqVO pageReqVO) {
         PageResult<OperateLogDO> pageResult = operateLogService.getOperateLogPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, OperateLogRespVO.class));
+        PageResult<OperateLogRespVO> result = BeanUtils.toBean(pageResult, OperateLogRespVO.class);
+        fillUserNames(result.getList());
+        return success(result);
     }
 
     @Operation(summary = "导出操作日志")
     @GetMapping("/export-excel")
     @PreAuthorize("@ss.hasPermission('system:operate-log:export')")
-    @TransMethodResult
     @ApiAccessLog(operateType = EXPORT)
     public void exportOperateLog(HttpServletResponse response, @Valid OperateLogPageReqVO exportReqVO) throws IOException {
         exportReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         List<OperateLogDO> list = operateLogService.getOperateLogPage(exportReqVO).getList();
+        List<OperateLogRespVO> result = BeanUtils.toBean(list, OperateLogRespVO.class);
+        fillUserNames(result);
         ExcelUtils.write(response, "操作日志.xls", "数据列表", OperateLogRespVO.class,
-                TranslateUtils.translate(BeanUtils.toBean(list, OperateLogRespVO.class)));
+                result);
+    }
+
+    private void fillUserNames(List<OperateLogRespVO> logs) {
+        // 不同用户类型的 ID 空间独立，不能把合作方或会员映射为同 ID 的员工。
+        Set<Long> userIds = logs.stream()
+                .filter(log -> UserTypeEnum.ADMIN.getValue().equals(log.getUserType()))
+                .map(OperateLogRespVO::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<Long, AdminUserDO> users = adminUserService.getUserMap(userIds);
+        for (OperateLogRespVO log : logs) {
+            if (UserTypeEnum.ADMIN.getValue().equals(log.getUserType()) && log.getUserId() != null) {
+                AdminUserDO user = users.get(log.getUserId());
+                if (user != null) {
+                    log.setUserName(user.getNickname());
+                }
+            }
+        }
     }
 
 }

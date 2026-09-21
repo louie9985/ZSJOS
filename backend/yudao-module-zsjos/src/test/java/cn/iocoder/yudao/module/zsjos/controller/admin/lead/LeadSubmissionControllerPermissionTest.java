@@ -7,6 +7,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LeadSubmissionControllerPermissionTest {
+    @Test
+    void contactCheckUsesConfiguredSubmissionPermissions() throws Exception {
+        var auth = LeadSubmissionController.class.getMethod("checkContact",
+                cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO.class)
+                .getAnnotation(PreAuthorize.class);
+        assertEquals("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')", auth.value());
+    }
+
 
     @Test
     void ordinaryCreateRequiresSubmitPermission() throws NoSuchMethodException {

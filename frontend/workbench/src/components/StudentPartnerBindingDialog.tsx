@@ -1,5 +1,6 @@
+import BusinessTable from './BusinessTable'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Input, Modal, Space, Table, Typography } from 'antd'
+import { Alert, Button, Input, Modal, Space, Typography } from 'antd'
 import { managementApi, type Partner } from '../services/managementApi'
 
 type Props = { studentPersonId: number; studentName: string; onClose: () => void; onBound: () => void }
@@ -46,7 +47,7 @@ export default function StudentPartnerBindingDialog({ studentPersonId, studentNa
       <Input.Search aria-label="搜索兼职账号" placeholder="搜索兼职姓名、手机号或编号" value={keyword} disabled={saving}
         onChange={event => setKeyword(event.target.value)} onSearch={value => { setQuery(value.trim()); setPage(1); setRetry(value => value + 1) }} enterButton="搜索" />
       {loadError ? <Alert type="error" showIcon message={loadError} action={<Button onClick={() => setRetry(value => value + 1)}>重试加载</Button>} /> :
-        <Table<Partner> size="small" rowKey="id" loading={loading} dataSource={rows} scroll={{ x: 520 }}
+        <BusinessTable<Partner> tableKey="student-partner-binding-dialog-1" columnMode="native" mode="compact" size="small" rowKey="id" loading={loading} dataSource={rows} scroll={{ x: 520 }}
           locale={{ emptyText: '没有找到兼职账号，请调整搜索条件' }}
           rowSelection={{ type: 'radio', selectedRowKeys: selected ? [selected.id] : [], getCheckboxProps: () => ({ disabled: saving || loading }), onChange: (_, selectedRows) => { setSelected(selectedRows[0]); setSaveError('') } }}
           columns={[{ title: '兼职编号', dataIndex: 'partnerNo' }, { title: '姓名', dataIndex: 'name' }, { title: '手机号', dataIndex: 'mobile' }]}

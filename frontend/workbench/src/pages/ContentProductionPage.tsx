@@ -1,3 +1,4 @@
+import ResourceLinkInput from '../components/ResourceLinkInput'
 import {
   CheckOutlined,
   EditOutlined,
@@ -320,10 +321,10 @@ function VersionEditor({ content, initial, purposeOptions, formatOptions, onSave
         <Form.Item name="formatValue" label="作品形式"><Select allowClear options={formatOptions} /></Form.Item>
       </div>
       <Form.Item name="scriptText" label="正文文稿"><Input.TextArea rows={9} maxLength={20000} showCount /></Form.Item>
-      <Form.Item name="detailUrl" label="作品详情"><Input placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
-      <Form.Item name="leadResourceUrl" label="引流资料链接"><Input placeholder="可点击下载的资料链接" /></Form.Item>
+      <Form.Item name="detailUrl" label="作品详情"><ResourceLinkInput placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
+      <Form.Item name="leadResourceUrl" label="引流资料链接"><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
       <Form.Item name="commentHook" label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
-      <Form.Item name="referenceWorkUrl" label="参考作品链接" extra="直接填写参考作品的链接，可留空。"><Input placeholder="https:// 参考作品链接" allowClear /></Form.Item>
+      <Form.Item name="referenceWorkUrl" label="参考作品链接" extra="直接填写参考作品的链接，可留空。"><ResourceLinkInput placeholder="https:// 参考作品链接" allowClear /></Form.Item>
       <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Button onClick={() => setPickerOpen(true)}>素材浏览 · 选择参考素材</Button>

@@ -42,6 +42,13 @@ public class DeptApiImpl implements DeptApi {
     }
 
     @Override
+    @DataPermission(enable = false) // 接口默认方法内部转调不会再次经过代理，单部门入口也必须声明花名册查询边界
+    public List<DeptRespDTO> getChildDeptList(Long id) {
+        return getChildDeptList(java.util.Collections.singletonList(id));
+    }
+
+    @Override
+    @DataPermission(enable = false) // 跨模块子部门花名册查询必须完整，不能被调用方的数据范围裁剪成空集
     public List<DeptRespDTO> getChildDeptList(Collection<Long> ids) {
         List<DeptDO> childDeptList = deptService.getChildDeptList(ids);
         return BeanUtils.toBean(childDeptList, DeptRespDTO.class);

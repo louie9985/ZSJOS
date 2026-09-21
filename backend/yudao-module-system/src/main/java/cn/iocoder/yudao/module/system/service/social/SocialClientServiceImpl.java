@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.system.service.social;
 
+import cn.hutool.core.util.StrUtil;
+
 import cn.binarywang.wx.miniapp.api.WxMaService;
 import cn.binarywang.wx.miniapp.api.WxMaSubscribeService;
 import cn.binarywang.wx.miniapp.api.impl.WxMaServiceImpl;
@@ -179,14 +181,27 @@ public class SocialClientServiceImpl implements SocialClientService {
     }
 
     @Override
+    public String getWecomWebAuthorizeUrl(Integer userType, String redirectUri) {
+        // Both enterprise flows share code exchange and UserId bindings. Reuse the configured
+        // request to register state in the same cache; never create a second identity namespace.
+        String qrUrl = getAuthorizeUrl(SocialTypeEnum.WECHAT_ENTERPRISE.getType(), userType, redirectUri);
+        String query = java.net.URI.create(qrUrl).getRawQuery();
+        return "https://open.weixin.qq.com/connect/oauth2/authorize?" + query
+                + "&response_type=code&scope=snsapi_base#wechat_redirect";
+    }
+
+    @Override
     public AuthUser getAuthUser(Integer socialType, Integer userType, String code, String state) {
         // 构建请求
         AuthRequest authRequest = buildAuthRequest(socialType, userType);
+        if (SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)
+                && UserTypeEnum.PARTNER.getValue().equals(userType)) {
+            authRequest = authRequestFactory.withWecomIdentityOnly(authRequest);
+        }
         AuthCallback authCallback = AuthCallback.builder().code(code).auth_code(code).state(state).build();
         // 执行请求
         AuthResponse<?> authResponse = authRequest.login(authCallback);
-        log.info("[getAuthUser][请求社交平台 type({}) request({}) response({})]", socialType,
-                toJsonString(authCallback), toJsonString(authResponse));
+        log.info("[getAuthUser][socialType({}) userType({}) success({})]", socialType, userType, authResponse.ok());
         if (!authResponse.ok()) {
             throw exception(SOCIAL_USER_AUTH_FAILURE, authResponse.getMsg());
         }
@@ -203,7 +218,7 @@ public class SocialClientServiceImpl implements SocialClientService {
     @VisibleForTesting
     AuthRequest buildAuthRequest(Integer socialType, Integer userType) {
         // Read the tenant configuration before construction because JustAuth validates in its constructor.
-        SocialClientDO client = socialClientMapper.selectBySocialTypeAndUserType(socialType, userType);
+        SocialClientDO client = resolveAuthClient(socialType, userType);
         if (client != null && Objects.equals(client.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
             AuthRequest request = authRequestFactory.get(SocialTypeEnum.valueOfType(socialType).getSource(), config -> {
                 config.setClientId(client.getClientId());
@@ -220,6 +235,24 @@ public class SocialClientServiceImpl implements SocialClientService {
         AuthRequest request = authRequestFactory.get(SocialTypeEnum.valueOfType(socialType).getSource());
         Assert.notNull(request, String.format("社交平台(%d) 不存在", socialType));
         return request;
+    }
+
+    private SocialClientDO resolveAuthClient(Integer socialType, Integer userType) {
+        SocialClientDO client = socialClientMapper.selectBySocialTypeAndUserType(socialType, userType);
+        if (!SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)
+                || !UserTypeEnum.PARTNER.getValue().equals(userType)) {
+            return client;
+        }
+        // Share the tenant's application credentials, never the ADMIN login/binding identity.
+        // An explicitly disabled Partner application must not be bypassed by a fallback.
+        if (client == null) {
+            client = socialClientMapper.selectBySocialTypeAndUserType(socialType, UserTypeEnum.ADMIN.getValue());
+        }
+        if (client == null || !CommonStatusEnum.ENABLE.getStatus().equals(client.getStatus())
+                || StrUtil.hasBlank(client.getClientId(), client.getClientSecret(), client.getAgentId())) {
+            throw exception(SOCIAL_CLIENT_PARTNER_WECOM_UNAVAILABLE);
+        }
+        return client;
     }
 
     // =================== 微信公众号独有 ===================

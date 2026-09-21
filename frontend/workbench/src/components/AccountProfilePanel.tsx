@@ -715,7 +715,7 @@ export default function AccountProfilePanel({
       <AccountProfileTextInput
         key={`${account?.id}-${open}`}
         fieldKey={f.key} label={f.label} value={String(value ?? "")}
-        multiline={f.type === 'textarea'} date={f.type === 'date'}
+        multiline={f.type === 'textarea'} date={f.type === 'date'} url={f.type === 'url'}
         onChange={updateText} onBlur={flushText}
         maxLength={["nickname", "uid"].includes(f.key) ? 255 : 2000}
         disabled={disabled}

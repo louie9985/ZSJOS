@@ -15,5 +15,7 @@ public class LeadAgingPoolPageReqVO extends PageParam {
     private String status;
     private String inboxGroup;
     private String inboxStage;
+    @Pattern(regexp = "owned|following", message = "公海关系筛选不正确")
+    private String relationScope;
     @Valid private AdvancedFilterGroupReqVO advancedFilter;
 }

@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PositioningCardServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Test void attachmentWrongDirectorReportsPermissionInsteadOfVersionConflict() {
         when(mapper.selectById(1L)).thenReturn(editableDraft(2));
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,

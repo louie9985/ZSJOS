@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PositioningConfirmationServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Mock private PositioningCardService cardService;
     @Mock private PositioningCardMapper cardMapper;
     @Mock private PositioningCardSubmissionMapper submissionMapper;
@@ -139,7 +140,7 @@ class PositioningConfirmationServiceTest {
     }
 
     @Test
-    void agreeConsumesLinkAndMakesSubmissionEffective() {
+    void agreeConsumesLinkAndWaitsForOperatorEvidence() {
         PositioningConfirmationLinkDO link = link("active");
         link.setTenantId(7L);
         PositioningCardDO card = card(POSITIONING_STUDENT_CONFIRM, 4).setAccountId(null);
@@ -150,7 +151,7 @@ class PositioningConfirmationServiceTest {
         when(submissionMapper.selectByIdForUpdate(11L, 7L)).thenReturn(submission);
         when(submissionMapper.selectLatestByCard(1L)).thenReturn(submission);
         when(submissionMapper.markStudentDecision(eq(11L), eq(2), eq(POSITIONING_STUDENT_CONFIRM),
-                eq(POSITIONING_CONFIRMED), eq("agree"), isNull(), any())).thenReturn(1);
+                eq("student_evidence_pending"), eq("agree"), isNull(), any())).thenReturn(1);
         when(linkMapper.consume(eq(21L), eq(0), any())).thenReturn(1);
         PublicPositioningDecisionReqVO request = new PublicPositioningDecisionReqVO();
         request.setDecision("agree");

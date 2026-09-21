@@ -35,6 +35,17 @@ class UserRelationSceneServiceImplTest {
     private PostApi postApi;
 
     @Test
+    void detailResponseKeepsEveryConfiguredPost() {
+        var row = scene(1L, "multiple", 0);
+        row.setSourcePostCodes(java.util.List.of("first", "second"));
+        row.setTargetPostCodes(java.util.List.of("third", "fourth"));
+        when(sceneMapper.selectById(1L)).thenReturn(row);
+        var response = service.getScene(1L);
+        assertEquals(row.getSourcePostCodes(), response.getSourcePostCodes());
+        assertEquals(row.getTargetPostCodes(), response.getTargetPostCodes());
+    }
+
+    @Test
     void createSceneRejectsDuplicateCode() {
         UserRelationSceneDO existing = scene(1L, "duplicate", CommonStatusEnum.ENABLE.getStatus());
         when(sceneMapper.selectByCode("duplicate")).thenReturn(existing);
@@ -92,6 +103,48 @@ class UserRelationSceneServiceImplTest {
                 () -> service.getEnabledSceneByCode("disabled"));
 
         assertEquals(USER_RELATION_SCENE_DISABLED.getCode(), exception.getCode());
+    }
+
+    @Test
+    void savesEverySelectedPostAndDeduplicates() {
+        var request = request(null, "multiple");
+        request.setSourcePostCodes(java.util.List.of("source_post", "second", "source_post"));
+        request.setTargetPostCodes(java.util.List.of("target_post", "second"));
+        when(postApi.getPostByCode(anyString())).thenReturn(post(11L));
+        service.createScene(request);
+        var captor = org.mockito.ArgumentCaptor.forClass(UserRelationSceneDO.class);
+        verify(sceneMapper).insert(captor.capture());
+        assertEquals(java.util.List.of("source_post", "second"), captor.getValue().getSourcePostCodes());
+        assertEquals(java.util.List.of("target_post", "second"), captor.getValue().getTargetPostCodes());
+    }
+
+    @Test
+    void emptyArrayDoesNotFallBackToLegacyPost() {
+        var request = request(null, "empty");
+        request.setSourcePostCodes(java.util.List.of());
+        assertEquals(USER_RELATION_SCENE_POST_INVALID.getCode(),
+                assertThrows(ServiceException.class, () -> service.createScene(request)).getCode());
+        verify(sceneMapper, never()).insert(any(UserRelationSceneDO.class));
+    }
+
+    @Test
+    void unknownAdditionalPostRejectsWholeSave() {
+        var request = request(null, "unknown");
+        request.setSourcePostCodes(java.util.List.of("source_post", "unknown"));
+        when(postApi.getPostByCode("source_post")).thenReturn(post(11L));
+        assertThrows(ServiceException.class, () -> service.createScene(request));
+        verify(sceneMapper, never()).insert(any(UserRelationSceneDO.class));
+    }
+
+    @Test
+    void readsLegacyPostWithoutRevivingExplicitEmptyArray() {
+        var row = new UserRelationSceneDO();
+        row.setSourcePostCode("source_post");
+        row.setTargetPostCode("target_post");
+        assertEquals(java.util.List.of("source_post"), row.getSourcePostCodes());
+        assertEquals(java.util.List.of("target_post"), row.getTargetPostCodes());
+        row.setSourcePostCodes(java.util.List.of());
+        assertEquals(java.util.List.of(), row.getSourcePostCodes());
     }
 
     private static UserRelationSceneSaveReqVO request(Long id, String code) {

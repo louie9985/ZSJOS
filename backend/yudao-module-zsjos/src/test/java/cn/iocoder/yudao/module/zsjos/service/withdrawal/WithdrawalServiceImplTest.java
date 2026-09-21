@@ -78,6 +78,9 @@ class WithdrawalServiceImplTest {
         when(userApi.getUserListByStatus(0)).thenReturn(List.of());
         service.handleProcessResult("p1",REJECT.getStatus(),"资料有误");
         assertEquals("rejected",row.getStatus());verify(itemMapper).deactivate(50L);
+        verify(publisher).publish(eq("zsjos.withdrawal.rejected"), eq(50L), anyString(), any(),
+                argThat(payload -> "TX-TEST-50".equals(payload.get("withdrawal.no"))
+                        && "资料有误".equals(payload.get("withdrawal.rejectionReason"))));
     }
 
     @Test void approvedProcessKeepsCashbackWithdrawing() {
@@ -85,6 +88,8 @@ class WithdrawalServiceImplTest {
         when(withdrawalMapper.selectByIdForUpdate(50L,9L)).thenReturn(row);when(taskApi.getProcessNodeStatuses(eq("p1"),anySet())).thenReturn(List.of());
         when(userApi.getUserListByStatus(0)).thenReturn(List.of());service.handleProcessResult("p1",APPROVE.getStatus(),null);
         assertEquals("approved",row.getStatus());assertEquals(new BigDecimal("20.00"),row.getApprovedAmount());verifyNoInteractions(cashbackMapper);
+        verify(publisher).publish(eq("zsjos.withdrawal.approved"), eq(50L), anyString(), any(),
+                argThat(payload -> "TX-TEST-50".equals(payload.get("withdrawal.no"))));
     }
 
     @Test void payoutRequiresOwnedProofAndWithdrawsCashback() {
@@ -147,5 +152,5 @@ class WithdrawalServiceImplTest {
 
     private WithdrawalDO invocationWithdrawal(org.mockito.invocation.InvocationOnMock inv){return inv.getArgument(0);}
     private CashbackDO cashback(long id,String amount){return new CashbackDO().setId(id).setPartnerId(8L).setBeneficiaryUserId(7L).setStatus("available").setAmount(new BigDecimal(amount)).setVersion(0);}
-    private WithdrawalDO withdrawal(long id,String status){return new WithdrawalDO().setId(id).setApplicantUserId(7L).setStatus(status).setApplicationAmount(new BigDecimal("20.00")).setProcessInstanceId("p1").setVersion(0);}
+    private WithdrawalDO withdrawal(long id,String status){return new WithdrawalDO().setId(id).setWithdrawalNo("TX-TEST-" + id).setApplicantUserId(7L).setStatus(status).setApplicationAmount(new BigDecimal("20.00")).setProcessInstanceId("p1").setVersion(0);}
 }

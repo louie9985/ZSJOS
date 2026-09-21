@@ -25,7 +25,6 @@ export interface PartnerCreateVO {
   channelId?: string
 }
 
-export const getPartnerList = () => request.get<PartnerVO[]>({ url: '/zsjos/partner/list' })
 export const getPartnerPage = (
   params: {
     pageNo: number

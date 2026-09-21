@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PositioningInterviewServiceTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
  @InjectMocks PositioningInterviewService service;
  @Mock PositioningInterviewMapper mapper;
  @Mock PositioningInterviewItemMapper itemMapper;

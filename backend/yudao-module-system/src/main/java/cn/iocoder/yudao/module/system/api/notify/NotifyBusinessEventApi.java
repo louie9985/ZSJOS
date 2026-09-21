@@ -8,7 +8,8 @@ public interface NotifyBusinessEventApi {
     void publish(NotifyBusinessEvent event);
 
     /**
-     * Synchronously confirms that all deliveries selected by the event are persisted or sent.
+     * Confirms persistence or sending for the selected deliveries. WeCom confirms durable outbox
+     * acceptance (WECOM_QUEUED), not provider delivery; inspect delivery status for the final result.
      * Existing asynchronous publishers should continue to use {@link #publish(NotifyBusinessEvent)}.
      */
     NotifySendResult publishConfirmed(NotifyBusinessEvent event);

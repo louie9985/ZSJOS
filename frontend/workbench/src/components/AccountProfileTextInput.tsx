@@ -1,9 +1,10 @@
+import ResourceLinkInput from './ResourceLinkInput'
 import { Input } from 'antd'
 import { memo, useEffect, useState } from 'react'
 
 /** Keystrokes stay local; the parent receives every value synchronously for immediate saves. */
-export default memo(function AccountProfileTextInput({ fieldKey, label, value, multiline, date, maxLength, disabled, onChange, onBlur }: {
-  fieldKey: string; label: string; value: string; multiline: boolean; date: boolean; maxLength: number; disabled: boolean;
+export default memo(function AccountProfileTextInput({ fieldKey, label, value, multiline, date, url, maxLength, disabled, onChange, onBlur }: {
+  fieldKey: string; label: string; value: string; multiline: boolean; date: boolean; url?: boolean; maxLength: number; disabled: boolean;
   onChange: (key: string, value: string) => void; onBlur: () => void;
 }) {
   const [text, setText] = useState(value)
@@ -14,5 +15,6 @@ export default memo(function AccountProfileTextInput({ fieldKey, label, value, m
       onChange(fieldKey, event.target.value)
     } }
   return multiline ? <Input.TextArea {...props} rows={3} showCount />
+    : url ? <ResourceLinkInput {...props} placeholder="待补充，可留空" />
     : <Input {...props} type={date ? 'date' : 'text'} placeholder="待补充，可留空" />
 })

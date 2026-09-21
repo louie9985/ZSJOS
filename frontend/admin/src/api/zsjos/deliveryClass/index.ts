@@ -56,11 +56,6 @@ export interface HomeroomCandidate {
   deptId?: number
   deptName?: string
 }
-export interface CategoryOption {
-  id: number
-  parentId: number
-  name: string
-}
 export interface ExamOption {
   id: number
   scheduleType: string
@@ -89,8 +84,6 @@ export const getDeliveryClassPage = (params: Record<string, unknown>, mine = fal
     url: mine ? '/zsjos/delivery-class/my-page' : '/zsjos/delivery-class/page',
     params
   })
-export const getDeliveryClass = (id: number) =>
-  request.get<DeliveryClass>({ url: `/zsjos/delivery-class/${id}` })
 export const getDeliveryClassStudents = (
   id: number,
   params: { pageNo: number; pageSize: number }
@@ -106,8 +99,6 @@ export const getDeliveryClassOptions = (categoryId?: number, includePending = tr
   })
 export const getHomeroomCandidates = () =>
   request.get<HomeroomCandidate[]>({ url: '/zsjos/delivery-class/homeroom-candidates' })
-export const getCategoryOptions = () =>
-  request.get<CategoryOption[]>({ url: '/zsjos/delivery-class/category-options' })
 export const getExamOptions = (categoryId: number, productId?: number, selectedAttrsJson?: string) =>
   request.get<ExamOption[]>({ url: '/zsjos/delivery-class/exam-options', params: { categoryId, productId, selectedAttrsJson } })
 export const getProductOptions = () =>

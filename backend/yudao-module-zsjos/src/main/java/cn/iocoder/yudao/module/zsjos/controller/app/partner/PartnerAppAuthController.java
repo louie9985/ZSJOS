@@ -40,8 +40,9 @@ public class PartnerAppAuthController {
     }
 
     @GetMapping("/wecom-authorize-url") @PermitAll
-    public CommonResult<String> wecomAuthorizeUrl(@RequestParam @NotBlank String redirectUri) {
-        return success(authService.getWecomAuthorizeUrl(redirectUri));
+    public CommonResult<String> wecomAuthorizeUrl(@RequestParam @NotBlank String redirectUri,
+            @RequestParam(defaultValue = "false") boolean inWecom) {
+        return success(authService.getWecomAuthorizeUrl(redirectUri, inWecom));
     }
 
     @PostMapping("/wecom-login") @PermitAll

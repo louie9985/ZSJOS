@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
@@ -12,7 +13,7 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import { useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable } from '@ant-design/pro-components'
+
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumns'
 import LeadDetailModal from '../components/LeadDetailModal'
@@ -138,11 +139,10 @@ export default function MySalesOrderPage() {
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {useTableLayout ? <div className="sales-order-table-area"><div className="sales-order-table-toolbar"><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderListItem>
+    {useTableLayout ? <div className="sales-order-table-area"><BusinessTable<SalesOrderListItem> filters={<><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="my-sales-order-page-1" error={error} onReload={reload}
       className="sales-order-inbox-table"
       rowKey="id"
-      search={false}
-      options={{ density: true, fullScreen: true, setting: true }}
+
       columnsState={{ persistenceKey: 'crm-sales-order-management-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}

@@ -34,6 +34,9 @@ public interface SocialClientService {
      */
     String getAuthorizeUrl(Integer socialType, Integer userType, String redirectUri);
 
+    /** Enterprise in-client OAuth; preserves the same application and identity namespace as QR login. */
+    String getWecomWebAuthorizeUrl(Integer userType, String redirectUri);
+
     /**
      * 请求社交平台，获得授权的用户
      *

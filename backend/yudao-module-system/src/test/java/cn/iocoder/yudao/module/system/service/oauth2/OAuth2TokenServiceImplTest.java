@@ -57,6 +57,21 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
     private AdminUserService adminUserService;
 
     @Test
+    public void partnerRefreshCannotExtendOriginalRememberDeadline() {
+        TenantContextHolder.setTenantId(0L);
+        OAuth2ClientDO client = new OAuth2ClientDO().setClientId("zsjos-mobile")
+                .setAccessTokenValiditySeconds(7200).setRefreshTokenValiditySeconds(604800);
+        when(oauth2ClientService.validOAuthClientFromCache("zsjos-mobile")).thenReturn(client);
+        OAuth2RefreshTokenDO refresh = randomPojo(OAuth2RefreshTokenDO.class, value -> value.setId(null)
+                .setUserType(UserTypeEnum.PARTNER.getValue()).setClientId("zsjos-mobile")
+                .setExpiresTime(LocalDateTime.now().plusMinutes(1).withNano(0)));
+        oauth2RefreshTokenMapper.insert(refresh);
+        OAuth2AccessTokenDO access = oauth2TokenService.refreshAccessToken(refresh.getRefreshToken(), "zsjos-mobile");
+        assertEquals(refresh.getExpiresTime(), access.getExpiresTime());
+        assertEquals(refresh.getExpiresTime(), oauth2RefreshTokenMapper.selectById(refresh.getId()).getExpiresTime());
+    }
+
+    @Test
     public void testRemoveExcessAccessTokens_removesOldestForClient() {
         TenantContextHolder.setTenantId(0L);
         Long userId = randomLongId();

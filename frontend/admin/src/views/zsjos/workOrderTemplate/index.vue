@@ -250,6 +250,7 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus'
 import { cloneDeep } from 'lodash-es'
 import * as DeptApi from '@/api/system/dept'
 import * as RoleApi from '@/api/system/role'
@@ -292,7 +293,8 @@ const fieldTypes = [
   { value: 'user', label: '用户' },
   { value: 'department', label: '部门' },
   { value: 'dictionary', label: '字典' },
-  { value: 'attachment', label: '附件' }
+  { value: 'attachment', label: '附件' },
+  { value: 'url', label: '链接' }
 ]
 const empty = (): Api.WorkOrderScene => ({
   code: '',

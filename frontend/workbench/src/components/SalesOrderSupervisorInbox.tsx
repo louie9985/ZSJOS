@@ -1,3 +1,4 @@
+import BusinessTable from './BusinessTable'
 import {
   useCallback,
   useEffect,
@@ -37,7 +38,7 @@ import SalesOrderDetailCards, {
 import { formatTimestamp } from "../services/time";
 import { useSubmissionGuard } from "../services/submissionGuard";
 import { AdvancedFilterToolbar } from "./AdvancedFilter";
-import { ProTable } from "@ant-design/pro-components";
+
 import { useInboxTableLayout } from "../services/inboxLayout";
 import ResizableDetailDrawer from "./ResizableDetailDrawer";
 import SubjectAvatar from "./SubjectAvatar";
@@ -338,11 +339,10 @@ export default function SalesOrderSupervisorInbox({
         </div>
       </header>
       {useTableLayout ? (
-        <><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey="sales_order_supervisor_confirm" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderSupervisorInboxItem>
+        <><BusinessTable<SalesOrderSupervisorInboxItem> filters={<><AdvancedFilterToolbar scene="order" pageKey="sales_order_supervisor_confirm" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="sales-order-supervisor-inbox-1" error={error} onReload={() => void load()}
           className="business-inbox-table"
           rowKey="id"
-          search={false}
-          options={{ density: true, fullScreen: true, setting: true }}
+
           columnsState={{ persistenceKey: "crm-sales-order-supervisor-table-columns", persistenceType: "localStorage" }}
           loading={loading}
           dataSource={items}

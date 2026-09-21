@@ -46,8 +46,8 @@ class NotifyBusinessEventApiImplTest {
     }
 
     @Test
-    void publishRoutesExternalRuleAfterCommitEventInsteadOfOutbox() {
-        NotifyRuleDO rule = NotifyRuleDO.builder().id(21L).sceneCode("test.scene").channelCode("wecom").build();
+    void publishRoutesSmsAfterCommitEventInsteadOfOutbox() {
+        NotifyRuleDO rule = NotifyRuleDO.builder().id(21L).sceneCode("test.scene").channelCode("sms").build();
         when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of(rule));
 
         api.publish(NotifyBusinessEvent.builder()
@@ -59,6 +59,26 @@ class NotifyBusinessEventApiImplTest {
         assertEquals(21L, routed.getTargetRuleId());
         assertEquals(10L, routed.getTenantId());
         org.mockito.Mockito.verifyNoInteractions(outboxService);
+    }
+
+    @Test
+    void wecomUsesOutboxAndNeverAfterCommitBestEffort() {
+        NotifyRuleDO rule = NotifyRuleDO.builder().id(21L).sceneCode("test.scene").channelCode("wecom").build();
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of(rule));
+        api.publish(NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").sourceEventKey("e").build());
+        verify(outboxService).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(java.util.List.of(rule)));
+        org.mockito.Mockito.verifyNoInteractions(applicationEventPublisher, eventProcessor);
+    }
+
+    @Test
+    void confirmedWecomReminderConfirmsDurableAcceptanceNotDirectSend() {
+        NotifyRuleDO rule = NotifyRuleDO.builder().id(21L).sceneCode("test.scene").channelCode("wecom").build();
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of(rule));
+        var result = api.publishConfirmed(NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene")
+                .targetRuleId(21L).sourceEventKey("e").build());
+        assertEquals("WECOM_QUEUED", result.getExternalId());
+        verify(outboxService).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(java.util.List.of(rule)));
+        org.mockito.Mockito.verifyNoInteractions(applicationEventPublisher, eventProcessor);
     }
 
     @Test

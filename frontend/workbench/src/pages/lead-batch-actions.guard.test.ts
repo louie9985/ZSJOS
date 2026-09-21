@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const page = readFileSync(new URL('LeadManagementPage.tsx', import.meta.url), 'utf8')
+const shared = readFileSync(new URL('../components/BusinessTable/index.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../services/api.ts', import.meta.url), 'utf8')
 
 describe('lead table batch actions', () => {
@@ -12,21 +13,21 @@ describe('lead table batch actions', () => {
     expect(page).toContain('showSizeChanger: true')
     expectSourceToContainTokens(page, 'pageSizeOptions: [20, 50, 100]')
     expect(page).toContain('sizeChanged ? 1 : nextPage')
-    expect(page).toContain('lead-management-table-toolbar-left')
-    expect(page.indexOf('lead-management-batch-toolbar')).toBeLessThan(page.indexOf('lead-management-table-filter-toolbar'))
+    expect(page).toContain('BusinessTable<ManagedLead>')
+    expect(shared.indexOf('className="business-table-batch"')).toBeLessThan(shared.indexOf('className="business-table-filters"'))
     expect(page).toContain('keys.slice(0, 100)')
-    expect(page).toContain('tableAlertRender={false}')
-    expect(page).toContain('tableAlertOptionRender={false}')
+    expect(shared).toContain('tableAlertRender={false}')
+    expect(shared).toContain('tableAlertOptionRender={false}')
     expect(page).not.toContain('lead-management-batch-float')
     expect(page).toContain('<Dropdown menu={{ items: batchMenuItems }}')
     expect(page).toContain('>批量操作</Button>')
-    expect(page).toContain('lead-management-batch-toolbar')
+    expect(page).toContain('batchActions={')
 
     expect(page).toContain('setSelectedRowKeys([])')
     expectSourceToContainTokens(page, 'setSelectedLeadMap(new Map())')
-    const styles = readFileSync(new URL('../styles/pages/lead-management.css', import.meta.url), 'utf8')
-    expect(styles).toMatch(/\.lead-management-table-toolbar-left \{[^}]*flex-wrap: nowrap;/)
-    expect(styles).toMatch(/\.lead-management-table-toolbar-left \{[^}]*min-width: 1040px;/)
+    const styles = readFileSync(new URL('../styles/components/business-table.css', import.meta.url), 'utf8')
+    expect(styles).toMatch(/\.business-table-toolbar \{[^}]*flex-wrap: wrap;/)
+    expect(styles).not.toContain('1040px')
   })
 
   it('exposes all five disposition actions and their result contract', () => {

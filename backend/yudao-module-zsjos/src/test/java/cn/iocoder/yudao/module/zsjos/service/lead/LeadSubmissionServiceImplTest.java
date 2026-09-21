@@ -83,6 +83,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadSubmissionIdentityService identityService;
     @Mock private LeadDuplicateReviewMapper duplicateReviewMapper;
     @Mock private LeadDuplicateMatcher duplicateMatcher;
+    @Mock private LeadContactActivationService contactActivationService;
     @Mock private LeadFollowUpRuleService followUpRuleService;
     @Mock private LeadDuplicateReviewService duplicateReviewService;
     @Mock private ZsjosProductSkuService productSkuService;
@@ -99,6 +100,17 @@ class LeadSubmissionServiceImplTest {
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
         org.mockito.Mockito.lenient().when(categorySnapshotService.requireEnabled(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new LeadCategorySnapshotService.Selection("test", "提交时分类"));
+    }
+
+    @Test
+    void creationNotificationFreezesSubmissionIdentityInsteadOfGuessingFromNumericId() {
+        LeadDO lead = new LeadDO().setSourceUserId(20L).setSourceType("partner");
+        java.util.Map<String, Object> partner = ReflectionTestUtils.invokeMethod(service, "eventContext", lead, 20L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.PARTNER, 10L));
+        java.util.Map<String, Object> employee = ReflectionTestUtils.invokeMethod(service, "eventContext", lead, 20L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
+        assertEquals(3, partner.get("operatorUserType"));
+        assertEquals(2, employee.get("operatorUserType"));
     }
 
     @Test
@@ -303,11 +315,10 @@ class LeadSubmissionServiceImplTest {
     @Test
     void duplicateMatchEntersManualReviewWhenAutoResolutionIsDisabled() {
         LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
-        when(duplicateMatcher.match(req, null)).thenReturn(
+        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.NAME_MOBILE_LAST4);
+        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(
                 match(null, List.of(candidate), "suspected_duplicate", "suspected_created",
-                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-weak"));
-        when(followUpRuleService.requireEnabledRule()).thenReturn(rule(false));
+                        LeadDuplicateMatcher.NAME_MOBILE_LAST4, "fp-weak"));
         prepareDuplicateValidation(req);
         assignReviewId();
 
@@ -324,32 +335,27 @@ class LeadSubmissionServiceImplTest {
     }
 
     @Test
-    void strongDuplicatePersistsAuditAndThrowsStableConflict() {
+    void contactMatchActivatesBeforeRequiringRemainingFormFields() {
         LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "closed", LeadDuplicateMatcher.SAME_MOBILE);
-        when(duplicateMatcher.match(req, null)).thenReturn(
-                match(candidate, List.of(candidate), "strong_duplicate", "strong_rejected",
-                        LeadDuplicateMatcher.SAME_MOBILE, "fp-strong"));
-        prepareDuplicateValidation(req);
+        when(contactActivationService.activate(req.getMobile(), req.getWechatId(), req.getIdempotencyKey(),
+                1L, SOURCE_INTERNAL_NEW_MEDIA, null)).thenReturn(true);
 
-        ServiceException error = assertThrows(ServiceException.class, () -> service.create(req, 1L));
+        LeadCreateRespVO result = service.create(req, 1L);
 
-        assertEquals(LEAD_DUPLICATE_STRONG_CONFLICT.getCode(), error.getCode());
-        verify(duplicateReviewMapper).insert(org.mockito.ArgumentMatchers.argThat(
-                (LeadDuplicateReviewDO review) -> "completed".equals(review.getStatus())
-                        && "strong_duplicate".equals(review.getDuplicateFlag())
-                        && "strong_rejected".equals(review.getDuplicateResult())
-                        && Long.valueOf(10L).equals(review.getMatchedLeadId())));
+        assertEquals("activated", result.getOutcome());
+        assertNull(result.getLeadId());
+        verify(duplicateReviewMapper, never()).insert(any(LeadDuplicateReviewDO.class));
         verify(dispatchService, never()).start(any(), any(), any());
+        verify(duplicateMatcher, never()).matchSubmissionWeakRules(any());
     }
 
     @Test
     void weakDuplicateReusesExistingPendingReviewByFingerprint() {
         LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
-        when(duplicateMatcher.match(req, null)).thenReturn(
+        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.NAME_MOBILE_LAST4);
+        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(
                 match(null, List.of(candidate), "suspected_duplicate", "suspected_created",
-                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-weak"));
+                        LeadDuplicateMatcher.NAME_MOBILE_LAST4, "fp-weak"));
         LeadDuplicateReviewDO existing = new LeadDuplicateReviewDO();
         existing.setId(77L);
         existing.setStatus("pending");
@@ -364,31 +370,6 @@ class LeadSubmissionServiceImplTest {
     }
 
     @Test
-    void crossContactAutoResolutionSelectsNewestMatchedLeadThenHighestId() {
-        LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate first = candidate(10L, "invalid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
-        LeadDuplicateMatcher.Candidate second = candidate(20L, "won", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
-        LeadDuplicateMatcher.Candidate third = candidate(19L, "closed", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
-        when(duplicateMatcher.match(req, null)).thenReturn(
-                match(null, List.of(first, second, third), "suspected_duplicate", "suspected_created",
-                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-cross"));
-        when(followUpRuleService.requireEnabledRule()).thenReturn(rule(true));
-        LeadDO older = lead(10L, LocalDateTime.of(2026, 8, 1, 10, 0));
-        LeadDO newerLowerId = lead(19L, LocalDateTime.of(2026, 8, 2, 10, 0));
-        LeadDO newerHigherId = lead(20L, LocalDateTime.of(2026, 8, 2, 10, 0));
-        when(leadMapper.selectBatchIds(List.of(10L, 20L, 19L))).thenReturn(List.of(older, newerLowerId, newerHigherId));
-        LeadCreateRespVO resolved = LeadCreateRespVO.duplicateAutoClosed(20L, "L20", "won");
-        when(duplicateReviewService.resolveAutomatically(99L, 20L, 1L)).thenReturn(resolved);
-        prepareDuplicateValidation(req);
-        assignReviewId();
-
-        LeadCreateRespVO result = service.create(req, 1L);
-
-        assertEquals("duplicate_auto_closed", result.getOutcome());
-        verify(duplicateReviewService).resolveAutomatically(99L, 20L, 1L);
-    }
-
-    @Test
     void selfSourcedSourceFallsBackToSubmittingSales() {
         assertEquals(10L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(null, 10L));
         assertEquals(20L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(20L, 10L));
@@ -397,16 +378,19 @@ class LeadSubmissionServiceImplTest {
     @Test
     void leadCreatedContextIncludesOnlyExplicitSelfSourcedProvider() {
         LeadDO linked = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(20L);
-        Map<String, Object> linkedContext = ReflectionTestUtils.invokeMethod(service, "eventContext", linked, 10L);
+        Map<String, Object> linkedContext = ReflectionTestUtils.invokeMethod(service, "eventContext", linked, 10L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.SALES, null));
         assertEquals(20L, linkedContext.get("newMediaProviderUserId"));
 
         LeadDO fallback = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(10L);
-        Map<String, Object> fallbackContext = ReflectionTestUtils.invokeMethod(service, "eventContext", fallback, 10L);
+        Map<String, Object> fallbackContext = ReflectionTestUtils.invokeMethod(service, "eventContext", fallback, 10L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.SALES, null));
         assertFalse(fallbackContext.containsKey("newMediaProviderUserId"));
 
         LeadDO newMediaSubmission = new LeadDO().setSourceType("internal_new_media").setSourceUserId(20L);
         Map<String, Object> newMediaContext = ReflectionTestUtils.invokeMethod(
-                service, "eventContext", newMediaSubmission, 20L);
+                service, "eventContext", newMediaSubmission, 20L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
         assertFalse(newMediaContext.containsKey("newMediaProviderUserId"));
     }
 

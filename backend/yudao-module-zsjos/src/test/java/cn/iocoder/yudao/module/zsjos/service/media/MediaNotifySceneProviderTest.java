@@ -35,4 +35,18 @@ class MediaNotifySceneProviderTest {
         assertEquals(Set.of(NotifyRecipientDTO.admin(21L), NotifyRecipientDTO.partner(31L)),
                 provider.resolveRecipients(event, Set.of("assignee")));
     }
+    @Test
+    void respectsConfiguredRolesAndAcceptsGroupedCollaborators() {
+        var event = NotifyBusinessEvent.builder().payload(Map.of("assigneeUserId", 21L,
+                "assigneeUserIds", java.util.List.of(21L, 22L), "supervisorUserId", 23L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.admin(23L)), provider.resolveRecipients(event, Set.of("supervisor")));
+        assertEquals(Set.of(NotifyRecipientDTO.admin(21L), NotifyRecipientDTO.admin(22L)),
+                provider.resolveRecipients(event, Set.of("assignee")));
+        assertTrue(provider.resolveRecipients(event, Set.of()).isEmpty());
+    }
+    @Test
+    void deliveryTemplateVariablesAndTimingAreRegistered() {
+        var scene = provider.getScenes().stream().filter(s -> s.getCode().equals("student.delivery.confirmation")).findFirst().orElseThrow();
+        assertTrue(scene.getVariables().stream().anyMatch(v -> v.getKey().equals("stageCode")));
+    }
 }

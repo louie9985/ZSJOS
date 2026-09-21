@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioning;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
@@ -20,6 +22,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class PositioningEvidenceService {
     public record Evidence(Long id, String name, String type, Long size, Long uploadedBy, LocalDateTime uploadedAt) {}
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSyncService deliverySync;
     @Resource private FileApi fileApi;
     @Resource private PositioningCardMapper cardMapper;
@@ -56,10 +59,12 @@ public class PositioningEvidenceService {
     }
 
     @ZsjosPermission(bizType="positioning-card", bizId="#cardId", action="evidence")
-    public PositioningCardService.CardFile upload(Long cardId, Long submissionId, byte[] bytes, String name, String type, Long userId) {
+    public PositioningCardService.CardFile upload(Long cardId, Long submissionId, byte[] bytes, String name, String declaredMime, Long userId) {
         requireWritable(cardId, requireSubmission(cardId, submissionId), userId);
-        if (bytes.length == 0 || bytes.length > 20 * 1024 * 1024) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-        var file = fileApi.createFileInfo(bytes, name == null ? "evidence" : name.replaceAll("[\\\\/\\r\\n]", "_"), directory(cardId, submissionId, userId), type);
+        // 确认凭证与定位卡附件同源：聊天记录截图、语音、视频等，走同一白名单。
+        String detected = PositioningAttachmentTypes.detectAllowed(name, bytes);
+        if (bytes.length == 0 || bytes.length > 20 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        var file = fileApi.createFileInfo(bytes, PositioningAttachmentTypes.storageName(name), directory(cardId, submissionId, userId), detected);
         return new PositioningCardService.CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), null);
     }
 
@@ -94,6 +99,7 @@ public class PositioningEvidenceService {
             if (cardMapper.transition(cardId, card.getVersion(), "student_evidence_pending", "confirmed") != 1) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
             workflowEventService.transition("positioning-card", cardId, userId, "student_evidence_pending", "confirmed", null, "positioning-evidence:" + submissionId);
             deliverySync.syncService(row.getStudentPersonId(), row.getServiceRelationId());
+            collaborationNotify.card(MEDIA_POSITIONING_EFFECTIVE, card, userId, "positioning-effective:" + submissionId);
         }
     }
 

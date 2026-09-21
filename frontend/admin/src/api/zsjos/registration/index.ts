@@ -118,9 +118,6 @@ export const getRegistrationPoolPage = (
 export const getRegistrationCase = (id: number) =>
   request.get<RegistrationCase>({ url: `/zsjos/registration/${id}` })
 
-export const getStudyPlannerCandidates = () =>
-  request.get<StudyPlanner[]>({ url: '/zsjos/registration/study-planner-candidates' })
-
 export const getRouteCandidates = (id: number, routeId: number) =>
   request.get<StudyPlanner[]>({ url: `/zsjos/registration/${id}/routes/${routeId}/candidates` })
 
@@ -174,12 +171,6 @@ export const updateRegistrationItem = (
   request.put<RegistrationCase>({
     url: `/zsjos/registration/${id}/items/${itemId}`,
     data: { checked, version, idempotencyKey: crypto.randomUUID() }
-  })
-
-export const updateStudyPlanner = (id: number, studyPlannerUserId: number, version: number) =>
-  request.put<RegistrationCase>({
-    url: `/zsjos/registration/${id}/study-planner`,
-    data: { studyPlannerUserId, version, idempotencyKey: crypto.randomUUID() }
   })
 
 export const completeRegistration = (id: number, version: number) =>

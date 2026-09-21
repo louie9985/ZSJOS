@@ -27,6 +27,13 @@ export const isWorkbenchCommand = (data: unknown): data is WorkbenchCommand => {
   )
 }
 
+export function workbenchRoutePath(fullPath: string) {
+  const url = new URL(fullPath, 'https://workbench.invalid')
+  url.searchParams.delete('embed')
+  url.searchParams.delete('platform')
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 /** 注册 Workbench 单 iframe 与 Vue Router 之间的同源路由桥。 */
 export const setupWorkbenchEmbedBridge = () => {
   if (!isWorkbenchEmbed() || window.parent === window) return
@@ -49,7 +56,7 @@ export const setupWorkbenchEmbedBridge = () => {
 
   const removeAfterEach = router.afterEach((to) => {
     rememberRoute(to)
-    postToWorkbench({ type: ADMIN_EMBED_MESSAGE.ROUTE_CHANGED, path: to.path })
+    postToWorkbench({ type: ADMIN_EMBED_MESSAGE.ROUTE_CHANGED, path: workbenchRoutePath(to.fullPath) })
   })
 
   const handleMessage = (event: MessageEvent) => {
@@ -65,7 +72,7 @@ export const setupWorkbenchEmbedBridge = () => {
       return
     }
 
-    if (router.currentRoute.value.path !== event.data.path) {
+    if (workbenchRoutePath(router.currentRoute.value.fullPath) !== event.data.path) {
       void router.push(event.data.path)
     }
   }
@@ -74,7 +81,7 @@ export const setupWorkbenchEmbedBridge = () => {
   rememberRoute(router.currentRoute.value)
   postToWorkbench({
     type: ADMIN_EMBED_MESSAGE.READY,
-    path: router.currentRoute.value.path
+    path: workbenchRoutePath(router.currentRoute.value.fullPath)
   })
 
   return () => {

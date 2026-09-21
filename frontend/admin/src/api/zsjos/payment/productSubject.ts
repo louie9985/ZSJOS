@@ -32,8 +32,3 @@ export const getProductPaymentSubjectPage = async (params: ProductPaymentSubject
 export const configProductPaymentSubject = async (data: ProductPaymentSubjectConfigReqVO) => {
   return await request.post({ url: '/zsjos/product-payment-subject/batch-configure', data })
 }
-
-// 查询产品的支付主体
-export const getProductPaymentSubject = async (productId: number) => {
-  return await request.get({ url: '/zsjos/product-payment-subject/get?productId=' + productId })
-}

@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { Alert, App, Avatar, Badge, Button, Drawer, Empty, Input, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { BellOutlined, CheckOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -16,7 +17,7 @@ import { useNotifyMessages } from '../components/NotifyMessageProvider'
 import { useRealtime, useRealtimeEvent } from '../components/RealtimeProvider'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
-import { ProTable, type ProColumns } from '@ant-design/pro-components'
+import { type ProColumns } from '@ant-design/pro-components'
 import {
   executeNotifyMessageAction,
   classifyNotifyActionError,
@@ -390,17 +391,17 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     {useTableLayout ? (
       <>
         <div className="message-inbox-table-shell">
-          <ProTable<NotifyMessage>
+          <BusinessTable<NotifyMessage> tableKey="message-inbox-page-1"
             className="message-inbox-table"
             rowKey="id"
             loading={loading}
             dataSource={visibleMessages}
-            search={false}
-            options={{ density: true, fullScreen: true, setting: true, reload: () => void loadCursor(false) }}
+
+            onReload={() => void loadCursor(false)}
             columnsState={{ persistenceKey: 'crm-message-table-columns', persistenceType: 'localStorage' }}
             pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
             size="middle"
-            bordered
+
             scroll={{ x: 2100 }}
             locale={{ emptyText: <Empty description={emptyText} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
             rowClassName={(item) => [

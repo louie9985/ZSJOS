@@ -21,6 +21,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudentDeliverySubmissionTest {
+    @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @InjectMocks StudentDeliverySubmissionServiceImpl service;
     @Mock StudentDeliverySubmissionMapper submissionMapper;
     @Mock StudentDeliveryStageMapper stageMapper;

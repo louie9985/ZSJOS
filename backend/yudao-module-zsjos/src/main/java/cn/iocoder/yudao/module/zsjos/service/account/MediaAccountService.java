@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
@@ -57,6 +59,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 @Slf4j
 public class MediaAccountService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private MediaAccountMapper mapper;
     @Resource private MediaAccountStudentLinkMapper linkMapper;
     @Resource private ServiceRelationMapper relationMapper;
@@ -122,6 +125,8 @@ public class MediaAccountService {
             mapper.insert(account);
             studentDeliveryPlanService.ensurePlan(account.getStudentPersonId(), account.getId(), relation.getId(),
                     directorUserId, java.time.LocalDateTime.now());
+            collaborationNotify.account(MEDIA_ACCOUNT_CREATED, account, userId,
+                    "media-account-created:" + account.getId(), java.util.Map.of());
             return account.getId();
         } catch (DuplicateKeyException duplicate) {
             MediaAccountDO concurrentReplay = mapper.selectByCreateIdempotencyKey(req.getIdempotencyKey());

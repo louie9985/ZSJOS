@@ -87,7 +87,7 @@ public class ContentReviewNotifySceneProvider implements NotifySceneProvider {
                         variable("deepLink", "详情链接"),
                         variable("event.time", "发生时间")),
                 List.of(roles).stream().map(role -> new NotifySceneRoleRespDTO(role, roleName(role))).toList(),
-                List.of(NotifyActionType.BUSINESS_DETAIL), false);
+                List.of(NotifyActionType.BUSINESS_DETAIL), "zsjos.content_review.review_timeout_reminder".equals(code));
     }
 
     private String roleName(String role) {

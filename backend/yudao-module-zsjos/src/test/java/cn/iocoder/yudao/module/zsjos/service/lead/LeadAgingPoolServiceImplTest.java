@@ -60,12 +60,31 @@ class LeadAgingPoolServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private SecurityFrameworkService securityFrameworkService;
+    @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private LeadPublicSeaRecordMapper publicSeaRecordMapper;
     @Mock private SalesOrderMapper orderMapper;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
+
+    @Test
+    void personalQueryUsesCallerIdentityForManageAllAndPreservesAdvancedStatusIntersection() {
+        var req = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadAgingPoolPageReqVO();
+        req.setRelationScope(AGING_POOL_RELATION_OWNED);
+        req.setInboxGroup("all");
+        req.setInboxStage("assigned");
+        when(securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL)).thenReturn(true);
+        when(inboxFilterConfigService.resolveQuery(any(), eq("all"), eq("assigned")))
+                .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false,
+                        java.util.Map.of(INBOX_FILTER_FIELD_POOL_STATUS, java.util.Set.of(AGING_POOL_ASSIGNED))));
+        when(advancedFilterService.matchLeadIds(any())).thenReturn(java.util.List.of(99L));
+        when(cycleMapper.selectPage(eq(req), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(),
+                eq(java.util.List.of(AGING_POOL_ASSIGNED)), eq(false), eq(java.util.List.of(99L)), eq(42L)))
+                .thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(), 0L));
+        assertEquals(0L, service.getPage(req, 42L).getTotal());
+        verify(cycleMapper).selectPage(req, null, null, java.util.List.of(AGING_POOL_ASSIGNED), false, java.util.List.of(99L), 42L);
+    }
 
     @Test
     void ownerAndConfiguredCollaboratorCanBothOperate() {

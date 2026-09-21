@@ -20,6 +20,30 @@ class PartnerProfileServiceImplTest {
     @Mock private PartnerMapper partnerMapper;
     @Mock private SocialUserApi socialUserApi;
 
+    @Test void bindingUsesPartnerSubjectWithoutEnablingPushAutomatically() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWecomBindReqVO();
+        request.setCode("test-code"); request.setState("test-state");
+        service.bindWecom(8L, request);
+        verify(accountService).requireContext(8L);
+        verify(socialUserApi).bindSocialUser(argThat(value -> value.getUserType() == 3
+                && Long.valueOf(8L).equals(value.getUserId()) && value.getSocialType() == 30));
+        verify(accountService, never()).updateWecomEnabled(anyLong(), anyBoolean());
+    }
+
+    @Test void unboundPartnerCannotEnablePush() {
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.updateNotifyChannel(8L, true));
+        verify(socialUserApi).getSocialUserByUserId(3, 8L, 30);
+        verify(accountService, never()).updateWecomEnabled(anyLong(), anyBoolean());
+    }
+
+    @Test void boundPartnerCanExplicitlyEnablePush() {
+        when(socialUserApi.getSocialUserByUserId(3, 8L, 30))
+                .thenReturn(new cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO());
+        service.updateNotifyChannel(8L, true);
+        verify(accountService).updateWecomEnabled(8L, true);
+    }
+
     @Test void readsIndependentNameAndNullableNicknameFromAuthenticatedSubject() {
         when(accountService.requireContext(8L)).thenReturn(new PartnerContext(8L, 21L));
         when(partnerMapper.selectById(21L)).thenReturn(new PartnerDO().setName("真实姓名"));

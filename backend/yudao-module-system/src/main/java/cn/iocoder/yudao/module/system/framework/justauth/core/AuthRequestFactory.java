@@ -60,6 +60,12 @@ public class AuthRequestFactory {
     private final JustAuthProperties properties;
     private final AuthStateCache authStateCache;
 
+    /** Retain effective tenant configuration and the shared state cache for Partner callbacks. */
+    public AuthRequest withWecomIdentityOnly(AuthRequest request) {
+        return new AuthWecomIdentityRequest((AuthConfig) ReflectUtil.getFieldValue(request, "config"),
+                authStateCache);
+    }
+
     /**
      * 返回当前Oauth列表
      *

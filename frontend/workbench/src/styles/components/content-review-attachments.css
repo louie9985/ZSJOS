@@ -1,0 +1,18 @@
+/* UTF-8. Local attachment inputs share the workbench spacing and surface tokens. */
+.content-review-attachments { min-width: 0; border-radius: var(--crm-radius-lg); outline: none; }
+.content-review-attachments:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 4px; }
+.content-review-attachments-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); margin-bottom: var(--crm-sp-3); flex-wrap: wrap; }
+.content-review-attachments .ant-upload-drag { background: var(--crm-bg-container); border-color: var(--crm-border); }
+.content-review-attachments-upload-icon { font-size: 28px; color: var(--crm-color-primary); margin-bottom: var(--crm-sp-2); }
+.content-review-attachments-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--crm-sp-3); margin-top: var(--crm-sp-3); }
+.content-review-attachment { display: flex; align-items: center; gap: var(--crm-sp-3); padding: var(--crm-sp-3); min-width: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.content-review-attachment.status-error { border-color: var(--crm-color-error); }
+.content-review-attachment-preview { width: 72px; flex: 0 0 72px; }
+.content-review-attachment-preview .ant-image { width: 72px; }
+.content-review-attachment-preview img, .content-review-attachment-preview video { width: 72px; height: 64px; object-fit: contain; border-radius: var(--crm-radius-sm); }
+.content-review-attachment-preview svg { width: 42px; height: 52px; }
+.content-review-attachment-meta { display: flex; flex-direction: column; flex: 1; min-width: 0; font-size: var(--crm-font-base); }
+.content-review-attachment-meta > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-review-attachment-meta .ant-typography { overflow-wrap: anywhere; font-size: var(--crm-font-sm); }
+.content-approval-draft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--crm-sp-3); }
+@media (max-width: 768px) { .content-approval-draft-grid { grid-template-columns: minmax(0, 1fr); } }

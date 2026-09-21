@@ -5,6 +5,16 @@ import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../
 describe('Lead aging pool page', () => {
   const page = readFileSync('src/pages/LeadAgingPoolPage.tsx', 'utf8')
 
+  it('keeps personal and configured filters visible with the shared status style', () => {
+    expect(page).toContain('className="lead-simple-status-shell"')
+    expect(page).toContain('归属我的')
+    expect(page).toContain('我跟进的')
+    expect(page).toContain('aria-pressed=')
+    expect(page).not.toContain('filterCount(advancedFilter)')
+    expect(page).toContain('relationScope,')
+    expect(page).toContain('agingPoolOptions.filter')
+  })
+
   it('reuses the Lead master-detail presentation while retaining pool actions', () => {
     expect(page).toContain('lead-inbox-layout')
     expect(page).toContain('lead-inbox-list-pane')

@@ -32,7 +32,7 @@ extend the repository root instructions.
 - When changing shared layout, themes, navigation, or component styling, **MUST** consult the relevant parts of `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions. Reuse material already read in the current context unless it changed or is no longer available.
 - Visual decisions (dimensions, tokens, hierarchy, icons, interaction) **MUST** be grounded in the documented design system and existing page implementations. **MUST NOT** approximate from memory.
 - Prefer existing Ant Design, Pro Components, icon, and theme primitives over new custom controls.
-- HRM tabular views **MUST** use the shared `HrmProTable`; management lists enable its advanced toolbar, while detail and editable child tables use its compact mode.
+- All Workbench business tables **MUST** use `src/components/BusinessTable`, including inbox table modes, management lists, selectors, detail and editable tables. Full mode owns the Lead Management table design and toolbar; embedded tables use compact mode. Pages supply business columns, API state, permissions and callbacks, and **MUST NOT** import Table/ProTable directly or duplicate table layout CSS. See `docs/business-table.md`. Vue Admin and embedded Admin pages are outside this migration.
 - Remote views **MUST** provide the applicable loading, empty, error, retry, and unauthorized states.
 - Fixed-format UI elements **SHOULD** use stable responsive dimensions so dynamic labels and states do not shift or overlap the layout.
 - User-facing text **MUST** use the Zhongshijian employee-work-platform context and avoid upstream developer-oriented branding or technology marketing copy.

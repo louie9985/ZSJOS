@@ -223,7 +223,7 @@ const outcomeInfo = computed(() => {
   if (!submitResult.value) return null
   const result = submitResult.value
   const map: Record<string, { icon: string; color: string; title: string; desc: string }> = {
-    activated: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
+    activated: { icon: 'checked', color: 'var(--h5-success)', title: '客资已存在，已激活提醒', desc: '本次未新建客资' },
     created: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
     review_pending: { icon: 'info-o', color: 'var(--h5-warning)', title: '疑似重复，等待管理员审核', desc: `复核单号：#${submitResult.value.reviewId}，请勿重复提交` },
     duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '联系方式已存在', desc: '本次提交未创建客资，请联系管理员' },

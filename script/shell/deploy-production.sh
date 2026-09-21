@@ -31,6 +31,7 @@ load_env() {
   FRONTEND_ADMIN_DIR="${ZSJOS_FRONTEND_ADMIN_DIR:-$REPO_DIR/frontend/admin}"
   FRONTEND_WORKBENCH_DIR="${ZSJOS_FRONTEND_WORKBENCH_DIR:-$REPO_DIR/frontend/workbench}"
   FRONTEND_H5_DIR="${ZSJOS_FRONTEND_H5_DIR:-$REPO_DIR/frontend/h5}"
+  FRONTEND_MEDIA_SCREEN_DIR="${ZSJOS_FRONTEND_MEDIA_SCREEN_DIR:-$REPO_DIR/frontend/media-screen}"
   JAR_PATH="${ZSJOS_JAR_PATH:-$REPO_DIR/backend/yudao-server/target/yudao-server.jar}"
   PID_FILE="${ZSJOS_PID_FILE:-$REPO_DIR/zsjos-server.pid}"
   SERVER_PORT="${SERVER_PORT:-48080}"
@@ -75,6 +76,9 @@ check_tools() {
   need_cmd pnpm
   need_cmd docker
   need_cmd sha256sum
+  need_cmd realpath
+  need_cmd find
+  need_cmd mountpoint
   docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
   java -version >/dev/null 2>&1
   node --version >/dev/null
@@ -97,17 +101,26 @@ build_backend() {
   [[ -f "$JAR_PATH" ]] || die "backend jar not found: $JAR_PATH"
 }
 
-build_frontends() {
-  log "building admin frontend"
+build_admin_frontend() {
+  local base_path="$1" out_dir="$2" log_name="$3"
   (cd "$FRONTEND_ADMIN_DIR" && env \
     VITE_APP_TITLE="${VITE_APP_TITLE:-}" VITE_APP_HEAD_TITLE="${VITE_APP_HEAD_TITLE:-}" \
-    VITE_BASE_PATH="${VITE_BASE_PATH:-/admin/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
+    VITE_BASE_PATH="$base_path" VITE_BASE_URL="${VITE_BASE_URL:-}" \
     VITE_API_URL="${VITE_API_URL:-/admin-api}" VITE_UPLOAD_TYPE="${VITE_UPLOAD_TYPE:-server}" \
     VITE_APP_TENANT_ENABLE="${VITE_APP_TENANT_ENABLE:-true}" VITE_APP_CAPTCHA_ENABLE="${VITE_APP_CAPTCHA_ENABLE:-true}" \
     VITE_DROP_DEBUGGER="${VITE_DROP_DEBUGGER:-true}" VITE_DROP_CONSOLE="${VITE_DROP_CONSOLE:-true}" \
-    VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="${VITE_OUT_DIR:-dist-prod}" \
+    VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="$out_dir" \
     VITE_APP_BAIDU_CODE="${VITE_APP_BAIDU_CODE:-}" \
-    pnpm install --frozen-lockfile --reporter=silent && pnpm build:prod > "$LOG_DIR/build-admin.log")
+    pnpm build:prod > "$LOG_DIR/$log_name" 2>&1)
+}
+
+build_frontends() {
+  (cd "$FRONTEND_ADMIN_DIR" && pnpm install --frozen-lockfile --reporter=silent)
+  log "building admin frontend"
+  build_admin_frontend "${VITE_BASE_PATH:-/admin/}" dist-prod build-admin.log
+  log "building embedded admin frontend"
+  # The iframe is a separate Vite artifact with its own absolute asset base.
+  build_admin_frontend /admin-embed/ dist-embed build-admin-embed.log
 
   log "building workbench frontend"
   (cd "$FRONTEND_WORKBENCH_DIR" && env \
@@ -122,6 +135,14 @@ build_frontends() {
     VITE_APP_REFERENCE_API="${VITE_APP_REFERENCE_API:-/app-api}" \
     VITE_APP_TENANT_ID="${VITE_APP_TENANT_ID:-1}" \
     pnpm install --frozen-lockfile --reporter=silent && pnpm build > "$LOG_DIR/build-h5.log")
+
+  log "building media-screen frontend"
+  (cd "$FRONTEND_MEDIA_SCREEN_DIR" && npm ci --silent && env \
+    VITE_MEDIA_SCREEN_TENANT_ID="${VITE_MEDIA_SCREEN_TENANT_ID:?media-screen tenant must be configured}" \
+    VITE_MEDIA_SCREEN_API_BASE_URL="${VITE_MEDIA_SCREEN_API_BASE_URL:-}" \
+    VITE_MEDIA_SCREEN_API_PREFIX="${VITE_MEDIA_SCREEN_API_PREFIX:-/public-api/zsjos/media-screen}" \
+    VITE_MEDIA_SCREEN_ENABLE_MOCK=false \
+    npm run build > "$LOG_DIR/build-media-screen.log" 2>&1)
 }
 
 build() {
@@ -170,13 +191,9 @@ install_release() {
   cp -a "$FRONTEND_ADMIN_DIR/dist-prod/." "$release_dir/admin/"
   cp -a "$FRONTEND_WORKBENCH_DIR/dist/." "$release_dir/workbench/"
   cp -a "$FRONTEND_H5_DIR/dist/." "$release_dir/h5/"
-  # admin-embed / media-screen are not built by this script; carry them over
-  # from the current release so nginx keeps serving them after the switch.
-  if [[ -n "$old_release" && "$old_release" != "$release_dir" ]]; then
-    for extra in admin-embed media-screen; do
-      [[ -d "$old_release/$extra" ]] && cp -a "$old_release/$extra" "$release_dir/"
-    done
-  fi
+  mkdir -p "$release_dir/admin-embed" "$release_dir/media-screen"
+  cp -a "$FRONTEND_ADMIN_DIR/dist-embed/." "$release_dir/admin-embed/"
+  cp -a "$FRONTEND_MEDIA_SCREEN_DIR/dist/." "$release_dir/media-screen/"
   for required in \
     "$release_dir/yudao-server.jar" \
     "$release_dir/admin/index.html" \
@@ -197,6 +214,59 @@ running_pid() {
   local pid
   pid="$(cat "$PID_FILE")"
   kill -0 "$pid" 2>/dev/null && printf '%s\n' "$pid" || true
+}
+
+cleanup_old_releases() {
+  local root current previous candidate protected
+  root="$(realpath -e -- "$RELEASES_DIR")" || return 1
+  # Resolve both retained versions before deleting anything; never guess by mtime.
+  if [[ "$root" == / || ! -L "$root/current" || ! -f "$root/previous-release" || -L "$root/previous-release" ]]; then
+    warn "release cleanup skipped: invalid release root or retention references"
+    return 1
+  fi
+  current="$(realpath -e -- "$root/current")" || return 1
+  previous="$(cat -- "$root/previous-release")"
+  if [[ "$previous" != /* || -L "$previous" ]]; then
+    warn "release cleanup skipped: invalid previous-release path"
+    return 1
+  fi
+  previous="$(realpath -e -- "$previous")" || return 1
+  if [[ "$current" == "$previous" || "${current%/*}" != "$root" || "${previous%/*}" != "$root" \
+      || "$current" != "$root/$APP_VERSION" || ! -d "$current" || ! -d "$previous" ]]; then
+    warn "release cleanup skipped: retained versions must be distinct direct children of the release root"
+    return 1
+  fi
+  for protected in "$current" "$previous"; do
+    if [[ ! -f "$protected/yudao-server.jar" || ! -d "$protected/admin" \
+        || ! -d "$protected/workbench" || ! -d "$protected/h5" ]]; then
+      warn "release cleanup skipped: retained release is incomplete: $protected"
+      return 1
+    fi
+  done
+  local -a candidates=()
+  while IFS= read -r -d '' candidate; do
+    [[ "$candidate" == "$current" || "$candidate" == "$previous" ]] && continue
+    # Recognize installed releases only; leave unrelated directories and symlinks alone.
+    [[ -f "$candidate/yudao-server.jar" && ! -L "$candidate/yudao-server.jar" \
+        && -d "$candidate/admin" && -d "$candidate/workbench" && -d "$candidate/h5" ]] || continue
+    for protected in "$REPO_DIR" "$LOG_DIR" "$BACKUP_DIR"; do
+      protected="$(realpath -m -- "$protected")" || return 1
+      if [[ "$protected" == "$candidate" || "$protected" == "$candidate/"* ]]; then
+        warn "release cleanup skipped: candidate contains a protected source/log/backup path: $candidate"
+        return 1
+      fi
+    done
+    if mountpoint -q -- "$candidate"; then
+      warn "release cleanup skipped: candidate is a mount point: $candidate"
+      return 1
+    fi
+    candidates+=("$candidate")
+  done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0)
+  for candidate in "${candidates[@]}"; do
+    log "removing old release: $candidate"
+    rm -rf --one-file-system -- "$candidate" || return 1
+  done
+  log "release cleanup completed; retained: $current and $previous"
 }
 
 stop_server() {
@@ -272,7 +342,10 @@ health() {
   local url="${HEALTH_CHECK_URL:-http://127.0.0.1:$SERVER_PORT/actuator/health}"
   local code
   code="$(curl -k -L -sS -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)"
-  [[ "$code" == "200" ]] || die "health check failed: $url ($code)"
+  if [[ "$code" != "200" ]]; then
+    warn "health check failed: $url ($code)"
+    return 1
+  fi
   log "health check passed: $url"
 }
 
@@ -289,10 +362,14 @@ deploy() {
   install_release
   start_server
   for _ in $(seq 1 120); do
-    if health >/dev/null 2>&1; then return 0; fi
+    if health >/dev/null 2>&1; then
+      cleanup_old_releases || return 1
+      return 0
+    fi
     sleep 1
   done
-  health
+  warn "deployment health checks exhausted; old releases retained"
+  return 1
 }
 
 rollback() {
@@ -314,7 +391,7 @@ Usage: deploy-production.sh <command>
 
 Commands:
   check       Validate environment, tools and required files
-  build       Build backend and admin/workbench/H5 frontends
+  build       Build backend and admin/admin-embed/workbench/H5/media-screen frontends
   db-plan     Rebuild the migrator image and show the read-only production plan
   db-migrate  Rebuild the migrator image and apply pending production migrations
   db-verify   Rebuild the migrator image and verify the production database
@@ -322,7 +399,7 @@ Commands:
   stop        Stop the backend
   restart     Restart the backend
   health      Check the local actuator health endpoint
-  deploy      Build, migrate, verify, install and start a release
+  deploy      Build, migrate, install, start, verify health and retain two releases
   rollback    Switch to the previous application release (database unchanged)
 EOF
 }

@@ -39,7 +39,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 @Service
 public class WorkOrderServiceImpl implements WorkOrderService {
     private static final Set<String> FIELD_TYPES = Set.of(
-            "text", "textarea", "number", "date", "datetime", "user", "department", "dictionary", "attachment");
+            "text", "textarea", "number", "date", "datetime", "user", "department", "dictionary", "attachment", "url");
 
     @Resource private WorkOrderSceneMapper sceneMapper;
     @Resource private WorkOrderSceneVersionMapper sceneVersionMapper;
@@ -226,11 +226,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         AdminUserRespDTO target = versioned ? validateTarget(req, published) : validateTarget(req, scene);
         List<WorkOrderFieldDefinition> definitions = parseDefinitions(versioned ? published.getFieldsJson() : scene.getFieldsJson());
         Map<String, Object> values = normalizeValues(definitions, req.getValues());
+        // 相关账号对拍剪/外勤模板是可选的：账号页发起时前端强制选择，工单中心直接发起时不绑定。
         if (versioned && ("PRODUCTION_TICKET".equals(published.getProcessorType())
-                || "FILMING_FIELD_WORK".equals(published.getProcessorType()))) {
-            if (req.getRelatedAccountId() == null) {
-                throw exception(ZsjosErrorCodeConstants.WORK_ORDER_RELATED_ACCOUNT_REQUIRED);
-            }
+                || "FILMING_FIELD_WORK".equals(published.getProcessorType()))
+                && req.getRelatedAccountId() != null) {
             values.put("accountId", req.getRelatedAccountId());
         }
         List<Long> attachments = validateAttachments(mergeAttachmentIds(attachmentIds,
@@ -496,7 +495,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         AdminUserRespDTO target = validateTarget(assignment, version);
         List<WorkOrderFieldDefinition> definitions = parseDefinitions(version.getFieldsJson());
         Map<String, Object> normalizedValues = normalizeValues(definitions, values);
-        normalizedValues.put("accountId", accountId);
+        // 工单中心发起的剪拍工单可以没有账号，此时不写入 accountId 而不是写入 null。
+        if (accountId != null) normalizedValues.put("accountId", accountId);
         List<Long> attachments = validateAttachments(mergeAttachmentIds(attachmentIds,
                 dynamicAttachmentIds(definitions, normalizedValues)), sourceUserId, 100);
         WorkOrderDO existing = orderMapper.selectByBusiness("PRODUCTION_TICKET", businessId);

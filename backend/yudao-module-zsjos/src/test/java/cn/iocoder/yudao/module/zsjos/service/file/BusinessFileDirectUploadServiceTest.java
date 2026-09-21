@@ -57,9 +57,17 @@ class BusinessFileDirectUploadServiceTest {
     }
 
     @Test
-    void initContentRejectsNonMediaAndOverOneGigabyte() {
-        assertServiceCode(() -> service.initContent(uploadRequest("application/pdf", 1024L), 42L));
+    void initContentRejectsUnsupportedTypesAndOverOneGigabyte() {
+        assertServiceCode(() -> service.initContent(uploadRequest("text/html", 1024L), 42L));
         assertServiceCode(() -> service.initContent(uploadRequest("video/mp4", 1024L * 1024 * 1024 + 1), 42L));
+    }
+
+    @Test
+    void initContentAcceptsReviewDocuments() {
+        when(fileApi.initDirectUpload(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new FileDirectUploadInitRespDTO());
+        service.initContent(uploadRequest("application/pdf", 1024L), 42L);
+        verify(fileApi).initDirectUpload(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

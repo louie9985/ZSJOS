@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyM
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
 import cn.iocoder.yudao.module.system.service.notify.NotifyMessageService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerAccountService;
+import cn.iocoder.yudao.module.zsjos.service.notification.PartnerNotificationTargetService;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerNotifyMessageRespVO;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -29,6 +31,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class PartnerAppMessageController {
     @Resource private NotifyMessageService notifyMessageService;
     @Resource private PartnerAccountService accountService;
+    @Resource private PartnerNotificationTargetService targetService;
 
     private static final List<MessageGroupRespVO> GROUPS = List.of(
             new MessageGroupRespVO("all", "全部", List.of()),
@@ -57,10 +60,18 @@ public class PartnerAppMessageController {
     }
 
     @GetMapping("/{id}")
-    public CommonResult<NotifyMessageRespVO> get(@PathVariable Long id) {
-        accountService.requireContext(getLoginUserId());
-        return success(BeanUtils.toBean(notifyMessageService.getMyNotifyMessage(id, getLoginUserId(),
-                UserTypeEnum.PARTNER.getValue()), NotifyMessageRespVO.class));
+    public CommonResult<PartnerNotifyMessageRespVO> get(@PathVariable Long id) {
+        var account = accountService.requireContext(getLoginUserId());
+        var message = notifyMessageService.getMyNotifyMessage(id, getLoginUserId(), UserTypeEnum.PARTNER.getValue());
+        var response = BeanUtils.toBean(message,
+                PartnerNotifyMessageRespVO.class);
+        if (response != null && "business_detail".equals(message.getActionType())
+                && "sales_order".equals(message.getBizType())) {
+            String path = targetService.orderLeadPath(message.getBizId(), account.partnerId());
+            response.setBusinessTarget(path);
+            if (path == null) response.setTargetUnavailableReason("关联订单不存在或当前账号无权查看");
+        }
+        return success(response);
     }
 
     @PutMapping("/read")

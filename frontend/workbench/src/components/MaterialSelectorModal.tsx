@@ -1,5 +1,6 @@
+import BusinessTable from './BusinessTable'
 import { SearchOutlined } from '@ant-design/icons'
-import { Alert, Button, Checkbox, Empty, Image, Input, Modal, Pagination, Select, Space, Spin, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Checkbox, Empty, Image, Input, Modal, Select, Space, Spin, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../services/api'
 import { materialApi, type Material, type MaterialType } from '../services/materialApi'
@@ -163,24 +164,16 @@ export default function MaterialSelectorModal({
       </Typography.Text>
 
       <Spin spinning={loading}>
-        <Table
+        <BusinessTable tableKey="material-selector-modal-1" columnMode="native" mode="compact"
           rowKey="id"
           size="small"
           columns={columns}
           dataSource={rows}
-          pagination={false}
+          pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, showTotal: value => `共 ${value} 条`, onChange: page => void load(page) }}
           scroll={{ x: 1000 }}
           locale={{ emptyText: <Empty description="暂无素材" /> }}
         />
       </Spin>
-      <Pagination
-        current={pageNo}
-        pageSize={PAGE_SIZE}
-        total={total}
-        showSizeChanger={false}
-        showTotal={value => `共 ${value} 条`}
-        onChange={page => void load(page)}
-      />
     </Space>
   </Modal>
 }

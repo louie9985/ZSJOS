@@ -35,7 +35,7 @@
         />
       </el-form-item>
       <el-form-item label="跳转链接" prop="url">
-        <el-input v-model="formData.url" placeholder="请输入跳转链接" />
+        <ResourceLinkInput v-model="formData.url" placeholder="请输入跳转链接" />
       </el-form-item>
       <el-form-item label="小程序 appId" prop="miniProgramAppId">
         <el-input v-model="formData.miniProgramAppId" placeholder="请输入小程序 appId" />
@@ -52,6 +52,7 @@
 </template>
 
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { MessageTemplateApi, MsgTemplateVO, MsgTemplateSendVO } from '@/api/mp/messageTemplate'
 import * as MpUserApi from '@/api/mp/user'
 

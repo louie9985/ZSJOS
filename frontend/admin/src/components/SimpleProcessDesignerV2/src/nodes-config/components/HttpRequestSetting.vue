@@ -18,7 +18,7 @@
       trigger: 'blur'
     }"
   >
-    <el-input v-model="setting.url" />
+    <ResourceLinkInput v-model="setting.url" />
   </el-form-item>
   <!-- 请求头，请求体设置-->
   <HttpRequestParamSetting :header="setting.header" :body="setting.body" :bind="formItemPrefix" />
@@ -83,6 +83,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import HttpRequestParamSetting from './HttpRequestParamSetting.vue'
 import { useFormFields } from '../../node'
 

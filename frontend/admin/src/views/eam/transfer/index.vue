@@ -108,6 +108,7 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus'
 import { dateFormatter } from '@/utils/formatTime'
 import { getIntDictOptions } from '@/utils/dict'
 import * as TransferApi from '@/api/eam/transfer'

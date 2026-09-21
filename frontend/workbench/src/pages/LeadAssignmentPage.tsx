@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import {
   ApartmentOutlined,
   CloseOutlined,
@@ -5,21 +6,7 @@ import {
   SearchOutlined,
   TeamOutlined
 } from '@ant-design/icons'
-import {
-  App,
-  Button,
-  Checkbox,
-  Empty,
-  Input,
-  Modal,
-  Pagination,
-  Segmented,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography
-} from 'antd'
+import { App, Button, Checkbox, Empty, Input, Modal, Segmented, Select, Space, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { api, type AssignmentLog, type AssignmentRelation, type AssignmentUser } from '../services/api'
@@ -194,19 +181,18 @@ export default function LeadAssignmentPage() {
   const actionLabels: Record<AssignmentLog['actionType'], string> = { append: '追加绑定', replace: '替换绑定', remove: '解除绑定' }
 
   return <section className="workspace-page assignment-page">
-    <div className="assignment-toolbar">
+
+    <BusinessTable<AssignmentRelation> filters={<>
       <Input value={keyword} onChange={event => setKeyword(event.target.value)} onPressEnter={() => { setPageNo(1); void loadList(1) }} allowClear prefix={<SearchOutlined/>} placeholder="搜索姓名或手机号" className="assignment-search"/>
       <Select value={configured} onChange={value => { setConfigured(value); setPageNo(1) }} allowClear placeholder="全部配置状态" className="assignment-filter" options={[{ label: '已配置', value: true }, { label: '未配置', value: false }]}/>
       <Button onClick={() => { setPageNo(1); void loadList(1) }}>查询</Button>
       <span className="assignment-toolbar-spacer"/>
       <Space><Button icon={<FileTextOutlined/>} onClick={() => { setLogOpen(true); setLogPage(1); void loadLogs(1) }}>变更记录</Button><Button type="primary" icon={<TeamOutlined/>} disabled={selectedRowKeys.length === 0} onClick={() => void openBatch()}>批量配置</Button></Space>
-    </div>
-    <Table<AssignmentRelation> rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} scroll={{ x: 980 }} rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}/>
-    <div className="assignment-pagination"><Pagination current={pageNo} pageSize={pageSize} total={total} showSizeChanger onChange={(page, size) => { setPageNo(page); setPageSize(size) }}/></div>
+    </>} tableKey="lead-assignment-page-1" columnMode="native" rowKey="id" loading={loading} columns={columns} dataSource={rows} onReload={() => void loadList()} pagination={{ current: pageNo, pageSize, total, showSizeChanger: true, onChange: (page, size) => { setPageNo(page); setPageSize(size) } }} scroll={{ x: 980 }} rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}/>
 
     <ResizableDrawer title={batchMode ? '批量配置派单关系' : '配置可派销售'} width="min(760px, 100vw)" defaultSize={760} minSize={640} storageKey={ASSIGNMENT_DRAWER_WIDTH_STORAGE_KEY} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={<IrreversiblePopconfirm action={assignmentConfirmAction(saveMode, batchMode ? { batchCount: selectedRowKeys.length } : { name: activeRow?.nickname || '当前员工' })} danger={saveMode === 'remove'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={saveMode === 'remove'} loading={saving} onClick={prepareSubmit}>保存配置</Button></IrreversiblePopconfirm>}>
       <div className="assignment-subject"><ApartmentOutlined/><Text type="secondary">配置对象</Text><Text strong>{batchMode ? `已选择 ${selectedRowKeys.length} 名员工` : activeRow ? userLabel(activeRow) : ''}</Text></div>
-      {batchMode && <Segmented<SaveMode> block value={saveMode} onChange={setSaveMode} options={[{ label: '追加绑定', value: 'append' }, { label: '替换原绑定', value: 'replace' }, { label: '解除指定绑定', value: 'remove' }]}/>} 
+      {batchMode && <Segmented<SaveMode> block value={saveMode} onChange={setSaveMode} options={[{ label: '追加绑定', value: 'append' }, { label: '替换原绑定', value: 'replace' }, { label: '解除指定绑定', value: 'remove' }]}/>}
       <div className="assignment-picker">
         <div className="assignment-candidates"><div className="assignment-pane-title"><Text strong>可选销售</Text><Text type="secondary">{filteredSales.length} 人</Text></div><Input value={salesKeyword} onChange={event => setSalesKeyword(event.target.value)} allowClear prefix={<SearchOutlined/>} placeholder="搜索姓名、手机号或部门"/>
           <Checkbox.Group value={selectedSalesIds} onChange={values => setSelectedSalesIds(values.map(Number))} className="assignment-check-list">
@@ -219,8 +205,7 @@ export default function LeadAssignmentPage() {
     </ResizableDrawer>
 
     <Modal title="派单关系变更记录" width={900} open={logOpen} footer={null} onCancel={() => setLogOpen(false)}>
-      <Table<AssignmentLog> rowKey="id" loading={logLoading} dataSource={logs} pagination={false} columns={[{ title: '操作时间', dataIndex: 'createTime', width: 180, render: value => value?.replace('T', ' ') }, { title: '操作人', dataIndex: 'operatorName', width: 110 }, { title: '操作', dataIndex: 'actionType', width: 100, render: value => actionLabels[value as AssignmentLog['actionType']] }, { title: '派单员工', dataIndex: 'sourceUsers', ellipsis: true }, { title: '销售人员', dataIndex: 'targetUsers', ellipsis: true }]}/>
-      <div className="assignment-pagination"><Pagination current={logPage} pageSize={10} total={logTotal} onChange={page => { setLogPage(page); void loadLogs(page) }}/></div>
+      <BusinessTable<AssignmentLog> tableKey="lead-assignment-page-2" columnMode="native" mode="compact" rowKey="id" loading={logLoading} dataSource={logs} onReload={() => void loadLogs(logPage)} pagination={{ current: logPage, pageSize: 10, total: logTotal, showSizeChanger: false, onChange: page => { setLogPage(page); void loadLogs(page) } }} columns={[{ title: '操作时间', dataIndex: 'createTime', width: 180, render: value => value?.replace('T', ' ') }, { title: '操作人', dataIndex: 'operatorName', width: 110 }, { title: '操作', dataIndex: 'actionType', width: 100, render: value => actionLabels[value as AssignmentLog['actionType']] }, { title: '派单员工', dataIndex: 'sourceUsers', ellipsis: true }, { title: '销售人员', dataIndex: 'targetUsers', ellipsis: true }]}/>
     </Modal>
   </section>
 }

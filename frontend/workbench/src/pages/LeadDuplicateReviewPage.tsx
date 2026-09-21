@@ -1,3 +1,4 @@
+import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
 import { api, type AdvancedFilterGroup, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
@@ -9,7 +10,7 @@ import { createIdempotencyKey } from '../services/idempotency'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { ProTable } from '@ant-design/pro-components'
+
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 type ResultType = LeadDuplicateReviewDecision['resultType']
@@ -191,12 +192,11 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       <div><Typography.Title level={4}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
       <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
     </header>
-    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
-    {useTableLayout ? <><div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<LeadDuplicateReview>
+    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
+    {useTableLayout ? <><BusinessTable<LeadDuplicateReview> filters={<><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="lead-duplicate-review-page-1"
       className="business-inbox-table"
       rowKey="id"
-      search={false}
-      options={{ density: true, fullScreen: true, setting: true }}
+
       columnsState={{ persistenceKey: 'crm-lead-duplicate-review-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
@@ -216,7 +216,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
         { title: '复核意见', dataIndex: 'reviewOpinion', width: 260, ellipsis: true, render: value => value || '-' },
         { title: '创建时间', dataIndex: 'createTime', render: (_, item) => formatTimestamp(item.createTime), width: 170 },
         { title: '复核时间', dataIndex: 'reviewedAt', render: (_, item) => formatTimestamp(item.reviewedAt), width: 170 },
-        { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
+        { key: 'action', title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
       ]}
     /></> : <div className="message-inbox-layout">
       <aside className="message-inbox-list-pane">

@@ -35,6 +35,10 @@ public class WecomClickTicketService {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private LeadMapper leadMapper;
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper;
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper partnerAccountMapper;
 
     @Value("${zsjos.wecom.workbench-base-url:}")
     private String workbenchBaseUrl;
@@ -66,6 +70,17 @@ public class WecomClickTicketService {
             LeadDO lead = context.getBizId() == null ? null : leadMapper.selectById(context.getBizId());
             if (lead == null || StrUtil.isBlank(lead.getLeadNo())) return null;
             payload.setLeadNo(lead.getLeadNo());
+        }
+        if (AUDIENCE_PARTNER.equals(audience) && "sales_order".equals(context.getBizType())) {
+            var order = context.getBizId() == null ? null : orderMapper.selectById(context.getBizId());
+            var lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
+            var account = context.getUserId() == null ? null : partnerAccountMapper.selectById(context.getUserId());
+            // Freeze only an owned Lead destination; resolving an anonymous ticket must not query business data.
+            // The existing authenticated H5 detail API rechecks ownership when the link is opened.
+            if (lead != null && account != null && account.getPartnerId() != null
+                    && account.getPartnerId().equals(lead.getPartnerId())) {
+                payload.setOrderLeadId(lead.getId());
+            }
         }
         stringRedisTemplate.opsForValue().set(TICKET_KEY_PREFIX + ticket, JsonUtils.toJsonString(payload),
                 Duration.ofMinutes(Math.max(1, ticketTtlMinutes)));
@@ -121,6 +136,7 @@ public class WecomClickTicketService {
         }
         return switch (payload.getBizType()) {
             case "lead" -> "/lead/" + payload.getBizId();
+            case "sales_order" -> payload.getOrderLeadId() == null ? null : "/lead/" + payload.getOrderLeadId();
             case "cashback" -> "/earnings";
             case "withdrawal" -> "/withdrawal/" + payload.getBizId();
             case "feedback" -> "/feedback/" + payload.getBizId();
@@ -168,5 +184,6 @@ public class WecomClickTicketService {
         private String bizType;
         private Long bizId;
         private String leadNo;
+        private Long orderLeadId;
     }
 }

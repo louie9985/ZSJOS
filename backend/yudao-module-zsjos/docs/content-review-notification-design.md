@@ -1,5 +1,8 @@
 # 内容审核通知系统设计文档
 
+> 2026-09-20 实现校正：当前受支持契约见 [编导与运营通知](../../../docs/api/director-operator-notifications.md)。以下示例保留作历史设计参考；超时场景为 `zsjos.content_review.review_timeout_reminder`，由 `MediaNotificationReminderScheduler` 按 System 规则扫描真实 BPM 待办，不使用本文旧 Quartz Job。Workbench 统一入口为 `/zsjos/material-library/content-review?batchId=…`，Vue Admin 未支持的员工业务动作回退消息详情。
+
+
 ## 一、概述
 
 本文档描述内容审核业务的通知系统设计，包括通知场景、收件人解析、跳转规则和实现细节。

@@ -12,7 +12,6 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCal
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountMaintenanceRevisionDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountStageLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMaintenanceRevisionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
@@ -39,7 +38,6 @@ class MediaAccountMaintenanceServiceTest {
     @InjectMocks private MediaAccountMaintenanceService service;
     @Mock private MediaAccountMapper accountMapper;
     @Mock private MediaAccountMaintenanceRevisionMapper revisionMapper;
-    @Mock private AccountStageLogMapper stageLogMapper;
     @Mock private DictDataApi dictDataApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PersonMapper personMapper;
@@ -51,7 +49,7 @@ class MediaAccountMaintenanceServiceTest {
         when(accountMapper.selectById(1L)).thenReturn(account());
         assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED.getCode(),
                 assertThrows(ServiceException.class, () -> service.maintain(1L, new MediaAccountMaintenanceReqVO(), 20L)).getCode());
-        verifyNoInteractions(revisionMapper, stageLogMapper, workflowEventService);
+        verifyNoInteractions(revisionMapper, workflowEventService);
     }
 
     @Test

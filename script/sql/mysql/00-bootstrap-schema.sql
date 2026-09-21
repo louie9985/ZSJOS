@@ -5748,6 +5748,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
   `source_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'system_user' COMMENT '来源主体类型',
+  `source_post_codes` json DEFAULT NULL COMMENT 'Configured source post codes',
+  `target_post_codes` json DEFAULT NULL COMMENT 'Configured target post codes',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
@@ -6802,7 +6804,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_positioning_exec_card` (
 CREATE TABLE IF NOT EXISTS `zsjos_production_ticket` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `ticket_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `account_id` bigint NOT NULL,
+  `account_id` bigint DEFAULT NULL,
+  `account_ids_json` json DEFAULT NULL COMMENT 'Frozen related account IDs',
+  `account_snapshot_json` json DEFAULT NULL COMMENT 'Frozen account names, platforms, homepage links and cover files',
   `owner_operator_user_id` bigint NOT NULL,
   `assignee_filming_editor_user_id` bigint DEFAULT NULL,
   `reviewer_user_id` bigint NOT NULL,

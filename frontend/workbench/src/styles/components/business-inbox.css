@@ -290,12 +290,6 @@
   flex: 1;
 }
 
-.business-inbox-table .ant-table-cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  word-break: keep-all;
-}
 
 .business-inbox-table-page .business-inbox-mobile-drawer {
   display: block;

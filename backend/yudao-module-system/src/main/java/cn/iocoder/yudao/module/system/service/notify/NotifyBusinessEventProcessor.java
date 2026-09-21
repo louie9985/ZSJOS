@@ -40,6 +40,45 @@ public class NotifyBusinessEventProcessor {
         return result.get();
     }
 
+    public record PreparedWecom(List<NotifyDeliveryContext> recipients, NotifySendResult failure) {}
+
+    /** Called inside the event tenant; freeze the same scene/rule contract used for immediate delivery. */
+    public PreparedWecom prepareWecom(NotifyBusinessEvent event) {
+        NotifySceneProvider provider = sceneRegistry.getProvider(event.getSceneCode());
+        if (provider == null) return new PreparedWecom(List.of(),
+                NotifySendResult.failure("NOTIFY_SCENE_MISSING", "通知场景未注册", false));
+        NotifyRuleDO rule = notifyRuleService.getEnabledRules(event.getSceneCode()).stream()
+                .filter(value -> java.util.Objects.equals(value.getId(), event.getTargetRuleId())
+                        && NotifyChannelType.WECOM.equals(value.getChannelCode())).findFirst().orElse(null);
+        if (rule == null) return new PreparedWecom(List.of(),
+                NotifySendResult.failure("NOTIFY_RULE_MISSING", "企微规则不存在、已停用或渠道已变更", false));
+        NotifyTemplateDO template = notifyTemplateService.getNotifyTemplate(rule.getTemplateId());
+        if (template == null || !Integer.valueOf(0).equals(template.getStatus())
+                || !event.getSceneCode().equals(template.getSceneCode())
+                || !NotifyChannelType.WECOM.equals(template.getChannelCode())) {
+            return new PreparedWecom(List.of(), NotifySendResult.failure("NOTIFY_TEMPLATE_INVALID", "企微模板不可用", false));
+        }
+        NotifySendResult invalid = validateTemplateContract(event, template);
+        if (invalid != null) return new PreparedWecom(List.of(), invalid);
+        Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
+        rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
+        recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
+        if (recipients.isEmpty()) return new PreparedWecom(List.of(),
+                NotifySendResult.failure("NOTIFY_RECIPIENT_MISSING", "通知收件人暂不可用", true));
+        List<NotifyDeliveryContext> prepared = new java.util.ArrayList<>();
+        for (NotifyRecipientDTO recipient : recipients) {
+            var variables = provider.resolveVariables(event, recipient);
+            prepared.add(NotifyDeliveryContext.builder().tenantId(event.getTenantId())
+                    .sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey()).ruleId(rule.getId())
+                    .actionType(rule.getActionType()).userId(recipient.getUserId()).userType(recipient.getUserType())
+                    .templateCode(template.getCode()).wecomMessageType(template.getWecomMessageType())
+                    .title(notifyTemplateService.formatNotifyTemplateContent(template.getTitle(), variables))
+                    .content(notifyTemplateService.formatNotifyTemplateContent(template.getContent(), variables))
+                    .variables(variables).bizType(event.getBizType()).bizId(event.getBizId()).build());
+        }
+        return new PreparedWecom(prepared, null);
+    }
+
     private NotifySendResult processConfirmedInTenant(NotifyBusinessEvent event) {
         NotifySceneProvider provider = sceneRegistry.getProvider(event.getSceneCode());
         if (provider == null) {

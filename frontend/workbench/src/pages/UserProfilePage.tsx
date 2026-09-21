@@ -1,10 +1,12 @@
+import { platformHref } from '../services/mobileRoutes'
+import { getAuthPlatform } from '../services/authSession'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Modal, Radio, Skeleton, Space, Switch, Tabs, Upload, message } from 'antd'
 import { UploadOutlined, WechatOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import EmployeeAvatar from '../components/EmployeeAvatar'
 import DateTimeText from '../components/DateTimeText'
-import { APP_ROUTES } from '../constants'
+import { APP_ROUTES, type AuthPlatform } from '../constants'
 import { api, type SocialUser, type UserProfile } from '../services/api'
 
 const WECOM_TYPE = 30
@@ -18,8 +20,8 @@ export const parseWecomCallback = (search: string) => {
   return { type, code, state, hasValidSocialCallback: type === WECOM_TYPE && Boolean(code && state) }
 }
 
-export const buildWecomRedirectUri = (origin: string) =>
-  `${origin}${APP_ROUTES.USER_PROFILE}?type=${WECOM_TYPE}`
+export const buildWecomRedirectUri = (origin: string, platform: AuthPlatform = 'PC') =>
+  `${origin}${platformHref(APP_ROUTES.USER_PROFILE, platform)}?type=${WECOM_TYPE}`
 
 export const isLatestAvatarUpload = (requestId: number, latestRequestId: number) =>
   requestId === latestRequestId
@@ -79,7 +81,7 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   const bind = async () => {
     if (binding) return
     setBinding(true)
-    try { const redirectUri = buildWecomRedirectUri(window.location.origin); window.location.href = await api.socialAuthRedirect(WECOM_TYPE, redirectUri) } catch (e) { setBinding(false); message.error(errorText(e)) }
+    try { const redirectUri = buildWecomRedirectUri(window.location.origin, getAuthPlatform()); window.location.href = await api.socialAuthRedirect(WECOM_TYPE, redirectUri) } catch (e) { setBinding(false); message.error(errorText(e)) }
   }
   const unbind = () => {
     if (!social || socialLoading) return

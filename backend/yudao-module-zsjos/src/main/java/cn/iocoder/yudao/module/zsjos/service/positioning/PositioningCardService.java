@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioning;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardDraftRespVO;
@@ -59,16 +61,21 @@ public class PositioningCardService {
         return "zsjos/positioning-card/" + cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId() + "/" + id + "/";
     }
 
+    /**
+     * @param declaredMime 客户端声明的类型，仅作参考；入库类型以内容探测结果为准。
+     */
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "submit-review")
-    public CardFile uploadAttachment(Long id, String fieldKey, byte[] bytes, String name, String mimeType, Long userId) {
+    public CardFile uploadAttachment(Long id, String fieldKey, byte[] bytes, String name, String declaredMime, Long userId) {
         var card = require(id); requireStatus(card, POSITIONING_CO_CREATING);
         if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_PERMISSION_DENIED);
         assignmentService.requireMaster(card);
         var fields = JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
+        // 与定位访谈同一白名单：文档、图片、音频、视频，且扩展名须与真实内容一致。
+        String detected = PositioningAttachmentTypes.detectAllowed(name, bytes);
         if (fields.stream().noneMatch(f -> f.getKey().equals(fieldKey) && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))
-                || bytes.length == 0 || bytes.length > 20 * 1024 * 1024) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-        var file = positioningFileApi.createFileInfo(bytes, name == null ? "attachment" : name.replaceAll("[\\\\/\\r\\n]", "_"),
-                fileDirectory(id) + fieldKey, mimeType);
+                || bytes.length == 0 || bytes.length > 20 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        var file = positioningFileApi.createFileInfo(bytes, PositioningAttachmentTypes.storageName(name),
+                fileDirectory(id) + fieldKey, detected);
         return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(file.getId(), 300));
     }
 
@@ -96,6 +103,7 @@ public class PositioningCardService {
             snapshot.getDictSnapshots().put(field.getKey(), files);
         }
     }
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private PositioningAssignmentService assignmentService;
     @Resource private PositioningCardMapper mapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
@@ -527,6 +535,8 @@ public class PositioningCardService {
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, operator, POSITIONING_OPERATOR_FEASIBILITY,
                 POSITIONING_STUDENT_LINK_PENDING, null,
                 transitionKey(card, version, POSITIONING_STUDENT_LINK_PENDING));
+        collaborationNotify.card(MEDIA_POSITIONING_OPERATOR_APPROVED, card, operator,
+                "positioning-approved:" + id + ":" + version);
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "operator-reject")
@@ -544,7 +554,7 @@ public class PositioningCardService {
         transitionOperatorReview(card, version, POSITIONING_CO_CREATING, operator, reason);
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, operator, POSITIONING_OPERATOR_FEASIBILITY,
                 POSITIONING_CO_CREATING, reason, transitionKey(card, version, POSITIONING_CO_CREATING));
-        workflowEventService.notify("media.positioning.operator_rejected", BIZ_TYPE_POSITIONING_CARD, id,
+        workflowEventService.notify(MEDIA_POSITIONING_OPERATOR_REJECTED, BIZ_TYPE_POSITIONING_CARD, id,
                 card.getDirectorUserId(), operator, "positioning-operator-rejected:" + id + ":" + version,
                 withReason(payload(card), reason));
     }
@@ -564,7 +574,7 @@ public class PositioningCardService {
         transition(card, version, "student_evidence_pending");
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, null, POSITIONING_STUDENT_CONFIRM,
                 "student_evidence_pending", null, transitionKey(card, version, "student_evidence_pending"));
-        notifyEmployeeResult(card, "media.positioning.student_confirmed", version, "student_evidence_pending");
+        notifyEmployeeResult(card, MEDIA_POSITIONING_STUDENT_CONFIRMED, version, "student_evidence_pending");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -574,7 +584,7 @@ public class PositioningCardService {
         transition(card, version, POSITIONING_CO_CREATING);
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, null, POSITIONING_STUDENT_CONFIRM,
                 POSITIONING_CO_CREATING, reason, transitionKey(card, version, POSITIONING_CO_CREATING));
-        notifyEmployeeResult(card, "media.positioning.student_rejected", version, POSITIONING_CO_CREATING);
+        notifyEmployeeResult(card, MEDIA_POSITIONING_STUDENT_REJECTED, version, POSITIONING_CO_CREATING);
     }
 
     /** Compatibility for non-HTTP internal callers while the Partner confirmation entry is retired. */
@@ -613,6 +623,8 @@ public class PositioningCardService {
         }
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, userId, card.getStatus(),
                 POSITIONING_CO_CREATING, null, transitionKey(card, version, POSITIONING_CO_CREATING));
+        collaborationNotify.card(MEDIA_POSITIONING_REVISION_STARTED, card, userId,
+                "positioning-revision:" + id + ":" + version);
         return new PositioningCardDraftRespVO(id, version + 1);
     }
 
@@ -668,7 +680,7 @@ public class PositioningCardService {
             workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, card.getId(), card.getIpReviewerUserId(),
                     POSITIONING_IP_REVIEW, target, reason, transitionKey(card, card.getVersion(), target));
             String scene = POSITIONING_OPERATOR_FEASIBILITY.equals(target)
-                    ? "media.positioning.ip_approved" : "media.positioning.ip_rejected";
+                    ? MEDIA_POSITIONING_IP_APPROVED : MEDIA_POSITIONING_IP_REJECTED;
             workflowEventService.notify(scene, BIZ_TYPE_POSITIONING_CARD, card.getId(), card.getDirectorUserId(),
                     card.getIpReviewerUserId(), "positioning-ip-result:" + card.getId() + ":" + card.getVersion()
                             + ":" + target, withReason(payload(card), reason));
@@ -681,7 +693,7 @@ public class PositioningCardService {
     private void notifyOperatorReview(PositioningCardDO card, Long operator, Integer version, String branch) {
         Long operatorUserId = card.getOperatorUserId();
         if (operatorUserId == null) return;
-        workflowEventService.notify("media.positioning.operator_review", BIZ_TYPE_POSITIONING_CARD, card.getId(),
+        workflowEventService.notify(MEDIA_POSITIONING_OPERATOR_REVIEW, BIZ_TYPE_POSITIONING_CARD, card.getId(),
                 operatorUserId, operator,
                 "positioning-operator-review:" + card.getId() + ":" + version + ":" + branch, payload(card));
     }

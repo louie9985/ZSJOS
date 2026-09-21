@@ -64,7 +64,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
     private PageResult<LeadAssignmentRelationRespVO> getRelationPageInternal(
             LeadAssignmentRelationPageReqVO reqVO, Long operatorUserId,
             UserRelationSceneDO scene, boolean enforceScope) {
-        List<AdminUserRespDTO> sourceUsers = getUsersByPostCode(scene.getSourcePostCode(), false).stream()
+        List<AdminUserRespDTO> sourceUsers = getUsersByPostCodes(scene.getSourcePostCodes(), false).stream()
                 .filter(user -> !enforceScope || canManageSourceUser(operatorUserId, user))
                 .filter(user -> reqVO.getDeptId() == null || Objects.equals(reqVO.getDeptId(), user.getDeptId()))
                 .filter(user -> matchesKeyword(user, reqVO.getKeyword()))
@@ -152,7 +152,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         if (!Set.of(MODE_APPEND, MODE_REPLACE, MODE_REMOVE).contains(mode)) {
             throw exception(leadErrors ? LEAD_ASSIGNMENT_MODE_INVALID : USER_RELATION_MODE_INVALID);
         }
-        Map<Long, AdminUserRespDTO> validSourceMap = getUsersByPostCode(scene.getSourcePostCode(), true).stream()
+        Map<Long, AdminUserRespDTO> validSourceMap = getUsersByPostCodes(scene.getSourcePostCodes(), true).stream()
                 .collect(Collectors.toMap(AdminUserRespDTO::getId, Function.identity()));
         for (Long sourceUserId : sourceUserIds) {
             AdminUserRespDTO sourceUser = validSourceMap.get(sourceUserId);
@@ -391,14 +391,15 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
-    private List<AdminUserRespDTO> getUsersByPostCode(String postCode, boolean enabledOnly) {
-        PostRespDTO post = postApi.getPostByCode(postCode);
-        if (post == null || !CommonStatusEnum.ENABLE.getStatus().equals(post.getStatus())) {
-            return List.of();
-        }
-        return adminUserApi.getUserListByPostIds(Collections.singleton(post.getId())).stream()
+    private List<AdminUserRespDTO> getUsersByPostCodes(List<String> postCodes, boolean enabledOnly) {
+        Set<Long> postIds = postCodes.stream().map(postApi::getPostByCode).filter(Objects::nonNull)
+                .filter(post -> CommonStatusEnum.ENABLE.getStatus().equals(post.getStatus()))
+                .map(PostRespDTO::getId).collect(Collectors.toSet());
+        if (postIds.isEmpty()) return List.of();
+        return adminUserApi.getUserListByPostIds(postIds).stream()
                 .filter(user -> !enabledOnly || CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
-                .toList();
+                .collect(Collectors.toMap(AdminUserRespDTO::getId, user -> user, (first, duplicate) -> first,
+                        java.util.LinkedHashMap::new)).values().stream().toList();
     }
 
     private List<AdminUserRespDTO> getEligibleTargetUsersInternal(UserRelationSceneDO scene) {
@@ -408,7 +409,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
                     .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
                     .toList();
         }
-        return getUsersByPostCode(scene.getTargetPostCode(), true);
+        return getUsersByPostCodes(scene.getTargetPostCodes(), true);
     }
 
     private boolean canManageSourceUser(Long operatorUserId, AdminUserRespDTO sourceUser) {

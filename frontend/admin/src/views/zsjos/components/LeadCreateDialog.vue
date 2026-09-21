@@ -204,7 +204,7 @@ const submit = async () => {
   saving.value = true
   try {
     const [provinceCode, cityCode] = form.region
-    await MenuApi.createLead(
+    const result = await MenuApi.createLead(
       {
         name: form.name.trim(),
         mobile: form.mobile.trim() || undefined,
@@ -231,7 +231,7 @@ const submit = async () => {
       },
       !!props.selfSourced, !!props.educationSelfSourced
     )
-    message.success('客资已提交')
+    message.success(result?.outcome === 'activated' ? '客资已存在，已激活提醒' : '客资已提交')
     visible.value = false
     emit('success')
   } catch (e: any) {

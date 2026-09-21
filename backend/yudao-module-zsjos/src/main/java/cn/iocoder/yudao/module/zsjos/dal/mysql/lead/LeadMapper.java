@@ -675,6 +675,13 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
                 .orderByDesc(LeadDO::getSubmittedAt).last("LIMIT 1"));
     }
+    // 提交联系方式命中需提醒全部历史客资，包括已关闭客资；不改变编辑时的查重范围。
+    default List<LeadDO> selectContactActivationLeads(List<Long> personIds) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadDO>()
+                .in(LeadDO::getPersonId, personIds).orderByAsc(LeadDO::getId));
+    }
+
     default List<LeadDO> selectByPersonIds(List<Long> personIds) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadDO>()

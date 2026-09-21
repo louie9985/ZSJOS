@@ -17,7 +17,7 @@ const businessTarget = computed(() => {
   const item = detail.value
   if (!item?.bizId || item.actionType !== 'business_detail') return undefined
   if (item.bizType === 'lead') return `/lead/${item.bizId}${item.sceneCode === 'zsjos.lead.submitter_feedback_created' ? '#submitter-feedback' : ''}`
-  if (item.bizType === 'sales_order') return '/lead/list'
+  if (item.bizType === 'sales_order') return item.businessTarget && /^\/lead\/\d+$/.test(item.businessTarget) ? item.businessTarget : undefined
   if (item.bizType === 'cashback') return '/earnings'
   if (item.bizType === 'withdrawal') return `/withdrawal/${item.bizId}`
   if (item.bizType === 'feedback') return `/feedback/${item.bizId}`
@@ -78,6 +78,7 @@ onMounted(loadDetail)
           <div class="message-detail__content">{{ detail.templateContent }}</div>
         </section>
 
+        <p v-if="detail.targetUnavailableReason" role="status">{{ detail.targetUnavailableReason }}</p>
         <van-button
           v-if="businessTarget"
           block

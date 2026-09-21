@@ -45,8 +45,9 @@ import {
   getPrimaryTarget,
   type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, MOBILE_RENDERABLE_APP_ROUTES, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
+import { APP_ROUTES, MOBILE_ROUTE_BASE, LAYOUT_SIZES, MINI_RAIL_W, MOBILE_RENDERABLE_APP_ROUTES, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
 import { initializeAuthPlatform, redirectToMobileEntryForPlatformReload, resolveAdminEmbedPresentation, shouldReloadForMobileEntry } from './services/authSession'
+import { normalizeMobileStartup } from './services/mobileRoutes'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -198,16 +199,15 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
     authPlatform,
     adminEmbedPath ? 'admin_embed' : currentMenu?.workbenchRenderMode
   )
-  const mobileAdminEmbed = adminEmbedPresentation === 'mobile-blocked'
   const activeAdminEmbedPath = adminEmbedPresentation === 'frame'
-    ? adminEmbedPath
+    ? `${location.pathname}${location.search}${location.hash}`
     : undefined
 
   const handleAdminRouteChange = useCallback((path: string) => {
-    if (findAdminEmbedPath(authorizedMenus, path) && path !== location.pathname) {
+    if (findAdminEmbedPath(authorizedMenus, path.split(/[?#]/, 1)[0]) && path !== `${location.pathname}${location.search}${location.hash}`) {
       navigate(path)
     }
-  }, [authorizedMenus, location.pathname, navigate])
+  }, [authorizedMenus, location.pathname, location.search, location.hash, navigate])
 
   useEffect(() => {
     if (!tabsEnabled) setTabs([])
@@ -474,15 +474,14 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
         <Content>
-          {authPlatform === 'PC' && <AdminEmbedFrame
+          {<AdminEmbedFrame
+              platform={authPlatform}
               ref={adminEmbedFrameRef}
               activePath={activeAdminEmbedPath}
               title={currentMenu?.name}
               onRouteChange={handleAdminRouteChange}
             />}
-          {mobileAdminEmbed
-            ? <Result status="info" title="请使用电脑端访问此页面" subTitle="该页面由管理端承载，手机端会话不会复用电脑端登录状态。"/>
-            : !activeAdminEmbedPath && <Routes>
+          {!activeAdminEmbedPath && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
@@ -558,7 +557,9 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
           filterRenderableMenus(authorizedMenus, RENDERABLE_APP_ROUTES)
         ))
         if (publicLoginRedirect || loginRedirectPending) {
-          navigateRef.current(publicLoginRedirect || homeTarget || fallbackTarget || '/', { replace: true })
+          const deepLink = location.pathname !== '/' && location.pathname !== '/zsjos/mobile'
+            ? `${location.pathname}${location.search}${location.hash}` : ''
+          navigateRef.current(publicLoginRedirect || deepLink || homeTarget || fallbackTarget || '/', { replace: true })
         }
         setPublicLoginRedirect('')
         setLoginRedirectPending(false)
@@ -592,7 +593,8 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
 }
 
 const authPlatform = initializeAuthPlatform()
+normalizeMobileStartup(authPlatform, window.location, window.history)
 
 createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><RuntimeBoundary><ThemeProvider><BrowserRouter><App><MobileEntryReloadGuard platform={authPlatform}/><Root authPlatform={authPlatform}/></App></BrowserRouter></ThemeProvider></RuntimeBoundary></React.StrictMode>
+  <React.StrictMode><RuntimeBoundary><ThemeProvider><BrowserRouter basename={authPlatform === 'MOBILE' ? MOBILE_ROUTE_BASE : '/'}><App><MobileEntryReloadGuard platform={authPlatform}/><Root authPlatform={authPlatform}/></App></BrowserRouter></ThemeProvider></RuntimeBoundary></React.StrictMode>
 )

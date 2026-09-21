@@ -15,6 +15,18 @@ import java.util.Set;
 
 @Mapper
 public interface PersonMapper extends BaseMapperX<PersonDO> {
+    /**
+     * Start of every student-page EXISTS clause: the person's live service relations. Each caller appends
+     * its own scope clause (class id, then the owner list where one applies) and then the status condition.
+     */
+    String STUDENT_RELATION_PREDICATE =
+            "EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
+                    + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' ";
+
+    /** A SQL fragment together with its positional arguments, kept in one value so the two cannot drift. */
+    record StudentScopePredicate(String sql, Object[] args) {
+    }
+
     @Select("SELECT * FROM zsjos_person WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     PersonDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
     @Select("<script>SELECT * FROM zsjos_person WHERE deleted=b'0' AND ("
@@ -85,14 +97,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     default PageResult<PersonDO> selectAllStudentPage(MyStudentPageReqVO reqVO,
                                                       java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
-        String basePredicate = "EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
-                + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
-                + "AND ({0} IS NULL OR sr.class_id={0}) AND ";
-        if (reqVO.getServiceStatus() == null) {
-            query.apply(basePredicate + "sr.status IN ('active','paused','completed'))", reqVO.getClassId());
-        } else {
-            query.apply(basePredicate + "sr.status={1})", reqVO.getClassId(), reqVO.getServiceStatus());
-        }
+        applyStatusPredicate(query, reqVO, "AND ({0} IS NULL OR sr.class_id={0}) AND ");
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 
@@ -109,15 +114,28 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
             return PageResult.empty();
         }
         String owners = ownerUserIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
-        String statusPredicate = reqVO.getServiceStatus() == null
-                ? "sr.status IN ('active','paused','completed')" : "sr.status={1}";
-        query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
-                        + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
-                        + "AND ({0} IS NULL OR sr.class_id={0}) "
-                        + "AND sr.owner_user_id IN (" + owners + ") "
-                        + "AND " + statusPredicate + ")",
-                reqVO.getClassId(), reqVO.getServiceStatus());
+        applyStatusPredicate(query, reqVO,
+                "AND ({0} IS NULL OR sr.class_id={0}) AND sr.owner_user_id IN (" + owners + ") AND ");
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
+    /**
+     * Appends the service-status condition to a class predicate. The SQL is branched rather than the
+     * argument list: MyBatis Plus rewrites "{n}" placeholders by position and rejects an argument whose
+     * placeholder is absent, so a null status must not carry a second argument (it never resolves "{1}").
+     */
+    private static void applyStatusPredicate(QueryWrapperX<PersonDO> query, MyStudentPageReqVO reqVO,
+                                             String scopeClause) {
+        StudentScopePredicate predicate = buildStudentScopePredicate(
+                STUDENT_RELATION_PREDICATE + scopeClause, reqVO.getClassId(), reqVO.getServiceStatus());
+        query.apply(predicate.sql(), predicate.args());
+    }
+
+    /** The SQL fragment plus its positional arguments, kept together so the two can never drift. */
+    static StudentScopePredicate buildStudentScopePredicate(String prefix, Long classId, String serviceStatus) {
+        return serviceStatus == null
+                ? new StudentScopePredicate(prefix + "sr.status IN ('active','paused','completed'))", new Object[]{classId})
+                : new StudentScopePredicate(prefix + "sr.status={1})", new Object[]{classId, serviceStatus});
     }
 
     private static QueryWrapperX<PersonDO> studentQuery(MyStudentPageReqVO reqVO,

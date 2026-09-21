@@ -14,6 +14,12 @@ Base path: `/admin-api/zsjos/lead/aging-pool`. All endpoints are tenant scoped a
 | POST | `/{id}/exit` | manage or manage-all | Exit with a required reason |
 | POST | `/{id}/transfer-request` | `zsjos:lead-aging-pool:transfer-request` | Current public-sea collaborator B requests formal transfer to self; other visible same-team sales are rejected |
 
+### 常驻筛选
+
+Workbench 公海池复用客资管理 `lead-simple-status-shell` 样式，常驻展示全部、归属我的、我跟进的及服务端发布的状态选项；单选切换后重新从第一页加载。高级筛选不隐藏常驻栏，与选中的常驻条件取交集。
+
+`GET /page` 和 `POST /search-page` 新增可选 `relationScope`：`owned` 为当前 ADMIN 用户是正式归属人 A，`following` 为当前指派的协同销售 B（不表示历史上写过跟进记录）。用户身份由服务端登录上下文传入，关系条件与现有租户、可见范围、关键词及高级筛选取交集，manage-all 用户也不绕过个人筛选。不传该字段保持原有范围；Admin 现有调用不需要新增参数，响应结构不变。`counts.all` 仍代表可见范围内的全部活动公海数量，列表 total 代表当前筛选结果。
+
 Assign body:
 
 ```json

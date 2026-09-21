@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioning;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningApplyReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.*;
@@ -13,12 +15,14 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
+import java.util.Map;
 import java.util.List;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PositioningAssignmentService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private PositioningServiceCardMapper masterMapper;
     @Resource private PositioningCardMapper cardMapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
@@ -106,5 +110,7 @@ public class PositioningAssignmentService {
         }
         logMapper.insert(new PositioningApplicationLogDO().setAccountId(req.accountId()).setPreviousSubmissionId(previous)
                 .setSubmissionId(req.submissionId()).setAppliedBy(userId).setExpectedVersion(req.version()).setIdempotencyKey(req.idempotencyKey()));
+        if (!Objects.equals(previous, req.submissionId())) collaborationNotify.account(MEDIA_POSITIONING_APPLIED,
+                account, userId, "positioning-applied:" + req.accountId() + ":" + current.getVersion(), Map.of());
     }
 }

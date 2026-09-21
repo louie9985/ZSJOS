@@ -24,7 +24,7 @@
         <el-input v-model="formData.apiKey" placeholder="请输入密钥" />
       </el-form-item>
       <el-form-item label="自定义 API URL" prop="url">
-        <el-input v-model="formData.url" placeholder="请输入自定义 API URL" />
+        <ResourceLinkInput v-model="formData.url" placeholder="请输入自定义 API URL" />
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-radio-group v-model="formData.status">
@@ -45,6 +45,7 @@
   </Dialog>
 </template>
 <script setup lang="ts">
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { getIntDictOptions, DICT_TYPE, getStrDictOptions } from '@/utils/dict'
 import { ApiKeyApi, ApiKeyVO } from '@/api/ai/model/apiKey'
 import { CommonStatusEnum } from '@/utils/constants'

@@ -31,11 +31,11 @@ const useStyles = createStyles((props) => {
       borderTop: `${cssVar.lineWidth} ${cssVar.lineType} ${cssVar.colorSplit}`,
       padding: `${cssVar.padding} ${cssVar.paddingLG}`,
       backgroundColor: cssVar.colorBgContainerDisabled,
-      boxShadow: `inset 0 1px 0 ${cssVar.colorBgContainer}`,
+      boxShadow: cssVar.boxShadow,
     }),
     buttonRoot: css({
       backgroundImage: `linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.2))`,
-      boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.15)`,
+      boxShadow: cssVar.boxShadow,
       transition: 'none',
       borderColor: `rgba(0, 0, 0, 0.3)`,
       textShadow: `0 -1px 0 rgba(0, 0, 0, 0.2)`,
@@ -45,7 +45,7 @@ const useStyles = createStyles((props) => {
       },
 
       '&:active': {
-        boxShadow: `inset 0 1px 3px rgba(0, 0, 0, 0.15)`,
+        boxShadow: cssVar.boxShadowSecondary,
       },
     }),
     buttonColorDefault: css({
@@ -86,7 +86,7 @@ const useStyles = createStyles((props) => {
       },
     }),
     switchRoot: css({
-      boxShadow: `inset 0 1px 3px rgba(0, 0, 0, 0.4)`,
+      boxShadow: cssVar.boxShadow,
     }),
     progressTrack: css({
       backgroundImage: `linear-gradient(to bottom, ${cssVar.colorPrimaryHover}, ${cssVar.colorPrimary})`,

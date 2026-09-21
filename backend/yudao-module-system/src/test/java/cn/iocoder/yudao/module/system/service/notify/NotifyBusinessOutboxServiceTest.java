@@ -25,12 +25,15 @@ class NotifyBusinessOutboxServiceTest {
     @Mock private NotifyBusinessOutboxMapper outboxMapper;
     @Mock private NotifyBusinessEventProcessor eventProcessor;
     @Mock private NotifyMessageMapper notifyMessageMapper;
+    @Mock private WecomOutboxDeliveryService wecomDeliveryService;
 
     @Test
     void permanentFailureIsNotRetriedAndUpdateUsesClaimToken() {
         NotifyBusinessOutboxDO row = row(1L, "event:1");
+        row.setPayload("null");
         when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(row));
         when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> { row.setClaimToken(call.getArgument(1)); return row; });
         when(eventProcessor.processConfirmed(any())).thenReturn(
                 NotifySendResult.failure("INVALID", "invalid rule", false));
 
@@ -51,6 +54,10 @@ class NotifyBusinessOutboxServiceTest {
         NotifyBusinessOutboxDO second = row(2L, "event:2");
         when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(first, second));
         when(outboxMapper.claim(anyLong(), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(anyLong(), anyString())).thenAnswer(call -> {
+            var claimed = Long.valueOf(1L).equals(call.getArgument(0)) ? first : second;
+            claimed.setClaimToken(call.getArgument(1)); return claimed;
+        });
         when(eventProcessor.processConfirmed(any()))
                 .thenThrow(new IllegalStateException("temporary"))
                 .thenReturn(NotifySendResult.success(null));
@@ -67,6 +74,7 @@ class NotifyBusinessOutboxServiceTest {
         NotifyBusinessOutboxDO row = row(1L, "event:1");
         when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(row));
         when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> { row.setClaimToken(call.getArgument(1)); return row; });
         when(eventProcessor.processConfirmed(any())).thenReturn(
                 NotifySendResult.failure("TEMPORARY", "recipient unavailable", true));
 
@@ -75,6 +83,27 @@ class NotifyBusinessOutboxServiceTest {
         assertEquals("pending", row.getStatus());
         assertEquals(1, row.getAttemptCount());
         assertNotNull(row.getNextAttemptAt());
+    }
+
+    @Test void claimedSnapshotReplacesStaleScanAndUsesWecomEnvelope() {
+        var scanned = row(1L, "event:1");
+        var fresh = row(1L, "event:1");
+        var envelope = new WecomOutboxPayload();
+        envelope.setEventPayload(java.util.Map.of("version", "fresh"));
+        fresh.setPayload(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(envelope));
+        when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(scanned));
+        when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> {
+            fresh.setClaimToken(call.getArgument(1)); return fresh;
+        });
+        when(wecomDeliveryService.deliver(eq(fresh), any())).thenAnswer(call -> {
+            var event = (cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent) call.getArgument(1);
+            assertEquals("fresh", event.getPayload().get("version"));
+            return NotifySendResult.success("ok");
+        });
+        service.deliverDue();
+        assertEquals("succeeded", fresh.getStatus());
+        verifyNoInteractions(eventProcessor);
     }
 
     private NotifyBusinessOutboxDO row(Long id, String eventKey) {

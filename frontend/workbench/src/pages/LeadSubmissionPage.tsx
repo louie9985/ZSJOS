@@ -67,6 +67,45 @@ export default function LeadSubmissionPage({
   const [pendingValues, setPendingValues] = useState<FormValues>()
   const [current, setCurrent] = useState(0)
   const [invalidSteps, setInvalidSteps] = useState<StepKey[]>([])
+  const [checkingContact, setCheckingContact] = useState(false)
+  const contactCheckBusy = useRef(false)
+  const contactRequestKeys = useRef(new Map<string, string>())
+  const [contactResult, setContactResult] = useState<{ input: string; matched?: boolean; error?: string }>()
+  const contactInput = (phone?: string, wechat?: string) => JSON.stringify([phone?.trim() || '', wechat?.trim().toLowerCase() || ''])
+  const currentContactInput = contactInput(mobile, wechatId)
+  const currentContactResult = contactResult?.input === currentContactInput ? contactResult : undefined
+  const canCheckContact = permissions.some(permission => [
+    'zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create'
+  ].includes(permission))
+
+  const checkContact = async () => {
+    if (contactCheckBusy.current) return
+    contactCheckBusy.current = true
+    try {
+      const values = await form.validateFields(['mobile', 'wechatId']).catch(() => undefined)
+      if (!values) return
+      const input = contactInput(values.mobile, values.wechatId)
+      const idempotencyKey = contactRequestKeys.current.get(input) ?? createIdempotencyKey()
+      contactRequestKeys.current.set(input, idempotencyKey)
+      setCheckingContact(true)
+      setContactResult(undefined)
+      try {
+        const checkApi = educationSelfSourced
+          ? api.checkEducationSelfSourcedLeadContact
+          : selfSourced ? api.checkSelfSourcedLeadContact : api.checkLeadContact
+        const matched = await checkApi({
+          mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined, idempotencyKey
+        })
+        setContactResult({ input, matched })
+      } catch (error) {
+        setContactResult({ input, error: error instanceof Error ? error.message : '查重失败，请重试' })
+      }
+    } finally {
+      contactCheckBusy.current = false
+      setCheckingContact(false)
+    }
+  }
+
   const canSpecifySales = permissions.includes('zsjos:lead:submit:specify')
 
   const loadOptions = useCallback(async () => {
@@ -160,12 +199,14 @@ export default function LeadSubmissionPage({
   }
 
   const goNext = async () => {
+    if (contactCheckBusy.current || currentContactResult?.matched) return
     if (!await validateStep(steps[current].key, true)) return
     setCurrent(index => Math.min(index + 1, lastIndex))
   }
 
   /** 点步骤条跳转：往回自由，往前需要逐步校验通过。 */
   const jumpTo = async (target: number) => {
+    if (contactCheckBusy.current || currentContactResult?.matched) return
     if (target <= current) return setCurrent(target)
     for (let index = current; index < target; index += 1) {
       if (!await validateStep(steps[index].key, index === current)) return setCurrent(index)
@@ -174,12 +215,17 @@ export default function LeadSubmissionPage({
   }
 
   const resetAll = () => {
+    if (contactCheckBusy.current) return
+    setContactResult(undefined)
     form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined)
     setPendingValues(undefined); setInvalidSteps([]); setCurrent(0)
   }
 
   const showResult = (result: LeadCreateResult) => {
-    if (result.outcome === 'created' || result.outcome === 'activated') {
+    if (result.outcome === 'activated') {
+      return modal.success({ title: '客资已存在，已激活提醒', content: '本次未新建客资。', okText: '知道了' })
+    }
+    if (result.outcome === 'created') {
       return modal.success({
         title: '客资提交成功',
         content: result.leadNo ? `客资编号 ${result.leadNo} 已创建，可在客资列表中查看跟进。` : '客资已创建，可在客资列表中查看跟进。',
@@ -208,6 +254,7 @@ export default function LeadSubmissionPage({
   }
 
   const prepareSubmit = async () => {
+    if (contactCheckBusy.current || currentContactResult?.matched) return
     for (const [index, step] of steps.entries()) {
       if (!await validateStep(step.key, false)) {
         setCurrent(index)
@@ -284,6 +331,13 @@ export default function LeadSubmissionPage({
             <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】" /></Form.Item></Col>
           </Row>
+          <Space orientation="vertical">
+            {canCheckContact && <Button loading={checkingContact} disabled={currentContactResult?.matched} onClick={() => void checkContact()}>查重</Button>}
+            <Text type="secondary">手机号、微信号至少填写一个；命中已有客资将自动激活提醒。</Text>
+            {currentContactResult && <Alert showIcon type={currentContactResult.error ? 'error' : 'success'}
+              message={currentContactResult.error || (currentContactResult.matched ? '客资已存在，已激活提醒' : '未发现重复客资，可继续填写提交。')}
+              action={currentContactResult.error && <Button onClick={() => void checkContact()}>重试</Button>} />}
+          </Space>
           <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
             <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true, message: '请选择来源渠道' }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
@@ -350,9 +404,9 @@ export default function LeadSubmissionPage({
           <Text type="secondary">提交后客资将进入查重与派单流程，内容不可撤回。</Text>
         </div>
         <div className="lead-form-actions"><Space>
-          <Button onClick={resetAll}>重置</Button>
+          <Button disabled={checkingContact} onClick={resetAll}>重置</Button>
           {current > 0 && <Button onClick={() => setCurrent(index => index - 1)}>上一步</Button>}
-          {current < lastIndex && <Button type="primary" disabled={unavailable} onClick={() => void goNext()}>下一步</Button>}
+          {current < lastIndex && <Button type="primary" disabled={unavailable || checkingContact || currentContactResult?.matched} onClick={() => void goNext()}>下一步</Button>}
           {current === lastIndex && <IrreversiblePopconfirm action={`提交客资「${pendingValues?.name?.trim() || '当前客户'}」`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}>
             <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading} onClick={() => void prepareSubmit()}>提交客资</Button>
           </IrreversiblePopconfirm>}

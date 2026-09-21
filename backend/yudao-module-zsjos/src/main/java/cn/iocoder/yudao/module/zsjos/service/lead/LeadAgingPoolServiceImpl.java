@@ -72,10 +72,9 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                         inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_AGING_POOL),
                         reqVO.getInboxGroup(), reqVO.getInboxStage());
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        boolean advanced = matchedLeadIds != null;
         PageResult<LeadAgingPoolCycleDO> page = cycleMapper.selectPage(reqVO, manageAll ? null : scopedOwnerUserIds,
-                manageAll ? null : userId, advanced ? List.of() : List.copyOf(filter.values(INBOX_FILTER_FIELD_POOL_STATUS)),
-                advanced ? false : filter.matchNone(), matchedLeadIds);
+                manageAll ? null : userId, List.copyOf(filter.values(INBOX_FILTER_FIELD_POOL_STATUS)),
+                filter.matchNone(), matchedLeadIds, userId);
         List<LeadAgingPoolRespVO> rows = page.getList().stream().map(cycle -> convert(cycle, userId)).toList();
         return new PageResult<>(rows, page.getTotal());
     }

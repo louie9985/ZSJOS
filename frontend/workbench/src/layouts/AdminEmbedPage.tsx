@@ -5,7 +5,7 @@ import {
   useImperativeHandle,
   useRef
 } from 'react'
-import { APP_CONFIG } from '../constants'
+import { APP_CONFIG, type AuthPlatform } from '../constants'
 
 export const ADMIN_EMBED_MESSAGE = {
   READY: 'zsjos:admin-embed:ready',
@@ -32,16 +32,19 @@ export function isAdminEmbedResponse(data: unknown): data is AdminEmbedResponse 
   return (
     (message.type === ADMIN_EMBED_MESSAGE.READY ||
       message.type === ADMIN_EMBED_MESSAGE.ROUTE_CHANGED) &&
-    typeof message.path === 'string'
+    typeof message.path === 'string' && message.path.startsWith('/') && !message.path.startsWith('//')
   )
 }
 
-export function buildAdminEmbedUrl(path: string) {
+export function buildAdminEmbedUrl(path: string, platform: AuthPlatform = 'PC') {
   const base = APP_CONFIG.ADMIN_EMBED_BASE.endsWith('/')
     ? APP_CONFIG.ADMIN_EMBED_BASE
     : `${APP_CONFIG.ADMIN_EMBED_BASE}/`
-  const relativePath = path.replace(/^\/+/, '')
-  return `${base}${relativePath}?embed=workbench`
+  const target = new URL(path, 'https://workbench.invalid')
+  target.searchParams.set('embed', 'workbench')
+  if (platform === 'MOBILE') target.searchParams.set('platform', 'MOBILE')
+  else target.searchParams.delete('platform')
+  return `${base}${target.pathname.replace(/^\/+/, '')}${target.search}${target.hash}`
 }
 
 /**
@@ -49,10 +52,11 @@ export function buildAdminEmbedUrl(path: string) {
  * 自身的 Vue Router 完成；消息只携带路由，不传递认证信息。
  */
 const AdminEmbedFrame = forwardRef<AdminEmbedFrameHandle, {
+  platform: AuthPlatform
   activePath?: string
   title?: string
   onRouteChange?: (path: string) => void
-}>(function AdminEmbedFrame({ activePath, title = '管理页面', onRouteChange }, ref) {
+}>(function AdminEmbedFrame({ platform, activePath, title = '管理页面', onRouteChange }, ref) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const initialPathRef = useRef<string | undefined>(undefined)
   const documentPathRef = useRef<string | undefined>(undefined)
@@ -75,8 +79,8 @@ const AdminEmbedFrame = forwardRef<AdminEmbedFrameHandle, {
     if (!frameRef.current) return
     loadedRef.current = false
     documentPathRef.current = path
-    frameRef.current.src = buildAdminEmbedUrl(path)
-  }, [])
+    frameRef.current.src = buildAdminEmbedUrl(path, platform)
+  }, [platform])
 
   const handleFrameLoad = useCallback(() => {
     loadedRef.current = true
@@ -147,7 +151,7 @@ const AdminEmbedFrame = forwardRef<AdminEmbedFrameHandle, {
     >
       <iframe
         ref={frameRef}
-        src={buildAdminEmbedUrl(initialPath)}
+        src={buildAdminEmbedUrl(initialPath, platform)}
         title={title}
         className="admin-embed-frame"
         referrerPolicy="same-origin"

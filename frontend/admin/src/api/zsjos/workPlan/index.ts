@@ -9,7 +9,6 @@ export interface WorkPlanPageReqVO extends PageParam { periodType?: string; stat
 export interface WorkPlanSearchReqVO extends WorkPlanPageReqVO { dynamicFilters?: Array<{ fieldKey: string; operator: string; value?: unknown; minValue?: unknown; maxValue?: unknown }> }
 
 export const getWorkPlanPage = (params: WorkPlanPageReqVO) => request.get<PageResult<WorkPlanVO[]>>({ url: '/zsjos/work-plan/page', params })
-export const searchWorkPlanPage = (data: WorkPlanSearchReqVO) => request.post<PageResult<WorkPlanVO[]>>({ url: '/zsjos/work-plan/search-page', data })
 export const getWorkPlan = (id: number) => request.get<WorkPlanVO>({ url: '/zsjos/work-plan/get', params: { id } })
 export const cancelWorkPlan = (id: number, version: number, reason: string) => request.post({ url: `/zsjos/work-plan/${id}/cancel`, data: { version, reason } })
 export const cancelWorkTask = (id: number, version: number, reason: string, cascadeChildren = false) => request.post({ url: `/zsjos/work-plan/task/${id}/cancel`, data: { version, reason, cascadeChildren } })

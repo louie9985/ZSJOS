@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioning;
 
+import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
+
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.SecureUtil;
@@ -35,6 +37,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PositioningConfirmationService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private PositioningCardService cardService;
     @Resource private PositioningCardMapper cardMapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
@@ -79,6 +82,8 @@ public class PositioningConfirmationService {
                     POSITIONING_STUDENT_LINK_PENDING, POSITIONING_STUDENT_CONFIRM, null,
                     "positioning-link:" + cardId + ":" + cardVersion);
         }
+        collaborationNotify.card(MEDIA_POSITIONING_CONFIRMATION_READY, card, operatorUserId,
+                "positioning-link-ready:" + submission.getId());
         return new PositioningLinkRespVO(baseUrl + "/positioning/share#token=" + rawToken, expiresAt);
     }
 

@@ -56,6 +56,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 提交接口先执行统一查重。同字段手机号或同字段微信号命中任何历史客资时为强重复，创建 `duplicate_flag=strong_duplicate`、`duplicate_result=strong_rejected` 的查重审计记录，并返回稳定业务错误 `LEAD_DUPLICATE_STRONG_CONFLICT`；本次不创建 `Person`、`Lead`、派单或指定销售任务。交叉联系方式、姓名+明确省市+明确主意向课程、姓名+手机号后四位命中时为疑似重复，保存提交快照、候选快照、命中规则和 `reviewFingerprint`，返回 `outcome=review_pending + reviewId`；相同 fingerprint 已有待处理任务时复用最早任务，不追加可见复核项。`duplicateAutoResolutionEnabled` 仅用于交叉联系方式疑似重复：开启时自动关闭本次复核并返回 `duplicate_auto_closed`，不创建 Lead、不改动历史客资。完全无命中返回 `created + leadId + leadNo`。
 
+当前提交页联系方式查重已收敛为强重复激活：手机号、微信号至少填写一个；同字段或交叉字段命中时，逐条创建 `LeadActivation` 并发送 `zsjos.lead.activated`，同一请求对同一客资按幂等键只处理一次，不改变历史客资状态和归属。手机号与微信号分别命中不同客资时分别激活和通知；无负责人时仍记录激活，页面统一显示“客资已存在，已激活提醒”。最终提交前服务端再次执行该联系方式激活，未命中联系方式时才继续执行既有弱重复复核规则。联系方式查重接口为 `POST /zsjos/lead/contact-check`、`/self-sourced/contact-check` 和 `/education-self-sourced/contact-check`，分别受对应提交权限保护。
+
 自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售或教务自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到关联提醒。V257 对未编辑的 V080 默认模板使用 `lead.submitterIdentityLabel` 区分销售/教务。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
 
 详情响应投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。来源标签为兼职提交、新媒体提交、销售自拓录、教务自拓录；兼职提交人从 Partner 主体解析姓名，不返回内部 ID。提交人与负责人互看时沿用中文姓名脱敏，其他有权业务关系人看完整姓名。四个历史标签分别要求 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read`，前端不得按 mode 或角色名补齐标签。详情顶层 `nextFollowUpAt` 只来自当前 `zsjos_business_task` 中 `task_type=lead_follow_up_reminder` 且 `status=pending` 的 `dueAt`，仅在 `visibleTabs` 包含 `follow-ups` 时查询；任务已完成或取消时返回空。Workbench 在详情标题栏展示该值，不得通过 Lead 历史时间、跟进记录或 Opportunity 摘要绕过任务状态。

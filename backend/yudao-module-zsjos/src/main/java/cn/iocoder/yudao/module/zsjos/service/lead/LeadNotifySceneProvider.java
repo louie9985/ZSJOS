@@ -48,12 +48,13 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Resource private LeadAssignmentService assignmentService;
     @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
     @Resource private PartnerAccountMapper partnerAccountMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper partnerMapper;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
         return List.of(
                 scene(CREATED, "客资新建", ROLE_SUBMITTER, ROLE_OPERATOR, ROLE_NEW_MEDIA_PROVIDER),
-                scene(ACTIVATED, "重复客资激活", ROLE_SUBMITTER, ROLE_OWNER, ROLE_OPERATOR),
+                scene(ACTIVATED, "重复客资激活", ROLE_SUBMITTER, ROLE_OWNER, ROLE_DIRECT_LEADER, ROLE_OPERATOR),
                 scene(ASSIGNED, "首次派单", ROLE_PENDING_SALES, ROLE_SUBMITTER),
                 scene(REASSIGNED, "重新派单", ROLE_PENDING_SALES, ROLE_SUBMITTER),
                 scene(ACCEPTED, "接单成功", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
@@ -116,7 +117,22 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                     ? NotifyRecipientDTO.partner(recipientId) : NotifyRecipientDTO.admin(recipientId));
         }
         LeadDO lead = leadMapper.selectById(event.getBizId());
+        Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
         for (String role : recipientRoles) {
+            if (ROLE_OPERATOR.equals(role)) {
+                Long operatorId = event.getOperatorUserId();
+                Long operatorType = longValue(payload.get("operatorUserType"));
+                if (operatorId != null && operatorId > 0) {
+                    if (Objects.equals(operatorType, UserTypeEnum.PARTNER.getValue().longValue())) {
+                        recipients.add(NotifyRecipientDTO.partner(operatorId));
+                    } else if (operatorType == null
+                            || Objects.equals(operatorType, UserTypeEnum.ADMIN.getValue().longValue())) {
+                        // Legacy employee events omit the type; new Partner publishers always freeze it.
+                        recipients.add(NotifyRecipientDTO.admin(operatorId));
+                    }
+                }
+                continue;
+            }
             if (ROLE_QUALIFICATION_MANAGERS.equals(role)) {
                 users.addAll(resolveQualificationManagers(payload));
                 continue;
@@ -126,6 +142,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 continue;
             }
             if (ROLE_DIRECT_LEADER.equals(role)) {
+                // 教务归属的激活仅提醒教务，不按销售主管链路追加接收人。
+                if (ACTIVATED.equals(event.getSceneCode()) && lead != null
+                        && OWNER_EDUCATION.equals(lead.getOwnerIdentity())) continue;
                 Long ownerId = longValue(payload.get("ownerUserId"));
                 AdminUserRespDTO owner = ownerId == null ? null : adminUserApi.getUser(ownerId);
                 DeptRespDTO dept = owner == null || owner.getDeptId() == null ? null : deptApi.getDept(owner.getDeptId());
@@ -154,7 +173,6 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 case ROLE_NEW_MEDIA_PROVIDER -> resolveNewMediaProvider(lead, event.getOperatorUserId());
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
                 case ROLE_OWNER -> longValue(payload.get("ownerUserId"));
-                case ROLE_OPERATOR -> event.getOperatorUserId();
                 case ROLE_PREVIOUS_OWNER -> longValue(payload.get("previousOwnerUserId"));
                 case ROLE_NEW_OWNER -> longValue(payload.get("newOwnerUserId"));
                 case ROLE_COLLABORATOR -> longValue(payload.get("collaboratorUserId"));
@@ -166,8 +184,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             };
             if (id != null && id > 0) users.add(id);
         }
-        Set<NotifyRecipientDTO> recipients = users.stream().map(NotifyRecipientDTO::admin)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        users.stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
         if (recipientRoles.contains(ROLE_SUBMITTER)
                 && lead != null && PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) {
             PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(lead.getProviderOwnerId());
@@ -238,8 +255,13 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 .map(LeadAttachmentDO::getOriginalName).filter(Objects::nonNull).collect(Collectors.joining("、")));
         values.put("attachment.count", attachments.size());
         boolean blindIdentity = recipientUserId != null && isBlindIdentity(lead, recipientUserId);
-        putUser(values, "submitter", lead.getSourceUserId(),
-                blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
+        if (lead.getPartnerId() != null) {
+            putPartner(values, "submitter", lead.getSourceUserId(),
+                    blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
+        } else {
+            putUser(values, "submitter", lead.getSourceUserId(),
+                    blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
+        }
         values.put("provider.type", lead.getProviderOwnerType());
         values.put("provider.id", lead.getProviderOwnerId());
         values.put("provider.name", lead.getProviderOwnerNameSnapshot());
@@ -247,7 +269,12 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(recipientUserId, lead.getProviderOwnerId()));
         putUser(values, "pendingSales", lead.getPendingAssigneeUserId(), false);
-        putUser(values, "operator", event.getOperatorUserId(), false);
+        Long operatorType = event.getPayload() == null ? null : longValue(event.getPayload().get("operatorUserType"));
+        if (Objects.equals(operatorType, UserTypeEnum.PARTNER.getValue().longValue())) {
+            putPartner(values, "operator", event.getOperatorUserId(), false);
+        } else if (operatorType == null || Objects.equals(operatorType, UserTypeEnum.ADMIN.getValue().longValue())) {
+            putUser(values, "operator", event.getOperatorUserId(), false);
+        }
         values.put("event.time", event.getOccurredAt());
         values.put("event.scene", event.getSceneCode());
         if (event.getPayload() != null) {
@@ -437,6 +464,14 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     private boolean hasUnmaskedIdentityAccess(Long userId, Long ownerUserId) {
         return permissionApi.hasAnyPermissions(userId, QUERY_ALL_PERMISSION)
                 || managesOwnerDepartment(userId, ownerUserId);
+    }
+
+    private void putPartner(Map<String, Object> values, String prefix, Long accountId, boolean masked) {
+        PartnerAccountDO account = accountId == null ? null : partnerAccountMapper.selectById(accountId);
+        var partner = account == null ? null : partnerMapper.selectById(account.getPartnerId());
+        values.put(prefix + ".id", masked ? null : accountId);
+        values.put(prefix + ".name", partner == null ? ""
+                : masked ? DesensitizedUtil.chineseName(partner.getName()) : partner.getName());
     }
 
     private void putUser(Map<String, Object> values, String prefix, Long userId, boolean masked) {

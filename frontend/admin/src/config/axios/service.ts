@@ -1,3 +1,4 @@
+import { isMobileWorkbench, returnToMobileWorkbench } from '@/utils/workbenchAuth'
 import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
 declare module 'axios' {
@@ -274,6 +275,12 @@ const refreshToken = async () => {
   )
 }
 const handleAuthorized = () => {
+  if (isMobileWorkbench) {
+    deleteUserCache()
+    removeToken()
+    returnToMobileWorkbench()
+    return Promise.reject(new Error('登录状态已失效，请重新登录'))
+  }
   const { t } = useI18n()
   if (!isRelogin.show) {
     // 如果已经到登录页面则不进行弹窗提示

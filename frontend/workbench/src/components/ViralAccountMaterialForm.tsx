@@ -1,3 +1,4 @@
+import ResourceLinkInput from './ResourceLinkInput'
 import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Alert, Button, Collapse, Input, Select, Space, Spin, Typography, Upload } from 'antd'
 import { useMemo, useState } from 'react'
@@ -157,6 +158,8 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
   return <label className="viral-field"><Typography.Text type="secondary">{label}</Typography.Text>
     {multiline ? <Input.TextArea className="viral-field-control" value={String(value ?? '')} placeholder={field.placeholder} rows={4}
       maxLength={field.maxLength} showCount onChange={event => onChange(event.target.value)} />
+      : field.type === 'https-link' ? <ResourceLinkInput className="viral-field-control" value={String(value ?? '')} placeholder={field.placeholder} maxLength={field.maxLength}
+        onChange={event => onChange(event.target.value)} />
       : <Input className="viral-field-control" value={String(value ?? '')} placeholder={field.placeholder} maxLength={field.maxLength}
         onChange={event => onChange(event.target.value)} />}</label>
 }

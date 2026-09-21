@@ -20,7 +20,7 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="跳转地址" prop="url">
-            <el-input v-model="formData.url" placeholder="请输入跳转地址" />
+            <ResourceLinkInput v-model="formData.url" placeholder="请输入跳转地址" />
           </el-form-item>
         </el-col>
         <el-col :span="24">
@@ -68,6 +68,7 @@
   </Dialog>
 </template>
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import * as BannerApi from '@/api/mall/promotion/banner'
 

@@ -1,4 +1,6 @@
 import { ref } from 'vue'
+import { ApiBusinessError } from '@/api/request'
+import { PARTNER_WECOM_NOT_BOUND } from '@/api/auth'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import {
@@ -13,6 +15,7 @@ export function useAuth() {
   const userStore = useUserStore()
   const loading = ref(false)
   const error = ref('')
+  const wecomUnbound = ref(false)
 
   /**
    * 初始化认证：
@@ -88,6 +91,7 @@ export function useAuth() {
    * 企业微信登录
    */
   async function loginWithWecom(code: string, state: string): Promise<boolean> {
+    wecomUnbound.value = false
     loading.value = true
     error.value = ''
     try {
@@ -97,7 +101,8 @@ export function useAuth() {
       await fetchUserInfo()
       return true
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '企业微信登录失败'
+      wecomUnbound.value = e instanceof ApiBusinessError && e.code === PARTNER_WECOM_NOT_BOUND
+      error.value = wecomUnbound.value ? '' : e instanceof Error ? e.message : '企业微信登录失败'
       return false
     } finally {
       loading.value = false
@@ -128,6 +133,7 @@ export function useAuth() {
   return {
     loading,
     error,
+    wecomUnbound,
     initAuth,
     loginWithPassword,
     activateWithInvite,

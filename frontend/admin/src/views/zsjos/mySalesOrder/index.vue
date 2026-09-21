@@ -132,10 +132,10 @@ import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 
 const message = useMessage()
-const queryParams = reactive({ keyword: '', status: '' })
+const queryParams = reactive<{ keyword: string; status: string | undefined }>({ keyword: '', status: undefined })
 const resetQuery = (reload: () => void) => {
   queryParams.keyword = ''
-  queryParams.status = ''
+  queryParams.status = undefined
   reload()
 }
 const detailOpen = ref(false)

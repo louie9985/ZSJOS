@@ -45,11 +45,21 @@ public class LeadDuplicateMatcher {
     @Resource private LeadIntendedProductMapper productMapper;
 
     public MatchResult match(LeadCreateReqVO request, Long excludedPersonId) {
+        return match(request, excludedPersonId, true);
+    }
+
+    public MatchResult matchSubmissionWeakRules(LeadCreateReqVO request) {
+        return match(request, null, false);
+    }
+
+    private MatchResult match(LeadCreateReqVO request, Long excludedPersonId, boolean includeContacts) {
         String mobile = StrUtil.trimToNull(request.getMobile());
         String wechat = normalizeWechat(request.getWechatId());
         Map<Long, Candidate> candidates = new LinkedHashMap<>();
-        List<PersonDO> contactPeople = personMapper.selectDuplicateCandidates(mobile, wechat).stream()
-                .filter(person -> !Objects.equals(person.getId(), excludedPersonId)).toList();
+        List<PersonDO> contactPeople = includeContacts
+                ? personMapper.selectDuplicateCandidates(mobile, wechat).stream()
+                    .filter(person -> !Objects.equals(person.getId(), excludedPersonId)).toList()
+                : List.of();
         Map<Long, PersonDO> people = new LinkedHashMap<>();
         contactPeople.forEach(person -> people.put(person.getId(), person));
         List<LeadDO> contactLeads = leadMapper.selectByPersonIds(new ArrayList<>(people.keySet())).stream()

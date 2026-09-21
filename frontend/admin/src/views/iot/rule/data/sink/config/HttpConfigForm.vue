@@ -1,6 +1,6 @@
 <template>
   <el-form-item label="请求地址" prop="config.url">
-    <el-input v-model="urlPath" placeholder="请输入请求地址">
+    <ResourceLinkInput v-model="urlPath" :preview-value="fullUrl" placeholder="请输入请求地址">
       <template #prepend>
         <el-select v-model="urlPrefix" placeholder="Select" style="width: 115px">
           <!--suppress HttpUrlsUsage -->
@@ -8,7 +8,7 @@
           <el-option label="https://" value="https://" />
         </el-select>
       </template>
-    </el-input>
+    </ResourceLinkInput>
   </el-form-item>
   <el-form-item label="请求方法" prop="config.method">
     <el-select v-model="config.method" placeholder="请选择请求方法">
@@ -30,6 +30,7 @@
 </template>
 
 <script lang="ts" setup>
+import ResourceLinkInput from '@/components/ResourceLinkInput/index.vue'
 import { HttpConfig, IotDataSinkTypeEnum } from '@/api/iot/rule/data/sink'
 import { useVModel } from '@vueuse/core'
 import { isEmpty } from '@/utils/is'

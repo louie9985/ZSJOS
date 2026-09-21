@@ -42,6 +42,11 @@ public class SocialClientApiImpl implements SocialClientApi {
     }
 
     @Override
+    public String getWecomWebAuthorizeUrl(Integer userType, String redirectUri) {
+        return socialClientService.getWecomWebAuthorizeUrl(userType, redirectUri);
+    }
+
+    @Override
     public SocialWxJsapiSignatureRespDTO createWxMpJsapiSignature(Integer userType, String url) {
         WxJsapiSignature signature = socialClientService.createWxMpJsapiSignature(userType, url);
         return BeanUtils.toBean(signature, SocialWxJsapiSignatureRespDTO.class);

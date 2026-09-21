@@ -9,4 +9,8 @@ public class MediaStudentTargetRespVO {
     private Long personId;
     private String targetTab;
     private Long recordId;
+    private Long serviceRelationId;
+    public MediaStudentTargetRespVO(Long personId, String targetTab, Long recordId) {
+        this(personId, targetTab, recordId, null);
+    }
 }

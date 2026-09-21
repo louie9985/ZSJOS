@@ -1,6 +1,7 @@
+import BusinessTable from './BusinessTable'
 import PositioningDialog from './PositioningDialog'
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Input, Select, Space, Spin, Table, Typography } from 'antd'
+import { Alert, Button, Empty, Input, Select, Space, Spin, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { api, type DictData, type StudentContactFormField } from '../services/api'
 import { materialApi, type Material, type MaterialVersion } from '../services/materialApi'
@@ -80,7 +81,7 @@ export default function PositioningCardMaterialPicker({ field, value = EMPTY_SEL
           options={(dicts[f.dict] || []).map(item => ({ value: item.value, label: item.label }))}
           onChange={next => { setFilters(current => ({ ...current, [f.key]: next })); setPage(1) }} />)}
       </Space>
-      {error ? <Alert type="error" showIcon message={error} action={<Button icon={<ReloadOutlined />} onClick={() => setRetry(n => n + 1)}>重试</Button>} /> : <Table<Material>
+      {error ? <Alert type="error" showIcon message={error} action={<Button icon={<ReloadOutlined />} onClick={() => setRetry(n => n + 1)}>重试</Button>} /> : <BusinessTable<Material> tableKey="positioning-card-material-picker-1" columnMode="native" mode="compact"
         rowKey={row => row.currentEffectiveVersionId!} size="small" loading={busy} dataSource={rows.filter(row => row.currentEffectiveVersionId)}
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合筛选条件的素材" /> }}
         rowSelection={{ selectedRowKeys: selected, preserveSelectedRowKeys: true, onChange: keys => setSelected(keys.map(Number)) }}

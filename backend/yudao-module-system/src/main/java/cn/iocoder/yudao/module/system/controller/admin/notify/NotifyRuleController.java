@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.rule.*;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyRuleDO;
 import cn.iocoder.yudao.module.system.service.notify.NotifyRuleService;
+import cn.iocoder.yudao.module.system.service.notify.NotifyDeliveryQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,14 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class NotifyRuleController {
 
     @Resource private NotifyRuleService notifyRuleService;
+    @Resource private NotifyDeliveryQueryService deliveryQueryService;
+
+    @GetMapping("/delivery-page")
+    @Operation(summary = "查询当前租户通知投递状态")
+    @PreAuthorize("@ss.hasPermission('system:notify-rule:query')")
+    public CommonResult<PageResult<NotifyDeliveryRespVO>> deliveries(@Valid NotifyDeliveryPageReqVO request) {
+        return success(deliveryQueryService.page(request));
+    }
 
     @PostMapping("/create")
     @Operation(summary = "创建业务通知规则")

@@ -31,6 +31,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DuplicateKeyException;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -115,31 +116,50 @@ public class ProductionTicketService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ProductionTicketSaveReqVO req, Long userId) {
+        // 账号页发起时必须绑定账号（前端已强制），工单中心直接发起时允许不绑定；
+        // 两者共用这一个入口，因此账号在此是可选上下文而不是必填引用。
+        List<Long> accountIds = normalizeAccountIds(req);
         String operatorRemark = StrUtil.trimToNull(req.getOperatorRemark());
-        String fingerprint = commandService.fingerprint("create", req.getSceneCode(), req.getAccountId(),
+        String fingerprint = commandService.fingerprint("create", req.getSceneCode(), accountIds,
                 req.getAssigneeUserId(), req.getTargetDeptId(), operatorRemark, req.getValues(),
                 req.getAttachmentIds(), userId);
         var command = commandService.begin(req.getIdempotencyKey(),
-                new ProductionTicketCommandService.Command("create", req.getAccountId(), null, null,
-                        userId, fingerprint), Long.class);
+                new ProductionTicketCommandService.Command("create", accountIds.isEmpty() ? null : accountIds.getFirst(),
+                        null, null, userId, fingerprint), Long.class);
         if (!command.created()) return command.result();
-        ProductionTicketCreateContextRespVO context = getCreateContext(req.getAccountId(), req.getSceneCode(), userId);
+        List<ProductionTicketCreateContextRespVO> contexts = accountIds.stream()
+                .map(accountId -> getCreateContext(accountId, req.getSceneCode(), userId)).toList();
+        ProductionTicketCreateContextRespVO context = contexts.isEmpty() ? null : contexts.getFirst();
+        if (accountIds.size() > 1 && req.getStudentPersonId() == null) throw exception(PRODUCTION_TICKET_REFERENCE_INVALID);
+        if (req.getStudentPersonId() != null && accountIds.stream().map(accountMapper::selectById)
+                .anyMatch(account -> account == null || !Objects.equals(account.getStudentPersonId(), req.getStudentPersonId()))) {
+            throw exception(PRODUCTION_TICKET_REFERENCE_INVALID);
+        }
+        Map<String, Object> values = enrichAccountLinks(req.getValues(), contexts);
         // 定位卡仅作为上下文信息展示，不再阻断发起（原 canCreate 强制校验已移除）
         if ((req.getAssigneeUserId() == null) == (req.getTargetDeptId() == null)) {
             throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
         }
-        if (req.getAssigneeUserId() != null && context.getAssigneeCandidates().stream()
-                .map(LeadAssignmentUserRespVO::getId).noneMatch(req.getAssigneeUserId()::equals)) {
-            throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
+        // 未绑定账号时没有账号维度的候选列表，改用工单模板的接收人候选校验。
+        if (req.getAssigneeUserId() != null) {
+            List<LeadAssignmentUserRespVO> candidates = context != null
+                    ? context.getAssigneeCandidates()
+                    : templateCandidates(req.getSceneCode(), userId);
+            if (candidates.stream().map(LeadAssignmentUserRespVO::getId).noneMatch(req.getAssigneeUserId()::equals)) {
+                throw exception(PRODUCTION_TICKET_ASSIGNEE_INVALID);
+            }
         }
         ProductionTicketDO ticket = new ProductionTicketDO();
         ticket.setTicketNo("PT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
-        ticket.setAccountId(req.getAccountId());
+        ticket.setAccountId(accountIds.isEmpty() ? null : accountIds.getFirst());
+        ticket.setAccountIdsJson(JsonUtils.toJsonString(accountIds));
         ticket.setOwnerOperatorUserId(userId);
         ticket.setReviewerUserId(userId);
         ticket.setAssigneeFilmingEditorUserId(req.getAssigneeUserId());
-        ticket.setPositioningSubmissionId(context.getPositioningSubmissionId());
-        ticket.setDispatchContextSnapshotJson(JsonUtils.toJsonString(contextSnapshot(context, operatorRemark)));
+        ticket.setPositioningSubmissionId(context == null ? null : context.getPositioningSubmissionId());
+        List<Map<String, Object>> accountSnapshots = contexts.stream().map(ProductionTicketService::accountSnapshot).toList();
+        ticket.setAccountSnapshotJson(JsonUtils.toJsonString(accountSnapshots));
+        ticket.setDispatchContextSnapshotJson(JsonUtils.toJsonString(contextSnapshot(context, accountSnapshots, operatorRemark)));
         ticket.setIdempotencyKey(req.getIdempotencyKey());
         ticket.setTicketVersion(1);
         ticket.setRevisionCount(0);
@@ -155,9 +175,10 @@ public class ProductionTicketService {
         }
         workflowEventService.transition(BIZ_TYPE_PRODUCTION_TICKET, ticket.getId(), userId, null,
                 ticket.getStatus(), null, "ticket-created:" + ticket.getId());
-        workOrderService.createProductionEnvelope(req.getSceneCode(), ticket.getId(), req.getAccountId(), userId,
+        workOrderService.createProductionEnvelope(req.getSceneCode(), ticket.getId(),
+                accountIds.isEmpty() ? null : accountIds.getFirst(), userId,
                 req.getAssigneeUserId(), req.getTargetDeptId(), operatorRemark == null ? "拍剪工单" : operatorRemark,
-                req.getValues(), req.getAttachmentIds(), req.getIdempotencyKey());
+                values, req.getAttachmentIds(), req.getIdempotencyKey());
         if (req.getAssigneeUserId() != null) {
             workflowEventService.createTaskAndNotify("media.ticket.pending_accept", "MEDIA_TICKET_ACCEPT",
                     BIZ_TYPE_PRODUCTION_TICKET, ticket.getId(), req.getAssigneeUserId(), "拍剪工单待接",
@@ -292,6 +313,8 @@ public class ProductionTicketService {
 
     private ProductionTicketRespVO toResp(ProductionTicketDO ticket, Long userId) {
         ProductionTicketRespVO response = BeanUtils.toBean(ticket, ProductionTicketRespVO.class);
+        response.setAccountIds(parseAccountIds(ticket.getAccountIdsJson(), ticket.getAccountId()));
+        response.setAccounts(parseAccountSnapshots(ticket.getAccountSnapshotJson()));
         response.setDispatchContext(parseMap(ticket.getDispatchContextSnapshotJson()));
         if (TICKET_PENDING_ACCEPT.equals(ticket.getStatus())) {
             if (!objectPermissionProvider.hasPermission(ticket.getId(), "accept", userId)) {
@@ -377,18 +400,77 @@ public class ProductionTicketService {
     }
 
     private static Map<String, Object> contextSnapshot(ProductionTicketCreateContextRespVO context,
+                                                       List<Map<String, Object>> accountSnapshots,
                                                        String operatorRemark) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("accountId", context.getAccountId());
-        result.put("accountNo", context.getAccountNo());
-        result.put("accountName", context.getAccountName());
-        result.put("platformLabel", context.getPlatformLabel());
-        result.put("studentName", context.getStudentName());
-        result.put("accountFields", context.getAccountFields());
-        result.put("positioningSubmissionId", context.getPositioningSubmissionId());
-        result.put("positioning", context.getPositioning());
+        // 工单中心可直接发起不绑定账号的剪拍工单，此时只有备注与动态字段。
+        result.put("accountId", context == null ? null : context.getAccountId());
+        result.put("accountNo", context == null ? null : context.getAccountNo());
+        result.put("accountName", context == null ? null : context.getAccountName());
+        result.put("platformLabel", context == null ? null : context.getPlatformLabel());
+        result.put("studentName", context == null ? null : context.getStudentName());
+        result.put("accountFields", context == null ? List.of() : context.getAccountFields());
+        result.put("accounts", accountSnapshots);
+        result.put("positioningSubmissionId", context == null ? null : context.getPositioningSubmissionId());
+        result.put("positioning", context == null ? null : context.getPositioning());
         result.put("operatorRemark", operatorRemark);
         return result;
+    }
+
+    private static Map<String, Object> accountSnapshot(ProductionTicketCreateContextRespVO context) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("accountId", context.getAccountId()); result.put("accountNo", context.getAccountNo());
+        result.put("accountName", context.getAccountName()); result.put("platformLabel", context.getPlatformLabel());
+        result.put("homepageUrl", accountFieldValue(context, "homepage_url"));
+        result.put("coverFileId", accountFieldValue(context, "cover"));
+        return result;
+    }
+
+    private static Map<String, Object> enrichAccountLinks(Map<String, Object> submitted,
+                                                           List<ProductionTicketCreateContextRespVO> contexts) {
+        String links = contexts.stream().map(context -> accountFieldValue(context, "homepage_url"))
+                .filter(String.class::isInstance).map(String.class::cast).filter(link -> !link.isBlank())
+                .collect(java.util.stream.Collectors.joining("\n"));
+        if (links.isBlank()) return submitted;
+        Map<String, Object> values = submitted == null ? new LinkedHashMap<>() : new LinkedHashMap<>(submitted);
+        values.put("account_link", links);
+        return values;
+    }
+
+    private static Object accountFieldValue(ProductionTicketCreateContextRespVO context, String key) {
+        return context.getAccountFields() == null ? null : context.getAccountFields().stream()
+                .filter(field -> key.equals(field.getKey())).map(MediaAccountDetailSnapshotVO::getValue)
+                .filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private static List<Long> normalizeAccountIds(ProductionTicketSaveReqVO req) {
+        List<Long> source = req.getAccountIds() == null || req.getAccountIds().isEmpty()
+                ? (req.getAccountId() == null ? List.of() : List.of(req.getAccountId())) : req.getAccountIds();
+        List<Long> ids = source.stream().filter(Objects::nonNull).distinct().toList();
+        // 账号可以整体为空（工单中心发起的剪拍工单），但一旦给了就必须是合法去重的 ID。
+        if (ids.size() != source.size()) throw exception(PRODUCTION_TICKET_REFERENCE_INVALID);
+        return ids;
+    }
+
+    /** 未绑定账号时用模板的接收人候选做归属校验，避免跳过接收人合法性检查。 */
+    private List<LeadAssignmentUserRespVO> templateCandidates(String sceneCode, Long userId) {
+        WorkOrderCandidatePageReqVO candidateReq = new WorkOrderCandidatePageReqVO();
+        candidateReq.setSceneCode(sceneCode); candidateReq.setPageNo(1); candidateReq.setPageSize(100);
+        return workOrderService.candidatePage(candidateReq, userId).getList().stream().map(candidate -> {
+            LeadAssignmentUserRespVO item = new LeadAssignmentUserRespVO();
+            item.setId(candidate.getId()); item.setNickname(candidate.getName()); item.setDeptId(candidate.getDeptId());
+            return item;
+        }).toList();
+    }
+
+    private static List<Long> parseAccountIds(String json, Long legacyId) {
+        List<Long> ids = json == null || json.isBlank() ? List.of() : JsonUtils.parseArray(json, Long.class);
+        return ids.isEmpty() && legacyId != null ? List.of(legacyId) : ids;
+    }
+
+    private static List<Map<String, Object>> parseAccountSnapshots(String json) {
+        return json == null || json.isBlank() ? List.of()
+                : JsonUtils.parseObject(json, new TypeReference<List<Map<String, Object>>>() {});
     }
 
     @SuppressWarnings("unchecked")

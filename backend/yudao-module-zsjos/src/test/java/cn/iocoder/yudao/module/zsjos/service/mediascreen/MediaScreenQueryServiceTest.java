@@ -12,6 +12,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenContributionRow;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.mediascreen.MediaScreenDailySnapshotMapper;
 import cn.iocoder.yudao.module.zsjos.framework.mediascreen.MediaScreenProperties;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerOwnershipMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,6 +35,7 @@ class MediaScreenQueryServiceTest {
     private final DeptApi deptApi=mock(DeptApi.class);
     private final StringRedisTemplate redis=mock(StringRedisTemplate.class);
     private final MediaScreenProperties properties=new MediaScreenProperties();
+    private final PartnerOwnershipMapper ownershipMapper=mock(PartnerOwnershipMapper.class);
     private MediaScreenQueryService service;
 
     @BeforeEach void setUp(){
@@ -47,8 +51,42 @@ class MediaScreenQueryServiceTest {
         when(partnerMapper.selectBatchIds(anyCollection())).thenReturn(List.of(
                 new PartnerDO().setId(101L).setName("合作方甲").setNickname("榜单昵称甲").setStatus("enabled"),
                 new PartnerDO().setId(102L).setName("合作方乙").setStatus("disabled")));
-        service=new MediaScreenQueryService(leadMapper,snapshotMapper,partnerMapper,userApi,deptApi,
+        service=new MediaScreenQueryService(leadMapper,snapshotMapper,partnerMapper,ownershipMapper,userApi,deptApi,
                 mock(MaintenanceModeApi.class),redis,properties);
+    }
+
+    @Test void currentOwnershipShowsZeroPartnersAndOperatorsWithoutContributions(){
+        when(ownershipMapper.selectList(any(Wrapper.class))).thenReturn(List.of(
+                new PartnerOwnershipDO().setPartnerId(101L).setEmployeeUserId(3L),
+                new PartnerOwnershipDO().setPartnerId(102L).setEmployeeUserId(4L)));
+        var result=service.stats(1L,true);
+        var members=result.getPartTimeCompanionDepartment().getMembers();
+        assertEquals(1,members.size());
+        assertEquals("成员甲",members.get(0).getName());
+        var detail=members.get(0).getPartTimers().get(0);
+        assertEquals(101L,detail.getPartnerId());
+        assertEquals("合作方甲",detail.getName());
+        assertEquals(0,detail.getToday()); assertEquals(0,detail.getWeek());
+        assertEquals(0,detail.getMonthTotal()); assertEquals(0,detail.getMonthEffective());
+        assertEquals(0,result.getSummary().getMonthTotal());
+    }
+
+    @Test void currentRosterDoesNotDuplicateOrTransferHistoricalContribution(){
+        when(ownershipMapper.selectList(any(Wrapper.class))).thenReturn(List.of(
+                new PartnerOwnershipDO().setPartnerId(101L).setEmployeeUserId(3L)));
+        when(leadMapper.countMediaScreenContributions(anyLong(),any(),any(),any(),any())).thenReturn(List.of(
+                row(3L,10L,"part_time",101L,"历史名称",1,2,3,1)));
+        var result=service.stats(1L,true);
+        assertEquals(1,result.getPartTimeCompanionDepartment().getMembers().get(0).getPartTimers().size());
+        assertEquals(3,result.getSummary().getMonthTotal());
+        when(ownershipMapper.selectList(any(Wrapper.class))).thenReturn(List.of(
+                new PartnerOwnershipDO().setPartnerId(101L).setEmployeeUserId(4L)));
+        result=service.stats(1L,true);
+        assertEquals(2,result.getPartTimeCompanionDepartment().getMembers().size());
+        assertEquals(3,result.getSummary().getMonthTotal());
+        assertEquals(0,result.getPartTimeCompanionDepartment().getMembers().stream()
+                .filter(m -> "成员乙".equals(m.getName())).findFirst().orElseThrow().getPartTimers().get(0).getMonthTotal());
+        service.stats(1L,false);
     }
 
     @Test void statsKeepsDirectAndPartTimeExclusiveAndSwitchControlsAllSummaryMetrics(){

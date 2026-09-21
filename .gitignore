@@ -73,8 +73,17 @@ node_modules/
 .playwright-cli/
 
 # Local runtime and generated review/build artifacts
-LOG_FILE_IS_UNDEFINED
+LOG_FILE_IS_UNDEFINED*
 jrebel-classpath-*.jar
+
+# 一次性任务的中间产物（截图 / 预览图 / 转换版文件 / 临时脚本）
+/output/
+/outputs/
+/tmp/
+
+# Python 字节码缓存
+__pycache__/
+*.pyc
 **/.cache/
 .superpowers/
 *.tsbuildinfo

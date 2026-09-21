@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class UserRelationSceneSaveReqVO {
@@ -28,6 +29,9 @@ public class UserRelationSceneSaveReqVO {
     private String sourcePostCode;
 
     private String targetPostCode;
+    private List<String> sourcePostCodes;
+    private List<String> targetPostCodes;
+
 
     @NotBlank(message = "目标资格类型不能为空")
     @Pattern(regexp = "post|permission", message = "目标资格类型不正确")
