@@ -441,9 +441,9 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
         columns={[
           { title: '任务', key: 'task', render: (_, task) => taskSubject(task), width: 220 },
-          { title: '状态', key: 'status', dataIndex: 'status', width: 110, render: value => <Tag color={taskStatusColor(Number(value))}>{taskStatusLabel(Number(value))}</Tag> },
+          { title: '状态', key: 'status', dataIndex: 'status', width: 110, render: (_, row) => <Tag color={taskStatusColor(Number(row.status))}>{taskStatusLabel(Number(row.status))}</Tag> },
           { title: '流程名称', key: 'processName', width: 200, ellipsis: true, render: (_, task) => task.processInstance?.name || '-' },
-          { title: '流程节点', key: 'node', dataIndex: 'name', width: 160, ellipsis: true, render: value => value || '流程节点' },
+          { title: '流程节点', key: 'node', dataIndex: 'name', width: 160, ellipsis: true, render: (_, row) => row.name || '流程节点' },
           { title: '流程摘要', key: 'summary', width: 300, ellipsis: true, render: (_, task) => {
             const business = briefSummary(task, briefs)
             return (business.length > 0 ? business : taskSummary(task)).join('；') || '-'
@@ -451,13 +451,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
           { title: '发起人', key: 'startUser', width: 130, render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
           { title: view === 'todo' ? '当前处理人' : '已处理人', key: 'assignee', width: 130, render: (_, task) => task.assigneeUser?.nickname || task.ownerUser?.nickname || '-' },
           { title: '流程发起时间', key: 'processCreateTime', width: 170, render: (_, task) => <DateTimeText value={task.processInstance?.createTime}/> },
-          { title: '审批意见', key: 'reason', dataIndex: 'reason', width: 240, ellipsis: true, render: value => value || '-' },
+          { title: '审批意见', key: 'reason', dataIndex: 'reason', width: 240, ellipsis: true, render: (_, row) => row.reason || '-' },
           // 以下四列只服务于排查，默认收起（用户仍可在列设置里打开），
           // 否则表格要横向滚 2300px 才能看全，而审批人判断用的就是左边那几列。
-          { title: '任务到达时间', key: 'taskCreateTime', dataIndex: 'createTime', width: 170, hideInTable: true, render: value => <DateTimeText value={value as BpmTask['createTime']}/> },
-          { title: '任务完成时间', key: 'taskEndTime', dataIndex: 'endTime', width: 170, hideInTable: true, render: value => <DateTimeText value={value as BpmTask['endTime']}/> },
-          { title: '处理耗时', key: 'duration', dataIndex: 'durationInMillis', width: 150, hideInTable: true, render: value => formatDuration(value as number | undefined) },
-          { title: '表单名称', key: 'formName', dataIndex: 'formName', width: 180, ellipsis: true, hideInTable: true, render: value => value || '-' },
+          { title: '任务到达时间', key: 'taskCreateTime', dataIndex: 'createTime', width: 170, hideInTable: true, render: (_, row) => <DateTimeText value={row.createTime as BpmTask['createTime']}/> },
+          { title: '任务完成时间', key: 'taskEndTime', dataIndex: 'endTime', width: 170, hideInTable: true, render: (_, row) => <DateTimeText value={row.endTime as BpmTask['endTime']}/> },
+          { title: '处理耗时', key: 'duration', dataIndex: 'durationInMillis', width: 150, hideInTable: true, render: (_, row) => formatDuration(row.durationInMillis as number | undefined) },
+          { title: '表单名称', key: 'formName', dataIndex: 'formName', width: 180, ellipsis: true, hideInTable: true, render: (_, row) => row.formName || '-' },
           { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
         ]}
       /> : <div className="business-inbox-layout bpm-approval-layout">

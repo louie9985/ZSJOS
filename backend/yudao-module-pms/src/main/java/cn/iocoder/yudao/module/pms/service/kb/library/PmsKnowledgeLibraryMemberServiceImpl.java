@@ -73,7 +73,8 @@ public class PmsKnowledgeLibraryMemberServiceImpl implements PmsKnowledgeLibrary
     @Override
     public PmsKnowledgeLibraryDO validateLibraryReadable(Long libraryId, Long userId) {
         PmsKnowledgeLibraryDO library = validateLibraryExists(libraryId);
-        if (Boolean.FALSE.equals(library.getOpenStatus()) && !isLibraryMember(libraryId, userId)) {
+        if (Boolean.FALSE.equals(library.getOpenStatus()) && !isLibraryMember(libraryId, userId)
+                && !permissionApi.hasTenantReadAllAccess(userId)) {
             throw exception(KNOWLEDGE_LIBRARY_ACCESS_DENIED);
         }
         return library;

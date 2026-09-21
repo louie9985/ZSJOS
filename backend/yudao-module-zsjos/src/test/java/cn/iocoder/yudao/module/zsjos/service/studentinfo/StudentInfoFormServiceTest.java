@@ -31,6 +31,7 @@ class StudentInfoFormServiceTest {
     @Mock LeadMapper leads;
     @Mock StudentInfoPermissionProvider permission;
     @Mock SecurityFrameworkService security;
+    @Mock cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Mock TenantFrameworkService tenants;
     private final String token="a".repeat(43);
     @BeforeEach void setup() {

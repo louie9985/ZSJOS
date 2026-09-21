@@ -65,7 +65,7 @@
 ## 我的日历
 
 `GET /zsjos/personal-calendar`、`POST /zsjos/personal-calendar`、`PUT /zsjos/personal-calendar/{id}` 和
-`DELETE /zsjos/personal-calendar/{id}` 分别使用 `query/create/update/delete` 权限。首版只承载手工个人日程，所有查询和命令固定使用当前登录用户作为 owner；不接受客户端 owner 字段，不聚合工作计划，也不提供管理员代看或代管旁路。
+`DELETE /zsjos/personal-calendar/{id}` 分别使用 `query/create/update/delete` 权限。仅承载手工个人日程，不聚合工作计划。查询新增可选 `readScope=SELF|ALL|USER`、`targetUserId`，省略时为本人；ALL 和他人的 USER 要求 System 当前租户全量读取能力，目标人员必须属于当前租户。返回 `ownerUserId/ownerName`；双端默认本人，全部和指定人员视图只读。创建、修改、删除仍固定当前登录用户为 owner，不接受客户端 owner 字段。
 
 ## 已移除的旧阶段流转
 

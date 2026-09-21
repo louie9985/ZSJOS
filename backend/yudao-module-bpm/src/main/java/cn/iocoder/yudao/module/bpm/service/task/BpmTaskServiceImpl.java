@@ -795,7 +795,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (reasonRequire && StrUtil.isEmpty(reqVO.getReason())) {
             throw exception(TASK_REASON_REQUIRE);
         }
-        validateTaskAction(userId, BpmTaskActionValidator.ACTION_APPROVE, task, instance);
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_APPROVE, task, instance, reqVO.getReason());
 
         // 情况一：被委派的任务，不调用 complete 去完成任务
         if (DelegationState.PENDING.equals(task.getDelegationState())) {
@@ -1068,7 +1068,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (instance == null) {
             throw exception(PROCESS_INSTANCE_NOT_EXISTS);
         }
-        validateTaskAction(userId, BpmTaskActionValidator.ACTION_REJECT, task, instance);
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_REJECT, task, instance, reqVO.getReason());
 
         // 并行加签的主任务先驳回时，流程将按主任务决定结束，不再保留主管子任务。
         cancelParallelSignChildren(task, "主审批任务已驳回");
@@ -1124,10 +1124,16 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     }
 
     private void validateTaskAction(Long userId, String action, Task task, ProcessInstance instance) {
+        validateTaskAction(userId, action, task, instance, null);
+    }
+
+    private void validateTaskAction(Long userId, String action, Task task, ProcessInstance instance, String reason) {
         ProcessDefinition definition = bpmProcessDefinitionService.getProcessDefinition(task.getProcessDefinitionId());
         BpmTaskActionContext context = new BpmTaskActionContext()
                 .setUserId(userId)
                 .setAction(action)
+                .setReason(reason)
+                .setParentTaskId(task.getParentTaskId())
                 .setTaskId(task.getId())
                 .setTaskDefinitionKey(task.getTaskDefinitionKey())
                 .setProcessInstanceId(task.getProcessInstanceId())

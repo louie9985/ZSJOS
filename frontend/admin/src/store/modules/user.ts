@@ -18,6 +18,7 @@ interface UserInfoVO {
   // USER 缓存
   permissions: Set<string>
   roles: string[]
+  dataAccess: { tenantReadAll: boolean }
   isSetUser: boolean
   user: UserVO
 }
@@ -26,6 +27,7 @@ export const useUserStore = defineStore('admin-user', {
   state: (): UserInfoVO => ({
     permissions: new Set<string>(),
     roles: [],
+    dataAccess: { tenantReadAll: false },
     isSetUser: false,
     user: {
       id: 0,
@@ -67,6 +69,7 @@ export const useUserStore = defineStore('admin-user', {
       }
       this.permissions = new Set(userInfo.permissions || []) // 兜底为 [] https://t.zsxq.com/xCJew
       this.roles = userInfo.roles
+      this.dataAccess = { tenantReadAll: userInfo.dataAccess?.tenantReadAll === true }
       this.user = userInfo.user
       this.isSetUser = true
       wsCache.set(CACHE_KEY.USER, userInfo)
@@ -95,6 +98,7 @@ export const useUserStore = defineStore('admin-user', {
     resetState() {
       this.permissions = new Set<string>()
       this.roles = []
+      this.dataAccess = { tenantReadAll: false }
       this.isSetUser = false
       this.user = {
         id: 0,

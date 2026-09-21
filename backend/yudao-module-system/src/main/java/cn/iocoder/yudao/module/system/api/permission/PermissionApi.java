@@ -12,6 +12,9 @@ import java.util.Set;
  */
 public interface PermissionApi extends PermissionCommonApi {
 
+    /** Current-tenant business read capability; never grants feature or command permission. */
+    boolean hasTenantReadAllAccess(Long userId);
+
     /** Returns the enabled role ids currently assigned to the user. */
     Set<Long> getEnabledRoleIdsByUserId(Long userId);
 

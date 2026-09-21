@@ -64,6 +64,25 @@ public class PermissionServiceImpl implements PermissionService {
     private AdminUserService userService;
 
     @Override
+    @DataPermission(enable = false)
+    public boolean hasTenantReadAllAccess(Long userId) {
+        var subject = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser();
+        if (subject != null && !cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN.getValue()
+                .equals(subject.getUserType())) return false;
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        if (userId == null || tenantId == null) return false;
+        AdminUserDO user = userService.getUser(userId);
+        if (user == null || !tenantId.equals(user.getTenantId())
+                || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) return false;
+        // Use the effective subject (including impersonation), never the original operator.
+        return getEnableUserRoleListByUserIdFromCache(userId).stream()
+                .filter(role -> tenantId.equals(role.getTenantId()))
+                .anyMatch(role -> SUPER_ADMIN.getCode().equals(role.getCode())
+                        || cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum
+                                .SYSTEM_ADMINISTRATOR.getCode().equals(role.getCode()));
+    }
+
+    @Override
     public boolean hasAnyPermissions(Long userId, String... permissions) {
         // 如果为空，说明已经有权限
         if (ArrayUtil.isEmpty(permissions)) {

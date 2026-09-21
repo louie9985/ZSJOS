@@ -101,6 +101,7 @@ export type WorkbenchLayoutMeta = {
   fallbackReason?: string;
 };
 export type PermissionInfo = {
+  dataAccess?: { tenantReadAll: boolean };
   user: User;
   roles: string[];
   permissions: string[];
@@ -1867,6 +1868,7 @@ export type SalesOrder = {
   approvalRoundStatus: string;
   processInstanceId?: string;
   taskId?: string;
+  approvalReasonRequired?: boolean;
   taskDefinitionKey?: "registrationReview" | "financeReview";
   taskStatus?: number;
   taskReason?: string;
@@ -1971,6 +1973,7 @@ export type SalesOrderListItem = Pick<
   leadProvinceName?: string;
   leadCityName?: string;
   taskId?: string;
+  approvalReasonRequired?: boolean;
   taskDefinitionKey?: "registrationReview" | "financeReview";
   taskStatus?: number;
   taskReason?: string;
@@ -2035,6 +2038,7 @@ export type SalesOrderApprovalTaskTarget = {
   workType: "approval" | "supervisor";
   orderId: number;
   taskId: string;
+  approvalReasonRequired?: boolean;
   taskDefinitionKey: "registrationReview" | "financeReview";
   center: "registration" | "finance";
   confirmationId?: number;
@@ -2873,6 +2877,8 @@ export const normalizeRequestError = (error: unknown): unknown => {
   return error;
 };
 export type PersonalCalendarEvent = {
+  ownerUserId?: number;
+  ownerName?: string;
   id: number;
   title: string;
   description?: string;
@@ -3506,7 +3512,7 @@ export const api = {
       await http.get("/zsjos/lead/self-sourced/new-media-providers"),
     ),
   personalCalendar: {
-    list: async (params: { rangeStart: string; rangeEnd: string }) =>
+    list: async (params: { rangeStart: string; rangeEnd: string; readScope?: "SELF" | "ALL" | "USER"; targetUserId?: number }) =>
       unwrap<PersonalCalendarEvent[]>(await http.get('/zsjos/personal-calendar', { params })),
     create: async (data: PersonalCalendarEventInput) =>
       unwrap<number>(await http.post('/zsjos/personal-calendar', data)),
@@ -4622,8 +4628,8 @@ export const api = {
     unwrap<number>(
       await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data),
     ),
-  salesOrder: async (orderId: number) =>
-    unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
+  salesOrder: async (orderId: number, taskId?: string) =>
+    unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`, { params: { taskId } })),
   managementSalesOrder: async (orderId: number) =>
     unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/management/${orderId}`)),
   mySalesOrder: async (orderId: number) =>
@@ -4809,7 +4815,7 @@ export const api = {
     decision: "approve" | "reject",
     data: {
       taskId: string;
-      reason: string;
+      reason?: string | null;
       approvalRoundId: number;
       orderVersion: number;
       roundVersion: number;
@@ -5729,6 +5735,8 @@ export const api = {
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
   myStudents: async (params: {
+    readScope?: "SELF" | "ALL" | "USER";
+    targetUserId?: number;
     pageNo: number;
     pageSize: number;
     keyword?: string;

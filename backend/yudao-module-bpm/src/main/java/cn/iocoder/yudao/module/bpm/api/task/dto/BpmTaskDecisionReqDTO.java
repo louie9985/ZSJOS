@@ -11,7 +11,6 @@ public class BpmTaskDecisionReqDTO {
     @NotEmpty
     private String taskId;
 
-    @NotEmpty
     private String reason;
 
     private List<String> attachments;

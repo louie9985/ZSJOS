@@ -10,7 +10,9 @@ public class BpmTaskActionContext {
 
     private Long userId;
     private String action;
+    private String reason;
     private String taskId;
+    private String parentTaskId;
     private String taskDefinitionKey;
     private String processInstanceId;
     private String processDefinitionId;

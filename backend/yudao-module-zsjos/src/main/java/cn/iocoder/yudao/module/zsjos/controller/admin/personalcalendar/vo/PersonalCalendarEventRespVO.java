@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 @Data
 public class PersonalCalendarEventRespVO {
     private Long id;
+    private Long ownerUserId;
+    private String ownerName;
     private String title;
     private String description;
     private LocalDateTime startTime;

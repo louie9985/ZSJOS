@@ -10,6 +10,6 @@ public class SalesOrderDecisionReqVO {
     @jakarta.validation.constraints.NotNull private Long approvalRoundId;
     @jakarta.validation.constraints.NotNull private Integer orderVersion;
     @jakarta.validation.constraints.NotNull private Integer roundVersion;
-    @NotBlank @Size(max = 1000) private String reason;
+    @Size(max = 1000) private String reason;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 }

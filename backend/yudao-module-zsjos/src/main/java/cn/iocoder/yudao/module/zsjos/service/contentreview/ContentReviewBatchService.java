@@ -1321,7 +1321,8 @@ public class ContentReviewBatchService {
     }
 
     private boolean canSeeAll(Long userId) {
-        return permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all");
+        return permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all");
     }
 
     private String normalizeDecision(String decision, String comment) {

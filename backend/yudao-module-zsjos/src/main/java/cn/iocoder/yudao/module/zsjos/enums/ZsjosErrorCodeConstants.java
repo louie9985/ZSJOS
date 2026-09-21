@@ -119,6 +119,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_DEFAULT_SUBJECT_MISSING = new ErrorCode(1_900_017_021, "未配置启用的默认支付主体，请联系管理员");
     ErrorCode PAYMENT_SUBJECT_CONFIG_INVALID = new ErrorCode(1_900_017_022, "支付主体商户或签名配置无效，请联系管理员");
     ErrorCode PAYMENT_SUBJECT_SNAPSHOT_INVALID = new ErrorCode(1_900_017_023, "支付主体快照缺失或异常，请核实原收款主体");
+    ErrorCode PAYMENT_SCHOOL_SUBJECT_MISSING = new ErrorCode(1_900_017_024, "未配置学校支付主体，请联系管理员配置 school 主体");
+    ErrorCode PAYMENT_COMPANY_SUBJECT_MISSING = new ErrorCode(1_900_017_025, "多产品支付主体冲突，但未配置公司支付主体，请联系管理员配置 company 主体");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
@@ -344,6 +346,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
     ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的销售直属主管");
     ErrorCode SALES_ORDER_SUPERVISOR_LEGACY_ROUND = new ErrorCode(1_900_006_027, "该审批轮次创建于主管确认功能上线前，请沿用原流程完成");
+    ErrorCode SALES_ORDER_SUPERVISOR_REASON_REQUIRED = new ErrorCode(1_900_006_030, "请填写主管确认意见");
+    ErrorCode SALES_ORDER_REJECT_REASON_REQUIRED = new ErrorCode(1_900_006_029, "请填写驳回原因");
     ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED = new ErrorCode(1_900_006_028, "订单销售直属主管未配置成交订单主管确认权限");
 
     ErrorCode IMPERSONATION_TARGET_INVALID = new ErrorCode(1_900_007_001, "借视图目标账号不存在、已停用或与当前账号相同");
@@ -409,7 +413,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode STUDENT_CONTACT_PROCESS_UNAVAILABLE = new ErrorCode(1_900_010_032, "联系延期审批流程尚未部署或暂不可用");
     ErrorCode STUDENT_COLLABORATOR_INVALID = new ErrorCode(1_900_010_033, "协作者不存在、已停用或不在当前学习规划师的可选关系中");
     ErrorCode STUDENT_COLLABORATOR_ALREADY_ASSIGNED = new ErrorCode(1_900_010_034, "该类协作者已分配，学习规划师不能修改");
-    ErrorCode STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED = new ErrorCode(1_900_010_035, "管理员纠正协作者时必须填写原因");
+    ErrorCode STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED = new ErrorCode(1_900_010_035, "变更已有协作者时必须填写原因");
 
     ErrorCode MEDIA_ACCOUNT_NOT_EXISTS = new ErrorCode(1_900_011_001, "第三方账号不存在");
     ErrorCode MEDIA_ACCOUNT_STATE_INVALID = new ErrorCode(1_900_011_002, "当前第三方账号状态不允许该操作");

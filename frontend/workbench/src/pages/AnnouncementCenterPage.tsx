@@ -1,5 +1,5 @@
 import BusinessTable from '../components/BusinessTable'
-import { Alert, Badge, Button, Empty, Grid, Input, List, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, Badge, Button, Empty, Grid, Input, List, Result, Skeleton, Space, Tabs, Tag, Typography } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -11,6 +11,8 @@ import SafeRichText from '../components/SafeRichText'
 import { useInboxTableLayout } from '../services/inboxLayout'
 
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
+import NoticeManagementPage from './NoticeManagementPage'
+import { noticePermission, noticeView } from '../services/noticeManagement'
 
 const CURSOR_LIMIT = 20
 
@@ -46,7 +48,21 @@ function announcementText(content?: string) {
   return new DOMParser().parseFromString(content, 'text/html').body.textContent?.trim() || '-'
 }
 
-export default function AnnouncementCenterPage() {
+export default function AnnouncementCenterPage({ permissions }: { permissions: string[] }) {
+  const [params, setParams] = useSearchParams()
+  const view = noticeView(permissions, params.get('view'), params.has('announcementId'))
+  if (view === 'denied') return <Result status="403" title="无权查看公告" subTitle="请联系管理员配置相应的公告权限" />
+  const tabs = [
+    ...(noticePermission(permissions, 'read') ? [{ key: 'mine', label: '我的公告' }] : []),
+    ...(noticePermission(permissions, 'query') ? [{ key: 'manage', label: '公告管理' }] : [])
+  ]
+  return <section className="workspace-page">
+    <Tabs activeKey={view} items={tabs} onChange={key => setParams(key === 'manage' ? { view: 'manage' } : {})} />
+    {view === 'mine' ? <MyAnnouncements /> : <NoticeManagementPage permissions={permissions} />}
+  </section>
+}
+
+function MyAnnouncements() {
   const screens = Grid.useBreakpoint()
   const [searchParams, setSearchParams] = useSearchParams()
   const { refresh: refreshSummary } = useAnnouncements()
@@ -55,6 +71,7 @@ export default function AnnouncementCenterPage() {
   const [tablePageSize, setTablePageSize] = useState(CURSOR_LIMIT)
   const [tableTotal, setTableTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [selected, setSelected] = useState<Announcement>()
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -65,16 +82,20 @@ export default function AnnouncementCenterPage() {
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const cursorRef = useRef<string | undefined>(undefined)
   const { useTableLayout } = useInboxTableLayout()
+  const requestedAnnouncementId = searchParams.get('announcementId')
+  const paramsRef = useRef(searchParams)
+  paramsRef.current = searchParams
 
   const openDetail = useCallback(async (id: number, mobile = useTableLayout || !screens.md) => {
     setDetailLoading(true)
+    setSelected(undefined)
     try {
       const detail = await api.announcement(id)
       if (!detail.read) await api.markAnnouncementRead(id)
       setSelected({ ...detail, read: true })
       setItems(current => current.map(item => item.id === id ? { ...item, read: true } : item))
       await refreshSummary()
-      setSearchParams({ announcementId: String(id) }, { replace: true })
+      if (paramsRef.current.get('announcementId') !== String(id)) setSearchParams({ announcementId: String(id) }, { replace: true })
       if (mobile) setDrawerOpen(true)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '公告详情加载失败')
@@ -93,15 +114,15 @@ export default function AnnouncementCenterPage() {
       if ('nextCursor' in data) { cursorRef.current = data.nextCursor; setHasMore(data.hasMore) }
       setError('')
       if (!append) {
-        const requestedId = Number(searchParams.get('announcementId'))
+        const requestedId = Number(requestedAnnouncementId)
         const targetId = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : data.list[0]?.id
-        if (targetId) await openDetail(targetId, false)
+        if (targetId) await openDetail(targetId, !!requestedAnnouncementId && !screens.md)
         else setSelected(undefined)
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '公告加载失败')
     } finally { setLoading(false); setLoadingMore(false) }
-  }, [keyword, openDetail, searchParams, tablePage, tablePageSize, useTableLayout])
+  }, [keyword, openDetail, requestedAnnouncementId, screens.md, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -115,7 +136,7 @@ export default function AnnouncementCenterPage() {
   return <section className={`workspace-page announcement-page${useTableLayout ? ' announcement-table-page' : ''}`}>
     <div className="page-heading">
       <Typography.Title level={4}>通知公告</Typography.Title>
-      <Space><Input.Search allowClear value={keyword} placeholder="搜索公告标题或正文" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></Space>
+      <Space wrap><Input.Search allowClear value={searchText} placeholder="搜索公告标题或正文" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { setSearchText(event.target.value); if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></Space>
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
     {useTableLayout ? <>
@@ -132,8 +153,8 @@ export default function AnnouncementCenterPage() {
       columns={[
         { title: '标题', dataIndex: 'title' },
         { title: '类型', render: (_, item) => item.type === 1 ? '通知' : '公告', width: 100 },
-        { title: '正文', dataIndex: 'content', width: 360, ellipsis: true, render: value => announcementText(value as string | undefined) },
-        { title: '高亮状态', dataIndex: 'highlighted', width: 110, render: value => value ? <Tag color="gold">高亮中</Tag> : '普通' },
+        { title: '正文', dataIndex: 'content', width: 360, ellipsis: true, render: (_, item) => announcementText(item.content) },
+        { title: '高亮状态', dataIndex: 'highlighted', width: 110, render: (_, item) => item.highlighted ? <Tag color="gold">高亮中</Tag> : '普通' },
         { title: '高亮截止时间', dataIndex: 'highlightUntil', render: (_, item) => formatTimestamp(item.highlightUntil), width: 170 },
         { title: '发布时间', dataIndex: 'publishTime', render: (_, item) => formatTimestamp(item.publishTime), width: 170 },
         { title: '阅读状态', render: (_, item) => item.read ? '已读' : <Tag color="processing">未读</Tag>, width: 100 },

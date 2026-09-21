@@ -159,6 +159,56 @@ class BpmExternalSimpleEngineTest {
         assertFalse(BpmExternalStartUtils.isSubmissionTask(snapshot, model, task));
     }
 
+    @Test
+    void orderDefinitionsCoexistAndRealTaskServiceUsesEachInstancesReasonPolicy() throws Exception {
+        String key = "zsjos_sales_order_dual_approval";
+        doReturn(Set.of(30L)).when(invoker).calculateUsersByTask(any());
+        var taskService = new BpmTaskServiceImpl();
+        ReflectionTestUtils.setField(taskService, "taskService", engine.getTaskService());
+        ReflectionTestUtils.setField(taskService, "runtimeService", engine.getRuntimeService());
+        ReflectionTestUtils.setField(taskService, "bpmProcessDefinitionService", definitions);
+        var lookup = mock(BpmProcessInstanceService.class);
+        when(lookup.getProcessInstance(anyString())).thenAnswer(a -> engine.getRuntimeService()
+                .createProcessInstanceQuery().processInstanceId(a.getArgument(0)).includeProcessVariables().singleResult());
+        ReflectionTestUtils.setField(taskService, "processInstanceService", lookup);
+        var models = mock(BpmModelService.class);
+        when(models.getBpmnModelByDefinitionId(anyString())).thenAnswer(a -> engine.getRepositoryService().getBpmnModel(a.getArgument(0)));
+        ReflectionTestUtils.setField(taskService, "modelService", models);
+        ReflectionTestUtils.setField(taskService, "commentService", mock(cn.iocoder.yudao.module.bpm.service.comment.BpmCommentService.class));
+        var validators = mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(validators.orderedStream()).thenAnswer(a -> java.util.stream.Stream.empty());
+        ReflectionTestUtils.setField(taskService, "taskActionValidatorProvider", validators);
+        var old = read(key);
+        deploy(key, SimpleModelUtils.buildBpmnModel(key, old.getName(), old.getSimpleModel()), info(old));
+        String oldId = startOrderForReasonTest(key);
+        var next = JsonUtils.parseObject(Files.readString(asset(key, "2.1.0/process-model.json")), BpmModelSaveReqVO.class);
+        deploy(key, SimpleModelUtils.buildBpmnModel(key, next.getName(), next.getSimpleModel()), info(next));
+        String newId = startOrderForReasonTest(key);
+        var oldTasks = engine.getTaskService().createTaskQuery().processInstanceId(oldId).list();
+        assertEquals(2, oldTasks.size());
+        for (var task : oldTasks) {
+            var error = assertThrows(ServiceException.class, () -> taskService.approveTask(30L,
+                    new cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO().setId(task.getId()).setReason("")));
+            assertEquals(TASK_REASON_REQUIRE.getCode(), error.getCode());
+        }
+        var newTasks = engine.getTaskService().createTaskQuery().processInstanceId(newId).list();
+        assertEquals(2, newTasks.size());
+        for (var task : newTasks) {
+            taskService.approveTask(30L, new cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO()
+                    .setId(task.getId()).setReason(""));
+        }
+        assertNull(engine.getRuntimeService().createProcessInstanceQuery().processInstanceId(newId).singleResult());
+        assertEquals(2, engine.getTaskService().createTaskQuery().processInstanceId(oldId).count());
+    }
+
+    private String startOrderForReasonTest(String key) {
+        var instance = FlowableUtils.executeAuthenticatedUserId(30L, () -> engine.getRuntimeService()
+                .startProcessInstanceByKey(key, Map.of(PROCESS_INSTANCE_VARIABLE_START_USER_ID, "30")));
+        var starter = engine.getTaskService().createTaskQuery().processInstanceId(instance.getId()).singleResult();
+        engine.getTaskService().complete(starter.getId());
+        return instance.getId();
+    }
+
     private String start(String key, String taskKey) {
         return service.createProcessInstance(partner, request(key, taskKey));
     }

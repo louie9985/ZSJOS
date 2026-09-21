@@ -134,7 +134,11 @@ public class AdvancedFilterService {
         return query == null ? null : mapper.selectRegistrationCaseIds(query);
     }
     public List<Long> matchStudentPersonIds(AdvancedFilterGroupReqVO group, Long userId) {
-        AdvancedFilterQuery query = buildIfPresent(group, "student", Map.of("userId", userId));
+        return matchStudentPersonIds(group, userId, false);
+    }
+
+    public List<Long> matchStudentPersonIds(AdvancedFilterGroupReqVO group, Long userId, boolean tenantReadAll) {
+        AdvancedFilterQuery query = buildIfPresent(group, "student", Map.of("userId", userId, "tenantReadAll", tenantReadAll));
         return query == null ? null : mapper.selectStudentPersonIds(query);
     }
 
@@ -428,7 +432,7 @@ public class AdvancedFilterService {
         String orderFromLead = "SELECT 1 FROM zsjos_order ro LEFT JOIN zsjos_order_item oi ON oi.order_id=ro.id AND oi.deleted=b'0' WHERE ro.person_id=l.person_id AND ro.tenant_id=l.tenant_id AND ro.deleted=b'0'";
         String orderFromAppeal = "SELECT 1 FROM zsjos_lead al JOIN zsjos_order ro ON ro.person_id=al.person_id AND ro.deleted=b'0' LEFT JOIN zsjos_order_item oi ON oi.order_id=ro.id AND oi.deleted=b'0' WHERE al.id=a.lead_id AND al.tenant_id=a.tenant_id AND al.deleted=b'0'";
         String orderFromRegistration = "SELECT 1 FROM zsjos_order ro LEFT JOIN zsjos_order_item oi ON oi.order_id=ro.id AND oi.deleted=b'0' WHERE ro.id=rc.order_id AND ro.tenant_id=rc.tenant_id AND ro.deleted=b'0'";
-        String serviceFromStudent = "SELECT 1 FROM zsjos_service_relation sr JOIN zsjos_order ro ON ro.id=sr.order_id AND ro.tenant_id=sr.tenant_id AND ro.deleted=b'0' LEFT JOIN zsjos_order_item oi ON oi.id=sr.order_item_id AND oi.tenant_id=sr.tenant_id AND oi.deleted=b'0' LEFT JOIN zsjos_registration_case_route scr ON scr.registration_case_id=sr.registration_case_id AND scr.assignee_user_id=#{query.parameters.userId} AND scr.selected=b'1' AND scr.tenant_id=sr.tenant_id AND scr.deleted=b'0' WHERE sr.person_id=p.id AND sr.tenant_id=p.tenant_id AND sr.status='active' AND sr.deleted=b'0' AND (sr.owner_user_id=#{query.parameters.userId} OR scr.id IS NOT NULL)";
+        String serviceFromStudent = "SELECT 1 FROM zsjos_service_relation sr JOIN zsjos_order ro ON ro.id=sr.order_id AND ro.tenant_id=sr.tenant_id AND ro.deleted=b'0' LEFT JOIN zsjos_order_item oi ON oi.id=sr.order_item_id AND oi.tenant_id=sr.tenant_id AND oi.deleted=b'0' LEFT JOIN zsjos_registration_case_route scr ON scr.registration_case_id=sr.registration_case_id AND scr.assignee_user_id=#{query.parameters.userId} AND scr.selected=b'1' AND scr.tenant_id=sr.tenant_id AND scr.deleted=b'0' WHERE sr.person_id=p.id AND sr.tenant_id=p.tenant_id AND sr.deleted=b'0' AND (#{query.parameters.tenantReadAll}=TRUE OR (sr.status='active' AND (sr.owner_user_id=#{query.parameters.userId} OR scr.id IS NOT NULL)))";
         String itemFromOrder = "SELECT 1 FROM zsjos_order_item oi WHERE oi.order_id=o.id AND oi.tenant_id=o.tenant_id AND oi.deleted=b'0'";
 
         add(result, text("person.name", IDENTITY, "姓名", bind("lead", "p.name", personFromLead, "order", "p.name", personFromOrder, "lead_appeal", "p.name", personFromAppeal, "registration", "p.name", personFromRegistration, "student", "p.name", null)));

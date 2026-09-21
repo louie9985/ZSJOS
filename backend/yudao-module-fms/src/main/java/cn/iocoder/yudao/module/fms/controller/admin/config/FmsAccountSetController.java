@@ -82,15 +82,21 @@ public class FmsAccountSetController {
     @PreAuthorize("@ss.hasPermission('fms:config:account-set:query')")
     public CommonResult<List<FmsAccountSetRespVO>> getAccountSetList() {
         List<FmsAccountUserDO> accountUsers = accountUserService.getAccountUserList(getLoginUserId());
-        Map<Long, FmsAccountSetDO> accountSetMap = accountSetService.getAccountSetMap(
-                convertSet(accountUsers, FmsAccountUserDO::getAccountSetId));
-        return success(buildAccountSetRespVOList(accountSetMap, accountUsers));
+        Map<Long, FmsAccountUserDO> members = accountUsers.stream().collect(java.util.stream.Collectors.toMap(
+                FmsAccountUserDO::getAccountSetId, java.util.function.Function.identity()));
+        return success(accountSetService.getReadableAccountSets(getLoginUserId()).stream()
+                .map(account -> buildAccountSetRespVO(account, members.get(account.getId()))).toList());
     }
 
     // ==================== 拼接 VO ====================
 
     private FmsAccountSetRespVO buildAccountSetRespVO(
             FmsAccountSetDO accountSet, FmsAccountUserDO accountUser) {
+        if (accountUser == null) {
+            return BeanUtils.toBean(accountSet, FmsAccountSetRespVO.class)
+                    .setDefaultStatus(false).setFounder(false)
+                    .setLevel(cn.iocoder.yudao.module.fms.enums.config.FmsAccountUserLevelEnum.READ.getLevel());
+        }
         return BeanUtils.toBean(accountSet, FmsAccountSetRespVO.class)
                 .setDefaultStatus(accountUser.getDefaultStatus()).setFounder(accountUser.getFounder())
                 .setLevel(accountUser.getLevel());

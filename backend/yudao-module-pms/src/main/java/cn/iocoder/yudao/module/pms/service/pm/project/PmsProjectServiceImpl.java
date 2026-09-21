@@ -141,7 +141,8 @@ public class PmsProjectServiceImpl implements PmsProjectService {
         } else if (PmsProjectSceneTypeEnum.ALL.getType().equals(pageReqVO.getSceneType())) {
             projectIds = projectMemberService.getProjectIdListByUserId(userId);
             includeOpenProject = true;
-            includeAllProject = permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode());
+            includeAllProject = permissionApi.hasTenantReadAllAccess(userId)
+                    || permissionApi.hasAnyRoles(userId, RoleCodeEnum.SUPER_ADMIN.getCode());
         } else if (PmsProjectSceneTypeEnum.MANAGED.getType().equals(pageReqVO.getSceneType())) {
             projectIds = projectMemberService.getManagedProjectIdListByUserId(userId);
         } else {

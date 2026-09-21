@@ -24,6 +24,13 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .eq(PositioningCardDO::getStudentPersonId, studentPersonId)
                 .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId));
     }
+
+    default List<PositioningCardDO> selectUnboundForStudent(Long personId) {
+        return selectList(new LambdaQueryWrapperX<PositioningCardDO>()
+                .eq(PositioningCardDO::getStudentPersonId, personId)
+                .isNull(PositioningCardDO::getAccountId)
+                .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId));
+    }
     default List<PositioningCardDO> selectByStudentAndAccountIds(Long studentPersonId, Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<PositioningCardDO>()

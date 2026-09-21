@@ -83,6 +83,16 @@ class SalesOrderSupervisorConfirmationServiceTest {
     }
 
     @Test
+    void ordinaryTaskTargetPropagatesItsDefinitionReasonPolicy() {
+        var task = ordinaryTask();
+        task.setReasonRequire(false);
+        when(processTaskApi.getTodoTask(REQUESTER_ID, "task-1")).thenReturn(task);
+        assertEquals(false, service.getTaskTarget("task-1", REQUESTER_ID).getApprovalReasonRequired());
+        task.setReasonRequire(true);
+        assertEquals(true, service.getTaskTarget("task-1", REQUESTER_ID).getApprovalReasonRequired());
+    }
+
+    @Test
     void requestCreatesBeforeSignTaskAndLocksCenter() {
         mockOrdinaryTask();
         mockSupervisor(SUPERVISOR_ID, CommonStatusEnum.ENABLE.getStatus());

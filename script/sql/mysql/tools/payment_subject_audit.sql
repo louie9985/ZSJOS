@@ -5,9 +5,18 @@
 SET NAMES utf8mb4;
 SET @payment_audit_tenant = COALESCE(@payment_audit_tenant, 1);
 
-SELECT COUNT(*) AS enabled_default_subjects
-FROM zsjos_payment_subject
-WHERE tenant_id = @payment_audit_tenant AND deleted = 0 AND status = 0 AND is_default = 1;
+-- Required route codes, independent of is_default. Each code should have one enabled complete row.
+-- Credential completeness is not RSA validation or proof of platform authorization.
+SELECT codes.subject_code, COUNT(s.id) AS existing_subjects,
+       SUM(CASE WHEN s.status = 0 THEN 1 ELSE 0 END) AS enabled_subjects,
+       SUM(CASE WHEN s.status = 0 AND COALESCE(TRIM(s.cusid), '') <> ''
+           AND COALESCE(TRIM(s.appid), '') <> ''
+           AND COALESCE(TRIM(s.merchant_private_key), '') <> ''
+           AND COALESCE(TRIM(s.platform_public_key), '') <> '' THEN 1 ELSE 0 END) AS enabled_complete_subjects
+FROM (SELECT 'school' AS subject_code UNION ALL SELECT 'company') codes
+LEFT JOIN zsjos_payment_subject s ON s.subject_code = codes.subject_code
+  AND s.tenant_id = @payment_audit_tenant AND s.deleted = 0
+GROUP BY codes.subject_code;
 
 SELECT COUNT(*) AS broken_product_subject_associations
 FROM zsjos_product_payment_subject r

@@ -1,6 +1,8 @@
-import { Alert, App, Button, Image, Modal, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Image, Modal, Space, Tag, Typography, theme } from 'antd'
 import { BellOutlined, ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { leadManagementDeepLink } from '../services/notifyMessageAction'
 import { api, type PendingLead } from '../services/api'
 import { protocolDisplayLabel, resolvedDisplayLabel } from '../services/leadManagement'
 import { LEAD_DISPATCH_MODE_LABELS } from '../constants'
@@ -27,6 +29,8 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
   openRequest: number
 }) {
   const { message } = App.useApp()
+  const navigate = useNavigate()
+  const { token } = theme.useToken()
   const { businessOverlayCount } = useOverlayCoordinator()
   const { status: realtimeStatus } = useRealtime()
   const mountedRef = useRef(true)
@@ -143,7 +147,7 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
   }, [blocked, openRequest, reminderLead])
 
   const handle = async (action: 'accept' | 'reject') => {
-    if (!current) return
+    if (!current || processing) return
     setProcessing(true)
     try {
       if (action === 'accept') await api.acceptLead(current.id)
@@ -151,12 +155,15 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
       setDeferred(ids => { const next = new Set(ids); next.delete(current.id); return next })
       // 标记要在刷新之前：客资列表页监听该事件自行拉取，标记晚到会漏掉高亮
       if (action === 'accept') markLeadUnseen(current.id)
-      await loadPending()
       if (action === 'accept') {
         message.success('接单成功，首次跟进任务已经开始计时')
+        navigate(leadManagementDeepLink(current.id, 'overview'))
       } else {
         message.success('已拒绝，客资将继续派发')
       }
+      // 接单已经成功，刷新待接列表只影响下一条提醒，不应阻断客资跳转。
+      setPending(items => items.filter(item => item.id !== current.id))
+      await loadPending()
     } catch (handleError) {
       message.error(handleError instanceof Error ? handleError.message : '派单已被处理')
       await loadPending()
@@ -182,6 +189,8 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
       </Space>
     </div>}
     <Modal
+      // 接单跳转可能同时打开详情抽屉，后续待接单必须保持可操作。
+      zIndex={token.zIndexPopupBase + 100}
       open={shouldShowAssignmentModal(Boolean(current), businessOverlayCount)}
       className="lead-assignment-modal"
       width={640}

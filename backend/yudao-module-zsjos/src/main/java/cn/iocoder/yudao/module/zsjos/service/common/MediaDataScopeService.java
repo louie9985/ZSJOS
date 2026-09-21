@@ -16,6 +16,7 @@ public class MediaDataScopeService {
     @Resource private AdminUserApi adminUserApi;
 
     public Scope resolve(Long userId, String queryAllPermission) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return new Scope(true, Set.of());
         if (permissionApi.hasAnyPermissions(userId, queryAllPermission)) return new Scope(true, Set.of());
         DeptDataPermissionRespDTO departmentScope = permissionApi.getDeptDataPermission(userId);
         if (departmentScope != null && Boolean.TRUE.equals(departmentScope.getAll())) return new Scope(true, Set.of());

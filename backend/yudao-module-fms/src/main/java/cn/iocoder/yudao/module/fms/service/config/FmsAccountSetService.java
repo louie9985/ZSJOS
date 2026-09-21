@@ -16,6 +16,7 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
  * @author 芋道源码
  */
 public interface FmsAccountSetService {
+    List<FmsAccountSetDO> getReadableAccountSets(Long userId);
 
     /**
      * 创建账套

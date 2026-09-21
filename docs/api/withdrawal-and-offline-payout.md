@@ -9,6 +9,13 @@ The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordi
 - `paid`: immutable terminal result. Recording payout accepts optional `paidAt` and `remark`; bank transaction number and proof are no longer payout inputs. `paidAt` is the supplied business payout time and stays null when omitted; the operator and the existing system audit/record update time still identify the registration. Cashback changes to `withdrawn`.
 - There is no balance account, partial cashback withdrawal, supervisor step, adjusted review amount, automatic transfer, fee, tax, reconciliation, payout failure state, or paid rollback.
 
+Workbench quick filters, list cells and details display the same lifecycle labels as Admin:
+`pending_review` → 待审核, `approved` → 待打款, `rejected` → 已驳回,
+`paid` → 已打款, `cancelled` → 已取消. Filters still submit the original state codes.
+These fixed workflow states are not administrator-editable dictionary choices.
+Workbench amount and timestamp cells read raw response fields from the row, never formatted
+ProTable render nodes; missing or invalid withdrawal amounts display `-` rather than a fabricated zero.
+
 `zsjos_withdrawal_item.active_cashback_id` is a generated nullable key. Its tenant unique index permits unlimited inactive history while ensuring one cashback belongs to at most one active withdrawal. Rejection/cancellation sets item `active_flag=false` before the cashback can be selected again.
 
 ## Endpoints and permissions

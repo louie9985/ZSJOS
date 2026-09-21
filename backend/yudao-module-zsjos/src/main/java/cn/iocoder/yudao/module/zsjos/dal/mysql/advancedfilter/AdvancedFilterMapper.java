@@ -68,8 +68,8 @@ public interface AdvancedFilterMapper {
                     + "AND EXISTS (SELECT 1 FROM zsjos_service_relation vsr LEFT JOIN zsjos_registration_case_route vcr "
                     + "ON vcr.registration_case_id=vsr.registration_case_id AND vcr.assignee_user_id=#{query.parameters.userId} "
                     + "AND vcr.selected=b'1' AND vcr.deleted=b'0' AND vcr.tenant_id=vsr.tenant_id "
-                    + "WHERE vsr.person_id=p.id AND vsr.status='active' AND vsr.deleted=b'0' "
-                    + "AND vsr.tenant_id=p.tenant_id AND (vsr.owner_user_id=#{query.parameters.userId} OR vcr.id IS NOT NULL)) "
+                    + "WHERE vsr.person_id=p.id AND vsr.deleted=b'0' "
+                    + "AND vsr.tenant_id=p.tenant_id AND (#{query.parameters.tenantReadAll}=TRUE OR (vsr.status='active' AND (vsr.owner_user_id=#{query.parameters.userId} OR vcr.id IS NOT NULL)))) "
                     + "AND (${query.whereSql})";
         }
     }

@@ -130,6 +130,8 @@ public class AuthController {
 
     private AuthPermissionInfoRespVO withWorkbenchLayout(AuthPermissionInfoRespVO permissionInfo,
                                                          Set<Long> roleIds, List<MenuDO> menuList) {
+        permissionInfo.setDataAccess(new AuthPermissionInfoRespVO.DataAccessVO(
+                permissionService.hasTenantReadAllAccess(getLoginUserId())));
         WorkbenchMenuProjection projection = workbenchLayoutService.getProjection(roleIds, menuList);
         permissionInfo.setWorkbenchLayoutMeta(projection.getMeta());
         permissionInfo.setWorkbenchMenus(Boolean.TRUE.equals(projection.getMeta().getFallback())

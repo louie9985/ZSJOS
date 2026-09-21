@@ -188,7 +188,9 @@ public class SalesOrderSupervisorConfirmationService {
         Long orderId = parseOrderId(task.getBusinessKey());
         if (orderId == null) throw exception(SALES_ORDER_PERMISSION_DENIED);
         objectPermissionService.check(orderId, done ? "read" : "review");
-        return taskTarget("approval", orderId, taskId, task.getTaskDefinitionKey(), null, done ? "handled" : "pending");
+        SalesOrderApprovalTaskTargetRespVO result = taskTarget("approval", orderId, taskId, task.getTaskDefinitionKey(), null, done ? "handled" : "pending");
+        result.setApprovalReasonRequired(task.getReasonRequire());
+        return result;
     }
 
     public SalesOrderApprovalTaskTargetRespVO getNotificationTarget(Long orderId, String sceneCode,

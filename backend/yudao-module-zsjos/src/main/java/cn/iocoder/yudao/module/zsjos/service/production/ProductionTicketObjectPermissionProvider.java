@@ -21,6 +21,7 @@ public class ProductionTicketObjectPermissionProvider implements ZsjosObjectPerm
     @Override public boolean hasPermission(Long id, String action, Long userId) {
         ProductionTicketDO ticket = mapper.selectById(id);
         if (ticket == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         return switch (action) {
             case "read" -> permissionApi.hasAnyPermissions(userId, "zsjos:production-ticket:query-all")
                     || Objects.equals(userId, ticket.getOwnerOperatorUserId())

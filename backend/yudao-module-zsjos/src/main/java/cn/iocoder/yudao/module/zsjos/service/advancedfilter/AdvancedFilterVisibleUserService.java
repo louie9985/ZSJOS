@@ -30,8 +30,20 @@ public class AdvancedFilterVisibleUserService {
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private ServiceRelationMapper serviceRelationMapper;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
 
     public Resolution resolve(String scene, Long userId) {
+        if (Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales")
+                .contains(scene) && leadObjectPermissionService.hasTenantReadAll(userId)) {
+            if ("subordinate_sales".equals(scene)) {
+                var post = postApi.getPostByCode(cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SALES_POST_CODE);
+                return Resolution.supported(post == null ? List.of()
+                        : options(adminUserApi.getUserListByPostIds(Set.of(post.getId()))));
+            }
+            var users = new java.util.ArrayList<>(adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()));
+            users.addAll(adminUserApi.getUserListByStatus(CommonStatusEnum.DISABLE.getStatus()));
+            return Resolution.supported(options(users));
+        }
         return switch (scene) {
             case "lead", "order", "lead_appeal", "duplicate_review", "registration" ->
                     Resolution.supported(leadUsers(userId));

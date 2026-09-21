@@ -46,6 +46,8 @@ public class FeedbackObjectPermissionProvider implements ZsjosObjectPermissionPr
     public boolean hasPermission(Long feedbackId, String action, Long userId) {
         FeedbackDO feedback = feedbackMapper.selectById(feedbackId);
         if (feedback == null) return false;
+        if (("read-own".equals(action) || ACTION_READ_APPROVER.equals(action))
+                && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if (action.endsWith("-own")) {
             return SUBJECT_ADMIN.equals(feedback.getSubmitterSubjectType())
                     && Objects.equals(feedback.getSubmitterUserId(), userId);

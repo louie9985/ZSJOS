@@ -28,6 +28,7 @@ public class ContentReviewObjectPermissionProvider implements ZsjosObjectPermiss
     public boolean hasPermission(Long batchId, String action, Long userId) {
         ContentReviewBatchDO batch = batchMapper.selectById(batchId);
         if (batch == null || userId == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         boolean operator = Objects.equals(batch.getOperatorUserId(), userId);
         boolean director = Objects.equals(batch.getDirectorUserId(), userId);
         boolean queryAll = permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all");

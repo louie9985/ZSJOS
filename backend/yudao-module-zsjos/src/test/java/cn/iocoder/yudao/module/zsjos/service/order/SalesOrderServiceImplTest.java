@@ -964,6 +964,100 @@ class SalesOrderServiceImplTest {
         verifyNoInteractions(opportunityMapper, agingPoolService);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"   ", "  同意  "})
+    void approveNormalizesOptionalReason(String reason) {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("optional-1");
+        request.setReason(reason);
+        service.approve(100L, 20L, request);
+        String normalized = reason == null ? "" : reason.trim();
+        verify(processTaskApi).approveTask(eq(20L), argThat(value -> normalized.equals(value.getReason())));
+        verify(commandService).fingerprint(normalized, 3, 4);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"   "})
+    void rejectBlankReasonBeforeMutation(String reason) {
+        SalesOrderDecisionReqVO request = new SalesOrderDecisionReqVO();
+        request.setReason(reason);
+        ServiceException error = assertThrows(ServiceException.class, () -> service.reject(100L, 20L, request));
+        assertEquals(SALES_ORDER_REJECT_REASON_REQUIRED.getCode(), error.getCode());
+        verifyNoInteractions(orderMapper, roundMapper, processTaskApi, commandService);
+    }
+
+    @Test
+    void registrationApprovalAlsoAcceptsMissingReason() {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("registration-optional");
+        processTaskApi.getTodoTask(20L, "finance-task").setTaskDefinitionKey(TASK_REGISTRATION);
+        request.setReason(null);
+        service.approve(100L, 20L, request);
+        verify(processTaskApi).approveTask(eq(20L), argThat(value -> "".equals(value.getReason())));
+        verify(registrationService).ensureCaseAfterRegistrationApproval(eq(100L), any());
+    }
+
+    @Test
+    void decisionReasonLengthAndMissingJsonFieldContract() {
+        SalesOrderDecisionReqVO request = JsonUtils.parseObject("{\"taskId\":\"task\",\"approvalRoundId\":1,\"orderVersion\":1,\"roundVersion\":1,\"idempotencyKey\":\"key\"}", SalesOrderDecisionReqVO.class);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            assertTrue(validator.validate(request).isEmpty());
+            request.setReason("字".repeat(1000));
+            assertTrue(validator.validate(request).isEmpty());
+            request.setReason("字".repeat(1001));
+            assertTrue(validator.validate(request).stream().anyMatch(v -> "reason".equals(v.getPropertyPath().toString())));
+        }
+    }
+
+    @Test
+    void taskScopedDetailUsesVerifiedTaskPolicy() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setStatus(STATUS_PENDING_APPROVAL); order.setSubmitterUserId(20L);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setProcessInstanceId("process-1");
+        BpmTaskRespDTO task = new BpmTaskRespDTO();
+        task.setId("task"); task.setBusinessKey(BUSINESS_KEY_PREFIX + 100L);
+        task.setProcessInstanceId("process-1"); task.setTaskDefinitionKey(TASK_FINANCE); task.setReasonRequire(false);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
+        when(processTaskApi.getTodoTask(20L, "task")).thenReturn(task);
+        assertEquals(false, service.get(100L, 20L, "task").getApprovalReasonRequired());
+        task.setReasonRequire(true);
+        assertEquals(true, service.get(100L, 20L, "task").getApprovalReasonRequired());
+        task.setBusinessKey(BUSINESS_KEY_PREFIX + 999L);
+        assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(),
+                assertThrows(ServiceException.class, () -> service.get(100L, 20L, "task")).getCode());
+    }
+
+    @Test
+    void optionalReasonReplayDoesNotExecuteBpmTwice() {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("optional-replay");
+        request.setReason(null);
+        when(commandService.fingerprint("", 3, 4)).thenCallRealMethod();
+        when(commandService.replayDecision(eq("optional-replay"), any())).thenReturn(false, true);
+        service.approve(100L, 20L, request);
+        request.setReason("   ");
+        service.approve(100L, 20L, request);
+        verify(processTaskApi, times(1)).approveTask(eq(20L), any());
+        ArgumentCaptor<SalesOrderCommandService.Command> commands = ArgumentCaptor.forClass(SalesOrderCommandService.Command.class);
+        verify(commandService, times(2)).replayDecision(eq("optional-replay"), commands.capture());
+        assertEquals(commands.getAllValues().get(0).requestFingerprint(), commands.getAllValues().get(1).requestFingerprint());
+    }
+
+    @Test
+    void optionalReasonDoesNotBypassVersionOrTaskOwnershipChecks() {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("optional-conflict");
+        request.setReason(null); request.setOrderVersion(99);
+        assertEquals(SALES_ORDER_VERSION_CONFLICT.getCode(), assertThrows(ServiceException.class,
+                () -> service.approve(100L, 20L, request)).getCode());
+        request.setOrderVersion(3);
+        processTaskApi.getTodoTask(20L, "finance-task").setBusinessKey(BUSINESS_KEY_PREFIX + 999L);
+        assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(), assertThrows(ServiceException.class,
+                () -> service.approve(100L, 20L, request)).getCode());
+        verify(processTaskApi, never()).approveTask(any(), any());
+    }
+
     private void mockEligibleLeadAndOpportunity() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setLeadNo("KZ202608160000000001");
         lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus("valid");

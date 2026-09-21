@@ -10,6 +10,26 @@ const decision = ref<'approve' | 'reject'>('approve')
 const reason = ref('')
 const saving = ref(false)
 const detailLoading = ref(false)
+const approvalReasonRequired = ref<boolean>()
+const loadError = ref('')
+const reasonRequired = computed(() => decision.value === 'reject' || approvalReasonRequired.value !== false)
+const load = async () => {
+  detail.value = undefined
+  approvalReasonRequired.value = undefined
+  loadError.value = ''
+  detailLoading.value = true
+  try {
+    const [order, target] = await Promise.all([
+      Api.getSalesOrder(current.value.id), Api.getSalesOrderApprovalTaskTarget(current.value.taskId)
+    ])
+    if (target.orderId !== current.value.id || typeof target.approvalReasonRequired !== 'boolean')
+      throw new Error('审批任务或意见配置未加载，请重试')
+    detail.value = order
+    approvalReasonRequired.value = target.approvalReasonRequired
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '审批详情加载失败，请重试'
+  } finally { detailLoading.value = false }
+}
 let reloadList = () => {}
 const show = async (row: any, fn: () => void) => {
   current.value = row
@@ -17,18 +37,14 @@ const show = async (row: any, fn: () => void) => {
   decision.value = 'approve'
   reason.value = ''
   open.value = true
-  detailLoading.value = true
-  try {
-    detail.value = await Api.getSalesOrder(row.id)
-  } finally {
-    detailLoading.value = false
-  }
+  await load()
 }
 const submit = async () => {
   if (!current.value?.taskId || !detail.value)
     return message.warning('审批并发信息缺失，请刷新详情')
-  if (decision.value === 'reject' && !reason.value.trim())
-    return message.warning('驳回时必须填写原因')
+  if (typeof approvalReasonRequired.value !== 'boolean') return message.warning('审批意见配置未加载，请重试')
+  if (reasonRequired.value && !reason.value.trim())
+    return message.warning(decision.value === 'reject' ? '请填写驳回原因' : '请填写审批意见')
   saving.value = true
   try {
     await Api.decideSalesOrder(current.value.id, decision.value, {
@@ -59,8 +75,11 @@ const submit = async () => {
         >审批</el-button
       ></template
     ></WorkbenchListPage
-  ><el-dialog v-model="open" title="成交审批" width="560px"
+  ><el-dialog v-model="open" title="成交审批" width="min(560px, calc(100vw - 32px))"
     ><div v-loading="detailLoading">
+      <el-alert v-if="loadError" :title="loadError" type="error" :closable="false">
+        <el-button link type="primary" @click="load">重试</el-button>
+      </el-alert>
       <OrderProductSummary v-if="detail && !detailLoading" :items="detail.items" />
       <el-descriptions v-if="detail && !detailLoading" :column="1" border>
         <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
@@ -73,10 +92,11 @@ const submit = async () => {
             ><el-radio value="approve">通过</el-radio
             ><el-radio value="reject">驳回</el-radio></el-radio-group
           ></el-form-item
-        ><el-form-item label="审批意见" :required="decision === 'reject'"
+        ><el-form-item label="审批意见" :required="reasonRequired"
           ><el-input
             v-model="reason"
             type="textarea"
+            :placeholder="decision === 'reject' ? '请填写驳回原因' : reasonRequired ? '请填写审批意见' : '审批意见（选填）'"
             :rows="4"
             maxlength="1000"
             show-word-limit /></el-form-item></el-form></div

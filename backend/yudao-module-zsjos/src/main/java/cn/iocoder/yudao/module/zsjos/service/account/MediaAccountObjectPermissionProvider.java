@@ -24,6 +24,13 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
     public boolean hasPermission(Long id, String action, Long userId) {
         MediaAccountDO account = mapper.selectById(id);
         if (account == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) {
+            if (account.getCreateServiceRelationId() == null) return true;
+            var source = relationMapper.selectById(account.getCreateServiceRelationId());
+            // Historical state is readable, but a broken or cross-person source is not a valid association.
+            return source != null && java.util.Objects.equals(source.getPersonId(), account.getStudentPersonId())
+                    && java.util.Objects.equals(source.getTenantId(), account.getTenantId());
+        }
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;
         if ("maintenance".equals(action)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;

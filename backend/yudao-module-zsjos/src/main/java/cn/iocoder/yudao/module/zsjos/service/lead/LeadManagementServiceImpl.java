@@ -206,7 +206,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Override
     public PageResult<LeadManagementRespVO> getManagedOwnerLeadPage(LeadManagementPageReqVO reqVO,
                                                                      Long managerUserId, Long ownerUserId) {
-        if (!leadObjectPermissionService.getManagedUserIds(managerUserId).contains(ownerUserId)) {
+        if (!leadObjectPermissionService.hasTenantReadAll(managerUserId)
+                && !leadObjectPermissionService.getManagedUserIds(managerUserId).contains(ownerUserId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
@@ -267,7 +268,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Override
     public List<LeadAssignmentUserRespVO> getVisibleUsers(Long userId) {
         List<AdminUserRespDTO> users;
-        if (leadObjectPermissionService.hasQueryAll()) {
+        if (leadObjectPermissionService.hasTenantReadAll(userId) || leadObjectPermissionService.hasQueryAll()) {
             users = adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
         } else {
             users = adminUserApi.getUserList(leadObjectPermissionService.getRelatedAndManagedUserIds(userId)).stream()
@@ -472,7 +473,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private LeadVisibilityScope resolveVisibilityScope(String relationScope, Long userId) {
-        if ("all".equals(relationScope) && leadObjectPermissionService.hasQueryAll()) {
+        if ("all".equals(relationScope) && (leadObjectPermissionService.hasTenantReadAll(userId)
+                || leadObjectPermissionService.hasQueryAll())) {
             return new LeadVisibilityScope(List.of(), List.of(), true);
         }
         List<Long> relatedUserIds = sortedUserIds(leadObjectPermissionService.getRelatedAndManagedUserIds(userId));

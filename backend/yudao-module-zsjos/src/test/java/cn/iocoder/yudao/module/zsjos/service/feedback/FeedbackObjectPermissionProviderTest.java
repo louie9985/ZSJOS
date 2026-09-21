@@ -34,6 +34,17 @@ class FeedbackObjectPermissionProviderTest {
     @InjectMocks private FeedbackObjectPermissionProvider provider;
 
     @Test
+    void administratorReadDoesNotGrantMarkReadReplyOrSurvey() {
+        when(feedbackMapper.selectById(FEEDBACK_ID)).thenReturn(feedback(FeedbackConstants.TYPE_BUG, SUBMITTER_ID));
+        when(permissionApi.hasTenantReadAllAccess(CHAIRMAN_ID)).thenReturn(true);
+        assertTrue(provider.hasPermission(FEEDBACK_ID, "read-own", CHAIRMAN_ID));
+        assertTrue(provider.hasPermission(FEEDBACK_ID, "read-approver", CHAIRMAN_ID));
+        assertFalse(provider.hasPermission(FEEDBACK_ID, "mark-read-own", CHAIRMAN_ID));
+        assertFalse(provider.hasPermission(FEEDBACK_ID, "reply-own", CHAIRMAN_ID));
+        assertFalse(provider.hasPermission(FEEDBACK_ID, "survey-submit-own", CHAIRMAN_ID));
+    }
+
+    @Test
     void employeeActionsAreStrictlyLimitedToSubmitter() {
         when(feedbackMapper.selectById(FEEDBACK_ID)).thenReturn(feedback(FeedbackConstants.TYPE_BUG, SUBMITTER_ID));
 

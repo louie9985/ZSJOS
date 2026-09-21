@@ -51,12 +51,27 @@ export const decideAppeal = (
   decision: 'overturn' | 'uphold',
   data: Record<string, unknown>
 ) => request.put({ url: `/zsjos/lead/appeal/${id}/${decision}`, data })
-export const getSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/${id}` })
+export interface SalesOrderApprovalTaskTarget {
+  taskId: string
+  orderId: number
+  approvalReasonRequired?: boolean
+}
+export const getSalesOrderApprovalTaskTarget = (taskId: string): Promise<SalesOrderApprovalTaskTarget> =>
+  request.get({ url: '/zsjos/sales-order/approval/task-target', params: { taskId, view: 'todo' } })
+export const getSalesOrder = (id: number, taskId?: string) => request.get({ url: `/zsjos/sales-order/${id}`, params: { taskId } })
 export const getManagementSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/management/${id}` })
+export interface SalesOrderDecisionRequest {
+  taskId: string
+  reason?: string | null
+  approvalRoundId: number
+  orderVersion: number
+  roundVersion: number
+  idempotencyKey: string
+}
 export const decideSalesOrder = (
   id: number,
   decision: 'approve' | 'reject',
-  data: Record<string, unknown>
+  data: SalesOrderDecisionRequest
 ) => request.put({ url: `/zsjos/sales-order/${id}/${decision}`, data })
 export const terminateSalesOrder = (id: number, data: Record<string, unknown>) =>
   request.put({ url: `/zsjos/sales-order/${id}/terminate`, data })

@@ -43,6 +43,7 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         // Managed visibility applies only to reads and to this exact service, never to commands.
         if ("read".equals(action)
                 && Set.of("active", "paused", "completed").contains(relation.getStatus())

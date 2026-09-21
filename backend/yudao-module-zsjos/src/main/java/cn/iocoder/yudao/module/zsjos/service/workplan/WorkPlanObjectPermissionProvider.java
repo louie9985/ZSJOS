@@ -33,6 +33,7 @@ public class WorkPlanObjectPermissionProvider implements ZsjosObjectPermissionPr
     public boolean hasPermission(Long planId, String action, Long userId) {
         WorkPlanDO plan = planMapper.selectById(planId);
         if (plan == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         boolean full = hasFullPlanAccess(plan, userId);
         if ("read".equals(action)) {
             return full || taskMapper.selectListByPlanId(planId).stream().anyMatch(task -> isRelated(task, userId));
@@ -56,6 +57,7 @@ public class WorkPlanObjectPermissionProvider implements ZsjosObjectPermissionPr
     }
 
     public boolean hasTaskPermission(WorkTaskDO task, String action, Long userId) {
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         WorkPlanDO plan = task.getPlanId() == null ? null : planMapper.selectById(task.getPlanId());
         boolean full = plan != null && hasFullPlanAccess(plan, userId);
         return switch (action) {

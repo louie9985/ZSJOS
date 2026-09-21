@@ -210,11 +210,20 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const metadataVersion = useRef(0)
   const activePageRequests = useRef(new Set<string>())
   const routeSelectionRef = useRef<number | undefined>(requestedLeadId)
+  const detailRequestVersion = useRef(0)
   const unseenIdsRef = useRef(unseenIds)
   const avatarRail = useInboxAvatarRail('zsjos.lead-management.list-collapsed')
   const { scrollRef: listScrollRef } = avatarRail
   const listSentinelRef = useRef<HTMLDivElement>(null)
   const itemIdsRef = useRef<number[]>([])
+
+  // 路由复用当前页面时仍以新的深链接为准，不让旧列表选择或详情响应覆盖接单目标。
+  useEffect(() => {
+    routeSelectionRef.current = requestedLeadId
+    if (!requestedLeadId) return
+    setSelectedId(requestedLeadId)
+    setFollowUpDirty(false)
+  }, [requestedLeadId])
 
   const clearLeadSelection = useCallback(() => {
     setSelectedRowKeys([])
@@ -329,45 +338,52 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   }, [detailOnly, loadPage])
   // 深链接直达某客资时，移动端直接把详情抽屉弹出来，避免用户以为列表为空
   useEffect(() => {
-    if (requestedLeadId && window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
-  }, [requestedLeadId])
+    if (requestedLeadId && (useTableLayout || window.matchMedia('(max-width: 768px)').matches)) setDrawerOpen(true)
+  }, [requestedLeadId, useTableLayout])
   // 视口拉宽回到桌面端时，关闭移动端详情抽屉、回到双栏布局
-  useEffect(() => { if (screens.md) setDrawerOpen(false) }, [screens.md])
+  useEffect(() => { if (screens.md && !useTableLayout) setDrawerOpen(false) }, [screens.md, useTableLayout])
 
   const loadDetail = useCallback(async (id: number, silent = false) => {
+    const version = ++detailRequestVersion.current
     if (!silent) setDetailLoading(true)
     setDetailError('')
     try {
       const loaded = await api.managedLead(id)
+      if (version !== detailRequestVersion.current) return
       setDetail(loaded)
       setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))
     } catch (loadError) {
+      if (version !== detailRequestVersion.current) return
       setDetail(undefined)
       setDetailError(loadError instanceof Error ? loadError.message : '客资详情加载失败')
     } finally {
-      if (!silent) setDetailLoading(false)
+      if (version === detailRequestVersion.current) setDetailLoading(false)
     }
   }, [])
 
   const loadDetailByNo = useCallback(async (leadNo: string) => {
+    const version = ++detailRequestVersion.current
     setDetailLoading(true)
     setDetailError('')
     try {
       const loaded = await api.managedLeadByNo(leadNo)
+      if (version !== detailRequestVersion.current) return
       setSelectedId(loaded.id)
       setDetail(loaded)
       setItems(current => current.some(item => item.id === loaded.id) ? current : pinLeadFirst(current, loaded))
     } catch (loadError) {
+      if (version !== detailRequestVersion.current) return
       setDetail(undefined)
       setDetailError(loadError instanceof Error ? loadError.message : '客资详情加载失败')
     } finally {
-      setDetailLoading(false)
+      if (version === detailRequestVersion.current) setDetailLoading(false)
     }
   }, [])
 
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId)
     else setDetail(undefined)
+    return () => { detailRequestVersion.current++ }
   }, [loadDetail, selectedId])
   useEffect(() => {
     if (!selectedId && requestedLeadNo) void loadDetailByNo(requestedLeadNo)

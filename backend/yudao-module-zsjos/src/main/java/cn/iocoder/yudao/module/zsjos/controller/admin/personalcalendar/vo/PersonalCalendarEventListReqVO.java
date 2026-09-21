@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 
 @Data
 public class PersonalCalendarEventListReqVO {
+    private String readScope;
+    private Long targetUserId;
     @NotNull private LocalDateTime rangeStart;
     @NotNull private LocalDateTime rangeEnd;
 }

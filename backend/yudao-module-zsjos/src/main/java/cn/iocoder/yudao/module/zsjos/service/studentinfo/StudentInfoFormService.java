@@ -37,6 +37,7 @@ public class StudentInfoFormService {
     @Resource private LeadMapper leads;
     @Resource private StudentInfoPermissionProvider permission;
     @Resource private SecurityFrameworkService security;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private TenantFrameworkService tenants;
     @Value("${zsjos.student-info.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}") private String publicBaseUrl;
     private static final SecureRandom RANDOM=new SecureRandom();
@@ -83,14 +84,18 @@ public class StudentInfoFormService {
     public Detail sensitiveDetail(Long leadId) { return project(leadId,true); }
 
     @ZsjosPermission(bizType="student-info",bizId="#leadId",action="export")
-    public Detail exportDetail(Long leadId) { return project(leadId,security.hasPermission(SENSITIVE)); }
+    public Detail exportDetail(Long leadId) { return project(leadId,canReadSensitive()); }
+
+    public boolean canReadSensitive() {
+        return security.hasPermission(SENSITIVE) || permissionApi.hasTenantReadAllAccess(getLoginUserId());
+    }
 
     private Detail project(Long leadId,boolean unmasked) {
         Detail result=new Detail();
         var form=forms.submitted(leadId);
         if (form==null) form=forms.byLead(leadId);
         result.setStatus(form==null ? "NONE" : state(form));
-        result.setCanReadSensitive(security.hasPermission(SENSITIVE));
+        result.setCanReadSensitive(canReadSensitive());
         result.setCanExport(security.hasPermission(EXPORT));
         if (form==null) return result;
         result.setId(form.getId()); result.setCreatedAt(form.getCreateTime()); result.setSubmittedAt(form.getSubmittedAt());

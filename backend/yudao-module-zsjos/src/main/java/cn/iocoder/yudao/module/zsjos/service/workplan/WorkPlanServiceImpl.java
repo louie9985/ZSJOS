@@ -670,6 +670,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     }
 
     private Set<Long> visibleTaskIds(WorkPlanDO plan, List<WorkTaskDO> tasks, Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return tasks.stream().map(WorkTaskDO::getId).collect(Collectors.toSet());
         if (permissionProvider.hasFullPlanAccess(plan, userId)) return tasks.stream().map(WorkTaskDO::getId).collect(Collectors.toSet());
         Map<Long, WorkTaskDO> byId = tasks.stream().collect(Collectors.toMap(WorkTaskDO::getId, Function.identity()));
         Map<Long, List<WorkTaskDO>> children = tasks.stream().filter(task -> task.getParentTaskId() != null)
@@ -794,6 +795,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     }
 
     private Visibility visibility(Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return new Visibility(true, List.of());
         DeptDataPermissionRespDTO scope = permissionApi.getDeptDataPermission(userId);
         boolean all = scope != null && Boolean.TRUE.equals(scope.getAll());
         Set<Long> deptIds = scope == null || scope.getDeptIds() == null ? Set.of() : scope.getDeptIds();

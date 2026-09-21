@@ -53,6 +53,12 @@ import BusinessTable from '../components/BusinessTable'
 `render(value, record, index)`，保留布尔值、数值零、缺失值、嵌套字段、分组列的语义。
 新页面优先采用 `ProColumns<T>`；此兼容模式仍使用同一个 ProTable 实现和样式，不是第二套表格。
 
+`ProColumns.render` 的第一个参数是格式化后的 React 节点，不能用于 `Number()`、状态比较、
+标签映射或日期解析。这些业务格式化必须从第二个参数读取原始字段，例如
+`render: (_, row) => formatTimestamp(row.submittedAt)`。仅 TypeScript 类型断言不能转换运行时节点。
+财务回归测试 `src/pages/finance-table-values.test.tsx` 使用实际 ProTable 验证提现、返现与订单展示；
+`test/finance-table.html` 是不连接业务服务的浏览器夹具，可验证中文筛选仍提交原状态编码。
+
 ## 列与主题
 
 - 列使用稳定 `key` 或 `dataIndex`；渲染列应显式定义 `key`，避免列顺序修改影响偏好。

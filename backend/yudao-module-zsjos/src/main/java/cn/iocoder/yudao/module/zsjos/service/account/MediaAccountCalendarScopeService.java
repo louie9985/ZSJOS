@@ -21,6 +21,7 @@ public class MediaAccountCalendarScopeService {
     @Resource private AdminUserApi adminUserApi;
 
     public Scope resolve(Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return new Scope(true, Set.of());
         if (permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_ALL)) return new Scope(true, Set.of());
         Set<Long> userIds = new HashSet<>();
         userIds.add(userId);

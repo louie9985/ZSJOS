@@ -576,7 +576,7 @@
     {
       "processKey": "zsjos_sales_order_dual_approval",
       "assetVersion": "2.0.0",
-      "recommended": true,
+      "recommended": false,
       "assetFormat": "simple",
       "taskKeys": [
         "registrationReview",
@@ -604,6 +604,42 @@
       "minimumMigration": "V023",
       "path": "zsjos_sales_order_dual_approval/2.0.0/process-model.json",
       "sha256": "d980cf49e727d4cf7fd82aa92a81e74197bb600168a3fed6be90975eadc223ae",
+      "startUserSelectTaskKeys": [
+        "registrationReview",
+        "financeReview"
+      ]
+    },
+    {
+      "processKey": "zsjos_sales_order_dual_approval",
+      "assetVersion": "2.1.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "registrationReview",
+        "financeReview"
+      ],
+      "businessVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo"
+      ],
+      "assigneeVariables": [
+        "registrationUsers",
+        "financeUsers"
+      ],
+      "runtimeOnlyVariables": [
+        "orderId",
+        "leadId",
+        "personId",
+        "roundNo",
+        "registrationUsers",
+        "financeUsers"
+      ],
+      "businessKeyFormat": "sales-order:{orderId}",
+      "minimumMigration": "V023",
+      "path": "zsjos_sales_order_dual_approval/2.1.0/process-model.json",
+      "sha256": "f0e5a28c105c08792165ebaa8e0a01588a02b2eded9bce47f34d2989e756dbab",
       "startUserSelectTaskKeys": [
         "registrationReview",
         "financeReview"

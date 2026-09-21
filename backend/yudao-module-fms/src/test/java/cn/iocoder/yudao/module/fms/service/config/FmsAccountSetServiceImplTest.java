@@ -45,6 +45,17 @@ import static org.mockito.Mockito.when;
 
 @Import(FmsAccountSetServiceImpl.class)
 public class FmsAccountSetServiceImplTest extends BaseDbUnitTest {
+    @MockitoBean private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    @Test
+    void administratorCanReadNonMemberAccountButCannotWrite() {
+        FmsAccountSetDO account = randomPojo(FmsAccountSetDO.class, row -> row.setDeleted(false));
+        accountSetMapper.insert(account);
+        when(permissionApi.hasTenantReadAllAccess(99L)).thenReturn(true);
+        assertEquals(account.getId(), accountSetService.validateAccountSetReadPermission(account.getId(), 99L).getId());
+        assertServiceException(() -> accountSetService.validateAccountSetWritePermission(account.getId(), 99L), ACCOUNT_SET_ACCESS_DENIED);
+        assertServiceException(() -> accountSetService.validateAccountSetOwnerPermission(account.getId(), 99L), ACCOUNT_SET_ACCESS_DENIED);
+    }
 
     @Resource
     private FmsAccountSetServiceImpl accountSetService;

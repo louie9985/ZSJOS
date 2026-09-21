@@ -52,6 +52,7 @@ public class SalesOrderListItemRespVO {
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private String taskId;
+    private Boolean approvalReasonRequired;
     private String taskDefinitionKey;
     private Integer taskStatus;
     private String taskReason;

@@ -456,7 +456,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
-    @ZsjosPermission(bizType = "feedback", bizId = "#id", action = "read-own")
+    @ZsjosPermission(bizType = "feedback", bizId = "#id", action = "mark-read-own")
     @Transactional(rollbackFor = Exception.class)
     public void markRead(Long id, FeedbackActionVO.VersionedCommand request, Long userId) {
         FeedbackDO row = requireLocked(id);

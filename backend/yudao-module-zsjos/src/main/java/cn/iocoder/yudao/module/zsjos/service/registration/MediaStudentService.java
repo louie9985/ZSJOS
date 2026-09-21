@@ -53,6 +53,7 @@ public class MediaStudentService {
     @Resource private PermissionApi permissionApi;
 
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
+        boolean readAll = permissionApi.hasTenantReadAllAccess(userId);
         MediaStudentDetailRespVO result = new MediaStudentDetailRespVO();
         result.setStudent(myStudentService.getMediaStudent(userId, personId));
         // Student visibility does not authorize all accounts under that person.
@@ -92,10 +93,11 @@ public class MediaStudentService {
         }).toList());
         // Interview drafts can exist before an account. Only the current director's
         // unbound cards supplement the account-authorized collection.
-        var unboundDrafts = positioningMapper.selectByDirectorAndStudent(userId, personId).stream()
+        var unboundDrafts = (readAll ? positioningMapper.selectUnboundForStudent(personId)
+                : positioningMapper.selectByDirectorAndStudent(userId, personId)).stream()
                 .filter(row -> row.getAccountId() == null && personId.equals(row.getStudentPersonId()));
         result.setPositioningDrafts(java.util.stream.Stream.concat(positioningCards.stream(), unboundDrafts)
-                .filter(row -> "co_creating".equals(row.getStatus()) && userId.equals(row.getDirectorUserId()))
+                .filter(row -> "co_creating".equals(row.getStatus()) && (readAll || userId.equals(row.getDirectorUserId())))
                 .map(row -> {
                     MediaStudentDetailRespVO.PositioningVO value = BeanUtils.toBean(row,
                             MediaStudentDetailRespVO.PositioningVO.class);

@@ -95,15 +95,20 @@ class PublicPaymentDetailTest {
 
     @Test
     void newLinkFreezesCommonConfiguredSubjectForRealSkuReferences() {
-        assertFrozenSubject(false);
+        assertFrozenSubject(false, false);
     }
 
     @Test
-    void newLinkFreezesDefaultSubjectWhenProductsResolveToDifferentSubjects() {
-        assertFrozenSubject(true);
+    void newLinkFreezesCompanySubjectWhenProductsResolveToDifferentSubjects() {
+        assertFrozenSubject(true, false);
     }
 
-    private void assertFrozenSubject(boolean mixed) {
+    @Test
+    void newLinkFreezesSchoolForUnconfiguredProducts() {
+        assertFrozenSubject(false, true);
+    }
+
+    private void assertFrozenSubject(boolean mixed, boolean unconfigured) {
         var request = prepareDraft();
         var resolver = new PaymentSubjectResolver();
         var configuredSubjects = mock(PaymentSubjectService.class);
@@ -113,10 +118,11 @@ class PublicPaymentDetailTest {
         ReflectionTestUtils.setField(resolver, "gatewayFactory", PaymentSubjectTestData.factory(properties));
         ReflectionTestUtils.setField(service, "paymentSubjectResolver", resolver);
         when(relations.getPaymentSubjectIdsByProductIds(List.of(101L, 202L)))
-                .thenReturn(java.util.Map.of(101L, 10L, 202L, mixed ? 20L : 10L));
+                .thenReturn(unconfigured ? java.util.Map.of() : java.util.Map.of(101L, 10L, 202L, mixed ? 20L : 10L));
         when(configuredSubjects.getPaymentSubject(10L)).thenReturn(PaymentSubjectTestData.subject(10));
         when(configuredSubjects.getPaymentSubject(20L)).thenReturn(PaymentSubjectTestData.subject(20));
-        when(configuredSubjects.getDefaultPaymentSubject()).thenReturn(PaymentSubjectTestData.subject(30));
+        when(configuredSubjects.getPaymentSubjectByCode("company")).thenReturn(PaymentSubjectTestData.subject(30));
+        when(configuredSubjects.getPaymentSubjectByCode("school")).thenReturn(PaymentSubjectTestData.subject(10));
         when(products.validateLeadProduct("COURSE-1", false, "sku_random1", false)).thenReturn(product("课程一", "高级班"));
         when(products.validateLeadProduct("COURSE-2", false, "sku_random2", false)).thenReturn(product("课程二", "基础班"));
         var firstSku = new ZsjosProductSkuDO(); firstSku.setSpuId(101L);
@@ -131,8 +137,37 @@ class PublicPaymentDetailTest {
         var snapshot = JsonUtils.parseObject(capture.getValue().getSubjectSnapshotJson(), PaymentSubjectDO.class);
         assertEquals(mixed ? 30L : 10L, snapshot.getId());
         assertEquals(mixed ? "merchant-30" : "merchant-10", snapshot.getCusid());
-        if (!mixed) verify(configuredSubjects, never()).getDefaultPaymentSubject();
-        verify(configuredSubjects, never()).getPaymentSubjectByCode(any());
+        verify(configuredSubjects, never()).getDefaultPaymentSubject();
+        if (!mixed && !unconfigured) verify(configuredSubjects, never()).getPaymentSubjectByCode(any());
+        var original = capture.getValue();
+        String originalSnapshot = original.getSubjectSnapshotJson();
+        when(payments.selectLatestByPurchaseIntent(1L)).thenReturn(original);
+        when(relations.getPaymentSubjectIdsByProductIds(anyList())).thenReturn(java.util.Map.of(101L, 40L, 202L, 40L));
+        when(configuredSubjects.getPaymentSubject(40L)).thenReturn(PaymentSubjectTestData.subject(40));
+        clearInvocations(relations);
+        for (String state : List.of("created", "waiting", "paid")) {
+            original.setStatus(state);
+            service.createPaymentLink(request, 7L);
+            assertEquals(originalSnapshot, original.getSubjectSnapshotJson());
+        }
+        verifyNoInteractions(relations);
+        verify(payments, times(1)).insert(any(PaymentIntentDO.class));
+        original.setStatus("created");
+        var intent = intents.selectByIdForUpdate(1L);
+        intent.setOwnerUserId(7L).setInitiatorUserId(7L);
+        service.cancelPayment(1L, 7L);
+        assertEquals("closed", original.getStatus());
+        assertFalse(intent.getSnapshotLocked());
+        service.createPaymentLink(request, 7L);
+        verify(payments, times(2)).insert(capture.capture());
+        var rebuilt = capture.getValue();
+        assertEquals(40L, JsonUtils.parseObject(rebuilt.getSubjectSnapshotJson(), PaymentSubjectDO.class).getId());
+        assertEquals(originalSnapshot, original.getSubjectSnapshotJson());
+
+        // A subsequent invalid configuration must fail before any new payment is inserted.
+        when(configuredSubjects.getPaymentSubject(40L)).thenReturn(null);
+        assertThrows(ServiceException.class, () -> service.createPaymentLink(request, 7L));
+        verify(payments, times(2)).insert(any(PaymentIntentDO.class));
     }
 
     @Test

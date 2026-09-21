@@ -448,6 +448,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     public WorkOrderRespVO get(Long id, Long userId) {
         WorkOrderDO row = orderMapper.selectUnifiedById(id);
         if (row == null) throw exception(ZsjosErrorCodeConstants.WORK_ORDER_NOT_EXISTS);
+        if (permissionApi.hasTenantReadAllAccess(userId)) return toVO(row, userId);
         boolean historyParticipant = historyMapper.selectByOrderId(id).stream().anyMatch(history -> Objects.equals(history.getOperatorUserId(), userId));
         boolean poolCandidate = "AVAILABLE".equals(row.getStatus()) && isQualified(userId, row.getCandidateQualificationMode(),
                 row.getCandidateRoleScopesJson(), row.getCandidateDeptScopesJson());

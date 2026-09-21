@@ -15,6 +15,13 @@ import java.util.Set;
 
 @Mapper
 public interface PersonMapper extends BaseMapperX<PersonDO> {
+    default PageResult<PersonDO> selectTenantReadStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds) {
+        QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
+        query.apply(STUDENT_RELATION_PREDICATE
+                + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}))",
+                req.getClassId(), req.getServiceStatus());
+        return selectPage(req, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
     /**
      * Start of every student-page EXISTS clause: the person's live service relations. Each caller appends
      * its own scope clause (class id, then the owner list where one applies) and then the status condition.
@@ -82,12 +89,18 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     }
 
     default PageResult<PersonDO> selectMediaStudentPage(MyStudentPageReqVO reqVO, Long userId) {
-        QueryWrapperX<PersonDO> query = studentQuery(reqVO, null);
+        return selectMediaStudentPage(reqVO, userId, null);
+    }
+
+    default PageResult<PersonDO> selectMediaStudentPage(MyStudentPageReqVO reqVO, Long userId,
+                                                       java.util.Collection<Long> matchedIds) {
+        QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
         query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                 + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                + "AND ({1} IS NULL OR sr.class_id={1}) AND ({2} IS NULL OR sr.status={2}) "
                 + "AND ((sr.owner_user_id={0} AND sr.status IN ('active','paused','completed')) "
                 + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0} OR sr.operator_user_id={0}) "
-                + "AND sr.status='active' AND sr.acceptance_status='accepted')))" , userId);
+                + "AND sr.status='active' AND sr.acceptance_status='accepted')))" , userId, reqVO.getClassId(), reqVO.getServiceStatus());
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 
