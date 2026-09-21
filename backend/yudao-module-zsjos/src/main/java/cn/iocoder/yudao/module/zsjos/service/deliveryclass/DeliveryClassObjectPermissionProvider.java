@@ -24,6 +24,7 @@ public class DeliveryClassObjectPermissionProvider implements ZsjosObjectPermiss
     public boolean hasPermission(Long id, String action, Long userId) {
         DeliveryClassDO row = mapper.selectById(id);
         if (row == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("read".equals(action) && Boolean.TRUE.equals(row.getSystemClass())) {
             return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED);
         }

@@ -123,6 +123,7 @@ export default function AccountProfilePanel({
   onMissingChange?: (id: number, count: number) => void;
 }) {
   const { message, modal } = App.useApp();
+  const [deleteOpen, setDeleteOpen] = useState(false), [deleteReason, setDeleteReason] = useState(''), [deleteSaving, setDeleteSaving] = useState(false);
   const [positioningRefresh, setPositioningRefresh] = useState(0);
   const [positioningStatusTarget, setPositioningStatusTarget] = useState<HTMLDivElement | null>(null);
   const [profile, setProfile] = useState<AccountProfile>(),
@@ -853,6 +854,15 @@ export default function AccountProfilePanel({
           dicts={dicts} onFinish={submitDiagnosis} />
       </Modal>
       {/* 主体自然滚动；右侧摘要栏由 CSS sticky 保持在视口内。 */}
+      <Modal title="申请删除账号" open={deleteOpen} confirmLoading={deleteSaving} okText="提交审批" okButtonProps={{ danger: true, disabled: !deleteReason.trim() }} onCancel={() => setDeleteOpen(false)} onOk={async () => {
+        if (!account || !deleteReason.trim()) return;
+        setDeleteSaving(true);
+        try { await api.mediaAccount.requestDelete(account.id, deleteReason.trim()); message.success('已提交删除审批'); setDeleteOpen(false); await load(); await onSaved(); }
+        catch (cause) { message.error(errorText(cause)); } finally { setDeleteSaving(false); }
+      }}>
+        <Alert type="warning" showIcon message="提交后账号将冻结，主管通过后删除账号并保留历史记录。" />
+        <Input.TextArea aria-label="删除原因" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} maxLength={500} showCount rows={4} placeholder="请说明错误新增或申请删除的原因" style={{ marginTop: 16 }} />
+      </Modal>
       <div className="account-profile-grid">
         <aside className="account-profile-aside">
           <div className="account-profile-cover">
@@ -879,16 +889,18 @@ export default function AccountProfilePanel({
               {profile.snapshots.find(s => s.key === "current_status")?.displayValue || "待完成启动诊断"}
             </Tag>
             <div className="account-profile-sidebar-actions">
+              {profile.account.availableActions.includes('REQUEST_DELETE_ACCOUNT') && <Button danger onClick={() => { setDeleteReason(''); setDeleteOpen(true); }}>申请删除账号</Button>}
               {editable.length > 0 && <Button icon={<EditOutlined />} onClick={() => openEditor()}>维护账号表</Button>}
               {profile.canStartDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_initial')}>填写启动诊断</Button>}
               {profile.canSubmitDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_7d', undefined, undefined, true)}>填写周期诊断</Button>}
             </div>
+            {profile.account.deleteStatus === 'pending' && <Alert type="warning" showIcon message="删除审批中，账号已冻结" />}
             {reminder}
             {missingList}
             <Progress percent={required ? Math.round(((required - missing.length) / required) * 100) : 100} size="small" />
           </section>
         </aside>
-        <div className="account-profile-sections">
+      <div className="account-profile-sections">
           {groups.map(([k, name]) => (
             <section
               key={k}

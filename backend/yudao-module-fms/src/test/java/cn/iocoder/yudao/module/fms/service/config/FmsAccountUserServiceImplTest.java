@@ -28,6 +28,16 @@ import static org.mockito.Mockito.when;
 @Import(FmsAccountUserServiceImpl.class)
 public class FmsAccountUserServiceImplTest extends BaseDbUnitTest {
 
+    @Test
+    void readAllNonmemberCannotClearOwnDefaultAccount() {
+        accountUserMapper.insert(new FmsAccountUserDO().setAccountSetId(1L).setUserId(10L)
+                .setDefaultStatus(true).setFounder(false).setLevel(FmsAccountUserLevelEnum.READ.getLevel()));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> accountUserService.updateAccountSetDefaultStatus(2L, 10L));
+        assertTrue(accountUserMapper.selectByAccountSetIdAndUserId(1L, 10L).getDefaultStatus());
+        assertNull(accountUserMapper.selectByAccountSetIdAndUserId(2L, 10L));
+    }
+
     @Resource
     private FmsAccountUserServiceImpl accountUserService;
     @Resource

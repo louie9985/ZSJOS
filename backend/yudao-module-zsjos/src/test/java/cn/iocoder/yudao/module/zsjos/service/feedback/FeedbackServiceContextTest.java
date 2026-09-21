@@ -27,6 +27,8 @@ import static org.mockito.Mockito.mock;
 class FeedbackServiceContextTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService.class,
+                    () -> mock(cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService.class))
             .withBean("configMapper", Runnable.class, () -> mock(Runnable.class))
             .withBean("feedbackMapper", FeedbackMapper.class, () -> mock(FeedbackMapper.class))
             .withBean("roundMapper", FeedbackRoundMapper.class, () -> mock(FeedbackRoundMapper.class))

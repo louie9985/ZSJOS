@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -73,16 +74,30 @@ describe('unavailable template', () => {
 
 describe('available template', () => {
   it.each([ViralAccountMaterialForm, ViralContentMaterialForm])('renders all sections from backend fields', component => {
-    const html = renderToStaticMarkup(createElement(component, {
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(component, {
       mode: 'create', type: { id: 1, currentSchema: { fields: [
         field('account_name', 10, 'ACCOUNT_DETAIL'),
         field('analysis', 20, 'DIRECTOR_ANALYSIS'),
         field('advice', 30, 'BUILD_SUGGESTION')
       ] } } as MaterialType, dicts: {}, onClose: () => {}, onSaved: () => {}
-    }))
+    })))
     expect(html.match(/class="viral-account-section"/g)).toHaveLength(3)
     expect(html).toContain('viral-account-screenshot')
     expect(html).toContain('保存草稿')
     expect(html).not.toContain('拆解模板不可用')
+  })
+})
+
+
+describe('reopening an existing material draft', () => {
+  it('uses the saved draft schema after a newer template is published', () => {
+    const html = renderToStaticMarkup(createElement(ViralAccountMaterialForm, {
+      mode: 'edit', type: { id: 1, currentSchema: { fields: [field('new_field', 1, 'ACCOUNT_DETAIL')] } } as MaterialType,
+      material: { id: 7, currentVersion: { status: 'DRAFT', fields: [field('saved_field', 1, 'ACCOUNT_DETAIL')], values: { saved_field: '已保存的内容' } } } as unknown as import('../services/materialApi').Material,
+      dicts: {}, onClose: () => {}, onSaved: () => {}
+    }))
+    expect(html).toContain('saved_field')
+    expect(html).toContain('已保存的内容')
+    expect(html).not.toContain('new_field')
   })
 })

@@ -128,7 +128,7 @@ public class MaterialService {
         boolean canManage = permissionApi.hasAnyPermissions(userId, "zsjos:material:manage");
         PageResult<MaterialDO> page = Boolean.TRUE.equals(request.getRecommendation())
                 ? getRecommendationPage(request, userId)
-                : materialMapper.selectPage(request, userId, canManage);
+                : materialMapper.selectPage(request, userId, canManage || permissionApi.hasTenantReadAllAccess(userId));
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -137,7 +137,8 @@ public class MaterialService {
 
     public List<MaterialRecommendationAccountRespVO> getRecommendationAccountCandidates(String keyword,
                                                                                          Long userId) {
-        boolean all = permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all");
+        boolean all = permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all");
         return mediaAccountMapper.selectMaterialRecommendationCandidates(trimToNull(keyword), userId, tenantId(), all)
                 .stream().map(account -> BeanUtils.toBean(account, MaterialRecommendationAccountRespVO.class))
                 .toList();
@@ -233,7 +234,7 @@ public class MaterialService {
     @ZsjosPermission(bizType = "material", bizId = "#materialId", action = "read")
     public List<MaterialVersionRespVO> getVersions(Long materialId, Long userId) {
         MaterialDO material = requireMaterial(materialId);
-        boolean seeAll = Objects.equals(material.getOwnerUserId(), userId)
+        boolean seeAll = permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(material.getOwnerUserId(), userId)
                 || permissionApi.hasAnyPermissions(userId, "zsjos:material:manage");
         return versionMapper.selectByMaterialId(materialId).stream()
                 .filter(version -> seeAll || VERSION_EFFECTIVE.equals(version.getStatus()))
@@ -247,7 +248,7 @@ public class MaterialService {
             throw exception(MATERIAL_VERSION_NOT_EXISTS);
         }
         MaterialDO material = requireMaterial(version.getMaterialId());
-        boolean seeAll = Objects.equals(material.getOwnerUserId(), userId)
+        boolean seeAll = permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(material.getOwnerUserId(), userId)
                 || permissionApi.hasAnyPermissions(userId, "zsjos:material:manage");
         if (!seeAll && !VERSION_EFFECTIVE.equals(version.getStatus())) {
             throw exception(MATERIAL_PERMISSION_DENIED);
@@ -967,7 +968,7 @@ public class MaterialService {
     }
 
     private Long selectedVersionId(MaterialDO material, Long userId, boolean canManage) {
-        if ((canManage || Objects.equals(material.getOwnerUserId(), userId))
+        if ((canManage || permissionApi.hasTenantReadAllAccess(userId) || Objects.equals(material.getOwnerUserId(), userId))
                 && material.getCurrentDraftVersionId() != null) {
             return material.getCurrentDraftVersionId();
         }

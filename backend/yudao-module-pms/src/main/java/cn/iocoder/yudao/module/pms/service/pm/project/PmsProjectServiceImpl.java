@@ -136,7 +136,11 @@ public class PmsProjectServiceImpl implements PmsProjectService {
         boolean includeAllProject = false;
 
         // 1. 按项目状态和列表场景确定可查询的项目范围
-        if (ObjectUtil.notEqual(PmsProjectStatusEnum.ACTIVE.getStatus(), pageReqVO.getStatus())) {
+        if (PmsProjectSceneTypeEnum.ALL.getType().equals(pageReqVO.getSceneType())
+                && permissionApi.hasTenantReadAllAccess(userId)) {
+            projectIds = List.of();
+            includeAllProject = true;
+        } else if (ObjectUtil.notEqual(PmsProjectStatusEnum.ACTIVE.getStatus(), pageReqVO.getStatus())) {
             projectIds = projectMemberService.getManagedProjectIdListByUserId(userId);
         } else if (PmsProjectSceneTypeEnum.ALL.getType().equals(pageReqVO.getSceneType())) {
             projectIds = projectMemberService.getProjectIdListByUserId(userId);
@@ -149,7 +153,7 @@ public class PmsProjectServiceImpl implements PmsProjectService {
             projectIds = projectGroupService.filterProjectIdListByGroupId(pageReqVO.getGroupId(), userId,
                     projectMemberService.getProjectIdListByUserId(userId));
         }
-        if (!includeOpenProject && CollUtil.isEmpty(projectIds)) {
+        if (!includeAllProject && !includeOpenProject && CollUtil.isEmpty(projectIds)) {
             return PageResult.empty();
         }
 

@@ -2,7 +2,7 @@
 
 ## 边界与身份
 
-需求、BUG 和技术支持共用 ZSJOS 反馈领域模型，并复用通用工单的编号关联、附件校验、乐观锁和历史能力。所有接口位于 ADMIN API 前缀下，使用当前登录员工、租户上下文和标准 `CommonResult` 包装。员工接口只允许读取本人提交的数据；管理接口除菜单权限外，还按反馈类型累计校验对象权限。
+需求、BUG 和技术支持共用 ZSJOS 反馈领域模型，并复用通用工单的编号关联、附件校验、乐观锁和历史能力。所有接口位于 ADMIN API 前缀下，使用当前登录员工、租户上下文和标准 `CommonResult` 包装。员工接口默认读取本人提交的数据，已授权管理员可按下述显式范围只读查看；管理接口除菜单权限外，还按反馈类型累计校验对象权限。
 
 通用工单使用 `businessType` 隔离：历史及普通工单为 `GENERIC`，本功能为 `FEEDBACK`。原通用工单列表和详情不会返回反馈记录。
 
@@ -68,3 +68,7 @@
 ## 通知
 
 四个场景为 `zsjos.feedback.employee_replied`、`zsjos.feedback.admin_replied`、`zsjos.feedback.completed` 和 `zsjos.feedback.survey_requested`。消息动作使用受控业务详情，深链为 `/zsjos/feedback?feedbackId={id}`，进入详情时仍重新校验菜单权限和本人数据范围。
+
+## 当前租户管理员读取
+
+个人列表新增可选 readScope=SELF|ALL|USER、targetUserId，默认本人。管理员 ALL/USER 为只读投影；查看他人不标记已读、不回复或重提。ADMIN 与 PARTNER 同号用户不能获得对方的本人动作。基础功能权限保留，详见 tenant-admin-read-all.md。

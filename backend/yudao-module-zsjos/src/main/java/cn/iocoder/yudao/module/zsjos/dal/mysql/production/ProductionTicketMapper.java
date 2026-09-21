@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 
 @Mapper
 public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> {
+    @org.apache.ibatis.annotations.Update("UPDATE zsjos_production_ticket SET account_ids_json=JSON_REMOVE(account_ids_json, JSON_UNQUOTE(JSON_SEARCH(account_ids_json,'one',CAST(#{accountId} AS CHAR)))), status=IF(JSON_LENGTH(account_ids_json)<=1,'cancelled',status), version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND JSON_CONTAINS(account_ids_json,JSON_ARRAY(#{accountId})) AND status NOT IN ('completed','cancelled')")
+    int excludeDeletedAccount(@org.apache.ibatis.annotations.Param("accountId") Long accountId);
     default List<ProductionTicketDO> selectByAccountIds(Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ProductionTicketDO>()
@@ -60,9 +62,9 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .eq(ProductionTicketDO::getVersion, version).eq(ProductionTicketDO::getStatus, from)
                 .set(ProductionTicketDO::getStatus, to).set(ProductionTicketDO::getVersion, version + 1));
     }
-    default int rejectForRevision(Long id, Integer version, String reason) {
+    default int rejectForRevision(Long id, Integer version, String expectedStatus, String reason) {
         return update(null, new LambdaUpdateWrapper<ProductionTicketDO>().eq(ProductionTicketDO::getId,id)
-                .eq(ProductionTicketDO::getVersion,version).eq(ProductionTicketDO::getStatus,"checking")
+                .eq(ProductionTicketDO::getVersion,version).eq(ProductionTicketDO::getStatus, expectedStatus)
                 .set(ProductionTicketDO::getStatus,"rejected").set(ProductionTicketDO::getReworkReasonType,reason)
                 .setSql("revision_count = revision_count + 1").set(ProductionTicketDO::getVersion,version+1));
     }

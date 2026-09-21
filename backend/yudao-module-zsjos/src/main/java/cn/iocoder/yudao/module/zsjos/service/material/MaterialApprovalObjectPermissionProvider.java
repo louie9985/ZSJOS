@@ -12,10 +12,13 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 public class MaterialApprovalObjectPermissionProvider implements ZsjosObjectPermissionProvider {
     @Resource private BpmProcessTaskApi taskApi;
     @Resource private MaterialApprovalRoundMapper roundMapper;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     public String getBizType() { return "material-approval"; }
     public boolean hasPermission(Long versionId, String action, Long userId) {
         if (userId == null || versionId == null || !List.of("read", "decide").contains(action)) return false;
-        for (MaterialApprovalRoundDO round : roundMapper.selectList(MaterialApprovalRoundDO::getMaterialVersionId, versionId)) {
+        var rounds = roundMapper.selectList(MaterialApprovalRoundDO::getMaterialVersionId, versionId);
+        if ("read".equals(action) && !rounds.isEmpty() && permissionApi.hasTenantReadAllAccess(userId)) return true;
+        for (MaterialApprovalRoundDO round : rounds) {
             BpmTaskPageReqDTO query = new BpmTaskPageReqDTO();
             query.setProcessDefinitionKey(round.getProcessDefinitionKey());
             query.setProcessInstanceIds(List.of(round.getProcessInstanceId()));

@@ -44,6 +44,8 @@ public interface PmsKnowledgeContentPermissionService {
      */
     Integer validateContentPermissionReadable(Long permissionId, Long libraryId, Long userId);
 
+    Integer validateContentPermissionInteraction(Long permissionId, Long libraryId, Long userId);
+
     /**
      * 校验当前用户对内容有编辑权限
      *

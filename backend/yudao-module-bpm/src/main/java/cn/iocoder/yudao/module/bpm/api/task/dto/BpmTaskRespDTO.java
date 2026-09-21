@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 
 @Data
 public class BpmTaskRespDTO {
+    private Long actionUserId;
+    private String actionUserNameSnapshot;
+
 
     private String id;
     private String processInstanceId;
@@ -16,7 +19,7 @@ public class BpmTaskRespDTO {
     private Boolean signTask;
     private Integer status;
     private String reason;
-    /** 当前任务所属流程定义的节点意见配置；无法读取时为 null。 */
+    /** 当前任务通过意见的有效要求（业务策略优先，未覆盖时沿用定义）；无法读取时为 null。 */
     private Boolean reasonRequire;
     private LocalDateTime createTime;
     private LocalDateTime endTime;

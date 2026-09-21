@@ -16,6 +16,29 @@ import static org.mockito.Mockito.*;
 
 class BusinessTaskServiceImplTest {
     @Test
+    void administratorReadUsesSelectedScopeWithoutActionProjection() {
+        var mapper = mock(BusinessTaskMapper.class);
+        var scopes = mock(cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService.class);
+        var users = mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class);
+        var service = new BusinessTaskServiceImpl(mapper, List.of(), Clock.systemUTC());
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "readScopeService", scopes);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "userApi", users);
+        var req = new BusinessTaskPageReqVO(); req.setReadScope("ALL");
+        var task = new BusinessTaskDO(); task.setId(2L); task.setBizType("sample"); task.setAssigneeId(20L);
+        task.setStatus("pending"); task.setActionCode("COMPLETE_BIRTHDAY_CARE");
+        when(scopes.resolve("ALL", null, 10L)).thenReturn(null);
+        when(mapper.selectReadPage(isNull(), same(req), any())).thenReturn(new PageResult<>(List.of(task), 1L));
+        when(users.getUserMap(List.of(20L))).thenReturn(Map.of(20L,
+                new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO().setId(20L).setNickname("测试执行人")));
+        var result = service.getMyPage(10L, req).getList().getFirst();
+        assertEquals(20L, result.getAssigneeId());
+        assertEquals("测试执行人", result.getAssigneeName());
+        assertFalse(result.getActionable()); assertNull(result.getActionCode());
+        verify(mapper, never()).selectMyPage(any(), any(), any());
+        when(scopes.resolve("ALL", null, 11L)).thenThrow(new cn.iocoder.yudao.framework.common.exception.ServiceException(403, "denied"));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.getMyPage(11L, req));
+    }
+    @Test
     void usesDatabasePageAndMarksUnknownSceneNotActionable() {
         BusinessTaskMapper mapper = mock(BusinessTaskMapper.class);
         Clock clock = Clock.fixed(Instant.parse("2026-08-10T04:00:00Z"), ZoneId.of("Asia/Shanghai"));

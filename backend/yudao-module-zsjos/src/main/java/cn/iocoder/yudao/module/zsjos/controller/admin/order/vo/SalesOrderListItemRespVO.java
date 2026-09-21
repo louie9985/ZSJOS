@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class SalesOrderListItemRespVO {
+    private java.util.Map<String, String> historyMissingFields;
     private Long id;
     private String orderNo;
     private Long leadId;

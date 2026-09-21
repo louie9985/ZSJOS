@@ -31,6 +31,7 @@ import static cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewC
 import static cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewConfigService.FINAL_TASK_KEY;
 import static cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewConfigService.PROCESS_DEFINITION_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -165,6 +166,49 @@ class ContentReviewConfigServiceTest {
         assertThrows(ServiceException.class, () -> service.requireReadyConfig(1L));
     }
 
+    @Test
+    void refusesRejectionThatReturnsToAnInternalTask() {
+        BpmProcessDefinitionMetadataRespDTO definition = twoStageDefinition();
+        definition.getUserTasks().stream().filter(task -> FINAL_TASK_KEY.equals(task.getKey()))
+                .findFirst().orElseThrow().setRejectEndsProcess(false);
+        when(definitionReadApi.getPublishedProcessDefinition(PROCESS_DEFINITION_KEY)).thenReturn(definition);
+        assertThrows(ServiceException.class, () -> service.requireCurrentDefinition(new ContentReviewConfigDO()));
+    }
+
+    @Test
+    void acceptsDesignerGeneratedIdsAndResolvesByEdgesInsteadOfListOrderOrLabels() {
+        stubPublishedProductionSchema();
+        var definition = twoStageDefinition();
+        var start = definition.getUserTasks().get(0);
+        var director = definition.getUserTasks().get(1);
+        var last = definition.getUserTasks().get(2);
+        director.setKey("Activity_director_generated");
+        last.setKey("Activity_final_generated");
+        director.setName("arbitrary first label");
+        last.setName("arbitrary second label");
+        start.setNextUserTaskKeys(List.of(director.getKey()));
+        director.setNextUserTaskKeys(List.of(last.getKey()));
+        definition.setUserTasks(List.of(last, start, director));
+        when(definitionReadApi.getPublishedProcessDefinition(PROCESS_DEFINITION_KEY)).thenReturn(definition);
+        when(contentReviewConfigMapper.selectCurrent()).thenReturn(configWithMapping(seededMapping()));
+        assertDoesNotThrow(() -> service.requireReadyConfig(1L));
+        var keys = service.requireReviewTaskKeys(definition);
+        assertEquals(director.getKey(), keys.director());
+        assertEquals(last.getKey(), keys.finalReview());
+    }
+
+    @Test
+    void resolvesOriginalAssetKeysAndRejectsBrokenEntryOrCycle() {
+        var definition = twoStageDefinition();
+        assertEquals(DIRECTOR_TASK_KEY, service.requireReviewTaskKeys(definition).director());
+        assertEquals(FINAL_TASK_KEY, service.requireReviewTaskKeys(definition).finalReview());
+        definition.getUserTasks().getFirst().setNextUserTaskKeys(List.of(FINAL_TASK_KEY));
+        assertThrows(ServiceException.class, () -> service.requireReviewTaskKeys(definition));
+        definition.getUserTasks().getFirst().setNextUserTaskKeys(List.of(DIRECTOR_TASK_KEY));
+        definition.getUserTasks().getLast().setNextUserTaskKeys(List.of(DIRECTOR_TASK_KEY));
+        assertThrows(ServiceException.class, () -> service.requireReviewTaskKeys(definition));
+    }
+
     private Map<String, String> seededMapping() {
         return Map.ofEntries(
                 Map.entry("__cover__", "coverFileId"),
@@ -258,10 +302,12 @@ class ContentReviewConfigServiceTest {
         submission.setNextUserTaskKeys(List.of(DIRECTOR_TASK_KEY));
         BpmUserTaskMetadataRespDTO director = new BpmUserTaskMetadataRespDTO();
         director.setKey(DIRECTOR_TASK_KEY);
+        director.setRejectEndsProcess(true);
         director.setExecutionMode("SINGLE");
         director.setNextUserTaskKeys(List.of(FINAL_TASK_KEY));
         BpmUserTaskMetadataRespDTO last = new BpmUserTaskMetadataRespDTO();
         last.setKey(FINAL_TASK_KEY);
+        last.setRejectEndsProcess(true);
         last.setExecutionMode("SINGLE");
         last.setNextUserTaskKeys(List.of());
         definition.setUserTasks(new java.util.ArrayList<>(List.of(submission, director, last)));

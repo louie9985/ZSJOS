@@ -101,11 +101,11 @@ describe('BPM 通用审批组件', () => {
         `allowDecision && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.${button})`
       )
     }
-    // 流程类动作（加签、转办、委派、抄送、评论）不受约束，始终可用。
+    // 非结论动作独立受业务 decisionOnly 限制，其余流程仍使用服务端按钮配置。
     for (const button of ['TRANSFER', 'DELEGATE', 'ADD_SIGN', 'COPY']) {
       expectSourceToContainTokens(
         actions,
-        `isBpmButtonVisible(task, BPM_OPERATION_BUTTON.${button})`
+        `!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.${button})`
       )
       expectSourceNotToContainTokens(
         actions,
@@ -145,7 +145,10 @@ describe('BPM 通用审批组件', () => {
     )
     // 结论未填齐时禁用并说明原因，后端仍会再次校验。
     expect(reviewPage).toContain('disabledReason')
-    expect(reviewPage).toContain('未填写结论')
+    expect(reviewPage).toContain('未保存结论')
+    expect(reviewPage).toContain('通过终审')
+    expect(reviewPage).toContain('退回运营修改')
+    expect(reviewPage).toContain('decision: completeDecision')
   })
 
   it('业务推进动作不受 bpm:task:update 缺失影响', () => {
@@ -154,6 +157,21 @@ describe('BPM 通用审批组件', () => {
     expect(actions).toContain('businessOnly')
     expectSourceToContainTokens(actions, 'return businessOnly(')
     expectSourceToContainTokens(panel, '!loading && !todoTask && businessAdvance')
+  })
+
+  it('内容审核两个入口仅提供结论动作，管理端遵循相同限制', () => {
+    const reviewPage = readFileSync('src/pages/ContentReviewBatchPage.tsx', 'utf8')
+    const panel = readFileSync('src/components/bpm/BpmProcessPanel.tsx', 'utf8')
+    const admin = readFileSync('../admin/src/views/bpm/processInstance/detail/ProcessInstanceOperationButton.vue', 'utf8')
+    expect(reviewPage).toContain('decisionOnly')
+    expect(panel).toContain('decisionOnly={decisionOnly}')
+    expect(detail).toContain("decisionOnly={detail?.processInstance?.businessKey?.startsWith('content-review-batch:')}")
+    expect(actions).toContain('!onlyDecisions && childrenTasks.length > 0')
+    expect(actions).toContain('!onlyDecisions && allowDecision')
+    expectSourceToContainTokens(actions, '!onlyDecisions && <Button icon={<CommentOutlined/>}')
+    expect(admin).toContain("props.processInstance?.businessKey?.startsWith('content-review-batch:')")
+    expect(admin).toContain('btnType !== OperationButtonType.APPROVE && btnType !== OperationButtonType.REJECT')
+    expect(admin).toContain('!decisionOnly && runningTask?.children?.length > 0')
   })
 
   it('审批详情提供审批记录、流转记录与评论', () => {

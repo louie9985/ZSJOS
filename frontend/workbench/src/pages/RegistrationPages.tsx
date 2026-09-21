@@ -803,18 +803,19 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   useEffect(() => { void loadDictionaries(); }, [loadDictionaries]);
   const loadClassOptions = useCallback(async (search?: string) => {
     const generation = ++classOptionsGeneration.current;
+    if (readScope.readScope === 'USER' && !readScope.targetUserId) { setClassOptions([]); setClassOptionsLoading(false); return; }
     setClassOptionsLoading(true); setClassOptionsError('');
     const manage = hasPermission(permissions, 'zsjos:delivery-class:query-managed');
     try {
       const [serving, completed] = await Promise.all([
-        api.deliveryClasses.page({ pageNo: 1, pageSize: 50, status: 'SERVING', keyword: search || undefined }, manage),
-        api.deliveryClasses.page({ pageNo: 1, pageSize: 50, status: 'COMPLETED', keyword: search || undefined }, manage),
+        api.deliveryClasses.page({ ...(tenantReadAll ? readScope : {}), pageNo: 1, pageSize: 50, status: 'SERVING', keyword: search || undefined }, manage),
+        api.deliveryClasses.page({ ...(tenantReadAll ? readScope : {}), pageNo: 1, pageSize: 50, status: 'COMPLETED', keyword: search || undefined }, manage),
       ]);
       if (generation === classOptionsGeneration.current) setClassOptions([...serving.list, ...completed.list]);
     } catch (requestError) {
       if (generation === classOptionsGeneration.current) { setClassOptions([]); setClassOptionsError(errorMessage(requestError)); }
     } finally { if (generation === classOptionsGeneration.current) setClassOptionsLoading(false); }
-  }, [permissions]);
+  }, [permissions, tenantReadAll, readScope]);
   useEffect(() => { void loadClassOptions(); }, [loadClassOptions]);
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {

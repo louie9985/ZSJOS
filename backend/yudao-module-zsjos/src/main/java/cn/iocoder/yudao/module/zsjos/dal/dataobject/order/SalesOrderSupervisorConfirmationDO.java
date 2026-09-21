@@ -19,6 +19,8 @@ public class SalesOrderSupervisorConfirmationDO extends TenantBaseDO {
     private Long approvalRoundId;
     private String taskDefinitionKey;
     private Long requesterUserId;
+    private String requesterNameSnapshot;
+    private String supervisorNameSnapshot;
     private Long supervisorUserId;
     private String parentTaskId;
     private String supervisorTaskId;

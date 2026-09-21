@@ -60,6 +60,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Resource private RoleApi roleApi;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private DeliveryClassScopeService scopeService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Resource private DeliveryClassNumberService numberService;
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private SalesOrderItemMapper orderItemMapper;
@@ -70,7 +71,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     @Override
     public PageResult<DeliveryClassRespVO> getManagedPage(Long userId, DeliveryClassPageReqVO req) {
-        DeliveryClassScopeService.Scope scope = scopeService.resolve(userId);
+        if (req.getReadScope() != null || req.getTargetUserId() != null) return getMyPage(userId, req);
+        DeliveryClassScopeService.Scope scope = permissionApi.hasTenantReadAllAccess(userId)
+                ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolve(userId);
         PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.deptIds(), null,
                 scope.allDepartments(), true);
         return toPageResult(page);
@@ -78,7 +81,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
-        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, Set.of(), userId, false, false);
+        Long subject = req.getReadScope() != null || req.getTargetUserId() != null
+                ? readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId) : userId;
+        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, Set.of(), subject, subject == null, subject == null);
         return toPageResult(page);
     }
 

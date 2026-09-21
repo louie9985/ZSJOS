@@ -1,5 +1,6 @@
-import ContentReviewAttachments from '../components/ContentReviewAttachments'
-import { prepareContentReviewWorks, restoreContentReviewFiles } from '../services/contentReviewAttachments'
+import ContentApprovalDraft from '../components/ContentApprovalDraft'
+import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
+import { prepareContentReviewWorks } from '../services/contentReviewAttachments'
 import ResourceLinkInput from '../components/ResourceLinkInput'
 import {
   ClockCircleOutlined,
@@ -34,7 +35,7 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import { useLocation } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
 import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import { ApiError, api, type SimpleUser } from '../services/api'
@@ -45,14 +46,14 @@ import {
   type ContentReviewBatch,
   type ContentReviewCandidate,
   type ContentReviewItem,
-  type Material,
 } from '../services/materialApi'
-import MaterialSelectorModal from '../components/MaterialSelectorModal'
 
 const PAGE_SIZE = 20
 const CANDIDATE_PAGE_SIZE = 10
 const statusText: Record<string, string> = {
   DRAFT: '草稿',
+  REVISION_DRAFT: '已有修订草稿',
+  RESUBMITTED: '已重新提交',
   DIRECTOR_REVIEW: '编导审核',
   FINAL_REVIEW: '终审',
   COMPLETED: '已完成',
@@ -266,10 +267,11 @@ function CreateBatchDialog({ open, onClose, onCreated }: {
   </Modal>
 }
 
-function DecisionEditor({ batch, item, stage, onSaved }: {
+function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
   batch: ContentReviewBatch
   item: ContentReviewItem
   stage: 'director' | 'final'
+  onDirtyChange: (id: number, dirty: boolean) => void
   onSaved: () => void
 }) {
   const { message } = App.useApp()
@@ -285,6 +287,12 @@ function DecisionEditor({ batch, item, stage, onSaved }: {
     setComment(existingComment || '')
     setCollect(Boolean(item.collectMaterial))
   }, [existingComment, existingDecision, item.collectMaterial])
+
+  useEffect(() => {
+    onDirtyChange(item.id, decision !== existingDecision || comment !== (existingComment || '')
+      || stage === 'final' && collect !== Boolean(item.collectMaterial))
+  }, [item.id, decision, existingDecision, comment, existingComment, stage, collect, item.collectMaterial, onDirtyChange])
+  useEffect(() => () => onDirtyChange(item.id, false), [item.id, onDirtyChange])
 
   const save = async () => {
     if (!batch.currentTaskId || !decision) return message.warning('请选择审核结论')
@@ -319,141 +327,76 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const activeDraftId = useRef<number | undefined>(undefined)
   const [purposeOptions, setPurposeOptions] = useState<Array<{ value: string; label: string }>>([])
   const [formatOptions, setFormatOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [platformOptions, setPlatformOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [stageOptions, setStageOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [statusOptions, setStatusOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [materialPickerIndex, setMaterialPickerIndex] = useState<number>()
-  const [materialsByWork, setMaterialsByWork] = useState<Record<number, Material[]>>({})
-  useEffect(() => {
-    if (!open) return
-    void Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format'), api.dictDataByType('zsjos_account_platform'), api.dictDataByType('zsjos_media_account_stage'), api.dictDataByType('zsjos_media_account_current_status')]).then(([purpose, format, platform, stage, status]) => {
+  const [optionsLoading, setOptionsLoading] = useState(false)
+  const [optionsError, setOptionsError] = useState('')
+  const restoredAccounts = useMemo(() => restoreDraftAccounts(batch), [batch])
+  const loadOptions = useCallback(async () => {
+    setOptionsLoading(true); setOptionsError('')
+    try {
+      const [purpose, format] = await Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')])
       setPurposeOptions(purpose.map(item => ({ value: item.value, label: item.label })))
       setFormatOptions(format.map(item => ({ value: item.value, label: item.label })))
-      setPlatformOptions(platform.map(item => ({ value: item.value, label: item.label })))
-      setStageOptions(stage.map(item => ({ value: item.value, label: item.label })))
-      setStatusOptions(status.map(item => ({ value: item.value, label: item.label })))
-    })
-  }, [open])
+    } catch (cause) { setOptionsError(errorText(cause)) }
+    finally { setOptionsLoading(false) }
+  }, [])
+  useEffect(() => { if (open) void loadOptions() }, [open, loadOptions])
   useEffect(() => {
     if (!open) return
-    const snapshots = Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []
-    form.setFieldsValue({ accountSnapshots: Object.fromEntries(snapshots.map((snapshot: Record<string, unknown>) => [String(snapshot.id), snapshot])), works: batch.items.map(item => ({
-      sourceContentId: batch.status === 'DRAFT' ? undefined : item.contentId,
-      sourceVersionId: batch.status === 'DRAFT' ? undefined : item.contentVersionId,
-      title: item.contentSnapshot.titleSnapshot || item.contentSnapshot.title,
-      scriptText: item.contentSnapshot.scriptText,
-      plannedPublishAt: item.contentSnapshot.plannedPublishAt ? dayjs(String(item.contentSnapshot.plannedPublishAt)) : undefined,
-      purposeValue: item.contentSnapshot.purposeValue,
-      purposeLabelSnapshot: item.contentSnapshot.purposeLabelSnapshot,
-      formatValue: item.contentSnapshot.formatValue,
-      formatLabelSnapshot: item.contentSnapshot.formatLabelSnapshot,
-      detailUrl: item.contentSnapshot.detailUrl,
-      leadResourceUrl: item.contentSnapshot.leadResourceUrl,
-      commentHook: item.contentSnapshot.commentHook,
-      referenceContentVersionId: item.contentSnapshot.referenceContentVersionId,
-      referenceWorkUrl: item.contentSnapshot.referenceWorkUrl,
-      coverItems: restoreContentReviewFiles(item.files, 'cover'),
-      attachmentItems: restoreContentReviewFiles(item.files, 'deliverable'),
-      coverFileId: item.files?.find(file => file.fieldKey === 'cover')?.infraFileId
-    })) })
-    // 参考素材按快照回填，审批期间的素材改动不影响已提交内容。
-    setMaterialsByWork(Object.fromEntries(batch.items.map((item, index) => [
-      index,
-      (Array.isArray(item.contentSnapshot.materialRefs) ? item.contentSnapshot.materialRefs : []).map(ref => ({
-        id: Number(ref.materialId),
-        materialNo: String(ref.materialNo || ''),
-        title: String(ref.title || '素材'),
-        materialTypeName: String(ref.materialTypeName || ''),
-        coverPreviewUrl: typeof ref.coverPreviewUrl === 'string' ? ref.coverPreviewUrl : undefined,
-      })) as Material[],
-    ])))
-  }, [batch, form, open])
-  const accountSnapshotRows = (Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
-  const save = async () => {
-    if (loading) return
+    activeDraftId.current = batch.status === 'DRAFT' ? batch.id : undefined
+    form.resetFields()
+    form.setFieldsValue({ accountIds: restoredAccounts.accountIds, accountSnapshots: restoredAccounts.accountSnapshots, works: restoreDraftWorks(batch) })
+  }, [batch, form, open, restoredAccounts])
+  const save = async (submitAfterSave: boolean) => {
+    if (loading || optionsLoading || optionsError) return
     try {
       await form.validateFields()
-      // Preserve source version identifiers and untouched snapshots during revision.
-      const values = form.getFieldsValue(true)
       setLoading(true)
+      const current = activeDraftId.current ? await contentReviewApi.get(activeDraftId.current) : undefined
+      // A submit response may have been lost: never create another draft for an already-started round.
+      if (current && current.status !== 'DRAFT') {
+        if (['DIRECTOR_REVIEW', 'FINAL_REVIEW', 'COMPLETED', 'PUBLISHED'].includes(current.status)) {
+          message.success('本轮审批已提交'); onClose(); onSaved(current.id); return
+        }
+        throw new Error('当前审批状态已变化，请刷新后继续')
+      }
+      const values = form.getFieldsValue(true)
       const works = await prepareContentReviewWorks(values.works, (index, field, items) => form.setFieldValue(['works', index, field], items))
-      const saveDraftRequest = batch.availableActions.includes('RESUBMIT') ? contentReviewApi.resubmitFromStudent : contentReviewApi.saveStudentDraft
-      const id = await saveDraftRequest(batch.id, {
+      const request = {
         studentPersonId: batch.studentPersonId!,
         accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
         accountSnapshots: values.accountSnapshots,
+        expectedVersion: current?.version,
         works: works.map((work: Record<string, unknown>) => ({ ...work, plannedPublishAt: work.plannedPublishAt ? (work.plannedPublishAt as dayjs.Dayjs).format('YYYY-MM-DDTHH:mm:ss') : undefined }))
+      }
+      const id = current
+        ? await contentReviewApi.saveStudentDraft(current.id, request)
+        : await contentReviewApi.resubmitFromStudent(batch.id, request)
+      activeDraftId.current = id
+      const saved = await contentReviewApi.get(id)
+      saved.items.forEach((item, index) => {
+        form.setFieldValue(['works', index, 'sourceContentId'], item.contentId)
+        form.setFieldValue(['works', index, 'sourceVersionId'], item.contentVersionId)
       })
-      message.success('草稿已保存')
+      if (submitAfterSave) await contentReviewApi.submit(id, saved.version)
+      message.success(submitAfterSave ? '已提交审批' : '修改已保存')
       onClose(); onSaved(id)
-    } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) }
-    finally { setLoading(false) }
+    } catch (cause) {
+      if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause))
+    } finally { setLoading(false) }
   }
-  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={() => { if (!loading) onClose() }} closable={!loading} keyboard={!loading} cancelButtonProps={{ disabled: loading }} onOk={() => void save()} confirmLoading={loading} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
+  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={() => { if (!loading) onClose() }} closable={!loading} keyboard={!loading} cancelButtonProps={{ disabled: loading }} footer={[<Button key="cancel" disabled={loading} onClick={onClose}>取消</Button>, <Button key="save" disabled={loading || optionsLoading || Boolean(optionsError)} onClick={() => void save(false)}>保存修改</Button>, <Button key="submit" type="primary" loading={loading} disabled={loading || optionsLoading || Boolean(optionsError)} onClick={() => void save(true)}>{batch.status === 'DRAFT' ? '提交审批' : '重新提交审批'}</Button>]} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
     <Form form={form} layout="vertical" disabled={loading}>
-      <Typography.Text strong>账号资料快照</Typography.Text>
-      <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>{accountSnapshotRows.map(snapshot => { const id = String(snapshot.id); return <Card key={id} size="small" title={`账号 ${id}`}>
-        <Form.Item name={['accountSnapshots', id, 'nickname']} label="账号名称"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'platformValue']} label="发布平台"><Select options={platformOptions} /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'stageValue']} label="当前期段"><Select options={stageOptions} /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'currentStatusValue']} label="账号状态"><Select options={statusOptions} /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'productGoal']} label="承接产品目标"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'productFormLabel']} label="主要产品形式"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'publishFrequency']} label="当前发布节奏"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'bottleneckLabel']} label="当前瓶颈"><Input /></Form.Item>
-        <Form.Item name={['accountSnapshots', id, 'operatorName']} label="责任运营人员"><Input /></Form.Item>
-      </Card>})}</Space>
-      <Form.List name="works">{(fields, { add, remove, move }) => <Space direction="vertical" style={{ width: '100%' }}>{fields.map((field, index) => <Card key={field.key} size="small" title={<Space>作品 {index + 1}<Button size="small" disabled={loading || index === 0} onClick={() => move(index, index - 1)}>上移</Button><Button size="small" disabled={loading || index === fields.length - 1} onClick={() => move(index, index + 1)}>下移</Button>{fields.length > 1 && <Button danger size="small" onClick={() => remove(field.name)}>删除</Button>}</Space>}>
-        <ContentReviewAttachments index={field.name} cover disabled={loading} />
-        <ContentReviewAttachments index={field.name} disabled={loading} />
-        <Form.Item {...field} name={[field.name, 'title']} label="发布标题" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, message: '请输入正文' }]}><Input.TextArea rows={6} /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select options={purposeOptions} onChange={value => form.setFieldValue(['works', field.name, 'purposeLabelSnapshot'], purposeOptions.find(item => item.value === value)?.label)} /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select options={formatOptions} onChange={value => form.setFieldValue(['works', field.name, 'formatLabelSnapshot'], formatOptions.find(item => item.value === value)?.label)} /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><ResourceLinkInput /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><ResourceLinkInput /></Form.Item>
-        <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接"><ResourceLinkInput placeholder="https:// 参考作品链接" allowClear /></Form.Item>
-        <Form.Item label="参考素材" extra="从素材库浏览并多选，审批人可在审批详情中查看。">
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Button onClick={() => setMaterialPickerIndex(field.name)}>素材浏览 · 选择参考素材</Button>
-            {(materialsByWork[field.name] || []).map(material => <Card key={material.id} size="small">
-              <Space align="start" size={8}>
-                {material.coverPreviewUrl ? <Image width={48} src={material.coverPreviewUrl} alt={material.title} /> : null}
-                <span><Typography.Text strong>{material.title}</Typography.Text><br /><Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text></span>
-                <Button danger type="text" size="small" onClick={() => {
-                  const next = (materialsByWork[field.name] || []).filter(item => item.id !== material.id)
-                  setMaterialsByWork({ ...materialsByWork, [field.name]: next })
-                  form.setFieldValue(['works', field.name, 'referenceMaterials'], next.map(item => ({ materialId: item.id, materialNo: item.materialNo, title: item.title, materialTypeName: item.materialTypeName, coverPreviewUrl: item.coverPreviewUrl })))
-                }}>移除</Button>
-              </Space>
-            </Card>)}
-          </Space>
-        </Form.Item>
-        <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
-        {(['purposeLabelSnapshot', 'formatLabelSnapshot', 'commentHook'] as const).map(key => <Form.Item key={key} name={[field.name, key]} hidden />)}
-      </Card>)}<Button type="dashed" block onClick={() => add({})}>新增作品</Button></Space>}</Form.List>
+      {batch.items.some(item => item.directorComment || item.finalComment) && <Alert type="info" showIcon
+        message="上一轮审核意见" description={batch.items.map((item, index) => <div key={item.id}>
+          作品 {index + 1}：{[item.directorComment && `编导：${item.directorComment}`, item.finalComment && `终审：${item.finalComment}`].filter(Boolean).join('；') || '本条无意见'}
+        </div>)} />}
+      <Typography.Paragraph type="secondary">保存修改不会发起审批；点击重新提交审批会保存修改并直接发起新一轮审批。提交失败时保留修改，可直接重试。</Typography.Paragraph>
+      {optionsError && <Alert type="error" showIcon message={optionsError} action={<Button onClick={() => void loadOptions()}>重试</Button>} />}
+      <ContentApprovalDraft disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
     </Form>
-    <MaterialSelectorModal
-      open={materialPickerIndex !== undefined}
-      onCancel={() => setMaterialPickerIndex(undefined)}
-      onConfirm={(materials) => {
-        if (materialPickerIndex !== undefined) {
-          setMaterialsByWork({ ...materialsByWork, [materialPickerIndex]: materials })
-          form.setFieldValue(['works', materialPickerIndex, 'referenceMaterials'], materials.map(item => ({
-            materialId: item.id,
-            materialVersionId: item.currentVersion?.id || item.currentEffectiveVersionId,
-            materialNo: item.materialNo,
-            title: item.title,
-            materialTypeName: item.materialTypeName,
-            coverPreviewUrl: item.coverPreviewUrl,
-          })))
-        }
-        setMaterialPickerIndex(undefined)
-      }}
-      defaultSelected={materialPickerIndex === undefined ? [] : materialsByWork[materialPickerIndex] || []}
-    />
   </Modal>
 }
 
@@ -474,6 +417,10 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [detailError, setDetailError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [completeStage, setCompleteStage] = useState<'director' | 'final'>()
+  const [dirtyItems, setDirtyItems] = useState<Record<number, boolean>>({})
+  const updateDirty = useCallback((id: number, dirty: boolean) => setDirtyItems(current =>
+    Boolean(current[id]) === dirty ? current : { ...current, [id]: dirty }), [])
+  const [completeDecision, setCompleteDecision] = useState<'APPROVED' | 'RETURNED'>('APPROVED')
   const [completeReason, setCompleteReason] = useState('本级逐条结论已完成')
   const [completeLoading, setCompleteLoading] = useState(false)
   const [publishItem, setPublishItem] = useState<ContentReviewItem>()
@@ -595,10 +542,10 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     if (!selected || !completeStage || !selected.currentTaskId || !completeReason.trim()) return
     setCompleteLoading(true)
     try {
-      const data = { expectedVersion: selected.version, taskId: selected.currentTaskId, reason: completeReason.trim() }
+      const data = { expectedVersion: selected.version, taskId: selected.currentTaskId, decision: completeDecision, reason: completeReason.trim() }
       if (completeStage === 'director') await contentReviewApi.completeDirector(selected.id, data)
       else await contentReviewApi.completeFinal(selected.id, data)
-      message.success(completeStage === 'director' ? '编导审核已完成' : '终审结论已统一落地')
+      message.success(completeDecision === 'RETURNED' ? '本批次已退回运营修改' : completeStage === 'director' ? '编导已通过，进入终审' : '终审已通过，内容待发布')
       setCompleteStage(undefined)
       await load(page, selected.id)
     } catch (cause) { message.error(errorText(cause)) }
@@ -635,27 +582,34 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
    * 这里的进度与禁用只是提前告知，避免填不齐就提交后才报错。
    */
   const advanceAction = useMemo(() => {
-    if (!selected) return undefined
-    const completeTarget = selected.availableActions.includes('DIRECTOR_COMPLETE') ? 'director'
-      : selected.availableActions.includes('FINAL_COMPLETE') ? 'final' : undefined
-    if (!completeTarget) return undefined
+    if (!selected || !stage) return undefined
     const items = selected.items
-    // 终审只需对编导已通过的条目给结论，被编导退回的条目不进入终审。
-    const pending = completeTarget === 'director'
-      ? items.filter(item => !item.directorDecision)
-      : items.filter(item => item.directorDecision === 'APPROVED' && !item.finalDecision)
-    const required = completeTarget === 'director'
-      ? items.length
-      : items.filter(item => item.directorDecision === 'APPROVED').length
-    return {
-      label: completeTarget === 'director' ? '完成编导审核' : '完成终审',
-      progress: `已完成 ${required - pending.length}/${required} 条结论`,
-      disabledReason: pending.length > 0
-        ? `还有 ${pending.length} 条内容未填写结论，填齐后才能提交`
-        : undefined,
-      onTrigger: () => setCompleteStage(completeTarget)
+    const requiredItems = stage === 'director' ? items : items.filter(item => item.directorDecision === 'APPROVED')
+    const pending = requiredItems.filter(item => !(stage === 'director' ? item.directorDecision : item.finalDecision))
+    const returned = items.some(item => item.directorDecision === 'RETURNED'
+      || stage === 'final' && item.finalDecision === 'RETURNED')
+    const prefix = stage === 'director' ? 'DIRECTOR' : 'FINAL'
+    const pendingReason = Object.values(dirtyItems).some(Boolean) ? '存在未保存的逐条修改，请先保存'
+      : pending.length ? `还有 ${pending.length} 条内容未保存结论` : undefined
+    const trigger = (decision: 'APPROVED' | 'RETURNED') => {
+      setCompleteDecision(decision)
+      setCompleteReason('')
+      setCompleteStage(stage)
     }
-  }, [selected])
+    return {
+      label: stage === 'director' ? '通过本次审批' : '通过终审',
+      progress: `已完成 ${requiredItems.length - pending.length}/${requiredItems.length} 条结论`,
+      disabledReason: pendingReason || (returned ? '存在不通过内容，请退回运营修改'
+        : !selected.availableActions.includes(`${prefix}_APPROVE`) ? '当前任务不允许通过，请刷新确认' : undefined),
+      onTrigger: () => trigger('APPROVED'),
+      alternative: {
+        label: '退回运营修改',
+        disabledReason: pendingReason || (!returned ? '至少一条内容不通过时才可整批退回'
+          : !selected.availableActions.includes(`${prefix}_RETURN`) ? '当前任务不允许退回，请刷新确认' : undefined),
+        onTrigger: () => trigger('RETURNED')
+      }
+    }
+  }, [selected, stage, dirtyItems])
 
   return <section className="workspace-page content-review-page">
     <header className="content-review-filter-shell">
@@ -697,7 +651,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
             </div><Space wrap>
               {selected.studentPersonId && <Button onClick={() => void showHistory()}>查看历史轮次</Button>}
               {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
-              {selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改并保存新草稿</Button>}
+              {selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改后重新提交</Button>}
               {selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
               {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
             </Space></div>
@@ -780,7 +734,8 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 : null}
               <ReviewFiles item={item} />
               {stage && (stage === 'director' || item.directorDecision === 'APPROVED') && <DecisionEditor batch={selected} item={item} stage={stage}
-                onSaved={() => void loadDetail(selected.id)} />}
+                onDirtyChange={updateDirty}
+                onSaved={() => { void contentReviewApi.get(selected.id).then(setSelected).catch(cause => message.error(errorText(cause))) }} />}
               {selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
                 && <Button icon={<ClockCircleOutlined />} onClick={() => setPublishItem(item)}>登记发布</Button>}
               {item.publishedPlatformUrl && <a href={item.publishedPlatformUrl} target="_blank" rel="noreferrer">查看已发布内容</a>}
@@ -793,6 +748,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 users={taskUsers}
                 canUpdate={canUpdateTask}
                 allowDecision={false}
+                decisionOnly
                 businessAdvance={advanceAction}
                 onActionSuccess={() => void loadDetail(selected.id)}
               />
@@ -803,9 +759,10 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     </div>
     <CreateBatchDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={id => void load(1, id)} />
     {selected?.studentPersonId && <DraftEditDialog batch={selected} open={draftEditOpen} onClose={() => setDraftEditOpen(false)} onSaved={id => void load(page, id)} />}
-    <Modal title={completeStage === 'director' ? '完成编导审核' : '完成终审'} open={Boolean(completeStage)}
-      onCancel={() => setCompleteStage(undefined)} onOk={() => void complete()} confirmLoading={completeLoading}>
-      <Input.TextArea rows={4} maxLength={2000} value={completeReason} onChange={event => setCompleteReason(event.target.value)} />
+    <Modal title={completeDecision === 'RETURNED' ? '退回运营修改' : completeStage === 'director' ? '通过本次审批' : '通过终审'} open={Boolean(completeStage)}
+      onCancel={() => setCompleteStage(undefined)} onOk={() => void complete()} confirmLoading={completeLoading} okButtonProps={{ disabled: !completeReason.trim() }}>
+      {completeDecision === 'RETURNED' && <Alert type="warning" showIcon message="本批次全部退回运营修改，结束本轮审批。原内容、附件和审核意见保留，修改后重新提交编导。" />}
+      <Input.TextArea placeholder={completeDecision === 'RETURNED' ? '整批退回原因（必填）' : '本轮审核意见（必填）'} rows={4} maxLength={2000} value={completeReason} onChange={event => setCompleteReason(event.target.value)} />
     </Modal>
     <Modal title="登记发布结果" open={Boolean(publishItem)} onCancel={() => { setPublishItem(undefined); publishForm.resetFields() }}
       onOk={() => void publish()} confirmLoading={completeLoading}>

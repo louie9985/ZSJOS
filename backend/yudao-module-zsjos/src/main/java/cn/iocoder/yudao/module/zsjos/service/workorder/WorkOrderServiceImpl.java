@@ -52,6 +52,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Resource private DictDataApi dictDataApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Resource private RoleApi roleApi;
     @Resource private FileApi fileApi;
     @Resource private MediaWorkflowEventService workflowEventService;
@@ -437,6 +438,17 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     }
 
     @Override
+    public PageResult<WorkOrderRespVO> readPage(WorkOrderMyPageReqVO request, Long userId) {
+        Long subject = readScopeService.resolve(request.getReadScope(), request.getTargetUserId(), userId);
+        if (request.getView() != null && !Set.of("PENDING_ACCEPT", "PROCESSING", "PENDING_REVIEW", "CREATED", "CLOSED").contains(request.getView())) {
+            throw exception(ZsjosErrorCodeConstants.WORK_ORDER_STATE_INVALID);
+        }
+        boolean readOnly = request.getReadScope() != null && !"SELF".equals(request.getReadScope());
+        return mapPage(orderMapper.selectReadPage(request, request.getStatus(), request.getView(), subject),
+                readOnly ? null : userId);
+    }
+
+    @Override
     public PageResult<WorkOrderRespVO> pool(String sceneCode, int pageNo, int pageSize, Long userId) {
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<WorkOrderDO> page =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNo, pageSize);
@@ -608,6 +620,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     public Long getProductionEnvelopeId(Long businessId) {
         return requireProductionEnvelope(businessId).getId();
+    }
+
+    @Override
+    public WorkOrderRespVO getProductionEnvelopeSnapshot(Long businessId) {
+        WorkOrderDO row = orderMapper.selectByBusiness("PRODUCTION_TICKET", businessId);
+        return row == null ? null : toVO(row, null);
     }
 
     private WorkOrderDO requireProductionEnvelope(Long businessId) {

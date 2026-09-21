@@ -15,6 +15,19 @@ import java.util.List;
 
 @Mapper
 public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
+    default int claimDelete(Long id, Integer version, String processId, Long requester, Long reviewer, String reason) {
+        return update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id).eq(MediaAccountDO::getVersion,version)
+                .and(w -> w.isNull(MediaAccountDO::getDeleteStatus).or().ne(MediaAccountDO::getDeleteStatus,"pending"))
+                .set(MediaAccountDO::getDeleteProcessInstanceId,processId).set(MediaAccountDO::getDeleteRequestedByUserId,requester)
+                .set(MediaAccountDO::getDeleteReviewerUserId,reviewer).set(MediaAccountDO::getDeleteReason,reason)
+                .set(MediaAccountDO::getDeleteStatus,"pending").set(MediaAccountDO::getRunStatus,"delete_pending").set(MediaAccountDO::getVersion,version+1));
+    }
+    default MediaAccountDO selectByDeleteProcessInstanceId(String processId) { return selectOne(new LambdaQueryWrapperX<MediaAccountDO>().eq(MediaAccountDO::getDeleteProcessInstanceId,processId)); }
+    default int finishDelete(Long id, Integer version, String processId, String status, String reason) {
+        return update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id).eq(MediaAccountDO::getVersion,version)
+                .eq(MediaAccountDO::getDeleteProcessInstanceId,processId).set(MediaAccountDO::getDeleteStatus,status)
+                .set(MediaAccountDO::getDeleteResultReason,reason).set(MediaAccountDO::getRunStatus,"approved".equals(status)?"deleted":"active").set(MediaAccountDO::getVersion,version+1));
+    }
     @Select("SELECT * FROM zsjos_media_account WHERE tenant_id=#{tenantId} AND run_status='active' AND director_user_id IS NOT NULL")
     List<MediaAccountDO> selectActiveForDiagnosis(@Param("tenantId") Long tenantId);
     @Select("SELECT * FROM zsjos_media_account WHERE id=#{id} AND tenant_id=#{tenantId} "

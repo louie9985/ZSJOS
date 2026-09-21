@@ -12,6 +12,8 @@ public class ProductionTicketSaveReqVO {
     private Long accountId;
     @Size(min = 1, max = 20) private java.util.List<@NotNull Long> accountIds;
     private Long studentPersonId;
+    /** PERSON keeps the selected target; AUTO selects the least-loaded configured target. */
+    private String dispatchMode;
     private Long assigneeUserId;
     private Long targetDeptId;
     @Size(max = 500) private String operatorRemark;

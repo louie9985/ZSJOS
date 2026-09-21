@@ -562,6 +562,7 @@ export default function BpmApprovalDetail({
       todoTask
         ? <BpmApprovalActions
           task={todoTask}
+          decisionOnly={detail?.processInstance?.businessKey?.startsWith('content-review-batch:')}
           canUpdate={canUpdate}
           users={users}
           onSuccess={refresh}

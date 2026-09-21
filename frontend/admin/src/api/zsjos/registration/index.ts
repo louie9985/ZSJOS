@@ -179,7 +179,7 @@ export const completeRegistration = (id: number, version: number) =>
     data: { version, idempotencyKey: crypto.randomUUID() } satisfies VersionCommand
   })
 
-export const getMyStudentPage = (params: PageParam & { keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+export const getMyStudentPage = (params: PageParam & { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
   params.advancedFilter
     ? request.post<PageResult<MyStudent[]>>({ url: '/zsjos/student/my/search-page', data: params })
     : request.get<PageResult<MyStudent[]>>({ url: '/zsjos/student/my-page', params })

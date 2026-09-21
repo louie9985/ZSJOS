@@ -80,7 +80,7 @@ public class WithdrawalController {
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(
             mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.SENSITIVE_READ,
             action = "withdrawal.card.view", targetType = "withdrawal")
-    @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:finance-query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query','zsjos:withdrawal:my-query')")
     public CommonResult<WithdrawalRespVO> financeDetail(@PathVariable Long id) {
         return success(service.getDetail(id, WebFrameworkUtils.getLoginUserId(), true));
     }

@@ -822,6 +822,28 @@
         "directorReview"
       ],
       "requiresTenantRoleConfiguration": true
+    },
+    {
+      "processKey": "zsjos_media_account_delete",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "assetFormat": "xml",
+      "taskKeys": [
+        "review"
+      ],
+      "businessVariables": [
+        "accountId"
+      ],
+      "assigneeVariables": [
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "accountId"
+      ],
+      "businessKeyFormat": "media-account-delete:{accountId}:{round}",
+      "minimumMigration": "V271",
+      "path": "zsjos_media_account_delete/1.0.0/process.bpmn20.xml",
+      "requiresTenantRoleConfiguration": true
     }
   ]
 }

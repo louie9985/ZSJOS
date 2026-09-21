@@ -21,7 +21,7 @@ const textColumn = (title: string, dataIndex: keyof SalesOrderListItem, width = 
   dataIndex,
   width,
   ellipsis: true,
-  render: value => value || '-'
+  render: value => value || (String(dataIndex).endsWith('LabelSnapshot') || ['leadSourceUserName', 'leadOwnerUserName', 'supervisorRequesterName'].includes(String(dataIndex)) ? '历史未记录' : '-')
 })
 
 export function buildSalesOrderTableColumns(onDetail: (item: SalesOrderListItem) => void): ProColumns<SalesOrderListItem>[] {

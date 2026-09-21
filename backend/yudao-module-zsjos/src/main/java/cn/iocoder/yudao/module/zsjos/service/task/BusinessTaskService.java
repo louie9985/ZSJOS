@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskSummar
 
 public interface BusinessTaskService {
     BusinessTaskSummaryRespVO getMySummary(Long userId);
+    BusinessTaskSummaryRespVO getReadSummary(Long userId, String readScope, Long targetUserId);
     PageResult<BusinessTaskRespVO> getMyPage(Long userId, String bucket, int pageNo, int pageSize);
     PageResult<BusinessTaskRespVO> getMyPage(Long userId, BusinessTaskPageReqVO reqVO);
 }

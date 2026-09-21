@@ -19,6 +19,7 @@ class MaterialApprovalObjectPermissionProviderTest {
     @InjectMocks MaterialApprovalObjectPermissionProvider provider;
     @Mock BpmProcessTaskApi taskApi;
     @Mock MaterialApprovalRoundMapper roundMapper;
+    @Mock cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     void round() {
         when(roundMapper.selectList(any(SFunction.class),eq(3L))).thenReturn(List.of(new MaterialApprovalRoundDO()
                 .setProcessInstanceId("p").setProcessDefinitionKey("zsjos_viral_account_review")));
@@ -40,5 +41,12 @@ class MaterialApprovalObjectPermissionProviderTest {
         assertFalse(provider.hasPermission(3L,"manage",9L));
         assertFalse(provider.hasPermission(3L,"read",null));
         verifyNoInteractions(taskApi,roundMapper);
+    }
+    @Test void administratorReadsHistoryWithoutAcquiringDecision() {
+        round(); when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);
+        assertTrue(provider.hasPermission(3L,"read",9L));
+        verifyNoInteractions(taskApi);
+        when(taskApi.getTodoTaskPage(eq(9L),any())).thenReturn(PageResult.empty());
+        assertFalse(provider.hasPermission(3L,"decide",9L));
     }
 }

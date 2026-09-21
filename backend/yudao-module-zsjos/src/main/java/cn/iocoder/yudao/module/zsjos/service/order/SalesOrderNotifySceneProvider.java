@@ -26,6 +26,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants
 
 @Component
 public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper roundMapper;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private CashbackService cashbackService;
     @Resource private PartnerAccountMapper partnerAccountMapper;
@@ -66,6 +67,9 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         SalesOrderDO order = orderMapper.selectById(event.getBizId());
         if (order == null) return Map.of();
+        var round = order.getCurrentApprovalRoundId() == null ? null : roundMapper.selectById(order.getCurrentApprovalRoundId());
+        order = SalesOrderSnapshot.read(round == null ? null : round.getOrderSnapshot()).project(order);
+
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("order.id", order.getId()); values.put("order.no", order.getOrderNo());

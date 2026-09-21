@@ -74,7 +74,20 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
 
     @BeforeEach
     void setUpTaskActionValidators() {
-        lenient().when(taskActionValidatorProvider.orderedStream()).thenReturn(Stream.empty());
+        lenient().when(taskActionValidatorProvider.orderedStream()).thenAnswer(invocation -> Stream.empty());
+    }
+
+    @Test
+    void automaticAndDelegatedActionsNeverBorrowAssigneeIdentity() {
+        TaskEntityImpl task = parentTask(null);
+        ReflectionTestUtils.invokeMethod(service, "snapshotActionActor", null, task, "approve", true);
+        ArgumentCaptor<Object> actor = ArgumentCaptor.forClass(Object.class);
+        verify(taskService).setVariableLocal(eq("parent-task"), eq(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.ACTOR), actor.capture());
+        assertEquals("SYSTEM", ((Map<?, ?>) actor.getValue()).get("subjectType"));
+        assertNull(((Map<?, ?>) actor.getValue()).get("userId"));
+        org.mockito.Mockito.clearInvocations(taskService);
+        ReflectionTestUtils.invokeMethod(service, "snapshotActionActor", 233L, task, "approve", false);
+        verify(taskService, never()).setVariableLocal(eq("parent-task"), eq(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.ACTOR), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -126,7 +139,13 @@ class BpmTaskServiceImplParallelSignTest extends BaseMockitoUnitTest {
         when(instance.getProcessVariables()).thenReturn(Map.of());
         when(modelService.getBpmnModelByDefinitionId("definition-1")).thenReturn(model());
 
+        when(adminUserApi.getUser(233L)).thenReturn(new AdminUserRespDTO().setId(233L).setNickname("审批时姓名"));
         service.approveTask(233L, new BpmTaskApproveReqVO().setId("parent-task").setReason("中心通过"));
+        ArgumentCaptor<Object> actor = ArgumentCaptor.forClass(Object.class);
+        verify(taskService).setVariableLocal(eq("parent-task"), eq(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.ACTOR), actor.capture());
+        assertEquals("审批时姓名", ((Map<?, ?>) actor.getValue()).get("name"));
+        assertEquals(233L, ((Map<?, ?>) actor.getValue()).get("userId"));
+
 
         verify(taskService).setVariableLocal("parent-task", BpmnVariableConstants.TASK_VARIABLE_STATUS,
                 BpmTaskStatusEnum.APPROVING.getStatus());

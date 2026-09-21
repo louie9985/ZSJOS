@@ -16,7 +16,7 @@ export default function BusinessReadScope({ value, onChange }: {
     if (value.readScope !== 'USER') return
     let active = true
     setLoading(true); setError('')
-    api.simpleUsers().then(rows => { if (active) setUsers(rows) })
+    api.simpleUsers(true).then(rows => { if (active) setUsers(rows) })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : '人员加载失败') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }

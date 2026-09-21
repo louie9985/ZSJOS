@@ -54,6 +54,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private SecurityFrameworkService securityFrameworkService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private NotifyRuleApi notifyRuleApi;
     @Resource private LeadAgingPoolNotifyStageMapper notifyStageMapper;
@@ -64,8 +65,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     public PageResult<LeadAgingPoolRespVO> getPage(LeadAgingPoolPageReqVO reqVO, Long userId) {
-        List<Long> scopedOwnerUserIds = visibleOwnerUserIds(userId);
-        boolean manageAll = hasManageAll();
+        boolean manageAll = permissionApi.hasTenantReadAllAccess(userId) || hasManageAll();
+        List<Long> scopedOwnerUserIds = manageAll ? null : visibleOwnerUserIds(userId);
         LeadInboxFilterQuery filter = reqVO.getInboxGroup() == null && reqVO.getInboxStage() == null
                 ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
                 : inboxFilterConfigService.resolveQuery(
@@ -83,8 +84,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     public Map<String, Long> getCounts(Long userId) {
-        List<Long> scopedOwnerUserIds = hasManageAll() ? null : visibleOwnerUserIds(userId);
-        boolean manageAll = hasManageAll();
+        boolean manageAll = permissionApi.hasTenantReadAllAccess(userId) || hasManageAll();
+        List<Long> scopedOwnerUserIds = manageAll ? null : visibleOwnerUserIds(userId);
         Long participant = manageAll ? null : userId;
         long waiting = cycleMapper.selectCountByStatus(scopedOwnerUserIds, participant, AGING_POOL_WAITING_ASSIGNMENT);
         long assigned = cycleMapper.selectCountByStatus(scopedOwnerUserIds, participant, AGING_POOL_ASSIGNED);
@@ -496,7 +497,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         result.setAvailableActions(actions); return result;
     }
 
-    private LeadAgingPoolCycleDO requireVisible(Long id, Long userId) { LeadAgingPoolCycleDO cycle = requireCycle(id); if (!canRead(cycle.getLeadId(), userId)) throw exception(LEAD_PERMISSION_DENIED); return cycle; }
+    private LeadAgingPoolCycleDO requireVisible(Long id, Long userId) { LeadAgingPoolCycleDO cycle = requireCycle(id); if (!permissionApi.hasTenantReadAllAccess(userId) && !canRead(cycle.getLeadId(), userId)) throw exception(LEAD_PERMISSION_DENIED); return cycle; }
     private LeadAgingPoolCycleDO requireManageable(Long id, Long userId) { return requireManageable(requireCycle(id), userId); }
     private LeadAgingPoolCycleDO requireManageable(LeadAgingPoolCycleDO cycle, Long userId) { if (!canManage(cycle, userId)) throw exception(LEAD_AGING_POOL_MANAGER_DENIED); return cycle; }
     private LeadAgingPoolCycleDO requireCycle(Long id) { LeadAgingPoolCycleDO cycle = cycleMapper.selectById(id); if (cycle == null) throw exception(LEAD_AGING_POOL_NOT_EXISTS); return cycle; }

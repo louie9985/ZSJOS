@@ -76,6 +76,16 @@ public class PmsKnowledgeLibraryMemberServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    void administratorCanReadPrivateLibraryWithoutGainingInteractionOrWrite() {
+        when(libraryService.getLibrary(1L)).thenReturn(randomLibraryDO(1L, false));
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
+        assertEquals(1L, memberService.validateLibraryReadable(1L, 10L).getId());
+        assertServiceException(() -> memberService.validateLibraryInteraction(1L, 10L), KNOWLEDGE_LIBRARY_ACCESS_DENIED);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> memberService.validateLibraryWritable(1L, 10L));
+    }
+
+    @Test
     public void testValidateLibraryReadable_privateMember() {
         // mock 数据
         Long libraryId = randomLongId();

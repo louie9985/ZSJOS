@@ -16,8 +16,10 @@ describe('ProductionTicketPositioningCard', () => {
     }} />)
 
     expect(html).toContain('第 3 次提交')
-    expect(html).toContain('<dt>主阵地</dt><dd>抖音</dd>')
-    expect(html).toContain('<dt>账号人设</dt><dd>一线营养师</dd>')
+    expect(html).toContain('定位卡项目')
+    expect(html).toContain('计划交付内容确定')
+    expect(html).toContain('主阵地 *</strong>')
+    expect(html).toContain('一线营养师')
     expect(html).toContain('可行性评估')
     expect(html).not.toContain('&quot;platform&quot;')
     expect(html).not.toContain('{')

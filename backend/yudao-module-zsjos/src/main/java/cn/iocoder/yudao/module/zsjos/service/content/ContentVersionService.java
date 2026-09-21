@@ -145,7 +145,8 @@ public class ContentVersionService {
         ContentVersionSaveReqVO req = new ContentVersionSaveReqVO();
         req.setContentId(source.getContentId());
         req.setTitleSnapshot(changes.getTitleSnapshot() != null ? changes.getTitleSnapshot() : source.getTitleSnapshot());
-        req.setTopicSnapshot(source.getTopicSnapshot());
+        req.setTopicSnapshot(changes.getTopicSnapshot() != null ? changes.getTopicSnapshot() : source.getTopicSnapshot());
+        req.setMaterialRefsJson(changes.getMaterialRefsJson() != null ? changes.getMaterialRefsJson() : source.getMaterialRefsJson());
         req.setCoverSnapshotJson(changes.getCoverSnapshotJson() != null ? changes.getCoverSnapshotJson() : source.getCoverSnapshotJson());
         // Omitted preserves history; an explicit empty array removes attachments only in the new version.
         req.setDeliverableSnapshotJson(changes.getDeliverableSnapshotJson() != null

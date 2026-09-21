@@ -801,7 +801,7 @@ public class PmsKnowledgeRecycleServiceImpl implements PmsKnowledgeRecycleServic
      */
     private void validateRecycleContentDeletable(PmsKnowledgeRecycleRecordDO record, Long userId) {
         // 1.1 先校验知识库可读
-        libraryMemberService.validateLibraryReadable(record.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(record.getLibraryId(), userId);
 
         // 1.2 再解析回收对象对应的内容权限
         Long permissionId;

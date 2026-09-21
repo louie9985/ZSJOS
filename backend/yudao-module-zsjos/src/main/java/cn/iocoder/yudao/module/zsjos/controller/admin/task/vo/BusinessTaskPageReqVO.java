@@ -8,6 +8,9 @@ import lombok.Data;
 @Schema(description = "管理后台 - 我的业务任务分页 Request VO")
 @Data
 public class BusinessTaskPageReqVO extends PageParam {
+    @Pattern(regexp = "SELF|ALL|USER")
+    private String readScope;
+    private Long targetUserId;
 
     @Schema(description = "任务状态", example = "pending")
     @Pattern(regexp = "pending|done|completed|cancelled", message = "任务状态无效")

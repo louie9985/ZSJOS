@@ -64,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -83,6 +84,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_READY_TO_PUBLISH;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_SCRIPT;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_TOPIC;
+import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_REJECTED;
+import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_REVISING;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -154,6 +157,10 @@ public class ContentReviewBatchService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ContentReviewBatchCreateReqVO request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    private Long create(ContentReviewBatchCreateReqVO request, Long userId, ContentReviewBatchDO editing) {
         List<Long> versionIds = request.getContentVersionIds().stream().filter(Objects::nonNull).distinct().toList();
         if (versionIds.size() != request.getContentVersionIds().size() || versionIds.isEmpty()
                 || versionIds.size() > 20) {
@@ -179,8 +186,8 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
         }
         MediaAccountDO account = subjects.account();
-        ContentReviewBatchDO batch = new ContentReviewBatchDO();
-        batch.setBatchNo(nextBatchNo());
+        ContentReviewBatchDO batch = editing == null ? new ContentReviewBatchDO() : editing;
+        if (editing == null) batch.setBatchNo(nextBatchNo());
         batch.setAccountId(account.getId());
         if (request.getStudentPersonId() != null) batch.setStudentPersonId(request.getStudentPersonId());
         List<Long> selectedAccountIds = request.getAccountIds() == null || request.getAccountIds().isEmpty() ? List.of(account.getId()) : request.getAccountIds().stream().filter(Objects::nonNull).distinct().toList();
@@ -192,22 +199,40 @@ public class ContentReviewBatchService {
         batch.setContextSnapshotJson(null);
         batch.setStatus(BATCH_DRAFT);
         batch.setCurrentStage(STAGE_DRAFT);
-        batch.setVersion(0);
-        batchMapper.insert(batch);
+        if (editing == null) {
+            batch.setVersion(0);
+            batchMapper.insert(batch);
+        } else {
+            batch.setVersion(batch.getVersion() + 1);
+            batchMapper.updateById(batch);
+        }
+        Map<Long, ContentReviewBatchItemDO> previousItems = editing == null ? Map.of()
+                : itemMapper.selectByBatchId(batch.getId()).stream().collect(Collectors.toMap(
+                        ContentReviewBatchItemDO::getContentId, Function.identity()));
+        Set<Long> retainedContents = new HashSet<>();
 
         int sortNo = 1;
         for (ContentVersionDO version : orderedVersions) {
             ContentDO content = contentMap.get(version.getContentId());
-            ContentReviewBatchItemDO item = new ContentReviewBatchItemDO();
+            ContentReviewBatchItemDO item = previousItems.getOrDefault(content.getId(), new ContentReviewBatchItemDO());
+            retainedContents.add(content.getId());
             item.setBatchId(batch.getId());
             item.setContentId(content.getId());
             item.setContentVersionId(version.getId());
             item.setSortNo(sortNo++);
             item.setContentSnapshotJson(JsonUtils.toJsonString(contentSnapshot(content, version)));
             item.setCollectMaterial(false);
-            item.setVersion(0);
-            itemMapper.insert(item);
+            if (item.getId() == null) {
+                item.setVersion(0);
+                itemMapper.insert(item);
+            } else {
+                item.setVersion(item.getVersion() + 1);
+                itemMapper.updateById(item);
+            }
         }
+        // Only unpublished draft items are replaceable; approved/rejected round snapshots stay immutable.
+        previousItems.values().stream().filter(item -> !retainedContents.contains(item.getContentId()))
+                .forEach(item -> itemMapper.deleteById(item.getId()));
         return batch.getId();
     }
 
@@ -227,8 +252,10 @@ public class ContentReviewBatchService {
         List<ContentReviewBatchDO> queue = new ArrayList<>(ancestors);
         queue.add(current);
         queue.addAll(batchMapper.selectByRevisionOfBatchId(batchId));
+        Set<Long> visited = new HashSet<>();
         while (!queue.isEmpty() && result.size() < 20) {
             ContentReviewBatchDO row = queue.removeFirst();
+            if (!visited.add(row.getId())) continue;
             List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(row.getId());
             Map<String, BpmTaskRespDTO> tasks = loadCurrentTasks(List.of(row), userId);
             result.add(toResponse(row, items, loadContentRecords(items),
@@ -244,6 +271,10 @@ public class ContentReviewBatchService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long createFromStudent(ContentReviewStudentDraftCreateReqVO request, Long userId) {
+        return createFromStudent(request, userId, null);
+    }
+
+    private Long createFromStudent(ContentReviewStudentDraftCreateReqVO request, Long userId, ContentReviewBatchDO editing) {
         List<Long> accountIds = request.getAccountIds().stream().filter(Objects::nonNull).distinct().toList();
         List<ContentReviewStudentDraftCreateReqVO.Work> works = request.getWorks().stream()
                 .filter(Objects::nonNull).toList();
@@ -275,21 +306,44 @@ public class ContentReviewBatchService {
         List<Long> contentIds = new ArrayList<>(works.size());
         for (int index = 0; index < works.size(); index++) {
             ContentReviewStudentDraftCreateReqVO.Work work = works.get(index);
+            if ((work.getSourceContentId() == null) != (work.getSourceVersionId() == null)) {
+                throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+            }
             if (work.getCoverFileId() == null && blank(work.getCoverSnapshotJson())) {
                 throw exception(CONTENT_VERSION_FILE_INVALID);
             }
             if (work.getPlannedPublishAt() == null || work.getPlannedPublishAt().isBefore(now)) {
                 throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
             }
-            String purposeLabel = resolveDictionaryLabel(work.getPurposeValue(), purposeLabels);
-            String formatLabel = resolveDictionaryLabel(work.getFormatValue(), formatLabels);
+            String purposeLabel;
+            String formatLabel;
             if (work.getSourceContentId() != null && work.getSourceVersionId() != null) {
                 ContentVersionDO source = contentVersionMapper.selectByIdForUpdate(work.getSourceVersionId(), tenantId());
                 ContentDO sourceContent = source == null ? null : contentMapper.selectById(source.getContentId());
                 if (source == null || sourceContent == null || !Objects.equals(source.getContentId(), work.getSourceContentId())
                         || !Objects.equals(sourceContent.getCurrentVersionNo(), source.getVersionNo())
-                        || source.getFrozenAt() == null || source.getReviewDecision() == null) {
+                        || source.getFrozenAt() != null && source.getReviewDecision() == null) {
                     throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+                }
+                ContentReviewBatchItemDO sourceItem = itemMapper.selectByContentVersionId(source.getId());
+                ContentReviewBatchDO sourceBatch = sourceItem == null ? null : batchMapper.selectById(sourceItem.getBatchId());
+                if (sourceBatch == null || !Objects.equals(sourceBatch.getOperatorUserId(), userId)
+                        || !Objects.equals(sourceBatch.getStudentPersonId(), request.getStudentPersonId())
+                        || !(BATCH_NEED_MODIFY.equals(sourceBatch.getStatus()) || BATCH_REJECTED.equals(sourceBatch.getStatus())
+                            || BATCH_CANCELLED.equals(sourceBatch.getStatus())
+                            || editing != null && Objects.equals(editing.getId(), sourceBatch.getId()) && BATCH_DRAFT.equals(sourceBatch.getStatus()))) {
+                    throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+                }
+                purposeLabel = Objects.equals(work.getPurposeValue(), source.getPurposeValue())
+                        ? source.getPurposeLabelSnapshot() : resolveDictionaryLabel(work.getPurposeValue(), purposeLabels);
+                formatLabel = Objects.equals(work.getFormatValue(), source.getFormatValue())
+                        ? source.getFormatLabelSnapshot() : resolveDictionaryLabel(work.getFormatValue(), formatLabels);
+                // Batch revision is authorized above; keep the same content aggregate and copy its version.
+                if (CONTENT_REJECTED.equals(sourceContent.getStatus()) || CONTENT_ACCEPTANCE.equals(sourceContent.getStatus())) {
+                    if (contentMapper.transition(sourceContent.getId(), sourceContent.getVersion(),
+                            sourceContent.getStatus(), CONTENT_REVISING) != 1) {
+                        throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+                    }
                 }
                 ContentVersionSaveReqVO changes = new ContentVersionSaveReqVO();
                 changes.setTitleSnapshot(work.getTitle()); changes.setScriptText(work.getScriptText());
@@ -306,6 +360,8 @@ public class ContentReviewBatchService {
                 contentIds.add(source.getContentId()); versionIds.add(versionId);
                 continue;
             }
+            purposeLabel = resolveDictionaryLabel(work.getPurposeValue(), purposeLabels);
+            formatLabel = resolveDictionaryLabel(work.getFormatValue(), formatLabels);
             ContentSaveReqVO contentRequest = new ContentSaveReqVO();
             contentRequest.setAccountId(primaryAccountId);
             contentRequest.setTitle(work.getTitle());
@@ -351,6 +407,13 @@ public class ContentReviewBatchService {
         for (Long contentId : contentIds) {
             ContentDO existing = contentMapper.selectById(contentId);
             if (existing != null && CONTENT_ACCEPTANCE.equals(existing.getStatus())) continue;
+            if (existing != null && CONTENT_REVISING.equals(existing.getStatus())) {
+                if (contentMapper.transition(contentId, existing.getVersion(), CONTENT_REVISING, CONTENT_IN_PRODUCTION) != 1
+                        || contentMapper.transition(contentId, existing.getVersion() + 1, CONTENT_IN_PRODUCTION, CONTENT_ACCEPTANCE) != 1) {
+                    throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+                }
+                continue;
+            }
             if (contentMapper.transition(contentId, 1, CONTENT_TOPIC, CONTENT_SCRIPT) != 1
                     || contentMapper.transition(contentId, 2, CONTENT_SCRIPT, CONTENT_IN_PRODUCTION) != 1
                     || contentMapper.transition(contentId, 3, CONTENT_IN_PRODUCTION, CONTENT_ACCEPTANCE) != 1) {
@@ -361,13 +424,13 @@ public class ContentReviewBatchService {
         batchRequest.setContentVersionIds(versionIds);
         batchRequest.setStudentPersonId(request.getStudentPersonId());
         batchRequest.setAccountIds(accountIds);
-        Long batchId = create(batchRequest, userId);
+        Long batchId = create(batchRequest, userId, editing);
         List<ContentReviewBatchItemDO> createdItems = itemMapper.selectByBatchId(batchId);
         for (int i = 0; i < Math.min(createdItems.size(), works.size()); i++) {
             Long sourceVersion = works.get(i).getSourceVersionId();
             if (sourceVersion == null) continue;
             ContentReviewBatchItemDO previous = itemMapper.selectByContentVersionId(sourceVersion);
-            if (previous != null) {
+            if (previous != null && !Objects.equals(previous.getBatchId(), batchId)) {
                 createdItems.get(i).setPreviousItemId(previous.getId());
                 itemMapper.updateById(createdItems.get(i));
             }
@@ -516,9 +579,12 @@ public class ContentReviewBatchService {
         validateSelectedAccountsAtSubmit(batch, relation.director().getId(), userId);
         ContentReviewConfigDO config = configService.requireReadyConfig(userId);
         BpmProcessDefinitionMetadataRespDTO definition = configService.requireCurrentDefinition(config);
+        var taskKeys = configService.requireReviewTaskKeys(definition);
         var materialSchema = configService.requireProductionMaterialSchema(config);
         String relationSnapshotJson = JsonUtils.toJsonString(relationSnapshot(relation, userId));
         Map<String, Object> frozenContext = contextSnapshot(config, subjects.account(), materialSchema);
+        frozenContext.put("directorTaskKey", taskKeys.director());
+        frozenContext.put("finalTaskKey", taskKeys.finalReview());
         // Preserve the student and multi-account draft snapshot when submit freezes the
         // configuration context. Re-resolving account data here would rewrite history.
         Map<String, Object> draftContext = parseMap(batch.getContextSnapshotJson());
@@ -541,7 +607,7 @@ public class ContentReviewBatchService {
 
         String businessKey = BUSINESS_KEY_PREFIX + batchId;
         String processInstanceId = UUID.randomUUID().toString().replace("-", "");
-        Map<String, List<Long>> assignees = Map.of(ContentReviewConfigService.DIRECTOR_TASK_KEY,
+        Map<String, List<Long>> assignees = Map.of(taskKeys.director(),
                 List.of(relation.director().getId()));
         BpmProcessInstanceCreateReqDTO processRequest = new BpmProcessInstanceCreateReqDTO();
         processRequest.setProcessDefinitionId(definition.getId());
@@ -650,8 +716,10 @@ public class ContentReviewBatchService {
 
         // 检查是否有退回的内容
         List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batchId);
+        requireDirectorDecisions(items);
         boolean hasReturned = items.stream()
                 .anyMatch(item -> DECISION_RETURNED.equals(item.getDirectorDecision()));
+        requireBatchDecision(request.getDecision(), hasReturned);
 
         if (hasReturned) {
             // 有退回内容，直接驳回整个批次，不进入终审
@@ -680,8 +748,9 @@ public class ContentReviewBatchService {
 
         // 检查是否有退回的内容
         List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batchId);
-        boolean hasReturned = items.stream()
-                .anyMatch(item -> DECISION_RETURNED.equals(item.getFinalDecision()));
+        requireFinalDecisions(items);
+        boolean hasReturned = hasReturnedItem(items);
+        requireBatchDecision(request.getDecision(), hasReturned);
 
         LocalDateTime now = LocalDateTime.now();
         if (hasReturned) {
@@ -744,10 +813,13 @@ public class ContentReviewBatchService {
         }
         if (BATCH_FINAL_REVIEW.equals(batch.getStatus()) && STAGE_FINAL.equals(batch.getCurrentStage())
                 && Objects.equals(finalTaskKey, context.getTaskDefinitionKey())) {
-            if (!ACTION_APPROVE.equals(context.getAction())) throw exception(CONTENT_REVIEW_TASK_INVALID);
             List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
             requireFinalDecisions(items);
-            for (ContentReviewBatchItemDO item : items) {
+            boolean returned = hasReturnedItem(items);
+            if (!(returned ? ACTION_REJECT : ACTION_APPROVE).equals(context.getAction())) {
+                throw exception(CONTENT_REVIEW_TASK_INVALID);
+            }
+            if (!returned) for (ContentReviewBatchItemDO item : items) {
                 if (Boolean.TRUE.equals(item.getCollectMaterial())) readPreparedCollection(batch, item);
             }
             return;
@@ -764,18 +836,23 @@ public class ContentReviewBatchService {
         ContentReviewBatchDO batch = lockBatch(located.getId());
         if (!matchesProcess(batch, event) || Objects.equals(batch.getLastEventKey(), event.getEventKey())
                 || BATCH_COMPLETED.equals(batch.getStatus()) || BATCH_REJECTED.equals(batch.getStatus())
-                || BATCH_NEED_MODIFY.equals(batch.getStatus())) return;
+                || BATCH_NEED_MODIFY.equals(batch.getStatus()) || BATCH_CANCELLED.equals(batch.getStatus())) return;
         List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
         LocalDateTime now = LocalDateTime.now();
 
-        // 处理驳回情况（编导有退回内容，或终审驳回）
-        if (!BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(event.getStatus())) {
-            // 解冻版本，允许运营修改后重新提交
+        if (BpmProcessInstanceStatusEnum.CANCEL.getStatus().equals(event.getStatus())) {
             for (ContentReviewBatchItemDO item : items) {
                 if (contentVersionMapper.unfreeze(item.getContentVersionId()) != 1) {
                     throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
                 }
             }
+            if (batchMapper.finalizeBatch(batch, BATCH_CANCELLED, event.getEventKey(), now) != 1) {
+                throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+            }
+            return;
+        }
+        // Rejected submissions stay frozen: operators edit a new revision, never approval history.
+        if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(event.getStatus())) {
             // 对每条内容落地退回结论
             for (ContentReviewBatchItemDO item : items) {
                 ContentDO content = contentMapper.selectByIdForUpdate(item.getContentId(), tenantId());
@@ -787,9 +864,12 @@ public class ContentReviewBatchService {
                 }
                 // 优先使用编导的退回意见，如果编导通过了但终审退回，则使用终审意见
                 String comment = DECISION_RETURNED.equals(item.getDirectorDecision())
-                        ? firstText(item.getDirectorComment(), "编导审核退回")
-                        : firstText(item.getFinalComment(), "终审审核退回");
-                Long reviewer = item.getDirectorReviewedByUserId();
+                        ? firstText(item.getDirectorComment(), event.getReason(), "编导审核退回")
+                        : DECISION_RETURNED.equals(item.getFinalDecision())
+                            ? firstText(item.getFinalComment(), event.getReason(), "终审审核退回")
+                            : firstText(event.getReason(), "本批次退回运营修改");
+                Long reviewer = item.getFinalReviewedByUserId() != null
+                        ? item.getFinalReviewedByUserId() : item.getDirectorReviewedByUserId();
                 contentService.applyBatchReview(content, content.getVersion(), false, comment, reviewer);
                 if (contentVersionMapper.finishReview(version.getId(), "rejected", comment, reviewer, now) != 1) {
                     throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
@@ -809,6 +889,7 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVIEW_TASK_INVALID);
         }
         requireFinalDecisions(items);
+        if (hasReturnedItem(items)) throw exception(CONTENT_REVIEW_TASK_INVALID);
         Map<Long, MaterialService.AutoCollectionSnapshot> preparedCollections = new HashMap<>();
         for (ContentReviewBatchItemDO item : items) {
             if (Boolean.TRUE.equals(item.getCollectMaterial())) {
@@ -911,6 +992,7 @@ public class ContentReviewBatchService {
         if (!Objects.equals(previous.getStudentPersonId(), request.getStudentPersonId())) {
             throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
         }
+        validateRevisionSources(previous, request);
         Long nextBatchId = createFromStudent(request, userId);
         ContentReviewBatchDO nextBatch = lockBatch(nextBatchId);
         nextBatch.setRevisionOfBatchId(previous.getId());
@@ -918,7 +1000,7 @@ public class ContentReviewBatchService {
         return nextBatchId;
     }
 
-    /** Saves a revised student draft as a new draft round, keeping the previous draft auditable. */
+    /** A draft has stable identity; saving it never creates another approval round. */
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "submit")
     @Transactional(rollbackFor = Exception.class)
     public Long saveStudentDraft(Long batchId, ContentReviewStudentDraftCreateReqVO request, Long userId) {
@@ -928,14 +1010,32 @@ public class ContentReviewBatchService {
                 || !Objects.equals(previous.getStudentPersonId(), request.getStudentPersonId())) {
             throw exception(CONTENT_REVIEW_BATCH_STATE_INVALID);
         }
-        if (batchMapper.cancelDraft(previous, previous.getVersion(), LocalDateTime.now()) != 1) {
+        if (request.getExpectedVersion() != null && !Objects.equals(previous.getVersion(), request.getExpectedVersion())) {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
-        Long nextBatchId = createFromStudent(request, userId);
-        ContentReviewBatchDO nextBatch = lockBatch(nextBatchId);
-        nextBatch.setRevisionOfBatchId(previous.getId());
-        batchMapper.updateById(nextBatch);
-        return nextBatchId;
+        validateRevisionSources(previous, request);
+        return createFromStudent(request, userId, previous);
+    }
+
+    private void validateRevisionSources(ContentReviewBatchDO previous, ContentReviewStudentDraftCreateReqVO request) {
+        if (!batchMapper.selectByRevisionOfBatchId(previous.getId()).isEmpty()) {
+            throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
+        }
+        Map<Long, Long> sources = itemMapper.selectByBatchId(previous.getId()).stream()
+                .collect(Collectors.toMap(ContentReviewBatchItemDO::getContentVersionId, ContentReviewBatchItemDO::getContentId));
+        Set<Long> seen = new HashSet<>();
+        for (ContentReviewStudentDraftCreateReqVO.Work work : request.getWorks()) {
+            if (work.getSourceVersionId() == null && work.getSourceContentId() == null) continue;
+            if (work.getSourceVersionId() == null || work.getSourceContentId() == null
+                    || !Objects.equals(sources.get(work.getSourceVersionId()), work.getSourceContentId())
+                    || !seen.add(work.getSourceVersionId())) {
+                throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+            }
+        }
+        if (!new HashSet<>(request.getAccountIds()).equals(new HashSet<>(previous.getAccountIdsJson() == null
+                ? List.of(previous.getAccountId()) : parseLongList(previous.getAccountIdsJson())))) {
+            throw exception(CONTENT_REVIEW_BATCH_ITEMS_INVALID);
+        }
     }
 
     private BatchSubjects validateSubjects(List<ContentVersionDO> versions, Map<Long, ContentDO> contentMap,
@@ -1170,7 +1270,13 @@ public class ContentReviewBatchService {
             response.setCurrentTaskId(task.getId());
             response.setCurrentTaskKey(task.getTaskDefinitionKey());
         }
-        response.setAvailableActions(availableActions(batch, items, task, userId));
+        List<ContentReviewBatchDO> revisions = batchMapper.selectByRevisionOfBatchId(batch.getId());
+        if (!revisions.isEmpty()) {
+            response.setStatus(BATCH_DRAFT.equals(revisions.getLast().getStatus()) ? "REVISION_DRAFT" : "RESUBMITTED");
+            response.setAvailableActions(List.of());
+        } else {
+            response.setAvailableActions(availableActions(batch, items, task, userId));
+        }
         response.setItems(items.stream()
                 .map(item -> toItemResponse(item, contents.get(item.getContentId()), includeFiles)).toList());
         return response;
@@ -1213,7 +1319,7 @@ public class ContentReviewBatchService {
         if ((BATCH_NEED_MODIFY.equals(batch.getStatus()) || BATCH_REJECTED.equals(batch.getStatus()))
                 && batch.getStudentPersonId() != null && Objects.equals(batch.getOperatorUserId(), userId)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:content-review:submit")) {
-            actions.add("RESUBMIT");
+            if (batchMapper.selectByRevisionOfBatchId(batch.getId()).isEmpty()) actions.add("RESUBMIT");
         }
         if (task != null && STAGE_DIRECTOR.equals(batch.getCurrentStage())
                 && Objects.equals(batch.getDirectorUserId(), userId)
@@ -1223,6 +1329,8 @@ public class ContentReviewBatchService {
             if (items.stream().allMatch(item -> item.getDirectorDecision() != null
                     && DECISIONS.contains(item.getDirectorDecision()))) {
                 actions.add("DIRECTOR_COMPLETE");
+                actions.add(items.stream().anyMatch(item -> DECISION_RETURNED.equals(item.getDirectorDecision()))
+                        ? "DIRECTOR_RETURN" : "DIRECTOR_APPROVE");
             }
         }
         if (task != null && STAGE_FINAL.equals(batch.getCurrentStage())
@@ -1232,6 +1340,7 @@ public class ContentReviewBatchService {
                     .allMatch(item -> item.getFinalDecision() != null
                             && DECISIONS.contains(item.getFinalDecision()))) {
                 actions.add("FINAL_COMPLETE");
+                actions.add(hasReturnedItem(items) ? "FINAL_RETURN" : "FINAL_APPROVE");
             }
         }
         if (BATCH_COMPLETED.equals(batch.getStatus()) && Objects.equals(batch.getOperatorUserId(), userId)
@@ -1263,8 +1372,6 @@ public class ContentReviewBatchService {
                                                 cn.iocoder.yudao.module.zsjos.dal.dataobject.material.MaterialSchemaVersionDO schema) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("configVersion", config.getVersion());
-        snapshot.put("directorTaskKey", ContentReviewConfigService.DIRECTOR_TASK_KEY);
-        snapshot.put("finalTaskKey", ContentReviewConfigService.FINAL_TASK_KEY);
         snapshot.put("productionMaterialTypeCode", ContentReviewConfigService.PRODUCTION_MATERIAL_TYPE_CODE);
         snapshot.put("productionMaterialSchemaVersionId", schema.getId());
         snapshot.put("productionMaterialSchemaHash", schema.getSchemaHash());
@@ -1323,6 +1430,18 @@ public class ContentReviewBatchService {
     private boolean canSeeAll(Long userId) {
         return permissionApi.hasTenantReadAllAccess(userId)
                 || permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all");
+    }
+
+    private boolean hasReturnedItem(List<ContentReviewBatchItemDO> items) {
+        // Legacy rounds already at final review may contain director returns; they can only be returned.
+        return items.stream().anyMatch(item -> DECISION_RETURNED.equals(item.getDirectorDecision())
+                || DECISION_RETURNED.equals(item.getFinalDecision()));
+    }
+
+    private void requireBatchDecision(String decision, boolean returned) {
+        if (decision != null && !(returned ? DECISION_RETURNED : DECISION_APPROVED).equals(decision)) {
+            throw exception(CONTENT_REVIEW_TASK_INVALID);
+        }
     }
 
     private String normalizeDecision(String decision, String comment) {

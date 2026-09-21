@@ -1,5 +1,5 @@
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Badge, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, NotificationOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'
@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type Announcement, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
 import { APP_ROUTES } from '../constants'
 import { formatTimestamp } from '../services/time'
+
+import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 
 const PAGE_SIZE = 6
 const ANNOUNCEMENT_LIMIT = 5
@@ -118,13 +120,19 @@ function SummaryRegion({
 function BusinessTaskPanel({
   summary,
   onOpenAssignment,
-  onRefreshSummary
+  onRefreshSummary,
+  tenantReadAll
 }: {
   summary?: BusinessTaskSummary
+  tenantReadAll: boolean
   onOpenAssignment: () => void
   onRefreshSummary: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
+  const [scopeSummary, setScopeSummary] = useState<BusinessTaskSummary>()
+  const sequence = useRef(0)
+  const readOnly = readScope.readScope !== 'SELF'
   const [view, setView] = useState<TaskView>('pending')
   const [bucket, setBucket] = useState<BusinessTaskBucket>('today')
   const [pageNo, setPageNo] = useState(1)
@@ -136,23 +144,21 @@ function BusinessTaskPanel({
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
+    const current = ++sequence.current
+    setPage({ list: [], total: 0 }); setScopeSummary(undefined); setError('')
+    if (readScope.readScope === 'USER' && !readScope.targetUserId) { setLoading(false); return }
     setLoading(true)
-    setError('')
     try {
-      setPage(
-        await api.businessTaskList({
-          status: view,
-          ...(view === 'pending' ? { bucket } : {}),
-          pageNo,
-          pageSize: PAGE_SIZE
-        })
-      )
+      const [result, counts] = await Promise.all([
+        api.businessTaskList({ ...(tenantReadAll ? readScope : {}), status: view,
+          ...(view === 'pending' ? { bucket } : {}), pageNo, pageSize: PAGE_SIZE }),
+        api.businessTaskSummary(tenantReadAll ? readScope : undefined)
+      ])
+      if (current === sequence.current) { setPage(result); setScopeSummary(counts) }
     } catch (loadError) {
-      setError(errorText(loadError, '业务任务加载失败'))
-    } finally {
-      setLoading(false)
-    }
-  }, [bucket, pageNo, view])
+      if (current === sequence.current) setError(errorText(loadError, '业务任务加载失败'))
+    } finally { if (current === sequence.current) setLoading(false) }
+  }, [bucket, pageNo, view, readScope, tenantReadAll])
 
   useEffect(() => {
     void load()
@@ -163,6 +169,7 @@ function BusinessTaskPanel({
   }
 
   const open = (task: BusinessTask) => {
+    if (readOnly || !task.actionable) return
     if (task.actionCode === 'MEDIA_ACCOUNT_DIAGNOSIS') {
       void diagnosisApi.tasks(task.bizId).then(items => { const item = items.find(x => x.taskId === task.id); if (item) navigate(diagnosisTaskUrl(item)); else setError("该诊断任务已处理或不再可用"); }).catch(e => setError(errorText(e, "诊断任务加载失败")))
       return
@@ -229,6 +236,7 @@ function BusinessTaskPanel({
   }
 
   const completeEmployeeReminder = async (task: BusinessTask) => {
+    if (readOnly || !task.actionable) return
     try {
       await api.completeEmployeeReminder(task.id)
       await refresh()
@@ -237,7 +245,7 @@ function BusinessTaskPanel({
     }
   }
 
-  const pendingSummary = useMemo(() => summary ?? emptySummary, [summary])
+  const pendingSummary = useMemo(() => scopeSummary ?? (readOnly ? emptySummary : summary ?? emptySummary), [scopeSummary, readOnly, summary])
 
   return (
     <section className="home-panel home-business-panel" aria-label="业务待办">
@@ -248,6 +256,7 @@ function BusinessTaskPanel({
         </div>
         <Button icon={<ReloadOutlined />} aria-label="刷新业务任务" onClick={() => void refresh()} />
       </header>
+      {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setPageNo(1); setReadScope(value) }} />}
       <div className="home-task-controls">
         <Segmented
           value={view}
@@ -300,6 +309,7 @@ function BusinessTaskPanel({
                   <div className="task-panel-item-copy">
                     <Space wrap>
                       <Typography.Text strong>{task.title}</Typography.Text>
+                      {readOnly && <Tag>{task.assigneeName || "未分配"}</Tag>}
                       {task.overdue && <Tag color="error">已逾期</Tag>}
                       {task.status === 'cancelled' && <Tag>已取消</Tag>}
                     </Space>
@@ -308,11 +318,11 @@ function BusinessTaskPanel({
                       <Typography.Text type="secondary">{formatTimestamp(task.dueAt || task.completedAt || task.cancelledAt, '无时间')}</Typography.Text>
                     </Space>
                   </div>
-                  {task.actionCode && workPlanActions.has(task.actionCode) && view === 'pending' ? (
+                  {!readOnly && task.actionCode && workPlanActions.has(task.actionCode) && view === 'pending' ? (
                     <Tag>已搁置</Tag>
-                  ) : task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) && view === 'pending' ? (
+                  ) : !readOnly && task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) && view === 'pending' ? (
                     <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成员工提醒" onClick={() => void completeEmployeeReminder(task)} />
-                  ) : task.actionable && view === 'pending' ? (
+                  ) : !readOnly && task.actionable && view === 'pending' ? (
                     <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />
                   ) : null}
                 </div>
@@ -441,7 +451,7 @@ function AnnouncementPanel({ enabled }: { enabled: boolean }) {
   )
 }
 
-export default function TodayTasksPage({ permissions, onOpenAssignment }: { permissions: string[]; onOpenAssignment: () => void }) {
+export default function TodayTasksPage({ permissions, onOpenAssignment, tenantReadAll = false }: { permissions: string[]; onOpenAssignment: () => void; tenantReadAll?: boolean }) {
   const showBpmTasks = canQueryBpmTasks(permissions)
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
   const [bpmCount, setBpmCount] = useState<number>()
@@ -485,7 +495,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment }: { perm
           onRefresh={loadSummary}
         />
         <HomeCalendarPanel enabled={canOpenPersonalCalendar(permissions)} />
-        <BusinessTaskPanel summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <AnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>

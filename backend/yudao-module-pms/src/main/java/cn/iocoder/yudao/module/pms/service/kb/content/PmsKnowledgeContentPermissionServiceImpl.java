@@ -134,7 +134,7 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
 
     @Override
     public Integer validateContentPermissionWritable(Long permissionId, Long libraryId, Long userId) {
-        Integer level = validateContentPermissionReadable(permissionId, libraryId, userId);
+        Integer level = validateContentPermissionInteraction(permissionId, libraryId, userId);
         if (!PmsKnowledgeContentLevelEnum.canEdit(level)) {
             throw exception(KNOWLEDGE_CONTENT_WRITE_ACCESS_DENIED);
         }
@@ -143,7 +143,7 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
 
     @Override
     public Integer validateContentPermissionDeletable(Long permissionId, Long libraryId, Long userId) {
-        Integer level = validateContentPermissionReadable(permissionId, libraryId, userId);
+        Integer level = validateContentPermissionInteraction(permissionId, libraryId, userId);
         if (!PmsKnowledgeContentLevelEnum.canDelete(level)) {
             throw exception(KNOWLEDGE_CONTENT_DELETE_ACCESS_DENIED);
         }
@@ -152,7 +152,7 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
 
     @Override
     public Integer validateContentPermissionManageable(Long permissionId, Long libraryId, Long userId) {
-        Integer level = validateContentPermissionReadable(permissionId, libraryId, userId);
+        Integer level = validateContentPermissionInteraction(permissionId, libraryId, userId);
         if (ObjectUtil.notEqual(PmsKnowledgeContentLevelEnum.MANAGE.getLevel(), level)) {
             throw exception(KNOWLEDGE_CONTENT_WRITE_ACCESS_DENIED);
         }
@@ -193,6 +193,17 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
 
     @Override
     public Map<Long, Integer> getCurrentUserContentPermissionLevelMap(Collection<Long> permissionIds, Long libraryId, Long userId) {
+        return resolveContentLevels(permissionIds, libraryId, userId, true);
+    }
+
+    @Override
+    public Integer validateContentPermissionInteraction(Long permissionId, Long libraryId, Long userId) {
+        Integer level = resolveContentLevels(Collections.singleton(permissionId), libraryId, userId, false).get(permissionId);
+        if (level == null) throw exception(KNOWLEDGE_CONTENT_ACCESS_DENIED);
+        return level;
+    }
+
+    private Map<Long, Integer> resolveContentLevels(Collection<Long> permissionIds, Long libraryId, Long userId, boolean readAll) {
         if (CollUtil.isEmpty(permissionIds)) {
             return Collections.emptyMap();
         }
@@ -229,7 +240,7 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
                     : deptMember != null ? deptMember.getLevel()
                     : null;
             // Preview is the only extra capability; preserve any existing edit/manage level.
-            if (level == null && permissionApi.hasTenantReadAllAccess(userId)) {
+            if (level == null && readAll && permissionApi.hasTenantReadAllAccess(userId)) {
                 level = PmsKnowledgeContentLevelEnum.PREVIEW.getLevel();
             }
             levelMap.put(permission.getId(), level);
@@ -309,7 +320,7 @@ public class PmsKnowledgeContentPermissionServiceImpl implements PmsKnowledgeCon
         // 1.1 校验内容权限存在
         PmsKnowledgeContentPermissionDO permission = validatePermissionExists(updateReqVO.getId());
         // 1.2 校验知识库可访问
-        PmsKnowledgeLibraryDO library = libraryMemberService.validateLibraryReadable(permission.getLibraryId(), userId);
+        PmsKnowledgeLibraryDO library = libraryMemberService.validateLibraryInteraction(permission.getLibraryId(), userId);
         // 1.3 校验内容管理权限
         if (!PmsKnowledgeContentLevelEnum.MANAGE.getLevel().equals(
                 getCurrentUserContentPermissionLevel(permission.getId(), permission.getLibraryId(), userId))) {

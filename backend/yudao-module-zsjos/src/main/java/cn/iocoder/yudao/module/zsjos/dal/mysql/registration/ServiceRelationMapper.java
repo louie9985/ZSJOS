@@ -17,6 +17,18 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 
 @Mapper
 public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
+    String MEDIA_RELATION_PREDICATE = "(content_director_user_id IS NOT NULL OR career_planner_user_id IS NOT NULL OR operator_user_id IS NOT NULL "
+                        + "OR EXISTS (SELECT 1 FROM zsjos_media_account ma WHERE ma.create_service_relation_id=zsjos_service_relation.id AND ma.student_person_id=zsjos_service_relation.person_id AND ma.tenant_id=zsjos_service_relation.tenant_id AND ma.deleted=b'0') "
+                        + "OR EXISTS (SELECT 1 FROM zsjos_positioning_card pc WHERE pc.service_relation_id=zsjos_service_relation.id AND pc.student_person_id=zsjos_service_relation.person_id AND pc.tenant_id=zsjos_service_relation.tenant_id AND pc.deleted=b'0') "
+                        + "OR EXISTS (SELECT 1 FROM zsjos_student_positioning_interview pi WHERE pi.service_relation_id=zsjos_service_relation.id AND pi.student_person_id=zsjos_service_relation.person_id AND pi.tenant_id=zsjos_service_relation.tenant_id AND pi.deleted=b'0'))";
+
+    default List<ServiceRelationDO> selectMediaReadByPersonIds(Collection<Long> personIds, String status) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .in(ServiceRelationDO::getPersonId, personIds).eqIfPresent(ServiceRelationDO::getStatus, status)
+                .apply(MEDIA_RELATION_PREDICATE)
+                .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId));
+    }
     default List<ServiceRelationDO> selectTenantReadByPersonIds(Collection<Long> personIds, String status) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()

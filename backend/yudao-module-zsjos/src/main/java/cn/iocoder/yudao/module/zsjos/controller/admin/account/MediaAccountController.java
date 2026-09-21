@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCal
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceRevisionRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDeleteReqVO;
 import java.util.List;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountService;
@@ -32,6 +33,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class MediaAccountController {
     @Resource private MediaAccountService mediaAccountService;
     @Resource private MediaAccountMaintenanceService maintenanceService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountDeleteService deleteService;
 
     @PostMapping("/create")
     @Operation(summary = "创建第三方平台账号")
@@ -113,4 +115,25 @@ public class MediaAccountController {
     public CommonResult<Boolean> rescue(@PathVariable Long id, @RequestParam Integer version, @RequestParam String status) { mediaAccountService.updateRescue(id, version, status); return success(true); }
     @PostMapping("/{id}/request-rebind") @PreAuthorize("@ss.hasPermission('zsjos:media-account:rebind')")
     public CommonResult<String> requestRebind(@PathVariable Long id,@RequestParam Long targetStudentId,@RequestParam Integer version){return success(mediaAccountService.requestRebind(id,targetStudentId,version,getLoginUserId()));}
+
+    @PostMapping("/{id}/request-delete")
+    @Operation(summary = "申请删除账号")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:delete')")
+    public CommonResult<String> requestDelete(@PathVariable Long id, @Valid @RequestBody MediaAccountDeleteReqVO req) {
+        return success(deleteService.submit(id, req.getReason(), getLoginUserId()));
+    }
+
+    @PostMapping("/{id}/withdraw-delete")
+    @Operation(summary = "撤回删除账号申请")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:delete')")
+    public CommonResult<Boolean> withdrawDelete(@PathVariable Long id) {
+        deleteService.withdraw(id, getLoginUserId()); return success(true);
+    }
+
+    @PostMapping("/{id}/retry-delete")
+    @Operation(summary = "重试已通过的账号删除")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:delete-approve')")
+    public CommonResult<Boolean> retryDelete(@PathVariable Long id) {
+        deleteService.retryByAccount(id); return success(true);
+    }
 }

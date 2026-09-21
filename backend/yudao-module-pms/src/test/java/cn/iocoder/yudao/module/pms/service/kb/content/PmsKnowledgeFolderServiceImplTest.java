@@ -102,7 +102,7 @@ public class PmsKnowledgeFolderServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         when(contentPermissionService.createDefaultContentPermission(library.getId(), userId)).thenReturn(randomLongId());
         // 准备参数
@@ -126,7 +126,7 @@ public class PmsKnowledgeFolderServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeFolderDO parent = randomFolderDO(library.getId(), 0L);
         folderMapper.insert(parent);
@@ -148,8 +148,8 @@ public class PmsKnowledgeFolderServiceImplTest extends BaseDbUnitTest {
         libraryMapper.insert(sourceLibrary);
         PmsKnowledgeLibraryDO targetLibrary = randomLibraryDO();
         libraryMapper.insert(targetLibrary);
-        when(memberService.validateLibraryReadable(sourceLibrary.getId(), userId)).thenReturn(sourceLibrary);
-        when(memberService.validateLibraryReadable(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
+        when(memberService.validateLibraryInteraction(sourceLibrary.getId(), userId)).thenReturn(sourceLibrary);
+        when(memberService.validateLibraryInteraction(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
         when(memberService.validateLibraryWritable(targetLibrary.getId(), userId)).thenReturn(targetLibrary);
         PmsKnowledgeFolderDO parent = randomFolderDO(sourceLibrary.getId(), 0L);
         folderMapper.insert(parent);
@@ -191,7 +191,7 @@ public class PmsKnowledgeFolderServiceImplTest extends BaseDbUnitTest {
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         memberMapper.insert(randomMemberDO(library.getId(), userId));
-        when(memberService.validateLibraryReadable(library.getId(), userId)).thenReturn(library);
+        when(memberService.validateLibraryInteraction(library.getId(), userId)).thenReturn(library);
         when(memberService.validateLibraryWritable(library.getId(), userId)).thenReturn(library);
         PmsKnowledgeFolderDO parentFolder = randomFolderDO(library.getId(), 0L);
         folderMapper.insert(parentFolder);
@@ -217,7 +217,7 @@ public class PmsKnowledgeFolderServiceImplTest extends BaseDbUnitTest {
         assertEquals(-1, folderMapper.selectById(childFolder.getId()).getStatus());
         assertEquals(-1, documentMapper.selectById(parentDocument.getId()).getStatus());
         assertEquals(-1, documentMapper.selectById(childDocument.getId()).getStatus());
-        verify(memberService).validateLibraryReadable(library.getId(), userId);
+        verify(memberService).validateLibraryInteraction(library.getId(), userId);
     }
 
     // ========== 随机对象 ==========

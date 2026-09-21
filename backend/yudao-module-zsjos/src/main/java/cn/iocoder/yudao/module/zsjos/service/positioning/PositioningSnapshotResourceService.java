@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardSubmissionMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.production.ProductionTicketService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -17,6 +18,16 @@ public class PositioningSnapshotResourceService {
     @Resource private PositioningCardMapper cardMapper;
     @Resource private PositioningCardSubmissionMapper submissionMapper;
     @Resource private FileApi fileApi;
+    @Resource private ProductionTicketService productionTicketService;
+    @Resource private PositioningCardObjectPermissionProvider objectPermissionProvider;
+
+    public PositioningCardService.CardFile attachmentForTicket(Long cardId, Long submissionId, Long fileId, Long userId) {
+        if (!productionTicketService.canReadPositioningSnapshot(cardId, submissionId, userId)) {
+            objectPermissionProvider.check(cardId, "read", userId);
+            return attachment(cardId, submissionId, fileId);
+        }
+        return attachmentFromSnapshot(snapshot(cardId, submissionId), fileId);
+    }
 
     public String snapshot(Long cardId, Long submissionId) {
         var card = cardMapper.selectById(cardId);

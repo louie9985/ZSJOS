@@ -32,7 +32,7 @@ describe('student positioning interview and account workspace boundary', () => {
   })
   it('uses server-projected operations and preserves notification navigation', () => {
     expect(page).toContain('directorContext?.availableActions')
-    expect(page).toContain('const overviewToolbarActions = [...plannerActions, ...directorActions, ...contentApprovalAction, ...overviewAccountActions]')
+    expect(page).toContain('const overviewToolbarActions = selectedService ? [...plannerActions, ...directorActions, ...contentApprovalAction, ...overviewAccountActions] : []')
     expect(page).toContain('overviewToolbarActions.length > 0 && <OverflowToolbar actions={overviewToolbarActions} />')
     expect(page).toContain('location.key')
     expect(page).toContain("params.get('personId')")

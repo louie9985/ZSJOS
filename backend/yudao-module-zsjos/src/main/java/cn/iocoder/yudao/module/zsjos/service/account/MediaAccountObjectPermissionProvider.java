@@ -24,6 +24,7 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
     public boolean hasPermission(Long id, String action, Long userId) {
         MediaAccountDO account = mapper.selectById(id);
         if (account == null) return false;
+        if (("delete_pending".equals(account.getRunStatus()) || "deleted".equals(account.getRunStatus())) && !"read".equals(action)) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) {
             if (account.getCreateServiceRelationId() == null) return true;
             var source = relationMapper.selectById(account.getCreateServiceRelationId());
@@ -54,7 +55,7 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
         return related && ("read".equals(action) || "update".equals(action) || "edit".equals(action)
                 || "maintenance".equals(action) || "positioning-apply".equals(action)
                 || "grade".equals(action) || "rescue".equals(action)
-                || "bind-student".equals(action) || "rebind".equals(action));
+                || "bind-student".equals(action) || "rebind".equals(action) || "delete".equals(action));
     }
 
     @Override public void check(Long id, String action, Long userId) {

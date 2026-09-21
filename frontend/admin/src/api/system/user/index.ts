@@ -41,8 +41,8 @@ export const getSimpleUserList = (): Promise<UserVO[]> => {
 }
 
 // 精简用户接口的真实返回契约
-export const getSimpleUserOptions = (): Promise<UserSimpleVO[]> => {
-  return request.get({ url: '/system/user/simple-list' })
+export const getSimpleUserOptions = (includeDisabled = false): Promise<UserSimpleVO[]> => {
+  return request.get({ url: '/system/user/simple-list', params: { includeDisabled } })
 }
 
 // 按用户编号查询用户精简信息（点头像弹名片）

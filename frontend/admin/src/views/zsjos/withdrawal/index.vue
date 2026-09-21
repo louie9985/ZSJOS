@@ -1,6 +1,8 @@
 <template>
   <ContentWrap>
+    <BusinessReadScope v-if="own && userStore.dataAccess.tenantReadAll" v-model="readScope" />
     <el-button
+      v-if="!readOnly"
       v-hasPermi="['zsjos:withdrawal:apply']"
       type="primary"
       class="mb-16px"
@@ -63,7 +65,7 @@
           <el-button link @click="openDetail(scope.row.id)">详情</el-button>
           <el-button
             v-if="
-              scope.row.status === 'pending_review' &&
+              !readOnly && scope.row.status === 'pending_review' &&
               scope.row.applicantUserId === userStore.getUser.id
             "
             v-hasPermi="['zsjos:withdrawal:apply']"
@@ -73,7 +75,7 @@
             >撤销</el-button
           >
           <el-button
-            v-if="scope.row.status === 'approved'"
+            v-if="!readOnly && scope.row.status === 'approved'"
             v-hasPermi="['zsjos:withdrawal:review']"
             link
             type="danger"
@@ -81,7 +83,7 @@
             >驳回</el-button
           >
           <el-button
-            v-if="scope.row.status === 'approved'"
+            v-if="!readOnly && scope.row.status === 'approved'"
             v-hasPermi="['zsjos:withdrawal:payout']"
             link
             type="primary"
@@ -100,13 +102,14 @@
     />
   </ContentWrap>
   <Dialog v-model="detailVisible" title="提现详情" width="620px">
+    <el-button v-if="detail && userStore.dataAccess.tenantReadAll && !detail.cardNumber" @click="viewFullCard">查看完整收款信息</el-button>
     <el-descriptions v-if="detail" :column="1" border>
       <el-descriptions-item label="提现单号">{{ detail.withdrawalNo }}</el-descriptions-item>
       <el-descriptions-item label="金额"
         >¥{{ money(detail.applicationAmount) }}</el-descriptions-item
       >
       <el-descriptions-item label="开户名">{{ detail.accountNameSnapshot }}</el-descriptions-item>
-      <el-descriptions-item label="银行卡">{{ detail.maskedCardNumber }}</el-descriptions-item>
+      <el-descriptions-item label="银行卡">{{ detail.cardNumber || detail.maskedCardNumber }}</el-descriptions-item>
       <el-descriptions-item label="开户行"
         >{{ detail.bankNameSnapshot }} {{ detail.branchNameSnapshot }}</el-descriptions-item
       >
@@ -224,6 +227,7 @@
   </Dialog>
 </template>
 <script setup lang="ts">
+import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
 import { ElMessageBox } from 'element-plus'
 import * as Api from '@/api/zsjos/withdrawal'
 import * as CashbackApi from '@/api/zsjos/cashback'
@@ -234,6 +238,9 @@ import { formatDate } from '@/utils/formatTime'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
 const router = useRouter()
+const own = computed(() => withdrawalDataScope(userStore.getPermissions) === 'own')
+const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
+const readOnly = computed(() => own.value && readScope.value.readScope !== 'SELF')
 const loading = ref(false),
   saving = ref(false),
   exporting = ref(false),
@@ -315,7 +322,9 @@ const statuses = [
 ]
 const statusName = (v: string) => statuses.find((i) => i.value === v)?.label || v,
   money = (v: number) => Number(v).toFixed(2)
+let loadSequence = 0
 const load = async () => {
+  const sequence = ++loadSequence
   selectedWithdrawals.value = []
   list.value = []
   loading.value = true
@@ -323,14 +332,22 @@ const load = async () => {
   try {
     const scope = withdrawalDataScope(userStore.getPermissions)
     if (scope === 'unauthorized') throw new Error('暂无提现查询权限')
-    const data = await (scope === 'own' ? Api.getMyPage(query) : Api.getPage(query))
+    if (own.value && readScope.value.readScope === 'USER' && !readScope.value.targetUserId) { total.value = 0; return }
+    const data = await (scope === 'own' ? Api.getMyPage({ ...query, ...readScope.value }) : Api.getPage(query))
+    if (sequence !== loadSequence) return
     list.value = data.list
     total.value = data.total
   } catch (e: any) {
-    error.value = e?.msg || e?.message || '提现记录加载失败'
+    if (sequence === loadSequence) error.value = e?.msg || e?.message || '提现记录加载失败'
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
+}
+watch(readScope, () => { detailVisible.value = false; applyVisible.value = false; rejectVisible.value = false; payoutVisible.value = false; query.pageNo = 1; void load() }, { deep: true })
+const viewFullCard = async () => {
+  if (!detail.value) return
+  try { detail.value = await Api.getFinanceDetail(detail.value.id) }
+  catch (cause: any) { error.value = cause?.msg || cause?.message || '完整收款信息加载失败' }
 }
 const openDetail = async (id: number) => {
   const scope = withdrawalDataScope(userStore.getPermissions)

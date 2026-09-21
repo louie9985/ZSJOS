@@ -48,6 +48,7 @@
           detail.decisionReason || detail.terminationReason || '-'
         }}</el-descriptions-item>
       </el-descriptions>
+      <OrderHistoryFacts v-if="detail" :order="detail" />
       <OrderProductSummary v-if="detail && !detailError" :items="detail.items" />
     </div>
     <template #footer>
@@ -93,6 +94,13 @@
   <el-dialog v-model="revisionOpen" title="补正并重新提交" width="620px">
     <el-alert title="未展示字段会沿用当前订单快照。" type="info" show-icon class="mb-12px" />
     <el-form label-width="100px">
+      <template v-for="field in revisionDictionaryFields" :key="field.key">
+        <el-form-item v-if="refreshedDictionaryFields.includes(field.key)" :label="field.label" required>
+          <el-select v-model="revision[field.key]" placeholder="历史未记录，请重新选择">
+            <el-option v-for="option in revisionOptions[field.key]" :key="option.value" :value="option.value" :label="option.label" />
+          </el-select>
+        </el-form-item>
+      </template>
       <el-form-item label="购买人"><el-input v-model="revision.buyerName" /></el-form-item>
       <el-form-item label="学员姓名" required
         ><el-input v-model="revision.studentName"
@@ -125,7 +133,9 @@
 </template>
 
 <script setup lang="ts">
+import { getSimpleDictDataList } from '@/api/system/dict/dict.data'
 import OrderProductSummary from '../components/OrderProductSummary.vue'
+import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
 import { reactive, ref } from 'vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
 import { useMessage } from '@/hooks/web/useMessage'
@@ -189,16 +199,34 @@ const terminate = async () => {
     terminating.value = false
   }
 }
-const openRevision = () => {
+const revisionDictionaryFields = [
+  { key: 'studentNature', type: 'zsjos_order_student_nature', label: '学员性质' },
+  { key: 'servicePeriod', type: 'zsjos_order_service_period', label: '服务周期' },
+  { key: 'studentSource', type: 'zsjos_order_student_source', label: '学员来源' },
+  { key: 'feeMode', type: 'zsjos_order_fee_mode', label: '收费方式' },
+  { key: 'paymentMethod', type: 'zsjos_order_payment_method', label: '支付方式' }
+]
+const refreshedDictionaryFields = ref<string[]>([])
+const revisionOptions = ref<Record<string, Array<{ value: string; label: string }>>>({})
+const openRevision = async () => {
   if (!detail.value) return
   Object.assign(revision, structuredClone(detail.value))
+  refreshedDictionaryFields.value = revisionDictionaryFields.filter(field => !detail.value[field.key + 'LabelSnapshot']).map(field => field.key)
+  const dictionaries = await getSimpleDictDataList()
+  for (const field of revisionDictionaryFields) {
+    revisionOptions.value[field.key] = dictionaries.filter(item => item.dictType === field.type)
+      .map(item => ({ value: item.value, label: item.label }))
+    if (refreshedDictionaryFields.value.includes(field.key)) revision[field.key] = undefined
+  }
   revisionOpen.value = true
 }
 const resubmit = async () => {
   if (!detail.value || !revision.studentName?.trim()) return message.warning('请填写学员姓名')
+  if (refreshedDictionaryFields.value.some(key => !revision[key])) return message.warning('请重新选择历史未记录的字典项')
   revising.value = true
   try {
     await Api.resubmitSalesOrder(detail.value.id, {
+      refreshedDictionaryFields: refreshedDictionaryFields.value,
       buyerName: revision.buyerName?.trim() || undefined,
       studentName: revision.studentName.trim(),
       studentNature: revision.studentNature,

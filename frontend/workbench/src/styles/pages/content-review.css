@@ -187,7 +187,7 @@
  */
 .content-review-items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
   gap: var(--crm-gap);
   align-items: start;
 }

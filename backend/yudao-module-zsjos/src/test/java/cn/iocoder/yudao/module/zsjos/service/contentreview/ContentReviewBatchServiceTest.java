@@ -78,6 +78,7 @@ class ContentReviewBatchServiceTest {
     private static final Long OPERATOR_ID = 7L;
 
     @InjectMocks private ContentReviewBatchService service;
+    @Mock private ContentReviewNotifyPublisher notifyPublisher;
     @Mock private ContentReviewBatchMapper batchMapper;
     @Mock private ContentReviewBatchItemMapper itemMapper;
     @Mock private ContentReviewRelationMapper relationMapper;
@@ -150,6 +151,55 @@ class ContentReviewBatchServiceTest {
     }
 
     @Test
+    void replacingDraftItemsRetainsBatchNumberAndExistingItemIdentity() {
+        ContentReviewBatchDO draft = reviewBatch(BATCH_DRAFT, STAGE_DRAFT);
+        ContentDO content = reviewableContent(1001L, 90L, 1, 0);
+        ContentVersionDO version = completeVersion(11L, 1001L);
+        ContentReviewBatchItemDO retained = reviewItem(1L, null, null, false)
+                .setContentId(1001L).setContentVersionId(10L).setPreviousItemId(99L);
+        ContentReviewBatchItemDO removed = reviewItem(2L, null, null, false).setContentId(1002L);
+        when(contentVersionMapper.selectByIdForUpdate(11L, TENANT_ID)).thenReturn(version);
+        when(contentMapper.selectByIds(any())).thenReturn(List.of(content));
+        when(contentPermissionProvider.hasPermission(1001L, "read", OPERATOR_ID)).thenReturn(true);
+        when(accountMapper.selectById(90L)).thenReturn(new MediaAccountDO().setId(90L).setOwnerOperatorUserId(OPERATOR_ID));
+        when(itemMapper.selectByBatchId(50L)).thenReturn(List.of(retained, removed));
+        ContentReviewBatchCreateReqVO request = new ContentReviewBatchCreateReqVO();
+        request.setContentVersionIds(List.of(11L));
+        Long savedId = ReflectionTestUtils.invokeMethod(service, "create", request, OPERATOR_ID, draft);
+        assertEquals(50L, savedId);
+        assertEquals("CRB-1", draft.getBatchNo());
+        assertEquals(1, draft.getVersion());
+        assertEquals(11L, retained.getContentVersionId());
+        assertEquals(99L, retained.getPreviousItemId());
+        verify(batchMapper, never()).insert(any(ContentReviewBatchDO.class));
+        verify(batchMapper).updateById(draft);
+        verify(itemMapper).updateById(retained);
+        verify(itemMapper).deleteById(removed.getId());
+    }
+
+    @Test
+    void savingStaleDraftFailsBeforeEditingContents() {
+        ContentReviewBatchDO draft = reviewBatch(BATCH_DRAFT, STAGE_DRAFT).setStudentPersonId(77L).setVersion(3);
+        when(batchMapper.selectByIdForUpdate(50L, TENANT_ID)).thenReturn(draft);
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
+        request.setStudentPersonId(77L); request.setExpectedVersion(2);
+        assertServiceCode(CONTENT_REVIEW_VERSION_CONFLICT, () -> service.saveStudentDraft(50L, request, OPERATOR_ID));
+        verifyNoInteractions(itemMapper, contentMapper, accountMapper);
+    }
+
+    @Test
+    void historicalRejectedRoundIsDisplayedAsResubmittedWithoutChangingStoredResult() {
+        ContentReviewBatchDO old = reviewBatch(BATCH_NEED_MODIFY, STAGE_DONE);
+        when(batchMapper.selectByRevisionOfBatchId(50L)).thenReturn(List.of(
+                new ContentReviewBatchDO().setId(51L).setStatus(BATCH_DIRECTOR_REVIEW)));
+        ContentReviewBatchRespVO response = ReflectionTestUtils.invokeMethod(service, "toResponse",
+                old, List.of(), Map.of(), null, OPERATOR_ID, false);
+        assertEquals("RESUBMITTED", response.getStatus());
+        assertEquals(BATCH_NEED_MODIFY, old.getStatus());
+        assertTrue(response.getAvailableActions().isEmpty());
+    }
+
+    @Test
     void cancelDraftReleasesBatchWithoutTouchingContentVersions() {
         ContentReviewBatchDO batch = reviewBatch(BATCH_DRAFT, STAGE_DRAFT);
         when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
@@ -208,14 +258,14 @@ class ContentReviewBatchServiceTest {
     }
 
     @Test
-    void finalCompletionAllowsBatchWhereDirectorReturnedEveryItem() {
+    void finalApprovalRejectsLegacyBatchWhereDirectorReturnedEveryItem() {
         ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
         mockLockedBatch(batch);
         when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
                 reviewItem(1L, DECISION_RETURNED, null, false),
                 reviewItem(2L, DECISION_RETURNED, null, false)));
 
-        assertDoesNotThrow(() -> service.validateTaskAction(taskContext("final", 9L)));
+        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.validateTaskAction(taskContext("final", 9L)));
 
         verifyNoInteractions(reviewMaterialService);
     }
@@ -391,7 +441,7 @@ class ContentReviewBatchServiceTest {
         when(contentVersionMapper.unfreeze(201L)).thenReturn(0);
 
         BpmProcessInstanceStatusEvent event = processEvent("event-rejected");
-        event.setStatus(BpmProcessInstanceStatusEnum.REJECT.getStatus());
+        event.setStatus(BpmProcessInstanceStatusEnum.CANCEL.getStatus());
         assertServiceCode(CONTENT_REVIEW_VERSION_CONFLICT,
                 () -> service.handleProcessResult(event));
 
@@ -418,43 +468,119 @@ class ContentReviewBatchServiceTest {
     }
 
     @Test
-    void processResultAppliesMixedOutcomesAsOneCompletedBatch() {
+    void rejectedRoundKeepsFrozenSnapshotsAndReturnsWholeBatch() {
         ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
         mockLocatedEventBatch(batch);
-        ContentReviewBatchItemDO approved = reviewItem(1L, DECISION_APPROVED, DECISION_APPROVED, false)
+        ContentReviewBatchItemDO item = reviewItem(1L, DECISION_APPROVED, DECISION_RETURNED, false)
+                .setContentId(101L).setContentVersionId(201L).setFinalComment("需要修改")
+                .setFinalReviewedByUserId(9L).setVersion(0);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(item));
+        ContentDO content = reviewableContent(101L, 90L, 1, 3);
+        ContentVersionDO version = frozenVersion(201L, 101L);
+        when(contentMapper.selectByIdForUpdate(101L, TENANT_ID)).thenReturn(content);
+        when(contentVersionMapper.selectByIdForUpdate(201L, TENANT_ID)).thenReturn(version);
+        when(contentVersionMapper.finishReview(eq(201L), eq("rejected"), eq("需要修改"), eq(9L), any())).thenReturn(1);
+        when(itemMapper.finalizeItem(eq(item), eq(RESULT_RETURNED), eq(null), eq(null))).thenReturn(1);
+        when(batchMapper.finalizeBatch(eq(batch), eq(BATCH_NEED_MODIFY), eq("event-return"), any())).thenReturn(1);
+        BpmProcessInstanceStatusEvent event = processEvent("event-return");
+        event.setStatus(BpmProcessInstanceStatusEnum.REJECT.getStatus());
+        service.handleProcessResult(event);
+        verify(contentVersionMapper, never()).unfreeze(anyLong());
+        verify(contentService).applyBatchReview(content, 3, false, "需要修改", 9L);
+        verifyNoInteractions(materialService);
+        org.junit.jupiter.api.Assertions.assertNotNull(version.getFrozenAt());
+    }
+
+    @Test
+    void finalApprovalMakesContentReadyToPublishWithoutUnfreezingHistory() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
+        mockLocatedEventBatch(batch);
+        ContentReviewBatchItemDO item = reviewItem(1L, DECISION_APPROVED, DECISION_APPROVED, false)
                 .setContentId(101L).setContentVersionId(201L).setFinalComment("通过")
                 .setFinalReviewedByUserId(9L).setVersion(0);
-        ContentReviewBatchItemDO returned = reviewItem(2L, DECISION_RETURNED, null, false)
-                .setContentId(102L).setContentVersionId(202L).setDirectorComment("需要修改")
-                .setDirectorReviewedByUserId(OPERATOR_ID).setVersion(0);
-        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(approved, returned));
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(item));
+        ContentDO content = reviewableContent(101L, 90L, 1, 3);
+        when(contentMapper.selectByIdForUpdate(101L, TENANT_ID)).thenReturn(content);
+        when(contentVersionMapper.selectByIdForUpdate(201L, TENANT_ID)).thenReturn(frozenVersion(201L, 101L));
+        when(contentVersionMapper.finishReview(eq(201L), eq("approved"), eq("通过"), eq(9L), any())).thenReturn(1);
+        when(itemMapper.finalizeItem(eq(item), eq(RESULT_READY_TO_PUBLISH), eq(null), eq(null))).thenReturn(1);
+        when(batchMapper.finalizeBatch(eq(batch), eq(BATCH_COMPLETED), eq("approved-event"), any())).thenReturn(1);
+        service.handleProcessResult(processEvent("approved-event"));
+        verify(contentService).applyBatchReview(content, 3, true, "通过", 9L);
+        verify(contentVersionMapper, never()).unfreeze(anyLong());
+        verifyNoInteractions(materialService);
+    }
 
-        ContentDO approvedContent = reviewableContent(101L, 90L, 1, 3);
-        ContentDO returnedContent = reviewableContent(102L, 90L, 1, 4);
-        ContentVersionDO approvedVersion = frozenVersion(201L, 101L);
-        ContentVersionDO returnedVersion = frozenVersion(202L, 102L);
-        when(contentMapper.selectByIdForUpdate(101L, TENANT_ID)).thenReturn(approvedContent);
-        when(contentMapper.selectByIdForUpdate(102L, TENANT_ID)).thenReturn(returnedContent);
-        when(contentVersionMapper.selectByIdForUpdate(201L, TENANT_ID)).thenReturn(approvedVersion);
-        when(contentVersionMapper.selectByIdForUpdate(202L, TENANT_ID)).thenReturn(returnedVersion);
-        when(contentVersionMapper.finishReview(eq(201L), eq("approved"), eq("通过"), eq(9L), any()))
-                .thenReturn(1);
-        when(contentVersionMapper.finishReview(eq(202L), eq("rejected"), eq("需要修改"),
-                eq(OPERATOR_ID), any())).thenReturn(1);
-        when(itemMapper.finalizeItem(eq(approved), eq(RESULT_READY_TO_PUBLISH), eq(null), eq(null)))
-                .thenReturn(1);
-        when(itemMapper.finalizeItem(eq(returned), eq(RESULT_RETURNED), eq(null), eq(null)))
-                .thenReturn(1);
-        when(batchMapper.finalizeBatch(eq(batch), eq(BATCH_NEED_MODIFY), eq("event-3"), any()))
-                .thenReturn(1);
+    @Test
+    void finalRejectionRequiresCompleteDecisionsAndDoesNotValidateCollection() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
+        mockLockedBatch(batch);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                reviewItem(1L, DECISION_APPROVED, DECISION_APPROVED, true),
+                reviewItem(2L, DECISION_APPROVED, DECISION_RETURNED, false)));
+        BpmTaskActionContext context = taskContext("final", 9L);
+        context.setAction(cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_REJECT);
+        assertDoesNotThrow(() -> service.validateTaskAction(context));
+        verifyNoInteractions(reviewMaterialService);
+        context.setAction(cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_APPROVE);
+        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.validateTaskAction(context));
+    }
 
-        service.handleProcessResult(processEvent("event-3"));
+    @Test
+    void finalRejectionCannotSkipUnreviewedItems() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
+        mockLockedBatch(batch);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                reviewItem(1L, DECISION_APPROVED, null, false),
+                reviewItem(2L, DECISION_APPROVED, DECISION_RETURNED, false)));
+        BpmTaskActionContext context = taskContext("final", 9L);
+        context.setAction(cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_REJECT);
+        assertServiceCode(CONTENT_REVIEW_DECISION_INCOMPLETE, () -> service.validateTaskAction(context));
+    }
 
-        verify(contentService).applyBatchReview(approvedContent, 3, true, "通过", 9L);
-        verify(contentService).applyBatchReview(returnedContent, 4, false, "需要修改", OPERATOR_ID);
-        verify(itemMapper).finalizeItem(approved, RESULT_READY_TO_PUBLISH, null, null);
-        verify(itemMapper).finalizeItem(returned, RESULT_RETURNED, null, null);
-        verify(batchMapper).finalizeBatch(eq(batch), eq(BATCH_NEED_MODIFY), eq("event-3"), any());
+    @Test
+    void explicitFinalDecisionCannotContradictSavedItems() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_FINAL_REVIEW, STAGE_FINAL);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        when(processTaskApi.getTodoTask(9L, "task-1")).thenReturn(new BpmTaskRespDTO()
+                .setProcessInstanceId("process-1").setBusinessKey("content-review-batch:50")
+                .setProcessDefinitionKey("content-review").setTaskDefinitionKey("final"));
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                reviewItem(1L, DECISION_APPROVED, DECISION_RETURNED, false)));
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCompleteReqVO();
+        request.setExpectedVersion(0); request.setTaskId("task-1"); request.setReason("整批退回");
+        request.setDecision(DECISION_APPROVED);
+        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.completeFinal(batch.getId(), request, 9L));
+        verify(processTaskApi, never()).approveTask(anyLong(), any());
+        verify(processTaskApi, never()).rejectTask(anyLong(), any());
+        request.setDecision(DECISION_RETURNED);
+        service.completeFinal(batch.getId(), request, 9L);
+        verify(processTaskApi).rejectTask(eq(9L), any());
+    }
+
+    @Test
+    void revisionRejectsSourcesFromAnotherBatchBeforeCreatingAnything() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_NEED_MODIFY, STAGE_DONE).setStudentPersonId(77L);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                reviewItem(1L, DECISION_RETURNED, null, false).setContentId(10L).setContentVersionId(20L)));
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
+        request.setStudentPersonId(77L); request.setAccountIds(List.of(90L));
+        var work = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.Work();
+        work.setSourceContentId(999L); work.setSourceVersionId(20L); request.setWorks(List.of(work));
+        assertServiceCode(CONTENT_REVIEW_BATCH_ITEMS_INVALID, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
+        verifyNoInteractions(accountMapper, contentService);
+    }
+
+    @Test
+    void revisionRejectsDuplicateChildBeforeCreatingAnything() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_NEED_MODIFY, STAGE_DONE).setStudentPersonId(77L);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        when(batchMapper.selectByRevisionOfBatchId(batch.getId())).thenReturn(List.of(new ContentReviewBatchDO().setId(51L)));
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
+        request.setStudentPersonId(77L);
+        assertServiceCode(CONTENT_REVIEW_VERSION_CONFLICT, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
+        verifyNoInteractions(accountMapper, contentService);
     }
 
     @Test

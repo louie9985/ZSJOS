@@ -14,6 +14,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDEN
 @Component
 public class StudentContactExtensionObjectPermissionProvider implements ZsjosObjectPermissionProvider {
     @Resource private StudentContactExtensionMapper extensionMapper;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @Override public String getBizType() { return "student-contact-extension"; }
 
@@ -21,6 +22,7 @@ public class StudentContactExtensionObjectPermissionProvider implements ZsjosObj
     public boolean hasPermission(Long bizId, String action, Long userId) {
         StudentContactExtensionDO extension = extensionMapper.selectById(bizId);
         if (extension == null) return false;
+        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("withdraw".equals(action)) return Objects.equals(extension.getApplicantUserId(), userId);
         return "read".equals(action) && (Objects.equals(extension.getApplicantUserId(), userId)
                 || Objects.equals(extension.getReviewerUserId(), userId));

@@ -290,6 +290,9 @@ export type MediaAccount = {
   status?: string;
   version: number;
   availableActions: string[];
+  deleteStatus?: string;
+  deleteReason?: string;
+  deleteResultReason?: string;
 };
 export type MediaAccountMaintenanceProblem = {
   value: string;
@@ -423,8 +426,15 @@ export type ProductionTicketDispatchContext = {
   positioningSubmissionId?: number;
   positioning?: PositioningTicketSnapshot;
   operatorRemark?: string;
+  completionRemark?: string;
+  completionAttachmentId?: number;
+  videoSentToOperator?: boolean;
+  accounts?: Array<{ accountId?: number; accountName?: string; accountNo?: string; homepageUrl?: string; coverUrl?: string }>;
 };
+export type ProductionTicketFormField = { key: string; label: string; type?: string; required?: boolean; dictionaryType?: string };
+export type ProductionTicketAttachment = { id: number; name: string; type?: string; size?: number; url?: string };
 export type PositioningTicketSnapshot = {
+  cardId?: number;
   submissionNo?: number;
   submittedAt?: Timestamp;
   fields?: StudentContactFormField[];
@@ -453,6 +463,10 @@ export type ProductionTicket = {
   expectedDeliveredAt?: Timestamp;
   deadlineAt?: Timestamp;
   availableActions: string[];
+  formFields?: ProductionTicketFormField[];
+  formValues?: Record<string, unknown>;
+  requestAttachments?: ProductionTicketAttachment[];
+  submitterName?: string;
 };
 export type ProductionTicketCreateContext = ProductionTicketDispatchContext & {
   sceneCode: string;
@@ -1712,6 +1726,7 @@ export type LeadAppeal = {
 };
 export type SalesOrderVoucher = LeadAttachment;
 export type SalesOrderSubmitRequest = {
+  refreshedDictionaryFields?: string[];
   purchaseIntentId?: number;
   buyerName?: string;
   studentName: string;
@@ -1808,6 +1823,10 @@ export type PaymentRefund = {
   lastErrorMessage?: string;
 };
 export type SalesOrder = {
+  submitterUserName?: string
+  formalSalesUserName?: string
+  historyMissingFields?: Record<string, 'history_not_recorded' | 'invalid_snapshot'>
+
   id: number;
   orderNo: string;
   leadId?: number;
@@ -2117,6 +2136,8 @@ export type BpmBusinessTaskTarget =
 export type BusinessTaskBucket = "unscheduled" | "overdue" | "today" | "future";
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>;
 export type BusinessTask = {
+  assigneeId?: number;
+  assigneeName?: string;
   id: number;
   taskType: string;
   bizType: string;
@@ -3321,7 +3342,7 @@ export type ClassTransfer = { id: number; serviceRelationId: number; fromClassNa
 
 export const api = {
   deliveryClasses: {
-    page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number }, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
+    page: async (params: { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number }, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
     get: async (id: number) => unwrap<DeliveryClass>(await http.get(`/zsjos/delivery-class/${id}`)),
     students: async (id: number, pageNo = 1, pageSize = 50) => unwrap<PageResult<DeliveryClassStudent>>(await http.get(`/zsjos/delivery-class/${id}/students`, { params: { pageNo, pageSize } })),
     options: async (categoryId?: number, includePending = true) => unwrap<DeliveryClassOption[]>(await http.get('/zsjos/delivery-class/options', { params: { categoryId, includePending } })),
@@ -3694,6 +3715,10 @@ export const api = {
           params: { targetStudentId, version },
         }),
       ),
+    requestDelete: async (id: number, reason: string) =>
+      unwrap<string>(await http.post(`/zsjos/media-account/${id}/request-delete`, { reason })),
+    withdrawDelete: async (id: number) =>
+      unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/withdraw-delete`)),
   },
   mediaContent: {
     create: async (data: {
@@ -3811,7 +3836,7 @@ export const api = {
           params: { accountId, sceneCode },
         }),
       ),
-    create: async (data: { sceneCode: string; accountId: number; accountIds?: number[]; studentPersonId?: number; assigneeUserId?: number; targetDeptId?: number; operatorRemark?: string; values?: Record<string, unknown>; attachmentIds?: number[] }) =>
+    create: async (data: { sceneCode: string; accountId: number; accountIds?: number[]; studentPersonId?: number; dispatchMode?: 'PERSON' | 'AUTO'; assigneeUserId?: number; targetDeptId?: number; operatorRemark?: string; values?: Record<string, unknown>; attachmentIds?: number[] }) =>
       unwrap<number>(
         await http.post("/zsjos/production-ticket/create", {
           ...data,
@@ -3872,11 +3897,9 @@ export const api = {
           { params: { version } },
         ),
       ),
-    submit: async (id: number, version: number) =>
+    submit: async (id: number, data: { version: number; remark?: string; attachmentId?: number; videoSentToOperator: boolean }) =>
       unwrap<boolean>(
-        await http.post(`/zsjos/production-ticket/${id}/submit`, null, {
-          params: { version },
-        }),
+        await http.post(`/zsjos/production-ticket/${id}/submit`, { ...data, idempotencyKey: createIdempotencyKey() }),
       ),
     startCheck: async (id: number, version: number) =>
       unwrap<boolean>(
@@ -4928,9 +4951,9 @@ export const api = {
       await http.post("/zsjos/sales-order/voucher/upload", data),
     );
   },
-  businessTaskSummary: async () =>
+  businessTaskSummary: async (params?: { readScope?: "SELF" | "ALL" | "USER"; targetUserId?: number }) =>
     unwrap<BusinessTaskSummary>(
-      await http.get("/zsjos/business-task/my-summary"),
+      await http.get("/zsjos/business-task/my-summary", { params }),
     ),
   studentDelivery: {
     reminders: async () => unwrap<DeliveryReminder[]>(await http.get('/zsjos/student-delivery/reminders')),
@@ -4960,6 +4983,8 @@ export const api = {
       }),
     ),
   businessTaskList: async (params: {
+    readScope?: "SELF" | "ALL" | "USER";
+    targetUserId?: number;
     status: "pending" | "done";
     bucket?: BusinessTaskBucket;
     pageNo: number;
@@ -5085,8 +5110,8 @@ export const api = {
     data.append("directory", "bpm/signature");
     return unwrap<string>(await http.post("/infra/file/upload", data));
   },
-  simpleUsers: async () =>
-    unwrap<SimpleUser[]>(await http.get("/system/user/simple-list")),
+  simpleUsers: async (includeDisabled = false) =>
+    unwrap<SimpleUser[]>(await http.get("/system/user/simple-list", { params: { includeDisabled } })),
   simpleDepartments: async () =>
     unwrap<SimpleDept[]>(await http.get("/system/dept/simple-list")),
   workPlanPage: async (params: {

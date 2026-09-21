@@ -49,6 +49,25 @@ import static org.mockito.Mockito.when;
 @Import(PmsKnowledgeContentPermissionServiceImpl.class)
 public class PmsKnowledgeContentPermissionServiceImplTest extends BaseDbUnitTest {
 
+    @Test
+    void administratorPrivatePreviewDoesNotGrantInteractionEditDeleteOrManage() {
+        var permission = new PmsKnowledgeContentPermissionDO().setLibraryId(1L).setOpenStatus(false);
+        permissionMapper.insert(permission);
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
+        assertEquals(PmsKnowledgeContentLevelEnum.PREVIEW.getLevel(),
+                permissionService.validateContentPermissionReadable(permission.getId(), 1L, 10L));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> permissionService.validateContentPermissionInteraction(permission.getId(), 1L, 10L));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> permissionService.validateContentPermissionWritable(permission.getId(), 1L, 10L));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> permissionService.validateContentPermissionDeletable(permission.getId(), 1L, 10L));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> permissionService.validateContentPermissionManageable(permission.getId(), 1L, 10L));
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> permissionService.validateContentPermissionReadable(permission.getId(), 2L, 10L));
+    }
+
     @Resource
     private PmsKnowledgeContentPermissionServiceImpl permissionService;
 

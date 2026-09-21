@@ -92,7 +92,27 @@ class FeedbackServiceImplTest {
     @Mock private FileApi fileApi;
     @Mock private PartnerMapper partnerMapper;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @InjectMocks private FeedbackServiceImpl service;
+
+    @Test
+    void allReadSuppressesOwnActionsIncludingPartnerIdCollision() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackPageReqVO();
+        request.setReadScope("ALL");
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_WAITING);
+        row.setSubmitterSubjectType(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT);
+        row.setSubmitterUserId(11L);
+        row.setUnreadForSubmitter(true);
+        when(readScopeService.resolve("ALL", null, 11L)).thenReturn(null);
+        when(feedbackMapper.selectReadPage(request, null, null)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(row), 1L));
+        var result = service.getMyPage(request, 11L).getList().getFirst();
+        assertFalse(result.getCanReply());
+        assertFalse(result.getCanResubmit());
+        assertFalse(result.getCanSubmitSurvey());
+        assertFalse(result.getUnread());
+        verify(feedbackMapper, never()).updateById(any(FeedbackDO.class));
+    }
 
     @BeforeEach
     void setUp() {

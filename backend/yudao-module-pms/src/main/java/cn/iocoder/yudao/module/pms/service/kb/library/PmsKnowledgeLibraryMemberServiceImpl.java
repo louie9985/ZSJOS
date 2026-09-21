@@ -81,6 +81,15 @@ public class PmsKnowledgeLibraryMemberServiceImpl implements PmsKnowledgeLibrary
     }
 
     @Override
+    public PmsKnowledgeLibraryDO validateLibraryInteraction(Long libraryId, Long userId) {
+        PmsKnowledgeLibraryDO library = validateLibraryExists(libraryId);
+        if (Boolean.FALSE.equals(library.getOpenStatus()) && !isLibraryMember(libraryId, userId)) {
+            throw exception(KNOWLEDGE_LIBRARY_ACCESS_DENIED);
+        }
+        return library;
+    }
+
+    @Override
     public PmsKnowledgeLibraryDO validateLibraryWritable(Long libraryId, Long userId) {
         PmsKnowledgeLibraryDO library = validateLibraryExists(libraryId);
         if (!isLibraryWritable(libraryId, userId)) {
@@ -261,7 +270,7 @@ public class PmsKnowledgeLibraryMemberServiceImpl implements PmsKnowledgeLibrary
     @Transactional(rollbackFor = Exception.class)
     public void exitLibrary(Long libraryId, Long userId) {
         // 1.1 校验知识库可访问
-        validateLibraryReadable(libraryId, userId);
+        validateLibraryInteraction(libraryId, userId);
         // 1.2 校验当前账号是直接成员
         PmsKnowledgeLibraryMemberDO member = memberMapper.selectByLibraryIdAndUserId(libraryId, userId);
         if (member == null) {

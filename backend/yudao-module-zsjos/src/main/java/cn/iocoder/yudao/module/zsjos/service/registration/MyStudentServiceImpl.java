@@ -97,6 +97,11 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     @Override
     public PageResult<MyStudentRespVO> getMediaPage(Long userId, MyStudentPageReqVO reqVO) {
+        if (MediaStudentReadScope.canReadAll(permissionApi, userId)
+                && (reqVO.getReadScope() == null && reqVO.getTargetUserId() == null
+                    || "ALL".equals(reqVO.getReadScope()) && reqVO.getTargetUserId() == null)) {
+            return getAllMediaPage(userId, reqVO);
+        }
         if (reqVO.getReadScope() != null || reqVO.getTargetUserId() != null) {
             return getExplicitReadPage(userId, reqVO, true);
         }
@@ -132,9 +137,9 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     @Override
     public MyStudentRespVO getMediaStudent(Long userId, Long personId) {
-        if (permissionApi.hasTenantReadAllAccess(userId)) {
-            var relations = relationMapper.selectTenantReadByPersonIds(List.of(personId), null);
-            if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
+        if (MediaStudentReadScope.canReadAll(permissionApi, userId)) {
+            if (!personMapper.existsMediaStudent(personId)) throw exception(STUDENT_NOT_EXISTS);
+            var relations = relationMapper.selectMediaReadByPersonIds(List.of(personId), null);
             return convert(userId, personId, relations);
         }
         Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
@@ -195,6 +200,17 @@ public class MyStudentServiceImpl implements MyStudentService {
                             resolveManagedOwnerIds(userId, scope), List.of(personId), null);
         }
         return selectAssignedRelationsForPerson(userId, personId);
+    }
+
+    private PageResult<MyStudentRespVO> getAllMediaPage(Long actorId, MyStudentPageReqVO req) {
+        List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), actorId);
+        PageResult<PersonDO> page = personMapper.selectAllMediaStudentPage(req, matchedIds);
+        var ids = page.getList().stream().map(PersonDO::getId).toList();
+        var groups = relationMapper.selectMediaReadByPersonIds(ids, req.getServiceStatus()).stream()
+                .filter(row -> req.getClassId() == null || Objects.equals(row.getClassId(), req.getClassId()))
+                .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId));
+        return new PageResult<>(page.getList().stream()
+                .map(person -> convert(actorId, person.getId(), groups.get(person.getId()))).toList(), page.getTotal());
     }
 
     private PageResult<MyStudentRespVO> getExplicitReadPage(Long actorId, MyStudentPageReqVO req, boolean media) {

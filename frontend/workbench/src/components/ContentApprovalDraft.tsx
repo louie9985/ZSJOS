@@ -1,3 +1,4 @@
+import { restoreDraftReferences } from '../services/contentReviewDraft'
 import ContentReviewAttachments from './ContentReviewAttachments'
 import ResourceLinkInput from './ResourceLinkInput'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
@@ -77,11 +78,14 @@ const toReferenceMaterials = (materials: Material[]): ContentApprovalReferenceMa
 
 export default function ContentApprovalDraft({
   disabled = false,
+  lockAccounts = false,
   accounts = [],
   purposeOptions,
   formatOptions,
 }: {
   disabled?: boolean
+  /** 修订必须沿用原审批的账号集合。 */
+  lockAccounts?: boolean
   accounts?: ContentApprovalAccount[]
   purposeOptions: Option[]
   formatOptions: Option[]
@@ -89,13 +93,16 @@ export default function ContentApprovalDraft({
   const form = Form.useFormInstance()
   const selectedAccountIds = (Form.useWatch('accountIds', form) as number[] | undefined) || []
   const [now] = useState(() => dayjs())
-  // 作品可上移/下移，下标会变化，因此选择缓存挂在 Form.List 稳定的 key 上。
   const [picker, setPicker] = useState<{ key: number; index: number }>()
-  const [materialsByWork, setMaterialsByWork] = useState<Record<number, Material[]>>({})
+  const works = Form.useWatch('works', { form, preserve: true }) as ContentApprovalWork[] | undefined
+  const materialsByWork = Object.fromEntries((works || []).map((work, index) => [index,
+    restoreDraftReferences(work.referenceMaterials).map(ref => ({ id: ref.materialId, currentEffectiveVersionId: ref.materialVersionId,
+      title: ref.title || '', materialNo: ref.materialNo || '', materialTypeName: ref.materialTypeName || '', coverPreviewUrl: ref.coverPreviewUrl }) as Material),
+  ]))
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Alert type="info" showIcon message="内容将同步适用于所选账号" description="账号资料只保存为本次审批快照；作品会按当前列表逐件提交和审批。" />
     <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个账号' }]}>
-      <Select mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
+      <Select disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
     </Form.Item>
     {selectedAccountIds.length > 0 && <Card size="small" title="账号资料快照（本批次可编辑）">
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
@@ -141,7 +148,7 @@ export default function ContentApprovalDraft({
             <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Button onClick={() => setPicker({ key: field.key, index: field.name })}>素材浏览 · 选择参考素材</Button>
-                {(materialsByWork[field.key] || []).map(material => <Card key={material.id} size="small">
+                {(materialsByWork[field.name] || []).map(material => <Card key={material.id} size="small">
                   <Space align="start" size={10} style={{ width: '100%' }}>
                     {material.coverPreviewUrl
                       ? <img src={material.coverPreviewUrl} alt={material.title} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
@@ -151,8 +158,7 @@ export default function ContentApprovalDraft({
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text>
                     </span>
                     <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => {
-                      const next = (materialsByWork[field.key] || []).filter(item => item.id !== material.id)
-                      setMaterialsByWork({ ...materialsByWork, [field.key]: next })
+                      const next = (materialsByWork[field.name] || []).filter(item => item.id !== material.id)
                       form.setFieldValue(['works', field.name, 'referenceMaterials'], toReferenceMaterials(next))
                     }}>移除</Button>
                   </Space>
@@ -170,12 +176,11 @@ export default function ContentApprovalDraft({
       onCancel={() => setPicker(undefined)}
       onConfirm={(materials) => {
         if (picker) {
-          setMaterialsByWork({ ...materialsByWork, [picker.key]: materials })
           form.setFieldValue(['works', picker.index, 'referenceMaterials'], toReferenceMaterials(materials))
         }
         setPicker(undefined)
       }}
-      defaultSelected={picker ? materialsByWork[picker.key] || [] : []}
+      defaultSelected={picker ? materialsByWork[picker.index] || [] : []}
     />
   </Space>
 }

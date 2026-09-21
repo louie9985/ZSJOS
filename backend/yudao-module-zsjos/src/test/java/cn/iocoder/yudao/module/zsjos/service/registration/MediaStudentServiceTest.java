@@ -38,6 +38,13 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
+    @Test
+    void fullReadDoesNotAuthorizeLegacyTalkWrite() {
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.createTalkRecord(30L, 2L,
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO()));
+        verifyNoInteractions(talkRecordMapper, myStudentService);
+    }
     @InjectMocks private MediaStudentService service;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryStageMapper deliveryStages;
     @Mock private StudentServiceObjectPermissionProvider servicePermissions;

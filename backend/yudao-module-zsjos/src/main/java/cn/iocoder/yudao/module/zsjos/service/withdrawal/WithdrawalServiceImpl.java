@@ -71,6 +71,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Resource private ConfigApi configApi;
     @Resource private FileApi fileApi;
     @Resource private BusinessAuditService auditService;
@@ -271,6 +272,9 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     @Override
     public PageResult<WithdrawalRespVO> getPage(WithdrawalPageReqVO request, Long applicantUserId) {
+        if (applicantUserId != null && (request.getReadScope() != null || request.getTargetUserId() != null)) {
+            applicantUserId = readScopeService.resolve(request.getReadScope(), request.getTargetUserId(), applicantUserId);
+        }
         PageResult<WithdrawalDO> page = withdrawalMapper.selectPageByApplicant(request, applicantUserId);
         return new PageResult<>(page.getList().stream().map(item -> toResponse(item, false)).toList(), page.getTotal());
     }

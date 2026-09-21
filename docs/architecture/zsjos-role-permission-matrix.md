@@ -1,5 +1,12 @@
 # ZSJOS 全角色目标权限矩阵
 
+## 新媒体学员全量读取（V270）
+
+`zsjos:media-student:query-my` 继续控制页面入口；`zsjos:media-student:query-all`
+扩大为当前租户的新媒体学员范围，包含历史服务和草稿。System 的既有租户管理员
+全量读取能力同样适用，普通角色须由管理员手动配置按钮权限。该读取范围不授予
+访谈保存、定位卡提交或旧版沟通记录新增权限；关联资产仍执行各自权限检查。
+
 ## Role-menu assignment policy (2026-09-17)
 
 Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer

@@ -52,6 +52,8 @@ public class UserController {
     private DeptService deptService;
     @Resource
     private AdminUserOnlineService adminUserOnlineService;
+    @Resource
+    private cn.iocoder.yudao.module.system.service.permission.PermissionService permissionService;
 
     @PostMapping("/create")
     @Operation(summary = "新增用户")
@@ -142,11 +144,26 @@ public class UserController {
     }
 
     @GetMapping({"/list-all-simple", "/simple-list"})
-    @Operation(summary = "获取用户精简信息列表", description = "只包含被开启的用户，主要用于前端的下拉选项")
+    @Operation(summary = "获取用户精简信息列表", description = "默认只包含启用用户；管理员只读人员选择可包含停用用户")
     public CommonResult<List<UserSimpleRespVO>> getSimpleUserList(
-            @RequestParam(value = "deptId", required = false) Long deptId) {
-        List<AdminUserDO> list = userService.getUserListByStatus(
-                CommonStatusEnum.ENABLE.getStatus(), deptId);
+            @RequestParam(value = "deptId", required = false) Long deptId,
+            @RequestParam(value = "includeDisabled", defaultValue = "false") boolean includeDisabled) {
+        if (includeDisabled && !permissionService.hasTenantReadAllAccess(
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN);
+        }
+        List<AdminUserDO> list;
+        if (includeDisabled) {
+            // Administrator read selectors span departments; tenant interception remains active.
+            list = cn.iocoder.yudao.framework.datapermission.core.util.DataPermissionUtils.executeIgnore(() -> {
+                var users = new java.util.ArrayList<>(userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus(), deptId));
+                users.addAll(userService.getUserListByStatus(CommonStatusEnum.DISABLE.getStatus(), deptId));
+                return users;
+            });
+        } else {
+            list = userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus(), deptId);
+        }
 
         // 拼接数据
         Map<Long, DeptDO> deptMap = deptService.getDeptMap(

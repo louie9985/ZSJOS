@@ -2,6 +2,7 @@ import { ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
+  Checkbox,
   DatePicker,
   Empty,
   Form,
@@ -17,6 +18,7 @@ import {
   Tooltip,
   Typography,
   message,
+  Upload,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,7 +35,6 @@ import {
 } from "../services/api";
 import { hasPermission } from "../services/managementAccess";
 import { formatTimestamp, type Timestamp } from "../services/time";
-import ProductionTicketPositioningCard from "../components/ProductionTicketPositioningCard";
 import { DICT_TYPE } from "../constants";
 
 export type MediaFeature =
@@ -192,7 +193,7 @@ async function runAction(
       ACCEPT_TICKET: () => api.productionTicket.accept(row.id, row.version),
       START_TICKET: () =>
         api.productionTicket.startProduction(row.id, row.version),
-      SUBMIT_TICKET: () => api.productionTicket.submit(row.id, row.version),
+      SUBMIT_TICKET: () => api.productionTicket.submit(row.id, { version: row.version, videoSentToOperator: true }),
       START_TICKET_CHECK: () =>
         api.productionTicket.startCheck(row.id, row.version),
       APPROVE_TICKET: () => api.productionTicket.approve(row.id, row.version),
@@ -1249,35 +1250,78 @@ export function ProductionTicketsPage({
   permissions?: string[];
 }) {
   const [view, setView] = useState<'pending' | 'mine' | 'pool'>('mine');
-  // 待接单接口要求接单权限，运营等无此权限的角色不应看到该筛选，否则一进入就是系统错误。
   const canAccept = hasPermission(permissions, 'zsjos:production-ticket:accept');
   const [rows, setRows] = useState<ProductionTicket[]>([]);
+  const [selected, setSelected] = useState<ProductionTicket>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState<ProductionTicket>();
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [submitRemark, setSubmitRemark] = useState('');
+  const [videoSent, setVideoSent] = useState(false);
+  const [submitFile, setSubmitFile] = useState<{ id: number; name: string }>();
+  const [reviewReason, setReviewReason] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
       const result = view === 'pending' ? { list: await api.productionTicket.pendingAssignments(), total: 0 } : view === 'pool' ? await api.productionTicket.poolPage({ pageNo: 1, pageSize: 100 }) : await api.productionTicket.page({ pageNo: 1, pageSize: 100 });
       setRows(result.list);
-    } catch (cause) { setRows([]); setError(errorText(cause)); } finally { setLoading(false); }
+      setSelected(current => result.list.find(ticket => ticket.id === current?.id) || result.list[0]);
+    } catch (cause) { setRows([]); setSelected(undefined); setError(errorText(cause)); } finally { setLoading(false); }
   }, [view]);
   useEffect(() => { void load(); }, [load]);
   const act = async (ticket: ProductionTicket, action: string) => {
-    try {
-      if (action === 'CLAIM_TICKET') { setPreview(ticket); return; }
-      await runAction('tickets', ticket as Row, action);
-      message.success('操作成功'); await load();
-    } catch (cause) { message.error(errorText(cause)); }
+    if (action === 'CLAIM_TICKET') {
+      try { await api.productionTicket.claim(ticket.id, ticket.version); message.success('抢单成功'); await load(); }
+      catch (cause) { message.error(errorText(cause)); }
+      return;
+    }
+    if (action === 'SUBMIT_TICKET') { setSelected(ticket); setSubmitRemark(''); setVideoSent(false); setSubmitFile(undefined); setSubmitOpen(true); return; }
+    if (action === 'REJECT_TICKET' && !reviewing) { setSelected(ticket); setReviewing(true); return; }
+    if (action === 'REJECT_TICKET' && !reviewReason.trim()) { message.error('请填写驳回理由'); return; }
+    try { await runAction('tickets', ticket as Row, action, reviewReason); message.success('操作成功'); setReviewing(false); setReviewReason(''); await load(); }
+    catch (cause) { message.error(errorText(cause)); }
   };
-  return <section className="workspace-page media-tickets-page"><header className="media-feature-heading"><Typography.Title level={4}>拍剪工单</Typography.Title><Tooltip title="刷新"><Button icon={<ReloadOutlined/>} onClick={() => void load()}/></Tooltip></header><Tabs activeKey={view} onChange={key => setView(key as typeof view)} items={[...(canAccept ? [{ key: 'pending', label: '待接单' }] : []), { key: 'mine', label: '我的工单' }, { key: 'pool', label: '公共池', disabled: !hasPermission(permissions, 'zsjos:production-ticket:pool-query') && !hasPermission(permissions, 'zsjos:production-ticket:claim') }]} />{error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}<div className="media-ticket-list">{loading ? <Skeleton active paragraph={{ rows: 6 }}/> : rows.length ? rows.map(ticket => <div className="media-ticket-row" key={ticket.id}><div><strong>{ticket.ticketNo}</strong><span>{ticket.dispatchContext?.studentName || '学员未记录'} · {ticket.dispatchContext?.platformLabel || '平台未记录'} · {ticket.dispatchContext?.accountName || ticket.dispatchContext?.accountNo || `账号 ${ticket.accountId}`}</span></div><Space wrap><Tag>{statusText(ticket.status)}</Tag><Button onClick={() => setPreview(ticket)}>查看快照</Button>{ticket.availableActions.filter(action => action !== 'REJECT_TICKET_ASSIGNMENT').map(action => <Button type={action === 'CLAIM_TICKET' ? 'primary' : 'default'} key={action} onClick={() => void act(ticket, action)}>{actionText(action)}</Button>)}</Space></div>) : <Empty description={view === 'pool' ? '公共池暂无可抢工单' : view === 'pending' ? '暂无待接指定单' : '暂无工单'}/>}</div><Modal width="min(960px, calc(100vw - 32px))" title={preview ? `${preview.ticketNo} · 派单快照` : '派单快照'} open={Boolean(preview)} onCancel={() => setPreview(undefined)} okText={preview?.availableActions.includes('CLAIM_TICKET') ? '确认抢单' : '关闭'} onOk={async () => { if (preview?.availableActions.includes('CLAIM_TICKET')) { try { await api.productionTicket.claim(preview.id, preview.version); message.success('抢单成功'); setPreview(undefined); await load(); } catch (cause) { message.error(errorText(cause)); } } else setPreview(undefined); }}><ProductionTicketSnapshot ticket={preview}/></Modal></section>;
+  const finishAssignment = async (accept: boolean) => {
+    if (!selected) return;
+    if (!accept && (!rejecting || !reason.trim())) { setRejecting(true); if (rejecting) message.error('请填写拒接原因'); return; }
+    try { setSaving(true); if (accept) await api.productionTicket.accept(selected.id, selected.version); else await api.productionTicket.rejectAssignment(selected.id, selected.version, reason.trim()); message.success(accept ? '已接单' : '已拒接'); setRejecting(false); setReason(''); await load(); }
+    catch (cause) { message.error(errorText(cause)); } finally { setSaving(false); }
+  };
+  const actionItems = selected?.availableActions.filter(action => !['CLAIM_TICKET', 'REJECT_TICKET_ASSIGNMENT', 'ACCEPT_TICKET'].includes(action)) || [];
+  return <section className="workspace-page media-tickets-page">
+    <header className="media-feature-heading"><div><Typography.Title level={4}>拍剪工单</Typography.Title><Typography.Text type="secondary">剪辑与拍摄共用同一套工单详情和操作流程</Typography.Text></div><Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void load()} /></Tooltip></header>
+    <Tabs activeKey={view} onChange={key => setView(key as typeof view)} items={[...(canAccept ? [{ key: 'pending', label: '待接单' }] : []), { key: 'mine', label: '我的工单' }, { key: 'pool', label: '公共池', disabled: !hasPermission(permissions, 'zsjos:production-ticket:pool-query') && !hasPermission(permissions, 'zsjos:production-ticket:claim') }]} />
+    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>} />}
+    <div className="media-feature-inbox-layout media-ticket-inbox-layout">
+      <aside className="media-feature-list-pane"><div className="media-feature-toolbar"><Typography.Text strong>{loading ? '加载中…' : `${rows.length} 条工单`}</Typography.Text></div><div className="media-feature-scroll">
+        {loading ? <Skeleton active paragraph={{ rows: 7 }} /> : rows.length ? rows.map(ticket => <button className={`media-feature-item media-ticket-item ${selected?.id === ticket.id ? 'active' : ''}`} key={ticket.id} onClick={() => setSelected(ticket)}><div><strong>{ticket.ticketNo}</strong><span>学员：{ticket.dispatchContext?.studentName || '未记录'}</span><span>账号：{ticket.dispatchContext?.accountName || ticket.dispatchContext?.accountNo || '未记录'}</span><span>提交人：{ticket.submitterName || '未记录'}</span><span>截止：{ticket.deadlineAt ? formatTimestamp(ticket.deadlineAt) : '未设置'}</span></div><Tag>{statusText(ticket.status)}</Tag></button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={view === 'pool' ? '公共池暂无可抢工单' : view === 'pending' ? '暂无待接指定单' : '暂无工单'} />}
+      </div></aside>
+      <main className="media-feature-detail-pane">{selected ? <><div className="media-feature-detail-title"><div><Typography.Title level={4}>{selected.ticketNo}</Typography.Title><Typography.Text type="secondary">{selected.dispatchContext?.studentName || '学员未记录'} · {selected.dispatchContext?.accountName || selected.dispatchContext?.accountNo || '账号未记录'}</Typography.Text></div><Tag color="blue">{statusText(selected.status)}</Tag></div><ProductionTicketDetail ticket={selected} /><section className="media-ticket-action-bar"><Typography.Text strong>操作区</Typography.Text><Space wrap>{selected.availableActions.includes('REJECT_TICKET_ASSIGNMENT') && <Button danger loading={saving} onClick={() => void finishAssignment(false)}>{rejecting ? '确认拒接' : '拒绝接单'}</Button>}{selected.availableActions.includes('ACCEPT_TICKET') && <Button type="primary" loading={saving} onClick={() => void finishAssignment(true)}>接单</Button>}{actionItems.map(action => <Button danger={action === 'REJECT_TICKET'} type={action === 'APPROVE_TICKET' || action === 'SUBMIT_TICKET' ? 'primary' : 'default'} key={action} onClick={() => void act(selected, action)}>{actionText(action)}</Button>)}</Space>{rejecting && <Input.TextArea rows={3} maxLength={500} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="请填写拒接原因" />}{reviewing && <Input.TextArea rows={3} maxLength={500} showCount value={reviewReason} onChange={event => setReviewReason(event.target.value)} placeholder="请填写驳回理由，然后再次点击驳回" />}</section><Modal title="提交成品" open={submitOpen} onCancel={() => setSubmitOpen(false)} okText="确认提交" onOk={async () => { if (!videoSent) { message.error('请确认视频已发送给运营'); return; } try { await api.productionTicket.submit(selected.id, { version: selected.version, remark: submitRemark, attachmentId: submitFile?.id, videoSentToOperator: videoSent }); message.success('成品已提交'); setSubmitOpen(false); await load(); } catch (cause) { message.error(errorText(cause)); } }}><Input.TextArea rows={4} maxLength={1000} showCount value={submitRemark} onChange={event => setSubmitRemark(event.target.value)} placeholder="备注（可选）" /><Upload maxCount={1} beforeUpload={async file => { try { const uploaded = await (await import('../services/workOrderApi')).workOrderApi.upload(file); setSubmitFile({ id: uploaded.id, name: uploaded.name }); message.success('附件已上传'); } catch (cause) { message.error(errorText(cause)); } return false; }} showUploadList={Boolean(submitFile)}><Button style={{ marginTop: 12 }}>上传成品附件（可选）</Button></Upload><Checkbox checked={videoSent} onChange={event => setVideoSent(event.target.checked)} style={{ display: 'block', marginTop: 16 }}>我已将视频发送给运营</Checkbox></Modal></> : <Empty description="请选择一张工单" />}</main>
+    </div>
+  </section>;
+}
+
+function ProductionTicketDetail({ ticket }: { ticket: ProductionTicket }) {
+  const context = ticket.dispatchContext;
+  const fields = ticket.formFields || [];
+  const values = ticket.formValues || {};
+  const account = context?.accounts?.[0];
+  return <div className="media-ticket-detail"><div className="media-feature-meta"><span>提交人</span><strong>{ticket.submitterName || '未记录'}</strong><span>截止时间</span><strong>{ticket.deadlineAt ? formatTimestamp(ticket.deadlineAt) : formatTicketValue(values.deadline_at || values.deadlineAt)}</strong><span>平台</span><strong>{context?.platformLabel || '未记录'}</strong><span>账号编号</span><strong>{context?.accountNo || String(ticket.accountId || '未记录')}</strong></div>{account && <section className="media-feature-card media-ticket-account"><Typography.Title level={5}>账号资料</Typography.Title><div className="media-ticket-account-content">{account.coverUrl ? <img src={account.coverUrl} alt="账号封面" /> : <div className="media-ticket-account-placeholder">暂无封面图</div>}<div><Typography.Text strong>{account.accountName || context?.accountName || '未记录'}</Typography.Text><Typography.Paragraph><span>主页链接：</span>{account.homepageUrl ? <a href={account.homepageUrl} target="_blank" rel="noreferrer">{account.homepageUrl}</a> : '未填写'}</Typography.Paragraph></div></div></section>}{fields.length > 0 && <section className="media-feature-card"><Typography.Title level={5}>运营填写内容</Typography.Title><div className="media-feature-fields">{fields.map(field => <div key={field.key}><span>{field.label}</span><strong>{formatTicketValue(values[field.key])}</strong></div>)}</div></section>}{(context?.completionRemark || context?.completionAttachmentId || context?.videoSentToOperator !== undefined) && <section className="media-feature-card"><Typography.Title level={5}>成品提交信息</Typography.Title><div className="media-feature-fields"><div><span>视频已发送给运营</span><strong>{context.videoSentToOperator ? '是' : '否'}</strong></div><div><span>提交备注</span><strong>{context.completionRemark || '未填写'}</strong></div></div></section>}{ticket.requestAttachments?.length ? <section className="media-feature-card"><Typography.Title level={5}>工单附件</Typography.Title>{ticket.requestAttachments.map(file => <Typography.Paragraph key={file.id}>📎 {file.name}</Typography.Paragraph>)}</section> : null}<section className="media-ticket-operator-remark"><Typography.Text strong>运营备注</Typography.Text><Typography.Paragraph>{context?.operatorRemark || '未填写'}</Typography.Paragraph></section></div>;
+}
+
+function formatTicketValue(value: unknown) {
+  if (value === undefined || value === null || value === '') return '未填写';
+  if (Array.isArray(value)) return value.join('、');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 function ProductionTicketSnapshot({ ticket }: { ticket?: ProductionTicket }) {
-  if (!ticket) return null;
-  const context = ticket.dispatchContext;
-  if (!context) return <Empty description="暂无派单快照" />;
-  return <div className="media-ticket-snapshot"><Typography.Paragraph><strong>学员：</strong>{context.studentName || '未记录'}</Typography.Paragraph><Typography.Paragraph><strong>账号：</strong>{context.platformLabel || '平台未记录'} · {context.accountName || context.accountNo || ticket.accountId}</Typography.Paragraph>{context.accountFields?.map(field => <Typography.Paragraph key={field.key}><strong>{field.label}：</strong>{field.displayValue || String(field.value ?? '未记录')}</Typography.Paragraph>)}<ProductionTicketPositioningCard snapshot={context.positioning} title="完整定位卡" /><section className="media-ticket-operator-remark"><Typography.Text strong>运营备注</Typography.Text><Typography.Paragraph>{context.operatorRemark || '未填写'}</Typography.Paragraph></section></div>;
+  return ticket ? <ProductionTicketDetail ticket={ticket} /> : null;
 }
 
 export function ProductionTicketAssignmentHost({ permissions = [] }: { permissions?: string[] }) {

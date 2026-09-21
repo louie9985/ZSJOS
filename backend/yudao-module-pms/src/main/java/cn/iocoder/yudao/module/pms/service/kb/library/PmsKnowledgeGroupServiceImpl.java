@@ -196,7 +196,7 @@ public class PmsKnowledgeGroupServiceImpl implements PmsKnowledgeGroupService {
     @Transactional(rollbackFor = Exception.class)
     public void moveLibraryToGroup(PmsKnowledgeLibraryMoveGroupReqVO moveReqVO, Long userId) {
         // 1. 校验当前用户可以读取知识库；个人分组允许收藏公开知识库
-        libraryMemberService.validateLibraryReadable(moveReqVO.getLibraryId(), userId);
+        libraryMemberService.validateLibraryInteraction(moveReqVO.getLibraryId(), userId);
 
         // 2. 移出分组时，删除已有的个人分组关系
         if (moveReqVO.getGroupId() == null) {

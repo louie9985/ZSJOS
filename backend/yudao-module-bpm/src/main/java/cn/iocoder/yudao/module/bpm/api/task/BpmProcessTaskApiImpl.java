@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.bpm.api.task;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
-import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskReasonUtils;
 import org.flowable.bpmn.model.BpmnModel;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -56,6 +56,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
     @Resource
+    private org.springframework.beans.factory.ObjectProvider<BpmTaskActionValidator> taskActionValidatorProvider;
+    @Resource
     private BpmProcessInstanceService processInstanceService;
     @Resource
     private AdminUserApi adminUserApi;
@@ -101,6 +103,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                 BpmProcessNodeStatusRespDTO value = new BpmProcessNodeStatusRespDTO();
                 value.setTaskDefinitionKey(task.getTaskDefinitionKey()); value.setStatus(status);
                 value.setReviewerUserId(NumberUtil.parseLong(task.getAssignee(), null));
+                value.setActionUserId(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.userId(task.getTaskLocalVariables()));
+                value.setActionUserNameSnapshot(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
                 value.setCreateTime(toLocalDateTime(task.getCreateTime())); value.setEndTime(taskEndTime);
                 result.put(task.getTaskDefinitionKey(), value);
             }
@@ -162,7 +166,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
-            result.setReasonRequire(readReasonRequire(task.getProcessDefinitionId(), task.getTaskDefinitionKey(), models));
+            result.setReasonRequire(readReasonRequire(task, models));
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             return result;
         }).toList();
@@ -188,7 +192,10 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             result.setStatus(task.getTaskLocalVariables() == null ? null : (Integer) task.getTaskLocalVariables().get("status"));
             result.setReason(task.getDescription()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
-            result.setEndTime(toLocalDateTime(task.getEndTime())); return result;
+            result.setEndTime(toLocalDateTime(task.getEndTime()));
+            result.setActionUserId(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.userId(task.getTaskLocalVariables()));
+            result.setActionUserNameSnapshot(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
+            return result;
         }).toList();
         return new PageResult<>(list, page.getTotal());
     }
@@ -203,7 +210,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
         result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
-        result.setReasonRequire(readReasonRequire(task.getProcessDefinitionId(), task.getTaskDefinitionKey(), new HashMap<>()));
+        result.setReasonRequire(readReasonRequire(task, new HashMap<>()));
         return result;
     }
 
@@ -220,21 +227,22 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
         result.setEndTime(toLocalDateTime(task.getEndTime()));
+        result.setActionUserId(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.userId(task.getTaskLocalVariables()));
+        result.setActionUserNameSnapshot(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
         result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
         result.setStatus(task.getTaskLocalVariables() == null ? null : (Integer) task.getTaskLocalVariables().get("status"));
         result.setReason(task.getDescription());
         return result;
     }
 
-    private Boolean readReasonRequire(String definitionId, String taskKey,
+    private Boolean readReasonRequire(Task task,
                                       Map<String, BpmnModel> models) {
+        String definitionId = task.getProcessDefinitionId();
         if (!models.containsKey(definitionId)) {
             models.put(definitionId, processDefinitionService.getProcessDefinitionBpmnModel(definitionId));
         }
         BpmnModel model = models.get(definitionId);
-        if (model == null || BpmnModelUtils
-                .getFlowElementById(model, taskKey) == null) return null;
-        return BpmnModelUtils.parseReasonRequire(model, taskKey);
+        return BpmTaskReasonUtils.approvalReasonRequired(task, model, taskActionValidatorProvider);
     }
 
     @Override

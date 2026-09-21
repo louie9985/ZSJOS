@@ -41,6 +41,8 @@ public class PmsKnowledgeDocumentCommentServiceImplTest extends BaseDbUnitTest {
 
     @MockitoBean
     private PmsKnowledgeDocumentService documentService;
+    @MockitoBean private cn.iocoder.yudao.module.pms.service.kb.library.PmsKnowledgeLibraryMemberService libraryMemberService;
+    @MockitoBean private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeContentPermissionService contentPermissionService;
 
     @Test
     public void testCreateComment_reply() {

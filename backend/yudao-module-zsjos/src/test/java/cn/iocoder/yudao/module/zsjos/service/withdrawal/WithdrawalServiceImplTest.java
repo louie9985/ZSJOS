@@ -38,6 +38,7 @@ class WithdrawalServiceImplTest {
     @Mock CashbackMapper cashbackMapper; @Mock PartnerMapper partnerMapper; @Mock BpmProcessInstanceApi processApi;
     @Mock BpmProcessTaskApi taskApi; @Mock AdminUserApi userApi; @Mock PermissionApi permissionApi;
     @Mock ConfigApi configApi; @Mock FileApi fileApi; @Mock BusinessAuditService auditService; @Mock WithdrawalNotifyPublisher publisher;
+    @Mock cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
 
     @BeforeEach void setup() {
         TenantContextHolder.setTenantId(9L);
@@ -48,8 +49,19 @@ class WithdrawalServiceImplTest {
         ReflectionTestUtils.setField(service,"permissionApi",permissionApi);ReflectionTestUtils.setField(service,"configApi",configApi);
         ReflectionTestUtils.setField(service,"fileApi",fileApi);ReflectionTestUtils.setField(service,"auditService",auditService);
         ReflectionTestUtils.setField(service,"notifyPublisher",publisher);
+        ReflectionTestUtils.setField(service,"readScopeService",readScopeService);
     }
     @AfterEach void clear(){TenantContextHolder.clear();}
+
+    @Test void personalAllScopeResolvesBeforeQueryWithoutWriting() {
+        WithdrawalPageReqVO request = new WithdrawalPageReqVO(); request.setReadScope("ALL");
+        when(readScopeService.resolve("ALL", null, 7L)).thenReturn(null);
+        when(withdrawalMapper.selectPageByApplicant(request, null)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L));
+        assertEquals(0L, service.getPage(request, 7L).getTotal());
+        verify(withdrawalMapper).selectPageByApplicant(request, null);
+        verifyNoInteractions(processApi, publisher, cashbackMapper);
+    }
 
     @Test void applyLocksSelectedCashbacksAndStartsSingleFinanceBpm() {
         when(partnerMapper.selectEnabledByUserId(7L)).thenReturn(new PartnerDO().setId(8L).setBoundSystemUserId(7L).setStatus("enabled"));

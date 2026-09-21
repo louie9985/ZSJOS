@@ -82,4 +82,10 @@ public class MediaAccountDO extends TenantBaseDO {
     private String createIdempotencyKey;
     private String createRequestFingerprint;
     private Integer version;
+    private String deleteProcessInstanceId;
+    private String deleteStatus;
+    private Long deleteRequestedByUserId;
+    private Long deleteReviewerUserId;
+    private String deleteReason;
+    private String deleteResultReason;
 }
