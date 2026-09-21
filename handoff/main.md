@@ -26080,6 +26080,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Dependencies / integration impact: 未新增依赖、未执行数据库或服务操作、未提交或推送；保护性 stash `codex-pre-pull-20260921-main-2` 保留。
 - Remaining work: 本地大量修改仍未提交；如需提交或推送需另行明确授权。
 
+## Delivery — 2026-09-21 18:45:00 +08:00 — commit-push-main
+- Context: local; branch `main`; worktree `D:\ZSJ-OS`; owner Codex /root; HEAD `a1daf1343b9268c01ed9e966218e11668e764d4b`; remote `origin/main`.
+- User goal: 将本地代码提交并推送到远端 `main` 分支。
+- Key decisions: 提交 170 个业务相关文件，包含后端、前端、测试、文档、流程配置及提现冲突解决；排除探针、缓存、截图、临时目录和 `backend/.mvn` 等环境产物。
+- Result: 创建提交 `a1daf1343b`（`feat: consolidate latest local business updates`）并通过禁用本机代理的直连方式推送成功。
+- Verification: 远端 fetch 后 `HEAD` 与 `origin/main` 均为 `a1daf1343b9268c01ed9e966218e11668e764d4b`，`HEAD...origin/main` 为 `0 0`；`frontend/workbench` 的 `npm run typecheck` 通过。
+- Dependency / integration impact: 未执行数据库写入或服务重启；未提交排除的临时文件；既有保护性 stash 保留。
+- Remaining work: 工作树仅保留未跟踪环境产物，未再推送；如需清理须另行确认。
+
 ## Registration — 2026-09-21 — finance-table-values
 - Workstream ID: main / finance-table-values; owner: Codex /root; environment: local (variable/file absent).
 - Goal: 修复提现中文状态、金额 NaN，并排查修复财务返现、订单与审批表格的同类原始值误用。
