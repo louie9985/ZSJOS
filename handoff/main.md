@@ -26321,6 +26321,15 @@ pm test -- --run src/pages/media-students.guard.test.ts 通过（3 tests）；gi
 - Beijing time: 2026-09-21; environment local (ZSJOS_AGENT_ENV absent; environment file checked below); owner Codex /root. User explicitly confirmed exclusive worktree ownership for continuation.
 - Context: main; D:\ZSJ-OS; current base/HEAD a7b90871c5e8496a1963ba7f1fe94c2ce52f1889. Preserve intervening media/student/account-deletion/BPM edits. Scope and non-goals remain the original registration; no Git or service operations authorized. Verification includes rerunning invalidated checks and remaining coverage matrix. Integration order: None.
 
+## Delivery — 2026-09-22 — commit-push-main
+- Context: local; branch `main`; worktree `D:\ZSJ-OS`; owner Codex /root; business commit `0a68187f8a`; remote `origin/main`.
+- User goal: 将本地代码提交并推送到远端 `main` 分支。
+- Key decisions: 提交当前本地业务源码、测试、SQL、BPM 资产、文档和 handoff，共 239 个文件；排除 `.failing_blocks`、`.playwright-mcp`、`.probe_*`、`.tmp_drift`、`.verify_*`、`backend/.mvn`、截图及 Python 字节码等环境产物。
+- Result: 已创建并推送业务提交 `0a68187f8a`（`feat: consolidate pending business changes`），未使用远程版本覆盖本地修改。
+- Verification: 提交前无未解决冲突，`git diff --cached --check` 通过；推送至 `https://gitee.com/louie9985/ZSJOS.git` 成功。
+- Dependency / integration impact: 未执行数据库写入、服务重启或部署；保护性 stash 保留，排除的环境产物仍留在本地。
+- Remaining work: 本次提交覆盖当前可识别业务改动；后续新增改动需单独审查和提交。
+
 ## Delivery — 2026-09-21 23:44:31 +08:00 — tenant-admin-read-all exclusive continuation
 - Context: local; branch main; worktree D:\ZSJ-OS; owner Codex /root; HEAD unchanged a7b90871c5e8496a1963ba7f1fe94c2ce52f1889. Registration and exclusive continuation above apply. Target branch/integration order: None.
 - User goal: Implement current-tenant administrator business read-all while preserving feature permissions, tenant isolation and command eligibility; user confirmed exclusive serial editing.
