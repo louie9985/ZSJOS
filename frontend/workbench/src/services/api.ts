@@ -2876,6 +2876,7 @@ export class ApiError extends Error {
   constructor(
     readonly code: number,
     message: string,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -2885,6 +2886,11 @@ export class ApiError extends Error {
 export const SERVER_CONNECTION_ERROR_MESSAGE = "服务器连接错误，请联系管理员";
 
 export const normalizeRequestError = (error: unknown): unknown => {
+  if (axios.isAxiosError(error) && error.response && error.response.status < 500) {
+    const payload = error.response.data;
+    if (payload && typeof payload.code === "number" && typeof payload.msg === "string")
+      return new ApiError(payload.code, payload.msg, payload.data);
+  }
   if (
     axios.isAxiosError(error) &&
     !axios.isCancel(error) &&
@@ -3200,6 +3206,7 @@ export const unwrap = <T>(response: { data: any }): T => {
       throw new ApiError(
         payload.code,
         payload.msg || `请求失败（${payload.code}）`,
+        payload.data,
       );
     }
     return payload.data as T;
@@ -3443,6 +3450,7 @@ export const api = {
         timeout: 15000,
       }),
     ),
+  invalidateDictDataCache: () => { dictDataRequest = undefined; },
   dictDataByType: async (dictType: string) => {
     const request =
       dictDataRequest ??

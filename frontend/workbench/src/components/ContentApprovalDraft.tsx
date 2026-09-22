@@ -1,3 +1,4 @@
+import { httpsLinkError, plannedTimeError } from '../services/contentReviewErrors'
 import { restoreDraftReferences } from '../services/contentReviewDraft'
 import ContentReviewAttachments from './ContentReviewAttachments'
 import ResourceLinkInput from './ResourceLinkInput'
@@ -82,7 +83,11 @@ export default function ContentApprovalDraft({
   accounts = [],
   purposeOptions,
   formatOptions,
+  optionsLoading = false,
+  onReloadOptions,
 }: {
+  optionsLoading?: boolean
+  onReloadOptions?: () => void
   disabled?: boolean
   /** 修订必须沿用原审批的账号集合。 */
   lockAccounts?: boolean
@@ -92,7 +97,6 @@ export default function ContentApprovalDraft({
 }) {
   const form = Form.useFormInstance()
   const selectedAccountIds = (Form.useWatch('accountIds', form) as number[] | undefined) || []
-  const [now] = useState(() => dayjs())
   const [picker, setPicker] = useState<{ key: number; index: number }>()
   const works = Form.useWatch('works', { form, preserve: true }) as ContentApprovalWork[] | undefined
   const materialsByWork = Object.fromEntries((works || []).map((work, index) => [index,
@@ -101,8 +105,9 @@ export default function ContentApprovalDraft({
   ]))
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Alert type="info" showIcon message="内容将同步适用于所选账号" description="账号资料只保存为本次审批快照；作品会按当前列表逐件提交和审批。" />
-    <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个账号' }]}>
-      <Select disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
+    {!optionsLoading && (!purposeOptions.length || !formatOptions.length) && <Alert type="warning" showIcon message="作品目的或作品形式暂无可用选项；已有历史选项可保留，新选择请联系管理员配置" action={onReloadOptions && <Button disabled={disabled} onClick={onReloadOptions}>重新加载</Button>} />}
+    <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, max: 20, message: '请选择 1 至 20 个发布账号' }]}>
+      <Select maxCount={20} disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
     </Form.Item>
     {selectedAccountIds.length > 0 && <Card size="small" title="账号资料快照（本批次可编辑）">
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
@@ -111,15 +116,15 @@ export default function ContentApprovalDraft({
           <Typography.Text type="secondary" style={{ marginLeft: 8 }}>{account.platformLabel || '平台未记录'} · {account.accountNo}</Typography.Text>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 8 }}>
             {accountSnapshotFields.map(([key, label]) => <Form.Item key={key} name={['accountSnapshots', String(account.id), key]} label={label} initialValue={key === 'nickname' ? account.nickname : key === 'platformLabel' ? account.platformLabel : key === 'stageLabelSnapshot' ? account.stageLabelSnapshot || account.stage : key === 'currentStatusLabelSnapshot' ? account.currentStatusLabelSnapshot || account.currentStatusValue : undefined}>
-              <Input />
+              <Input maxLength={200} showCount />
             </Form.Item>)}
           </div>
           {account.primaryProblems?.length ? <Typography.Text type="secondary">当前瓶颈：{account.primaryProblems.map(problem => problem.labelSnapshot).join('、')}</Typography.Text> : null}
         </div>)}
       </Space>
     </Card>}
-    <Form.List name="works" initialValue={[{}]}>
-      {(fields, { add, remove, move }) => <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Form.List name="works" initialValue={[{}]} rules={[{ validator: (_, value) => Array.isArray(value) && value.length >= 1 && value.length <= 20 ? Promise.resolve() : Promise.reject(new Error("每批次必须包含 1 至 20 件作品")) }]}>
+      {(fields, { add, remove, move }, { errors }) => <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {fields.map((field, index) => {
           return <Card key={field.key} size="small" title={<Space><span>作品 {index + 1}</span><Tag color="blue">逐件审批</Tag></Space>} extra={<Space size={4}>
             <Button type="text" size="small" disabled={disabled || index === 0} onClick={() => move(index, index - 1)}>上移</Button>
@@ -128,26 +133,26 @@ export default function ContentApprovalDraft({
           </Space>}>
             <div className="content-approval-draft-grid">
               <ContentReviewAttachments index={field.name} cover disabled={disabled} />
-              <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }, { validator: (_, value: Dayjs | undefined) => !value || !value.isBefore(now, 'minute') ? Promise.resolve() : Promise.reject(new Error('预计发布时间不能早于当前时间')) }]}>
-                <DatePicker showTime style={{ width: '100%' }} disabledDate={date => date.isBefore(dayjs(), 'minute')} />
+              <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }, { validator: (_, value: Dayjs | undefined) => !value || !plannedTimeError(value) ? Promise.resolve() : Promise.reject(new Error(plannedTimeError(value))) }]}>
+                <DatePicker showTime style={{ width: '100%' }} disabledDate={date => date.isBefore(dayjs(), 'day')} />
               </Form.Item>
             </div>
             <div className="content-approval-draft-grid">
-              <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select options={purposeOptions} /></Form.Item>
-              <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select options={formatOptions} /></Form.Item>
+              <Form.Item {...field} name={[field.name, 'purposeValue']} label="作品目的" rules={[{ required: true, message: '请选择作品目的' }]}><Select loading={optionsLoading} options={purposeOptions} labelRender={item => works?.[field.name]?.purposeLabelSnapshot || item.label || String(item.value)} onChange={value => form.setFieldValue(['works', field.name, 'purposeLabelSnapshot'], purposeOptions.find(item => item.value === value)?.label)} /></Form.Item>
+              <Form.Item {...field} name={[field.name, 'formatValue']} label="作品形式" rules={[{ required: true, message: '请选择作品形式' }]}><Select loading={optionsLoading} options={formatOptions} labelRender={item => works?.[field.name]?.formatLabelSnapshot || item.label || String(item.value)} onChange={value => form.setFieldValue(['works', field.name, 'formatLabelSnapshot'], formatOptions.find(item => item.value === value)?.label)} /></Form.Item>
             </div>
             <Form.Item {...field} name={[field.name, 'title']} label="发布标题" rules={[{ required: true, whitespace: true, message: '请输入发布标题' }, { max: 200, message: '发布标题不能超过 200 字' }]}><Input showCount maxLength={200} /></Form.Item>
             <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, whitespace: true, message: '请输入正文文稿' }]}><Input.TextArea rows={7} showCount maxLength={10000} /></Form.Item>
             <ContentReviewAttachments index={field.name} disabled={disabled} />
             <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><ResourceLinkInput placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
-            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接"><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
+            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接" extra="可留空；填写时须为完整 HTTPS 地址" rules={[{ validator: (_, value) => httpsLinkError(value) ? Promise.reject(new Error(httpsLinkError(value))) : Promise.resolve() }]} ><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
             <Form.Item {...field} name={[field.name, 'commentHook']} label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
             <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接" extra="直接填写参考作品的链接，可留空。">
               <ResourceLinkInput placeholder="https:// 参考作品链接" allowClear />
             </Form.Item>
             <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                <Button onClick={() => setPicker({ key: field.key, index: field.name })}>素材浏览 · 选择参考素材</Button>
+                <Button disabled={disabled} onClick={() => setPicker({ key: field.key, index: field.name })}>素材浏览 · 选择参考素材</Button>
                 {(materialsByWork[field.name] || []).map(material => <Card key={material.id} size="small">
                   <Space align="start" size={10} style={{ width: '100%' }}>
                     {material.coverPreviewUrl
@@ -157,7 +162,7 @@ export default function ContentApprovalDraft({
                       <Typography.Text strong>{material.title}</Typography.Text><br />
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>{material.materialNo} · {material.materialTypeName}</Typography.Text>
                     </span>
-                    <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => {
+                    <Button disabled={disabled} danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => {
                       const next = (materialsByWork[field.name] || []).filter(item => item.id !== material.id)
                       form.setFieldValue(['works', field.name, 'referenceMaterials'], toReferenceMaterials(next))
                     }}>移除</Button>
@@ -167,8 +172,8 @@ export default function ContentApprovalDraft({
             </Form.Item>
           </Card>
         })}
-        <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({})} block>新增作品</Button>
-        <Typography.Text type="secondary">至少保留一个作品；驳回后可在当前列表中新增、删除和修改作品，再次提交。</Typography.Text>
+        <Form.ErrorList errors={errors} /><Button disabled={disabled || fields.length >= 20} type="dashed" icon={<PlusOutlined />} onClick={() => add({})} block>新增作品</Button>
+        <Typography.Text type="secondary">每批次 1 至 20 件作品；驳回后可在当前列表中新增、删除和修改作品，再次提交。</Typography.Text>
       </Space>}
     </Form.List>
     <MaterialSelectorModal

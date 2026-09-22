@@ -67,6 +67,7 @@ export default function BpmProcessPanel({
   const [comments, setComments] = useState<BpmComment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [commentError, setCommentError] = useState('')
 
   const load = useCallback(async () => {
     if (!processInstanceId) {
@@ -74,11 +75,11 @@ export default function BpmProcessPanel({
       return
     }
     setLoading(true)
-    setError('')
+    setError(''); setCommentError('')
     try {
       const [approvalDetail, commentList] = await Promise.all([
         api.bpmApprovalDetail({ processInstanceId, taskId }),
-        api.bpmCommentList(processInstanceId).catch(() => [] as BpmComment[])
+        api.bpmCommentList(processInstanceId).catch(() => { setCommentError('历史评论加载失败，请重试'); return [] as BpmComment[] })
       ])
       setDetail(approvalDetail)
       setComments(commentList)
@@ -156,6 +157,7 @@ export default function BpmProcessPanel({
           )}
         </Space>,
         children: <>
+          {commentError && <Alert type="warning" showIcon message={commentError} action={<Button onClick={() => void load()}>重试</Button>} />}
           {error && <Alert
             type="error"
             showIcon

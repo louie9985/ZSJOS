@@ -67,7 +67,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CONTENT_REVIEW_COLLECTION_INVALID = new ErrorCode(1_900_020_029, "所选内容无法按当前映射收录素材库：{}");
     ErrorCode CONTENT_REVIEW_PERMISSION_DENIED = new ErrorCode(1_900_020_030, "无权查看或处理该审核批次");
     ErrorCode CONTENT_REVIEW_PUBLISH_INVALID = new ErrorCode(1_900_020_031, "内容尚未通过审核，或发布链接和时间无效");
-    ErrorCode CONTENT_REVIEW_PROCESS_UNAVAILABLE = new ErrorCode(1_900_020_032, "生产内容审核流程尚未发布或当前不可用");
+    ErrorCode CONTENT_REVIEW_PROCESS_UNAVAILABLE = new ErrorCode(1_900_020_032, "内容审批启动失败，本次提交已回滚；请稍后重试，持续失败请联系管理员");
     ErrorCode CONTENT_REVIEW_LEGACY_ENTRY_DISABLED = new ErrorCode(1_900_020_033,
             "生产内容验收已统一使用审核批次，请从内容审核批次发起或处理");
     ErrorCode MATERIAL_RECOMMENDATION_ACCOUNT_REQUIRED = new ErrorCode(1_900_020_034,
@@ -447,10 +447,52 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CONTENT_ACCOUNT_INVALID = new ErrorCode(1_900_012_005, "内容关联的第三方账号不存在或不属于当前租户");
     ErrorCode CONTENT_VERSION_NOT_EXISTS = new ErrorCode(1_900_012_006, "内容版本不存在");
     ErrorCode CONTENT_VERSION_STAGE_INVALID = new ErrorCode(1_900_012_007, "内容版本阶段不允许该操作");
-    ErrorCode CONTENT_VERSION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_012_008, "内容版本提交幂等键已被使用");
+    ErrorCode CONTENT_VERSION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_012_008, "本次请求标识已用于不同内容，请重新打开编辑器后核对并提交");
     ErrorCode CONTENT_REJECT_REASON_REQUIRED = new ErrorCode(1_900_012_009, "内容验收退回原因不能为空且不能超过 500 个字符");
     ErrorCode CONTENT_CLASS_INVALID = new ErrorCode(1_900_012_010, "内容分类不存在或已停用");
-    ErrorCode CONTENT_VERSION_IDEMPOTENCY_INVALID = new ErrorCode(1_900_012_011, "内容版本提交幂等键不能超过 128 个字符");
+
+    // 内容审批可操作错误：旧错误码保留，新分支按实际原因返回。
+    ErrorCode CONTENT_LINK_INVALID = new ErrorCode(1_900_012_100, "{}格式不正确，请填写包含有效域名的完整 HTTPS 地址");
+    ErrorCode CONTENT_PLANNED_TIME_INVALID = new ErrorCode(1_900_012_101, "预计发布时间不能为空或早于当前时间，请重新选择");
+    ErrorCode CONTENT_ACCOUNT_SELECTION_INVALID = new ErrorCode(1_900_012_102, "发布账号必须选择 1 至 20 个");
+    ErrorCode CONTENT_WORK_COUNT_INVALID = new ErrorCode(1_900_012_103, "每批次必须包含 1 至 20 件作品");
+    ErrorCode CONTENT_ACCOUNT_SCOPE_CHANGED = new ErrorCode(1_900_012_104, "所选账号不可用或归属已变化，请重新加载账号列表");
+    ErrorCode CONTENT_ACCOUNT_DIRECTOR_MISMATCH = new ErrorCode(1_900_012_105, "所选账号的责任编导不一致或与运营关联不符，请联系管理员核对");
+    ErrorCode CONTENT_DICTIONARY_INVALID = new ErrorCode(1_900_012_106, "{}选项已失效，请重新选择；没有可用选项时请联系管理员");
+    ErrorCode CONTENT_TEXT_TOO_LONG = new ErrorCode(1_900_012_107, "{}不能超过 {} 字");
+    ErrorCode CONTENT_VERSION_UNAVAILABLE = new ErrorCode(1_900_012_108, "所选内容版本已变化、不可编辑或不再可用，请重新加载后核对");
+    ErrorCode CONTENT_VERSION_IN_REVIEW = new ErrorCode(1_900_012_109, "该内容已提交审核，暂不能修改，请等待审核结果");
+    ErrorCode CONTENT_VERSION_OCCUPIED = new ErrorCode(1_900_012_110, "该内容版本已加入其他有效审核批次，请打开已有批次处理");
+    ErrorCode CONTENT_REVISION_SOURCE_INVALID = new ErrorCode(1_900_012_111, "修订来源与当前批次不符或重复，请重新打开当前草稿");
+    ErrorCode CONTENT_REVISION_ACCOUNTS_CHANGED = new ErrorCode(1_900_012_112, "修订必须沿用原批次的学员和发布账号，请重新打开草稿");
+    ErrorCode CONTENT_REVISION_EXISTS = new ErrorCode(1_900_012_113, "本轮已有后续修订，请从历史轮次打开最新草稿或审批");
+    ErrorCode CONTENT_COVER_REQUIRED = new ErrorCode(1_900_012_114, "请选择作品封面图");
+    ErrorCode CONTENT_FILE_COUNT_INVALID = new ErrorCode(1_900_012_115, "{}最多允许 {} 个文件");
+    ErrorCode CONTENT_FILE_SIZE_INVALID = new ErrorCode(1_900_012_116, "{}不能为空，且单个文件不能超过 1GB");
+    ErrorCode CONTENT_FILE_TYPE_INVALID = new ErrorCode(1_900_012_117, "{}类型不支持：封面仅支持图片；审核附件支持图片、视频、PDF、Word、Excel、PPT");
+    ErrorCode CONTENT_FILE_UNAVAILABLE = new ErrorCode(1_900_012_118, "{}不可用或无权使用，请移除后重新上传");
+    ErrorCode CONTENT_FILE_SNAPSHOT_INVALID = new ErrorCode(1_900_012_119, "{}引用格式无效，请重新选择文件");
+    ErrorCode CONTENT_REFERENCE_INVALID = new ErrorCode(1_900_012_120, "参考素材信息无效，请重新选择参考素材");
+    ErrorCode CONTENT_DIRECTOR_MISSING = new ErrorCode(1_900_012_121, "尚未关联责任编导，请联系管理员配置运营与编导关系");
+    ErrorCode CONTENT_DIRECTOR_MULTIPLE = new ErrorCode(1_900_012_122, "关联了多名责任编导，请联系管理员保留唯一有效关联");
+    ErrorCode CONTENT_REVIEW_USER_DISABLED = new ErrorCode(1_900_012_123, "运营或责任编导账号不可用，请联系管理员核对账号状态");
+    ErrorCode CONTENT_PROCESS_NOT_PUBLISHED = new ErrorCode(1_900_012_124, "内容审批流程尚未发布，请联系管理员发布流程");
+    ErrorCode CONTENT_PROCESS_SUSPENDED = new ErrorCode(1_900_012_125, "内容审批流程已停用，请联系管理员处理");
+    ErrorCode CONTENT_PROCESS_STRUCTURE_INVALID = new ErrorCode(1_900_012_126, "内容审批流程配置不符合编导、终审两级单人顺序审核及退回结束要求，请联系管理员检查");
+    ErrorCode CONTENT_MATERIAL_CONFIG_INVALID = new ErrorCode(1_900_012_127, "内容审批素材收录配置无效：{}，请联系管理员处理");
+    ErrorCode CONTENT_TASK_CHANGED = new ErrorCode(1_900_012_128, "当前审核任务已变化或不再可处理，请刷新待办后确认");
+    ErrorCode CONTENT_TASK_LOOKUP_FAILED = new ErrorCode(1_900_012_129, "暂时无法读取审核任务，请稍后重试；持续失败请联系管理员");
+    ErrorCode CONTENT_DECISION_INVALID = new ErrorCode(1_900_012_130, "请选择有效的审核结论：通过或退回");
+    ErrorCode CONTENT_RETURN_REASON_REQUIRED = new ErrorCode(1_900_012_131, "请填写本条作品的退回原因");
+    ErrorCode CONTENT_BATCH_DECISION_MISMATCH = new ErrorCode(1_900_012_132, "{}");
+    ErrorCode CONTENT_PUBLISH_STATE_INVALID = new ErrorCode(1_900_012_133, "该作品当前不处于待发布阶段，请刷新确认审核和发布状态");
+    ErrorCode CONTENT_PUBLISH_ALREADY_RECORDED = new ErrorCode(1_900_012_134, "该作品已登记不同的发布结果，请刷新查看原记录");
+    ErrorCode CONTENT_ITEM_NOT_EXISTS = new ErrorCode(1_900_012_135, "该审核条目已不存在或不属于当前批次，请重新加载");
+    ErrorCode CONTENT_BATCH_STAGE_CHANGED = new ErrorCode(1_900_012_136, "当前批次已不允许{}，请刷新查看审批阶段");
+    ErrorCode CONTENT_PARAMETER_INVALID = new ErrorCode(1_900_012_137, "{}");
+    ErrorCode CONTENT_UPLOAD_NAME_INVALID = new ErrorCode(1_900_012_138, "文件名不能为空且不能超过 255 字");
+
+    ErrorCode CONTENT_VERSION_IDEMPOTENCY_INVALID = new ErrorCode(1_900_012_011, "提交请求标识无效，请重新打开编辑器后重试");
 
     ErrorCode PRODUCTION_TICKET_NOT_EXISTS = new ErrorCode(1_900_013_001, "拍剪工单不存在");
     ErrorCode PRODUCTION_TICKET_STATE_INVALID = new ErrorCode(1_900_013_002, "当前拍剪工单状态不允许该操作");

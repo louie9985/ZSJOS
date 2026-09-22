@@ -2,8 +2,8 @@ import { Alert, Button, Empty, Modal, Space, Spin } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { contentReviewApi, type ContentReviewBatch } from '../services/materialApi'
 
-export default function StudentContentDraftPicker({ studentPersonId, onClose, onCreate, onResume }: {
-  studentPersonId: number; onClose: () => void; onCreate: () => void; onResume: (batch: ContentReviewBatch) => void
+export default function StudentContentDraftPicker({ studentPersonId, onClose, onCreate, onResume, canCreate = true }: {
+  canCreate?: boolean; studentPersonId: number; onClose: () => void; onCreate: () => void; onResume: (batch: ContentReviewBatch) => void
 }) {
   const [rows, setRows] = useState<ContentReviewBatch[]>([])
   const [loading, setLoading] = useState(true), [error, setError] = useState('')
@@ -35,7 +35,7 @@ export default function StudentContentDraftPicker({ studentPersonId, onClose, on
     } catch (cause) { if (run === generation.current) setError(cause instanceof Error ? cause.message : '读取草稿失败') }
     finally { if (run === generation.current) setLoading(false) }
   }
-  return <Modal open title="内容审批草稿" onCancel={onClose} footer={<Space><Button onClick={onClose}>取消</Button><Button disabled={loading} onClick={onCreate}>新建内容审批</Button></Space>}>
+  return <Modal open title="内容审批草稿" onCancel={onClose} footer={<Space><Button onClick={onClose}>取消</Button>{canCreate && <Button disabled={loading || Boolean(error)} onClick={onCreate}>新建内容审批</Button>}</Space>}>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} />}
     {loading ? <Spin /> : !error && <Space orientation="vertical">{rows.length ? rows.map(row => <Button key={row.id} disabled={!row.availableActions.includes('SUBMIT')} onClick={() => void resume(row.id)}>继续填写 · {row.batchNo}</Button>) : <Empty description="当前学员没有内容审批草稿" />}</Space>}
   </Modal>

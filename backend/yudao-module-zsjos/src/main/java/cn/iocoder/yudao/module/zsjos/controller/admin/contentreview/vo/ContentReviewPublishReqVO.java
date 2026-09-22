@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class ContentReviewPublishReqVO {
-    @NotBlank @Size(max = 1024) private String platformUrl;
-    @NotNull private LocalDateTime publishedAt;
-    @NotNull private Integer expectedContentVersion;
+    @NotBlank(message = "请填写平台发布链接") @Size(max = 1024, message = "平台链接不能超过 1024 字") private String platformUrl;
+    @NotNull(message = "请选择发布时间") private LocalDateTime publishedAt;
+    @NotNull(message = "缺少内容版本，请刷新后重试") private Integer expectedContentVersion;
 }

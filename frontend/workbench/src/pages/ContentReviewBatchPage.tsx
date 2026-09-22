@@ -1,3 +1,4 @@
+import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase } from '../services/contentReviewErrors'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
 import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
 import { prepareContentReviewWorks } from '../services/contentReviewAttachments'
@@ -38,7 +39,7 @@ import { useLocation } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
 import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
-import { ApiError, api, type SimpleUser } from '../services/api'
+import { api, type SimpleUser } from '../services/api'
 import { hasPermission } from '../services/managementAccess'
 import {
   contentReviewApi,
@@ -66,9 +67,7 @@ const statusText: Record<string, string> = {
   APPROVED: '通过'
 }
 
-const errorText = (error: unknown) => error instanceof ApiError && error.code === 403
-  ? '无权访问内容审核'
-  : error instanceof Error ? error.message : '内容审核加载失败，请重试'
+const errorText = (error: unknown) => error instanceof Error ? error.message : '内容审核加载失败，请重试'
 
 const snapshotText = (snapshot: Record<string, unknown>, key: string, fallback = '未记录') => {
   const value = snapshot[key]
@@ -295,7 +294,8 @@ function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
   useEffect(() => () => onDirtyChange(item.id, false), [item.id, onDirtyChange])
 
   const save = async () => {
-    if (!batch.currentTaskId || !decision) return message.warning('请选择审核结论')
+    if (!batch.currentTaskId) return message.warning('当前审核任务已变化，请刷新待办后确认')
+    if (!decision) return message.warning('请选择审核结论')
     if (decision === 'RETURNED' && !comment.trim()) return message.warning('退回时必须填写原因')
     setLoading(true)
     try {
@@ -328,6 +328,10 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const activeDraftId = useRef<number | undefined>(undefined)
+  const activeDraftVersion = useRef<number | undefined>(undefined)
+  const saveLock = useRef(false)
+  const [saveError, setSaveError] = useState('')
+  const [uncertain, setUncertain] = useState(false)
   const [purposeOptions, setPurposeOptions] = useState<Array<{ value: string; label: string }>>([])
   const [formatOptions, setFormatOptions] = useState<Array<{ value: string; label: string }>>([])
   const [optionsLoading, setOptionsLoading] = useState(false)
@@ -335,6 +339,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
   const restoredAccounts = useMemo(() => restoreDraftAccounts(batch), [batch])
   const loadOptions = useCallback(async () => {
     setOptionsLoading(true); setOptionsError('')
+    api.invalidateDictDataCache()
     try {
       const [purpose, format] = await Promise.all([api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')])
       setPurposeOptions(purpose.map(item => ({ value: item.value, label: item.label })))
@@ -346,21 +351,24 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
   useEffect(() => {
     if (!open) return
     activeDraftId.current = batch.status === 'DRAFT' ? batch.id : undefined
+    activeDraftVersion.current = batch.version
+    setSaveError(''); setUncertain(false)
     form.resetFields()
     form.setFieldsValue({ accountIds: restoredAccounts.accountIds, accountSnapshots: restoredAccounts.accountSnapshots, works: restoreDraftWorks(batch) })
   }, [batch, form, open, restoredAccounts])
   const save = async (submitAfterSave: boolean) => {
-    if (loading || optionsLoading || optionsError) return
+    if (saveLock.current || loading || optionsLoading || optionsError || uncertain) return
+    saveLock.current = true
+    let saved = false
+    let phase: ContentSavePhase = 'prepare'
+    setSaveError('')
     try {
       await form.validateFields()
       setLoading(true)
       const current = activeDraftId.current ? await contentReviewApi.get(activeDraftId.current) : undefined
-      // A submit response may have been lost: never create another draft for an already-started round.
       if (current && current.status !== 'DRAFT') {
-        if (['DIRECTOR_REVIEW', 'FINAL_REVIEW', 'COMPLETED', 'PUBLISHED'].includes(current.status)) {
-          message.success('本轮审批已提交'); onClose(); onSaved(current.id); return
-        }
-        throw new Error('当前审批状态已变化，请刷新后继续')
+        setUncertain(true)
+        throw new Error('本轮状态已变化，请保留当前输入并查询审批状态')
       }
       const values = form.getFieldsValue(true)
       const works = await prepareContentReviewWorks(values.works, (index, field, items) => form.setFieldValue(['works', index, field], items))
@@ -368,34 +376,44 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         studentPersonId: batch.studentPersonId!,
         accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
         accountSnapshots: values.accountSnapshots,
-        expectedVersion: current?.version,
+        expectedVersion: activeDraftVersion.current,
         works: works.map((work: Record<string, unknown>) => ({ ...work, plannedPublishAt: work.plannedPublishAt ? (work.plannedPublishAt as dayjs.Dayjs).format('YYYY-MM-DDTHH:mm:ss') : undefined }))
       }
+      phase = 'save'
       const id = current
         ? await contentReviewApi.saveStudentDraft(current.id, request)
         : await contentReviewApi.resubmitFromStudent(batch.id, request)
       activeDraftId.current = id
-      const saved = await contentReviewApi.get(id)
-      saved.items.forEach((item, index) => {
+      saved = true
+      phase = 'refresh'
+      const savedBatch = await contentReviewApi.get(id)
+      activeDraftVersion.current = savedBatch.version
+      savedBatch.items.forEach((item, index) => {
         form.setFieldValue(['works', index, 'sourceContentId'], item.contentId)
         form.setFieldValue(['works', index, 'sourceVersionId'], item.contentVersionId)
       })
-      if (submitAfterSave) await contentReviewApi.submit(id, saved.version)
+      phase = 'submit'
+      if (submitAfterSave) await submitContentReview(id, savedBatch.version)
       message.success(submitAfterSave ? '已提交审批' : '修改已保存')
       onClose(); onSaved(id)
     } catch (cause) {
-      if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause))
-    } finally { setLoading(false) }
+      if (!(cause as { errorFields?: unknown }).errorFields) {
+        locateContentError(form, cause)
+        setSaveError(contentSaveError(cause, saved, phase))
+        setUncertain(current => current || contentResultUncertain(cause, phase))
+      }
+    } finally { setLoading(false); saveLock.current = false }
   }
-  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={() => { if (!loading) onClose() }} closable={!loading} keyboard={!loading} cancelButtonProps={{ disabled: loading }} footer={[<Button key="cancel" disabled={loading} onClick={onClose}>取消</Button>, <Button key="save" disabled={loading || optionsLoading || Boolean(optionsError)} onClick={() => void save(false)}>保存修改</Button>, <Button key="submit" type="primary" loading={loading} disabled={loading || optionsLoading || Boolean(optionsError)} onClick={() => void save(true)}>{batch.status === 'DRAFT' ? '提交审批' : '重新提交审批'}</Button>]} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
-    <Form form={form} layout="vertical" disabled={loading}>
+  return <Modal title="编辑内容审批草稿" open={open} maskClosable={false} onCancel={() => { if (!loading) onClose() }} closable={!loading} keyboard={!loading} cancelButtonProps={{ disabled: loading }} footer={[<Button key="cancel" disabled={loading} onClick={onClose}>取消</Button>, <Button key="save" disabled={loading || uncertain || optionsLoading || Boolean(optionsError)} onClick={() => void save(false)}>保存修改</Button>, <Button key="submit" type="primary" loading={loading} disabled={loading || uncertain || optionsLoading || Boolean(optionsError)} onClick={() => void save(true)}>{batch.status === 'DRAFT' ? '提交审批' : '重新提交审批'}</Button>]} width="min(1100px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}>
+    <Form form={form} layout="vertical" disabled={loading || optionsLoading}>
+      {saveError && <Alert type="error" showIcon message={saveError} description={uncertain ? '请先保留填写内容，关闭后从草稿列表或历史轮次查询最新状态，再继续操作。' : undefined} />}
       {batch.items.some(item => item.directorComment || item.finalComment) && <Alert type="info" showIcon
         message="上一轮审核意见" description={batch.items.map((item, index) => <div key={item.id}>
           作品 {index + 1}：{[item.directorComment && `编导：${item.directorComment}`, item.finalComment && `终审：${item.finalComment}`].filter(Boolean).join('；') || '本条无意见'}
         </div>)} />}
-      <Typography.Paragraph type="secondary">保存修改不会发起审批；点击重新提交审批会保存修改并直接发起新一轮审批。提交失败时保留修改，可直接重试。</Typography.Paragraph>
+      <Typography.Paragraph type="secondary">保存修改不会发起审批；点击重新提交审批会保存修改并直接发起新一轮审批。明确失败时可修正后重试；结果待确认时先查询批次状态。</Typography.Paragraph>
       {optionsError && <Alert type="error" showIcon message={optionsError} action={<Button onClick={() => void loadOptions()}>重试</Button>} />}
-      <ContentApprovalDraft disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
+      <ContentApprovalDraft optionsLoading={optionsLoading} onReloadOptions={() => void loadOptions()} disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
     </Form>
   </Modal>
 }
@@ -429,6 +447,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [historyRows, setHistoryRows] = useState<ContentReviewBatch[]>([])
   const [taskUsers, setTaskUsers] = useState<SimpleUser[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const submitLock = useRef(false)
   const [publishForm] = Form.useForm<{ platformUrl: string; publishedAt: dayjs.Dayjs }>()
 
   const location = useLocation()
@@ -471,12 +492,14 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   }, [permissions])
 
   const submitBatch = async () => {
-    if (!selected) return
+    if (!selected || submitLock.current) return
+    submitLock.current = true; setSubmitting(true)
     try {
-      await contentReviewApi.submit(selected.id, selected.version)
+      await submitContentReview(selected.id, selected.version)
       message.success('批次已提交')
       await load(page, selected.id)
-    } catch (cause) { message.error(errorText(cause)) }
+    } catch (cause) { message.error(contentSaveError(cause, true)) }
+    finally { submitLock.current = false; setSubmitting(false) }
   }
 
   const saveDraft = async () => {
@@ -512,9 +535,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
 
   const showHistory = async () => {
     if (!selected) return
-    setHistoryOpen(true); setHistoryLoading(true)
+    setHistoryOpen(true); setHistoryLoading(true); setHistoryError('')
     try { setHistoryRows(await contentReviewApi.history(selected.id)) }
-    catch (cause) { message.error(errorText(cause)); setHistoryRows([]) }
+    catch (cause) { setHistoryError(errorText(cause)); setHistoryRows([]) }
     finally { setHistoryLoading(false) }
   }
 
@@ -539,7 +562,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   }
 
   const complete = async () => {
-    if (!selected || !completeStage || !selected.currentTaskId || !completeReason.trim()) return
+    if (!selected || !completeStage || completeLoading) return
+    if (!selected.currentTaskId) { message.warning('当前审核任务已变化，请刷新待办后确认'); return }
+    if (!completeReason.trim()) { message.warning('请填写本轮审核意见'); return }
     setCompleteLoading(true)
     try {
       const data = { expectedVersion: selected.version, taskId: selected.currentTaskId, decision: completeDecision, reason: completeReason.trim() }
@@ -567,6 +592,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       publishForm.resetFields()
       await load(page, selected.id)
     } catch (cause) {
+      locateContentError(publishForm, cause)
       if (cause instanceof Error) message.error(errorText(cause))
     } finally { setCompleteLoading(false) }
   }
@@ -650,7 +676,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
               <Typography.Text type="secondary">运营：{selected.operatorName || selected.operatorUserId}　编导：{selected.directorName || '提交时确定'}</Typography.Text>
             </div><Space wrap>
               {selected.studentPersonId && <Button onClick={() => void showHistory()}>查看历史轮次</Button>}
-              {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
+              {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" loading={submitting} icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
               {selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改后重新提交</Button>}
               {selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
               {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
@@ -777,7 +803,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       </Form>
     </Modal>
     <Modal title="审批历史轮次" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={null}>
-      {historyLoading ? <Skeleton active /> : historyRows.length ? <List dataSource={historyRows} renderItem={row => <List.Item actions={[<Button type="link" onClick={() => { setHistoryOpen(false); void loadDetail(row.id) }}>查看</Button>] }>
+      {historyLoading ? <Skeleton active /> : historyError ? <Alert type="error" message={historyError} action={<Button onClick={() => void showHistory()}>重试</Button>} /> : historyRows.length ? <List dataSource={historyRows} renderItem={row => <List.Item actions={[<Button type="link" onClick={() => { setHistoryOpen(false); void loadDetail(row.id) }}>查看</Button>] }>
         <List.Item.Meta title={`${row.batchNo} · ${statusText[row.status] || row.status}`} description={`作品 ${row.items.length} 条 · ${row.finalizedAt || row.submittedAt || '未提交'}`} />
       </List.Item>} /> : <Empty description="暂无历史轮次" />}
     </Modal>

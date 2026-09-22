@@ -74,7 +74,13 @@ public class ContentReviewMaterialService {
                     && serviceError.getCode() == CONTENT_REVIEW_COLLECTION_INVALID.getCode()) {
                 throw error;
             }
-            throw exception(CONTENT_REVIEW_COLLECTION_INVALID, "字段映射或文件快照无效");
+            if (error instanceof cn.iocoder.yudao.framework.common.exception.ServiceException business
+                    && (business.getCode().equals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_FIELD_INVALID.getCode())
+                    || business.getCode().equals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_FILE_INVALID.getCode()))) {
+                throw exception(CONTENT_REVIEW_COLLECTION_INVALID, business.getMessage()
+                        + "；请核对收录字段，或关闭本条收录后重新保存结论");
+            }
+            throw exception(CONTENT_REVIEW_COLLECTION_INVALID, "收录校验暂时失败，请重试；持续失败请联系管理员检查模板和映射");
         }
     }
 

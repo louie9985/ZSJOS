@@ -114,7 +114,7 @@ class ContentReviewBatchServiceTest {
         ContentReviewBatchCreateReqVO request = new ContentReviewBatchCreateReqVO();
         request.setContentVersionIds(LongStream.rangeClosed(1, 21).boxed().toList());
 
-        assertServiceCode(CONTENT_REVIEW_BATCH_ITEMS_INVALID,
+        assertServiceCode(CONTENT_WORK_COUNT_INVALID,
                 () -> service.create(request, OPERATOR_ID));
 
         verifyNoInteractions(contentVersionMapper, contentMapper, itemMapper, batchMapper);
@@ -219,8 +219,10 @@ class ContentReviewBatchServiceTest {
                 reviewItem(1L, DECISION_APPROVED, null, false),
                 reviewItem(2L, null, null, false)));
 
-        assertServiceCode(CONTENT_REVIEW_DECISION_INCOMPLETE,
+        ContentReviewFieldException failure = assertThrows(ContentReviewFieldException.class,
                 () -> service.validateTaskAction(taskContext("director", OPERATOR_ID)));
+        assertEquals("works[1].directorDecision", failure.details().get("fieldPath"));
+        assertEquals("第 2 件作品：请先保存本条编导审核结论", failure.getMessage());
 
         verify(batchMapper, never()).markDirectorCompleted(any(), any());
     }
@@ -237,7 +239,7 @@ class ContentReviewBatchServiceTest {
                 reviewItem(1L, DECISION_APPROVED, null, false),
                 reviewItem(2L, DECISION_RETURNED, null, false)));
 
-        assertServiceCode(CONTENT_REVIEW_TASK_INVALID,
+        assertServiceCode(CONTENT_BATCH_DECISION_MISMATCH,
                 () -> service.validateTaskAction(taskContext("director", OPERATOR_ID)));
 
         verify(batchMapper, never()).markDirectorCompleted(any(), any());
@@ -265,7 +267,7 @@ class ContentReviewBatchServiceTest {
                 reviewItem(1L, DECISION_RETURNED, null, false),
                 reviewItem(2L, DECISION_RETURNED, null, false)));
 
-        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.validateTaskAction(taskContext("final", 9L)));
+        assertServiceCode(CONTENT_BATCH_DECISION_MISMATCH, () -> service.validateTaskAction(taskContext("final", 9L)));
 
         verifyNoInteractions(reviewMaterialService);
     }
@@ -339,7 +341,7 @@ class ContentReviewBatchServiceTest {
                 dictData("S2", "冷启动期")));
         MediaAccountDO account = profileAccount();
 
-        assertServiceCode(CONTENT_REVIEW_BATCH_ITEMS_INVALID, () ->
+        assertServiceCode(CONTENT_DICTIONARY_INVALID, () ->
                 ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
                         account, Map.of("stageValue", "S99")));
     }
@@ -407,7 +409,7 @@ class ContentReviewBatchServiceTest {
     /** 结论缺失应返回业务错误，而不是 Set.of 的 NPE。 */
     @Test
     void decisionWithoutValueFailsAsBusinessError() {
-        assertServiceCode(CONTENT_REVIEW_BATCH_STATE_INVALID, () ->
+        assertServiceCode(CONTENT_DECISION_INVALID, () ->
                 ReflectionTestUtils.invokeMethod(service, "normalizeDecision", null, "备注"));
     }
 
@@ -523,7 +525,7 @@ class ContentReviewBatchServiceTest {
         assertDoesNotThrow(() -> service.validateTaskAction(context));
         verifyNoInteractions(reviewMaterialService);
         context.setAction(cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_APPROVE);
-        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.validateTaskAction(context));
+        assertServiceCode(CONTENT_BATCH_DECISION_MISMATCH, () -> service.validateTaskAction(context));
     }
 
     @Test
@@ -535,7 +537,7 @@ class ContentReviewBatchServiceTest {
                 reviewItem(2L, DECISION_APPROVED, DECISION_RETURNED, false)));
         BpmTaskActionContext context = taskContext("final", 9L);
         context.setAction(cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_REJECT);
-        assertServiceCode(CONTENT_REVIEW_DECISION_INCOMPLETE, () -> service.validateTaskAction(context));
+        assertServiceCode(CONTENT_PARAMETER_INVALID, () -> service.validateTaskAction(context));
     }
 
     @Test
@@ -550,7 +552,7 @@ class ContentReviewBatchServiceTest {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewCompleteReqVO();
         request.setExpectedVersion(0); request.setTaskId("task-1"); request.setReason("整批退回");
         request.setDecision(DECISION_APPROVED);
-        assertServiceCode(CONTENT_REVIEW_TASK_INVALID, () -> service.completeFinal(batch.getId(), request, 9L));
+        assertServiceCode(CONTENT_BATCH_DECISION_MISMATCH, () -> service.completeFinal(batch.getId(), request, 9L));
         verify(processTaskApi, never()).approveTask(anyLong(), any());
         verify(processTaskApi, never()).rejectTask(anyLong(), any());
         request.setDecision(DECISION_RETURNED);
@@ -568,7 +570,7 @@ class ContentReviewBatchServiceTest {
         request.setStudentPersonId(77L); request.setAccountIds(List.of(90L));
         var work = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.Work();
         work.setSourceContentId(999L); work.setSourceVersionId(20L); request.setWorks(List.of(work));
-        assertServiceCode(CONTENT_REVIEW_BATCH_ITEMS_INVALID, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
+        assertServiceCode(CONTENT_REVISION_SOURCE_INVALID, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
         verifyNoInteractions(accountMapper, contentService);
     }
 
@@ -579,7 +581,7 @@ class ContentReviewBatchServiceTest {
         when(batchMapper.selectByRevisionOfBatchId(batch.getId())).thenReturn(List.of(new ContentReviewBatchDO().setId(51L)));
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
         request.setStudentPersonId(77L);
-        assertServiceCode(CONTENT_REVIEW_VERSION_CONFLICT, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
+        assertServiceCode(CONTENT_REVISION_EXISTS, () -> service.resubmit(batch.getId(), request, OPERATOR_ID));
         verifyNoInteractions(accountMapper, contentService);
     }
 
@@ -599,11 +601,94 @@ class ContentReviewBatchServiceTest {
         request.setPublishedAt(LocalDateTime.of(2026, 9, 8, 10, 0));
         request.setExpectedContentVersion(3);
 
-        assertServiceCode(CONTENT_REVIEW_PUBLISH_INVALID,
+        assertServiceCode(CONTENT_VERSION_CONFLICT,
                 () -> service.registerPublished(batch.getId(), item.getId(), request, OPERATOR_ID));
 
         verify(contentService, never()).registerPublished(any(), any(), anyString(), any(), anyLong());
         verify(itemMapper, never()).markPublished(any(), anyString(), any(), anyLong());
+    }
+
+    @Test
+    void returnReasonAndDecisionHaveDifferentErrors() {
+        ContentReviewFieldException missingReason = assertThrows(ContentReviewFieldException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "normalizeDecision", DECISION_RETURNED, " "));
+        assertEquals(CONTENT_RETURN_REASON_REQUIRED.getCode(), missingReason.getCode());
+        assertEquals("comment", missingReason.details().get("fieldPath"));
+        ContentReviewFieldException invalidDecision = assertThrows(ContentReviewFieldException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "normalizeDecision", "UNKNOWN", "原因"));
+        assertEquals(CONTENT_DECISION_INVALID.getCode(), invalidDecision.getCode());
+        verifyNoInteractions(batchMapper, itemMapper, processTaskApi);
+    }
+
+    @Test
+    void staleSubmissionFailsWithVersionConflictBeforeFreezing() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DRAFT, STAGE_DRAFT);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchSubmitReqVO();
+        request.setExpectedVersion(batch.getVersion() + 1);
+        assertServiceCode(CONTENT_REVIEW_VERSION_CONFLICT, () -> service.submit(batch.getId(), request, OPERATOR_ID));
+        verifyNoInteractions(itemMapper, contentVersionMapper, processTaskApi);
+    }
+
+    @Test
+    void differentOperatorReceivesPermissionErrorBeforeStateChecks() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DRAFT, STAGE_DRAFT).setOperatorUserId(999L);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchSubmitReqVO();
+        request.setExpectedVersion(batch.getVersion());
+        assertServiceCode(CONTENT_REVIEW_PERMISSION_DENIED, () -> service.submit(batch.getId(), request, OPERATOR_ID));
+        verifyNoInteractions(itemMapper, contentVersionMapper, processInstanceApi);
+    }
+
+    @Test
+    void publishedBatchAcceptsIdenticalReplayWithoutWritingAgain() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_PUBLISHED, STAGE_DONE);
+        when(batchMapper.selectByIdForUpdate(batch.getId(), TENANT_ID)).thenReturn(batch);
+        LocalDateTime time = LocalDateTime.of(2026, 9, 8, 10, 0);
+        var item = reviewItem(1L, DECISION_APPROVED, DECISION_APPROVED, false)
+                .setResultStatus(RESULT_PUBLISHED).setPublishedPlatformUrl("https://example.com/published")
+                .setPublishedAt(time);
+        when(itemMapper.selectByIdForUpdate(item.getId(), TENANT_ID)).thenReturn(item);
+        var request = new ContentReviewPublishReqVO();
+        request.setPlatformUrl("https://example.com/published"); request.setPublishedAt(time);
+        request.setExpectedContentVersion(0);
+        service.registerPublished(batch.getId(), item.getId(), request, OPERATOR_ID);
+        verifyNoInteractions(contentMapper, contentVersionMapper, contentService);
+        verify(itemMapper, never()).markPublished(any(), anyString(), any(), anyLong());
+        request.setPlatformUrl("https://example.com/different");
+        assertServiceCode(CONTENT_PUBLISH_ALREADY_RECORDED,
+                () -> service.registerPublished(batch.getId(), item.getId(), request, OPERATOR_ID));
+    }
+
+    @Test
+    void missingPlannedTimeIdentifiesWorkBeforeAnyContentWrite() {
+        when(accountMapper.selectByIdForUpdate(90L, TENANT_ID)).thenReturn(new MediaAccountDO()
+                .setId(90L).setStudentPersonId(77L).setOwnerOperatorUserId(OPERATOR_ID).setDirectorUserId(5L));
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
+        request.setStudentPersonId(77L); request.setAccountIds(List.of(90L));
+        var work = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.Work();
+        work.setCoverFileId(99L); request.setWorks(List.of(work));
+        ContentReviewFieldException error = assertThrows(ContentReviewFieldException.class,
+                () -> service.createFromStudent(request, OPERATOR_ID));
+        assertEquals(CONTENT_PLANNED_TIME_INVALID.getCode(), error.getCode());
+        assertEquals("works[0].plannedPublishAt", error.details().get("fieldPath"));
+        verifyNoInteractions(contentMapper, contentVersionMapper, contentService);
+    }
+
+    @Test
+    void taskLookupDistinguishesMissingAssigneeAndInfrastructureFailures() {
+        var batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        when(processTaskApi.getTodoTask(OPERATOR_ID, "task-1"))
+                .thenThrow(new ServiceException(cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_NOT_EXISTS))
+                .thenThrow(new ServiceException(cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_OPERATE_FAIL_ASSIGN_NOT_SELF))
+                .thenThrow(new IllegalStateException("private infrastructure detail"));
+        org.junit.jupiter.api.function.Executable lookup = () -> ReflectionTestUtils.invokeMethod(service,
+                "requireStageAndTask", batch, BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR,
+                "directorTaskKey", "task-1", OPERATOR_ID);
+        assertServiceCode(CONTENT_TASK_CHANGED, lookup);
+        assertServiceCode(CONTENT_REVIEW_PERMISSION_DENIED, lookup);
+        assertServiceCode(CONTENT_TASK_LOOKUP_FAILED, lookup);
+        verifyNoInteractions(itemMapper, contentMapper, contentVersionMapper);
     }
 
     private void mockLockedBatch(ContentReviewBatchDO batch) {
@@ -636,7 +721,7 @@ class ContentReviewBatchServiceTest {
 
     private ContentReviewBatchItemDO reviewItem(Long id, String directorDecision, String finalDecision,
                                                 boolean collectMaterial) {
-        return new ContentReviewBatchItemDO().setId(id).setBatchId(50L)
+        return new ContentReviewBatchItemDO().setId(id).setBatchId(50L).setSortNo(id.intValue())
                 .setDirectorDecision(directorDecision).setFinalDecision(finalDecision)
                 .setCollectMaterial(collectMaterial).setVersion(0);
     }
@@ -682,7 +767,8 @@ class ContentReviewBatchServiceTest {
     }
 
     private void assertServiceCode(ErrorCode expected, org.junit.jupiter.api.function.Executable executable) {
-        ServiceException error = assertThrows(ServiceException.class, executable);
-        assertEquals(expected.getCode(), error.getCode());
+        RuntimeException error = assertThrows(RuntimeException.class, executable);
+        if (error instanceof ContentReviewFieldException field) assertEquals(expected.getCode(), field.getCode());
+        else assertEquals(expected.getCode(), ((ServiceException) error).getCode());
     }
 }

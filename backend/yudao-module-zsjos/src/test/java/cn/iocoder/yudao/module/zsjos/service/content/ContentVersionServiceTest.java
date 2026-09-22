@@ -25,7 +25,8 @@ import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_ACCEPTANCE;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.CONTENT_REVISING;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_VERSION_FILE_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
+import cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewFieldException;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_VERSION_IDEMPOTENCY_CONFLICT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_VERSION_IDEMPOTENCY_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -187,7 +188,7 @@ class ContentVersionServiceTest {
         ContentVersionSaveReqVO request = request(null);
         request.setCoverSnapshotJson("[11]");
 
-        assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
+        assertServiceCode(CONTENT_FILE_UNAVAILABLE, () -> service.create(request, USER_ID));
         verify(mapper, never()).insert(any(ContentVersionDO.class));
         verifyNoInteractions(fileApi);
     }
@@ -221,7 +222,7 @@ class ContentVersionServiceTest {
                 "application/pdf", 20L, "999"));
         ContentVersionSaveReqVO request = request(null);
         request.setDeliverableSnapshotJson("[90]");
-        assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
+        assertServiceCode(CONTENT_FILE_UNAVAILABLE, () -> service.create(request, USER_ID));
         verify(mapper, never()).insert(any(ContentVersionDO.class));
     }
 
@@ -245,7 +246,7 @@ class ContentVersionServiceTest {
         ContentVersionSaveReqVO request = request(null);
         request.setMaterialRefsJson("not-json");
 
-        assertServiceCode(CONTENT_VERSION_FILE_INVALID, () -> service.create(request, USER_ID));
+        assertServiceCode(CONTENT_REFERENCE_INVALID, () -> service.create(request, USER_ID));
         verify(mapper, never()).insert(any(ContentVersionDO.class));
     }
 
@@ -290,9 +291,22 @@ class ContentVersionServiceTest {
         return request;
     }
 
+    @Test
+    void invalidLeadLinkIdentifiesFieldBeforeVersionInsert() {
+        when(contentMapper.selectByIdForUpdate(CONTENT_ID, TENANT_ID)).thenReturn(content(CONTENT_REVISING, 0, 0));
+        ContentVersionSaveReqVO request = request(null);
+        request.setLeadResourceUrl("http://example.com/lead");
+        ContentReviewFieldException error = assertThrows(ContentReviewFieldException.class, () -> service.create(request, USER_ID));
+        assertEquals(CONTENT_LINK_INVALID.getCode(), error.getCode());
+        assertEquals("leadResourceUrl", error.details().get("fieldPath"));
+        verify(mapper, never()).insert(any(ContentVersionDO.class));
+        verify(contentService, never()).advanceCurrentVersion(any(), any(), any());
+    }
+
     private void assertServiceCode(cn.iocoder.yudao.framework.common.exception.ErrorCode expected,
                                    org.junit.jupiter.api.function.Executable executable) {
-        ServiceException error = assertThrows(ServiceException.class, executable);
-        assertEquals(expected.getCode(), error.getCode());
+        RuntimeException error = assertThrows(RuntimeException.class, executable);
+        if (error instanceof ContentReviewFieldException field) assertEquals(expected.getCode(), field.getCode());
+        else assertEquals(expected.getCode(), ((ServiceException) error).getCode());
     }
 }

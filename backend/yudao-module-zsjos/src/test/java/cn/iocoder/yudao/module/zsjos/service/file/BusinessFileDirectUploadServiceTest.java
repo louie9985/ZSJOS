@@ -17,7 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_VERSION_FILE_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -58,8 +58,8 @@ class BusinessFileDirectUploadServiceTest {
 
     @Test
     void initContentRejectsUnsupportedTypesAndOverOneGigabyte() {
-        assertServiceCode(() -> service.initContent(uploadRequest("text/html", 1024L), 42L));
-        assertServiceCode(() -> service.initContent(uploadRequest("video/mp4", 1024L * 1024 * 1024 + 1), 42L));
+        assertServiceCode(CONTENT_FILE_TYPE_INVALID, () -> service.initContent(uploadRequest("text/html", 1024L), 42L));
+        assertServiceCode(CONTENT_FILE_SIZE_INVALID, () -> service.initContent(uploadRequest("video/mp4", 1024L * 1024 * 1024 + 1), 42L));
     }
 
     @Test
@@ -76,7 +76,7 @@ class BusinessFileDirectUploadServiceTest {
                 new FileInfoRespDTO(10L, 8L, "video.mp4", "zsjos/material/42/id/video.mp4",
                         "https://files.test/video.mp4", "video/mp4", 1024L, "42"));
 
-        assertServiceCode(() -> service.completeContent("token", 42L));
+        assertServiceCode(CONTENT_FILE_UNAVAILABLE, () -> service.completeContent("token", 42L));
     }
 
     @Test
@@ -102,8 +102,8 @@ class BusinessFileDirectUploadServiceTest {
         return request;
     }
 
-    private void assertServiceCode(org.junit.jupiter.api.function.Executable executable) {
+    private void assertServiceCode(cn.iocoder.yudao.framework.common.exception.ErrorCode expected, org.junit.jupiter.api.function.Executable executable) {
         ServiceException error = assertThrows(ServiceException.class, executable);
-        assertEquals(CONTENT_VERSION_FILE_INVALID.getCode(), error.getCode());
+        assertEquals(expected.getCode(), error.getCode());
     }
 }

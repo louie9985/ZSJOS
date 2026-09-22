@@ -1,3 +1,4 @@
+import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
 import StudentContentDraftPicker from '../components/StudentContentDraftPicker'
 import { restoreDraftWorks } from '../services/contentReviewDraft'
 import type { ContentReviewBatch } from '../services/materialApi'
@@ -218,7 +219,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
   const [contentPickerOpen, setContentPickerOpen] = useState(false)
-  const contentDraft = useRef<{ id: number; fingerprint: string } | undefined>(undefined)
+  const [contentError, setContentError] = useState('')
+  const [contentOptionsLoading, setContentOptionsLoading] = useState(false)
+  const [contentOptionsError, setContentOptionsError] = useState('')
+  const [contentUncertain, setContentUncertain] = useState(false)
+  const contentCommandLock = useRef(false)
+  const contentDraft = useRef<{ id: number; fingerprint: string; version?: number } | undefined>(undefined)
   const [tab, setTab] = useState(normalizeMediaStudentTab(params.get('tab'))), [dialog, setDialog] = useState<'account' | 'content' | 'positioning' | 'reject-content' | 'reject-positioning' | 'precheck' | 'operator' | 'student-partner'>(), [saving, setSaving] = useState(false), [contentSubmitAfterSave, setContentSubmitAfterSave] = useState(false)
   const [directorContext, setDirectorContext] = useState<StudentContactContext>()
   const [contentClasses, setContentClasses] = useState<DictData[]>([])
@@ -419,7 +425,16 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       setPositioningImportError(cause instanceof ApiError && cause.code === 403 ? '无权读取可导入的定位卡' : errorText(cause))
     } finally { setPositioningImportLoading(false) }
   }
-  const open = async (type: typeof dialog, accountId?: number, positioningDraftId?: number) => { form.resetFields(); const session = resetAutoSave(); if (type === 'content') contentDraft.current = undefined; setLegacyRegionText(undefined); if (type === 'account') accountCreatePending.current = undefined; if (type === 'positioning') { setPositioningTemplate(undefined); setPositioningImportSources([]); setPositioningImportSourceId(undefined); setPositioningImportError(''); setPositioningJsonOpen(false); setPositioningJsonPreview(undefined); setPositioningJsonError('') } if (accountId) form.setFieldValue('accountId', accountId); if (type !== 'positioning' && type !== 'precheck') setDialog(type)
+  const loadContentOptions = async () => {
+    setContentOptionsLoading(true); setContentOptionsError('')
+    api.invalidateDictDataCache()
+    try {
+      const [classes, purposes, formats] = await Promise.all([api.dictDataByType('zsjos_content_class'), api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')])
+      setContentClasses(classes); setContentPurposes(purposes); setContentFormats(formats)
+    } catch (cause) { setContentOptionsError(errorText(cause)) }
+    finally { setContentOptionsLoading(false) }
+  }
+  const open = async (type: typeof dialog, accountId?: number, positioningDraftId?: number) => { form.resetFields(); const session = resetAutoSave(); if (type === 'content') { contentDraft.current = undefined; setContentError(''); setContentUncertain(false) }; setLegacyRegionText(undefined); if (type === 'account') accountCreatePending.current = undefined; if (type === 'positioning') { setPositioningTemplate(undefined); setPositioningImportSources([]); setPositioningImportSourceId(undefined); setPositioningImportError(''); setPositioningJsonOpen(false); setPositioningJsonPreview(undefined); setPositioningJsonError('') } if (accountId) form.setFieldValue('accountId', accountId); if (type !== 'positioning' && type !== 'precheck') setDialog(type)
     if (type === 'precheck') {
       let activeContext: StudentContactContext
       try {
@@ -476,10 +491,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         void loadPositioningImportSources()
       } catch (cause) { if (autoSaveCoordinator.current!.isCurrent(session)) { setDialog(undefined); message.error(errorText(cause)) } return }
     }
-    if (type === 'content' && (!contentClasses.length || !contentPurposes.length || !contentFormats.length)) {
-      try { const [classes, purposes, formats] = await Promise.all([api.dictDataByType('zsjos_content_class'), api.dictDataByType('zsjos_content_purpose'), api.dictDataByType('zsjos_content_format')]); if (autoSaveCoordinator.current!.isCurrent(session)) { setContentClasses(classes); setContentPurposes(purposes); setContentFormats(formats) } }
-      catch (cause) { if (autoSaveCoordinator.current!.isCurrent(session)) { setDialog(undefined); message.error(errorText(cause)) } }
-    } }
+    if (type === 'content') await loadContentOptions()
+  }
   const importPositioningSubmission = async () => {
     if (!detail || !selectedService || !positioningImportSourceId || positioningLock.current) return
     const accountId = undefined
@@ -644,6 +657,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     autoSaveCoordinator.current!.schedule(draftSaveTask())
   }
   const closeDialog = async () => {
+    if (dialog === 'content' && contentCommandLock.current) return
     if (dialog === 'content' && saving) return
     if (dialog === 'positioning') {
       if (positioningLock.current || !await confirmDiscardPositioning()) return
@@ -662,7 +676,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const resumeContentDraft = async (batch: ContentReviewBatch) => {
     setContentPickerOpen(false)
     await open('content')
-    contentDraft.current = { id: batch.id, fingerprint: '' }
+    contentDraft.current = { id: batch.id, fingerprint: '', version: batch.version }; setContentError(''); setContentUncertain(false)
     const snapshots = Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []
     form.setFieldsValue({ accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
       accountSnapshots: Object.fromEntries(snapshots.map((row: Record<string, unknown>) => [String(row.id), row])),
@@ -686,18 +700,29 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     } catch (cause) { message.error(errorText(cause)) } finally { setSaving(false) }
   }
   const submit = async (submitContent = contentSubmitAfterSave) => { if (!detail || !dialog || saving) return
+    if (dialog === 'content' && (contentUncertain || contentOptionsLoading || contentOptionsError || contentCommandLock.current)) return
+    if (dialog === 'content') { contentCommandLock.current = true; setContentError('') }
+    let contentSaved = false
+    let contentPhase: ContentSavePhase = 'prepare'
     try {
       if (dialog === 'positioning') { await savePositioning(true); return }
       const validated = await form.validateFields()
       const values = dialog === 'content' ? form.getFieldsValue(true) : validated
       setSaving(true)
       if (dialog === 'content') {
+        if (contentDraft.current) {
+          const current = await contentReviewApi.get(contentDraft.current.id)
+          if (approvalHasStarted(current) || current.status !== 'DRAFT') {
+            setContentUncertain(true)
+            throw new Error('本轮状态已变化，请保留当前输入并查询审批状态')
+          }
+        }
         const preparedWorks = await prepareContentReviewWorks(Array.isArray(values.works) ? values.works : [], (index, field, items) => form.setFieldValue(['works', index, field], items))
         const works = preparedWorks.map(work => ({
           ...work,
           plannedPublishAt: work.plannedPublishAt ? dayjs(work.plannedPublishAt as never).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-          purposeLabelSnapshot: contentPurposes.find(item => item.value === work.purposeValue)?.label || '',
-          formatLabelSnapshot: contentFormats.find(item => item.value === work.formatValue)?.label || '',
+          purposeLabelSnapshot: work.purposeLabelSnapshot || contentPurposes.find(item => item.value === work.purposeValue)?.label || '',
+          formatLabelSnapshot: work.formatLabelSnapshot || contentFormats.find(item => item.value === work.formatValue)?.label || '',
         }))
         const draftRequest = {
           studentPersonId: detail.student.personId,
@@ -707,11 +732,15 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         }
         const fingerprint = JSON.stringify(draftRequest)
         if (contentDraft.current?.fingerprint !== fingerprint) {
+          contentPhase = 'save'
           const id = contentDraft.current
-            ? await contentReviewApi.saveStudentDraft(contentDraft.current.id, draftRequest)
+            ? await contentReviewApi.saveStudentDraft(contentDraft.current.id, { ...draftRequest, expectedVersion: contentDraft.current.version })
             : await contentReviewApi.createFromStudent(draftRequest)
           contentDraft.current = { id, fingerprint }
+          contentSaved = true
+          contentPhase = 'refresh'
           const savedDraft = await contentReviewApi.get(id)
+          contentDraft.current.version = savedDraft.version
           savedDraft.items.forEach((item, index) => {
             form.setFieldValue(['works', index, 'sourceContentId'], item.contentId)
             form.setFieldValue(['works', index, 'sourceVersionId'], item.contentVersionId)
@@ -719,9 +748,10 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           })
           contentDraft.current.fingerprint = JSON.stringify(draftRequest)
         }
+        contentSaved = true
         if (submitContent) {
-          const batch = await contentReviewApi.get(contentDraft.current!.id)
-          await contentReviewApi.submit(batch.id, batch.version)
+          contentPhase = 'submit'
+          await submitContentReview(contentDraft.current!.id, contentDraft.current!.version!)
         } else {
           message.success('草稿已保存，可继续填写；下次从发起内容审批入口选择此草稿')
           return
@@ -773,13 +803,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       setDialog(undefined); message.success('已保存'); await loadDetail(detail.student.personId, selectedServiceId, selectedAccountId)
     } catch (cause) {
       if (!(cause as { errorFields?: unknown }).errorFields) {
-        message.error(errorText(cause))
+        if (dialog === 'content') {
+          locateContentError(form, cause)
+          setContentError(contentSaveError(cause, contentSaved, contentPhase))
+          setContentUncertain(current => current || contentResultUncertain(cause, contentPhase))
+        } else message.error(errorText(cause))
         if (dialog === 'student-partner') void refreshInvitation()
         if (dialog === 'precheck' && !(cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code))) {
           scheduleAutoSave()
         }
       }
-    } finally { setSaving(false) } }
+    } finally { setSaving(false); contentCommandLock.current = false } }
   const openStudentPartnerInvitation = async () => {
     if (!detail) return
     const context = await refreshInvitation()
@@ -838,7 +872,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       onClick: () => openDirectorAction(action),
     }))
   // 内容审批由运营发起；编导只负责后续逐条审核。
-  const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:submit') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => setContentPickerOpen(true) }] : []
+  const contentApprovalAction: ToolbarAction[] = hasPermission(permissions, 'zsjos:content-review:submit') && hasPermission(permissions, 'zsjos:content-review:query') ? [{ key: 'CREATE_CONTENT_REVIEW', icon: <SendOutlined />, label: '发起内容审批', onClick: () => setContentPickerOpen(true) }] : []
   const overviewAccountActions: ToolbarAction[] = [
     ...(hasPermission(permissions, 'zsjos:production-ticket:create') ? [
       { key: 'CREATE_MEDIA_DESIGN_EDIT_TICKET', icon: <EditOutlined />, label: '发起剪辑设计工单', onClick: () => void openTicket('media_design_edit'), disabled: saving },
@@ -998,13 +1032,15 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         setDialog(undefined)
         await Promise.all([loadPage(1, undefined, false, true), loadDetail(detail.student.personId, selectedService.serviceRelationId, selectedAccountId)])
       }} />}
-    <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog) && dialog !== 'operator'} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
+    <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog) && dialog !== 'operator'} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" disabled={saving} onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" disabled={contentUncertain || contentOptionsLoading || Boolean(contentOptionsError)} loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" disabled={contentUncertain || contentOptionsLoading || Boolean(contentOptionsError)} loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" disabled={dialog === 'positioning' && positioningBusy} onValuesChange={scheduleAutoSave}>
         {autoSaveNotice}
         {dialog === 'positioning' && !positioningCanSubmit && <Alert type="info" message="提交前请指派课程服务责任运营，并确认你拥有提交审核权限" />}
         {dialog === 'positioning' && <Space orientation="vertical" style={{ width: '100%' }}><Typography.Text type="secondary">{saving ? '正在保存草稿…' : positioningDirty ? '有未保存的修改' : '修改后请点击保存草稿'}</Typography.Text>{positioningSaveError && <Alert type="error" showIcon message={positioningSaveError} action={positioningConflict ? <Space><Button onClick={() => void copyPositioningValues()}>复制当前内容</Button><Button onClick={() => void reloadPositioning()}>重新加载</Button></Space> : undefined} />}</Space>}
         {dialog === 'account' && <Alert type="info" showIcon message="创建空白账号" description="账号归属当前学员，业务资料全部留空。创建后自动打开账号表，由编导与运营分别补充负责字段。" />}
-        {dialog === 'content' && <ContentApprovalDraft disabled={saving} accounts={detail?.accounts || []} purposeOptions={contentPurposes.map(x => ({ value: x.value, label: x.label }))} formatOptions={contentFormats.map(x => ({ value: x.value, label: x.label }))} />}
+        {dialog === 'content' && contentError && <Alert type="error" showIcon message={contentError} description={contentUncertain ? '请保留填写内容，关闭后从草稿列表查询最新状态，再继续操作。' : undefined} />}
+        {dialog === 'content' && contentOptionsError && <Alert type="error" showIcon message={contentOptionsError} action={<Button onClick={() => void loadContentOptions()}>重试</Button>} />}
+        {dialog === 'content' && <ContentApprovalDraft optionsLoading={contentOptionsLoading} onReloadOptions={() => void loadContentOptions()} disabled={saving || contentOptionsLoading || Boolean(contentOptionsError)} accounts={detail?.accounts || []} purposeOptions={contentPurposes.map(x => ({ value: x.value, label: x.label }))} formatOptions={contentFormats.map(x => ({ value: x.value, label: x.label }))} />}
         {dialog === 'positioning' && <><div className="media-students-positioning-toolbar"><Space wrap><Button icon={<UploadOutlined />} disabled={positioningBusy} onClick={() => { setPositioningJsonText(''); setPositioningJsonFileName(''); setPositioningJsonPreview(undefined); setPositioningJsonError(''); setPositioningJsonOpen(true) }}>导入 JSON</Button>{hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />} title={!positioningDraft.current?.id ? '请先保存草稿，再导入历史版本' : undefined} disabled={positioningBusy || !positioningDraft.current?.id} onClick={() => { setPositioningImportOpen(true); if (!positioningImportSources.length && !positioningImportLoading) void loadPositioningImportSources() }}>导入现有定位卡</Button>}</Space></div><PositioningCardFields fields={positioningTemplate?.fields || []} render={directorField} /></>}
         {dialog === 'precheck' && <><Alert type="info" showIcon message="核对学员、订单和服务归属后，预约定位访谈。"/><Form.Item name="confirmed" valuePropName="checked" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false||v?Promise.resolve():Promise.reject(new Error('请确认资料无误'))}]}><Checkbox>已确认资料无误</Checkbox></Form.Item><Form.Item name="interviewAt" label="定位访谈预约时间（北京时间）" rules={[{validator:(_,v)=>form.getFieldValue('submit')===false?Promise.resolve():!v?Promise.reject(new Error('请选择定位访谈预约时间')):dayjs(v).isAfter(dayjs())?Promise.resolve():Promise.reject(new Error('定位访谈预约时间必须晚于当前北京时间'))}]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="submit" initialValue={true} valuePropName="checked"><Checkbox>确认完成资料预审</Checkbox></Form.Item></>}
         {dialog === 'student-partner' && <><Alert type="info" showIcon message="姓名和手机号仅用于本次兼职账号注册，不会修改学员主体资料。" />{invitationContext?.invitation && <Alert type="warning" showIcon message="原邀请码已失效，重新生成后请发送新邀请码。" />}{invitationContext?.operatorAssignmentConflict && <Alert type="warning" showIcon message="学员运营归属不一致，请明确选择本次兼职的归属运营。" />}{invitationOperatorsError && <Alert type="error" showIcon message={invitationOperatorsError} action={<Button onClick={() => void loadInvitationOperators()}>重试加载运营</Button>} />}<Form.Item name="assignedOperatorUserId" label="归属运营" extra="默认学员当前运营，可改选；仅决定本次兼职归属，不改变学员运营安排。" rules={[{ required: true, message: '请选择归属运营' }, { validator: (_, value) => !value || invitationOperators.some(operator => operator.id === value) ? Promise.resolve() : Promise.reject(new Error('该运营已不可用，请重新选择')) }]}><Select showSearch optionFilterProp="label" loading={invitationOperatorsLoading} disabled={invitationOperatorsLoading || Boolean(invitationOperatorsError)} placeholder="请选择归属运营" notFoundContent={invitationOperatorsLoading ? '加载中' : '暂无可用运营'} options={invitationOperators.map(operator => ({ value: operator.id, label: operator.nickname }))} /></Form.Item><Form.Item name="studentName" label="注册姓名" rules={[{ required: true, whitespace: true, max: 100, message: '请输入注册姓名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="studentMobile" label="注册手机号" rules={[{ required: true, whitespace: true, message: '请输入注册手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的 11 位手机号' }]}><Input maxLength={11} /></Form.Item><Form.Item name="invitationExpiresAt" label="到期时间" rules={[{ required: true, message: '请选择到期时间' }, { validator: (_, value) => !value || dayjs(value).isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('到期时间必须晚于当前时间')) }]}><DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} /></Form.Item></>}
@@ -1014,7 +1050,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     <PositioningDialog title="导入现有定位卡" mask={{ closable: false }} keyboard={false} open={positioningImportOpen} closable={!positioningBusy} cancelButtonProps={{ disabled: positioningBusy }} onCancel={() => { if (!positioningLock.current) setPositioningImportOpen(false) }} onOk={() => void importPositioningSubmission()} okText="导入并保存" okButtonProps={{ disabled: positioningBusy || !positioningImportSourceId }} confirmLoading={positioningImportSaving}>
       {positioningImportLoading ? <Skeleton active paragraph={{ rows: 4 }} /> : positioningImportError ? <Alert type="error" showIcon message={positioningImportError} action={<Button size="small" onClick={() => void loadPositioningImportSources()}>重试</Button>} /> : positioningImportSources.length ? <Radio.Group value={positioningImportSourceId} onChange={event => setPositioningImportSourceId(event.target.value)} className="media-students-positioning-import-list">{positioningImportSources.map(source => <Radio value={source.submissionId} key={source.submissionId}><span className="media-students-positioning-import-option"><strong>{source.accountLabel}</strong><span><Tag color={source.sameAccount ? 'blue' : undefined}>历史版本</Tag>第 {source.submissionNo} 次提交 · {formatTimestamp(source.submittedAt)} · {statusLabel(source.status)}</span></span></Radio>)}</Radio.Group> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可导入的已提交定位卡" />}
     </PositioningDialog>
-    {contentPickerOpen && detail && <StudentContentDraftPicker studentPersonId={detail.student.personId} onClose={() => setContentPickerOpen(false)} onCreate={() => { setContentPickerOpen(false); void open('content') }} onResume={batch => void resumeContentDraft(batch)} />}
+    {contentPickerOpen && detail && <StudentContentDraftPicker canCreate={hasPermission(permissions, 'zsjos:content-review:create')} studentPersonId={detail.student.personId} onClose={() => setContentPickerOpen(false)} onCreate={() => { setContentPickerOpen(false); void open('content') }} onResume={batch => void resumeContentDraft(batch)} />}
     <PositioningDialog width="min(760px, calc(100vw - 32px))" title="导入定位卡 JSON" open={positioningJsonOpen} onCancel={() => { if (!positioningJsonSaving) setPositioningJsonOpen(false) }} onOk={() => void confirmPositioningJsonImport()} okText="导入到表单" okButtonProps={{ disabled: !positioningJsonPreview || !positioningJsonPreview.importable.length && !positioningJsonPreview.cleared.length }} confirmLoading={positioningJsonSaving} mask={{ closable: false }} keyboard={false}>
       <div className="media-students-json-import">
         <Alert type="info" showIcon message="仅按当前模板字段 key 匹配" description="字典字段请填写服务端稳定 value；null 表示清空该字段，未提供或校验失败的字段会保留原值。" action={<Button size="small" icon={<CopyOutlined />} onClick={() => void copyPositioningJsonPrompt()}>复制提示词</Button>} />

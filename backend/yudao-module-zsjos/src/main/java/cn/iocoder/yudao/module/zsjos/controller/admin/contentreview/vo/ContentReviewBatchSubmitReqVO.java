@@ -5,5 +5,5 @@ import lombok.Data;
 
 @Data
 public class ContentReviewBatchSubmitReqVO {
-    @NotNull private Integer expectedVersion;
+    @NotNull(message = "缺少审核版本，请刷新后重试") private Integer expectedVersion;
 }

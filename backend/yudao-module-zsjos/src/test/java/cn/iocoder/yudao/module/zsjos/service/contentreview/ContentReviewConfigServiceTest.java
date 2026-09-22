@@ -46,6 +46,18 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ContentReviewConfigServiceTest {
 
+    @Test
+    void unpublishedAndSuspendedDefinitionsHaveDifferentRecoveryMessages() {
+        when(definitionReadApi.getPublishedProcessDefinition(PROCESS_DEFINITION_KEY)).thenReturn(null);
+        ServiceException missing = assertThrows(ServiceException.class, () -> service.requireCurrentDefinition(null));
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_PROCESS_NOT_PUBLISHED.getCode(), missing.getCode());
+        var definition = twoStageDefinition();
+        definition.setSuspended(true);
+        when(definitionReadApi.getPublishedProcessDefinition(PROCESS_DEFINITION_KEY)).thenReturn(definition);
+        ServiceException suspended = assertThrows(ServiceException.class, () -> service.requireCurrentDefinition(null));
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_PROCESS_SUSPENDED.getCode(), suspended.getCode());
+    }
+
     @InjectMocks private ContentReviewConfigService service;
     @Mock private ContentReviewConfigMapper contentReviewConfigMapper;
     @Mock private BpmDefinitionReadApi definitionReadApi;

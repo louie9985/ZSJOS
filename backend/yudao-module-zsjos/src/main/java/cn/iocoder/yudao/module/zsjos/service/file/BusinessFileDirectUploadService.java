@@ -15,7 +15,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_VERSION_FILE_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_FILE_INVALID;
 
 @Service
@@ -35,7 +35,7 @@ public class BusinessFileDirectUploadService {
     public FileInfoRespDTO completeContent(String uploadToken, Long userId) {
         FileInfoRespDTO file = fileApi.completeDirectUpload(buildCompleteRequest(uploadToken, userId, CONTENT_SCENE));
         if (!validCompletedFile(file, userId, contentDirectory(userId))) {
-            throw exception(CONTENT_VERSION_FILE_INVALID);
+            throw exception(CONTENT_FILE_UNAVAILABLE, "上传文件");
         }
         return file;
     }
@@ -61,7 +61,11 @@ public class BusinessFileDirectUploadService {
                 || request.getName() == null || request.getName().isBlank() || request.getName().length() > 255
                 || invalidType) {
             if (contentScene) {
-                throw exception(CONTENT_VERSION_FILE_INVALID);
+                if (request.getSize() == null || request.getSize() <= 0 || request.getSize() > MAX_FILE_BYTES)
+                    throw exception(CONTENT_FILE_SIZE_INVALID, "上传文件");
+                if (request.getName() == null || request.getName().isBlank() || request.getName().length() > 255)
+                    throw exception(CONTENT_UPLOAD_NAME_INVALID);
+                throw exception(CONTENT_FILE_TYPE_INVALID, "上传文件");
             }
             throw exception(MATERIAL_FILE_INVALID, "文件为空、类型无效或超过 1GB");
         }

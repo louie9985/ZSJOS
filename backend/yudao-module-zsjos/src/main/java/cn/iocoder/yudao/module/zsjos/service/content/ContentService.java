@@ -134,11 +134,11 @@ public class ContentService {
         ContentDO content = require(id);
         if (!expected.equals(content.getStatus())) throw exception(CONTENT_STATE_INVALID);
         if (content.getCurrentVersionNo() == null || content.getCurrentVersionNo() <= 0) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw exception(CONTENT_VERSION_NOT_EXISTS);
         }
         var currentVersion = contentVersionMapper.selectByContentAndVersionNo(id, content.getCurrentVersionNo());
         if (currentVersion == null) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw exception(CONTENT_VERSION_NOT_EXISTS);
         }
         boolean startsRejectedRevision = CONTENT_REJECTED.equals(expected) && CONTENT_REVISING.equals(target)
                 && currentVersion.getFrozenAt() != null
@@ -170,7 +170,7 @@ public class ContentService {
     public void registerPublished(ContentDO content, Integer expectedVersion, String url,
                                   java.time.LocalDateTime publishedAt, Long operatorUserId) {
         if (content == null || mapper.registerPublished(content.getId(), expectedVersion, url, publishedAt) != 1) {
-            throw exception(CONTENT_REVIEW_PUBLISH_INVALID);
+            throw exception(CONTENT_VERSION_CONFLICT);
         }
         publishTransitionEvents(content, CONTENT_READY_TO_PUBLISH, CONTENT_PUBLISHED,
                 null, operatorUserId, expectedVersion);

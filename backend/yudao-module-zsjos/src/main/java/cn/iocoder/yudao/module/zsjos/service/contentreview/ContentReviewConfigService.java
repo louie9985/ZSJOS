@@ -30,8 +30,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.zsjos.enums.ContentReviewConstants.BPM_CATEGORY;
 import static cn.iocoder.yudao.module.zsjos.enums.ContentReviewConstants.MATERIAL_TYPE_PRODUCTION_CONTENT;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.*;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_CONFIG_INVALID;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_VERSION_CONFLICT;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ContentReviewConfigService {
@@ -143,15 +142,14 @@ public class ContentReviewConfigService {
     public ContentReviewConfigDO requireReadyConfig(Long userId) {
         ContentReviewConfigDO config = contentReviewConfigMapper.selectCurrent();
         if (config == null) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+            throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "尚未建立审核配置");
         }
         BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
                 PROCESS_DEFINITION_KEY);
-        if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
-                || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition)) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
-        }
+        if (definition == null) throw exception(CONTENT_PROCESS_NOT_PUBLISHED);
+        if (Boolean.TRUE.equals(definition.getSuspended())) throw exception(CONTENT_PROCESS_SUSPENDED);
+        if (!BPM_CATEGORY.equals(definition.getCategory()) || !validTaskSequence(definition))
+            throw exception(CONTENT_PROCESS_STRUCTURE_INVALID);
         validateMaterialMapping(PRODUCTION_MATERIAL_TYPE_CODE, mapping(config), defaults(config), userId);
         return config;
     }
@@ -159,11 +157,10 @@ public class ContentReviewConfigService {
     public BpmProcessDefinitionMetadataRespDTO requireCurrentDefinition(ContentReviewConfigDO config) {
         BpmProcessDefinitionMetadataRespDTO definition = definitionReadApi.getPublishedProcessDefinition(
                 PROCESS_DEFINITION_KEY);
-        if (definition == null || Boolean.TRUE.equals(definition.getSuspended())
-                || !BPM_CATEGORY.equals(definition.getCategory())
-                || !validTaskSequence(definition)) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
-        }
+        if (definition == null) throw exception(CONTENT_PROCESS_NOT_PUBLISHED);
+        if (Boolean.TRUE.equals(definition.getSuspended())) throw exception(CONTENT_PROCESS_SUSPENDED);
+        if (!BPM_CATEGORY.equals(definition.getCategory()) || !validTaskSequence(definition))
+            throw exception(CONTENT_PROCESS_STRUCTURE_INVALID);
         return definition;
     }
 
@@ -171,7 +168,7 @@ public class ContentReviewConfigService {
         MaterialTypeDO type = materialTypeMapper.selectByCode(PRODUCTION_MATERIAL_TYPE_CODE);
         if (type == null || !CommonStatusEnum.ENABLE.getStatus().equals(type.getStatus())
                 || !Boolean.TRUE.equals(type.getAllowAutoCollect())) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+            throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "素材类型不可用或未启用自动收录");
         }
         return materialTypeService.requirePublishedSchema(type);
     }
@@ -193,7 +190,7 @@ public class ContentReviewConfigService {
 
     public ReviewTaskKeys requireReviewTaskKeys(BpmProcessDefinitionMetadataRespDTO definition) {
         ReviewTaskKeys keys = findReviewTaskKeys(definition);
-        if (keys == null) throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+        if (keys == null) throw exception(CONTENT_PROCESS_STRUCTURE_INVALID);
         return keys;
     }
 
@@ -237,7 +234,7 @@ public class ContentReviewConfigService {
         MaterialTypeDO type = materialTypeMapper.selectByCode(typeCode);
         if (type == null || !CommonStatusEnum.ENABLE.getStatus().equals(type.getStatus())
                 || !Boolean.TRUE.equals(type.getAllowAutoCollect())) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+            throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "素材类型不可用或未启用自动收录");
         }
         MaterialSchemaVersionDO schema = materialTypeService.requirePublishedSchema(type);
         List<MaterialFieldDefinition> fields = materialSchemaService.parseFields(schema.getFieldsJson());
@@ -250,29 +247,29 @@ public class ContentReviewConfigService {
                 || !java.util.Collections.disjoint(mapping.keySet(), defaults.keySet())
                 || mapping.keySet().stream().anyMatch(key -> !"__cover__".equals(key) && !fieldsByKey.containsKey(key))
                 || defaults.keySet().stream().anyMatch(key -> !fieldsByKey.containsKey(key))) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+            throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "映射目标不存在、封面映射错误或默认值重复");
         }
         for (Map.Entry<String, String> entry : mapping.entrySet()) {
             if ("__cover__".equals(entry.getKey())) continue;
             if (!supportsSource(fieldsByKey.get(entry.getKey()), entry.getValue())) {
-                throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+                throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "字段「" + fieldsByKey.get(entry.getKey()).getLabel() + "」来源与目标类型不匹配");
             }
         }
         for (String key : defaults.keySet()) {
             if (FILE_FIELD_TYPES.contains(fieldsByKey.get(key).getType())) {
-                throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+                throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "文件字段「" + fieldsByKey.get(key).getLabel() + "」不能设置固定默认值");
             }
         }
         for (MaterialFieldDefinition field : fields) {
             if (Boolean.TRUE.equals(field.getRequired()) && !mapping.containsKey(field.getKey())
                     && empty(defaults.get(field.getKey()))) {
-                throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+                throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "必填字段「" + field.getLabel() + "」未配置来源或默认值");
             }
         }
         try {
             materialSchemaService.validatePartialValues(fields, defaults, userId);
         } catch (RuntimeException error) {
-            throw exception(CONTENT_REVIEW_CONFIG_INVALID);
+            throw exception(CONTENT_MATERIAL_CONFIG_INVALID, "默认值不符合素材字段要求");
         }
     }
 

@@ -39,6 +39,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewFieldException.field;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -78,13 +79,13 @@ public class ContentVersionService {
         }
         if (!List.of(CONTENT_TOPIC, CONTENT_SCRIPT, CONTENT_IN_PRODUCTION, CONTENT_REVISING)
                 .contains(content.getStatus())) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw exception(CONTENT_VERSION_UNAVAILABLE);
         }
         ContentVersionDO current = content.getCurrentVersionNo() == null ? null
                 : mapper.selectByContentAndVersionNoForUpdate(content.getId(), content.getCurrentVersionNo(),
                 TenantContextHolder.getRequiredTenantId());
         if (current != null && current.getFrozenAt() != null && current.getReviewDecision() == null) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw exception(CONTENT_VERSION_IN_REVIEW);
         }
         List<ContentVersionFileDO> currentFiles = current == null ? List.of() : contentVersionFileMapper.selectByVersionId(current.getId());
         Set<Long> currentFileIds = currentFiles.stream().map(ContentVersionFileDO::getInfraFileId)
@@ -108,8 +109,8 @@ public class ContentVersionService {
         row.setTopicSnapshot(normalize(req.getTopicSnapshot(), content.getTopic()));
         String deliverableUrl = normalizeOptional(req.getDeliverableUrl());
         String leadResourceUrl = normalizeOptional(req.getLeadResourceUrl());
-        validateHttps(deliverableUrl);
-        validateHttps(leadResourceUrl);
+        validateHttps(deliverableUrl, "deliverableUrl", "成品链接");
+        validateHttps(leadResourceUrl, "leadResourceUrl", "引流资料链接");
         row.setCoverSnapshotJson(coverFiles.snapshotJson());
         // 首个版本接受客户端提交的参考素材快照；创建后续版本时完整继承，不允许客户端改写引用审计。
         row.setMaterialRefsJson(current == null ? normalizeMaterialRefs(req.getMaterialRefsJson())
@@ -134,7 +135,7 @@ public class ContentVersionService {
         insertFiles(row.getId(), coverFiles.files());
         insertFiles(row.getId(), deliverableFiles.files());
         if (contentService.advanceCurrentVersion(content.getId(), content.getVersion(), nextVersion) == 0) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw exception(CONTENT_VERSION_CONFLICT);
         }
         return row.getId();
     }
@@ -202,7 +203,7 @@ public class ContentVersionService {
         try {
             JsonUtils.parseTree(normalized);
         } catch (RuntimeException error) {
-            throw exception(CONTENT_VERSION_FILE_INVALID);
+            throw field(CONTENT_REFERENCE_INVALID, "referenceMaterials");
         }
         return normalized;
     }
@@ -251,6 +252,8 @@ public class ContentVersionService {
     private BoundFiles normalizeFiles(String json, String fieldKey, Long userId, boolean imageOnly, int maxCount,
                                       Map<Long, ContentVersionFileDO> inheritedFiles,
                                       Set<Long> currentFileIds) {
+        String path = imageOnly ? "coverItems" : "attachmentItems";
+        String label = imageOnly ? "封面" : "审核附件";
         if (json == null || json.isBlank()) return new BoundFiles(null, List.of());
         LinkedHashSet<Long> ids = new LinkedHashSet<>();
         try {
@@ -258,9 +261,10 @@ public class ContentVersionService {
             if (node != null && node.isArray() && node.isEmpty()) return new BoundFiles(null, List.of());
             collectFileIds(node, ids);
         } catch (RuntimeException error) {
-            throw exception(CONTENT_VERSION_FILE_INVALID);
+            throw field(CONTENT_FILE_SNAPSHOT_INVALID, path, label);
         }
-        if (ids.isEmpty() || ids.size() > maxCount) throw exception(CONTENT_VERSION_FILE_INVALID);
+        if (ids.isEmpty()) throw field(CONTENT_FILE_SNAPSHOT_INVALID, path, label);
+        if (ids.size() > maxCount) throw field(CONTENT_FILE_COUNT_INVALID, path, label, maxCount);
         List<BoundFile> files = new ArrayList<>(ids.size());
         List<Map<String, Object>> snapshots = new ArrayList<>(ids.size());
         int sortNo = 1;
@@ -274,18 +278,18 @@ public class ContentVersionService {
                 continue;
             }
             if (currentFileIds.contains(id)) {
-                throw exception(CONTENT_VERSION_FILE_INVALID);
+                throw field(CONTENT_FILE_UNAVAILABLE, path, label);
             }
             FileInfoRespDTO file;
             try {
                 file = fileApi.getFileInfo(id);
             } catch (ServiceException error) {
-                throw exception(CONTENT_VERSION_FILE_INVALID);
+                throw field(CONTENT_FILE_UNAVAILABLE, path, label);
             }
             if (file == null || file.getPath() == null
                     || !file.getPath().startsWith(contentDirectory(userId) + "/")
                     || !Objects.equals(String.valueOf(userId), file.getCreator())) {
-                throw exception(CONTENT_VERSION_FILE_INVALID);
+                throw field(CONTENT_FILE_UNAVAILABLE, path, label);
             }
             validateFileMetadata(file, imageOnly);
             snapshots.add(fileSnapshot(file));
@@ -304,10 +308,12 @@ public class ContentVersionService {
         String contentType = Objects.toString(file.getType(), "").toLowerCase(Locale.ROOT);
         boolean acceptedType = imageOnly ? contentType.startsWith("image/")
                 : ContentAttachmentTypes.accepts(contentType);
-        if (file.getSize() == null || file.getSize() < 0 || file.getSize() > MAX_CONTENT_FILE_BYTES
-                || !acceptedType) {
-            throw exception(CONTENT_VERSION_FILE_INVALID);
+        String path = imageOnly ? "coverItems" : "attachmentItems";
+        String label = imageOnly ? "封面" : "审核附件";
+        if (file.getSize() == null || file.getSize() <= 0 || file.getSize() > MAX_CONTENT_FILE_BYTES) {
+            throw field(CONTENT_FILE_SIZE_INVALID, path, label);
         }
+        if (!acceptedType) throw field(CONTENT_FILE_TYPE_INVALID, path, label);
     }
 
     private Map<String, Object> fileSnapshot(FileInfoRespDTO file) {
@@ -366,15 +372,15 @@ public class ContentVersionService {
         contentVersionFileMapper.insertBatch(rows);
     }
 
-    private void validateHttps(String value) {
+    private void validateHttps(String value, String path, String label) {
         if (value == null || value.isBlank()) return;
         try {
             URI uri = URI.create(value.trim());
             if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
-                throw exception(CONTENT_VERSION_STAGE_INVALID);
+                throw field(CONTENT_LINK_INVALID, path, label);
             }
         } catch (IllegalArgumentException error) {
-            throw exception(CONTENT_VERSION_STAGE_INVALID);
+            throw field(CONTENT_LINK_INVALID, path, label);
         }
     }
 
