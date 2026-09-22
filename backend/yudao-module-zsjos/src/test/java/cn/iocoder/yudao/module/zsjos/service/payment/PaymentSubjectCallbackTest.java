@@ -25,6 +25,9 @@ class PaymentSubjectCallbackTest {
     private final PaymentRefundMapper refundMapper = mock(PaymentRefundMapper.class);
     private final PaymentTransactionMapper transactions = mock(PaymentTransactionMapper.class);
     private final PaymentGatewayEventMapper events = mock(PaymentGatewayEventMapper.class);
+    private final PurchaseIntentMapper intents = mock(PurchaseIntentMapper.class);
+    private final cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi notifications =
+            mock(cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi.class);
     private final PaymentIntentDO payment = payment(subject(10)).setId(1L).setStatus("waiting")
             .setPaymentOrderNo("PAY1").setReqsn("REQ1").setExpectedAmount(new BigDecimal("1.00"));
     private final PaymentRefundDO refund = new PaymentRefundDO().setId(2L).setPaymentOrderId(1L)
@@ -35,6 +38,11 @@ class PaymentSubjectCallbackTest {
         var global = new AllinpayProperties(); global.setCusid("global"); global.setAppid("global");
         var factory = factory(global);
         ReflectionTestUtils.setField(service, "paymentIntentMapper", payments);
+        ReflectionTestUtils.setField(service, "purchaseIntentMapper", intents);
+        ReflectionTestUtils.setField(service, "notifyBusinessEventApi", notifications);
+        payment.setPurchaseIntentId(3L);
+        when(intents.selectById(3L)).thenReturn(new PurchaseIntentDO().setId(3L)
+                .setOwnerUserId(8L).setPurchaseIntentNo("PI-TEST"));
         ReflectionTestUtils.setField(service, "transactionMapper", transactions);
         ReflectionTestUtils.setField(service, "gatewayEventMapper", events);
         ReflectionTestUtils.setField(service, "gatewayFactory", factory);
@@ -56,6 +64,11 @@ class PaymentSubjectCallbackTest {
         assertEquals("paid", payment.getStatus());
         verify(transactions, times(1)).insert(any(PaymentTransactionDO.class));
         verify(events, times(1)).insert(any(PaymentGatewayEventDO.class));
+        verify(notifications).publish(argThat(event -> PaymentNotifySceneProvider.PAID.equals(event.getSceneCode())
+                && Long.valueOf(1L).equals(event.getTenantId())
+                && "payment-paid:1".equals(event.getSourceEventKey())
+                && Long.valueOf(8L).equals(event.getPayload().get("ownerUserId"))
+                && "PI-TEST".equals(event.getPayload().get("purchase.no"))));
     }
 
     @Test
@@ -64,7 +77,7 @@ class PaymentSubjectCallbackTest {
             var payload = payload("REQ1"); payload.put(field, field.equals("trxamt") ? "101" : "global"); sign(payload);
             assertServiceException(() -> service.notify(payload), PAYMENT_CALLBACK_INVALID);
         }
-        verifyNoInteractions(transactions, events);
+        verifyNoInteractions(transactions, events, notifications);
         assertEquals("waiting", payment.getStatus());
     }
 
@@ -72,7 +85,7 @@ class PaymentSubjectCallbackTest {
     void invalidSignatureCannotConfirmPayment() {
         var payload = payload("REQ1"); payload.put("sign", "invalid");
         assertServiceException(() -> service.notify(payload), PAYMENT_CALLBACK_INVALID);
-        verifyNoInteractions(transactions, events);
+        verifyNoInteractions(transactions, events, notifications);
     }
 
     @Test

@@ -32,6 +32,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
   const [products, setProducts] = useState<DeliveryClassProductOption[]>([])
   const [form] = Form.useForm<ClassForm>()
   const selectedProductId = Form.useWatch('productId', form)
+  const selectedSkuIds = Form.useWatch('selectedSkuIds', form) || []
   const selectedProduct = products.find(row => row.productId === selectedProductId)
   const productCascaderOptions = useMemo(() => {
     type Node = { value: number; label: string; children?: Node[]; isLeaf?: boolean }
@@ -57,8 +58,8 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
     return roots
   }, [products])
   const normalizeAttrs = (attrs?: Record<string, string>) => Object.fromEntries(Object.entries(attrs || {}).filter(([, value]) => value != null && value !== ''))
-  const loadExams = async (categoryId: number, productId?: number, attrs?: Record<string, string>) => {
-    setExams(await api.deliveryClasses.exams(categoryId, productId, normalizeAttrs(attrs)))
+  const loadExams = async (categoryId: number, productId?: number, attrs?: Record<string, string>, skuIds?: number[]) => {
+    setExams(await api.deliveryClasses.exams(categoryId, productId, normalizeAttrs(attrs), skuIds))
   }
 
   const load = useCallback(async (targetPage = 1) => {
@@ -88,23 +89,21 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
       form.resetFields()
       const product = row?.productId ? productRows.find(item => item.productId === row.productId) : undefined
       form.setFieldsValue(row ? { className: row.className, productId: row.productId!, productSelection: (product?.categoryPath?.map(category => category.id) || [row.categoryId!]).concat(row.productId!), selectedAttrs: attrs, selectedSkuIds: row.selectedSkus?.map(sku => sku.id), categoryId: row.categoryId!, examScheduleId: row.examScheduleId!, homeroomUserId: row.homeroomUserId! } : {})
-      if (row?.categoryId) await loadExams(row.categoryId, row.productId, attrs)
+      if (row?.categoryId && row?.selectedSkus?.length) await loadExams(row.categoryId, row.productId, attrs, row.selectedSkus.map(sku => sku.id))
     } catch (e) { message.error(e instanceof Error ? e.message : '创建班级所需数据加载失败'); setEditOpen(false) }
     finally { setSaving(false) }
   }
   const productChanged = async (productId: number) => {
     const product = products.find(item => item.productId === productId)
     if (!product) return
-    form.setFieldsValue({ categoryId: product.categoryId, selectedSkuIds: product.skus.map(sku => sku.id), selectedAttrs: {}, examScheduleId: undefined })
-    await loadExams(product.categoryId, product.productId, {})
+    form.setFieldsValue({ categoryId: product.categoryId, selectedSkuIds: [], selectedAttrs: {}, examScheduleId: undefined })
+    setExams([])
   }
-  const attrsChanged = async (attrKey: string, value?: string) => {
-    const attrs = normalizeAttrs({ ...form.getFieldValue('selectedAttrs'), [attrKey]: value || '' })
-    const product = selectedProduct
-    if (!product) return
-    const validSkuIds = new Set(product.skus.filter(sku => Object.entries(attrs).every(([key, selected]) => sku.attrValues?.[key] === selected)).map(sku => sku.id))
-    form.setFieldsValue({ selectedAttrs: attrs, selectedSkuIds: (form.getFieldValue('selectedSkuIds') || []).filter((id: number) => validSkuIds.has(id)), examScheduleId: undefined })
-    await loadExams(product.categoryId, product.productId, attrs)
+  const skuChanged = async (skuIds: number[]) => {
+    form.setFieldValue('examScheduleId', undefined)
+    if (!selectedProduct || !skuIds.length) { setExams([]); return }
+    try { await loadExams(selectedProduct.categoryId, selectedProduct.productId, {}, skuIds) }
+    catch (e) { message.error(e instanceof Error ? e.message : '考期加载失败'); setExams([]) }
   }
   const categoryChanged = async (categoryId: number) => {
     form.setFieldValue('examScheduleId', undefined); setExams([])
@@ -124,7 +123,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
     value.categoryId = categoryId;
     setSaving(true)
     try {
-      value.selectedAttrs = normalizeAttrs(value.selectedAttrs)
+      value.selectedAttrs = {}
       const payload = { ...value }
       delete payload.productSelection
       if (editing) await api.deliveryClasses.update(editing.id, { ...payload, version: editing.version })
@@ -163,7 +162,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
       <div ref={sentinelRef} className="delivery-class-sentinel">{loading && rows.length > 0 ? '加载中…' : hasMore ? '加载更多' : rows.length ? '已加载全部班级' : ''}</div>
     </Space>
     <Modal open={editOpen} title={editing ? '编辑班级' : '创建班级'} confirmLoading={saving} onOk={() => void save()} onCancel={() => setEditOpen(false)} destroyOnHidden>
-      <Form form={form} layout="vertical"><Form.Item name="className" label="班级名称"><Input maxLength={100} placeholder="留空时按分类、考期和序号生成" /></Form.Item><Form.Item name="productSelection" label="产品" rules={[{ required: true, message: '请选择分类和产品' }]}><Cascader showSearch options={productCascaderOptions} changeOnSelect={false} placeholder="请选择产品" onChange={path => { const values = path as number[]; const productId = values[values.length - 1]; if (products.some(product => product.productId === productId)) { form.setFieldValue('productId', productId); void productChanged(productId) } }} /></Form.Item><Form.Item name="productId" hidden><Input /></Form.Item><Form.Item name="categoryId" hidden><Input /></Form.Item>{(selectedProduct?.attrs || []).map(attr => <Form.Item key={attr.attrKey} name={['selectedAttrs', attr.attrKey!] as [string, string]} label={attr.attrName}><Select allowClear options={attr.values.map(value => ({ label: value.label, value: value.value }))} onChange={value => void attrsChanged(attr.attrKey!, value as string | undefined)} /></Form.Item>)}<Form.Item name="selectedSkuIds" label="SKU"><Select mode="multiple" showSearch optionFilterProp="label" options={(selectedProduct?.skus || []).map(row => ({ label: row.skuName, value: row.id }))} /></Form.Item><Form.Item name="examScheduleId" label="考期" rules={[{ required: true }]}><Select options={exams.map(row => ({ label: row.displayName, value: row.id }))} /></Form.Item><Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} /></Form.Item></Form>
+      <Form form={form} layout="vertical"><Form.Item name="className" label="班级名称"><Input maxLength={100} placeholder="留空时按分类、考期和序号生成" /></Form.Item><Form.Item name="productSelection" label="产品" rules={[{ required: true, message: '请选择分类和产品' }]}><Cascader showSearch options={productCascaderOptions} changeOnSelect={false} placeholder="请选择产品" onChange={path => { const values = path as number[]; const productId = values[values.length - 1]; if (products.some(product => product.productId === productId)) { form.setFieldValue('productId', productId); void productChanged(productId) } }} /></Form.Item><Form.Item name="productId" hidden><Input /></Form.Item><Form.Item name="categoryId" hidden><Input /></Form.Item><Form.Item name="selectedSkuIds" label="SKU" rules={[{ required: true, type: 'array', min: 1, message: '请至少选择一个 SKU' }]}><Select mode="multiple" showSearch optionFilterProp="label" disabled={!selectedProduct} options={(selectedProduct?.skus || []).map(row => ({ label: row.skuName, value: row.id }))} onChange={value => void skuChanged(value as number[])} /></Form.Item><Form.Item name="examScheduleId" label="考期" rules={[{ required: true }]}><Select disabled={!selectedProduct || !selectedSkuIds.length} options={exams.map(row => ({ label: row.displayName, value: row.id }))} /></Form.Item><Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} /></Form.Item></Form>
     </Modal>
   </section>
 }

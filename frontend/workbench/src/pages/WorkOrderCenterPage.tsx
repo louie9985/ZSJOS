@@ -1,3 +1,6 @@
+import AttachmentCard from '../components/AttachmentCard'
+import { LinkedText } from '../components/ResourceLink'
+import { TICKET_CHANGED } from '../services/productionTicketEvents'
 import { platformHref } from '../services/mobileRoutes'
 import { getAuthPlatform } from '../services/authSession'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -9,7 +12,7 @@ import WorkOrderAttachmentPicker from '../components/WorkOrderAttachmentPicker'
 import ResourceLinkInput from '../components/ResourceLinkInput'
 import { APP_ROUTES } from '../constants'
 import { workOrderApi, type WorkOrder, type WorkOrderAccount, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
-import { serializeWorkOrderDynamicValues } from '../services/workOrderForm'
+import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
 
 const labels: Record<string, string> = { PENDING_ACCEPT: '待接单', AVAILABLE: '可认领', IN_PROGRESS: '处理中', PENDING_REVIEW: '待验收', COMPLETED: '已完成', REJECTED_INVALID: '已失效', WITHDRAWN: '已撤回', TERMINATED_UNQUALIFIED: '已终止' }
 const views = [{ key: 'PENDING_ACCEPT', label: '待我接单' }, { key: 'PROCESSING', label: '处理中' }, { key: 'PENDING_REVIEW', label: '待我验收' }, { key: 'CREATED', label: '我发起的' }, { key: 'CLOSED', label: '已结束' }]
@@ -42,7 +45,7 @@ export default function WorkOrderCenterPage({ tenantReadAll = false }: { tenantR
     } catch (cause) { if (sequence === requestSequence.current) setError(cause instanceof Error ? cause.message : '工单加载失败') }
     finally { if (sequence === requestSequence.current) setLoading(false) }
   }
-  useEffect(() => { void load() }, [location.pathname, mineView, readScope])
+  useEffect(() => { void load(); const refresh = () => void load(); window.addEventListener(TICKET_CHANGED, refresh); return () => window.removeEventListener(TICKET_CHANGED, refresh) }, [location.pathname, mineView, readScope])
   useEffect(() => {
     const id = Number(new URLSearchParams(location.search).get('workOrderId'))
     if (!Number.isSafeInteger(id) || id <= 0) return
@@ -60,10 +63,10 @@ export default function WorkOrderCenterPage({ tenantReadAll = false }: { tenantR
     if (field.type === 'attachment') {
       const ids = Array.isArray(value) ? value.map(Number) : []
       const files = (selected?.requestAttachments || []).filter(file => ids.includes(file.id))
-      return files.length ? <Space direction="vertical" size={2}>{files.map(file => <Typography.Text key={file.id}>{file.name}</Typography.Text>)}</Space> : '-'
+      return files.length ? <Space direction="vertical" size={2}>{files.map(file => <AttachmentCard key={file.id} name={file.name} load={async () => { const current = await workOrderApi.detail(selected!.id); const resource = current.requestAttachments?.find(item => item.id === file.id); if (!resource) throw new Error('附件不存在或不可访问'); return resource; }} />)}</Space> : '-'
     }
     if (value && typeof value === 'object' && 'label' in value) return String((value as { label: unknown }).label)
-    return value === undefined || value === null || value === '' ? '-' : String(value)
+    return value === undefined || value === null || value === '' ? '-' : <LinkedText text={String(value)} resource />
   }
   if (loading) return <section className="workspace-page"><Spin /></section>
   return <section className="workspace-page"><Card title={createMode ? '发起工单' : availableMode ? '可接工单' : '我的工单'} extra={!createMode && <Button icon={<ReloadOutlined />} onClick={() => void load()} aria-label="刷新工单" />}>
@@ -76,7 +79,7 @@ export default function WorkOrderCenterPage({ tenantReadAll = false }: { tenantR
         {/* 账号页发起的拍剪工单必须绑定账号；工单中心直接发起时不要求绑定，因此这里不设必填。 */}
         {template.processorType === 'PRODUCTION_TICKET' && <Form.Item name="relatedAccountId" label="相关账号（选填）" extra="留空表示不绑定账号；如需绑定请在学员账号页发起"><Select allowClear showSearch optionFilterProp="label" options={accounts.map(item => ({ value: item.id, label: `${item.platformLabelSnapshot || '平台'} · ${item.nickname || item.accountNo || item.id}` }))} /></Form.Item>}
         {dispatchMode === 'DIRECTED' && (assignmentType === 'PERSON' ? <Form.Item name="targetUserId" label="接收人" rules={[{ required: true, message: '请选择接收人' }]}><Select showSearch optionFilterProp="label" options={candidates.map(item => ({ value: item.id, label: item.name }))} /></Form.Item> : <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true, message: '请选择接收部门' }]}><Select showSearch optionFilterProp="label" options={targetDepartments.map(item => ({ value: item.id, label: item.name }))} /></Form.Item>)}
-        {template.fields?.map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : undefined}>{field.type === 'attachment' ? <DynamicAttachmentField /> : field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'user' ? <Select showSearch optionFilterProp="label" options={users.map(item => ({ value: item.id, label: item.nickname }))} /> : field.type === 'department' ? <Select showSearch optionFilterProp="label" options={departments.map(item => ({ value: item.id, label: item.name }))} /> : field.type === 'dictionary' ? <Select options={dictionaryOptions.filter(item => item.dictType === field.dictionaryType).map(item => ({ value: item.value, label: item.label }))} /> : field.type === 'url' ? <ResourceLinkInput /> : <Input />}</Form.Item>)}
+        {template.fields?.map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : undefined}>{field.type === 'attachment' ? <DynamicAttachmentField /> : field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'user' ? <Select showSearch optionFilterProp="label" options={users.map(item => ({ value: item.id, label: item.nickname }))} /> : field.type === 'department' ? <Select showSearch optionFilterProp="label" options={departments.map(item => ({ value: item.id, label: item.name }))} /> : field.type === 'dictionary' ? <Select options={dictionaryOptions.filter(item => item.dictType === field.dictionaryType).map(item => ({ value: item.value, label: item.label }))} /> : isWorkOrderLinkField(field, template.processorType === 'PRODUCTION_TICKET') ? <ResourceLinkInput /> : <Input />}</Form.Item>)}
         <Form.Item name="remark" label="备注" rules={[{ required: true, message: '请填写备注' }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={requestFiles} onChange={setRequestFiles} /></Form.Item><Button type="primary" htmlType="submit">发起工单</Button>
       </Form>}
       {!templates.length && <Empty description="暂无可发起的工单" />}

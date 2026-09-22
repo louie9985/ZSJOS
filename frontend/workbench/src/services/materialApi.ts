@@ -231,11 +231,30 @@ export type ContentReviewCandidate = {
   contentVersionId: number
 }
 
+export type ContentReviewAccount = {
+  accountId?: number
+  accountName?: string
+  accountNo?: string
+  platformValue?: string
+  platformLabel?: string
+  operatorUserId?: number
+  operatorName?: string
+  operatorNameResolved?: boolean
+  directorUserId?: number
+  directorName?: string
+  directorNameResolved?: boolean
+}
+export type ContentReviewPageParams = {
+  pageNo: number; pageSize: number; keyword?: string; status?: string; statuses?: string[]; mine?: boolean
+  operatorUserId?: number; directorUserId?: number; platformValue?: string; submittedFrom?: string; submittedTo?: string
+}
 export type ContentReviewBatch = {
   id: number
   batchNo: string
   accountId: number
   studentPersonId?: number
+  studentName?: string
+  accounts?: ContentReviewAccount[]
   revisionOfBatchId?: number
   accountIds?: number[]
   operatorUserId: number
@@ -333,8 +352,10 @@ export const materialApi = {
 export const contentReviewApi = {
   candidates: async (params: { pageNo: number; pageSize: number; keyword?: string }) =>
     unwrap<PageResult<ContentReviewCandidate>>(await http.get('/zsjos/content-review/candidate/page', { params })),
-  page: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: string; mine?: boolean }) =>
-    unwrap<PageResult<ContentReviewBatch>>(await http.get('/zsjos/content-review/batch/page', { params })),
+  page: async (params: ContentReviewPageParams) =>
+    unwrap<PageResult<ContentReviewBatch>>(await http.get('/zsjos/content-review/batch/page', {
+      params: { ...params, statuses: params.statuses?.join(',') }
+    })),
   get: async (id: number) => unwrap<ContentReviewBatch>(
     await http.get('/zsjos/content-review/batch/get', { params: { id } })
   ),

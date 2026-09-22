@@ -26,6 +26,11 @@ import static cn.hutool.core.util.StrUtil.isNotBlank;
 
 @Mapper
 public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
+    default int releasePaymentForSuccessor(Long id, Long paymentId) {
+        return update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SalesOrderDO>()
+                .eq(SalesOrderDO::getId, id).eq(SalesOrderDO::getSourcePaymentOrderId, paymentId)
+                .set(SalesOrderDO::getSourcePaymentOrderId, null));
+    }
     @Select("SELECT COALESCE(SUM(o.payable_amount),0) FROM zsjos_order o JOIN zsjos_lead l "
             + "ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=b'0' "
             + "WHERE o.tenant_id=#{tenantId} AND o.deleted=b'0' AND l.partner_id=#{partnerId} "
@@ -34,6 +39,15 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
             @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
     @Select("SELECT COUNT(*) AS deals, COALESCE(SUM(o.payable_amount),0) AS amount FROM zsjos_order o JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=b'0' WHERE o.tenant_id=#{tenantId} AND o.deleted=b'0' AND l.partner_id=#{partnerId} AND o.status IN ('paid','effective','completed','won') AND COALESCE(o.effective_at,o.customer_paid_at,o.create_time) >= #{from}")
     java.util.Map<String,Object> aggregatePartnerDeals(@Param("tenantId") Long tenantId, @Param("partnerId") Long partnerId, @Param("from") LocalDateTime from);
+    default List<SalesOrderDO> selectFirstPurchaseTimestampsByLeadIds(Collection<Long> leadIds) {
+        if (leadIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<SalesOrderDO>()
+                .select(SalesOrderDO::getLeadId, SalesOrderDO::getSubmittedAt, SalesOrderDO::getId)
+                .in(SalesOrderDO::getLeadId, leadIds)
+                .eq(SalesOrderDO::getOrderType, ORDER_TYPE_FIRST_PURCHASE)
+                .orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId));
+    }
+
     default SalesOrderDO selectLatestFirstPurchaseByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
                 .eq(SalesOrderDO::getOrderType, ORDER_TYPE_FIRST_PURCHASE)

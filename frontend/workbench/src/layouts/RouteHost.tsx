@@ -17,6 +17,8 @@ import MessageInboxPage from '../pages/MessageInboxPage'
 import LeadAppealPage from '../pages/LeadAppealPage'
 import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
 import MySalesOrderPage from '../pages/MySalesOrderPage'
+import SalesPerformancePage from '../pages/SalesPerformancePage'
+import SalesPerformanceTargetPage from '../pages/SalesPerformanceTargetPage'
 import SubordinateSalesPage from '../pages/SubordinateSalesPage'
 import SubordinatePartnerPage from '../pages/SubordinatePartnerPage'
 import ExternalRepurchasePage from '../pages/ExternalRepurchasePage'
@@ -45,6 +47,7 @@ import MediaStudentsPage from '../pages/MediaStudentsPage'
 import { DirectorTemplateConfigPage } from '../pages/DirectorConfigPages'
 import MediaCalendarPage from '../pages/MediaCalendarPage'
 import PersonalCalendarPage from '../pages/PersonalCalendarPage'
+import LeadFollowUpCalendarPage from '../pages/LeadFollowUpCalendarPage'
 import ExamCalendarPage from '../pages/ExamCalendarPage'
 import CourseCalendarPage from '../pages/CourseCalendarPage'
 import EamAssetPage from '../pages/EamAssetPage'
@@ -85,6 +88,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions} tenantReadAll={tenantReadAll}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR) return <LeadFollowUpCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
@@ -105,6 +109,8 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
+  if (menu?.path === APP_ROUTES.SALES_PERFORMANCE) return <SalesPerformancePage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.SALES_PERFORMANCE_TARGET) return <SalesPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>

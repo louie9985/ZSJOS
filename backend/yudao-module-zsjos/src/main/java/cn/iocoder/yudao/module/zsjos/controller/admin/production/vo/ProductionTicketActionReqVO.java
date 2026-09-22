@@ -11,6 +11,9 @@ public class ProductionTicketActionReqVO {
     @NotBlank @Size(max = 64) private String idempotencyKey;
     @Size(max = 500) private String reason;
     @Size(max = 1000) private String remark;
+    @Size(max = 2000)
+    @org.hibernate.validator.constraints.URL(protocol = "", regexp = "https?://[^\\s]+")
+    private String completionUrl;
     private Long attachmentId;
     private Boolean videoSentToOperator;
 }

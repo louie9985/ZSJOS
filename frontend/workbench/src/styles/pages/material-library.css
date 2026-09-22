@@ -271,6 +271,20 @@
   gap: var(--crm-sp-2);
 }
 
+/* 草稿工具栏占用自然高度，Spin 的两层包装将剩余高度传递给列内滚动区。 */
+.standalone-viral-decompose > .ant-space,
+.standalone-viral-decompose > .ant-alert {
+  flex-shrink: 0;
+}
+
+.standalone-viral-decompose > .ant-spin,
+.standalone-viral-decompose > .ant-spin > .ant-spin-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
 /* 审批详情是阅读面，不使用素材编辑页的内凹字段块。 */
 .material-approval-page .material-approval-toolbar { margin-block: var(--crm-sp-3); }
 .material-approval-detail-modal .ant-modal-body { max-height: min(78vh, 900px); overflow: auto; }
@@ -636,6 +650,16 @@
 
 /* 窄屏还原为纵向堆叠：定高卡片改回按内容撑开，整页滚动。 */
 @media (max-width: 1180px) {
+  .standalone-viral-decompose {
+    height: auto;
+    overflow: visible;
+  }
+
+  .standalone-viral-decompose > .ant-spin,
+  .standalone-viral-decompose > .ant-spin > .ant-spin-container {
+    flex: none;
+  }
+
   .viral-account-form {
     height: auto;
   }

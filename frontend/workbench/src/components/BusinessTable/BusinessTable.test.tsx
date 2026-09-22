@@ -7,7 +7,7 @@ import { columnKey, fromNativeColumns, parseColumnWidths } from './columns'
 describe('BusinessTable compatibility and states', () => {
   it('rejects malformed storage and clamps valid widths without coercing strings', () => {
     for (const value of ['null', '[]', 'broken', '123']) expect(parseColumnWidths(value)).toEqual({})
-    expect(parseColumnWidths('{"name":12,"amount":240.5,"text":"200","bad":null}')).toEqual({ name: 80, amount: 241 })
+    expect(parseColumnWidths('{"name":12,"amount":240.5,"text":"200","bad":null,"compact":48,"minimum":32,"existing":80}')).toEqual({ name: 32, amount: 241, compact: 48, minimum: 32, existing: 80 })
   })
   it('preserves existing ProTable column setting keys', () => {
     expect(columnKey({ dataIndex: ['customer', 'name'] }, 2)).toBe('customer,name')

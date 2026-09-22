@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LeadLifecycleTaskServiceTest {
     @InjectMocks private LeadLifecycleTaskService service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private LeadMapper leadMapper;

@@ -60,7 +60,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     public WorkOrderFileRespVO upload(byte[] content, String name, String contentType, Long userId) {
         FileInfoRespDTO file = fileApi.createFileInfo(content, name, "zsjos/work-order/" + userId, contentType);
-        return BeanUtils.toBean(file, WorkOrderFileRespVO.class);
+        WorkOrderFileRespVO result = BeanUtils.toBean(file, WorkOrderFileRespVO.class);
+        result.setUrl(fileApi.presignGetUrl(file.getId(), 300));
+        return result;
     }
 
     @Override
@@ -951,6 +953,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                     WorkOrderFileRespVO file = new WorkOrderFileRespVO();
                     file.setId(attachment.getFileId()); file.setName(attachment.getFileNameSnapshot());
                     file.setType(attachment.getMimeTypeSnapshot()); file.setSize(attachment.getFileSizeSnapshot());
+                    // Only bound attachments of the already-authorized order receive temporary read URLs.
+                    try { file.setUrl(fileApi.presignGetUrl(attachment.getFileId(), 300)); }
+                    catch (RuntimeException ignored) { /* Missing files remain visible and can be retried. */ }
                     return file;
                 }).toList());
         result.setCompletionAttachmentIds(row.getCompletionAttachmentIdsJson() == null ? List.of()

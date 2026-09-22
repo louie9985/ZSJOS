@@ -33,13 +33,15 @@ class LeadNotificationTenantInitializerTest {
 
         ArgumentCaptor<List<NotifyDefaultRuleReqDTO>> captor = ArgumentCaptor.forClass(List.class);
         verify(notifyRuleApi).initializeDefaultRules(captor.capture());
-        assertEquals(2, captor.getValue().size());
-        NotifyDefaultRuleReqDTO salesRule = captor.getValue().get(0);
+        assertEquals(3, captor.getValue().size());
+        assertEquals("zsjos.lead.submitter_assist_replied", captor.getValue().get(0).getSceneCode());
+        assertEquals(List.of("requester"), captor.getValue().get(0).getRecipientRoles());
+        NotifyDefaultRuleReqDTO salesRule = captor.getValue().get(1);
         assertEquals(CREATED, salesRule.getSceneCode());
         assertEquals("ZSJOS_LEAD_CREATED", salesRule.getTemplateCode());
         assertEquals(List.of(ROLE_OPERATOR), salesRule.getRecipientRoles());
         assertEquals(NotifyActionType.BUSINESS_DETAIL, salesRule.getActionType());
-        NotifyDefaultRuleReqDTO providerRule = captor.getValue().get(1);
+        NotifyDefaultRuleReqDTO providerRule = captor.getValue().get(2);
         assertEquals(CREATED, providerRule.getSceneCode());
         assertEquals("ZSJOS_LEAD_SOURCE_LINKED", providerRule.getTemplateCode());
         assertEquals(List.of(ROLE_NEW_MEDIA_PROVIDER), providerRule.getRecipientRoles());

@@ -109,16 +109,17 @@ export default function ContentApprovalDraft({
     <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, max: 20, message: '请选择 1 至 20 个发布账号' }]}>
       <Select maxCount={20} disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
     </Form.Item>
-    {selectedAccountIds.length > 0 && <Card size="small" title="账号资料快照（本批次可编辑）">
+    {selectedAccountIds.length > 0 && <Card size="small" title="账号资料快照">
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
         {accounts.filter(account => selectedAccountIds.includes(account.id)).map(account => <div key={account.id} style={{ borderBottom: '1px solid var(--crm-border)', paddingBottom: 10 }}>
           <Typography.Text strong>{accountLabel(account)}</Typography.Text>
           <Typography.Text type="secondary" style={{ marginLeft: 8 }}>{account.platformLabel || '平台未记录'} · {account.accountNo}</Typography.Text>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 8 }}>
             {accountSnapshotFields.map(([key, label]) => <Form.Item key={key} name={['accountSnapshots', String(account.id), key]} label={label} initialValue={key === 'nickname' ? account.nickname : key === 'platformLabel' ? account.platformLabel : key === 'stageLabelSnapshot' ? account.stageLabelSnapshot || account.stage : key === 'currentStatusLabelSnapshot' ? account.currentStatusLabelSnapshot || account.currentStatusValue : undefined}>
-              <Input maxLength={200} showCount />
+              <Input readOnly={key !== 'nickname'} maxLength={200} showCount={key === 'nickname'} />
             </Form.Item>)}
           </div>
+          <Typography.Text type="secondary">账号名称可编辑；平台、期段和状态保留账号资料快照。</Typography.Text>
           {account.primaryProblems?.length ? <Typography.Text type="secondary">当前瓶颈：{account.primaryProblems.map(problem => problem.labelSnapshot).join('、')}</Typography.Text> : null}
         </div>)}
       </Space>
@@ -133,7 +134,7 @@ export default function ContentApprovalDraft({
           </Space>}>
             <div className="content-approval-draft-grid">
               <ContentReviewAttachments index={field.name} cover disabled={disabled} />
-              <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" rules={[{ required: true, message: '请选择预计发布时间' }, { validator: (_, value: Dayjs | undefined) => !value || !plannedTimeError(value) ? Promise.resolve() : Promise.reject(new Error(plannedTimeError(value))) }]}>
+              <Form.Item {...field} name={[field.name, 'plannedPublishAt']} label="预计发布时间" extra="请填写当前时间之后的时间，过去的时间无法提交。" rules={[{ required: true, message: '请选择预计发布时间' }, { validator: (_, value: Dayjs | undefined) => !value || !plannedTimeError(value) ? Promise.resolve() : Promise.reject(new Error(plannedTimeError(value))) }]}>
                 <DatePicker showTime style={{ width: '100%' }} disabledDate={date => date.isBefore(dayjs(), 'day')} />
               </Form.Item>
             </div>
@@ -145,7 +146,7 @@ export default function ContentApprovalDraft({
             <Form.Item {...field} name={[field.name, 'scriptText']} label="正文文稿" rules={[{ required: true, whitespace: true, message: '请输入正文文稿' }]}><Input.TextArea rows={7} showCount maxLength={10000} /></Form.Item>
             <ContentReviewAttachments index={field.name} disabled={disabled} />
             <Form.Item {...field} name={[field.name, 'detailUrl']} label="作品详情"><ResourceLinkInput placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
-            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接" extra="可留空；填写时须为完整 HTTPS 地址" rules={[{ validator: (_, value) => httpsLinkError(value) ? Promise.reject(new Error(httpsLinkError(value))) : Promise.resolve() }]} ><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
+            <Form.Item {...field} name={[field.name, 'leadResourceUrl']} label="引流资料链接" extra="没有链接请留空；有链接请填写以 https:// 开头的地址，不要填写“无”。" rules={[{ validator: (_, value) => httpsLinkError(value) ? Promise.reject(new Error(httpsLinkError(value))) : Promise.resolve() }]}><ResourceLinkInput placeholder="没有链接请留空，填写时使用 https://" /></Form.Item>
             <Form.Item {...field} name={[field.name, 'commentHook']} label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
             <Form.Item {...field} name={[field.name, 'referenceWorkUrl']} label="参考作品链接" extra="直接填写参考作品的链接，可留空。">
               <ResourceLinkInput placeholder="https:// 参考作品链接" allowClear />

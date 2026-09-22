@@ -25,6 +25,12 @@ async function submitSuccess() {
 }
 try {
   await open('change'); await select()
+  const student = page.locator('.ant-form-item').filter({ hasText: '当前学员' })
+  const operator = page.locator('.ant-form-item').filter({ hasText: '当前运营' })
+  assert.ok((await student.textContent()).includes('测试学员'))
+  assert.ok((await operator.textContent()).includes('原运营'))
+  assert.equal(await student.locator('input,select,textarea').count(), 0)
+  assert.equal(await operator.locator('input,select,textarea').count(), 0)
   await confirm().click()
   await page.locator('.ant-form-item-explain-error').filter({ hasText: '变更已有运营时请填写原因' }).waitFor()
   assert.equal(await result(), '尚未提交')
@@ -39,7 +45,9 @@ try {
   assert.equal(JSON.parse(await result()).attempts, 1)
 
   for (const mode of ['first', 'same']) {
-    await open(mode); await select(mode === 'same' ? '原运营' : '新运营'); await submitSuccess()
+    await open(mode); await select(mode === 'same' ? '原运营' : '新运营')
+    assert.ok((await operator.textContent()).includes(mode === 'first' ? '未指派' : '原运营'))
+    await submitSuccess()
     assert.equal(JSON.parse(await result()).correctionReason, undefined)
   }
   await open('conflict'); await select('原运营'); await confirm().click()

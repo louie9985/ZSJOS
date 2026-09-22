@@ -64,8 +64,8 @@ export const leadManagementDeepLink = (leadId: number, tab: LeadDetailTab) =>
 
 export const classifyNotifyActionError = (error: unknown): NotifyActionErrorKind => {
   if (error instanceof AuthenticationError) return 'authentication'
-  if (error instanceof ApiError && error.code === 403) return 'forbidden'
-  if (error instanceof ApiError && error.code === 404) return 'missing'
+  if (error instanceof ApiError && [403, 1900003013].includes(error.code)) return 'forbidden'
+  if (error instanceof ApiError && [404, 1900003009].includes(error.code)) return 'missing'
   return 'temporary'
 }
 
@@ -164,6 +164,17 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
     return
   }
   if (detail.bizType === 'sales_order' && isPositiveId(detail.bizId)) {
+    if (detail.sceneCode === 'zsjos.sales_order.submitter_pending'
+      || detail.sceneCode === 'zsjos.sales_order.submitter_effective') {
+      try {
+        const lead = await api.leadOrderNotificationTarget(detail.bizId)
+        deps.navigate(leadManagementDeepLink(lead.id, 'overview'))
+      } catch (error) {
+        deps.warn(actionFailureMessage(error, '客资'))
+        deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+      }
+      return
+    }
     try {
       if (detail.sceneCode === 'zsjos.sales_order.supervisor_requested') {
         const target = await api.salesOrderApprovalNotificationTarget(detail.bizId, detail.sceneCode, detail.sourceEventKey)

@@ -22,14 +22,16 @@ public class LeadLifecycleTaskService {
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Resource private LeadFollowUpRuleService followUpRuleService;
 
     public void createAssignmentTask(Long leadId, Long assigneeId, Long assignmentHistoryId,
                                      LocalDateTime dueAt, String dispatchMode) {
-        taskCommandService.create(command(TASK_TYPE_ASSIGNMENT_ACCEPT, leadId, assigneeId,
+        Long performanceTaskId = taskCommandService.create(command(TASK_TYPE_ASSIGNMENT_ACCEPT, leadId, assigneeId,
                 "待接客资：" + leadNumber(leadId), "OPEN_LEAD_ASSIGNMENT", dueAt,
                 JsonUtils.toJsonString(Map.of("assignmentHistoryId", assignmentHistoryId,
                         "dispatchMode", dispatchMode)), "lead-assignment-accept:" + assignmentHistoryId));
+        performanceSnapshotService.activity("TASK", performanceTaskId, leadId, assigneeId);
     }
 
     public void completeAssignmentTask(Long leadId, Long assigneeId, LocalDateTime completedAt) {
@@ -46,12 +48,14 @@ public class LeadLifecycleTaskService {
         LeadFollowUpRuleDO rule = followUpRuleService.requireEnabledRule();
         int timeoutMinutes = rule.getFirstFollowUpTimeoutMinutes();
         LocalDateTime dueAt = ownershipStartedAt.plusMinutes(timeoutMinutes);
-        taskCommandService.create(command(TASK_TYPE_FIRST_FOLLOW_UP, leadId, assigneeId,
+        Long performanceTaskId = taskCommandService.create(command(TASK_TYPE_FIRST_FOLLOW_UP, leadId, assigneeId,
                 "首次跟进：" + leadNumber(leadId), "OPEN_LEAD_FOLLOW_UP", dueAt,
                 JsonUtils.toJsonString(Map.of("assignmentHistoryId", assignmentHistoryId,
                         "ruleId", rule.getId(), "ruleVersion", rule.getVersion() == null ? 0 : rule.getVersion(),
                         "timeoutMinutes", timeoutMinutes, "ownershipStartedAt", ownershipStartedAt.toString())),
                 "lead-first-follow-up:" + assignmentHistoryId));
+        performanceSnapshotService.activity("TASK", performanceTaskId, leadId, assigneeId);
+        performanceSnapshotService.received(leadId, assigneeId, assignmentHistoryId, ownershipStartedAt);
         addOwnershipEvent(leadId, assigneeId, assignmentHistoryId, ownershipStartedAt,
                 eventType, fromAssignmentStatus);
         return dueAt;
@@ -69,12 +73,13 @@ public class LeadLifecycleTaskService {
                                         LocalDateTime dueAt, LocalDateTime changedAt) {
         taskCommandService.complete(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId, changedAt);
         if (dueAt == null) return;
-        taskCommandService.create(command(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId,
+        Long performanceTaskId = taskCommandService.create(command(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId,
                 "跟进提醒：" + leadNumber(leadId), "OPEN_LEAD_FOLLOW_UP", dueAt,
                 JsonUtils.toJsonString(Map.of(
                 "followUpRecordScope", recordScope,
                 "followUpRecordId", recordId)),
                 "lead-follow-up-reminder:" + recordScope + ":" + recordId));
+        performanceSnapshotService.activity("TASK", performanceTaskId, leadId, assigneeId);
     }
 
     public void cancelFollowUpReminders(Long leadId, LocalDateTime cancelledAt, String reason) {
@@ -97,11 +102,12 @@ public class LeadLifecycleTaskService {
                 "startedAt", startedAt.toString())));
         lead.setSuspendedAt(null);
 
-        taskCommandService.create(command(TASK_TYPE_QUALIFICATION, lead.getId(), assigneeId,
+        Long performanceTaskId = taskCommandService.create(command(TASK_TYPE_QUALIFICATION, lead.getId(), assigneeId,
                 "有效性判定：" + leadName(lead), "OPEN_LEAD_FOLLOW_UP", dueAt,
                 JsonUtils.toJsonString(Map.of("roundNo", roundNo, "ruleId", rule.getId(),
                         "ruleVersion", rule.getVersion() == null ? 0 : rule.getVersion(),
                         "timeoutMinutes", timeoutMinutes)), qualificationTaskKey(lead.getId(), roundNo)));
+        performanceSnapshotService.qualification(lead, performanceTaskId, assigneeId);
         BusinessEventDO event = new BusinessEventDO();
         event.setEventType(EVENT_LEAD_QUALIFICATION_STARTED);
         event.setAggregateType(BIZ_TYPE_LEAD);
@@ -119,12 +125,16 @@ public class LeadLifecycleTaskService {
     public void completeQualificationTask(Long leadId, Integer roundNo, LocalDateTime completedAt) {
         if (roundNo == null) return;
         taskCommandService.completeByKey(qualificationTaskKey(leadId, roundNo), completedAt);
+        performanceSnapshotService.qualificationResult(getQualificationTaskId(leadId, roundNo), "valid", completedAt);
     }
 
     public void cancelQualificationTask(Long leadId, Integer roundNo, LocalDateTime cancelledAt, String reason) {
         if (roundNo == null) return;
         var task = taskCommandService.getByIdempotencyKey(qualificationTaskKey(leadId, roundNo));
         if (task != null) {
+            LeadDO current = leadMapper.selectById(leadId);
+            String outcome = current != null && "invalid".equals(current.getStatus()) ? "invalid" : current != null && "suspended".equals(current.getStatus()) ? "overdue" : "ended";
+            performanceSnapshotService.qualificationResult(task.getId(), outcome, cancelledAt);
             taskCommandService.cancel(TASK_TYPE_QUALIFICATION, leadId, task.getAssigneeId(), cancelledAt, reason);
         }
     }

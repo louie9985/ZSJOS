@@ -167,22 +167,36 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     @Override
-    public List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson) {
+    public List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson,
+                                                           String selectedSkuIdsJson) {
         Map<String, String> selectedAttrs = selectedAttrsJson == null || selectedAttrsJson.isBlank()
                 ? Map.of() : JsonUtils.parseObject(selectedAttrsJson, Map.class);
         ExamProductScopeRespVO requested = productId == null ? null : productSkuService.resolveExamScope(productId, selectedAttrs);
+        if (requested != null && selectedSkuIdsJson != null && !selectedSkuIdsJson.isBlank()) {
+            Set<Long> selectedSkuIds = new HashSet<>(JsonUtils.parseArray(selectedSkuIdsJson, Long.class));
+            Set<Long> validSkuIds = requested.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet());
+            if (selectedSkuIds.isEmpty() || !validSkuIds.containsAll(selectedSkuIds)) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
+            requested = new ExamProductScopeRespVO(requested.productId(), requested.productRef(), requested.productName(), requested.categoryId(),
+                    requested.categoryPath(), requested.attrs(), requested.selectedSpecs(),
+                    requested.skus().stream().filter(sku -> selectedSkuIds.contains(sku.id())).toList());
+        }
         if (requested != null && !Objects.equals(categoryId, requested.categoryId())) {
             throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
         }
+        ExamProductScopeRespVO requestedScope = requested;
         return scheduleMapper.selectList(new LambdaQueryWrapperX<ExamScheduleDO>()
                 .eq(ExamScheduleDO::getCategoryId, categoryId)
                 .eq(ExamScheduleDO::getRecordStatus, "PUBLISHED")
                 .orderByDesc(ExamScheduleDO::getPublishedAt).orderByDesc(ExamScheduleDO::getId))
-                .stream().filter(this::isUnended).filter(row -> scheduleCovers(row, requested))
+                .stream().filter(this::isUnended).filter(row -> scheduleCovers(row, requestedScope))
                 .map(row -> new DeliveryClassExamOptionRespVO(row.getId(), row.getScheduleType(),
                         "EXACT".equals(row.getScheduleType()) ? String.valueOf(row.getExactDate())
                                 : row.getRoughStartDate() + "~" + row.getRoughEndDate(), row.getProductId(),
                         row.getCategoryId(), parseSkus(row.getFrozenSkusJson()))).toList();
+    }
+
+    public List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson) {
+        return examOptions(categoryId, productId, selectedAttrsJson, null);
     }
 
     @Override
@@ -378,11 +392,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         if (!Objects.equals(req.getCategoryId(), resolved.categoryId())) {
             throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
         }
-        Set<Long> selectedIds = req.getSelectedSkuIds() == null || req.getSelectedSkuIds().isEmpty()
-                ? resolved.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet())
-                : req.getSelectedSkuIds();
+        Set<Long> selectedIds = req.getSelectedSkuIds();
         Set<Long> validIds = resolved.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet());
-        if (!validIds.containsAll(selectedIds) || selectedIds.isEmpty()) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
+        if (selectedIds == null || selectedIds.isEmpty() || !validIds.containsAll(selectedIds)) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
         ExamProductScopeRespVO scope = new ExamProductScopeRespVO(resolved.productId(), resolved.productRef(), resolved.productName(),
                 resolved.categoryId(), resolved.categoryPath(), resolved.attrs(), resolved.selectedSpecs(),
                 resolved.skus().stream().filter(sku -> selectedIds.contains(sku.id())).toList());

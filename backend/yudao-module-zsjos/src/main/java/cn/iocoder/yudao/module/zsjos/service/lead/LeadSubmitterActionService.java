@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistRequestReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistReplyReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistHistoryRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
@@ -26,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.*;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -40,6 +44,7 @@ public class LeadSubmitterActionService {
     @Resource private LeadSubmissionIdentityService identityService;
     @Resource private LeadSubmitterAssistRequestMapper assistRequestMapper;
     @Resource private LeadAttachmentService attachmentService;
+    @Resource private cn.iocoder.yudao.module.infra.api.file.FileApi fileApi;
     @Resource private LeadObjectPermissionService objectPermissionService;
     @Resource private PartnerOwnershipService partnerOwnershipService;
     @Resource private BusinessTaskCommandService businessTaskCommandService;
@@ -174,6 +179,7 @@ public class LeadSubmitterActionService {
 
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (assistRequestMapper.selectPendingByLeadId(leadId) != null) throw exception(LEAD_SUBMITTER_ASSIST_PENDING_EXISTS);
         AssistRecipient recipient = resolveAssistRecipient(lead);
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
         LeadSubmitterAssistRequestDO row = new LeadSubmitterAssistRequestDO();
@@ -184,6 +190,7 @@ public class LeadSubmitterActionService {
         row.setSubmitterNameSnapshot(recipient.submitterName()); row.setAssigneeUserIdSnapshot(recipient.assigneeUserId());
         row.setAssigneeNameSnapshot(recipient.assigneeName()); row.setRequestedAt(now);
         row.setRequestFingerprint(fingerprint); row.setIdempotencyKey(req.getIdempotencyKey());
+        row.setStatus("pending"); row.setVersion(0);
         try {
             assistRequestMapper.insert(row);
         } catch (DuplicateKeyException duplicate) {
@@ -223,6 +230,70 @@ public class LeadSubmitterActionService {
         return row.getId();
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void replyAssist(Long leadId, Long requestId, Long userId, LeadSubmitterAssistReplyReqVO req) {
+        LeadSubmitterAssistRequestDO row = assistRequestMapper.selectById(requestId);
+        if (row == null || !Objects.equals(row.getLeadId(), leadId) || !"pending".equals(row.getStatus()))
+            throw exception(LEAD_SUBMITTER_ASSIST_NOT_EXISTS);
+        if (!Objects.equals(row.getAssigneeUserIdSnapshot(), userId)) throw exception(LEAD_SUBMITTER_ASSIST_REPLY_FORBIDDEN);
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        objectPermissionService.check(leadId, "read");
+        if (!Objects.equals(row.getVersion(), req.getVersion())) throw exception(LEAD_SUBMITTER_ASSIST_NOT_EXISTS);
+        List<LeadAttachmentReqVO> attachments = req.getAttachments() == null ? List.of() : req.getAttachments();
+        Map<Long, FileInfoRespDTO> files = attachmentService.validateReferences(attachments, userId);
+        List<Map<String,Object>> snapshots = files.values().stream().map(file -> {
+            Map<String,Object> item = new LinkedHashMap<>(); item.put("infraFileId", file.getId());
+            item.put("name", file.getName()); item.put("type", file.getType()); item.put("size", file.getSize()); return item;
+        }).toList();
+        var user = adminUserApi.getUser(userId);
+        row.setResponseRemark(StrUtil.trim(req.getRemark())); row.setResponseAttachmentSnapshotsJson(JsonUtils.toJsonString(snapshots));
+        row.setResponderUserIdSnapshot(userId); row.setResponderNameSnapshot(user == null ? null : user.getNickname());
+        row.setRespondedAt(LocalDateTime.now()); row.setStatus("completed"); row.setVersion(row.getVersion() + 1);
+        assistRequestMapper.updateById(row);
+        businessTaskCommandService.completeByKey("lead-submitter-assist:" + requestId, row.getRespondedAt());
+        Map<String,Object> context = new LinkedHashMap<>(); context.put("assist.requestId", requestId);
+        context.put("assist.response", row.getResponseRemark()); context.put("assist.leadNo", row.getLeadNoSnapshot());
+        context.put("assist.requesterUserId", row.getRequesterUserId());
+        notifyPublisher.publish(SUBMITTER_ASSIST_REPLIED, leadId, "lead-submitter-assist-replied:" + requestId,
+                userId, row.getRespondedAt(), context);
+    }
+
+    public PageResult<LeadSubmitterAssistHistoryRespVO> history(Long leadId, Long userId, PageParam page) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        objectPermissionService.check(leadId, "read");
+        PageResult<LeadSubmitterAssistRequestDO> rows = assistRequestMapper.selectPageByLeadId(leadId, page);
+        List<LeadSubmitterAssistHistoryRespVO> result = rows.getList().stream().map(row -> {
+            LeadSubmitterAssistHistoryRespVO vo = new LeadSubmitterAssistHistoryRespVO();
+            vo.setId(row.getId()); vo.setLeadNo(row.getLeadNoSnapshot()); vo.setStatus(row.getStatus()); vo.setVersion(row.getVersion());
+            vo.setProblem(row.getProblem()); vo.setExpectedAssistance(row.getExpectedAssistance());
+            vo.setRemark(row.getRemark());
+            // Legacy requests store the requester ID, but no name snapshot.
+            var requester = row.getRequesterUserId() == null ? null : adminUserApi.getUser(row.getRequesterUserId());
+            vo.setRequesterName(requester == null ? null : requester.getNickname());
+            vo.setRequestAttachments(historyAttachments(row.getAttachmentSnapshotsJson()));
+            vo.setResponseAttachments(historyAttachments(row.getResponseAttachmentSnapshotsJson()));
+            vo.setSubmitterName(row.getSubmitterNameSnapshot()); vo.setAssigneeName(row.getAssigneeNameSnapshot());
+            vo.setRequestedAt(row.getRequestedAt()); vo.setResponseRemark(row.getResponseRemark());
+            vo.setResponderName(row.getResponderNameSnapshot()); vo.setRespondedAt(row.getRespondedAt());
+            return vo;
+        }).toList();
+        return new PageResult<>(result, rows.getTotal());
+    }
+
+    private List<LeadSubmitterAssistHistoryRespVO.Attachment> historyAttachments(String snapshot) {
+        if (StrUtil.isBlank(snapshot)) return List.of();
+        var attachments = JsonUtils.parseArray(snapshot, LeadSubmitterAssistHistoryRespVO.Attachment.class);
+        if (attachments == null) return List.of();
+        // Only sign stored references after the parent Lead read check; never persist signed URLs.
+        for (var attachment : attachments) {
+            attachment.setUrl(attachment.getInfraFileId() == null ? null
+                    : fileApi.presignGetUrl(attachment.getInfraFileId(), 600));
+        }
+        return attachments;
+    }
+
     private AssistRecipient resolveAssistRecipient(LeadDO lead) {
         if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType()) && lead.getProviderOwnerId() != null) {
             return new AssistRecipient(PROVIDER_OWNER_SYSTEM_USER, lead.getProviderOwnerId(),
@@ -230,13 +301,8 @@ public class LeadSubmitterActionService {
         }
         if (PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType()) && lead.getProviderOwnerId() != null) {
             PartnerOwnershipDO ownership = partnerOwnershipService.getByPartnerId(lead.getProviderOwnerId());
-            Long assigneeId = ownership != null && ownership.getEmployeeUserId() != null
-                    ? ownership.getEmployeeUserId() : lead.getPartnerOwnerUserIdSnapshot();
-            String assigneeName = ownership != null && ownership.getEmployeeUserId() != null
-                    ? ownership.getEmployeeNameSnapshot() : lead.getPartnerOwnerNameSnapshot();
-            if (assigneeId == null) {
-                throw exception(LEAD_SUBMITTER_ASSIST_RECIPIENT_MISSING);
-            }
+            Long assigneeId = ownership == null ? null : ownership.getEmployeeUserId();
+            String assigneeName = ownership == null ? null : ownership.getEmployeeNameSnapshot();
             return new AssistRecipient(PROVIDER_OWNER_PARTNER, lead.getProviderOwnerId(),
                     lead.getProviderOwnerNameSnapshot(), assigneeId, assigneeName);
         }

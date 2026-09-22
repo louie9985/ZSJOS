@@ -86,9 +86,11 @@ class ContentReviewBatchServiceTest {
     @Mock private ContentVersionMapper contentVersionMapper;
     @Mock private ContentVersionFileMapper contentVersionFileMapper;
     @Mock private MediaAccountMapper accountMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper personMapper;
     @Mock private ContentReviewConfigService configService;
     @Mock private ContentReviewMaterialService reviewMaterialService;
     @Mock private ContentReviewAccessService accessService;
+    @Mock private ContentReviewObjectPermissionProvider reviewPermissionProvider;
     @Mock private ContentService contentService;
     @Mock private ContentObjectPermissionProvider contentPermissionProvider;
     @Mock private MaterialService materialService;
@@ -295,6 +297,34 @@ class ContentReviewBatchServiceTest {
                 (List<Map<String, Object>>) response.getContextSnapshot().get("accountSnapshots");
         assertEquals("新媒体一部运营1", snapshots.getFirst().get("operatorName"));
         assertEquals("编导1", snapshots.getFirst().get("directorName"));
+        assertTrue(response.getAccounts().getFirst().isOperatorNameResolved());
+        assertTrue(response.getAccounts().getFirst().isDirectorNameResolved());
+    }
+
+    @Test
+    void responseUsesCurrentStudentNameAndKeepsFrozenAccountNames() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        batch.setStudentPersonId(11L);
+        batch.setContextSnapshotJson("{\"accountSnapshots\":[{\"id\":3,\"nickname\":\"历史账号名\",\"operatorName\":\"历史运营姓名\"}]}");
+        when(personMapper.selectById(11L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO().setId(11L).setName("当前学员姓名"));
+        ContentReviewBatchRespVO response = ReflectionTestUtils.invokeMethod(service, "toResponse", batch, List.of(), Map.of(), null, OPERATOR_ID, false);
+        assertEquals("当前学员姓名", response.getStudentName());
+        assertEquals("历史账号名", response.getAccounts().getFirst().getAccountName());
+        assertEquals("历史运营姓名", response.getAccounts().getFirst().getOperatorName());
+        assertFalse(response.getAccounts().getFirst().isOperatorNameResolved());
+        verifyNoInteractions(accountMapper);
+    }
+
+    @Test
+    void legacySingleAccountKeepsItsFrozenResponsibilityNames() {
+        ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
+        batch.setContextSnapshotJson("{\"account\":{\"id\":3,\"operatorName\":\"历史运营\",\"directorName\":\"历史编导\"}}");
+        ContentReviewBatchRespVO response = ReflectionTestUtils.invokeMethod(service, "toResponse",
+                batch, List.of(), Map.of(), null, OPERATOR_ID, false);
+        assertEquals("历史运营", response.getAccounts().getFirst().getOperatorName());
+        assertEquals("历史编导", response.getAccounts().getFirst().getDirectorName());
+        assertFalse(response.getAccounts().getFirst().isOperatorNameResolved());
+        verifyNoInteractions(accountMapper);
     }
 
     /**
@@ -689,6 +719,67 @@ class ContentReviewBatchServiceTest {
         assertServiceCode(CONTENT_REVIEW_PERMISSION_DENIED, lookup);
         assertServiceCode(CONTENT_TASK_LOOKUP_FAILED, lookup);
         verifyNoInteractions(itemMapper, contentMapper, contentVersionMapper);
+    }
+
+    @Test
+    void historyFiltersDeniedDraftBeforeLoadingItsItemsOrAttachments() {
+        var current = reviewBatch(BATCH_COMPLETED, STAGE_DONE);
+        current.setTenantId(TENANT_ID);
+        current.setRevisionOfBatchId(40L);
+        var parent = reviewBatch(BATCH_REJECTED, STAGE_DONE).setId(40L);
+        parent.setTenantId(TENANT_ID);
+        var draft = reviewBatch(BATCH_DRAFT, STAGE_DRAFT).setId(60L).setRevisionOfBatchId(50L);
+        draft.setTenantId(TENANT_ID);
+        when(batchMapper.selectById(50L)).thenReturn(current);
+        when(batchMapper.selectById(40L)).thenReturn(parent);
+        when(batchMapper.selectByRevisionOfBatchId(40L)).thenReturn(List.of(current));
+        when(batchMapper.selectByRevisionOfBatchId(50L)).thenReturn(List.of(draft));
+        when(reviewPermissionProvider.hasPermission(40L, "read", 9L)).thenReturn(true);
+        when(reviewPermissionProvider.hasPermission(50L, "read", 9L)).thenReturn(true);
+        var result = service.history(50L, 9L);
+        assertEquals(List.of(40L, 50L), result.stream().map(ContentReviewBatchRespVO::getId).toList());
+        assertTrue(result.stream().allMatch(row -> row.getAvailableActions().isEmpty()));
+        verify(itemMapper, never()).selectByBatchId(60L);
+    }
+
+    @Test
+    void detailRetainsFrozenFieldsAndRefreshesBoundAttachmentUrls() {
+        var batch = reviewBatch(BATCH_REJECTED, STAGE_DONE);
+        var item = reviewItem(1L, DECISION_RETURNED, null, false).setContentId(10L).setContentVersionId(100L);
+        var fields = Map.of("detailUrl", "https://example.com/detail", "leadResourceUrl", "https://example.com/lead",
+                "referenceWorkUrl", "https://example.com/reference", "topicSnapshot", "历史选题",
+                "deliverableUrl", "https://example.com/deliverable", "purposeLabelSnapshot", "历史目的",
+                "formatLabelSnapshot", "历史形式", "commentHook", "评论区钩子");
+        item.setContentSnapshotJson(JsonUtils.toJsonString(fields));
+        var file = new cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentVersionFileDO()
+                .setId(101L).setContentVersionId(100L).setInfraFileId(200L).setFieldKey("deliverable")
+                .setOriginalName("审核附件.pdf").setContentType("application/pdf");
+        when(batchMapper.selectById(50L)).thenReturn(batch);
+        when(itemMapper.selectByBatchId(50L)).thenReturn(List.of(item));
+        when(contentVersionFileMapper.selectByVersionId(100L)).thenReturn(List.of(file));
+        when(fileApi.presignGetUrl(200L, 3600)).thenReturn("https://example.com/signed-one", "https://example.com/signed-two");
+        var first = service.get(50L, OPERATOR_ID);
+        var second = service.get(50L, OPERATOR_ID);
+        assertEquals(fields, first.getItems().getFirst().getContentSnapshot());
+        assertEquals("https://example.com/signed-one", first.getItems().getFirst().getFiles().getFirst().getPreviewUrl());
+        assertEquals("https://example.com/signed-two", second.getItems().getFirst().getFiles().getFirst().getPreviewUrl());
+    }
+
+    @Test
+    void revisionAccountSnapshotPreservesStoredLabelsAndIgnoresClientIdentity() {
+        var account = new MediaAccountDO().setId(90L).setNickname("当前改名").setSStage("current");
+        Map<String, Object> stored = Map.of("id", 90L, "nickname", "历史账号", "platformLabel", "历史平台",
+                "sStageLabel", "历史期段", "currentStatusLabel", "历史状态", "operatorName", "历史运营");
+        Map<String, Object> result = ReflectionTestUtils.invokeMethod(service, "reviewAccountSnapshot", account,
+                Map.of("accountSnapshots", List.of(stored)), Map.of("nickname", "本轮标题", "platformLabel", "伪造平台",
+                        "operatorName", "伪造运营", "stageValue", "current"));
+        assertEquals("本轮标题", result.get("nickname"));
+        assertEquals("历史平台", result.get("platformLabel"));
+        assertEquals("历史期段", result.get("sStageLabel"));
+        assertEquals("历史状态", result.get("currentStatusLabel"));
+        assertEquals("历史运营", result.get("operatorName"));
+        assertEquals("历史账号", stored.get("nickname"));
+        verifyNoInteractions(dictDataApi, adminUserApi);
     }
 
     private void mockLockedBatch(ContentReviewBatchDO batch) {

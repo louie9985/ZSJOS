@@ -30,4 +30,11 @@ public class LeadSubmitterAssistRequestDO extends TenantBaseDO {
     private LocalDateTime requestedAt;
     private String requestFingerprint;
     private String idempotencyKey;
+    private String status;
+    private String responseRemark;
+    private String responseAttachmentSnapshotsJson;
+    private Long responderUserIdSnapshot;
+    private String responderNameSnapshot;
+    private LocalDateTime respondedAt;
+    private Integer version;
 }

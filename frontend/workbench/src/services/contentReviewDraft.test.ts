@@ -47,3 +47,22 @@ it('keeps comments, source identities and persisted links through revision seria
     commentHook: '原评论区钩子', topic: '原选题', deliverableUrl: 'https://example.com/video',
     referenceWorkUrl: 'https://example.com/reference', purposeLabelSnapshot: '原目的' })
 })
+
+it('round trips the version topic, all optional links and label snapshots without reuploading', async () => {
+  const contentSnapshot = { titleSnapshot: '版本标题', topicSnapshot: '版本选题', topic: '旧选题',
+    detailUrl: 'https://example.com/detail', leadResourceUrl: 'https://example.com/lead',
+    referenceWorkUrl: 'https://example.com/reference', deliverableUrl: 'https://example.com/video',
+    purposeValue: 'goal', purposeLabelSnapshot: '旧目的标签', formatValue: 'format', formatLabelSnapshot: '旧形式标签',
+    scriptText: '正文', commentHook: '钩子', plannedPublishAt: '2026-09-27T10:30:00' }
+  const batch = { items: [{ contentId: 7, contentVersionId: 8, contentSnapshot, files: [
+    { id: 1, fieldKey: 'cover', infraFileId: 11, originalName: 'cover.png', contentType: 'image/png', fileSize: 10 },
+    { id: 2, fieldKey: 'deliverable', infraFileId: 12, originalName: 'review.pdf', contentType: 'application/pdf', fileSize: 20 },
+  ] }] } as unknown as import('./materialApi').ContentReviewBatch
+  const upload = vi.fn()
+  const [request] = await prepareContentReviewWorks(restoreDraftWorks(batch), vi.fn(), upload)
+  expect(request).toMatchObject({ title: '版本标题', topic: '版本选题', detailUrl: contentSnapshot.detailUrl,
+    leadResourceUrl: contentSnapshot.leadResourceUrl, referenceWorkUrl: contentSnapshot.referenceWorkUrl,
+    deliverableUrl: contentSnapshot.deliverableUrl, purposeLabelSnapshot: '旧目的标签', formatLabelSnapshot: '旧形式标签',
+    coverFileId: 11, deliverableSnapshotJson: '[12]' })
+  expect(upload).not.toHaveBeenCalled()
+})

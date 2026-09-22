@@ -300,8 +300,58 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
+    void submittedScopeAllowsSubmitterDepartmentAndAncestorReadsWithoutCommands() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-submitted")).thenReturn(true);
+        when(adminUserApi.getUser(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation ->
+                Long.valueOf(10L).equals(invocation.getArgument(0)) ? user(10L, 102L) : null);
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(102L)));
+        when(deptApi.getDeptListByLeaderUserId(40L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(102L)));
+
+        for (Long userId : List.of(30L, 40L)) {
+            for (String action : List.of("read", "follow-up-read", "flow-read", "sales-history-read")) {
+                assertActionAllowed(userId, action);
+            }
+            try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+                security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);
+                for (String action : List.of("request-submitter-assist", "basic-info-update",
+                        "follow-up-create", "owner-transfer", "qualify", "enter-deal")) {
+                    assertEquals(LEAD_PERMISSION_DENIED.getCode(), assertThrows(ServiceException.class,
+                            () -> service.check(1L, action)).getCode());
+                }
+            }
+        }
+    }
+
+    @Test
+    void submittedScopeRejectsParallelDepartmentAndMissingEmployee() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-submitted")).thenReturn(true);
+        when(adminUserApi.getUser(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation ->
+                Long.valueOf(10L).equals(invocation.getArgument(0)) ? user(10L, 102L) : null);
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(101L)));
+        assertFalse(service.canReadDetail(lead(10L, 20L), 30L));
+        assertFalse(service.canReadDetail(lead(11L, 20L), 30L));
+        assertFalse(service.canReadDetail(lead(10L, 20L), null));
+    }
+
+    @Test
+    void submittedScopeDoesNotTreatPartnerIdAsEmployeeId() {
+        LeadDO lead = lead(10L, 20L);
+        lead.setProviderOwnerType("partner");
+        org.mockito.Mockito.lenient().when(securityFrameworkService.hasPermission(
+                "zsjos:lead:query-submitted")).thenReturn(true);
+        assertFalse(service.canReadDetail(lead, 30L));
+        verify(adminUserApi, org.mockito.Mockito.never()).getUser(10L);
+    }
+
+    @Test
     void readRejectsSubmitterDepartmentLeaderWithoutDirectBusinessRelation() {
         when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        org.mockito.Mockito.lenient().when(adminUserApi.getUser(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation ->
+                Long.valueOf(10L).equals(invocation.getArgument(0)) ? user(10L, 102L) : null);
+        org.mockito.Mockito.lenient().when(deptApi.getDeptListByLeaderUserId(30L))
+                .thenReturn(List.of(dept(102L)));
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);

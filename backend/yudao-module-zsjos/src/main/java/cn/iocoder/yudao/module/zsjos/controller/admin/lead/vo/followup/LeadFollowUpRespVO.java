@@ -22,6 +22,10 @@ public class LeadFollowUpRespVO {
     private String methodLabel;
     private String result;
     private String resultLabel;
+    private String salesStageBefore;
+    private String salesStageBeforeLabelSnapshot;
+    private String salesStageAfter;
+    private String salesStageAfterLabelSnapshot;
     private String categoryBefore;
     private String categoryBeforeLabel;
     private String categoryAfter;

@@ -10,6 +10,15 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface PurchaseIntentMapper extends BaseMapperX<PurchaseIntentDO> {
+    default int reviseOfflineSnapshot(PurchaseIntentDO intent, String items, java.math.BigDecimal amount) {
+        int version = intent.getVersion() == null ? 0 : intent.getVersion();
+        return update(null, new LambdaUpdateWrapper<PurchaseIntentDO>()
+                .eq(PurchaseIntentDO::getId, intent.getId()).eq(PurchaseIntentDO::getVersion, version)
+                .eq(PurchaseIntentDO::getCurrentOrderId, intent.getCurrentOrderId())
+                .eq(PurchaseIntentDO::getStatus, "submitted").eq(PurchaseIntentDO::getCollectionMode, "offline_paid")
+                .set(PurchaseIntentDO::getItemSnapshotJson, items).set(PurchaseIntentDO::getTotalAmount, amount)
+                .set(PurchaseIntentDO::getVersion, version + 1));
+    }
     default PurchaseIntentDO selectActive(Long leadId, Long personId, String purchaseType, String sourceKey, Long userId) {
         return selectOne(new LambdaQueryWrapperX<PurchaseIntentDO>()
                 .eqIfPresent(PurchaseIntentDO::getLeadId, leadId)

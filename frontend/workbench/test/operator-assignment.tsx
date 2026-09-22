@@ -14,6 +14,7 @@ http.defaults.adapter = async config => {
     if (mode === 'loading') await new Promise(resolve => setTimeout(resolve, 3000))
     if (mode === 'load-error' && loads === 1) throw new Error('上下文加载失败（测试）')
     data = { serviceRelationId: 10, version: loads, operatorUserId: ['first', 'server-required'].includes(mode) ? undefined : 8,
+      operatorUserName: ['first', 'server-required'].includes(mode) ? undefined : '原运营',
       operatorAssignmentConflict: mode === 'conflict', availableActions: mode === 'denied' ? [] : ['ASSIGN_OPERATOR'] }
   } else if (url.endsWith('collaborator-candidates')) {
     data = mode === 'empty' ? [] : [{ id: 8, nickname: '原运营' }, { id: 9, nickname: '新运营' }]
@@ -30,6 +31,6 @@ http.defaults.adapter = async config => {
 function Fixture() {
   const [open, setOpen] = useState(true)
   return <App><div id="result">尚未提交</div><Button onClick={() => setOpen(true)}>打开</Button>
-    {open && <OperatorAssignmentDialog relationId={10} onCancel={() => setOpen(false)} onSaved={async () => { setOpen(false) }} />}</App>
+    {open && <OperatorAssignmentDialog relationId={10} studentName="测试学员" studentNo="TEST-10" onCancel={() => setOpen(false)} onSaved={async () => { setOpen(false) }} />}</App>
 }
 createRoot(document.getElementById('root')!).render(<Fixture />)

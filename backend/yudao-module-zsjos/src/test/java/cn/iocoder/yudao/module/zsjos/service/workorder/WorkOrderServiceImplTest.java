@@ -66,6 +66,24 @@ class WorkOrderServiceImplTest {
     @Mock MediaWorkflowEventService workflowEventService;
     @InjectMocks WorkOrderServiceImpl service;
 
+    @Test void authorizedDetailSignsOnlyBoundRequestAttachments() {
+        WorkOrderDO row = order(11L, 22L);
+        when(orderMapper.selectUnifiedById(1L)).thenReturn(row);
+        var attachment = new cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderAttachmentDO();
+        attachment.setFileId(7L); attachment.setFileNameSnapshot("request.pdf");
+        when(attachmentMapper.selectListByOrderIdAndPhase(1L, "REQUEST")).thenReturn(List.of(attachment));
+        when(fileApi.presignGetUrl(7L, 300)).thenReturn("https://example.com/signed");
+        var result = service.get(1L, 11L);
+        assertEquals("https://example.com/signed", result.getRequestAttachments().getFirst().getUrl());
+        verify(fileApi).presignGetUrl(7L, 300);
+    }
+
+    @Test void unrelatedReaderCannotObtainAttachmentUrls() {
+        when(orderMapper.selectUnifiedById(1L)).thenReturn(order(11L, 22L));
+        assertThrows(ServiceException.class, () -> service.get(1L, 33L));
+        verifyNoInteractions(fileApi, attachmentMapper);
+    }
+
     @Test void administratorAllReadDoesNotExposeCommandsEvenForOwnOrder() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderMyPageReqVO();
         request.setReadScope("ALL"); request.setView("PROCESSING");

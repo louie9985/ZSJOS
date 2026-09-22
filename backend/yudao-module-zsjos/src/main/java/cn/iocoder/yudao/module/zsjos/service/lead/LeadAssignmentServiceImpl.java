@@ -106,6 +106,14 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         return getEligibleTargetUsers(scene);
     }
 
+    @Override
+    public boolean isEligibleSalesUser(Long userId) {
+        if (userId == null) return false;
+        UserRelationSceneDO scene = sceneService.getEnabledSceneByCode(SCENE);
+        // 状态判断复用场景资格规则，不查询仅供候选列表展示的部门资料。
+        return getEligibleTargetUsersInternal(scene).stream().anyMatch(user -> userId.equals(user.getId()));
+    }
+
     private List<LeadAssignmentUserRespVO> getEligibleTargetUsers(UserRelationSceneDO scene) {
         List<AdminUserRespDTO> users = getEligibleTargetUsersInternal(scene).stream()
                 .sorted(userComparator()).toList();

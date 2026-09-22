@@ -980,3 +980,7 @@ Administrator read scopes are resolved at explicit read boundaries. Task/feedbac
 ### 订单历史姓名与当前授权（2026-09-22）
 
 订单历史展示使用订单/课程/BPM 动作快照，缺失不回退当前字典、客资或用户姓名；详情、列表、两端审批卡和导出遵循同一来源。用户 ID 继续用于当前服务端权限、数据范围、业务关联与通知收件人计算，历史姓名不参与授权。BPM 的新增动作人快照字段不改变既有 reviewer 接口含义；订单主管申请保留申请时/指派时姓名，实际审核历史仍由 BPM 持有。详见 [订单 API](../api/zsjos-sales-order.md#订单历史展示契约2026-09-22)。
+
+## Sales performance
+
+Sales performance uses configured self/department/center view permissions plus System data scope; details require a separate permission. Historical facts retain event-time organization and are checked against that frozen department. Target writes do not inherit tenant-read-all. ZSJOS owns target/org associations and facts; System owns the organization tree and grants. See [the contract](../api/sales-performance.md).

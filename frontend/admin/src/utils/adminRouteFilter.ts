@@ -13,7 +13,7 @@ type AdminMenuRoute = {
  */
 export const filterAdminRoutes = <T extends AdminMenuRoute>(routes: T[]): T[] =>
   routes.flatMap((route) => {
-    if (route.component === 'zsjos-workbench') {
+    if (['zsjos-workbench', 'zsjos/salesPerformance/index', 'zsjos/salesPerformanceTarget/index', 'zsjos/leadFollowUpCalendar/index'].includes(route.component || '')) {
       return []
     }
     if (!route.children) {

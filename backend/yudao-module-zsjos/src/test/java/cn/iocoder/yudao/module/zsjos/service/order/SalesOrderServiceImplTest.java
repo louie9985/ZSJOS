@@ -52,6 +52,13 @@ import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationChecklistConfigService;
 import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationService;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.OrderPaymentAllocationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PurchaseIntentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentIntentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentTransactionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PurchaseIntentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentIntentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentTransactionDO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +89,11 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
+    @Mock private PurchaseIntentMapper purchaseIntentMapper;
+    @Mock private PaymentIntentMapper paymentIntentMapper;
+    @Mock private PaymentTransactionMapper paymentTransactionMapper;
+    @Mock private OrderPaymentAllocationMapper orderPaymentAllocationMapper;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private RegistrationChecklistConfigService registrationChecklistConfigService;
     @Mock private RegistrationService registrationService;
@@ -419,6 +431,11 @@ class SalesOrderServiceImplTest {
 
         assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         verify(businessTaskCommandService, never()).create(any());
+        service.handleProcessResult("process-1", CANCEL.getStatus(), "流程异常取消");
+        verify(notifyBusinessEventApi).publish(argThat(event ->
+                "zsjos.sales_order.cancelled".equals(event.getSceneCode())
+                        && "sales-order-cancelled:200".equals(event.getSourceEventKey())
+                        && List.of(20L).equals(event.getPayload().get("resultUserIds"))));
     }
 
     @Test
@@ -795,6 +812,10 @@ class SalesOrderServiceImplTest {
     void reviseCreatesIndependentSuccessorAndPreservesRejectedOrder() {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
+        order.setPersonId(10L); order.setPurchaseIntentId(800L);
+        PurchaseIntentDO intent = purchaseIntent("offline_paid");
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
+        when(purchaseIntentMapper.reviseOfflineSnapshot(eq(intent), anyString(), eq(new BigDecimal("500.00")))).thenReturn(1);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setId(200L); previous.setRoundNo(1);
@@ -811,7 +832,7 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
                 .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
 
-        Long successorId = service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        Long successorId = service.reviseAndResubmit(100L, 20L, request(new BigDecimal("500"), "13800138000", null));
 
         assertEquals(101L, successorId);
         assertEquals(STATUS_SUPERSEDED, order.getStatus());
@@ -833,6 +854,18 @@ class SalesOrderServiceImplTest {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L);
         order.setStatus(STATUS_REVISION_REQUIRED); order.setSourcePaymentOrderId(900L);
+        order.setPurchaseIntentId(800L); order.setPersonId(10L);
+        PurchaseIntentDO intent = purchaseIntent("online_link");
+        intent.setTotalAmount(BigDecimal.ZERO);
+        intent.setItemSnapshotJson("[{\"spuRef\":\"spu-1\",\"skuRef\":\"sku-1\",\"actualAmount\":0}]");
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
+        PaymentIntentDO payment = new PaymentIntentDO(); payment.setId(900L);
+        payment.setStatus("paid"); payment.setExpectedAmount(BigDecimal.ZERO);
+        when(paymentIntentMapper.selectLatestByPurchaseIntent(800L)).thenReturn(payment);
+        PaymentTransactionDO transaction = new PaymentTransactionDO(); transaction.setId(901L);
+        transaction.setAmountFen(0); transaction.setAmount(BigDecimal.ZERO); transaction.setCurrency("CNY");
+        when(paymentTransactionMapper.selectByPaymentOrderId(900L)).thenReturn(transaction);
+        when(orderMapper.releasePaymentForSuccessor(100L, 900L)).thenReturn(1);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setId(200L); previous.setRoundNo(1);
@@ -852,6 +885,98 @@ class SalesOrderServiceImplTest {
         // uk_tenant_source_payment_order spans (tenant_id, source_payment_order_id), so the superseded
         // row must release the key before the successor carries it, or the insert fails.
         assertNull(order.getSourcePaymentOrderId());
+        verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(created ->
+                Objects.equals(created.getSourcePaymentOrderId(), 900L) && Objects.equals(created.getPurchaseIntentId(), 800L)));
+        verify(orderPaymentAllocationMapper).insert(org.mockito.Mockito.<cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.OrderPaymentAllocationDO>argThat(allocation ->
+                Objects.equals(allocation.getOrderId(), 101L) && Objects.equals(allocation.getPaymentTransactionId(), 901L)));
+        assertEquals(101L, intent.getCurrentOrderId());
+        var sequence = inOrder(orderMapper);
+        sequence.verify(orderMapper).releasePaymentForSuccessor(100L, 900L);
+        sequence.verify(orderMapper).updateById(order);
+        sequence.verify(orderMapper).insert(any(SalesOrderDO.class));
+    }
+
+
+    private PurchaseIntentDO purchaseIntent(String mode) {
+        return new PurchaseIntentDO().setId(800L).setPersonId(10L).setCurrentOrderId(100L)
+                .setStatus("submitted").setCollectionMode(mode).setVersion(1).setTotalAmount(new BigDecimal("500"))
+                .setItemSnapshotJson("[{\"spuRef\":\"spu-1\",\"skuRef\":\"old-sku\",\"actualAmount\":500}]");
+    }
+
+    @Test
+    void offlineRevisionAcceptsDifferentSkuAndAmountWithoutPaymentLookup() {
+        PurchaseIntentDO intent = purchaseIntent("offline_paid");
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
+        when(purchaseIntentMapper.reviseOfflineSnapshot(eq(intent), anyString(), eq(new BigDecimal("800")))).thenReturn(1);
+        var req = request(new BigDecimal("800"), "13800138000", null);
+        req.setPurchaseIntentId(800L);
+        assertNull(ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("800"), 10L, 100L));
+        verifyNoInteractions(paymentIntentMapper, paymentTransactionMapper);
+        verify(purchaseIntentMapper).reviseOfflineSnapshot(eq(intent), contains("sku-1"), eq(new BigDecimal("800")));
+    }
+
+    @Test
+    void onlineRevisionRejectsSkuChangeWithAccurateError() {
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("online_link"));
+        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        ServiceException error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
+        assertEquals(PAYMENT_TRANSACTION_LOCKED.getCode(), error.getCode());
+        verifyNoInteractions(paymentIntentMapper);
+    }
+
+    @Test
+    void onlineRevisionRejectsAmountChangeAndUnconfirmedPayment() {
+        PurchaseIntentDO intent = purchaseIntent("online_link");
+        intent.setItemSnapshotJson("[{\"spuRef\":\"spu-1\",\"skuRef\":\"sku-1\",\"actualAmount\":500}]");
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
+        var req = request(new BigDecimal("800"), "13800138000", null); req.setPurchaseIntentId(800L);
+        ServiceException error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("800"), 10L, 100L));
+        assertEquals(PAYMENT_TRANSACTION_LOCKED.getCode(), error.getCode());
+        req.getItems().getFirst().setActualAmount(new BigDecimal("500"));
+        error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
+        assertEquals(PURCHASE_INTENT_PAYMENT_REQUIRED.getCode(), error.getCode());
+        PaymentIntentDO payment = new PaymentIntentDO(); payment.setId(900L); payment.setStatus("paid");
+        payment.setExpectedAmount(new BigDecimal("500"));
+        when(paymentIntentMapper.selectLatestByPurchaseIntent(800L)).thenReturn(payment);
+        PaymentTransactionDO transaction = new PaymentTransactionDO(); transaction.setAmountFen(49900);
+        when(paymentTransactionMapper.selectByPaymentOrderId(900L)).thenReturn(transaction);
+        error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
+        assertEquals(PAYMENT_AMOUNT_MISMATCH.getCode(), error.getCode());
+    }
+
+    @Test
+    void initialOfflineSubmissionStillChecksSnapshot() {
+        PurchaseIntentDO intent = purchaseIntent("offline_paid").setStatus("draft").setCurrentOrderId(null);
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
+        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        ServiceException error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, null));
+        assertEquals(PURCHASE_INTENT_ITEMS_MISMATCH.getCode(), error.getCode());
+    }
+
+    @Test
+    void offlineRevisionRejectsDifferentPersonAndCurrentOrder() {
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("offline_paid"));
+        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        for (Long[] binding : List.of(new Long[]{11L, 100L}, new Long[]{10L, 101L})) {
+            ServiceException error = assertThrows(ServiceException.class, () ->
+                    ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), binding[0], binding[1]));
+            assertEquals(PURCHASE_INTENT_BINDING_INVALID.getCode(), error.getCode());
+        }
+        verify(purchaseIntentMapper, never()).reviseOfflineSnapshot(any(), anyString(), any());
+    }
+
+    @Test
+    void offlineRevisionRejectsSnapshotVersionConflict() {
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("offline_paid"));
+        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        ServiceException error = assertThrows(ServiceException.class, () ->
+                ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
+        assertEquals(PURCHASE_INTENT_VERSION_CONFLICT.getCode(), error.getCode());
     }
 
     @Test
@@ -982,6 +1107,11 @@ class SalesOrderServiceImplTest {
         assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
         verify(processInstanceApi).terminateProcessInstanceByBusiness(
                 20L, "process-1", "zsjos.sales-order.terminate", "客户取消");
+        verify(notifyBusinessEventApi).publish(argThat(event ->
+                "zsjos.sales_order.cancelled".equals(event.getSceneCode())
+                        && "sales-order-cancelled:200".equals(event.getSourceEventKey())
+                        && List.of(20L).equals(event.getPayload().get("resultUserIds"))
+                        && "客户取消".equals(event.getPayload().get("decisionReason"))));
         verifyNoInteractions(opportunityMapper, agingPoolService);
     }
 

@@ -3972,6 +3972,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_customer_account_ledger` (
 
 -- zsjos_lead
 CREATE TABLE IF NOT EXISTS `zsjos_lead` (
+  `sales_stage` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '当前销售阶段字典值',
+  `sales_stage_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '销售阶段名称快照',
+
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '内部客资ID',
   `lead_no` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资业务编号',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',
@@ -4181,13 +4184,22 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_submitter_assist_request` (
   `submitter_name_snapshot` varchar(128) DEFAULT NULL, `assignee_user_id_snapshot` bigint DEFAULT NULL,
   `assignee_name_snapshot` varchar(128) DEFAULT NULL, `requested_at` datetime NOT NULL,
   `request_fingerprint` varchar(64) NOT NULL, `idempotency_key` varchar(128) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'pending', `response_remark` varchar(2000) DEFAULT NULL,
+  `response_attachment_snapshots_json` json DEFAULT NULL, `responder_user_id_snapshot` bigint DEFAULT NULL,
+  `responder_name_snapshot` varchar(128) DEFAULT NULL, `responded_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
   KEY `idx_tenant_lead_requested` (`tenant_id`,`lead_id`,`requested_at`,`id`),
   KEY `idx_tenant_assignee_requested` (`tenant_id`,`assignee_user_id_snapshot`,`requested_at`,`id`)
+  ,KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资提交人协助请求快照';
+
+INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT '协助历史','zsjos:lead:submitter-assist:read',3,33,parent.id,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'
+FROM `system_menu` parent WHERE parent.permission='zsjos:lead:query' AND parent.type=2 AND parent.deleted=b'0'
+AND NOT EXISTS (SELECT 1 FROM `system_menu` existing WHERE existing.permission='zsjos:lead:submitter-assist:read' AND existing.deleted=b'0') ORDER BY parent.id LIMIT 1;
 
 
 CREATE TABLE IF NOT EXISTS `zsjos_lead_urge` (
@@ -4327,6 +4339,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_history` (
 
 -- zsjos_lead_follow_up_record
 CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_record` (
+  `sales_stage_before` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '跟进前销售阶段',
+  `sales_stage_before_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '跟进前销售阶段名称快照',
+  `sales_stage_after` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本次跟进后销售阶段',
+  `sales_stage_after_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本次跟进后销售阶段名称快照',
+
   `id` bigint NOT NULL AUTO_INCREMENT,
   `lead_id` bigint NOT NULL,
   `assignment_history_id` bigint NOT NULL,
@@ -4633,6 +4650,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_opportunity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 销售机会';
 
 CREATE TABLE IF NOT EXISTS `zsjos_opportunity_follow_up_record` (
+  `sales_stage_before` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '跟进前销售阶段',
+  `sales_stage_before_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '跟进前销售阶段名称快照',
+  `sales_stage_after` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本次跟进后销售阶段',
+  `sales_stage_after_label_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本次跟进后销售阶段名称快照',
+
   `id` bigint NOT NULL AUTO_INCREMENT, `opportunity_id` bigint NOT NULL, `lead_id` bigint NOT NULL,
   `operator_user_id` bigint NOT NULL, `owner_user_id_snapshot` bigint NOT NULL, `owner_dept_id_snapshot` bigint DEFAULT NULL,
   `owner_identity_snapshot` varchar(32) DEFAULT NULL,
@@ -7743,3 +7765,52 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_submission` (
 INSERT IGNORE INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`updater`)
 VALUES ('作品目的','zsjos_content_purpose',0,'ZSJOS 内容审核作品目的，管理员维护','system','system'),
        ('作品形式','zsjos_content_format',0,'ZSJOS 内容审核作品形式，管理员维护','system','system');
+
+-- Sales performance (V276): empty tenant-owned tables.
+CREATE TABLE IF NOT EXISTS zsjos_performance_org (
+ id bigint NOT NULL AUTO_INCREMENT,
+ dept_id bigint NOT NULL, center_id bigint NOT NULL, kind varchar(16) NOT NULL, version int NOT NULL DEFAULT 0,
+  creator varchar(64) NOT NULL DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '',
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  tenant_id bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(id), UNIQUE KEY uk_org(tenant_id,dept_id,deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_performance_target (
+ id bigint NOT NULL AUTO_INCREMENT,
+ scope_type varchar(16) NOT NULL, scope_id bigint NOT NULL, dept_id bigint NULL, center_id bigint NULL, period_type varchar(16) NOT NULL, period_start date NOT NULL, floor_amount decimal(18,2) NULL, sprint_amount decimal(18,2) NULL, manual bit(1) NOT NULL DEFAULT b'0', reason varchar(500) NOT NULL, version int NOT NULL DEFAULT 0,
+  creator varchar(64) NOT NULL DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '',
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  tenant_id bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(id), UNIQUE KEY uk_target(tenant_id,scope_type,scope_id,period_type,period_start,deleted), KEY idx_target_dept(tenant_id,dept_id,period_type,period_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_performance_revision (
+ id bigint NOT NULL AUTO_INCREMENT,
+ target_id bigint NOT NULL, before_json longtext NULL, after_json longtext NOT NULL, reason varchar(500) NOT NULL, operator_id bigint NOT NULL,
+  creator varchar(64) NOT NULL DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '',
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  tenant_id bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(id), KEY idx_revision(tenant_id,target_id,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_performance_attribution (
+ id bigint NOT NULL AUTO_INCREMENT,
+ outcome varchar(32) NULL, completed_at datetime NULL, fact_type varchar(16) NOT NULL, fact_id bigint NOT NULL, user_id bigint NULL, user_name varchar(100) NULL, dept_id bigint NULL, dept_name varchar(100) NULL, center_id bigint NULL, center_name varchar(100) NULL, lead_id bigint NULL, assignment_id bigint NULL, received_at datetime NULL, source_group varchar(32) NULL, channel_code varchar(100) NULL, channel_label varchar(255) NULL,
+  creator varchar(64) NOT NULL DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '',
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  tenant_id bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(id), UNIQUE KEY uk_fact(tenant_id,fact_type,fact_id,deleted), KEY idx_user(tenant_id,user_id,fact_type,received_at), KEY idx_dept(tenant_id,dept_id,fact_type,received_at), KEY idx_center(tenant_id,center_id,fact_type,received_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

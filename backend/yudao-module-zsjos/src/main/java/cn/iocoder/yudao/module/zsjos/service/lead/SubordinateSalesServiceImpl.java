@@ -53,6 +53,10 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SubordinateSalesCommandService commandService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper followUpRecordMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper eventMapper;
 
     @Override
     public PageResult<SubordinateSalesRespVO> getPage(SubordinateSalesPageReqVO reqVO, Long managerUserId) {
@@ -261,9 +265,28 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         LocalDateTime start = LocalDate.now(BEIJING).atStartOfDay();
         LocalDateTime end = start.plusDays(1);
         LocalDateTime now = LocalDateTime.now(BEIJING);
-        return users.stream().map(user -> buildRow(user, leads.getOrDefault(user.getId(), List.of()),
+        var assignments = assignmentHistoryMapper.selectTodayByUserIds(ids, start, end);
+        var followUps = followUpRecordMapper.selectTodayByUserIds(ids, start, end);
+        var opportunityFollowUps = opportunityFollowUpRecordMapper.selectTodayByUserIds(ids, start, end);
+        var qualifications = eventMapper.selectTodayByUserIds(ids, start, end);
+        return users.stream().map(user -> {
+            var row = buildRow(user, leads.getOrDefault(user.getId(), List.of()),
                 tasks.getOrDefault(user.getId(), List.of()), orders.getOrDefault(user.getId(), List.of()),
-                categories, eligible.contains(user.getId()), start, end, now)).toList();
+                categories, eligible.contains(user.getId()), start, end, now);
+            // Event-time attribution survives later ownership changes; never infer daily activity from current ownership.
+            var history = assignments.stream().filter(item -> Objects.equals(item.getCandidateUserId(), row.getUserId())).toList();
+            row.setTodayAssignedCount(history.stream().filter(item -> ACTION_DISPATCH.equals(item.getActionType()))
+                    .map(item -> item.getLeadId()).distinct().count());
+            row.setTodayMissedCount(history.stream().filter(item -> ACTION_TIMEOUT.equals(item.getActionType()))
+                    .map(item -> item.getLeadId()).distinct().count());
+            row.setTodayReceivedCount(history.stream().filter(item -> ACTION_ACCEPT.equals(item.getActionType())
+                    || ACTION_CLAIM.equals(item.getActionType())).map(item -> item.getLeadId()).distinct().count());
+            row.setTodayQualifiedCount(qualifications.stream().filter(item -> Objects.equals(item.getOperatorUserId(), row.getUserId()))
+                    .map(item -> item.getAggregateId()).distinct().count());
+            row.setTodayFollowUpRecordCount(followUps.stream().filter(item -> Objects.equals(item.getOperatorUserId(), row.getUserId())).count()
+                    + opportunityFollowUps.stream().filter(item -> Objects.equals(item.getOperatorUserId(), row.getUserId())).count());
+            return row;
+        }).toList();
     }
 
     private SubordinateSalesRespVO buildRow(AdminUserRespDTO user, List<LeadDO> leads,
@@ -279,10 +302,22 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         row.setCanReceiveNewLeads(CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) && eligible
                 && "online".equals(dispatch.getPresence()) && Boolean.TRUE.equals(row.getAccepting()));
         row.setNewcomerPoolStatus("not_available");
-        long todayPending = tasks.stream().filter(task -> isFollowUpTask(task.getTaskType()))
-                .filter(task -> TASK_STATUS_PENDING.equals(task.getStatus())
-                && task.getDueAt() != null && !task.getDueAt().isBefore(start) && task.getDueAt().isBefore(end)).count();
-        row.setTodayPendingCount(todayPending); row.setTodayFollowUpStatus(todayPending > 0 ? "incomplete" : "completed");
+        // Count leads, not tasks: first-follow and reminder tasks can coexist for one lead.
+        var todayTasks = tasks.stream().filter(task -> BIZ_TYPE_LEAD.equals(task.getBizType()) && isFollowUpTask(task.getTaskType()))
+                .filter(task -> TASK_STATUS_PENDING.equals(task.getStatus()) || "completed".equals(task.getStatus()))
+                .filter(task -> task.getDueAt() != null && !task.getDueAt().isBefore(start) && task.getDueAt().isBefore(end)).toList();
+        long todayPending = todayTasks.stream().filter(task -> TASK_STATUS_PENDING.equals(task.getStatus()))
+                .map(BusinessTaskDO::getBizId).filter(Objects::nonNull).distinct().count();
+        row.setTodayFollowUpTotalCount(todayTasks.stream().map(BusinessTaskDO::getBizId).filter(Objects::nonNull).distinct().count());
+        row.setTodayFollowUpRemainingCount(todayPending);
+        // Preserve the existing task-count field for other consumers.
+        row.setTodayPendingCount(tasks.stream().filter(task -> isFollowUpTask(task.getTaskType()))
+                .filter(task -> TASK_STATUS_PENDING.equals(task.getStatus()) && task.getDueAt() != null
+                        && !task.getDueAt().isBefore(start) && task.getDueAt().isBefore(end)).count()); row.setTodayFollowUpStatus(todayPending > 0 ? "incomplete" : "completed");
+        row.setTodayOrderAmount(orders.stream().filter(order -> order.getEffectiveAt() != null
+                && !order.getEffectiveAt().isBefore(start) && order.getEffectiveAt().isBefore(end))
+                .map(SalesOrderDO::getTotalAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add));
+        row.setPendingQualificationCount(leads.stream().filter(lead -> QUALIFICATION_PENDING.equals(LeadStateProjection.qualification(lead))).count());
         row.setFirstFollowTimeoutCount(tasks.stream().filter(task -> TASK_TYPE_FIRST_FOLLOW_UP.equals(task.getTaskType())
                 && !"cancelled".equals(task.getStatus())
                 && task.getDueAt() != null && task.getDueAt().isBefore(now)).count());

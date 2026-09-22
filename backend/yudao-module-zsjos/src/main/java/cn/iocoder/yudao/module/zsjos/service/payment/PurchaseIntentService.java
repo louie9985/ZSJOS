@@ -60,6 +60,7 @@ public class PurchaseIntentService {
     @Resource private ZsjosProductSkuMapper productSkuMapper;
     @Resource private PaymentClosePendingRecorder closePendingRecorder;
     @Resource private ZsjosProductSkuService productSkuService;
+    @Resource private cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi notifyBusinessEventApi;
 
     public PurchaseIntentRespVO current(PurchaseIntentSaveDraftReqVO request, Long userId) {
         resolvePerson(request, false);
@@ -376,6 +377,17 @@ public class PurchaseIntentService {
                 .setCallbackEventId(eventId).setReqsn(payment.getReqsn()).setTrxId(result.getTrxid()).setChannelTransactionNo(result.getChnltrxid())
                 .setAmountFen(result.getTrxamt()).setSource(source); transactionMapper.insert(transaction);
         payment.setStatus("paid").setPaidAt(LocalDateTime.now()); paymentIntentMapper.updateById(payment);
+        PurchaseIntentDO intent = purchaseIntentMapper.selectById(payment.getPurchaseIntentId());
+        Map<String, Object> notification = new LinkedHashMap<>();
+        notification.put("ownerUserId", intent == null ? null : intent.getOwnerUserId());
+        notification.put("purchase.no", intent == null ? "" : intent.getPurchaseIntentNo());
+        notification.put("payment.no", payment.getPaymentOrderNo());
+        notification.put("payment.amount", payment.getExpectedAmount());
+        // Freeze the responsible employee at confirmation; callbacks and reconciliation share this path.
+        notifyBusinessEventApi.publish(cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent.builder()
+                .tenantId(payment.getTenantId()).sceneCode(PaymentNotifySceneProvider.PAID)
+                .sourceEventKey("payment-paid:" + payment.getId()).bizType("purchase_intent")
+                .bizId(payment.getPurchaseIntentId()).occurredAt(payment.getPaidAt()).payload(notification).build());
     }
 
     private PaymentIntentDO requirePublic(String no, String token) {

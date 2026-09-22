@@ -115,6 +115,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource private DeptApi deptApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
@@ -319,8 +320,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         List<SalesOrderItemDO> historicalItems = itemMapper.selectListByOrderId(orderId);
         ValidatedSubmission validated = validateSubmission(reqVO, userId, historicalItems, order);
-        if (reqVO.getPurchaseIntentId() == null) reqVO.setPurchaseIntentId(order.getPurchaseIntentId());
-        validatePurchaseIntent(reqVO, validated.total(), order.getPersonId(), order.getId());
+        if (reqVO.getPurchaseIntentId() != null && !Objects.equals(reqVO.getPurchaseIntentId(), order.getPurchaseIntentId())) {
+            throw exception(PURCHASE_INTENT_BINDING_INVALID);
+        }
+        reqVO.setPurchaseIntentId(order.getPurchaseIntentId());
+        PaymentIntentDO inheritedPayment = validatePurchaseIntent(reqVO, validated.total(), order.getPersonId(), order.getId());
+        if (!Objects.equals(order.getSourcePaymentOrderId(), inheritedPayment == null ? null : inheritedPayment.getId())) {
+            throw exception(PURCHASE_INTENT_BINDING_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         SalesOrderApprovalRoundDO latest = roundMapper.selectLatestByOrderId(orderId);
         if (order.getSupersededByOrderId() != null || orderMapper.selectBySupersedesOrderId(orderId) != null) {
@@ -335,16 +342,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         // uk_tenant_source_payment_order key that the successor is about to carry. Lineage is kept
         // through supersedes_order_id, so the payment intent remains reachable from the successor.
         order.setStatus(STATUS_SUPERSEDED); order.setSupersededByOrderId(null);
+        if (order.getSourcePaymentOrderId() != null
+                && orderMapper.releasePaymentForSuccessor(orderId, order.getSourcePaymentOrderId()) != 1) {
+            throw exception(SALES_ORDER_VERSION_CONFLICT);
+        }
         order.setSourcePaymentOrderId(null);
         orderMapper.updateById(order);
         SalesOrderDO successor = copyForSuccessor(order, userId, now);
+        successor.setSourcePaymentOrderId(inheritedPayment == null ? null : inheritedPayment.getId());
         successor.setSupersedesOrderId(orderId); successor.setSupersededByOrderId(null);
         successor.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
         applySubmission(successor, reqVO, validated, now);
         insertOrderWithNumber(successor);
         bindPurchaseIntent(successor);
-        allocateOnlinePayment(successor, successor.getSourcePaymentOrderId() == null ? null
-                : paymentIntentMapper.selectById(successor.getSourcePaymentOrderId()), now);
+        allocateOnlinePayment(successor, inheritedPayment, now);
         order.setSupersededByOrderId(successor.getId()); orderMapper.updateById(order);
         List<SalesOrderItemDO> createdItems = insertItems(successor.getId(), validated.items());
         createDealCashbacks(successor.getLeadId(), successor.getId(), createdItems, validated.items());
@@ -904,6 +915,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         cashbackService.cancelDealCashbacks(orderId, "订单主动终止");
         processInstanceApi.terminateProcessInstanceByBusiness(userId, round.getProcessInstanceId(),
                 "zsjos.sales-order.terminate", reqVO.getReason().trim());
+        publishCancellationNotification(order, round, reqVO.getReason().trim(), now);
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
             OpportunityDO opportunity = opportunityMapper.selectById(order.getOpportunityId());
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
@@ -1016,7 +1028,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                     .filter(Objects::nonNull).distinct().toList();
             publishOrderNotification(REJECTED, order, "sales-order-rejected:" + round.getId(),
                     List.of(), resultUserIds, leadSubmitterUserId, partnerId, reason, now);
+        } else {
+            publishCancellationNotification(order, round, reason, now);
         }
+    }
+
+    private void publishCancellationNotification(SalesOrderDO order, SalesOrderApprovalRoundDO round,
+                                                 String reason, LocalDateTime now) {
+        List<Long> recipients = java.util.stream.Stream.of(order.getFormalSalesUserId(), round.getSubmittedByUserId(),
+                        order.getSubmitterUserId()).filter(Objects::nonNull).distinct().toList();
+        publishOrderNotification(CANCELLED, order, "sales-order-cancelled:" + round.getId(),
+                List.of(), recipients, null, null, reason, now);
     }
 
     private void createGiftPurchaseIfNeeded(SalesOrderDO order, LocalDateTime now) {
@@ -1209,9 +1231,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 || !Objects.equals(intent.getCurrentOrderId(), allowedCurrentOrderId)
                 || !(allowedCurrentOrderId == null
                     ? Set.of("draft", "paid_pending_submission").contains(intent.getStatus())
-                    : "submitted".equals(intent.getStatus()))
-                || intent.getTotalAmount().setScale(2).compareTo(total.setScale(2)) != 0) {
-            throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+                    : "submitted".equals(intent.getStatus()))) {
+            throw exception(PURCHASE_INTENT_BINDING_INVALID);
+        }
+        if (!"offline_paid".equals(intent.getCollectionMode()) && !"online_link".equals(intent.getCollectionMode())) {
+            throw exception(PURCHASE_INTENT_BINDING_INVALID);
+        }
+        // Only the latest offline recording advances; submitted order/BPM snapshots remain immutable.
+        if (allowedCurrentOrderId != null && "offline_paid".equals(intent.getCollectionMode())) {
+            if (purchaseIntentMapper.reviseOfflineSnapshot(intent, JsonUtils.toJsonString(req.getItems()), total) != 1) {
+                throw exception(PURCHASE_INTENT_VERSION_CONFLICT);
+            }
+            return null;
         }
         List<PurchaseIntentSaveDraftReqVO.Item> snapshots = JsonUtils.parseArray(
                 intent.getItemSnapshotJson(), PurchaseIntentSaveDraftReqVO.Item.class);
@@ -1219,7 +1250,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 item -> item.getSpuRef() + "\n" + item.getSkuRef(), item -> item.getActualAmount().setScale(2)));
         Map<String, BigDecimal> actual = req.getItems().stream().collect(java.util.stream.Collectors.toMap(
                 item -> item.getSpuRef() + "\n" + item.getSkuRef(), item -> item.getActualAmount().setScale(2)));
-        if (!expected.equals(actual)) throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        if (!expected.equals(actual) || intent.getTotalAmount().setScale(2).compareTo(total.setScale(2)) != 0) {
+            throw exception(allowedCurrentOrderId != null ? PAYMENT_TRANSACTION_LOCKED : PURCHASE_INTENT_ITEMS_MISMATCH);
+        }
         if (!"online_link".equals(intent.getCollectionMode())) return null;
         PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
         if (payment == null || !"paid".equals(payment.getStatus())) throw exception(PURCHASE_INTENT_PAYMENT_REQUIRED);
@@ -1227,7 +1260,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         int totalFen = total.movePointRight(2).intValueExact();
         if (transaction == null || transaction.getAmountFen() == null || transaction.getAmountFen() != totalFen
                 || payment.getExpectedAmount().setScale(2).compareTo(total.setScale(2)) != 0) {
-            throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+            throw exception(PAYMENT_AMOUNT_MISMATCH);
         }
         return payment;
     }
@@ -1433,6 +1466,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             order.setOrderNo(orderNumberService.next());
             try {
                 orderMapper.insert(order);
+                performanceSnapshotService.order(order);
                 return;
             } catch (DuplicateKeyException exception) {
                 if (!isOrderNumberConflict(exception) || attempt == 20) {
@@ -1486,6 +1520,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderSnapshot history = readSnapshot(round);
         SalesOrderDO order = history.project(currentOrder);
         SalesOrderRespVO result = new SalesOrderRespVO();
+        projectPaymentState(currentOrder, result);
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setOpportunityId(order.getOpportunityId()); result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType());
         result.setPersonId(order.getPersonId()); result.setFormalSalesUserId(order.getFormalSalesUserId());
@@ -1606,6 +1641,26 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setReviewerUserName(source.getActionUserNameSnapshot());
         result.setCreateTime(source.getCreateTime()); result.setEndTime(source.getEndTime());
         return result;
+    }
+
+    private void projectPaymentState(SalesOrderDO order, SalesOrderRespVO result) {
+        if (order.getPurchaseIntentId() == null) {
+            // Pre-purchase-intent offline orders have no channel payment reference.
+            if (order.getSourcePaymentOrderId() == null) {
+                result.setCollectionMode("offline_paid");
+                result.setTransactionLocked(false);
+            }
+            return;
+        }
+        PurchaseIntentDO intent = purchaseIntentMapper.selectById(order.getPurchaseIntentId());
+        if (intent == null || !Objects.equals(intent.getPersonId(), order.getPersonId())
+                || (!"offline_paid".equals(intent.getCollectionMode()) && !"online_link".equals(intent.getCollectionMode()))) return;
+        result.setCollectionMode(intent.getCollectionMode());
+        result.setTransactionLocked("online_link".equals(intent.getCollectionMode()));
+        if ("online_link".equals(intent.getCollectionMode())) {
+            PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
+            if (payment != null) result.setPaymentStatus(payment.getStatus());
+        }
     }
 
     /**

@@ -37,6 +37,7 @@ public interface LeadNotifySceneConstants {
     String SUBMITTER_SUPPLEMENTED = "zsjos.lead.submitter_supplemented";
     String SUBMITTER_ASSIST_REQUESTED = "zsjos.lead.submitter_assist_requested";
     String PARTNER_ASSIST_REMINDER = "zsjos.lead.partner_assist_reminder";
+    String SUBMITTER_ASSIST_REPLIED = "zsjos.lead.submitter_assist_replied";
     String COMPLAINT_FOUNDED = "zsjos.lead.complaint_founded";
     String COMPLAINT_UNFOUNDED = "zsjos.lead.complaint_unfounded";
     String DUPLICATE_REACTIVATED = "zsjos.lead.duplicate_reactivated";

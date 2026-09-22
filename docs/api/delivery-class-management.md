@@ -18,9 +18,10 @@
 - `GET /zsjos/delivery-class/homeroom-candidates`：返回主管部门范围内启用且同时持有
 `zsjos:delivery-class:query-my`、`zsjos:student:query-my` 的用户。
 - `GET /zsjos/delivery-class/product-options`：返回教务端同源的启用产品、规格和 SKU。
-- `GET /zsjos/delivery-class/category-options`、`GET /zsjos/delivery-class/exam-options?categoryId=&productId=`：
+- `GET /zsjos/delivery-class/category-options`、`GET /zsjos/delivery-class/exam-options?categoryId=&productId=&selectedSkuIdsJson=`：
   返回启用产品分类和同产品范围、已发布且未结束的考期；精确考期按 `exactDate`，粗略考期按
-  `roughEndDate`，结束日期次日起不可选。
+  `roughEndDate`，结束日期次日起不可选。`selectedSkuIdsJson` 传班级实际选择的 SKU ID 数组时，
+  仅返回覆盖全部所选 SKU 的考期；未传时保留按产品/规格范围查询的兼容语义。
 - `POST /zsjos/delivery-class/create`、`PUT /zsjos/delivery-class/{id}`、
   `POST /zsjos/delivery-class/{id}/complete`：创建、编辑和手动结课。
 
@@ -28,7 +29,7 @@
 
 正式班编号为 `BJyyyyMMddHHmmss####`，由服务生成并依赖租户级唯一约束及冲突重试。
 班级保存产品、规格条件、所选 SKU、产品分类完整路径、考期、班主任和创建时部门名称快照。
-SKU 可以只选择产品下的部分有效 SKU，但至少选择一个；班内已有任何服务关系后
+SKU 可以只选择产品下的部分有效 SKU，但至少选择一个；创建班级时直接在产品下多选 SKU，规格条件不再作为前置筛选；班内已有任何服务关系后
 产品范围永久锁定；名称、同产品范围未结束考期和同班级部门内的合格班主任仍可修改。结课只
 关闭新学员入口，不修改已有服务关系、接收状态或服务阶段。
 

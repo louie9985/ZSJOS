@@ -34,6 +34,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadSubmitterAssistRequestMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
@@ -69,6 +70,7 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPol
 @Service
 public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
+    @Resource private LeadSubmitterAssistRequestMapper submitterAssistRequestMapper;
 
     private static final String QUERY_ALL_PERMISSION = "zsjos:lead:query-all";
 
@@ -131,6 +133,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 .map(lead -> convert(lead, userId, users, products.getOrDefault(lead.getId(), List.of()),
                         List.of(), Map.of(), false, opportunities, partners))
                 .toList();
+        populatePageTimestamps(page.getList(), result, userId);
         return new PageResult<>(result, page.getTotal());
     }
 
@@ -222,11 +225,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         Map<Long, OpportunityDO> opportunities = getOpportunityMap(leadIds);
         Map<Long, PartnerDO> partners = getPartnerMap(page.getList());
         Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
-        return new PageResult<>(page.getList().stream()
+        List<LeadManagementRespVO> result = page.getList().stream()
                 .map(lead -> convert(lead, managerUserId, users,
                         products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false,
-                        opportunities, partners))
-                .toList(), page.getTotal());
+                        opportunities, partners)).toList();
+        populatePageTimestamps(page.getList(), result, managerUserId);
+        return new PageResult<>(result, page.getTotal());
     }
 
     @Override
@@ -453,6 +457,26 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return result;
     }
 
+    private void populatePageTimestamps(List<LeadDO> leads, List<LeadManagementRespVO> rows, Long userId) {
+        // Match detail projection and its follow-up visibility; stale Lead.nextFollowUpAt
+        // must not resurrect a completed or cancelled reminder in the table.
+        List<Long> followUpLeadIds = leads.stream()
+                .filter(lead -> securityFrameworkService.hasPermission(PERMISSION_DETAIL_FOLLOW_UP_READ)
+                        || leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId))
+                .map(LeadDO::getId).toList();
+        Map<Long, BusinessTaskDO> reminders = businessTaskMapper.selectPendingFollowUpRemindersByLeadIds(followUpLeadIds)
+                .stream().collect(Collectors.toMap(BusinessTaskDO::getBizId, Function.identity(), (first, ignored) -> first));
+        Map<Long, SalesOrderDO> orders = salesOrderMapper.selectFirstPurchaseTimestampsByLeadIds(
+                leads.stream().map(LeadDO::getId).toList()).stream()
+                .collect(Collectors.toMap(SalesOrderDO::getLeadId, Function.identity(), (first, ignored) -> first));
+        rows.forEach(row -> {
+            BusinessTaskDO reminder = reminders.get(row.getId());
+            row.setNextFollowUpAt(reminder == null ? null : reminder.getDueAt());
+            SalesOrderDO order = orders.get(row.getId());
+            row.setSalesOrderSubmittedAt(order == null ? null : order.getSubmittedAt());
+        });
+    }
+
     private String resolveRelationScope(LeadManagementPageReqVO reqVO) {
         if (reqVO.getRelationScope() != null) return reqVO.getRelationScope();
         if (INBOX_AUDIENCE_SUBMITTER.equals(reqVO.getAudience())) return "submitted";
@@ -503,7 +527,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         // through the ADMIN permission evaluator.
         result.setVisibleTabs(List.of(DETAIL_TAB_OVERVIEW, DETAIL_TAB_FOLLOW_UPS,
                 DETAIL_TAB_APPEALS, DETAIL_TAB_COMPLAINTS, DETAIL_TAB_ORDERS,
-                DETAIL_TAB_FLOW_HISTORY, cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB));
+                DETAIL_TAB_FLOW_HISTORY, DETAIL_TAB_ASSIST_HISTORY, cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB));
         result.setAvailableActions(resolvePartnerActions(lead, partnerId));
         return result;
     }
@@ -539,6 +563,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 && submitterFeedbackPermission.canRead(lead, userId)) {
             tabs.add(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB);
         }
+        if (securityFrameworkService.hasPermission(PERMISSION_SUBMITTER_ASSIST_READ)
+                && leadObjectPermissionService.canReadDetail(lead, userId)) tabs.add(DETAIL_TAB_ASSIST_HISTORY);
         if (leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId)) {
             tabs.add(DETAIL_TAB_FOLLOW_UPS);
             tabs.add(DETAIL_TAB_APPEALS);
@@ -596,6 +622,10 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (securityFrameworkService.hasPermission(PERMISSION_REQUEST_SUBMITTER_ASSIST)
                 && leadObjectPermissionService.canRequestSubmitterAssist(lead, currentUserId)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_REQUEST_SUBMITTER_ASSIST, true));
+        }
+        var assist = submitterAssistRequestMapper.selectPendingByLeadId(lead.getId());
+        if (assist != null && Objects.equals(assist.getAssigneeUserIdSnapshot(), currentUserId)) {
+            actions.add(new LeadManagementRespVO.ActionVO("SUBMITTER_ASSIST_REPLY", true));
         }
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus())
                 && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());

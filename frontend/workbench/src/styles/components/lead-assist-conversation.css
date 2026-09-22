@@ -1,0 +1,28 @@
+/* UTF-8. Assistance request/reply bubbles use the workbench theme tokens. */
+.lead-assist-panel { container-type: inline-size; }
+.lead-assist-toolbar, .lead-assist-pending { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-gap); flex-wrap: wrap; }
+.lead-assist-toolbar { margin-bottom: var(--crm-sp-5); }
+.lead-assist-loading { display: grid; place-items: center; min-height: 160px; }
+.lead-assist-conversations { display: grid; gap: var(--crm-sp-6); }
+.lead-assist-conversation { display: grid; gap: var(--crm-sp-5); padding: var(--crm-card-pad); background: var(--crm-bg-layout); border-radius: var(--crm-radius-lg); }
+.lead-assist-round { display: flex; justify-content: center; align-items: center; gap: var(--crm-sp-2); flex-wrap: wrap; font-size: var(--crm-font-sm); }
+.lead-assist-message { display: flex; align-items: flex-start; justify-self: start; gap: var(--crm-sp-3); width: min(760px, 88%); min-width: 0; }
+.lead-assist-message > .ant-avatar { flex-shrink: 0; background: var(--crm-fill-secondary); color: var(--crm-text-secondary); }
+.lead-assist-message-body { min-width: 0; flex: 1; }
+.lead-assist-message-meta { margin-bottom: var(--crm-sp-2); font-size: var(--crm-font-sm); }
+.lead-assist-bubble { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: 0 var(--crm-radius-lg) var(--crm-radius-lg); background: var(--crm-bg-container); }
+.lead-assist-bubble dl { margin: 0; }
+.lead-assist-bubble dt, .lead-assist-attachment-label { font-weight: 600; margin-bottom: var(--crm-sp-1); }
+.lead-assist-bubble dd { margin: 0 0 var(--crm-sp-4); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lead-assist-message.is-response { justify-self: end; flex-direction: row-reverse; }
+.lead-assist-message.is-response .lead-assist-message-meta { display: flex; justify-content: flex-end; }
+.lead-assist-message.is-response .lead-assist-bubble { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); border-radius: var(--crm-radius-lg) 0 var(--crm-radius-lg) var(--crm-radius-lg); }
+.lead-assist-message.is-response > .ant-avatar { background: var(--crm-color-primary-bg); color: var(--crm-color-primary); }
+.lead-assist-attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--crm-sp-3); }
+.lead-assist-pending { justify-content: flex-end; }
+.lead-assist-panel > .ant-pagination { margin-top: var(--crm-sp-5); }
+@container (max-width: 599px) {
+  .lead-assist-message { max-width: 100%; width: 100%; gap: var(--crm-sp-2); }
+  .lead-assist-conversation { padding: var(--crm-sp-3); }
+  .lead-assist-round { justify-content: flex-start; }
+}

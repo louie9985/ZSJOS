@@ -43,6 +43,7 @@ public class AdvancedFilterService {
             "this_week", "本周", "this_month", "本月", "this_quarter", "本季度", "this_year", "本年");
 
     @Resource private AdvancedFilterMapper mapper;
+    @Resource private LeadFilterOrganizationService leadFilterOrganizations;
 
     public AdvancedFilterCatalogRespVO catalog(String scene) {
         if (!SCENES.contains(scene)) throw exception(ADVANCED_FILTER_INVALID);
@@ -88,7 +89,7 @@ public class AdvancedFilterService {
         if (group == null) throw exception(ADVANCED_FILTER_INVALID);
         validateShape(group, 0, new int[]{0});
         if (hasConditions(group)) {
-            groupSql(group, scene, new LinkedHashMap<>());
+            groupSql(group, scene, new LinkedHashMap<>(Map.of("validateOnly", true)));
         } else if (!SCENES.contains(scene)) {
             throw exception(ADVANCED_FILTER_INVALID);
         }
@@ -205,6 +206,19 @@ public class AdvancedFilterService {
         Binding binding = field == null ? null : field.bindings.get(scene);
         if (field == null || binding == null || !field.operators.contains(condition.getOperator())) throw exception(ADVANCED_FILTER_INVALID);
         validateOperands(field, condition);
+        if ("lead.ownerDeptId".equals(field.key)) {
+            if ("is_empty".equals(condition.getOperator()) || "is_not_empty".equals(condition.getOperator())) {
+                throw exception(ADVANCED_FILTER_INVALID);
+            }
+            LeadFilterOrganizationService.requestedIds(condition.getValue());
+            if (Boolean.TRUE.equals(params.get("validateOnly"))) return new Compiled(null, "1=1", false);
+            var ids = leadFilterOrganizations.ownerIds(condition.getValue());
+            if (ids.isEmpty()) return new Compiled(null, "1=0", false);
+            String predicate = ids.isEmpty() ? "1=0" : "l.owner_user_id IN (" + ids.stream()
+                    .map(id -> ref(params, id)).collect(java.util.stream.Collectors.joining(",")) + ")";
+            if ("not_in".equals(condition.getOperator())) predicate = "NOT (" + predicate + ")";
+            return new Compiled(null, predicate, false);
+        }
         String expression = binding.expression;
         String operator = condition.getOperator();
         String predicate;
@@ -451,6 +465,12 @@ public class AdvancedFilterService {
         add(result, select("order.formalOwnerIdentity", EXTRA, "成交归属身份", options("sales", "销售", "education", "教务"), orderBind("formal_owner_identity", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, selectSource("lead.sourceChannel", EXTRA, "来源渠道", "dict:zsjos_lead_source_channel", leadBind("source_channel_id", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, selectSource("lead.category", EXTRA, "客资分类", "dict:zsjos_lead_category", leadBind("lead_category", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
+        add(result, selectSource("lead.salesStage", STATUS, "当前销售阶段", "dict:zsjos_lead_sales_stage", bind("lead", "l.sales_stage", null)));
+        add(result, new Field("lead.ownerDeptId", PEOPLE, "负责人所属组织（含下级）", "select", List.of("in", "not_in"), "visible-departments", List.of(), bind("lead", "l.owner_user_id", null)));
+        add(result, select("lead.qualificationStatus", STATUS, "有效性", options("pending", "待判定", "valid", "有效", "invalid", "无效"), bind("lead", "CASE WHEN l.status='invalid' THEN 'invalid' WHEN l.status IN ('valid','won') THEN 'valid' ELSE 'pending' END", null)));
+        add(result, select("lead.dealStatus", STATUS, "成交状态", options("won", "已成交", "not_won", "未成交"), bind("lead", "CASE WHEN l.status='won' THEN 'won' ELSE 'not_won' END", null)));
+        add(result, date("lead.qualifiedAt", TIME, "有效性判定时间", bind("lead", "l.qualified_at", null)));
+        add(result, date("lead.convertedAt", TIME, "成交时间", bind("lead", "op.won_at", "SELECT 1 FROM zsjos_opportunity op WHERE op.lead_id=l.id AND op.type='initial_conversion' AND op.tenant_id=l.tenant_id AND op.deleted=b'0'")));
         add(result, selectSource("lead.sourceUserId", PEOPLE, "提交人", "visible-users",
                 leadSubmitterFilterBind(leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, selectSource("lead.ownerUserId", PEOPLE, "负责人", "visible-users", leadBind("owner_user_id", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));

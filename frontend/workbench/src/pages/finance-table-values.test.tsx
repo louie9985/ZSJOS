@@ -23,6 +23,25 @@ describe('finance lists through the real ProTable renderer', () => {
     expect(html).not.toContain('NaN')
     expect(html).not.toContain('[object Object]')
   })
+  it.each([
+    ['pending_review', '待审核'], ['approved', '待打款'], ['rejected', '已驳回'],
+    ['paid', '已打款'], ['cancelled', '已取消'], ['unrecognized', '未知状态'],
+  ])('renders withdrawal state %s from the record with ellipsis enabled', (status, label) => {
+    fixture.rows = [{ id: 1, applicationAmount: 25, status, reviewedAt: '2026-09-21T11:30:00', paidAt: '2026-09-21T12:30:00' }]
+    const html = renderToStaticMarkup(<WithdrawalPage permissions={['zsjos:withdrawal:finance-query']} />)
+    expect(html).toContain(label)
+    expect(html).toContain('2026-09-21 11:30')
+    expect(html).not.toContain('2026-09-21 12:30')
+    expect(html).not.toContain('打款时间')
+    if (status !== 'unrecognized') expect(html).not.toContain('未知状态')
+  })
+  it('renders persisted withdrawal identity and account snapshots through dataIndex', () => {
+    fixture.rows = [{ id: 7, withdrawalNo: 'TEST-PERSISTED-W', applicantUserId: 42,
+      applicationAmount: 98.5, status: 'paid', accountNameSnapshot: '测试收款账户',
+      maskedCardNumber: '****5678', bankNameSnapshot: '测试开户银行', submittedAt: '2026-09-21T10:30:00' }]
+    const html = renderToStaticMarkup(<WithdrawalPage permissions={['zsjos:withdrawal:finance-query']} />)
+    for (const value of ['TEST-PERSISTED-W', '42', '测试收款账户', '****5678', '测试开户银行', '¥98.50', '已打款']) expect(html).toContain(value)
+  })
   it('does not invent zero for missing or invalid withdrawal amounts', () => {
     fixture.rows = [{ id: 1, applicationAmount: undefined }, { id: 2, applicationAmount: 'invalid' }]
     const html = renderToStaticMarkup(<WithdrawalPage permissions={['zsjos:withdrawal:finance-query']} />)

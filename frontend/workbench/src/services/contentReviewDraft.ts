@@ -20,7 +20,7 @@ export function restoreDraftWorks(batch: ContentReviewBatch) {
     sourceVersionId: item.contentVersionId,
     title: item.contentSnapshot.titleSnapshot || item.contentSnapshot.title,
     scriptText: item.contentSnapshot.scriptText,
-    topic: item.contentSnapshot.topic,
+    topic: item.contentSnapshot.topicSnapshot || item.contentSnapshot.topic,
     deliverableUrl: item.contentSnapshot.deliverableUrl,
     plannedPublishAt: item.contentSnapshot.plannedPublishAt ? dayjs(String(item.contentSnapshot.plannedPublishAt)) : undefined,
     purposeValue: item.contentSnapshot.purposeValue,

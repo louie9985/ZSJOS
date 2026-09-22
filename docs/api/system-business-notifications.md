@@ -178,3 +178,33 @@ Missing/deleted/foreign relationships yield no target and a `targetUnavailableRe
 on the readable message with that explanation. `message_detail` and `none` never expose a business
 action. Normal route permission and authenticated Lead detail ownership checks remain in force.
 Internal IDs appear only in technical routes, never as the displayed 客资编号.
+
+
+## 销售事件与企微对齐（2026-09-22）
+
+- 销售首跟、下次跟进、判定以及学员联系提醒继续只发送当前最紧急的未处理阶段，但该阶段全部已到期规则均独立发布，不能只选一条后消费其他渠道。全部发布入队后才记录阶段；事件键包含任务版本和规则 ID，重新排期不会与旧 outbox 冲突。阶段仍为既有幂等边界，不自动重放历史已处理阶段。
+- 当前订单主动终止及 BPM 非通过/非驳回结束发布 `zsjos.sales_order.cancelled`，事件键为轮次，提供成交负责人和本轮录单人。保留历史 `submitter` 收件人兼容；V056 停用的租户规则保持停用，由管理员决定启用。首次派单、重新派单、接单、抢单完成仍按原约定只刷新派单功能，不恢复已退役的消息事件。
+- 新增 `zsjos.payment.paid`：可信在线支付确认后，在原业务事务发布到账待补录通知；回调与主动查单共用支付确认入口。收件人冻结为到账时购买意向负责人，变量为购买意向编号、支付单号、到账金额，不包含支付令牌、联系方式或客户姓名。默认站内信和企微均为 `message_detail`，仅提示核对补录，不自动创建订单。
+- `zsjos.lead.submitter_assist_replied` 补齐企微模板/规则与新租户默认规则。新租户长模板编码的企微命名与 SQL 的截断加 MD5 规则对齐。
+- 开发中的 V274 引用[销售通知配置脚本](../../script/sql/mysql/sales-notification-alignment.sql)。已应用本地 V274 可单独执行该脚本：先补到账站内配置，再为销售场景缺少整个企微配置的场景复制全部站内规则，保留接收人、阶段、偏移、动作和启停状态。已有任意企微规则的场景不追加；两渠道后续仍独立维护。唯一文本修正为精确匹配且未经编辑的 V177 来源关联企微副本，沿用 V257 销售/教务身份文案，不覆盖管理员编辑。
+
+执行前备份通知模板/规则，先在隔离库验证依赖、重复执行、配置保留和中文 HEX。验证入口：
+`python script/sql/mysql/tools/test_sales_notification_alignment.py --backup-dir <仓库外新目录>`。
+`--apply-local` 仅用于已核实目标的本地 Docker 开发库；共享或生产同步须独立审查，不能据此改写其已部署迁移校验值。
+回退仅审查停用本次新建规则，或按备份恢复精确模板字段；不删除业务历史。历史失败/跳过/不确定投递不补发；企微入队仍不等于送达。
+
+Admin 消息详情继续消费 System 标题/摘要/正文，Workbench 消息中心沿用相同消息协议和动作解析；本次无响应字段变更。到账提醒使用双方已有消息详情能力，不引入未经支持的购买意向跳转。企微渠道、应用和个人推送开关仍为独立投递条件。
+
+### 客资提交人成交通知定位（2026-09-22）
+
+Workbench 对 `zsjos.sales_order.submitter_pending` 和 `zsjos.sales_order.submitter_effective`
+使用 `GET /admin-api/zsjos/lead/order-notification-target?orderId=...`，返回通过当前客资对象授权的
+`LeadManagementRespVO`，打开 `/zsjos/leads/manage?leadId=...&tab=overview`。
+接口要求 `zsjos:lead:query`，通过代理调用现有 Lead `read` 授权；订单查询保留正常租户和逻辑删除过滤，
+不返回订单详情、不授予订单权限。不存在或无关联客资返回客资不存在，客资无权访问保留权限错误。
+历史消息仍保留 `bizType=sales_order`、原订单 ID，无需重写或重发；其他订单通知继续走原订单/审批入口。
+Admin 和 Partner H5 的消息响应及入口保持既有契约。本次新增接口由 Workbench 使用。
+
+销售/教务自拓选择提供人后，提交范围列表按 `provider_owner_type=system_user`、`provider_owner_id`
+及 `zsjos:lead:query-submitted` 配置累计授权。仅有 `zsjos:lead:query-owned` 不代表可查看本人提供给
+其他负责人的客资。缺失角色授权应由管理员配置；通知修复不自动修改 `system_role_menu`。

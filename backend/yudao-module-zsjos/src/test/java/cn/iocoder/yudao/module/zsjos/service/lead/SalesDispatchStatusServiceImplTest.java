@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.SalesDispatchPreferenceDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SalesDispatchPreferenceMapper;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,7 +37,7 @@ class SalesDispatchStatusServiceImplTest {
 
     @Test
     void heartbeatDefaultsEligibleSalesToPausedAndMarksPresenceOnline() {
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(true);
         when(preferenceMapper.selectByUserId(10L)).thenReturn(null);
         when(redisRepository.isOnline(10L)).thenReturn(true);
 
@@ -49,11 +47,12 @@ class SalesDispatchStatusServiceImplTest {
         assertEquals("paused", result.getMode());
         assertEquals("busy", result.getEffectiveStatus());
         verify(redisRepository).heartbeat(10L, false);
+        verify(assignmentService, never()).getEligibleSalesUsers();
     }
 
     @Test
     void ineligibleUserIsRemovedAndNeverAppearsActive() {
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of());
+        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(false);
 
         var result = service.heartbeat(10L);
 
@@ -67,7 +66,7 @@ class SalesDispatchStatusServiceImplTest {
         SalesDispatchPreferenceDO preference = new SalesDispatchPreferenceDO();
         preference.setUserId(10L);
         preference.setAcceptingEnabled(true);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(true);
         when(preferenceMapper.selectByUserId(10L)).thenReturn(preference);
         when(redisRepository.isOnline(10L)).thenReturn(true);
 
@@ -91,7 +90,7 @@ class SalesDispatchStatusServiceImplTest {
         assertFalse(preference.getAcceptingEnabled());
         verify(preferenceMapper).updateById(preference);
         verify(redisRepository).cacheMode(10L, false);
-        verify(assignmentService, never()).getEligibleSalesUsers();
+        org.mockito.Mockito.verifyNoInteractions(assignmentService);
     }
 
     @Test
@@ -121,9 +120,4 @@ class SalesDispatchStatusServiceImplTest {
         verify(redisRepository).cacheMode(10L, true);
     }
 
-    private static LeadAssignmentUserRespVO salesUser(Long id) {
-        LeadAssignmentUserRespVO user = new LeadAssignmentUserRespVO();
-        user.setId(id);
-        return user;
-    }
 }

@@ -313,7 +313,7 @@ function VersionEditor({ content, initial, purposeOptions, formatOptions, onSave
         </div></ClipboardUploadButtons>
       </div>
       <div className="content-production-form-grid">
-        <Form.Item name="plannedPublishAt" label="预计发布时间"><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+        <Form.Item name="plannedPublishAt" label="预计发布时间" extra="请填写当前时间之后的时间，过去的时间无法提交。" rules={[{ validator: (_, value: dayjs.Dayjs | undefined) => !value || !value.isBefore(dayjs(), 'minute') ? Promise.resolve() : Promise.reject(new Error('预计发布时间不能早于当前时间，请重新选择未来时间')) }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
         <Form.Item name="titleSnapshot" label="发布标题" rules={[{ required: true, whitespace: true, message: '请输入发布标题' }]}><Input maxLength={255} showCount /></Form.Item>
       </div>
       <div className="content-production-form-grid">
@@ -322,7 +322,7 @@ function VersionEditor({ content, initial, purposeOptions, formatOptions, onSave
       </div>
       <Form.Item name="scriptText" label="正文文稿"><Input.TextArea rows={9} maxLength={20000} showCount /></Form.Item>
       <Form.Item name="detailUrl" label="作品详情"><ResourceLinkInput placeholder="可填写链接，或由审批详情页直接查看" /></Form.Item>
-      <Form.Item name="leadResourceUrl" label="引流资料链接"><ResourceLinkInput placeholder="可点击下载的资料链接" /></Form.Item>
+      <Form.Item name="leadResourceUrl" label="引流资料链接" extra="没有链接请留空；有链接请填写以 https:// 开头的地址，不要填写“无”。" rules={[{ validator: (_, value?: string) => { const text = value?.trim(); if (!text) return Promise.resolve(); try { const url = new URL(text); return url.protocol === 'https:' && Boolean(url.hostname) ? Promise.resolve() : Promise.reject(new Error('引流资料链接必须是合法的 HTTPS 地址，没有链接请留空')); } catch { return Promise.reject(new Error('引流资料链接必须是合法的 HTTPS 地址，没有链接请留空')); } } }]}><ResourceLinkInput placeholder="没有链接请留空，填写时使用 https://" /></Form.Item>
       <Form.Item name="commentHook" label="评论区钩子"><Input.TextArea rows={3} maxLength={1000} showCount /></Form.Item>
       <Form.Item name="referenceWorkUrl" label="参考作品链接" extra="直接填写参考作品的链接，可留空。"><ResourceLinkInput placeholder="https:// 参考作品链接" allowClear /></Form.Item>
       <Form.Item label="参考素材" extra="从素材库浏览并多选参考素材，审批人可在审批详情中查看。">

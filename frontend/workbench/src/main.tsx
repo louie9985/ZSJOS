@@ -30,7 +30,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, SERVER_CONNECTION_ERROR_MESSAGE, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, readSharedTenantId, SERVER_CONNECTION_ERROR_MESSAGE, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
@@ -67,6 +67,8 @@ import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
+import RetainedReviewRoute from './layouts/RetainedReviewRoutes'
+import { WorkbenchPageNavigation } from './components/WorkbenchPageNavigation'
 import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbedPage'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
@@ -481,7 +483,14 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
               title={currentMenu?.name}
               onRouteChange={handleAdminRouteChange}
             />}
-          {!activeAdminEmbedPath && <Routes>
+          {[APP_ROUTES.CONTENT_REVIEW, APP_ROUTES.MEDIA_STUDENTS].map(path => {
+            const menu = findMenuByPath(authorizedMenus, path)
+            if (!menu || menu.workbenchRenderMode === 'admin_only' || findAdminEmbedPath(authorizedMenus, path) || (location.pathname !== path && (!tabsEnabled || !tabs.some(tab => tab.key === path)))) return null
+            return <RetainedReviewRoute key={`${path}:${readSharedTenantId()}:${info.user.id}:${JSON.stringify(info.permissions)}`} active={location.pathname === path}>
+              <RouteHost tenantReadAll={info.dataAccess?.tenantReadAll === true} menu={menu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
+            </RetainedReviewRoute>
+          })}
+          {!activeAdminEmbedPath && !(currentMenu && currentMenu.workbenchRenderMode !== 'admin_only' && [APP_ROUTES.CONTENT_REVIEW, APP_ROUTES.MEDIA_STUDENTS].some(path => path === location.pathname)) && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
@@ -500,14 +509,14 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   </Layout>
   )
 
-  return <>
+  return <WorkbenchPageNavigation canOpen={path => Boolean(findMenuByPath(authorizedMenus, path))}>
     <>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
     </>
-  </>
+  </WorkbenchPageNavigation>
 }
 
 function Root({ authPlatform }: { authPlatform: AuthPlatform }) {

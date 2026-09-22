@@ -20,4 +20,6 @@ BEGIN
   END IF;
  END LOOP; CLOSE c; COMMIT;
 END$$
-DELIMITER ; CALL zsjos_fix_content_format_auto(); DROP PROCEDURE IF EXISTS zsjos_fix_content_format_auto;
+DELIMITER ;
+CALL zsjos_fix_content_format_auto();
+DROP PROCEDURE IF EXISTS zsjos_fix_content_format_auto;

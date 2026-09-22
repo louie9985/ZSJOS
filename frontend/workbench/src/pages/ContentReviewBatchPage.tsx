@@ -1,10 +1,16 @@
 import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase } from '../services/contentReviewErrors'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
+import ContentReviewWorkDetail from '../components/ContentReviewWorkDetail'
 import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
 import { prepareContentReviewWorks } from '../services/contentReviewAttachments'
 import ResourceLinkInput from '../components/ResourceLinkInput'
+import ContentReviewInbox, { type ReviewFilters } from '../components/ContentReviewInbox'
+import { contentReviewCategories, reviewAccounts } from '../services/contentReviewQuery'
+import { useWorkbenchPageGuard, useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
+import { APP_ROUTES } from '../constants'
 import {
   ClockCircleOutlined,
+  ArrowLeftOutlined,
   CloseCircleOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -20,7 +26,6 @@ import {
   DatePicker,
   Empty,
   Form,
-  Image,
   Input,
   List,
   Modal,
@@ -31,6 +36,7 @@ import {
   Space,
   Switch,
   Tag,
+  Tabs,
   Tooltip,
   Typography
 } from 'antd'
@@ -47,6 +53,7 @@ import {
   type ContentReviewBatch,
   type ContentReviewCandidate,
   type ContentReviewItem,
+  type ContentReviewAccount,
 } from '../services/materialApi'
 
 const PAGE_SIZE = 20
@@ -57,7 +64,7 @@ const statusText: Record<string, string> = {
   RESUBMITTED: '已重新提交',
   DIRECTOR_REVIEW: '编导审核',
   FINAL_REVIEW: '终审',
-  COMPLETED: '已完成',
+  COMPLETED: '待发布',
   NEED_MODIFY: '待修改',
   REJECTED: '已退回',
   CANCELLED: '已取消',
@@ -74,27 +81,11 @@ const snapshotText = (snapshot: Record<string, unknown>, key: string, fallback =
   return value == null || value === '' ? fallback : String(value)
 }
 
-const httpsSnapshotUrl = (snapshot: Record<string, unknown>, key: string) => {
-  const value = snapshot[key]
-  return typeof value === 'string' && /^https:\/\//i.test(value) ? value : undefined
-}
-
-/** 审批只读取提交时的素材快照，因此这里不依赖素材库的实时状态。 */
-const referenceMaterials = (item: ContentReviewItem) =>
-  (Array.isArray(item.contentSnapshot.materialRefs) ? item.contentSnapshot.materialRefs : [])
-    .map(ref => ref as Record<string, unknown>)
-    .map(ref => ({
-      materialId: String(ref.materialId ?? ''),
-      materialNo: String(ref.materialNo || ''),
-      title: String(ref.title || '素材'),
-      coverPreviewUrl: typeof ref.coverPreviewUrl === 'string' ? ref.coverPreviewUrl : undefined,
-    }))
-
 /**
  * 账号档案区，每个账号一块。数据全部取自提交时冻结的 contextSnapshot.accountSnapshots，
  * 不实时查账号表：否则账号改名或换阶段会改写历史审批记录。
  */
-function AccountProfiles({ batch }: { batch: ContentReviewBatch }) {
+export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBatch; accountLink: (account: ContentReviewAccount) => React.ReactNode }) {
   const snapshots = (Array.isArray(batch.contextSnapshot.accountSnapshots)
     ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
   if (!snapshots.length) return null
@@ -108,63 +99,28 @@ function AccountProfiles({ batch }: { batch: ContentReviewBatch }) {
         ?? (problem as Record<string, unknown>).label ?? '')
       : String(problem)).filter(Boolean).join('、')
     : ''
+  const badge = (value: unknown, color: string) => <Tag color={text(value) === '—' ? undefined : color}>{text(value)}</Tag>
   return <div className="content-review-account-profiles">{snapshots.map(snapshot => {
     const id = text(snapshot.id)
     const bottleneck = text(snapshot.bottleneckLabel) !== '—'
       ? text(snapshot.bottleneckLabel) : text(problems(snapshot.primaryProblems))
     return <dl className="content-review-account-profile" key={id}>
       <div className="content-review-account-heading">
-        <Typography.Text strong>账号 {text(snapshot.accountNo)}</Typography.Text>
+        <Tag color="blue">{accountLink(reviewAccounts(batch).find(account => String(account.accountId) === id) || { accountName: text(snapshot.nickname) })}</Tag>
+        {badge(snapshot.platformLabel, 'cyan')}
       </div>
-      <div><dt>账号名称</dt><dd>{text(snapshot.nickname)}</dd></div>
-      <div><dt>发布平台</dt><dd>{text(snapshot.platformLabel ?? snapshot.platformValue)}</dd></div>
-      <div><dt>平台账号</dt><dd>{text(snapshot.platformAccountId)}</dd></div>
-      <div><dt>当前期段</dt><dd>{text(snapshot.sStageLabel ?? snapshot.sStage)}</dd></div>
-      <div><dt>账号状态</dt><dd>{text(snapshot.currentStatusLabel ?? snapshot.currentStatusValue)}</dd></div>
-      {/* 只展示姓名：内部用户编号对审核人没有意义，服务端已按编号解析昵称。 */}
-      <div><dt>责任运营人员</dt><dd>{text(snapshot.operatorName)}</dd></div>
-      <div><dt>责任编导</dt><dd>{text(snapshot.directorName)}</dd></div>
-      <div><dt>承接产品目标</dt><dd>{text(snapshot.productGoal)}</dd></div>
-      <div><dt>主要产品形式</dt><dd>{text(snapshot.productFormLabel)}</dd></div>
-      <div><dt>当前发布节奏</dt><dd>{text(snapshot.publishFrequency)}</dd></div>
-      <div><dt>当前瓶颈</dt><dd>{bottleneck}</dd></div>
+      <div><dt>责任运营</dt><dd>{badge(snapshot.operatorName ? `${snapshot.operatorName}${snapshot.operatorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'blue')}</dd></div>
+      <div><dt>责任编导</dt><dd>{badge(snapshot.directorName ? `${snapshot.directorName}${snapshot.directorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'purple')}</dd></div>
+      <div><dt>当前期段</dt><dd>{badge(snapshot.sStageLabel ?? snapshot.stageLabelSnapshot ?? snapshot.sStage, 'geekblue')}</dd></div>
+      <div><dt>账号状态</dt><dd>{badge(snapshot.currentStatusLabel ?? snapshot.currentStatusLabelSnapshot ?? snapshot.currentStatusValue, 'cyan')}</dd></div>
+      <div className="content-review-profile-background"><details open><summary>运营背景与账号信息</summary><dl>
+        <div><dt>平台账号</dt><dd>{badge(snapshot.platformAccountId, 'cyan')}</dd></div>
+        <div><dt>承接产品目标</dt><dd>{badge(snapshot.productGoal, 'cyan')}</dd></div>
+        <div><dt>主要产品形式</dt><dd>{badge(snapshot.productFormLabel, 'cyan')}</dd></div>
+        <div><dt>当前发布节奏</dt><dd>{badge(snapshot.publishFrequency, 'cyan')}</dd></div>
+        <div><dt>当前瓶颈</dt><dd>{badge(bottleneck, 'orange')}</dd></div>
+      </dl></details></div>
     </dl>
-  })}</div>
-}
-
-/** 作品封面：放在卡片左栏，与右侧字段表格并排，对齐纸质审核表的版式。 */
-function ItemCover({ item }: { item: ContentReviewItem }) {
-  const cover = item.files?.find(file => file.fieldKey === 'cover' && file.previewUrl
-    && file.contentType.startsWith('image/'))
-  return <div className="content-review-item-cover">
-    {cover
-      ? <Image src={cover.previewUrl} alt={`作品封面图：${cover.originalName}`} />
-      : <Typography.Text type="secondary">暂无封面图</Typography.Text>}
-    <span>作品封面图</span>
-  </div>
-}
-
-/** 成品文件。封面已在卡片左栏单独展示，这里不再重复。 */
-function ReviewFiles({ item }: { item: ContentReviewItem }) {
-  const files = item.files?.filter(file => file.fieldKey !== 'cover') ?? []
-  if (!files.length) return null
-  return <div className="content-review-media">{files.map(file => {
-    const label = '审核附件'
-    if (file.contentType.startsWith('image/') && file.previewUrl) {
-      return <div className="content-review-media-item" key={file.id}>
-        <Image width={128} height={84} src={file.previewUrl} alt={`${label}：${file.originalName}`} />
-        <span>{label} · {file.originalName}</span>
-      </div>
-    }
-    if (file.contentType.startsWith('video/') && file.previewUrl) {
-      return <div className="content-review-media-item" key={file.id}>
-        <video src={file.previewUrl} controls preload="metadata" aria-label={`${label}：${file.originalName}`} />
-        <span>{label} · {file.originalName}</span>
-      </div>
-    }
-    return file.previewUrl
-      ? <a key={file.id} href={file.previewUrl} target="_blank" rel="noreferrer">{label} · {file.originalName}</a>
-      : <Typography.Text key={file.id}>{label} · {file.originalName}</Typography.Text>
   })}</div>
 }
 
@@ -420,14 +376,21 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
 
 export default function ContentReviewBatchPage({ permissions = [] }: { permissions?: string[] }) {
   const { message, modal } = App.useApp()
+  const navigation = useWorkbenchPageNavigation()
   const [rows, setRows] = useState<ContentReviewBatch[]>([])
   const [selectedId, setSelectedId] = useState<number>()
   const [selected, setSelected] = useState<ContentReviewBatch>()
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
-  const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  const [status, setStatus] = useState<string>()
+  const [category, setCategory] = useState('PENDING')
+  const [filters, setFilters] = useState<ReviewFilters>({})
+  const [mobileDetail, setMobileDetail] = useState(false)
+  const [compactProcess, setCompactProcess] = useState(false)
+  const detailPane = useRef<HTMLDivElement>(null)
+  const listRun = useRef(0)
+  const detailRun = useRef(0)
+  const selectedIdRef = useRef<number | undefined>(undefined)
   const [mine, setMine] = useState(false)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -450,37 +413,64 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [historyError, setHistoryError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const submitLock = useRef(false)
+  const [historyOriginId, setHistoryOriginId] = useState<number>()
+  const historyRun = useRef(0)
   const [publishForm] = Form.useForm<{ platformUrl: string; publishedAt: dayjs.Dayjs }>()
+
+  const confirmChange = (action: () => void) => {
+    if (!Object.values(dirtyItems).some(Boolean)) { action(); return }
+    modal.confirm({ title: '有尚未保存的审核意见', content: '切换批次或查询条件会放弃当前未保存意见。', okText: '放弃并切换', cancelText: '继续审核', onOk: action })
+  }
+  useWorkbenchPageGuard(APP_ROUTES.CONTENT_REVIEW, async destination => {
+    if (destination || !Object.values(dirtyItems).some(Boolean)) return true
+    return new Promise(resolve => modal.confirm({ title: '关闭审批页并放弃未保存意见？', okText: '放弃并关闭', cancelText: '继续审核', onOk: () => resolve(true), onCancel: () => resolve(false) }))
+  })
+  useEffect(() => {
+    const node = detailPane.current
+    if (!node) return
+    const observer = new ResizeObserver(entries => { const width = entries[0]?.contentRect.width; if (width) setCompactProcess(width <= 900) })
+    observer.observe(node)
+    return () => { observer.disconnect(); listRun.current++; detailRun.current++ }
+  }, [])
 
   const location = useLocation()
   const linkedBatchId = Number(new URLSearchParams(location.search).get('batchId')) || undefined
-  const loadDetail = useCallback(async (id: number) => {
+  const loadDetail = useCallback(async (id: number, historyOrigin?: number) => {
+    setHistoryOriginId(historyOrigin)
+    const run = ++detailRun.current
+    selectedIdRef.current = id
     setSelectedId(id)
     setDetailLoading(true)
     setDetailError('')
-    try { setSelected(await contentReviewApi.get(id)) }
-    catch (cause) { setSelected(undefined); setDetailError(errorText(cause)) }
-    finally { setDetailLoading(false) }
+    try { const result = await contentReviewApi.get(id); if (run === detailRun.current) { setSelected(result); detailPane.current?.scrollTo(0, 0) } }
+    catch (cause) { if (run === detailRun.current) { setSelected(undefined); setDetailError(errorText(cause)) } }
+    finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [])
 
   const load = useCallback(async (targetPage = 1, preferredId?: number) => {
+    const run = ++listRun.current
+    detailRun.current++
     setLoading(true)
     setError('')
     try {
       const result = await contentReviewApi.page({ pageNo: targetPage, pageSize: PAGE_SIZE,
-        keyword: keyword || undefined, status, mine })
+        keyword: keyword || undefined, mine, ...filters,
+        statuses: category === 'PENDING' && filters.stage ? [filters.stage] : contentReviewCategories.find(item => item.key === category)?.statuses })
+      if (run !== listRun.current) return
       setRows(result.list)
       setTotal(result.total)
       setPage(targetPage)
       const nextId = preferredId ?? linkedBatchId ?? result.list[0]?.id
       if (nextId) await loadDetail(nextId)
-      else { setSelectedId(undefined); setSelected(undefined) }
+      else { setSelectedId(undefined); selectedIdRef.current = undefined; setSelected(undefined); setDetailLoading(false) }
     } catch (cause) {
+      if (run !== listRun.current) return
       setRows([]); setSelected(undefined); setSelectedId(undefined); setError(errorText(cause))
-    } finally { setLoading(false) }
-  }, [keyword, loadDetail, mine, status, linkedBatchId])
+      setDetailLoading(false)
+    } finally { if (run === listRun.current) setLoading(false) }
+  }, [keyword, loadDetail, mine, category, filters, linkedBatchId])
 
-  useEffect(() => { void load(1) }, [keyword, status, mine, linkedBatchId])
+  useEffect(() => { void load(1) }, [load])
   useEffect(() => {
     // 加签、转办、委派、抄送需要人员候选；无处理权限时不请求。
     if (!hasPermission(permissions, 'bpm:task:update')) return
@@ -535,10 +525,11 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
 
   const showHistory = async () => {
     if (!selected) return
-    setHistoryOpen(true); setHistoryLoading(true); setHistoryError('')
-    try { setHistoryRows(await contentReviewApi.history(selected.id)) }
-    catch (cause) { setHistoryError(errorText(cause)); setHistoryRows([]) }
-    finally { setHistoryLoading(false) }
+    const run = ++historyRun.current
+    setHistoryOpen(true); setHistoryLoading(true); setHistoryError(''); setHistoryRows([])
+    try { const result = await contentReviewApi.history(historyOriginId ?? selected.id); if (run === historyRun.current) setHistoryRows(result) }
+    catch (cause) { if (run === historyRun.current) setHistoryError(errorText(cause)) }
+    finally { if (run === historyRun.current) setHistoryLoading(false) }
   }
 
   const cancelBatch = () => {
@@ -597,11 +588,11 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     } finally { setCompleteLoading(false) }
   }
 
-  const stage = selected?.availableActions.includes('DIRECTOR_DECIDE') ? 'director'
+  const stage = historyOriginId ? undefined : selected?.availableActions.includes('DIRECTOR_DECIDE') ? 'director'
     : selected?.availableActions.includes('FINAL_DECIDE') ? 'final' : undefined
   const canCreate = hasPermission(permissions, 'zsjos:content-review:create')
   const canSeeAll = hasPermission(permissions, 'zsjos:content-review:query-all')
-  const canUpdateTask = hasPermission(permissions, 'bpm:task:update')
+  const canUpdateTask = !historyOriginId && hasPermission(permissions, 'bpm:task:update')
 
   /**
    * 本级"交卷"动作。后端 requireDirectorDecisions / requireFinalDecisions 会再校验一次，
@@ -637,67 +628,69 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     }
   }, [selected, stage, dirtyItems])
 
+  const accountLink = (account: ContentReviewAccount) => {
+    const name = account.accountName || '未记录账号名称'
+    if (!selected?.studentPersonId || !account.accountId || !navigation?.canOpen(APP_ROUTES.MEDIA_STUDENTS)) return name
+    const href = `${APP_ROUTES.MEDIA_STUDENTS}?personId=${selected.studentPersonId}&accountId=${account.accountId}`
+    return <a className="content-review-account-link" href={href} onClick={event => { event.preventDefault(); void navigation.open(href) }}><span>{name}</span><LinkOutlined /></a>
+  }
+
   return <section className="workspace-page content-review-page">
     <header className="content-review-filter-shell">
       <div><Typography.Title level={4}>内容审核</Typography.Title>
-        <Typography.Text type="secondary">{total} 个批次</Typography.Text></div>
+        <Typography.Text type="secondary">查看内容，给出反馈，推进审批</Typography.Text></div>
       <div className="content-review-toolbar">
-        <Input.Search allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
-          onSearch={value => setKeyword(value.trim())} placeholder="搜索批次编号" />
-        <Select allowClear value={status} onChange={setStatus} placeholder="审核状态" options={Object.entries(statusText)
-          .filter(([key]) => ['DRAFT', 'DIRECTOR_REVIEW', 'FINAL_REVIEW', 'COMPLETED', 'NEED_MODIFY', 'PUBLISHED', 'REJECTED', 'CANCELLED'].includes(key))
-          .map(([value, label]) => ({ value, label }))} />
-        {canSeeAll && <Checkbox checked={mine} onChange={event => setMine(event.target.checked)}>只看我的</Checkbox>}
-        <Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void load(page, selectedId)} /></Tooltip>
+        <Tooltip title="刷新"><Button aria-label="刷新内容审核" icon={<ReloadOutlined />} onClick={() => confirmChange(() => { if (historyOriginId && selectedId) void loadDetail(selectedId, historyOriginId); else void load(page, selectedId) })} /></Tooltip>
         {canCreate && <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建批次</Button>}
       </div>
     </header>
-    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load(page)}>重试</Button>} />}
-    <div className="content-review-layout">
+    <Tabs className="content-review-status-tabs" activeKey={category} items={contentReviewCategories.map(({ key, label }) => ({ key, label }))}
+      onChange={value => confirmChange(() => { setCategory(value); setFilters(current => ({ ...current, stage: undefined })); setMobileDetail(false) })} />
+    <div className={`content-review-layout${mobileDetail ? ' content-review-show-detail' : ''}`}>
       <aside className="content-review-list-pane">
-        <div className="content-review-scroll">{loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(item =>
-          <button type="button" key={item.id} className={`content-review-list-item${item.id === selectedId ? ' active' : ''}`}
-            onClick={() => void loadDetail(item.id)}>
-            <span><strong>{item.batchNo}</strong><Tag>{statusText[item.status] || item.status}</Tag></span>
-            <span>账号 {item.accountId} · {item.items?.length || 0} 条内容</span>
-            <span>{item.directorName ? `责任编导：${item.directorName}` : '尚未提交'}</span>
-          </button>) : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无审核批次" />}</div>
+        <ContentReviewInbox rows={rows} selectedId={selectedId} loading={loading} error={error} total={total}
+          keyword={keyword} category={category} filters={filters} mine={mine} canSeeAll={canSeeAll} statusText={statusText}
+          onSearch={value => confirmChange(() => setKeyword(value))} onFilters={value => confirmChange(() => setFilters(value))}
+          onMine={value => confirmChange(() => setMine(value))} onReset={() => confirmChange(() => { setKeyword(''); setFilters({}); setMine(false) })}
+          onRetry={() => void load(page)} onSelect={id => { if (id === selectedId) { setMobileDetail(true); return }; confirmChange(() => { setMobileDetail(true); void loadDetail(id) }) }} />
         {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total}
-          onChange={value => void load(value)} />}
+          onChange={value => confirmChange(() => void load(value))} />}
       </aside>
-      <main className="content-review-detail-pane">
+      <main ref={detailPane} className="content-review-detail-pane">
+        <Button className="content-review-mobile-back" icon={<ArrowLeftOutlined />} onClick={() => setMobileDetail(false)}>返回收件箱</Button>
         {detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError
-          ? <Alert type="error" showIcon message={detailError} action={selectedId
-            ? <Button size="small" onClick={() => void loadDetail(selectedId)}>重试</Button> : undefined} />
+          ? <Alert type="error" showIcon message={detailError} action={<Space>{selectedId && <Button size="small" onClick={() => void loadDetail(selectedId, historyOriginId)}>重试</Button>}{historyOriginId && <Button size="small" onClick={() => void loadDetail(historyOriginId)}>返回原批次</Button>}</Space>} />
           : selected ? <>
+            {historyOriginId && <Alert className="content-review-history-notice" type="info" showIcon message="历史轮次 · 只读" action={<Button onClick={() => confirmChange(() => void loadDetail(historyOriginId))}>返回原批次</Button>} />}
             <div className="content-review-heading"><div>
-              <Space><Tag>{statusText[selected.status] || selected.status}</Tag><Typography.Text>{selected.batchNo}</Typography.Text></Space>
-              <Typography.Title level={4}>{selected.studentPersonId ? `学员 ${selected.studentPersonId} · ` : ''}账号 {(selected.accountIds?.length ? selected.accountIds.join('、') : selected.accountId)} 的内容审核</Typography.Title>
-              <Typography.Text type="secondary">运营：{selected.operatorName || selected.operatorUserId}　编导：{selected.directorName || '提交时确定'}</Typography.Text>
-            </div><Space wrap>
-              {selected.studentPersonId && <Button onClick={() => void showHistory()}>查看历史轮次</Button>}
-              {selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" loading={submitting} icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
-              {selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改后重新提交</Button>}
-              {selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
-              {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
-            </Space></div>
+              <Typography.Title level={4}>{selected.studentName || '未记录学员姓名'} · 内容审核</Typography.Title>
+            </div><Tag color="processing">{statusText[selected.status] || selected.status}</Tag></div>
             <div className="content-review-meta">
-              <span>当前节点：{selected.currentStage || '无'}</span>
+              <span>当前阶段：{statusText[selected.status] || '未记录'}</span>
               <span>提交时间：<DateTimeText value={selected.submittedAt} /></span>
-              <span>内容数量：{selected.items.length}</span>
+              <Tag color="blue">{selected.items.length} 条内容</Tag>
+              <Typography.Text type="secondary">审批编号：{selected.batchNo}</Typography.Text>
             </div>
+            {!historyOriginId && selected.availableActions.some(action => ['SUBMIT', 'RESUBMIT', 'CANCEL'].includes(action)) && <div className="content-review-detail-actions">
+              <Space wrap>
+              {!historyOriginId && selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" loading={submitting} icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
+              {!historyOriginId && selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改后重新提交</Button>}
+              {!historyOriginId && selected.availableActions.includes('CANCEL') && <Button danger icon={<CloseCircleOutlined />} onClick={cancelBatch}>取消批次</Button>}
+              {/* 「完成编导审核 / 完成终审」推进 BPM 任务，已移至下方审批流程面板的动作栏。 */}
+            </Space></div>}
             {/*
               工作区分两栏：左侧是待审内容流，右侧固定轨承载审批流程与交卷动作。
-              右轨 sticky，滚内容时流程状态和提交按钮始终可见；窄屏折到内容下方。
+              右轨 sticky，滚内容时流程状态和提交按钮始终可见；窄屏前置并默认折叠流程。
             */}
             <div className="content-review-workspace">
             <div className="content-review-content-column">
-            <AccountProfiles batch={selected} />
+            <div className="content-review-section-heading"><Typography.Text strong>账号资料</Typography.Text><Typography.Text type="secondary">本轮审批快照</Typography.Text></div>
+            <AccountProfiles batch={selected} accountLink={accountLink} />
             {/* 分节标题：让"账号档案 → 逐条审核 → 交卷"的顺序在页面上可见。 */}
             <div className="content-review-section-heading">
               <Typography.Text strong>待审内容</Typography.Text>
               <Typography.Text type="secondary">
-                共 {selected.items.length} 条{stage ? '，逐条给出结论后在右侧提交' : ''}
+                共 {selected.items.length} 条{stage ? '，逐条保存后在审批流程区提交' : ''}
               </Typography.Text>
             </div>
             <div className="content-review-items">{selected.items.map(item => <section className="content-review-item" key={item.id}>
@@ -709,73 +702,27 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 {item.finalDecision && <Tag color={item.finalDecision === 'APPROVED' ? 'success' : 'error'}>终审：{statusText[item.finalDecision] || item.finalDecision}</Tag>}
                 {item.resultStatus && <Tag>{statusText[item.resultStatus] || item.resultStatus}</Tag>}
               </Space></div>
-              {/*
-                字段按栅格分组：短字段多列并排压缩高度，长文本与链接独占整行。
-                顺序仍对齐纸质审核表：发布计划 → 定位 → 正文 → 各类链接。
-              */}
-              <div className="content-review-item-body">
-                <ItemCover item={item} />
-                <div className="content-review-field-groups">
-                  <dl className="content-review-fields content-review-fields-compact">
-                    <div className="content-review-field"><dt>预计发布时间</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'plannedPublishAt')}</dd></div>
-                    <div className="content-review-field"><dt>作品目的</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'purposeLabelSnapshot', snapshotText(item.contentSnapshot, 'purposeValue'))}</dd></div>
-                    <div className="content-review-field"><dt>作品形式</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'formatLabelSnapshot', snapshotText(item.contentSnapshot, 'formatValue'))}</dd></div>
-                    <div className="content-review-field"><dt>选题</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'topicSnapshot', snapshotText(item.contentSnapshot, 'topic'))}</dd></div>
-                    <div className="content-review-field content-review-field-wide"><dt>发布标题</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'titleSnapshot', snapshotText(item.contentSnapshot, 'title'))}</dd></div>
-                    <div className="content-review-field content-review-field-wide"><dt>正文文稿</dt>
-                      <dd className="content-review-field-text">{snapshotText(item.contentSnapshot, 'scriptText')}</dd></div>
-                    <div className="content-review-field content-review-field-wide"><dt>评论区钩子</dt>
-                      <dd>{snapshotText(item.contentSnapshot, 'commentHook')}</dd></div>
-                  </dl>
-                  {/* 链接单独成组：审核时通常连续打开核对，聚在一起比夹在字段表里更好点。 */}
-                  <dl className="content-review-fields content-review-fields-links">
-                    <div className="content-review-field"><dt>作品详情</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'detailUrl')
-                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'detailUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开详情</a>
-                      : snapshotText(item.contentSnapshot, 'detailUrl')}</dd></div>
-                    <div className="content-review-field"><dt>成品外链</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl')
-                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'deliverableUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a>
-                      : snapshotText(item.contentSnapshot, 'deliverableUrl')}</dd></div>
-                    <div className="content-review-field"><dt>引流资料链接</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')
-                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'leadResourceUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开链接</a>
-                      : snapshotText(item.contentSnapshot, 'leadResourceUrl')}</dd></div>
-                    <div className="content-review-field"><dt>参考作品链接</dt><dd>{httpsSnapshotUrl(item.contentSnapshot, 'referenceWorkUrl')
-                      ? <a href={httpsSnapshotUrl(item.contentSnapshot, 'referenceWorkUrl')} target="_blank" rel="noreferrer"><LinkOutlined /> 打开参考作品</a>
-                      : snapshotText(item.contentSnapshot, 'referenceWorkUrl')}</dd></div>
-                  </dl>
-                </div>
-              </div>
-              {(item.contentSnapshot.materialRefs as Array<Record<string, unknown>> | undefined)?.length
-                ? <div><Typography.Text strong>参考素材</Typography.Text>
-                  <div className="content-review-media">{referenceMaterials(item).map(reference => <div className="content-review-media-item" key={reference.materialId}>
-                    {reference.coverPreviewUrl
-                      ? <Image width={128} height={84} src={reference.coverPreviewUrl} alt={`参考素材：${reference.title}`} />
-                      : null}
-                    <span>{reference.title} · {reference.materialNo}</span>
-                  </div>)}</div></div>
-                : null}
-              <ReviewFiles item={item} />
+              <ContentReviewWorkDetail key={`${selected.id}:${item.id}`} item={item} batchId={selected.id} />
               {stage && (stage === 'director' || item.directorDecision === 'APPROVED') && <DecisionEditor batch={selected} item={item} stage={stage}
                 onDirtyChange={updateDirty}
-                onSaved={() => { void contentReviewApi.get(selected.id).then(setSelected).catch(cause => message.error(errorText(cause))) }} />}
-              {selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
+                onSaved={() => { const id = selected.id; void contentReviewApi.get(id).then(value => { if (selectedIdRef.current === id) setSelected(value) }).catch(cause => message.error(errorText(cause))) }} />}
+              {!historyOriginId && selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
                 && <Button icon={<ClockCircleOutlined />} onClick={() => setPublishItem(item)}>登记发布</Button>}
               {item.publishedPlatformUrl && <a href={item.publishedPlatformUrl} target="_blank" rel="noreferrer">查看已发布内容</a>}
             </section>)}</div>
             </div>
             <aside className="content-review-process-column">
+              <Button block icon={<ClockCircleOutlined />} onClick={() => void showHistory()}>查看历史轮次</Button>
               <BpmProcessPanel
+                compact={compactProcess}
+                actionsOutside
                 processInstanceId={selected.processInstanceId}
                 taskId={selected.currentTaskId}
                 users={taskUsers}
                 canUpdate={canUpdateTask}
                 allowDecision={false}
                 decisionOnly
-                businessAdvance={advanceAction}
+                businessAdvance={historyOriginId ? undefined : advanceAction}
                 onActionSuccess={() => void loadDetail(selected.id)}
               />
             </aside>
@@ -798,13 +745,13 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           { type: 'url', message: '请输入有效链接' },
           { pattern: /^https:\/\//i, message: '平台链接必须使用 HTTPS' }
         ]}><ResourceLinkInput /></Form.Item>
-        <Form.Item name="publishedAt" label="发布时间" rules={[{ required: true, message: '请选择发布时间' }]}
-          initialValue={dayjs()}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+        <Form.Item name="publishedAt" label="发布时间" extra="请填写当前时间之后的时间，过去的时间无法登记发布结果。" rules={[{ required: true, message: '请选择发布时间' }, { validator: (_, value: dayjs.Dayjs | undefined) => !value || value.isAfter(dayjs(), 'minute') ? Promise.resolve() : Promise.reject(new Error('发布时间必须晚于当前时间，请重新选择未来时间')) }]}
+          initialValue={dayjs().add(1, 'minute')}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
       </Form>
     </Modal>
     <Modal title="审批历史轮次" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={null}>
-      {historyLoading ? <Skeleton active /> : historyError ? <Alert type="error" message={historyError} action={<Button onClick={() => void showHistory()}>重试</Button>} /> : historyRows.length ? <List dataSource={historyRows} renderItem={row => <List.Item actions={[<Button type="link" onClick={() => { setHistoryOpen(false); void loadDetail(row.id) }}>查看</Button>] }>
-        <List.Item.Meta title={`${row.batchNo} · ${statusText[row.status] || row.status}`} description={`作品 ${row.items.length} 条 · ${row.finalizedAt || row.submittedAt || '未提交'}`} />
+      {historyLoading ? <Skeleton active /> : historyError ? <Alert type="error" showIcon message={historyError} action={<Button onClick={() => void showHistory()}>重试</Button>} /> : historyRows.length ? <List dataSource={historyRows} renderItem={(row, index) => <List.Item actions={[<Button key="view" type="link" onClick={() => confirmChange(() => { setHistoryOpen(false); void loadDetail(row.id, row.id === (historyOriginId ?? selected?.id) ? undefined : historyOriginId ?? selected?.id) })}>查看详情</Button>] }>
+        <List.Item.Meta title={<Space wrap><Typography.Text strong>轮次记录 {index + 1}</Typography.Text><Tag>{statusText[row.status] || row.status}</Tag><Typography.Text type="secondary">{row.batchNo}</Typography.Text></Space>} description={<span>作品 {row.items.length} 条 · <DateTimeText value={row.finalizedAt || row.submittedAt} emptyText="未提交" /></span>} />
       </List.Item>} /> : <Empty description="暂无历史轮次" />}
     </Modal>
   </section>

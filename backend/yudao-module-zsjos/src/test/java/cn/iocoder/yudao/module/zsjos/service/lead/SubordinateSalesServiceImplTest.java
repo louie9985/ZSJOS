@@ -45,6 +45,91 @@ class SubordinateSalesServiceImplTest {
     @Mock private PostApi postApi;
     @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper;
+    @Mock private cn.iocoder.yudao.module.system.api.dict.DictDataApi dictDataApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper followUpRecordMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper eventMapper;
+
+    @Test
+    void dailyMetricsDeduplicateLeadsAndKeepCurrentUnqualifiedWithoutAgeLimit() {
+        var user = subordinate(20L, 0, 5L);
+        var post = new PostRespDTO(); post.setId(5L);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
+        var dispatch = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.SalesDispatchStatusRespVO();
+        dispatch.setPresence("online"); dispatch.setMode("accepting");
+        when(dispatchStatusService.getStatus(20L)).thenReturn(dispatch);
+        var start = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).atStartOfDay();
+        var end = start.plusDays(1);
+        var pending = task(1L, "pending", start);
+        var duplicate = task(1L, "pending", start.plusHours(1));
+        var completed = task(2L, "completed", start.plusHours(2));
+        var cancelled = task(3L, "cancelled", start.plusHours(3));
+        when(taskMapper.selectByAssigneeIds(List.of(20L))).thenReturn(List.of(pending, duplicate, completed,
+                cancelled, task(4L, "pending", end), task(5L, "pending", start.minusSeconds(1))));
+        var fresh = new LeadDO(); fresh.setId(1L); fresh.setOwnerUserId(20L); fresh.setStatus("submitted");
+        fresh.setQualificationDeadlineAt(end.plusDays(3));
+        var old = new LeadDO(); old.setId(2L); old.setOwnerUserId(20L); old.setStatus("submitted");
+        old.setQualificationDeadlineAt(start.minusDays(3));
+        var valid = new LeadDO(); valid.setId(3L); valid.setOwnerUserId(20L); valid.setStatus("valid");
+        when(leadMapper.selectByOwnerUserIds(List.of(20L))).thenReturn(List.of(fresh, old, valid));
+        when(assignmentHistoryMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(
+                assignment(1L, "dispatch"), assignment(1L, "dispatch"), assignment(1L, "timeout"),
+                assignment(2L, "accept"), assignment(2L, "claim"), assignment(3L, "claim")));
+        var event = new cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO();
+        event.setOperatorUserId(20L); event.setAggregateId(99L);
+        when(eventMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(event, event));
+        var follow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO(); follow.setOperatorUserId(20L);
+        var opportunityFollow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpRecordDO(); opportunityFollow.setOperatorUserId(20L);
+        when(followUpRecordMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(follow));
+        when(opportunityFollowUpRecordMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(opportunityFollow));
+        var order = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO();
+        order.setSubmitterUserId(20L); order.setEffectiveAt(start); order.setTotalAmount(new java.math.BigDecimal("125.50"));
+        var previous = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO();
+        previous.setSubmitterUserId(20L); previous.setEffectiveAt(start.minusSeconds(1)); previous.setTotalAmount(java.math.BigDecimal.TEN);
+        when(orderMapper.selectEffectiveBySubmitterIds(List.of(20L))).thenReturn(List.of(order, previous));
+        var row = service.getOverview(20L, 10L);
+        assertEquals(2L, row.getTodayPendingCount());
+        assertEquals(1L, row.getTodayFollowUpRemainingCount());
+        assertEquals(2L, row.getTodayFollowUpTotalCount());
+        assertEquals("incomplete", row.getTodayFollowUpStatus());
+        assertEquals(2L, row.getPendingQualificationCount());
+        assertEquals(1L, row.getTodayAssignedCount());
+        assertEquals(1L, row.getTodayMissedCount());
+        assertEquals(2L, row.getTodayReceivedCount());
+        assertEquals(1L, row.getTodayQualifiedCount());
+        assertEquals(2L, row.getTodayFollowUpRecordCount());
+        assertEquals(new java.math.BigDecimal("125.50"), row.getTodayOrderAmount());
+        assertEquals(new java.math.BigDecimal("135.50"), row.getEffectiveOrderAmount());
+        pending.setStatus("completed"); duplicate.setStatus("completed");
+        assertEquals("completed", service.getOverview(20L, 10L).getTodayFollowUpStatus());
+        when(taskMapper.selectByAssigneeIds(List.of(20L))).thenReturn(List.of());
+        row = service.getOverview(20L, 10L);
+        assertEquals(0L, row.getTodayFollowUpTotalCount());
+        assertEquals("completed", row.getTodayFollowUpStatus());
+    }
+
+    @Test
+    void overviewDeniedBeforeDailyQueries() {
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of());
+        assertThrows(ServiceException.class, () -> service.getOverview(20L, 10L));
+        org.mockito.Mockito.verifyNoInteractions(assignmentHistoryMapper, eventMapper, followUpRecordMapper, opportunityFollowUpRecordMapper);
+    }
+
+    private static cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO task(Long leadId, String status, LocalDateTime dueAt) {
+        var task = new cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO();
+        task.setBizType("lead"); task.setBizId(leadId); task.setTaskType("lead_first_follow_up");
+        task.setAssigneeId(20L); task.setStatus(status); task.setDueAt(dueAt); return task;
+    }
+
+    private static cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO assignment(Long leadId, String action) {
+        var item = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
+        item.setLeadId(leadId); item.setActionType(action); item.setCandidateUserId(20L); return item;
+    }
+
     @Test
     void administratorReadsDisabledSalesWithoutGainingBulkPauseAuthority() {
         when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);

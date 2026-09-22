@@ -30,7 +30,11 @@ public final class LeadStateProjection {
             return FOLLOW_UP_FOLLOWING;
         }
         if (STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
-            return lead.getQualificationDeadlineAt() == null ? FOLLOW_UP_FIRST_PENDING : FOLLOW_UP_FOLLOWING;
+            // Supervisor disposition can enter qualification without a new first-follow task.
+            boolean firstCompletedOrWaived = lead.getCurrentAssignmentFirstFollowUpAt() != null
+                    || lead.getCurrentAssignmentFirstFollowUpDeadlineAt() == null
+                    && lead.getQualificationDeadlineAt() != null;
+            return firstCompletedOrWaived ? FOLLOW_UP_FOLLOWING : FOLLOW_UP_FIRST_PENDING;
         }
         return null;
     }

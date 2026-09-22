@@ -107,7 +107,9 @@ public class BusinessTaskReminderService {
         }
         NotifyTimingRuleRespDTO urgent = applicable.stream().max(Comparator.comparingInt(
                 rule -> urgency(rule.getTimingStage()))).orElseThrow();
-        for (NotifyTimingRuleRespDTO rule : applicable) recordStage(task, rule, now);
+        // Collapse missed stages, not recipients or channels within the selected stage.
+        List<NotifyTimingRuleRespDTO> selected = applicable.stream()
+                .filter(rule -> urgent.getTimingStage().equals(rule.getTimingStage())).toList();
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("reminder.stage", stageLabel(urgent.getTimingStage()));
         context.put("reminder.dueAt", task.getDueAt());
@@ -115,22 +117,33 @@ public class BusinessTaskReminderService {
             Long supervisorId = currentSupervisor(task.getAssigneeId());
             context.put("plannerUserId", task.getAssigneeId());
             context.put("supervisorUserId", supervisorId);
-            studentNotifyPublisher.publish(scene, task.getBizId(),
-                    "student-task-reminder:" + task.getId() + ":" + urgent.getTimingStage(), urgent.getId(), now, context);
+            for (var rule : selected) {
+                studentNotifyPublisher.publish(scene, task.getBizId(),
+                        reminderKey("student-task-reminder", task, rule), rule.getId(), now, context);
+            }
             if (TYPE_FIRST_CONTACT.equals(task.getTaskType())
                     && applicable.stream().anyMatch(rule -> "due".equals(rule.getTimingStage()))
                     && supervisorId != null) {
                 createAssistanceTask(task, supervisorId);
             }
-            return 1;
+            for (var rule : applicable) recordStage(task, rule, now);
+            return selected.size();
         }
         LeadDO lead = leadMapper.selectById(task.getBizId());
         context.put("ownerUserId", task.getAssigneeId());
         context.put("submitterUserId", lead == null ? null : lead.getSourceUserId());
-        notifyEventPublisher.publish(scene, task.getBizId(),
-                "business-task-reminder:" + task.getId() + ":" + urgent.getTimingStage(), urgent.getId(),
-                null, now, context);
-        return 1;
+        for (var rule : selected) {
+            notifyEventPublisher.publish(scene, task.getBizId(),
+                    reminderKey("business-task-reminder", task, rule), rule.getId(), null, now, context);
+        }
+        for (var rule : applicable) recordStage(task, rule, now);
+        return selected.size();
+    }
+
+    private String reminderKey(String prefix, BusinessTaskDO task, NotifyTimingRuleRespDTO rule) {
+        // A rescheduled task version must not collide with an earlier outbox delivery.
+        return prefix + ":" + task.getId() + ":" + task.getVersion() + ":"
+                + rule.getTimingStage() + ":" + rule.getId();
     }
 
     private void publishMediaReminder(BusinessTaskDO task, NotifyTimingRuleRespDTO rule, LocalDateTime now) {

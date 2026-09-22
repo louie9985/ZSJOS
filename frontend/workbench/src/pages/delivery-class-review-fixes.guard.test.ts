@@ -29,9 +29,9 @@ describe('delivery class review fixes', () => {
     expect(source).not.toContain('loadStudents')
   })
 
-  it('reloads exam options with current attributes and restores edit snapshots', () => {
+  it('reloads exam options with selected SKUs and restores edit snapshots', () => {
     expect(source).toContain('selectedAttrs: attrs')
-    expect(source).toContain('loadExams(row.categoryId, row.productId, attrs)')
-    expect(source).toContain('onChange={value => void attrsChanged(attr.attrKey!, value as string | undefined)}')
+    expect(source).toContain('loadExams(row.categoryId, row.productId, attrs, row.selectedSkus.map(sku => sku.id))')
+    expect(source).toContain('onChange={value => void skuChanged(value as number[])}')
   })
 })

@@ -11,6 +11,16 @@ import java.util.LinkedHashMap;
 
 @Mapper
 public interface LeadAssignmentHistoryMapper extends BaseMapperX<LeadAssignmentHistoryDO> {
+
+    default List<LeadAssignmentHistoryDO> selectTodayByUserIds(List<Long> userIds,
+            java.time.LocalDateTime start, java.time.LocalDateTime end) {
+        if (userIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
+                .select(LeadAssignmentHistoryDO::getLeadId, LeadAssignmentHistoryDO::getCandidateUserId, LeadAssignmentHistoryDO::getActionType)
+                .in(LeadAssignmentHistoryDO::getCandidateUserId, userIds)
+                .ge(LeadAssignmentHistoryDO::getOccurredAt, start).lt(LeadAssignmentHistoryDO::getOccurredAt, end));
+    }
+
     default List<Long> selectTriedSalesUserIds(Long leadId) {
         return selectList(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
                 .eq(LeadAssignmentHistoryDO::getLeadId, leadId)

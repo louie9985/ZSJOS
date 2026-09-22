@@ -8,6 +8,9 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_PERMISSION_DENIED;
@@ -28,19 +31,45 @@ public class ContentReviewObjectPermissionProvider implements ZsjosObjectPermiss
     public boolean hasPermission(Long batchId, String action, Long userId) {
         ContentReviewBatchDO batch = batchMapper.selectById(batchId);
         if (batch == null || userId == null) return false;
-        if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
-        boolean operator = Objects.equals(batch.getOperatorUserId(), userId);
-        boolean director = Objects.equals(batch.getDirectorUserId(), userId);
-        boolean queryAll = permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all");
-        boolean currentReviewer = accessService.hasCurrentTask(batch, userId);
-        boolean historicalReviewer = accessService.hasReviewedHistory(batchId, userId);
+        if (!Objects.equals(batch.getTenantId(), TenantContextHolder.getTenantId())) return false;
+        if ("read".equals(action)) return canReadDirectly(batch, userId) || canReadSubmittedAncestor(batch, userId);
+        // A superseded round is immutable, even for its original operator/reviewer.
+        if (!batchMapper.selectByRevisionOfBatchId(batchId).isEmpty()) return false;
         return switch (action) {
-            case "read" -> operator || director || currentReviewer || historicalReviewer || queryAll;
-            case "submit", "publish" -> operator;
-            case "director-review" -> director;
-            case "final-review" -> currentReviewer;
+            case "submit", "publish" -> Objects.equals(batch.getOperatorUserId(), userId);
+            case "director-review" -> Objects.equals(batch.getDirectorUserId(), userId);
+            case "final-review" -> accessService.hasCurrentTask(batch, userId);
             default -> false;
         };
+    }
+
+    private boolean canReadDirectly(ContentReviewBatchDO batch, Long userId) {
+        return permissionApi.hasTenantReadAllAccess(userId)
+                || Objects.equals(batch.getOperatorUserId(), userId)
+                || Objects.equals(batch.getDirectorUserId(), userId)
+                || permissionApi.hasAnyPermissions(userId, "zsjos:content-review:query-all")
+                || accessService.hasCurrentTask(batch, userId)
+                || accessService.hasReviewedHistory(batch.getId(), userId);
+    }
+
+    private boolean canReadSubmittedAncestor(ContentReviewBatchDO batch, Long userId) {
+        if (batch.getSubmittedAt() == null) return false;
+        var queue = new ArrayDeque<ContentReviewBatchDO>();
+        var visited = new HashSet<Long>();
+        queue.add(batch);
+        while (!queue.isEmpty()) {
+            ContentReviewBatchDO parent = queue.removeFirst();
+            if (!visited.add(parent.getId())) continue;
+            for (ContentReviewBatchDO child : batchMapper.selectByRevisionOfBatchId(parent.getId())) {
+                if (!Objects.equals(child.getTenantId(), batch.getTenantId())
+                        || !Objects.equals(child.getRevisionOfBatchId(), parent.getId())
+                        || visited.contains(child.getId())) continue;
+                // Never call hasPermission recursively: inherited reads cannot become new grants.
+                if (canReadDirectly(child, userId)) return true;
+                queue.addLast(child);
+            }
+        }
+        return false;
     }
 
     @Override

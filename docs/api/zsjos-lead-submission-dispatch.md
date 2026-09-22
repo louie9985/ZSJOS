@@ -1,5 +1,7 @@
 # 客资提交与派单 API
 
+销售阶段的默认值、跟进快照和组合筛选见 [销售阶段与高级筛选](lead-sales-stage.md)。
+
 教务自拓直接归属及成交身份规则见 [教务自拓与直接成交](zsjos-education-self-sourced.md)。
 
 ## 运行边界
@@ -51,6 +53,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `POST /zsjos/lead/{id}/judge-invalid` | `zsjos:lead:qualify` + 当前负责人对象权限 |
 | `GET /zsjos/lead/get?id={leadId}` | 读取指定客资详情；允许客资、公海、订单、学员或审批的真实对象关系，不扩大客资列表 |
 | `POST /zsjos/lead/qualification/attachment/upload` | `zsjos:lead:qualify`；上传后仍需由判无效命令校验引用归属 |
+
+提交人主管只读范围：持有 `zsjos:lead:query-submitted`，且为员工提交人所在部门或上级部门负责人的 ADMIN 用户，可以读取该客资详情、跟进、流转及销售历史，即使客资当前负责人属于其他部门。提交人按 `providerOwnerType=system_user` 和 `providerOwnerId` 识别，部门关系使用 System 当前配置；各接口功能权限仍须独立满足。该规则同时适用于管理端和员工工作台，不授予请求提交人协助、修改、跟进新增、转移或判定等操作权限，也不将合作方 ID 当作员工 ID。
 
 派单、接单、拒单和超时同时维护 `lead_assignment_accept` 业务任务。接单、抢单和管理员转派在归属事务内创建 `lead_first_follow_up` 任务，截止时间由接单时启用的独立跟进规则计算。
 
@@ -119,6 +123,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 规则参数范围为接单超时 10–3600 秒、最大尝试 1–20 次。修改只影响之后提交的客资，进行中客资继续使用提交时规则快照。
 
 自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。每次派单最多旋转初始池长度的三倍，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
+
+派单状态接口的资格判断复用人员关系场景配置的候选资格规则（权限或岗位及账号启用状态），不加载候选列表的部门名称；部门资料可见范围不参与该资格判断。候选列表仍按原有流程补充展示资料。
 
 顶部接单控件与工作台全局状态提示复用同一状态和 30 秒心跳。接口确认具备销售资格但状态加载失败、页面/实时连接离线或接单偏好暂停时，所有工作台路由都会在全局内容区域显示醒目提示，并按该优先级处理；顶部“接单暂停”和“页面离线”状态使用红色标签。不具备销售资格的用户不显示可恢复式接单提示。
 
@@ -189,6 +195,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
   Partner 账号；待办与补充提醒发送给当前 `PartnerOwnership` 员工，当前关系缺失时回落 Lead
   的历史所属员工快照。补充提醒固定包含“请提醒兼职人员尽快协助处理”。
 
+协助申请现在支持双向闭环：同一客资同时只允许一条未完成申请。内部员工提交时，提交人收到通知并生成本人待办；兼职提交时通知兼职，有当前所属运营才提醒运营并生成运营待办，没有所属运营则只通知兼职、不生成待办。待办打开客资后进入“协助历史”回复表单，填写多行备注和图片附件（JPG、PNG、WebP，沿用客资附件接口），提交即完成申请并通知原发起销售。历史接口为 `GET /admin-api/zsjos/lead/{leadId}/submitter-assist/history/page`，回复接口为 `POST /admin-api/zsjos/lead/{leadId}/submitter-assist/{requestId}/reply`；标签页需要独立权限 `zsjos:lead:submitter-assist:read`。
+
 ## 客资表格批量处置
 
 Workbench 客资表格使用 ProTable 原生 `rowSelection`，通过 `preserveSelectedRowKeys` 支持跨分页选择，
@@ -201,3 +209,20 @@ Workbench 客资表格使用 ProTable 原生 `rowSelection`，通过 `preserveSe
 
 接口逐条调用现有 Lead 命令并返回 `successCount`、`failureCount` 及逐条 `leadNo`、稳定错误码和用户可读消息；
 单条失败不回滚其他成功项，系统异常统一返回“操作失败，请刷新后重试”。
+
+
+### 客资概览与列表时间刷新（2026-09-22）
+
+工作台弹窗和跟进记录页提交成功后，刷新最近跟进卡片、详情和列表；表格保留当前页。
+最近跟进读取失败显示错误并允许重试，切换客资后忽略旧请求的迟到响应。
+ADMIN 客资分页（含下属销售列表）与详情采用一致的时间来源：`nextFollowUpAt` 来自该客资最新的待处理跟进提醒任务，仍遵循既有跟进读取权限；已完成或取消的提醒不回退主表旧值。
+`salesOrderSubmittedAt` 为最近首购订单提交时间，按提交时间和订单 ID 降序取第一条。分页批量读取关联时间，避免逐行查询。Admin 与 Workbench 共用字段类型和毫秒时间契约，历史缺失值保持为空。
+本次不修复历史首跟/判定任务数据，不变更判定状态、权限或计时规则。
+
+协助历史以每次申请为一组显示左右对话，申请在左、回复在右，保留服务端分页和待回复入口。申请完整展示问题、希望协助方式、备注和附件；回复展示协助备注、附件、实际回复人快照及回复时间，多行文本保留换行。历史响应补全 `remark`、`requesterName`、`requestAttachments`、`responseAttachments`，附件含 `infraFileId/name/type/size/url`；仅在客资读取授权通过后，按已存附件引用生成 600 秒访问地址，预览/下载通过历史接口重新获取。发起人旧记录仅存用户 ID，`requesterName` 为 System 当前姓名（非历史快照），账号缺失时显示未记录，不借用提交人身份。未保存过的历史内容不推测补造。无需数据库迁移；后端需加载新增投影后，前端才能展示已持久化的完整内容。现有 Admin/H5 无该历史接口消费者。
+
+
+### 首跟事实与迁移恢复（2026-09-23）
+
+新增跟进不再依赖首跟任务存在或 UPDATE 成功才写首跟时间。当前负责人、当前归属周期的最早跟进记录决定缺失的首跟事实，已有首跟时间不被覆盖；任务完成保持同步且不重置判定轮次。合作人的跟进不能代替负责人首跟。`followUpStatus` 不再因缺少判定截止时间把已首跟客资显示为待首跟；主管直接进入判定的既有例外保持。
+Admin/Workbench 继续读取同一 `followUpStatus`、`handlingStage`、`currentAssignmentFirstFollowUpAt` 和判定时间字段，接口类型、菜单和对象权限不变。历史数据恢复必须显式执行，不能在 GET 请求中补任务或重计时。

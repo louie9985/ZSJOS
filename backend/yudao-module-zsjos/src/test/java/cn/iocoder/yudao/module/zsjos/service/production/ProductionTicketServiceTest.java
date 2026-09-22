@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.service.production;
 
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketActionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
@@ -41,6 +43,33 @@ class ProductionTicketServiceTest {
     @Mock private LeadAssignmentService relationService;
     @Mock private ProductionTicketCommandService commandService;
     @Mock private WorkOrderService workOrderService;
+
+    @Test
+    void detailProjectsRealHistoryAndKeepsMissingHistoryEmpty() {
+        when(mapper.selectById(101L)).thenReturn(new ProductionTicketDO().setId(101L).setStatus("completed"));
+        var envelope = new cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderRespVO();
+        envelope.setTargetName("测试制作人"); envelope.setCurrentRound(2);
+        var event = new cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderTimelineRespVO();
+        event.setOperation("production-return"); event.setReason("调整片尾");
+        envelope.setTimeline(java.util.List.of(event));
+        when(workOrderService.getProductionEnvelopeSnapshot(101L)).thenReturn(envelope);
+        var result = service.get(101L, 20L);
+        assertEquals("测试制作人", result.getAssigneeName());
+        assertEquals(2, result.getCurrentRound());
+        assertEquals("调整片尾", result.getTimeline().getFirst().getReason());
+        assertNotNull(result.getServerNow());
+        when(workOrderService.getProductionEnvelopeSnapshot(101L)).thenReturn(null);
+        assertNull(service.get(101L, 20L).getTimeline());
+    }
+
+    @Test
+    void pendingPageUsesAssigneeInsteadOfExpandedManagementScope() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.production.vo.ProductionTicketPageReqVO();
+        request.setPendingAssignment(true);
+        when(mapper.selectPendingPage(request, 20L)).thenReturn(new PageResult<>(java.util.List.of(), 47L));
+        assertEquals(47L, service.page(request, 20L).getTotal());
+        verifyNoInteractions(dataScopeService);
+    }
 
     @Test
     void createRegistersCommandAndCompletesWithTicketId() {
@@ -103,15 +132,33 @@ class ProductionTicketServiceTest {
                 .setRevisionCount(0).setMaxRevisionCount(2).setReviewerUserId(230L)
                 .setAssigneeFilmingEditorUserId(251L);
         when(mapper.selectById(1L)).thenReturn(ticket);
-        when(mapper.rejectForRevision(1L, 4, "补充字幕并调整节奏")).thenReturn(1);
+        when(mapper.rejectForRevision(1L, 4, "checking", "补充字幕并调整节奏")).thenReturn(1);
 
         service.reject(1L, 4, "  补充字幕并调整节奏  ");
 
-        verify(mapper).rejectForRevision(1L, 4, "补充字幕并调整节奏");
+        verify(mapper).rejectForRevision(1L, 4, "checking", "补充字幕并调整节奏");
         verify(workflowEventService).transition("production-ticket", 1L, null, "checking", "rejected",
                 "补充字幕并调整节奏", "ticket:1:4:rejected");
         verify(workflowEventService).notify(eq("media.ticket.rejected"), eq("production-ticket"), eq(1L),
                 eq(251L), isNull(), eq("ticket-result:1:4:rejected"), anyMap());
+    }
+
+    @Test
+    void completionLinkValidationAllowsWebUrlsAndLegacyOmission() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            var req = new ProductionTicketActionReqVO();
+            req.setVersion(1); req.setIdempotencyKey("validate-link");
+            assertTrue(validator.validate(req).isEmpty());
+            for (String value : java.util.List.of("https://example.com/video", "http://example.com/video")) {
+                req.setCompletionUrl(value);
+                assertTrue(validator.validate(req).isEmpty());
+            }
+            for (String value : java.util.List.of("javascript:alert(1)", "ftp://example.com/video", "https://example.com/a b")) {
+                req.setCompletionUrl(value);
+                assertFalse(validator.validate(req).isEmpty());
+            }
+        }
     }
 
     @Test
@@ -120,12 +167,28 @@ class ProductionTicketServiceTest {
                 .setId(6L).setTicketNo("PT-6").setStatus("in_production").setVersion(2)
                 .setReviewerUserId(230L).setAssigneeFilmingEditorUserId(251L);
         when(mapper.selectById(6L)).thenReturn(ticket);
+        when(mapper.updateById(any(ProductionTicketDO.class))).thenReturn(1);
         when(mapper.transition(6L, 2, "in_production", "submitted")).thenReturn(1);
 
-        service.submit(6L, 2);
+        ProductionTicketActionReqVO req = new ProductionTicketActionReqVO();
+        req.setVersion(2);
+        req.setIdempotencyKey("submit-key");
+        req.setRemark("  已完成剪辑  ");
+        req.setCompletionUrl("https://example.com/finished");
+        req.setAttachmentId(88L);
+        req.setVideoSentToOperator(true);
+        service.submit(6L, req);
 
+        ArgumentCaptor<ProductionTicketDO> ticketCaptor = ArgumentCaptor.forClass(ProductionTicketDO.class);
+        verify(mapper).updateById(ticketCaptor.capture());
+        var context = JsonUtils.parseObject(ticketCaptor.getValue().getDispatchContextSnapshotJson(), java.util.Map.class);
+        assertEquals("已完成剪辑", context.get("completionRemark"));
+        assertEquals("https://example.com/finished", context.get("completionUrl"));
+        assertEquals(88L, ((Number) context.get("completionAttachmentId")).longValue());
+        assertEquals(true, context.get("videoSentToOperator"));
+        verify(mapper).transition(6L, 2, "in_production", "submitted");
         verify(workflowEventService).createTaskAndNotify("media.ticket.pending_check", "MEDIA_TICKET_CHECK",
-                "production-ticket", 6L, 230L, "拍剪工单待核对", "START_TICKET_CHECK", null,
+                "production-ticket", 6L, 230L, "拍剪工单待核对", "APPROVE_TICKET", null,
                 "ticket-check:6:2", java.util.Map.of("bizNo", "PT-6",
                         "deepLink", "/zsjos/production-tickets?ticketId=6"));
     }
@@ -159,6 +222,5 @@ class ProductionTicketServiceTest {
         template.setCode("production"); template.setName("拍剪工单"); template.setProcessorType("PRODUCTION_TICKET");
         template.setAllowedAssignmentTypes(java.util.List.of("PERSON", "DEPARTMENT"));
         when(workOrderService.catalog(1, 500, 20L)).thenReturn(new PageResult<>(java.util.List.of(template), 1L));
-        when(workOrderService.candidatePage(any(), eq(20L))).thenReturn(PageResult.empty());
     }
 }

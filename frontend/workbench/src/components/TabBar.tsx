@@ -2,24 +2,29 @@ import { Tabs } from 'antd'
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { WorkbenchMenu } from '../services/api'
-import type { TabStyle } from '../constants'
+import { APP_ROUTES, type TabStyle } from '../constants'
+import { useWorkbenchPageNavigation } from './WorkbenchPageNavigation'
 
 export interface TabItem {
   key: string
   label: string
   closable: boolean
+  href?: string
 }
 
 export const MAX_TABS = 15
 
-export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu): TabItem[] {
-  if (!currentMenu || tabs.some(tab => tab.key === currentMenu.path)) return tabs
+export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu, href?: string): TabItem[] {
+  if (!currentMenu) return tabs
+  const existing = tabs.find(tab => tab.key === currentMenu.path)
+  if (existing) return !href || existing.href === href ? tabs : tabs.map(tab => tab === existing ? { ...tab, href } : tab)
   const next = [
     ...tabs,
-    { key: currentMenu.path, label: currentMenu.name, closable: tabs.length > 0 }
+    { key: currentMenu.path, label: currentMenu.name, closable: tabs.length > 0, ...(href ? { href } : {}) }
   ]
   if (next.length > MAX_TABS) {
-    const index = next.findIndex(tab => tab.closable && tab.key !== currentMenu.path)
+    const index = next.findIndex(tab => tab.closable && tab.key !== currentMenu.path
+      && tab.key !== APP_ROUTES.CONTENT_REVIEW && tab.key !== APP_ROUTES.MEDIA_STUDENTS)
     if (index >= 0) next.splice(index, 1)
   }
   return next
@@ -38,12 +43,13 @@ const TabBar: React.FC<{
 }> = ({ currentMenu, initialPath, tabStyle = 'card', tabs, setTabs }) => {
   const navigate = useNavigate()
   const location = useLocation()
+  const navigation = useWorkbenchPageNavigation()
   const initialPathRef = useRef(initialPath)
 
   // 当前页面进入 tabs
   useEffect(() => {
-    setTabs(prev => appendMenuTab(prev, currentMenu))
-  }, [currentMenu, setTabs])
+    setTabs(prev => appendMenuTab(prev, currentMenu, `${location.pathname}${location.search}${location.hash}`))
+  }, [currentMenu, setTabs, location.pathname, location.search, location.hash])
 
   // 第一个 tab 设为不可关闭
   useEffect(() => {
@@ -61,11 +67,14 @@ const TabBar: React.FC<{
   const activeKey = location.pathname
 
   const onChange = useCallback((key: string) => {
-    navigate(key)
-  }, [navigate])
+    const href = tabs.find(tab => tab.key === key)?.href || key
+    if (navigation) void navigation.open(href)
+    else navigate(href)
+  }, [navigate, navigation, tabs])
 
-  const onEdit = useCallback((targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
+  const onEdit = useCallback(async (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
     if (action !== 'remove' || typeof targetKey !== 'string') return
+    if (navigation && !await navigation.canClose(targetKey)) return
     setTabs((prev) => {
       const idx = prev.findIndex((t) => t.key === targetKey)
       if (idx < 0) return prev
@@ -73,11 +82,11 @@ const TabBar: React.FC<{
       // 如果关闭的是当前 tab，跳转到相邻 tab
       if (targetKey === activeKey && next.length > 0) {
         const newActive = next[Math.min(idx, next.length - 1)]
-        navigate(newActive.key)
+        navigate(newActive.href || newActive.key)
       }
       return next
     })
-  }, [activeKey, navigate])
+  }, [activeKey, navigate, navigation])
 
   if (tabs.length === 0) return null
 

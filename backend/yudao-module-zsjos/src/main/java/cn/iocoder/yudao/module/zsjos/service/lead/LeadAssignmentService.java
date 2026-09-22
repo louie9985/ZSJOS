@@ -16,6 +16,8 @@ public interface LeadAssignmentService {
 
     List<LeadAssignmentUserRespVO> getEligibleSalesUsers();
 
+    boolean isEligibleSalesUser(Long userId);
+
     List<LeadAssignmentUserRespVO> getAssignableSalesUsers(Long sourceUserId);
 
     void saveRelations(LeadAssignmentSaveReqVO reqVO, Long operatorUserId);

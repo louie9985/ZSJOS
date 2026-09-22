@@ -92,7 +92,8 @@
     >
   </el-dialog>
   <el-dialog v-model="revisionOpen" title="补正并重新提交" width="620px">
-    <el-alert title="未展示字段会沿用当前订单快照。" type="info" show-icon class="mb-12px" />
+    <el-alert title="未展示字段沿用当前订单快照；补正后教务和财务将重新审批。" type="info" show-icon class="mb-12px" />
+    <el-alert v-if="revision.collectionMode === 'online_link'" title="线上已到账：本次仅补正资料，原课程、规格和金额保持不变。" type="info" show-icon class="mb-12px" />
     <el-form label-width="100px">
       <template v-for="field in revisionDictionaryFields" :key="field.key">
         <el-form-item v-if="refreshedDictionaryFields.includes(field.key)" :label="field.label" required>
@@ -112,7 +113,7 @@
         :key="index"
         :label="`课程 ${Number(index) + 1} 金额`"
       >
-        <el-input-number v-model="item.actualAmount" :min="0" :precision="2" class="w-100%" />
+        <el-input-number v-model="item.actualAmount" :disabled="revision.transactionLocked !== false" :min="0" :precision="2" class="w-100%" />
       </el-form-item>
       <el-form-item label="备注"
         ><el-input
@@ -136,7 +137,7 @@
 import { getSimpleDictDataList } from '@/api/system/dict/dict.data'
 import OrderProductSummary from '../components/OrderProductSummary.vue'
 import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
-import { reactive, ref } from 'vue'
+import { reactive, ref, toRaw } from 'vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
 import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
@@ -209,8 +210,12 @@ const revisionDictionaryFields = [
 const refreshedDictionaryFields = ref<string[]>([])
 const revisionOptions = ref<Record<string, Array<{ value: string; label: string }>>>({})
 const openRevision = async () => {
-  if (!detail.value) return
-  Object.assign(revision, structuredClone(detail.value))
+  if (!detail.value || detailLoading.value || detailError.value) return
+  if (!['offline_paid', 'online_link'].includes(detail.value.collectionMode)
+      || typeof detail.value.transactionLocked !== 'boolean') return message.warning('订单收款状态未加载，请刷新后重试')
+  if (detail.value.collectionMode === 'online_link' && detail.value.paymentStatus !== 'paid')
+    return message.warning('线上支付尚未确认到账，请核实收款记录')
+  Object.assign(revision, structuredClone(toRaw(detail.value)))
   refreshedDictionaryFields.value = revisionDictionaryFields.filter(field => !detail.value[field.key + 'LabelSnapshot']).map(field => field.key)
   const dictionaries = await getSimpleDictDataList()
   for (const field of revisionDictionaryFields) {

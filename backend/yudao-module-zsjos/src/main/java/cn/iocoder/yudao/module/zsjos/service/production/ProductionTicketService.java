@@ -67,6 +67,10 @@ public class ProductionTicketService {
     @Resource private FileApi fileApi;
 
     public PageResult<ProductionTicketRespVO> page(ProductionTicketPageReqVO req, Long userId) {
+        if (Boolean.TRUE.equals(req.getPendingAssignment())) {
+            PageResult<ProductionTicketDO> pending = mapper.selectPendingPage(req, userId);
+            return new PageResult<>(pending.getList().stream().map(row -> toResp(row, userId)).toList(), pending.getTotal());
+        }
         MediaDataScopeService.Scope scope = dataScopeService.resolve(userId, "zsjos:production-ticket:query-all");
         PageResult<ProductionTicketDO> page = mapper.selectPage(req, scope.userIds(), scope.all());
         return new PageResult<>(page.getList().stream().map(row -> toResp(row, userId)).toList(), page.getTotal());
@@ -277,6 +281,7 @@ public class ProductionTicketService {
     public void submit(Long id, ProductionTicketActionReqVO req) {
         ProductionTicketDO ticket = require(id);
         Map<String, Object> context = new LinkedHashMap<>(parseMap(ticket.getDispatchContextSnapshotJson()));
+        context.put("completionUrl", StrUtil.trimToNull(req.getCompletionUrl()));
         context.put("completionRemark", StrUtil.trimToNull(req.getRemark()));
         context.put("completionAttachmentId", req.getAttachmentId());
         context.put("videoSentToOperator", Boolean.TRUE.equals(req.getVideoSentToOperator()));
@@ -360,6 +365,7 @@ public class ProductionTicketService {
 
     private ProductionTicketRespVO toResp(ProductionTicketDO ticket, Long userId) {
         ProductionTicketRespVO response = BeanUtils.toBean(ticket, ProductionTicketRespVO.class);
+        response.setServerNow(System.currentTimeMillis());
         response.setAccountIds(parseAccountIds(ticket.getAccountIdsJson(), ticket.getAccountId()));
         response.setAccounts(parseAccountSnapshots(ticket.getAccountSnapshotJson()));
         response.setDispatchContext(parseMap(ticket.getDispatchContextSnapshotJson()));
@@ -369,6 +375,10 @@ public class ProductionTicketService {
             response.setFormValues(envelope.getValues());
             response.setRequestAttachments(envelope.getRequestAttachments());
             response.setSubmitterName(envelope.getSourceName());
+            response.setAssigneeName(envelope.getTargetName());
+            response.setSceneName(envelope.getSceneName());
+            response.setCurrentRound(envelope.getCurrentRound());
+            response.setTimeline(envelope.getTimeline());
             if (response.getDeadlineAt() == null) {
                 response.setDeadlineAt(parseDeadline(envelope.getValues()));
             }

@@ -97,6 +97,53 @@ class BusinessTaskReminderServiceTest {
     }
 
     @Test
+    void mostUrgentStagePublishesEveryChannelAndRecipientRuleBeforeRecording() {
+        var now = LocalDateTime.of(2026, 9, 22, 12, 0);
+        var task = task("pending", now.minusMinutes(10)); task.setVersion(4);
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(
+                rule(1L, "advance", 30), rule(2L, "due", 0),
+                rule(3L, "overdue", 5), rule(4L, "overdue", 5), rule(5L, "overdue", 5)));
+
+        assertEquals(3, service.emitDueForTask(8L, now));
+
+        var order = inOrder(publisher, stageMapper);
+        for (long id : List.of(3L, 4L, 5L)) {
+            order.verify(publisher).publish(eq(NEXT_FOLLOW_UP_REMINDER), eq(20L),
+                    eq("business-task-reminder:8:4:overdue:" + id), eq(id), isNull(), eq(now), anyMap());
+        }
+        order.verify(stageMapper, times(5)).insert(any(BusinessTaskNotifyStageDO.class));
+        verify(publisher, times(3)).publish(anyString(), anyLong(), anyString(), anyLong(), isNull(), any(), anyMap());
+    }
+
+    @Test
+    void failedPublicationDoesNotConsumeStage() {
+        var now = LocalDateTime.of(2026, 9, 22, 12, 0);
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task("pending", now));
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(rule(1L, "due", 0)));
+        doThrow(new IllegalStateException("outbox unavailable")).when(publisher)
+                .publish(anyString(), anyLong(), anyString(), anyLong(), isNull(), any(), anyMap());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.emitDueForTask(8L, now));
+        verify(stageMapper, never()).insert(any(BusinessTaskNotifyStageDO.class));
+    }
+
+    @Test
+    void studentRemindersAlsoPublishBothChannels() {
+        var now = LocalDateTime.of(2026, 9, 22, 12, 0);
+        var task = task("pending", now); task.setTaskType("student_contact"); task.setBizType("student_service");
+        task.setVersion(2);
+        // Use the existing ordinary-contact task type from the authoritative contract.
+        task.setTaskType(cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.TYPE_CONTACT);
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(
+                new NotifyTimingRuleRespDTO(1L, "zsjos.student.contact_reminder", "due", 0),
+                new NotifyTimingRuleRespDTO(2L, "zsjos.student.contact_reminder", "due", 0)));
+        assertEquals(2, service.emitDueForTask(8L, now));
+        for (long id : List.of(1L, 2L)) verify(studentPublisher).publish(eq("zsjos.student.contact_reminder"),
+                eq(20L), eq("student-task-reminder:8:2:due:" + id), eq(id), eq(now), anyMap());
+    }
+
+    @Test
     void firstContactDueCreatesSupervisorAssistanceTask() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 19, 12, 0);
         BusinessTaskDO task = task("pending", now); task.setTaskType("student_first_contact");

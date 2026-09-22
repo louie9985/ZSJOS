@@ -13,9 +13,16 @@ import org.apache.ibatis.annotations.Select;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.ArrayList;
 
 @Mapper
 public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatchDO> {
+    // Legacy single-account approvals freeze identity in $.account and responsibility in the batch.
+    // Never join the current account owner when filtering historical approval responsibilities.
+    String ACCOUNT_SNAPSHOTS = "(CASE WHEN JSON_LENGTH(JSON_EXTRACT(context_snapshot_json, '$.accountSnapshots')) > 0 "
+            + "THEN JSON_EXTRACT(context_snapshot_json, '$.accountSnapshots') ELSE JSON_ARRAY(JSON_MERGE_PATCH("
+            + "COALESCE(JSON_EXTRACT(context_snapshot_json, '$.account'), JSON_OBJECT()), "
+            + "JSON_OBJECT('ownerOperatorUserId', operator_user_id, 'directorUserId', director_user_id))) END)";
     @org.apache.ibatis.annotations.Update("UPDATE zsjos_content_review_batch SET account_ids_json=JSON_REMOVE(account_ids_json, JSON_UNQUOTE(JSON_SEARCH(account_ids_json,'one',CAST(#{accountId} AS CHAR)))), version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND JSON_CONTAINS(account_ids_json,JSON_ARRAY(#{accountId})) AND status IN ('DRAFT','DIRECTOR_REVIEW','FINAL_REVIEW')")
     int excludeDeletedAccount(@org.apache.ibatis.annotations.Param("accountId") Long accountId);
 
@@ -25,12 +32,47 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
         LambdaQueryWrapperX<ContentReviewBatchDO> query = new LambdaQueryWrapperX<ContentReviewBatchDO>()
                 .eqIfPresent(ContentReviewBatchDO::getStatus, request.getStatus())
                 .eqIfPresent(ContentReviewBatchDO::getAccountId, request.getAccountId());
+        query.inIfPresent(ContentReviewBatchDO::getStatus, request.getStatuses());
+        if (request.getSubmittedFrom() != null) query.ge(ContentReviewBatchDO::getSubmittedAt, request.getSubmittedFrom().atStartOfDay());
+        if (request.getSubmittedTo() != null) query.lt(ContentReviewBatchDO::getSubmittedAt, request.getSubmittedTo().plusDays(1).atStartOfDay());
         query.apply("NOT EXISTS (SELECT 1 FROM zsjos_content_review_batch successor "
                         + "WHERE successor.revision_of_batch_id=zsjos_content_review_batch.id "
                         + "AND successor.tenant_id=zsjos_content_review_batch.tenant_id AND successor.deleted=b'0')");
         if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-            query.like(ContentReviewBatchDO::getBatchNo, request.getKeyword().trim());
+            String keyword = request.getKeyword().trim().toLowerCase(java.util.Locale.ROOT);
+            String accountPattern = "%" + keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+            query.and(search -> search.apply("LOCATE({0}, LOWER(batch_no)) > 0", keyword)
+                    .or().apply("EXISTS (SELECT 1 FROM zsjos_person p WHERE p.id=zsjos_content_review_batch.student_person_id "
+                            + "AND p.tenant_id=zsjos_content_review_batch.tenant_id AND p.deleted=b'0' AND LOCATE({0}, LOWER(p.name)) > 0)", keyword)
+                    .or().apply("JSON_SEARCH(LOWER(CAST(" + ACCOUNT_SNAPSHOTS + " AS CHAR)), 'one', {0}, '!', '$[*].nickname') IS NOT NULL", accountPattern)
+                    .or().apply("EXISTS (SELECT 1 FROM zsjos_content_review_batch_item ri WHERE ri.batch_id=zsjos_content_review_batch.id "
+                            + "AND ri.tenant_id=zsjos_content_review_batch.tenant_id AND ri.deleted=b'0' AND ("
+                            + "LOCATE({0}, LOWER(JSON_UNQUOTE(JSON_EXTRACT(ri.content_snapshot_json, '$.title')))) > 0 OR "
+                            + "LOCATE({0}, LOWER(JSON_UNQUOTE(JSON_EXTRACT(ri.content_snapshot_json, '$.titleSnapshot')))) > 0 OR "
+                            + "LOCATE({0}, LOWER(JSON_UNQUOTE(JSON_EXTRACT(ri.content_snapshot_json, '$.topic')))) > 0 OR "
+                            + "LOCATE({0}, LOWER(JSON_UNQUOTE(JSON_EXTRACT(ri.content_snapshot_json, '$.topicSnapshot')))) > 0 OR "
+                            + "LOCATE({0}, LOWER(JSON_UNQUOTE(JSON_EXTRACT(ri.content_snapshot_json, '$.scriptText')))) > 0))", keyword));
         }
+        // JSON_CONTAINS matches the combined object within one array element, avoiding cross-account owner matches.
+        // Unlike JSON_TABLE this expression is supported by the established tenant SQL parser.
+        List<Object> accountParams = new ArrayList<>();
+        StringBuilder accountConditions = new StringBuilder();
+        if (request.getOperatorUserId() != null) {
+            accountConditions.append("'ownerOperatorUserId',{").append(accountParams.size()).append("}");
+            accountParams.add(request.getOperatorUserId());
+        }
+        if (request.getDirectorUserId() != null) {
+            if (!accountParams.isEmpty()) accountConditions.append(",");
+            accountConditions.append("'directorUserId',{").append(accountParams.size()).append("}");
+            accountParams.add(request.getDirectorUserId());
+        }
+        if (request.getPlatformValue() != null && !request.getPlatformValue().isBlank()) {
+            if (!accountParams.isEmpty()) accountConditions.append(",");
+            accountConditions.append("'platformValue',{").append(accountParams.size()).append("}");
+            accountParams.add(request.getPlatformValue());
+        }
+        if (!accountParams.isEmpty()) query.apply("JSON_CONTAINS(" + ACCOUNT_SNAPSHOTS
+                + ", JSON_OBJECT(" + accountConditions + ")) = 1", accountParams.toArray());
         if (Boolean.TRUE.equals(request.getMine())) {
             query.eq(ContentReviewBatchDO::getOperatorUserId, userId);
         } else if (!seeAll) {

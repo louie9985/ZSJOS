@@ -1,6 +1,8 @@
 import { diagnosisApi, type DiagnosisTodo } from "../services/mediaAccountProfile";
 import AccountDiagnosisForm from "./AccountDiagnosisForm";
 import AccountReviewRecord from "./AccountReviewRecord";
+import { useWorkbenchPageGuard } from './WorkbenchPageNavigation';
+import { APP_ROUTES } from '../constants';
 import {
   EditOutlined,
   FileImageOutlined,
@@ -160,6 +162,15 @@ export default function AccountProfilePanel({
   const [record, setRecord] = useState<ProfileField>(),
     [content, setContent] = useState(""),
     [recordFiles, setRecordFiles] = useState<ProfileFile[]>([]);
+  useWorkbenchPageGuard(APP_ROUTES.MEDIA_STUDENTS, async destination => {
+    if (!open && !record && !diagnosisOpen) return true;
+    if (destination && Number(new URL(destination, window.location.origin).searchParams.get('accountId')) === account?.id) return true;
+    if (saving || uploading || diagnosisSaving) { message.warning('正在保存或上传，请完成后再切换账号'); return false; }
+    return new Promise(resolve => modal.confirm({ title: '账号页面有未保存修改',
+      content: '可继续填写，或放弃本次编辑后切换。', okText: '放弃并切换', cancelText: '继续填写',
+      onOk: () => { setOpen(false); setRecord(undefined); setDiagnosisOpen(false); onEditingFinished?.(); resolve(true); },
+      onCancel: () => resolve(false) }));
+  });
   const pending = useRef<{ fingerprint: string; key: string } | undefined>(
       undefined,
     ),

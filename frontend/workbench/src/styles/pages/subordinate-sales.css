@@ -54,6 +54,7 @@
 
 .subordinate-sales-item {
   position: relative;
+  flex: none;
   width: 100%;
   padding: var(--crm-sp-4);
   border: 1px solid var(--crm-border);
@@ -121,7 +122,43 @@
 .subordinate-sales-item-status {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--crm-sp-2);
+  gap: var(--crm-sp-1);
+}
+
+.subordinate-sales-daily-heading {
+  margin-top: var(--crm-sp-2);
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+.subordinate-sales-daily-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--crm-sp-3);
+  font-size: var(--crm-font-sm);
+}
+
+.subordinate-sales-daily-metric {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--crm-sp-1);
+  padding-block: var(--crm-sp-1);
+  border-bottom: 1px dashed var(--crm-border);
+}
+
+.subordinate-sales-daily-metric > span {
+  color: var(--crm-text-secondary);
+}
+
+.subordinate-sales-daily-metric > b {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.subordinate-sales-daily-metric .is-pending {
+  color: var(--crm-color-error);
 }
 
 .subordinate-sales-item-summary {

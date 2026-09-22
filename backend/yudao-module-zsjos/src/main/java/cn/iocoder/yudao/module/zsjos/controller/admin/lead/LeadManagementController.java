@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
@@ -11,6 +12,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInb
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistRequestReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistReplyReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistHistoryRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmitterActionService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
@@ -143,6 +146,16 @@ public class LeadManagementController {
         return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.service.lead.LeadOrderNotificationTargetService orderNotificationTargetService;
+
+    @GetMapping("/order-notification-target")
+    @Operation(summary = "定位成交结果通知关联的可见客资")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<LeadManagementRespVO> getOrderNotificationTarget(@RequestParam Long orderId) {
+        return success(orderNotificationTargetService.getLead(orderId, getLoginUserId()));
+    }
+
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
     @Parameter(name = "id", description = "内部客资ID", required = true)
@@ -211,6 +224,21 @@ public class LeadManagementController {
     public CommonResult<Long> requestSubmitterAssist(@PathVariable("id") Long id,
             @Valid @RequestBody LeadSubmitterAssistRequestReqVO reqVO) {
         return success(submitterActionService.requestAssist(id, getLoginUserId(), reqVO));
+    }
+
+    @GetMapping("/{id}/submitter-assist/history/page")
+    @Operation(summary = "查看客资协助历史")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:submitter-assist:read')")
+    public CommonResult<PageResult<LeadSubmitterAssistHistoryRespVO>> submitterAssistHistory(@PathVariable("id") Long id,
+                                                                                              @Valid PageParam page) {
+        return success(submitterActionService.history(id, getLoginUserId(), page));
+    }
+
+    @PostMapping("/{id}/submitter-assist/{requestId}/reply")
+    @Operation(summary = "回复客资协助申请")
+    public CommonResult<Boolean> replySubmitterAssist(@PathVariable("id") Long id, @PathVariable Long requestId,
+                                                       @Valid @RequestBody LeadSubmitterAssistReplyReqVO reqVO) {
+        submitterActionService.replyAssist(id, requestId, getLoginUserId(), reqVO); return success(true);
     }
 
     @GetMapping("/status-counts")

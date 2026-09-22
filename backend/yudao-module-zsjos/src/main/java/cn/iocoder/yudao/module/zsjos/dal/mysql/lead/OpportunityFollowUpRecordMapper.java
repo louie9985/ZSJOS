@@ -10,6 +10,16 @@ import java.time.LocalDateTime;
 
 @Mapper
 public interface OpportunityFollowUpRecordMapper extends BaseMapperX<OpportunityFollowUpRecordDO> {
+
+    default List<OpportunityFollowUpRecordDO> selectTodayByUserIds(List<Long> userIds,
+            java.time.LocalDateTime start, java.time.LocalDateTime end) {
+        if (userIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<OpportunityFollowUpRecordDO>()
+                .select(OpportunityFollowUpRecordDO::getOperatorUserId)
+                .in(OpportunityFollowUpRecordDO::getOperatorUserId, userIds)
+                .ge(OpportunityFollowUpRecordDO::getOccurredAt, start).lt(OpportunityFollowUpRecordDO::getOccurredAt, end));
+    }
+
     default OpportunityFollowUpRecordDO selectByIdempotencyKey(String key) {
         return selectOne(new LambdaQueryWrapperX<OpportunityFollowUpRecordDO>()
                 .eq(OpportunityFollowUpRecordDO::getIdempotencyKey, key));

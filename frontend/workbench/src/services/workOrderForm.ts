@@ -29,3 +29,9 @@ function formatValue(value: unknown, pattern: string) {
   }
   return value
 }
+
+// V206 production templates published these link fields as text. Keep their persisted schema intact.
+export function isWorkOrderLinkField(field: { key: string; type?: string }, production = false) {
+  return field.type === 'url' || (production && field.type === 'text'
+    && ['account_link', 'original_work_link', 'reference_work_link'].includes(field.key))
+}

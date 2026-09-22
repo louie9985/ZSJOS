@@ -34,4 +34,9 @@ public class ProductionTicketRespVO {
     private Map<String, Object> formValues;
     private List<WorkOrderFileRespVO> requestAttachments;
     private String submitterName;
+    private String assigneeName;
+    private String sceneName;
+    private Integer currentRound;
+    private Long serverNow;
+    private List<cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderTimelineRespVO> timeline;
 }

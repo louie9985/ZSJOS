@@ -90,6 +90,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [collectionMode, setCollectionMode] = useState<CollectionMode>('offline_paid')
   const [purchaseIntent, setPurchaseIntent] = useState<PurchaseIntent>()
   const [draftSaving, setDraftSaving] = useState(false)
+  const [revisionOrder, setRevisionOrder] = useState<SalesOrder>()
+  const transactionLocked = orderId ? revisionOrder?.transactionLocked !== false : Boolean(purchaseIntent?.paymentLocked)
 
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
@@ -102,7 +104,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     sourceKey: `${purchaseType}:${lead.id}:${lead.submittedMobile || lead.submittedWechatId || lead.submittedName}` }
 
   const load = async () => {
-    setLoading(true); setLoadError('')
+    setLoading(true); setLoadError(''); setRevisionOrder(undefined)
     const dictTypes = [DICT_TYPE.ORDER_STUDENT_NATURE, DICT_TYPE.ORDER_SERVICE_PERIOD, DICT_TYPE.ORDER_STUDENT_SOURCE, DICT_TYPE.ORDER_FEE_MODE, DICT_TYPE.ORDER_PAYMENT_METHOD]
     try {
       const [areaResult, catalogResult, giftResult, orderResult, ...dictResults] = await Promise.all([
@@ -156,7 +158,14 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           const draft = current.draft as Partial<Values> & { customerPaidAt?: number }
           form.setFieldsValue({ ...draft, customerPaidAt: draft.customerPaidAt ? dayjs(draft.customerPaidAt) : undefined } as Partial<Values>)
         }
-      } else { setPurchaseIntent(undefined); setCollectionMode('offline_paid') }
+      } else {
+        setPurchaseIntent(undefined)
+        if (!order || !['offline_paid', 'online_link'].includes(order.collectionMode || '')
+            || typeof order.transactionLocked !== 'boolean') throw new Error('订单收款状态未加载，请刷新后重试')
+        if (order.collectionMode === 'online_link' && order.paymentStatus !== 'paid')
+          throw new Error('线上支付尚未确认到账，请核实收款记录')
+        setRevisionOrder(order); setCollectionMode(order.collectionMode!)
+      }
     } catch (error) {
       setAreas([]); setCatalog(emptyCatalog); setDicts({}); setLoadError(errorText(error))
     } finally { setLoading(false) }
@@ -213,6 +222,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
     ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const prepareSubmit = async () => {
+    if (loading || loadError || (orderId && !revisionOrder)) return
     if (!orderId && collectionMode === 'online_link' && purchaseIntent?.paymentStatus !== 'paid') {
       message.warning('线上支付尚未确认到账，不能提交审批'); return
     }
@@ -224,6 +234,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     setPendingValues(values); setConfirmOpen(true)
   }
   const submit = async () => {
+    if (loading || loadError || (orderId && !revisionOrder)) return
     const values = pendingValues
     setConfirmOpen(false)
     if (!values) return
@@ -285,7 +296,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
-      <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving || draftSaving}>
+      <Form form={form} layout="vertical" disabled={loading || Boolean(loadError) || saving || draftSaving}>
         {!orderId && <><Divider titlePlacement="start">收款路径</Divider>
           <Segmented block value={collectionMode} disabled={Boolean(purchaseIntent?.paymentLocked)} onChange={value => setCollectionMode(value as CollectionMode)}
             options={[{ label: '线上支付链接', value: 'online_link' }, { label: '线下已支付', value: 'offline_paid' }]}/>
@@ -322,14 +333,17 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={12}><Form.Item name="studentSource" label="学生来源" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_SOURCE)}/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">成交课程与金额</Divider>
+        {orderId && revisionOrder && <Alert showIcon type="info" message={transactionLocked
+          ? '线上已到账：课程、规格和金额不可直接修改，补正资料后将重新审批。'
+          : '线下已支付：可更正课程及金额录入错误，请核实付款凭证；重提后教务和财务将重新审批，补款或退款须另行处理。'}/>}
         <Form.List name="items" rules={[{ validator: async (_, value) => value?.length ? undefined : Promise.reject(new Error('至少添加一个成交课程')) }]}>
           {(fields, { add, remove }, { errors }) => <>
             {fields.map((field, index) => <Row gutter={12} key={field.key} align="top">
-              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog} historicalItems={historicalItems} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
-              <Col xs={24} md={6}><Form.Item name={[field.name, 'actualAmount']} label={`实际成交金额 ${index + 1}`} rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={0} precision={2} prefix="¥" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
-              <Col><Button aria-label="删除成交课程" title="删除成交课程" icon={<DeleteOutlined/>} danger disabled={fields.length === 1} onClick={() => remove(field.name)} style={{ marginTop: 30 }}/></Col>
+              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog} historicalItems={historicalItems} disabled={transactionLocked}/></Form.Item></Col>
+              <Col xs={24} md={6}><Form.Item name={[field.name, 'actualAmount']} label={`实际成交金额 ${index + 1}`} rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={0} precision={2} prefix="¥" style={{ width: '100%' }} disabled={transactionLocked}/></Form.Item></Col>
+              <Col><Button aria-label="删除成交课程" title="删除成交课程" icon={<DeleteOutlined/>} danger disabled={fields.length === 1 || transactionLocked} onClick={() => remove(field.name)} style={{ marginTop: 30 }}/></Col>
             </Row>)}
-            <Button type="dashed" icon={<PlusOutlined/>} onClick={() => add({ actualAmount: 0 })}>添加成交课程</Button><Form.ErrorList errors={errors}/>
+            <Button type="dashed" icon={<PlusOutlined/>} disabled={transactionLocked} onClick={() => add({ actualAmount: 0 })}>添加成交课程</Button><Form.ErrorList errors={errors}/>
           </>}
         </Form.List>
         <div style={{ textAlign: 'right', marginTop: 12 }}><Typography.Text strong>订单总金额：¥{total.toFixed(2)}</Typography.Text></div>

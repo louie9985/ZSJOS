@@ -10,8 +10,8 @@ export function operatorReasonRequired(context: Pick<StudentContactContext, 'ope
 type Values = { userId: number; correctionReason?: string }
 
 // Mount per assignment session so late requests cannot update another student's form.
-export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved }: {
-  relationId: number; onCancel: () => void; onSaved: () => Promise<void>
+export default function OperatorAssignmentDialog({ relationId, studentName, studentNo, isTargetCurrent, onBusyChange, onCancel, onSaved }: {
+  relationId: number; studentName: string | undefined; studentNo?: string; isTargetCurrent?: () => boolean; onBusyChange?: (busy: boolean) => void; onCancel: () => void; onSaved: () => Promise<void>
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
@@ -25,7 +25,7 @@ export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved
   const pending = useRef<{ fingerprint: string; key: string } | undefined>(undefined)
   const required = operatorReasonRequired(context, userId, serverRequired)
   const allowed = context?.availableActions.some(action => action === 'ASSIGN_OPERATOR' || action === 'DIRECTOR_OPERATOR_ASSIGN')
-  const blocked = loading || Boolean(loadError) || !allowed || !candidates.length || reloadRequired
+  const blocked = loading || Boolean(loadError) || !allowed || !candidates.length || reloadRequired || (isTargetCurrent != null && !isTargetCurrent())
   const errorText = (cause: unknown) => cause instanceof Error ? cause.message : '请求失败，请重试'
 
   const load = async () => {
@@ -36,6 +36,7 @@ export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved
         api.studentContactContext(relationId), api.studentCollaboratorCandidates(relationId, 'operator'),
       ])
       if (!alive.current || current !== run.current) return
+      if (nextContext.serviceRelationId !== relationId) throw new Error('学员服务上下文不一致，请重新加载')
       setContext(nextContext); setCandidates(nextCandidates); setReloadRequired(false)
       const selected = form.getFieldValue('userId')
       if (selected != null && !nextCandidates.some(item => item.id === selected)) {
@@ -57,10 +58,11 @@ export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved
 
   const submit = async () => {
     if (lock.current || blocked || !context) return
-    lock.current = true
+    if (isTargetCurrent && !isTargetCurrent()) return
+    lock.current = true; onBusyChange?.(true)
     try {
       const values = await form.validateFields()
-      if (!alive.current) return
+      if (!alive.current || (isTargetCurrent && !isTargetCurrent()) || context.serviceRelationId !== relationId) return
       setSaving(true); setSubmitError('')
       const body = { collaboratorType: 'operator' as const, userId: values.userId, version: context.version,
         correctionReason: values.correctionReason?.trim() || undefined }
@@ -84,7 +86,7 @@ export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved
           ? '无权为该学员指派运营，请联系管理员确认权限。' : errorText(cause))
       }
     } finally {
-      lock.current = false
+      lock.current = false; onBusyChange?.(false)
       if (alive.current) setSaving(false)
     }
   }
@@ -100,6 +102,9 @@ export default function OperatorAssignmentDialog({ relationId, onCancel, onSaved
     {context?.operatorAssignmentConflict && <Alert type="warning" showIcon message="学员运营归属不一致，本次将统一归属，请填写变更原因。" />}
     {submitError && <Alert type="error" showIcon message={submitError} action={reloadRequired ? <Button disabled={loading} onClick={() => void load()}>刷新运营信息</Button> : undefined} />}
     <Form form={form} layout="vertical" disabled={loading || saving || Boolean(loadError) || !allowed}>
+      <Form.Item label="当前学员"><span>{studentName || '未填写姓名'}</span></Form.Item>
+      <Form.Item label="学员编号"><span>{studentNo || '历史未记录'}</span></Form.Item>
+      <Form.Item label="当前运营"><span>{loading ? '加载中…' : !context ? '加载失败' : context.operatorUserName || (context.operatorUserId != null ? '姓名未提供' : '未指派')}</span></Form.Item>
       <Form.Item name="userId" label="运营负责人" rules={[{ required: true, message: '请选择运营负责人' },
         { validator: (_, value) => value == null || candidates.some(item => item.id === value) ? Promise.resolve() : Promise.reject(new Error('该运营已不可用，请重新选择')) }]}>
         <Select showSearch optionFilterProp="label" placeholder="请选择运营负责人" options={candidates.map(user => ({ value: user.id, label: user.nickname }))} />

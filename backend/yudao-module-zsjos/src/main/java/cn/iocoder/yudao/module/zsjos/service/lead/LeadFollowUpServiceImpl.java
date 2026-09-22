@@ -44,6 +44,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Resource private LeadFollowUpRecordMapper recordMapper;
     @Resource private LeadFollowUpImageMapper imageMapper;
     @Resource private BusinessEventMapper eventMapper;
@@ -113,6 +114,11 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setMethodLabelSnapshot(method.getLabel());
         record.setResultValue(result.getValue());
         record.setResultLabelSnapshot(result.getLabel());
+        var stage = LeadSalesStageSnapshot.resolve(lead, reqVO.getSalesStage(), dictDataApi);
+        record.setSalesStageBefore(lead.getSalesStage());
+        record.setSalesStageBeforeLabelSnapshot(lead.getSalesStageLabelSnapshot());
+        record.setSalesStageAfter(stage.value());
+        record.setSalesStageAfterLabelSnapshot(stage.label());
         record.setCategoryBefore(lead.getLeadCategory());
         record.setCategoryBeforeLabelSnapshot(labelOf(beforeCategory, lead.getLeadCategory()));
         record.setCategoryAfter(categoryAfter);
@@ -123,6 +129,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setFirstInAssignment(false);
         record.setIdempotencyKey(reqVO.getIdempotencyKey());
         recordMapper.insert(record);
+        performanceSnapshotService.activity("FOLLOW_UP", record.getId(), record.getLeadId(), record.getOperatorUserId());
 
         for (int index = 0; index < reqVO.getImages().size(); index++) {
             FileInfoRespDTO file = files.get(reqVO.getImages().get(index).getInfraFileId());
@@ -147,12 +154,20 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setLeadCategory(categoryAfter);
             lead.setLeadCategoryLabelSnapshot(labelOf(afterCategory, categoryAfter));
         }
-        boolean first = lifecycleTaskService.completeFirstFollowUpTask(
-                lead.getCurrentAssignmentHistoryId(), occurredAt);
-        if (first) {
-            record.setFirstInAssignment(true);
-            recordMapper.updateById(record);
-            lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
+        if (Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+            // Migrated records can outlive their task. The current-cycle record is
+            // the business fact; completing a task is a consequence, not evidence.
+            if (lead.getCurrentAssignmentFirstFollowUpAt() == null) {
+                LeadFollowUpRecordDO first = recordMapper.selectFirstByAssignment(
+                        leadId, lead.getCurrentAssignmentHistoryId(), lead.getOwnerUserId());
+                if (first == null) first = record;
+                first.setFirstInAssignment(true);
+                recordMapper.updateById(first);
+                if (Objects.equals(first.getId(), record.getId())) record.setFirstInAssignment(true);
+                lead.setCurrentAssignmentFirstFollowUpAt(first.getOccurredAt());
+            }
+            lifecycleTaskService.completeFirstFollowUpTask(lead.getCurrentAssignmentHistoryId(),
+                    lead.getCurrentAssignmentFirstFollowUpAt());
         }
         lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
@@ -162,6 +177,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         lead.setLastFollowUpRecordId(record.getId());
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
+        lead.setSalesStage(record.getSalesStageAfter());
+        lead.setSalesStageLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
         leadMapper.updateById(lead);
         BusinessEventDO followUpEvent = addEvent(EVENT_LEAD_FOLLOW_UP_RECORDED, lead, operatorUserId,
                 record.getId(), occurredAt, null, null);
@@ -255,12 +272,18 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setOwnerDeptIdSnapshot(operator == null ? null : operator.getDeptId());
         record.setMethodValue(method.getValue()); record.setMethodLabelSnapshot(method.getLabel());
         record.setResultValue(result.getValue()); record.setResultLabelSnapshot(result.getLabel());
+        var stage = LeadSalesStageSnapshot.resolve(lead, reqVO.getSalesStage(), dictDataApi);
+        record.setSalesStageBefore(lead.getSalesStage());
+        record.setSalesStageBeforeLabelSnapshot(lead.getSalesStageLabelSnapshot());
+        record.setSalesStageAfter(stage.value());
+        record.setSalesStageAfterLabelSnapshot(stage.label());
         record.setCategoryBefore(lead.getLeadCategory());
         record.setCategoryBeforeLabelSnapshot(labelOf(beforeCategory, lead.getLeadCategory()));
         record.setCategoryAfter(categoryAfter); record.setCategoryAfterLabelSnapshot(labelOf(afterCategory, categoryAfter));
         record.setRemark(reqVO.getRemark()); record.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         record.setOccurredAt(occurredAt); record.setIdempotencyKey(reqVO.getIdempotencyKey());
         opportunityRecordMapper.insert(record);
+        performanceSnapshotService.activity("OPPORTUNITY_FU", record.getId(), record.getLeadId(), record.getOperatorUserId());
         for (int i = 0; i < reqVO.getImages().size(); i++) {
             FileInfoRespDTO file = files.get(reqVO.getImages().get(i).getInfraFileId());
             OpportunityFollowUpImageDO image = new OpportunityFollowUpImageDO();
@@ -272,15 +295,22 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         if (!Objects.equals(record.getCategoryBefore(), categoryAfter)) {
             lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
         }
-        // 首次跟进任务按归属周期建键，与客资路径同源；valid 客资的跟进同样要完成本周期首跟，
-        // 否则时效进度会一直显示已超时，且有效性判定会被首跟校验挡住。
-        if (lifecycleTaskService.completeFirstFollowUpTask(
-                lead.getCurrentAssignmentHistoryId(), occurredAt)) {
-            lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
+        // A public-sea collaborator must not complete the owner's first follow-up.
+        if (Objects.equals(operatorUserId, lead.getOwnerUserId())
+                && lead.getCurrentAssignmentHistoryId() != null) {
+            if (lead.getCurrentAssignmentFirstFollowUpAt() == null) {
+                LeadFollowUpRecordDO first = recordMapper.selectFirstByAssignment(
+                        lead.getId(), lead.getCurrentAssignmentHistoryId(), lead.getOwnerUserId());
+                lead.setCurrentAssignmentFirstFollowUpAt(first == null ? occurredAt : first.getOccurredAt());
+            }
+            lifecycleTaskService.completeFirstFollowUpTask(lead.getCurrentAssignmentHistoryId(),
+                    lead.getCurrentAssignmentFirstFollowUpAt());
         }
         lead.setLastFollowUpAt(occurredAt); LeadMapper.advanceActivity(lead, occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
+        lead.setSalesStage(record.getSalesStageAfter());
+        lead.setSalesStageLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
         leadMapper.updateById(lead);
         opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         opportunity.setNextFollowUpAt(reqVO.getNextFollowUpAt()); opportunityMapper.updateById(opportunity);
@@ -339,6 +369,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     private LeadFollowUpRespVO convert(LeadFollowUpRecordDO record, List<LeadFollowUpImageDO> images,
                                        Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
+        result.setSalesStageBefore(record.getSalesStageBefore());
+        result.setSalesStageBeforeLabelSnapshot(record.getSalesStageBeforeLabelSnapshot());
+        result.setSalesStageAfter(record.getSalesStageAfter());
+        result.setSalesStageAfterLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
         result.setOwnerIdentitySnapshot(record.getOwnerIdentitySnapshot());
         result.setOwnerIdentityLabel(ownerIdentityLabel(record.getOwnerIdentitySnapshot()));
         result.setId(record.getId()); result.setLeadId(record.getLeadId());
@@ -368,6 +402,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     private LeadFollowUpRespVO convertOpportunity(OpportunityFollowUpRecordDO record,
             List<OpportunityFollowUpImageDO> images, Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
+        result.setSalesStageBefore(record.getSalesStageBefore());
+        result.setSalesStageBeforeLabelSnapshot(record.getSalesStageBeforeLabelSnapshot());
+        result.setSalesStageAfter(record.getSalesStageAfter());
+        result.setSalesStageAfterLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
         result.setOwnerIdentitySnapshot(record.getOwnerIdentitySnapshot());
         result.setOwnerIdentityLabel(ownerIdentityLabel(record.getOwnerIdentitySnapshot()));
         result.setId(record.getId()); result.setLeadId(record.getLeadId()); result.setOpportunityId(record.getOpportunityId());

@@ -93,7 +93,10 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
             // Every business default also gets a separately rendered WeCom rule when the
             // corresponding channel template is present. Existing tenants are backfilled by V177.
             if (NotifyChannelType.IN_APP.equals(channelCode)) {
-                String wecomCode = seed.getTemplateCode() + "_WECOM";
+                String code = seed.getTemplateCode();
+                String wecomCode = code.length() <= 58 ? code + "_WECOM"
+                        : code.substring(0, 47) + "_" + cn.hutool.crypto.digest.DigestUtil.md5Hex(code).substring(0, 8)
+                        + "_WECOM";
                 NotifyTemplateDO wecomTemplate = notifyTemplateService.getNotifyTemplateByCodeFromCache(wecomCode);
                 if (wecomTemplate != null) {
                     initializeDefaultRule(seed, wecomCode, NotifyChannelType.WECOM, seed.getName() + "（企微）");

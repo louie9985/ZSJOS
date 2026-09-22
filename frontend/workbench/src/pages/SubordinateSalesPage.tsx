@@ -1,3 +1,4 @@
+import SubordinateSalesCard from "../components/SubordinateSalesCard";
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Empty, Form, Input, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
@@ -940,51 +941,8 @@ export default function SubordinateSalesPage({
             ) : rows.length ? (
               <>
               {rows.map((row) => (
-                <button
-                  type="button"
-                  key={row.userId}
-                  className={`subordinate-sales-item ${selectedSales?.userId === row.userId ? "active" : ""}`}
-                  onClick={() => setSelectedSales(row)}
-                >
-                  <div className="subordinate-sales-item-title">
-                    <EmployeeAvatar avatar={row.avatar} name={row.name} size={28} />
-                    <strong>{row.name}</strong>
-                    <Tag
-                      color={row.accountStatus === 0 ? "success" : "default"}
-                    >
-                      {row.accountStatus === 0 ? "启用" : "停用"}
-                    </Tag>
-                  </div>
-                  <div className="subordinate-sales-item-account">
-                    {row.username} · {row.mobile || "未填写手机号"}
-                  </div>
-                  <div className="subordinate-sales-item-status">
-                    <Tag
-                      color={row.presence === "online" ? "success" : "default"}
-                    >
-                      {row.presence === "online" ? "在线" : "离线"}
-                    </Tag>
-                    <Tag color={row.accepting ? "processing" : "default"}>
-                      {row.accepting ? "接单开启" : "接单关闭"}
-                    </Tag>
-                    <Tag color={row.canReceiveNewLeads ? "success" : "default"}>
-                      {receiveStatusLabel(row)}
-                    </Tag>
-                  </div>
-                  <div className="subordinate-sales-item-summary">
-                    <span>
-                      今日待跟进 <b>{row.todayPendingCount}</b>
-                    </span>
-                    <span>{todayStatusLabel(row.todayFollowUpStatus)}</span>
-                  </div>
-                  <div className="subordinate-sales-item-summary">
-                    <span>有效客资 {row.validLeadCount}</span>
-                    <span>
-                      成交 {row.convertedLeadCount} /{" "}
-                      {formatCurrency(row.effectiveOrderAmount)}
-                    </span>
-                  </div>
-                </button>
+                <SubordinateSalesCard key={row.userId} sales={row}
+                  selected={selectedSales?.userId === row.userId} onSelect={() => setSelectedSales(row)} />
               ))}
               <div ref={sentinelRef} className="subordinate-sales-load-sentinel" aria-hidden="true" />
               {loadingMore && <div className="subordinate-sales-load-state"><Button type="text" size="small" loading>正在加载更多</Button></div>}

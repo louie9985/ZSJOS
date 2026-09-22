@@ -99,8 +99,8 @@ export const getDeliveryClassOptions = (categoryId?: number, includePending = tr
   })
 export const getHomeroomCandidates = () =>
   request.get<HomeroomCandidate[]>({ url: '/zsjos/delivery-class/homeroom-candidates' })
-export const getExamOptions = (categoryId: number, productId?: number, selectedAttrsJson?: string) =>
-  request.get<ExamOption[]>({ url: '/zsjos/delivery-class/exam-options', params: { categoryId, productId, selectedAttrsJson } })
+export const getExamOptions = (categoryId: number, productId?: number, selectedAttrsJson?: string, selectedSkuIds?: number[]) =>
+  request.get<ExamOption[]>({ url: '/zsjos/delivery-class/exam-options', params: { categoryId, productId, selectedAttrsJson, selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })
 export const getProductOptions = () =>
   request.get<ProductOption[]>({ url: '/zsjos/delivery-class/product-options' })
 export const createDeliveryClass = (data: {

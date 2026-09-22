@@ -1,6 +1,6 @@
 import ProductSpecs from './ProductSpecs'
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Empty, Image, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Image, Tag, Typography } from 'antd'
 import {
   CopyOutlined,
   ClockCircleOutlined,
@@ -132,19 +132,25 @@ function ProductCard({ product }: { product: ManagedLeadProduct }) {
 
 /* ========== 最近跟进 ========== */
 
-function LatestFollowUp({ leadId }: { leadId: number }) {
+export function LatestFollowUp({ leadId, refreshVersion = 0 }: { leadId: number; refreshVersion?: number | string }) {
   const [record, setRecord] = useState<LeadFollowUp | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [retryVersion, setRetryVersion] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
+    setError('')
     api.leadFollowUpPage(leadId, { pageNo: 1, pageSize: 1 })
-      .then(page => setRecord(page.list[0] || null))
-      .catch(() => setRecord(null))
-      .finally(() => setLoading(false))
-  }, [leadId])
+      .then(page => { if (!cancelled) setRecord(page.list[0] || null) })
+      .catch(error => { if (!cancelled) setError(error instanceof Error ? error.message : '最近跟进加载失败') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [leadId, refreshVersion, retryVersion])
 
   if (loading) return <div className="lead-section-block"><Typography.Text type="secondary">加载中...</Typography.Text></div>
+  if (error) return <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => setRetryVersion(value => value + 1)}>重试</Button>}/>
   if (!record) return (
     <div className="lead-latest-followup">
       <div className="lead-section-header">
@@ -585,7 +591,7 @@ export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) 
   }
 }
 
-export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots }: {
+export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots, followUpRefreshVersion = 0 }: {
   lead?: ManagedLead
   student?: MyStudent
   categoryLabel: (value?: string) => string
@@ -596,6 +602,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   studentContext?: StudentOverviewContext
   studentService?: MyStudent['services'][number]
   hideProviderOwner?: boolean
+  followUpRefreshVersion?: number
   slots?: LeadOverviewSlots
 }) {
   const sourceDispatchTag = lead ? leadSourceDispatchTag(lead) : undefined
@@ -664,6 +671,10 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}{lead.ownerIdentity && ` · ${lead.ownerIdentityLabel}`}</span>
                   </div>
                   <div className="lead-profile-row">
+                    <span className="lead-field-label">销售阶段</span>
+                    <span className="lead-field-value">{lead.salesStageLabelSnapshot || '未记录'}</span>
+                  </div>
+                  <div className="lead-profile-row">
                     <span className="lead-field-label">分类</span>
                     <span className="lead-field-value">{lead.leadCategoryLabelSnapshot?.trim() || categoryLabel(lead.leadCategory)}</span>
                   </div>
@@ -705,7 +716,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 </section>
 
                 {(slots?.latestActivity || studentContext || lead) && <section className="lead-card">
-                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead ? <LatestFollowUp leadId={lead.id} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近联系" />)}
+                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead ? <LatestFollowUp leadId={lead.id} refreshVersion={`${followUpRefreshVersion}:${lead.lastActivityAt ?? ''}`} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近联系" />)}
                 </section>}
               </div>
 

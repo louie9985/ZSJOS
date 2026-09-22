@@ -1,0 +1,17 @@
+package cn.iocoder.yudao.module.zsjos.service.performance;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact;
+import org.junit.jupiter.api.Test;
+import java.time.*;
+import java.math.BigDecimal;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+class PerformanceCalculationTest {
+ private PerformanceFact order(long lead,String amount,LocalDateTime received,LocalDateTime submitted,String type){var f=new PerformanceFact();f.setLeadId(lead);f.setAmount(new BigDecimal(amount));f.setReceivedAt(received);f.setOccurredAt(submitted);f.setOrderType(type);return f;}
+ private PerformanceFact receipt(long lead,LocalDateTime at){var f=new PerformanceFact();f.setLeadId(lead);f.setReceivedAt(at);f.setStatus("valid");return f;}
+ @Test void windowBoundaries(){var n=LocalDateTime.of(2026,1,1,12,0);assertEquals(LocalDate.of(2025,12,29),PerformancePeriods.window("week",n).start().toLocalDate());assertEquals(n.toLocalDate().minusDays(6),PerformancePeriods.window("last7",n).start().toLocalDate());assertEquals(LocalDate.of(2025,12,1),PerformancePeriods.window("lastMonth",n).start().toLocalDate());assertEquals(LocalDate.of(2024,2,1),PerformancePeriods.window("month",LocalDateTime.of(2024,2,29,12,0)).start().toLocalDate());}
+ @Test void sixtyDaysIsExclusiveAndTransferRestarts(){var at=LocalDateTime.of(2026,1,1,10,0);assertTrue(PerformancePeriods.withinValidity(at,at.plusDays(60).minusNanos(1)));assertFalse(PerformancePeriods.withinValidity(at,at.plusDays(60)));assertTrue(PerformancePeriods.withinValidity(at.plusDays(30),at.plusDays(70)));assertFalse(PerformancePeriods.withinValidity(at,at.minusSeconds(1)));}
+ @Test void teamDedupOldConversionsAndRepurchase(){var n=LocalDateTime.of(2026,9,22,12,0);var fresh=n.minusDays(5);var old=n.minusDays(30);var w=PerformancePeriods.window("month",n);var metric=PerformanceStatisticsService.metric(w,List.of(order(1,"100",fresh,n.minusDays(1),"first_purchase"),order(1,"200",fresh,n.minusDays(1),"repurchase"),order(2,"100",old,n.minusDays(1),"first_purchase")),List.of(receipt(1,fresh),receipt(1,fresh.plusDays(1)),receipt(3,fresh)));assertEquals(2,metric.converted());assertEquals(3,metric.denominator());assertEquals(3,metric.orders());assertEquals(new BigDecimal("400"),metric.amount());assertEquals(new BigDecimal("0.666667"),metric.rate());}
+ @Test void averageExcludesBothNumeratorAndDenominator(){var n=LocalDateTime.of(2026,9,22,12,0);var rows=List.of(order(1,"0",n.minusDays(1),n.minusHours(1),"first_purchase"),order(2,"0.01",n.minusDays(1),n.minusHours(1),"first_purchase"),order(3,"100",n.minusDays(1),n.minusHours(1),"first_purchase"));var m=PerformanceStatisticsService.metric(PerformancePeriods.window("month",n),rows,List.of());assertEquals(3,m.orders());assertEquals(new BigDecimal("100.01"),m.amount());assertEquals(new BigDecimal("100.000000"),m.average());}
+ @Test void emptyIsNotZeroConversion(){var m=PerformanceStatisticsService.metric(PerformancePeriods.window("month",LocalDateTime.now()),List.of(),List.of());assertNull(m.rate());assertNull(m.average());assertEquals(BigDecimal.ZERO,m.amount());}
+ @Test void expiredAndUnrelatedTransfersDoNotConvert(){var n=LocalDateTime.of(2026,9,22,12,0);var m=PerformanceStatisticsService.metric(PerformancePeriods.window("month",n),List.of(order(1,"100",n.minusDays(80),n.minusDays(1),"first_purchase")),List.of(receipt(1,n.minusDays(2))));assertEquals(0,m.converted());assertEquals(1,m.denominator());}
+}

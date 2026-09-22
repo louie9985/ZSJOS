@@ -187,6 +187,27 @@ class NotifyRuleServiceImplTest {
                 captor.getAllValues().stream().map(NotifyRuleDO::getChannelCode).toList());
     }
 
+    @Test
+    void longTemplateCodesUseTheSameWecomNameAsSqlMirroring() {
+        String code = "ZSJ_" + "X".repeat(56);
+        String mirrored = code.substring(0, 47) + "_"
+                + cn.hutool.crypto.digest.DigestUtil.md5Hex(code).substring(0, 8) + "_WECOM";
+        var seed = NotifyDefaultRuleReqDTO.builder().name("long code").sceneCode("test.scene")
+                .templateCode(code).recipientRoles(List.of("owner"))
+                .actionType(NotifyActionType.MESSAGE_DETAIL).build();
+        var inApp = NotifyTemplateDO.builder().id(2L).sceneCode("test.scene").channelCode("in_app").build();
+        var wecom = NotifyTemplateDO.builder().id(3L).sceneCode("test.scene").channelCode("wecom").build();
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache(code)).thenReturn(inApp);
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache(mirrored)).thenReturn(wecom);
+        when(notifyTemplateService.getNotifyTemplate(2L)).thenReturn(inApp);
+        when(notifyTemplateService.getNotifyTemplate(3L)).thenReturn(wecom);
+        when(sceneRegistry.getScene("test.scene")).thenReturn(scene());
+        service.initializeDefaultRules(List.of(seed));
+        var rules = ArgumentCaptor.forClass(NotifyRuleDO.class);
+        verify(notifyRuleMapper, times(2)).insert(rules.capture());
+        assertEquals(List.of("in_app", "wecom"), rules.getAllValues().stream().map(NotifyRuleDO::getChannelCode).toList());
+    }
+
     private void stubValidCatalog() {
         when(sceneRegistry.getScene("test.scene")).thenReturn(scene());
         when(notifyTemplateService.getNotifyTemplate(2L))

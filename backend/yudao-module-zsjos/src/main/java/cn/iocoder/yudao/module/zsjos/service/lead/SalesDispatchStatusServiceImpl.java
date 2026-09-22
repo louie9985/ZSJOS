@@ -109,7 +109,7 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
     }
 
     private boolean isEligible(Long userId) {
-        return assignmentService.getEligibleSalesUsers().stream().anyMatch(user -> userId.equals(user.getId()));
+        return assignmentService.isEligibleSalesUser(userId);
     }
 
     private void requireEligible(Long userId) {

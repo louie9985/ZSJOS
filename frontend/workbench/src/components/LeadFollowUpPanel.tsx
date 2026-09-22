@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, App, Button, DatePicker, Empty, Form, Input, Select, Space, Spin } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useLeadSalesStages } from '../services/useLeadSalesStages'
 import { api, type DictData, type LeadAttachment, type LeadFollowUp, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { useBusinessOverlay } from './OverlayCoordinator'
@@ -14,13 +15,14 @@ import FollowUpTimeline from './FollowUpTimeline'
 
 const PAGE_SIZE = 10
 
-type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
+type Values = { salesStage?: string; method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
 export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, onClose, onChanged, onDirtyChange, onTotalChange }: {
   lead: ManagedLead; open: boolean; onOpen?: () => void; onClose: () => void; onChanged?: () => void
   refreshVersion?: number; onDirtyChange?: (dirty: boolean) => void; onTotalChange?: (total: number) => void
 }) {
   const { message } = App.useApp()
+  const stages = useLeadSalesStages(lead)
   const [form] = Form.useForm<Values>()
   const [dirty, setDirty] = useState(false)
   const { submitting, run: runSubmission, resetIntent } = useSubmissionGuard()
@@ -62,9 +64,9 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
     ]).then(([methodData, resultData, categoryData, notes]) => {
       setMethods(methodData); setResults(resultData); setCategories(categoryData); setQuickNotes(notes)
     }).catch(() => setError('跟进字典加载失败，请重试'))
-    form.setFieldsValue({ leadCategory: lead.leadCategory })
+    form.setFieldsValue({ leadCategory: lead.leadCategory, salesStage: lead.salesStage })
     setDirty(false); setImages([])
-  }, [form, lead.id, lead.leadCategory])
+  }, [form, lead.id, lead.leadCategory, lead.salesStage])
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault() }
@@ -79,10 +81,11 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
   const isFiltered = Boolean(filterMethod || filterResult)
 
   const reset = () => {
-    form.resetFields(); form.setFieldsValue({ leadCategory: lead.leadCategory })
+    form.resetFields(); form.setFieldsValue({ leadCategory: lead.leadCategory, salesStage: lead.salesStage })
     setImages([]); setDirty(false)
   }
   const prepareSubmit = async () => {
+    if (stages.loading || stages.error) return
     const values = await form.validateFields().catch(() => undefined)
     if (!values) return
     setPendingValues(values)
@@ -96,7 +99,7 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
       const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
       if (uploadResult.failed) { message.error('有跟进图片上传失败，请重试失败项'); return }
       await api.createLeadFollowUp(lead.id, {
-        method: values.method, result: values.result, leadCategory: values.leadCategory,
+        method: values.method, result: values.result, leadCategory: values.leadCategory, salesStage: values.salesStage,
         remark: values.remark?.trim() || undefined,
         nextFollowUpAt: values.nextFollowUpAt?.valueOf(),
         images: uploadResult.items.filter(image => image.uploaded).map(image => ({ infraFileId: image.uploaded!.infraFileId })), idempotencyKey
@@ -160,6 +163,10 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
               <Form form={form} layout="vertical" className="follow-up-form" onValuesChange={() => setDirty(true)} disabled={submitting}>
                 <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}><Select options={methods.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
                 <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}><Select options={results.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
+                {stages.error && <Alert type="error" showIcon title={stages.error} action={<Button size="small" onClick={() => void stages.reload()}>重试</Button>}/>}
+                <Form.Item name="salesStage" label="跟进后销售阶段" rules={[{ required: true, message: '请选择销售阶段' }]}>
+                  <Select loading={stages.loading} disabled={Boolean(stages.error)} options={stages.options} notFoundContent={stages.loading ? <Spin size="small"/> : '暂无可选销售阶段，请联系管理员'}/>
+                </Form.Item>
                 <Form.Item name="leadCategory" label="客资分类"><Select allowClear options={categories.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
                 {quickNotes.length > 0 && <Space wrap className="follow-up-quick-notes">{quickNotes.map(note => <Button size="small" key={note.value} onClick={() => appendNote(note.label)}>{note.label}</Button>)}</Space>}
                 <Form.Item name="remark" label="跟进备注" rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }]}><Input.TextArea rows={3} maxLength={2000} showCount/></Form.Item>
@@ -174,7 +181,7 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
                 </div>
                 <Space>
                   <IrreversiblePopconfirm action={`提交客资「${lead.submittedName}」的跟进记录`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}>
-                    <Button type="primary" loading={submitting} onClick={() => void prepareSubmit()}>提交跟进</Button>
+                    <Button type="primary" loading={submitting} disabled={stages.loading || Boolean(stages.error)} onClick={() => void prepareSubmit()}>提交跟进</Button>
                   </IrreversiblePopconfirm>
                   <Button onClick={reset}>重置</Button>
                 </Space>

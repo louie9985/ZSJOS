@@ -38,7 +38,8 @@ public class DeliveryClassController {
     @GetMapping("/exam-options")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:create','zsjos:delivery-class:update')")
     public CommonResult<List<DeliveryClassExamOptionRespVO>> examOptions(@RequestParam Long categoryId,
-            @RequestParam(required = false) Long productId, @RequestParam(required = false) String selectedAttrsJson){ return success(service.examOptions(categoryId, productId, selectedAttrsJson)); }
+            @RequestParam(required = false) Long productId, @RequestParam(required = false) String selectedAttrsJson,
+            @RequestParam(required = false) String selectedSkuIdsJson){ return success(service.examOptions(categoryId, productId, selectedAttrsJson, selectedSkuIdsJson)); }
     @GetMapping("/{id}") @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:query','zsjos:delivery-class:query-managed','zsjos:delivery-class:query-my')")
     public CommonResult<DeliveryClassRespVO> get(@PathVariable Long id){ return success(service.get(id,getLoginUserId())); }
     @GetMapping("/{id}/students") @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:query','zsjos:delivery-class:query-managed','zsjos:delivery-class:query-my')")

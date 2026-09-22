@@ -78,6 +78,47 @@ class LeadAssignmentServiceImplTest {
     }
 
     @Test
+    void permissionEligibilityExcludesDisabledAndMissingUsersWithoutDepartmentLookup() {
+        var scene = leadScene();
+        scene.setTargetEligibilityType("permission");
+        scene.setTargetPermissionCode("zsjos:lead:accept");
+        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
+        when(permissionApi.getEnabledUserIdsByPermission("zsjos:lead:accept")).thenReturn(Set.of(2L, 3L));
+        when(adminUserApi.getUserList(Set.of(2L, 3L))).thenReturn(List.of(
+                user(2L, 20L, "enabled", 0), user(3L, 20L, "disabled", 1)));
+
+        assertTrue(service.isEligibleSalesUser(2L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(3L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(4L));
+        verifyNoInteractions(deptApi, postApi);
+    }
+
+    @Test
+    void postEligibilityExcludesDisabledPostsAndUsersWithoutDepartmentLookup() {
+        var scene = leadScene();
+        scene.setTargetPostCodes(List.of("enabled", "disabled", "missing"));
+        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
+        when(postApi.getPostByCode("enabled")).thenReturn(post(12L));
+        var disabledPost = post(13L);
+        disabledPost.setStatus(1);
+        when(postApi.getPostByCode("disabled")).thenReturn(disabledPost);
+        when(adminUserApi.getUserListByPostIds(Set.of(12L))).thenReturn(List.of(
+                user(2L, 20L, "enabled", 0), user(3L, 20L, "disabled", 1)));
+
+        assertTrue(service.isEligibleSalesUser(2L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(3L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(4L));
+        verifyNoInteractions(deptApi, permissionApi);
+    }
+
+    @Test
+    void emptyCandidateSetAndNullUserAreIneligible() {
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(null));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(2L));
+        verifyNoInteractions(deptApi, adminUserApi);
+    }
+
+    @Test
     void savingSourceFromAdditionalPostStillRequiresManagementScope() {
         var scene = leadScene();
         scene.setSourcePostCodes(List.of("first_source", "second_source"));

@@ -52,3 +52,24 @@
 ## 当前租户管理员读取
 
 my-page 新增可选 readScope=SELF|ALL|USER、targetUserId，默认本人。管理员全量／指定人员查询保留 view/status 与业务类型过滤，availableActions 为空；候选池和办理命令不变。管理审计页面继续使用现有审计接口。
+
+## 拍剪成品交付与工作台展示
+
+拍剪提交接口新增可选 `completionUrl`（HTTP(S)，最多 2000 字符），保存到工单 dispatchContext 的同名字段，与 completionRemark 一起返回详情与列表。工作台提交成品要求填写链接，复用 ResourceLinkInput，取消成品文件上传及发送视频确认复选框。旧 attachmentId、videoSentToOperator 请求字段保持兼容，不改写历史记录；新工作台不再发送这两个字段。
+
+发起表单、接单弹窗及详情使用通用链接和附件展示；动态附件仍保存文件 ID 数组。操作区采用右侧 grid，小屏移至正文上方。公共池按照 availableActions 展示 CLAIM_TICKET；全局接单/拒接完成后通知已挂载的拍剪页和通用工单列表重新读取。工单通知/列表深链的 ticketId 必须读取对应详情，运营可查看提交备注和成品链接，不依赖目标工单位于第一页。
+
+请求附件与上传响应增加可选 `url`：从 Infra 获取 300 秒临时读取地址，读取详情仍先经过原有工单可见性检查。附件预览/下载重读所属工单刷新地址；文件不可用时保留快照信息并展示失败重试。管理端审计既有文件名展示兼容该新增字段。
+旧 V206 拍剪发布模板中的 `account_link`、`original_work_link`、`reference_work_link` 虽为 text，发起端按已定义字段键兼容链接输入；不依据显示名称猜测字段，也不改写发布模板或管理员数据。
+
+## 拍剪工单收件箱与流转展示（2026-09-22）
+
+`GET /zsjos/production-ticket/page` 新增可选 `statusGroup=todo|producing|review|completed|all`、`deadlineFrom`、`deadlineTo`、`pendingAssignment`。旧参数及默认读取范围保持兼容。todo 对应 pending_accept/accepted/rejected；producing 对应 in_production；review 对应 submitted/checking；completed 对应 completed；all 不增加状态条件。具体 status 与分组取交集。pendingAssignment=true 强制当前登录人、pending_accept 状态，忽略扩大管理范围的能力，不接受客户端处理人 ID。日期格式为 `yyyy-MM-dd HH:mm:ss`，起止均包含；工作台按北京时间当日开始/结束提交。`pool/page` 同样接受日期起止，继续限定 public_pool。
+
+截止筛选优先读取主表 deadline_at；主表为空时读取同租户、未删除统一工单 value_json 的 deadline_at/deadlineAt 冻结值，与详情的兼容来源一致。未设置截止时间的工单不命中日期范围；不修补历史数据，不解析当前字典。
+
+ProductionTicket 响应新增可选 sceneName、assigneeName、currentRound、timeline 和毫秒时间戳 serverNow，来自已有关联工单快照与操作历史。timeline 保留 WorkOrderTimeline 的 operation/fromStatus/toStatus/operatorName/reason/resultRemark/roundNo/operatedAt 语义；其中状态为统一工单状态，不等同于拍剪状态。阶段以拍剪 status 为准。未记录的处理人、时间及历史明确显示缺失，不根据阶段补造事件。权限、对象读取、租户隔离和业务命令保持原契约；无新表、流程实例或依赖。
+
+Workbench 我的工单为每页 20 条的状态收件箱，抢单池为每页 12 条的卡片网格。卡片进入完整详情后执行抢单；返回保留池筛选、页码及滚动位置。独立详情请求支持非第一页深链并忽略过期响应。提交/开始制作/通过/返工后刷新对应状态组；重复按钮点击被阻止，服务端仍校验版本与幂等。多账号全部展示，动态附件保留字段归属且补充附件去重。字典与实体对象展示冻结 label，缺失标签不回查当前值。
+
+Vue 管理端未发现 production-ticket 专用 API 消费者；通用工单审计继续使用原 WorkOrder 响应及时间线，无页面迁移。全局指定派单仍使用原 pendingAssignments 接口与刷新事件，共享需求阅读布局。原命令、附件和成品链接字段保留兼容。

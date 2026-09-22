@@ -162,7 +162,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const routeState = location.state as { leadId?: number; leadNo?: string; openFollowUp?: boolean; relationScope?: 'submitted' | 'owned' } | null
+  const routeState = location.state as { leadId?: number; leadNo?: string; openFollowUp?: boolean; tab?: string; relationScope?: 'submitted' | 'owned' } | null
   const queryLeadId = Number(searchParams.get('leadId')) || undefined
   const requestedLeadNo = routeState?.leadNo || searchParams.get('leadNo') || undefined
   const screens = Grid.useBreakpoint()
@@ -170,6 +170,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const { useTableLayout } = useInboxTableLayout()
   const requestedLeadId = routeState?.leadId || queryLeadId
   const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
+    || parseLeadDetailTab(routeState?.tab)
     || (routeState?.openFollowUp ? 'follow-ups' : undefined)
   const returnToValue = searchParams.get('returnTo')
   const returnTo = returnToValue?.startsWith('/zsjos/sales-order-approvals') ? returnToValue : undefined
@@ -351,7 +352,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       const loaded = await api.managedLead(id)
       if (version !== detailRequestVersion.current) return
       setDetail(loaded)
-      setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))
+      setItems(current => current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : pinLeadFirst(current, loaded))
     } catch (loadError) {
       if (version !== detailRequestVersion.current) return
       setDetail(undefined)
@@ -370,7 +371,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       if (version !== detailRequestVersion.current) return
       setSelectedId(loaded.id)
       setDetail(loaded)
-      setItems(current => current.some(item => item.id === loaded.id) ? current : pinLeadFirst(current, loaded))
+      setItems(current => current.some(item => item.id === loaded.id) ? current.map(item => item.id === loaded.id ? loaded : item) : pinLeadFirst(current, loaded))
     } catch (loadError) {
       if (version !== detailRequestVersion.current) return
       setDetail(undefined)
@@ -398,12 +399,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     setSelectedId(id)
     const version = ++requestVersion.current
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
-    const [, refreshedItems] = await Promise.all([
+    await Promise.all([
       loadMetadata(),
-      loadPage(1, true, version, { preferredSelectedId: id, silent: true })
+      loadPage(useTableLayout ? pageNo : 1, true, version, { preferredSelectedId: id, silent: true }),
+      loadDetail(id, true)
     ])
-    if (!refreshedItems || refreshedItems.some(item => item.id === id)) await loadDetail(id, true)
-  }, [loadDetail, loadMetadata, loadPage])
+  }, [loadDetail, loadMetadata, loadPage, pageNo, useTableLayout])
 
   useEffect(() => { itemIdsRef.current = items.map(item => item.id) }, [items])
 
@@ -493,6 +494,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       { key: 'source', title: '来源', render: (_: unknown, item: ManagedLead) => item.sourceLabel || item.sourceType || '-' },
       { key: 'sourceUser', title: '提交人', render: (_: unknown, item: ManagedLead) => item.sourceUserName || '-' },
       { key: 'owner', title: '负责人', render: (_: unknown, item: ManagedLead) => [item.ownerUserName, item.ownerIdentity ? item.ownerIdentityLabel : undefined].filter(Boolean).join(' · ') || '-' },
+      { key: 'salesStage', title: '销售阶段', render: (_: unknown, item: ManagedLead) => item.salesStageLabelSnapshot || '未记录' },
       { key: 'category', title: '分类', render: (_: unknown, item: ManagedLead) => snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError) },
       { key: 'channel', title: '渠道', render: (_: unknown, item: ManagedLead) => channelLabel(item.sourceChannel) },
       { key: 'region', title: '地区', render: (_: unknown, item: ManagedLead) => [item.provinceName, item.cityName].filter(Boolean).join(' / ') || '-' },
@@ -700,7 +702,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>
               </div>
-              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{channelLabel(item.sourceChannel)} · {snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError)} · {formatTimestamp(item.submittedAt)}</span></div>
+              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{item.salesStageLabelSnapshot || '未记录'} · {channelLabel(item.sourceChannel)} · {snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError)} · {formatTimestamp(item.submittedAt)}</span></div>
             </button></Tooltip>
           })}
           {!initialLoading && items.length > 0 && <div ref={listSentinelRef} className="lead-list-sentinel">

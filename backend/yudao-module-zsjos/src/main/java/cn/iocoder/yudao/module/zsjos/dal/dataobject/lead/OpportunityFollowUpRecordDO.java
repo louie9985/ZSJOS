@@ -25,6 +25,10 @@ public class OpportunityFollowUpRecordDO extends TenantBaseDO {
     private String methodLabelSnapshot;
     private String resultValue;
     private String resultLabelSnapshot;
+    private String salesStageBefore;
+    private String salesStageBeforeLabelSnapshot;
+    private String salesStageAfter;
+    private String salesStageAfterLabelSnapshot;
     private String categoryBefore;
     private String categoryBeforeLabelSnapshot;
     private String categoryAfter;

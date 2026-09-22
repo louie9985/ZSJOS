@@ -169,8 +169,7 @@
         ><el-input v-model="editor.className" maxlength="100" placeholder="留空时由系统生成"
       /></el-form-item>
       <el-form-item label="产品" prop="productId"><el-select v-model="editor.productId" filterable @change="productChanged"><el-option v-for="item in products" :key="item.productId" :label="item.productName" :value="item.productId" /></el-select></el-form-item>
-      <el-form-item v-for="attr in selectedProduct?.attrs || []" :key="attr.attrKey" :label="attr.attrName"><el-select v-model="editor.selectedAttrs[attr.attrKey]" clearable @change="productScopeChanged"><el-option v-for="item in attr.values" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
-      <el-form-item label="SKU" prop="selectedSkuIds"><el-select v-model="editor.selectedSkuIds" multiple collapse-tags filterable :disabled="!selectedProduct"><el-option v-for="item in selectedProduct?.skus || []" :key="item.id" :label="item.skuName" :value="item.id" /></el-select></el-form-item>
+      <el-form-item label="SKU" prop="selectedSkuIds"><el-select v-model="editor.selectedSkuIds" multiple collapse-tags filterable :disabled="!selectedProduct" @change="skuChanged"><el-option v-for="item in selectedProduct?.skus || []" :key="item.id" :label="item.skuName" :value="item.id" /></el-select></el-form-item>
       <el-form-item label="考期" prop="examScheduleId"
         ><el-alert v-if="examError" :title="examError" type="error" show-icon :closable="false"><template #default><el-button link type="primary" @click="reloadExams()">重试</el-button></template></el-alert><el-select v-model="editor.examScheduleId" :loading="examLoading" :disabled="examLoading || Boolean(examError)"
           ><el-option
@@ -285,6 +284,7 @@ const editor = reactive({
 })
 const rules: FormRules = {
   productId: [{ required: true, message: '请选择产品' }],
+  selectedSkuIds: [{ type: 'array', required: true, min: 1, message: '请至少选择一个 SKU' }],
   examScheduleId: [{ required: true, message: '请选择考期' }],
   homeroomUserId: [{ required: true, message: '请选择班主任' }]
 }
@@ -383,30 +383,25 @@ const openEditor = async (row?: Api.DeliveryClass) => {
     referenceLoading.value = false
   }
 }
-const reloadExams = async (categoryId = selectedProduct.value?.categoryId, productId = selectedProduct.value?.productId, attrs = editor.selectedAttrs) => {
+const reloadExams = async (categoryId = selectedProduct.value?.categoryId, productId = selectedProduct.value?.productId, attrs = {}, skuIds = editor.selectedSkuIds) => {
   if (!categoryId) { exams.value = []; return }
   examLoading.value = true; examError.value = ''
-  try { exams.value = await Api.getExamOptions(categoryId, productId, JSON.stringify(normalizeAttrs(attrs))) }
+  try { exams.value = await Api.getExamOptions(categoryId, productId, JSON.stringify(normalizeAttrs(attrs)), skuIds) }
   catch (cause: any) { exams.value = []; examError.value = cause?.msg || cause?.message || '考期加载失败' }
   finally { examLoading.value = false }
 }
 const productChanged = (productId: number) => {
   const product = products.value.find(item => item.productId === productId)
   editor.categoryId = product?.categoryId
-  editor.selectedSkuIds = product?.skus.map(sku => sku.id) || []
+  editor.selectedSkuIds = []
   editor.selectedAttrs = {}
   editor.examScheduleId = undefined
-  void reloadExams(product?.categoryId, product?.productId, {})
+  exams.value = []
 }
-const productScopeChanged = () => {
-  const product = selectedProduct.value
-  if (!product) return
-  const attrs = normalizeAttrs(editor.selectedAttrs)
-  editor.selectedAttrs = attrs
-  const validSkuIds = new Set(product.skus.filter(sku => Object.entries(attrs).every(([key, value]) => sku.attrValues[key] === value)).map(sku => sku.id))
-  editor.selectedSkuIds = editor.selectedSkuIds.filter(id => validSkuIds.has(id))
+const skuChanged = () => {
   editor.examScheduleId = undefined
-  void reloadExams(product.categoryId, product.productId, editor.selectedAttrs)
+  if (!selectedProduct.value || !editor.selectedSkuIds.length) { exams.value = []; return }
+  void reloadExams(selectedProduct.value.categoryId, selectedProduct.value.productId, {}, editor.selectedSkuIds)
 }
 const save = async () => {
   if (!(await editorRef.value?.validate())) return
@@ -415,7 +410,7 @@ const save = async () => {
     const value = {
       className: editor.className || undefined,
       productId: editor.productId!, selectedSkuIds: editor.selectedSkuIds,
-      selectedAttrs: editor.selectedAttrs,
+      selectedAttrs: {},
       categoryId: editor.categoryId!,
       examScheduleId: editor.examScheduleId!,
       homeroomUserId: editor.homeroomUserId!

@@ -83,6 +83,9 @@
       <el-table-column label="地区" min-width="130">
         <template #default="scope">{{ areaText(scope.row) }}</template>
       </el-table-column>
+      <el-table-column label="销售阶段" min-width="120">
+        <template #default="scope">{{ scope.row.salesStageLabelSnapshot || '未记录' }}</template>
+      </el-table-column>
       <el-table-column label="客资分类" min-width="120">
         <template #default="scope">{{
           scope.row.leadCategoryLabelSnapshot || '历史未记录'
@@ -138,7 +141,7 @@
     />
   </ContentWrap>
 
-  <el-drawer v-model="detailVisible" title="客资详情" size="720px" destroy-on-close>
+  <el-drawer v-model="detailVisible" title="客资详情" size="min(720px, 100vw)" destroy-on-close>
     <div v-loading="detailLoading">
       <el-alert v-if="detailError" type="error" :title="detailError" show-icon :closable="false">
         <template #default
@@ -160,6 +163,7 @@
           }}</el-descriptions-item>
         </el-descriptions>
         <el-descriptions title="客资信息" :column="2" border class="mt-20px">
+          <el-descriptions-item label="销售阶段">{{ detail.salesStageLabelSnapshot || '未记录' }}</el-descriptions-item>
           <el-descriptions-item label="客资分类">{{
             detail.leadCategoryLabelSnapshot || '历史未记录'
           }}</el-descriptions-item>
@@ -293,6 +297,7 @@
                   snapshotLabel(record.resultLabel, record.result)
                 }}</el-tag></div
               >
+              <div>销售阶段：<template v-if="record.salesStageBefore !== record.salesStageAfter">{{ record.salesStageBeforeLabelSnapshot || '未记录' }} → </template>{{ record.salesStageAfterLabelSnapshot || '未记录' }}</div>
               <div v-if="record.categoryBefore !== record.categoryAfter"
                 >分类：{{ snapshotLabel(record.categoryBeforeLabel, record.categoryBefore) }} →
                 {{ snapshotLabel(record.categoryAfterLabel, record.categoryAfter) }}</div

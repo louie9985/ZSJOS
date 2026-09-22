@@ -45,7 +45,7 @@ describe('unified Lead management route', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
     expect(page).toContain('preserveRequestedId: routeSelectionRef.current !== undefined')
-    expectSourceToContainTokens(page, 'setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))')
+    expectSourceToContainTokens(page, 'setItems(current => current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : pinLeadFirst(current, loaded))')
     expect(page).toContain('const loaded = await api.managedLead(leadId)')
     expect(page).toContain('routeSelectionRef.current = undefined')
   })

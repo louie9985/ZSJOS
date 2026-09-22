@@ -200,7 +200,7 @@ function BusinessTaskPanel({
       return
     }
     if (task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST') {
-      navigate(APP_ROUTES.LEAD_MANAGEMENT, { state: { leadId: task.bizId } })
+      navigate(APP_ROUTES.LEAD_MANAGEMENT, { state: { leadId: task.bizId, tab: 'assist-history', assistRequestId: task.targetRecordId ?? task.bizId } })
       return
     }
     if (task.actionCode === 'OPEN_SALES_ORDER_REVISION') {

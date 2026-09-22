@@ -38,7 +38,7 @@ The partner start subject is external, but `zsjos_partner_withdrawal` may use th
 
 The Vue withdrawal list exposes direct asynchronous export only when the user has both `zsjos:export:withdrawal` and full withdrawal-list visibility. It exports all rows matching the current status filter, retains masked card numbers, creates an asynchronous task without polling the business page, and links to the existing export-task center.
 
-Only `GET /{id}/finance-detail` returns the full card and payout finance fields, including bank transaction number, proof, payout remark, payout operator and payout time. Ordinary list/detail projections never generate proof pre-signed URLs.
+Only `GET /{id}/finance-detail` returns the full card and payout finance fields, including bank transaction number, proof, payout remark, payout operator and payout time. Ordinary list/detail projections never generate proof pre-signed URLs. The Workbench withdrawal table omits payout time because ordinary list responses redact it; authorized finance detail remains the entry for viewing the stored payout time. Table renderers read raw row fields for amounts, lifecycle states and timestamps, rather than treating ProTable formatted nodes as API values.
 
 ## Single and batch payout registration
 

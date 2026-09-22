@@ -9,6 +9,26 @@ import java.util.List;
 
 @Mapper
 public interface LeadFollowUpRecordMapper extends BaseMapperX<LeadFollowUpRecordDO> {
+
+    default List<LeadFollowUpRecordDO> selectTodayByUserIds(List<Long> userIds,
+            java.time.LocalDateTime start, java.time.LocalDateTime end) {
+        if (userIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadFollowUpRecordDO>()
+                .select(LeadFollowUpRecordDO::getOperatorUserId)
+                .in(LeadFollowUpRecordDO::getOperatorUserId, userIds)
+                .ge(LeadFollowUpRecordDO::getOccurredAt, start).lt(LeadFollowUpRecordDO::getOccurredAt, end));
+    }
+
+    default LeadFollowUpRecordDO selectFirstByAssignment(Long leadId, Long assignmentId, Long ownerId) {
+        return selectOne(new LambdaQueryWrapperX<LeadFollowUpRecordDO>()
+                .eq(LeadFollowUpRecordDO::getLeadId, leadId)
+                .eq(LeadFollowUpRecordDO::getAssignmentHistoryId, assignmentId)
+                .eq(LeadFollowUpRecordDO::getOperatorUserId, ownerId)
+                .isNotNull(LeadFollowUpRecordDO::getOccurredAt)
+                .orderByAsc(LeadFollowUpRecordDO::getOccurredAt)
+                .orderByAsc(LeadFollowUpRecordDO::getId).last("LIMIT 1"));
+    }
+
     default LeadFollowUpRecordDO selectByIdempotencyKey(String key) {
         return selectOne(new LambdaQueryWrapperX<LeadFollowUpRecordDO>()
                 .eq(LeadFollowUpRecordDO::getIdempotencyKey, key));

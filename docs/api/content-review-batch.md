@@ -146,3 +146,29 @@ UI 使用工作台主题 token、文件类型图标和图片放大预览，窄�
 - 浏览器：`test/content-review-errors.tsx` 使用隔离 adapter；esbuild 仅输出到 `/tmp`，`test/content-review-errors-browser.mjs` 在临时回环端口检查 1440 / 390 宽度、中文显示、字段标红、动态时间校验、输入保留、双击防重、保存后读取失败、明确提交失败重试版本、响应丢失查询、状态变化、历史字典和读取失败。截图在 `/tmp/zsjos-content-errors-{desktop-field,mobile-uncertain}.png`。
 - 管理端：在工作台目录运行 `node test/content-review-admin-errors.mjs`，以隔离导入执行 Vue 实际响应拦截器，验证三类新错误的中文消息、可选字段数据、旧拒绝形式及 `preserveBusinessError` 兼容性。
 - 未执行生产构建、服务启动、部署、重启、数据库写入或真实审批写请求。上述证据不替代部署后的 Spring MVC / BPM / 数据库端到端验收；当前运行实例仍使用原部署版本。此前全量前端尝试发现未修改的字体样式守卫和财务表格测试失败，不作为本次定向验证通过的证据。
+
+### 收件箱查询与账号摘要（2026-09-22）
+
+`GET /zsjos/content-review/batch/page` 保留 `pageNo/pageSize/status/accountId/mine/keyword`，新增可选 `statuses`（逗号分隔状态集合）、`operatorUserId`、`directorUserId`、`platformValue`、`submittedFrom`、`submittedTo`。日期为 `yyyy-MM-dd`，起止日均包含；`status` 与 `statuses` 同时提供时取交集。人员与平台组合必须在同一份账号快照命中，不能跨账号拼接条件。
+
+搜索在分页前匹配学员当前姓名、账号快照昵称、作品标题（兼容 titleSnapshot）、选题（兼容 topicSnapshot）、正文及批次编号，任一命中即可；输入中的 `%`、`_` 按字面匹配。继续执行既有租户拦截、对象可见范围及最新修订链限制。`mine=true` 精确表示当前用户为批次运营。
+
+列表与详情新增 `studentName`（关联 Person 当前姓名）与明确类型的 `accounts`。账号摘要包含 `accountId/accountName/accountNo/platformValue/platformLabel/operatorUserId/operatorName/directorUserId/directorName/operatorNameResolved/directorNameResolved`。账号及责任人读取本轮 accountSnapshots；旧单账号快照读取 context.account，责任关联读取原批次。仅缺失责任姓名时按原责任人 ID 查询系统用户当前姓名，标记 NameResolved=true，页面标注“现用姓名”。不读取当前账号归属替换历史责任人，不回写历史快照。
+
+工作台默认待审批（DIRECTOR_REVIEW、FINAL_REVIEW）；待修改兼容 NEED_MODIFY、REJECTED；COMPLETED 显示为待发布。其余分类为全部、草稿、已发布、已取消。状态分类是既有流程契约，人员与平台选项分别来自 System simple users 与 zsjos_account_platform 字典。
+
+账号详情链接使用服务端 studentPersonId 与 accountId 定位媒体学员页面；缺失可靠关联或目标菜单权限时仅显示名称。目标 API 仍独立执行对象权限；不存在、不可访问或学员不匹配时显示错误，不回落到另一个账号。管理端沿用原审批操作契约，本次参数与响应增量不要求管理端复制工作台收件箱。
+
+查询回归 `ContentReviewQueryMysqlTest` 通过真实 MySQL、既有分页与租户拦截器执行；使用只读 CTE 夹具覆盖同名表，不写业务数据。通过环境变量 ZSJOS_REVIEW_QUERY_JDBC_URL、ZSJOS_REVIEW_QUERY_USER、ZSJOS_REVIEW_QUERY_PASSWORD 提供本地连接，不把凭据写入文档或源码。
+
+## 审核详情与历史读取（2026-09-22）
+
+详情 Grid 左栏展示本轮账号快照及作品，右栏顶部为全宽历史入口，其下为 BPM 流程；窄屏单列。标题不重复账号链接。账号字段使用可换行标签，运营背景默认展开。作品发布时间格式化为北京时间分钟精度，目的/形式显示保存的标签快照。
+
+作品展示与运营提交字段对应：`detailUrl` 为作品详情，`leadResourceUrl` 为引流资料链接，`referenceWorkUrl` 为参考作品链接。作品详情链接、引流资料链接、参考作品链接固定展示，使用通用 ResourceLink 资源卡片（打开、复制）；未填写显示“未填写”，不生成虚构链接。`topicSnapshot/topic` 与 `deliverableUrl` 不新增运营输入项，仅历史有值时展示补充信息。审核附件从 `deliverableSnapshotJson` 文件引用落入版本文件列表，与成品外链不是同一字段；封面使用 cover 文件单独展示。参考素材保持比例，审核附件复用 AttachmentCard，每次预览、下载或重试通过已授权 batch/get 刷新签名地址，同件作品并发请求合并，不直接绕过业务权限读取文件。
+
+修改重提回填优先使用 `topicSnapshot`。账号草稿编辑及修订读取服务端保存的 accountSnapshots（旧记录兼容 context.account），不从当前账号或当前字典重建旧标签，不接受客户端身份/归属/标签覆盖；账号名称和既有纯文本背景修改仅写入新草稿。缺失旧字段保持缺失，不补造历史。表单平台、期段、账号状态为只读快照，账号名称仍可编辑；作品目的/形式保持原有字典选择与未变值标签保留行为。
+
+batch/history 与 batch/get 保持响应结构和 `zsjos:content-review:query` 功能权限。对象读取允许已有直接访问者读取同修订链已提交祖先；未提交草稿不继承此读取权。授权只沿本租户真实 revisionOfBatchId 关系，检查后代的直接权限，不递归继承、不按学员或账号扩大范围；循环关系防重复遍历。history 在加载条目及附件前逐条过滤不可读取记录。已被后续轮次替代的批次拒绝业务命令，响应不提供动作；历史读取不授予任何操作权。
+
+历史弹窗区分错误、空态并支持重试，切换前保护未保存意见，详情提供只读标识和返回原批次入口。BPM 流程读取仍使用原公共接口及 `bpm:process-instance:query` 功能权限；不自动授予权限。管理端不直接消费 batch/history/get 专用工作台界面，其 BPM 流程页和操作契约保持原状；业务审批内容 provider 继续经受保护的 batchService.get 读取。上线需先加载后端权限/快照修正，再加载前端；无需数据库迁移或历史数据重写。

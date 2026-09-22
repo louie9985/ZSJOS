@@ -32,6 +32,11 @@ public class LeadNotificationTenantInitializer {
 
     static List<NotifyDefaultRuleReqDTO> defaultRules() {
         return List.of(
+                NotifyDefaultRuleReqDTO.builder().name("协助申请回复通知")
+                        .sceneCode(cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.SUBMITTER_ASSIST_REPLIED)
+                        .templateCode("ZSJOS_LEAD_SUBMITTER_ASSIST_REPLIED")
+                        .recipientRoles(List.of(cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ROLE_REQUESTER))
+                        .actionType(NotifyActionType.BUSINESS_DETAIL).build(),
                 NotifyDefaultRuleReqDTO.builder()
                         .name("销售客资提交成功")
                         .sceneCode(CREATED)

@@ -41,6 +41,8 @@ class LeadSubmitterActionServiceTest {
     @Mock private LeadMapper leadMapper;
     @Mock private LeadSubmitterAssistRequestMapper assistRequestMapper;
     @Mock private LeadAttachmentService attachmentService;
+    @Mock private cn.iocoder.yudao.module.infra.api.file.FileApi fileApi;
+    @Mock private cn.iocoder.yudao.module.system.api.user.AdminUserApi adminUserApi;
     @Mock private LeadObjectPermissionService objectPermissionService;
     @Mock private PartnerOwnershipService partnerOwnershipService;
     @Mock private BusinessTaskCommandService businessTaskCommandService;
@@ -56,6 +58,64 @@ class LeadSubmitterActionServiceTest {
     @AfterEach
     void tearDown() {
         TenantContextHolder.clear();
+    }
+
+    @Test
+    void historyReturnsBothFormsAndSignsStoredAttachmentsAfterReadCheck() {
+        var page = new cn.iocoder.yudao.framework.common.pojo.PageParam();
+        var requestedAt = java.time.LocalDateTime.of(2026, 9, 22, 10, 0);
+        var row = new LeadSubmitterAssistRequestDO().setId(8L).setRequesterUserId(20L)
+                .setLeadNoSnapshot("LEAD-TEST").setProblem("问题\n第二行").setExpectedAssistance("联系确认")
+                .setRemark("申请补充说明").setRequestedAt(requestedAt).setStatus("completed")
+                .setSubmitterNameSnapshot("提交人").setAssigneeNameSnapshot("协助人")
+                .setResponseRemark("回复\n第二行").setResponderNameSnapshot("实际回复人")
+                .setRespondedAt(requestedAt.plusHours(1)).setVersion(1)
+                .setAttachmentSnapshotsJson("[{\"infraFileId\":11,\"name\":\"申请.png\",\"type\":\"image/png\",\"size\":42}]")
+                .setResponseAttachmentSnapshotsJson("[{\"infraFileId\":12,\"name\":\"回复.pdf\",\"type\":\"application/pdf\",\"size\":84}]");
+        when(leadMapper.selectById(1L)).thenReturn(internalLead());
+        when(assistRequestMapper.selectPageByLeadId(1L, page)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(row), 1L));
+        when(adminUserApi.getUser(20L)).thenReturn(new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO().setNickname("发起销售"));
+        when(fileApi.presignGetUrl(11L, 600)).thenReturn("https://example.test/request");
+        when(fileApi.presignGetUrl(12L, 600)).thenReturn("https://example.test/reply");
+        var result = service.history(1L, 20L, page).getList().getFirst();
+        assertEquals("申请补充说明", result.getRemark());
+        assertEquals("问题\n第二行", result.getProblem());
+        assertEquals("联系确认", result.getExpectedAssistance());
+        assertEquals("发起销售", result.getRequesterName());
+        assertEquals("实际回复人", result.getResponderName());
+        assertEquals("回复\n第二行", result.getResponseRemark());
+        assertEquals(requestedAt.plusHours(1), result.getRespondedAt());
+        assertEquals("申请.png", result.getRequestAttachments().getFirst().getName());
+        assertEquals(42L, result.getRequestAttachments().getFirst().getSize());
+        assertEquals("https://example.test/request", result.getRequestAttachments().getFirst().getUrl());
+        assertEquals("回复.pdf", result.getResponseAttachments().getFirst().getName());
+        assertEquals("https://example.test/reply", result.getResponseAttachments().getFirst().getUrl());
+        var order = inOrder(objectPermissionService, fileApi);
+        order.verify(objectPermissionService).check(1L, "read");
+        order.verify(fileApi).presignGetUrl(11L, 600);
+    }
+
+    @Test
+    void historyKeepsLegacyMissingFieldsEmpty() {
+        var page = new cn.iocoder.yudao.framework.common.pojo.PageParam();
+        when(leadMapper.selectById(1L)).thenReturn(internalLead());
+        when(assistRequestMapper.selectPageByLeadId(1L, page)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(new LeadSubmitterAssistRequestDO()), 1L));
+        var result = service.history(1L, 20L, page).getList().getFirst();
+        org.junit.jupiter.api.Assertions.assertNull(result.getRequesterName());
+        org.junit.jupiter.api.Assertions.assertNull(result.getRemark());
+        assertTrue(result.getRequestAttachments().isEmpty());
+        assertTrue(result.getResponseAttachments().isEmpty());
+        verifyNoInteractions(fileApi, adminUserApi);
+    }
+
+    @Test
+    void historyDenialDoesNotReadOrSignAttachments() {
+        when(leadMapper.selectById(1L)).thenReturn(internalLead());
+        doThrow(new IllegalStateException("denied")).when(objectPermissionService).check(1L, "read");
+        assertThrows(IllegalStateException.class, () -> service.history(1L, 20L, new cn.iocoder.yudao.framework.common.pojo.PageParam()));
+        verifyNoInteractions(assistRequestMapper, fileApi, adminUserApi);
     }
 
     @Test

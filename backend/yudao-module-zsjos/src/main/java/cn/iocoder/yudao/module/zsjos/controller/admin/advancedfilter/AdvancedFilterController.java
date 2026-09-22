@@ -18,6 +18,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/advanced-filter")
 public class AdvancedFilterController {
     @Resource private AdvancedFilterService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.LeadFilterOrganizationService organizations;
     @Resource private AdvancedFilterVisibleUserService visibleUserService;
 
     @GetMapping("/catalog")
@@ -37,8 +38,16 @@ public class AdvancedFilterController {
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {
         var userScope = visibleUserService.resolve(scene, getLoginUserId());
-        return success(userScope.supported()
-                ? service.catalog(scene, userScope.options())
-                : service.catalogWithoutVisibleUsers(scene));
+        var catalog = userScope.supported() ? service.catalog(scene, userScope.options())
+                : service.catalogWithoutVisibleUsers(scene);
+        if ("lead".equals(scene)) {
+            var organizationOptions = organizations.options(userScope.options());
+            catalog = new AdvancedFilterCatalogRespVO(catalog.fields().stream().map(field ->
+                    "visible-departments".equals(field.optionSource())
+                            ? new AdvancedFilterCatalogRespVO.FieldVO(field.fieldKey(), field.group(), field.label(),
+                            field.valueType(), field.operators(), null, organizationOptions) : field).toList(),
+                    catalog.relativeDateOptions());
+        }
+        return success(catalog);
     }
 }

@@ -45,6 +45,8 @@ public class LeadDO extends TenantBaseDO {
     private String provinceName;
     private String cityCode;
     private String cityName;
+    private String salesStage;
+    private String salesStageLabelSnapshot;
     private String leadCategory;
     private String leadCategoryLabelSnapshot;
     private String remark;

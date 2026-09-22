@@ -78,6 +78,17 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .set(BusinessTaskDO::getPayload, payload));
     }
 
+    default List<BusinessTaskDO> selectPendingFollowUpRemindersByLeadIds(java.util.Collection<Long> leadIds) {
+        if (leadIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
+                .select(BusinessTaskDO::getBizId, BusinessTaskDO::getDueAt, BusinessTaskDO::getId)
+                .eq(BusinessTaskDO::getTaskType, TASK_TYPE_FOLLOW_UP_REMINDER)
+                .eq(BusinessTaskDO::getBizType, BIZ_TYPE_LEAD)
+                .in(BusinessTaskDO::getBizId, leadIds)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .orderByDesc(BusinessTaskDO::getId));
+    }
+
     default BusinessTaskDO selectPendingFollowUpReminderByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getTaskType, TASK_TYPE_FOLLOW_UP_REMINDER)

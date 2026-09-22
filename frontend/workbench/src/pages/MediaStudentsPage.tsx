@@ -1,4 +1,5 @@
 import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
+import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
 import StudentContentDraftPicker from '../components/StudentContentDraftPicker'
 import { restoreDraftWorks } from '../services/contentReviewDraft'
 import type { ContentReviewBatch } from '../services/materialApi'
@@ -14,6 +15,8 @@ import { Alert, App, Button, Cascader, Checkbox, DatePicker, Empty, Form, Image,
 import type { InputRef } from 'antd'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import { useWorkbenchPageGuard, useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
+import { APP_ROUTES } from '../constants'
 import dayjs from 'dayjs'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
@@ -181,7 +184,9 @@ const positioningFormValues = (values: Record<string, unknown>, fields: Director
 export default function MediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
   // The student inbox deliberately remains master-detail for every global inbox layout setting.
   const location = useLocation()
+  const workspaceNavigation = useWorkbenchPageNavigation()
   const initialLocationKey = useRef(location.key)
+  const acceptedLocationSearch = useRef(location.search)
   const { message, modal } = App.useApp()
   const [params, setParams] = useSearchParams()
   const [listCollapsed, setListCollapsed] = useState(() => {
@@ -214,6 +219,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const updateMissing = useCallback((id: number, count: number) => setAccountMissing(current => current[id] === count ? current : { ...current, [id]: count }), [])
   const [maintenanceEditorAccountId, setMaintenanceEditorAccountId] = useState<number>()
   const [selectedId, setSelectedId] = useState<number>()
+  const selectedStudent = useRef<number | undefined>(undefined)
+  const firstListLoad = useRef(true)
+  const loadedKeyword = useRef('')
+  const searchIntent = useRef(0)
+  const operatorBusy = useRef(false)
+  const [assignmentTarget, setAssignmentTarget] = useState<{ personId: number; personNo?: string; name?: string; relationId: number }>()
   const [keyword, setKeyword] = useState(''), [search, setSearch] = useState(''), [pageNo, setPageNo] = useState(1)
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
@@ -321,20 +332,44 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   if (!autoSaveCoordinator.current) {
     autoSaveCoordinator.current = new DirectorAutoSaveCoordinator(AUTO_SAVE_DELAY_MS, setAutoSave, () => crypto.randomUUID(), cause => cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code))
   }
+  useWorkbenchPageGuard(APP_ROUTES.MEDIA_STUDENTS, async destination => {
+    if (destination) {
+      const requested = new URL(destination, window.location.origin).searchParams
+      if (Number(requested.get('personId')) === selectedId && (Number(requested.get('accountId')) || undefined) === selectedAccountId) return true
+    }
+    if (!dialog) return true
+    if (saving || operatorBusy.current || positioningLock.current || autoSave.status === 'saving') { message.warning('正在保存，请稍后再切换'); return false }
+    return new Promise(resolve => modal.confirm({ title: '学员页面有正在编辑的内容', content: '放弃未保存内容后切换，或继续编辑。',
+      okText: '放弃并切换', cancelText: '继续编辑', onOk: () => { autoSaveCoordinator.current?.invalidate(); setDialog(undefined); resolve(true) }, onCancel: () => resolve(false) }))
+  })
 
   const loadDetail = useCallback(async (personId: number, preferredServiceId?: number, preferredAccountId?: number, background = false) => {
-    const run = ++detailRun.current; setSelectedId(personId); if (!background) setDetailLoading(true); setDetailError(''); setInterviewSummary(undefined); setSummaryError('')
+    const run = ++detailRun.current
+    const switching = selectedStudent.current !== personId
+    selectedStudent.current = personId
+    if (switching) { setDialog(undefined); setAssignmentTarget(undefined); setDetail(undefined); setDirectorContext(undefined); setSelectedServiceId(undefined); setSelectedAccountId(undefined) }
+    // Route hints belong only to the student named by that route.
+    const detailParams = Number(params.get('personId')) === personId ? params : new URLSearchParams()
+    setSelectedId(personId); if (!background) setDetailLoading(true); setDetailError(''); setInterviewSummary(undefined); setSummaryError('')
     try {
       const value = await api.mediaStudents.get(personId)
+      if (run !== detailRun.current) return
+      if (value.student.personId !== personId) throw new Error('学员详情身份不一致，请重新加载')
+      const requestedAccountId = preferredAccountId || Number(detailParams.get('accountId')) || accountIdFromTab(detailParams.get('tab'))
+      if (requestedAccountId && !value.accounts.some(account => account.id === requestedAccountId)) {
+        throw new Error('该账号已失效、不属于此学员或你无权查看；请返回审批核对账号。')
+      }
       const service = value.student.services.find(item => item.serviceRelationId === preferredServiceId) || value.student.services[0]
       const context = service ? await api.studentContactContext(service.serviceRelationId) : undefined
+      if (run !== detailRun.current) return
+      if (context && context.serviceRelationId !== service?.serviceRelationId) throw new Error('学员服务上下文不一致，请重新加载')
       const accountId = resolveMediaStudentAccountId(value.accounts, value.contents,
         [...value.positioningCards, ...value.positioningDrafts], {
           preferredAccountId,
-          accountId: Number(params.get('accountId')) || undefined,
-          tab: params.get('tab'),
-          contentId: Number(params.get('contentId')) || undefined,
-          positioningCardId: Number(params.get('positioningCardId')) || undefined,
+          accountId: Number(detailParams.get('accountId')) || undefined,
+          tab: detailParams.get('tab'),
+          contentId: Number(detailParams.get('contentId')) || undefined,
+          positioningCardId: Number(detailParams.get('positioningCardId')) || undefined,
         })
       if (run === detailRun.current) {
         setDetail(value); setSelectedServiceId(service?.serviceRelationId); setSelectedAccountId(accountId); setDirectorContext(context)
@@ -348,21 +383,37 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     catch (cause) { if (run === detailRun.current) { setDetail(undefined); setDetailError(cause instanceof ApiError && cause.code === 403 ? '无权查看该学员' : errorText(cause)) } }
     finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [params])
-  const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false, keepDetail = false) => {
+  const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false, keepDetail = false, initialLink = false) => {
     if (append && listBusy.current) return
     listBusy.current = true
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
     try {
-      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined })
+      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined })
       if (run !== listRun.current) return
+      firstListLoad.current = false
+      if (!append) loadedKeyword.current = keyword
       setRows(current => append ? [...current, ...result.list.filter(row => !current.some(existing => existing.personId === row.personId))] : result.list)
       setPageNo(targetPage); setHasMore(result.list.length > 0 && targetPage * PAGE_SIZE < result.total)
       // Appending students must not reload the selected detail or discard its editor state.
       if (!append && !keepDetail) {
         listScrollRef.current?.scrollTo({ top: 0, left: 0 })
-        const target = preferred || Number(params.get('personId')) || result.list[0]?.personId
-        if (target) await loadDetail(target, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
-        else { setDetail(undefined); setSelectedId(undefined) }
+        const current = preferred ?? selectedStudent.current
+        const linked = initialLink ? Number(params.get('personId')) || undefined : undefined
+        const target = linked || result.list.find(row => row.personId === current)?.personId || result.list[0]?.personId
+        if (!linked) {
+          const next = target != null && target === current ? new URLSearchParams(params) : new URLSearchParams()
+          if (target) next.set('personId', String(target))
+          else next.delete('personId')
+          acceptedLocationSearch.current = next.size ? `?${next}` : ''
+          setParams(next, { replace: true })
+        }
+        if (target) await loadDetail(target, target === current || linked ? Number(params.get('serviceRelationId')) || undefined : undefined)
+        else {
+          ++detailRun.current; selectedStudent.current = undefined
+          setDetail(undefined); setSelectedId(undefined); setDirectorContext(undefined)
+          setSelectedServiceId(undefined); setSelectedAccountId(undefined); setInterviewSummary(undefined)
+          setDetailLoading(false); setDetailError(''); setSummaryError(''); setDialog(undefined); setAssignmentTarget(undefined)
+        }
       }
     } catch (cause) {
       if (run === listRun.current) {
@@ -371,13 +422,42 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       }
     } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
   }, [keyword, loadDetail, params])
-  useEffect(() => { void loadPage(1) }, [keyword])
+  const cancelPendingList = () => {
+    ++searchIntent.current; ++listRun.current; listBusy.current = false; setLoading(false)
+  }
+  const searchStudents = async (value: string) => {
+    const next = value.trim()
+    const intent = ++searchIntent.current
+    const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS) ?? !dialog
+    if (!allowed || intent !== searchIntent.current) return
+    cancelPendingList()
+    firstListLoad.current = false
+    ++detailRun.current; setDetailLoading(false)
+    setLoading(true)
+    if (next === keyword) void loadPage(1)
+    else setKeyword(next)
+  }
+  useEffect(() => {
+    const initialLink = firstListLoad.current
+    void loadPage(1, undefined, false, false, initialLink)
+  }, [keyword])
+  useEffect(() => () => { ++listRun.current; ++detailRun.current }, [])
   useEffect(() => {
     if (location.key === initialLocationKey.current) return
     initialLocationKey.current = location.key
-    if (listSelectionNavigation.current) { listSelectionNavigation.current = false; return }
+    if (location.search === acceptedLocationSearch.current) { listSelectionNavigation.current = false; return }
+    if (listSelectionNavigation.current) { listSelectionNavigation.current = false; acceptedLocationSearch.current = location.search; return }
+    cancelPendingList()
     const linkedId = Number(params.get('personId')) || undefined
-    if (linkedId) void loadDetail(linkedId, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
+    let disposed = false
+    void (async () => {
+      const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS, `${APP_ROUTES.MEDIA_STUDENTS}${location.search}`) ?? true
+      if (disposed) return
+      if (!allowed) { setParams(new URLSearchParams(acceptedLocationSearch.current), { replace: true }); return }
+      acceptedLocationSearch.current = location.search
+      if (linkedId) void loadDetail(linkedId, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
+    })()
+    return () => { disposed = true }
   }, [location.key, params, selectedId, loadDetail])
   useEffect(() => {
     if (loading || error || moreError || !rows.length || !hasMore) return
@@ -406,9 +486,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const createTicket = async () => {
     const context = ticketContext
     if (!context || !ticketAccountIds.length || !detail) return
-    try { const values = await ticketForm.validateFields(); const dynamicValues = Object.fromEntries((context.fields || []).filter(field => field.key !== 'account_link').map(field => { const value = values[field.key]; return [field.key, dayjs.isDayjs(value) ? (field.type === 'date' ? value.format('YYYY-MM-DD') : value.format('YYYY-MM-DDTHH:mm:ss')) : value] })); setTicketSaving(true); await api.productionTicket.create({ sceneCode: String(values.sceneCode), accountId: ticketAccountIds[0], accountIds: ticketAccountIds, studentPersonId: detail.student.personId, dispatchMode: values.assignmentType === 'AUTO' ? 'AUTO' : 'PERSON', assigneeUserId: values.assignmentType === 'PERSON' ? Number(values.assigneeUserId) : undefined, targetDeptId: values.assignmentType === 'DEPARTMENT' ? Number(values.targetDeptId) : undefined, operatorRemark: String(values.operatorRemark || ''), values: dynamicValues, attachmentIds: ticketFiles.map(file => file.id) }); message.success('工单已发起'); setTicketOpen(false); setTicketFiles([]); await loadDetail(detail.student.personId, selectedServiceId, ticketAccountIds[0]) } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) } finally { setTicketSaving(false) }
+    try { const values = await ticketForm.validateFields(); const { values: dynamicValues } = serializeWorkOrderDynamicValues((context.fields || []).filter(field => field.key !== 'account_link'), values); setTicketSaving(true); await api.productionTicket.create({ sceneCode: String(values.sceneCode), accountId: ticketAccountIds[0], accountIds: ticketAccountIds, studentPersonId: detail.student.personId, dispatchMode: values.assignmentType === 'AUTO' ? 'AUTO' : 'PERSON', assigneeUserId: values.assignmentType === 'PERSON' ? Number(values.assigneeUserId) : undefined, targetDeptId: values.assignmentType === 'DEPARTMENT' ? Number(values.targetDeptId) : undefined, operatorRemark: String(values.operatorRemark || ''), values: dynamicValues, attachmentIds: ticketFiles.map(file => file.id) }); message.success('工单已发起'); setTicketOpen(false); setTicketFiles([]); await loadDetail(detail.student.personId, selectedServiceId, ticketAccountIds[0]) } catch (cause) { if (!(cause as { errorFields?: unknown }).errorFields) message.error(errorText(cause)) } finally { setTicketSaving(false) }
   }
   const selectedService = detail?.student.services.find(item => item.serviceRelationId === selectedServiceId) || detail?.student.services[0]
+  const assignmentReady = !loading && !detailLoading && !detailError && !error && selectedId != null
+    && detail?.student.personId === selectedId && selectedService != null
+    && directorContext?.serviceRelationId === selectedService.serviceRelationId
+  const assignmentValid = useRef<() => boolean>(() => false)
+  assignmentValid.current = () => Boolean(assignmentReady && assignmentTarget
+    && selectedStudent.current === assignmentTarget.personId
+    && selectedService?.serviceRelationId === assignmentTarget.relationId && !listBusy.current)
+
   const resetAutoSave = () => {
     stageDraftVersion.current = undefined; draftIdentity.current = undefined; positioningDraft.current = undefined
     manualSave.current = new PositioningManualSave(); setPositioningDirty(false); setPositioningSaveError(''); setPositioningConflict(false)
@@ -859,7 +947,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const openDirectorAction = (action: string) => {
     if (action === 'DIRECTOR_PRECHECK') void open('precheck')
     if (['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW', 'VIEW_POSITIONING_INTERVIEW'].includes(action) && selectedService) setInterviewId(selectedService.serviceRelationId)
-    if (action === 'ASSIGN_OPERATOR' || action === 'DIRECTOR_OPERATOR_ASSIGN') void open('operator')
+    if (action === 'ASSIGN_OPERATOR' || action === 'DIRECTOR_OPERATOR_ASSIGN') {
+      if (!assignmentReady || listBusy.current || !detail || !selectedService) return
+      setAssignmentTarget({ personId: detail.student.personId, personNo: detail.student.personNo, name: detail.student.name, relationId: selectedService.serviceRelationId })
+      void open('operator')
+    }
     if (action === 'CREATE_POSITIONING_CARD') void open('positioning', selectedAccountId)
   }
   const directorStage = directorContext?.directorStage || selectedService?.directorStage || 'precheck'
@@ -869,6 +961,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       key: action,
       icon: action === 'DIRECTOR_PRECHECK' ? <FileSearchOutlined /> : action === 'VIEW_POSITIONING_INTERVIEW' ? <EyeOutlined /> : String(action) === 'CREATE_POSITIONING_CARD' ? <EditOutlined /> : action === 'ASSIGN_OPERATOR' || action === 'DIRECTOR_OPERATOR_ASSIGN' ? <UserSwitchOutlined /> : <PlayCircleOutlined />,
       label: actionLabels[action] || action,
+      disabled: (action === 'ASSIGN_OPERATOR' || action === 'DIRECTOR_OPERATOR_ASSIGN') && !assignmentReady,
       onClick: () => openDirectorAction(action),
     }))
   // 内容审批由运营发起；编导只负责后续逐条审核。
@@ -980,6 +1073,14 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     }
   })
 
+  const changeAccountTab = (value: string) => {
+    const next = new URLSearchParams(params); next.set('tab', value)
+    const accountId = accountIdFromTab(value)
+    if (accountId) next.set('accountId', String(accountId)); else next.delete('accountId')
+    if (selectedId) next.set('personId', String(selectedId))
+    if (workspaceNavigation) void workspaceNavigation.open(`${APP_ROUTES.MEDIA_STUDENTS}?${next}`)
+    else { setTab(value); setSelectedAccountId(accountId); listSelectionNavigation.current = true; setParams(next) }
+  }
   const body = detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError ? <Alert type="warning" showIcon message={detailError} action={selectedId ? <Button size="small" onClick={() => void loadDetail(selectedId, selectedServiceId)}>重试</Button> : undefined} /> : !detail ? <Empty description="从左侧选择一名学员" /> : selectedService && directorContext ? <StudentPlannerOperations student={detail.student} service={selectedService} context={directorContext} permissions={permissions} onRefresh={() => loadDetail(detail.student.personId, selectedServiceId, selectedAccountId)}>
     {plannerActions => <StudentDetail
       student={detail.student}
@@ -988,16 +1089,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       overviewOnly
       overviewContent={overviewContent(plannerActions)}
       activeTab={tab}
-      onTabChange={value => {
-        setTab(value)
-        const accountId = value.startsWith('account-') ? Number(value.slice('account-'.length)) : undefined
-        setSelectedAccountId(accountId)
-        setParams(accountId ? { personId: String(detail.student.personId), accountId: String(accountId) } : { personId: String(detail.student.personId) }, { replace: true })
-      }}
+      onTabChange={changeAccountTab}
       extraTabs={tabs}
     />}
   </StudentPlannerOperations> : <div className="lead-inbox-detail"><Typography.Title level={4}>{detail.student.name || '未填写姓名'}</Typography.Title>
-    <Tabs className="lead-detail-tabs" activeKey={tab} onChange={setTab} items={[{ key: 'overview', label: '概览', children: overviewContent([]) }, ...tabs]} />
+    <Tabs className="lead-detail-tabs" activeKey={tab} onChange={changeAccountTab} items={[{ key: 'overview', label: '概览', children: overviewContent([]) }, ...tabs]} />
   </div>
 
   return <section className="workspace-page media-students-page">
@@ -1006,14 +1102,14 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       <aside className="media-students-list-pane" aria-label="学员列表">
         <div className="media-students-toolbar">
           <Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip>
-          <div className="media-students-search" hidden={listCollapsed}><Input.Search ref={searchRef} allowClear value={search} onChange={e => { setSearch(e.target.value); if (!e.target.value) setKeyword('') }} onSearch={value => setKeyword(value.trim())} placeholder="搜索姓名或手机号" /></div>
+          <div className="media-students-search" hidden={listCollapsed}><Input.Search ref={searchRef} allowClear value={search} onChange={e => { setSearch(e.target.value); if (!e.target.value) void searchStudents('') }} onSearch={value => void searchStudents(value)} placeholder="搜索姓名或手机号" /></div>
           {listCollapsed && <Tooltip title={keyword ? '搜索学员（已筛选）' : '搜索学员'}><Button size="small" aria-label="搜索学员" type={keyword ? 'primary' : 'text'} icon={<SearchOutlined />} onClick={() => changeListCollapsed(false, true)} /></Tooltip>}
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
         <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
           {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <Tooltip key={x.personId} title={listCollapsed ? `${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}>
-            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`lead-inbox-item media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { listSelectionNavigation.current = true; setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) }}>
+            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`lead-inbox-item media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { cancelPendingList(); if (workspaceNavigation) void workspaceNavigation.open(`${APP_ROUTES.MEDIA_STUDENTS}?personId=${x.personId}`); else { listSelectionNavigation.current = true; setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) } }}>
               <NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" />
               <span className="media-students-item-copy"><span className="media-students-item-heading"><strong title={x.name}>{x.name || '未填写姓名'}</strong><span title={x.personNo}>{x.personNo || '暂无学员编号'}</span></span><span title={x.mobile}>手机：{x.mobile || '未填写'}</span><span title={x.wechatId}>微信：{x.wechatId || '未填写'}</span></span>
             </button>
@@ -1027,10 +1123,11 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       <main className="media-students-detail-pane">{body}</main>
     </div>
     {interviewId && <PositioningInterviewDialog relationId={interviewId} onClose={() => setInterviewId(undefined)} onChanged={() => selectedId ? loadDetail(selectedId, selectedServiceId, selectedAccountId) : Promise.resolve()} />}
-    {dialog === 'operator' && !detailLoading && selectedService && detail && <OperatorAssignmentDialog key={selectedService.serviceRelationId}
-      relationId={selectedService.serviceRelationId} onCancel={() => setDialog(undefined)} onSaved={async () => {
+    {dialog === 'operator' && !detailLoading && assignmentTarget && detail?.student.personId === assignmentTarget.personId && assignmentTarget.personId === selectedId && assignmentTarget.relationId === selectedService?.serviceRelationId && <OperatorAssignmentDialog key={`${assignmentTarget.personId}-${assignmentTarget.relationId}`}
+      relationId={assignmentTarget.relationId} studentName={assignmentTarget.name} studentNo={assignmentTarget.personNo}
+      isTargetCurrent={() => assignmentValid.current()} onBusyChange={busy => { operatorBusy.current = busy }} onCancel={() => setDialog(undefined)} onSaved={async () => {
         setDialog(undefined)
-        await Promise.all([loadPage(1, undefined, false, true), loadDetail(detail.student.personId, selectedService.serviceRelationId, selectedAccountId)])
+        await Promise.all([loadPage(1, undefined, false, true), loadDetail(assignmentTarget.personId, assignmentTarget.relationId, selectedAccountId)])
       }} />}
     <Modal width={dialog === 'content' ? 'min(1100px, calc(100vw - 32px))' : dialog === 'positioning' ? 'min(1480px, calc(100vw - 32px))' : undefined} mask={{ closable: false }} keyboard={dialog === 'positioning' ? false : undefined} closable={dialog === 'positioning' ? !positioningBusy : undefined} styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} title={dialog === 'account' ? '新增第三方账号' : dialog === 'content' ? '发起内容审批' : dialog === 'positioning' ? '填写定位卡' : dialog === 'reject-content' ? '退回内容修改' : dialog === 'reject-positioning' ? '退回定位卡修改' : dialog === 'precheck' ? '资料预审' : dialog === 'student-partner' ? '开通学员兼职账号' : '指派运营'} open={Boolean(dialog) && dialog !== 'operator'} onCancel={() => void closeDialog()} footer={dialog === 'positioning' ? [<Button key="cancel" disabled={positioningBusy} onClick={() => void closeDialog()}>取消</Button>, <Button key="save" disabled={positioningBusy} onClick={() => void savePositioning(false)}>保存草稿</Button>, <Button key="close" loading={saving} disabled={positioningBusy} onClick={() => void savePositioning(true)}>保存并关闭</Button>, <Button key="submit" type="primary" loading={saving} disabled={positioningBusy || !positioningCanSubmit} onClick={() => void savePositioning(true, true)}>保存并提交审核</Button>] : dialog === 'content' ? [<Button key="cancel" disabled={saving} onClick={() => void closeDialog()}>取消</Button>, <Button key="draft" disabled={contentUncertain || contentOptionsLoading || Boolean(contentOptionsError)} loading={saving} onClick={() => void submit(false)}>保存草稿</Button>, <Button key="submit" type="primary" disabled={contentUncertain || contentOptionsLoading || Boolean(contentOptionsError)} loading={saving} onClick={() => void submit(true)}>保存并提交审批</Button>] : undefined} onOk={() => void submit()} okText={dialog === 'positioning' ? '保存并关闭' : undefined} confirmLoading={saving}>
       <Form form={form} layout="vertical" disabled={dialog === 'positioning' && positioningBusy} onValuesChange={scheduleAutoSave}>
@@ -1071,7 +1168,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       </div>
     </PositioningDialog>
     <Modal width="min(1040px, calc(100vw - 32px))" title={`发起${ticketTemplates[0]?.name || '拍剪工单'}`} open={ticketOpen} onCancel={() => setTicketOpen(false)} onOk={() => void createTicket()} okText="确认发起" okButtonProps={{ disabled: !ticketContext || Boolean(ticketContextError) || !ticketAccountIds.length }} confirmLoading={ticketSaving}>
-      {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} /> : <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" hidden><Input /></Form.Item><Form.Item name="accountIds" label="关联账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个该学员名下的账号' }]}><Select mode="multiple" showSearch optionFilterProp="label" options={(detail?.accounts || []).map(account => ({ value: account.id, label: `${account.nickname || account.accountNo} - ${account.platformLabel || '平台未记录'}` }))} onChange={ids => void selectTicketAccounts(ids.map(Number))} /></Form.Item>{ticketAccountIds.map(id => { const profile = ticketProfiles[id]; const account = detail?.accounts.find(item => item.id === id); const homepageUrl = profile?.values.homepage_url; return <DetailFieldGrid key={id} columns={2} items={[{ key: 'account', label: '账号', value: `${account?.nickname || account?.accountNo || '账号'} - ${account?.platformLabel || '平台未记录'}` }, { key: 'homepage', label: '账号主页链接', value: typeof homepageUrl === 'string' && homepageUrl ? <ResourceLink href={homepageUrl} /> : '未填写' }, { key: 'cover', label: '主页封面图', value: profile?.files.cover?.previewUrl ? <Image width={120} src={profile.files.cover.previewUrl} /> : '未上传' }]} /> })}{ticketContext ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : value === 'AUTO' ? '自动派单' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true }]}><Select options={ticketTargetDepartments.map(item => ({ value: item.id, label: item.name }))} /></Form.Item> : getFieldValue('assignmentType') === 'AUTO' ? <Alert type="info" showIcon message="系统将从已配置的剪拍专员中选择当前待处理工单最少的人。" /> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true }]}><Select options={ticketContext.assigneeCandidates.map(item => ({ value: item.id, label: item.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).filter(field => field.key !== 'account_link').map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true }] : undefined}>{field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : field.type === 'url' ? <ResourceLinkInput /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="info" showIcon message="请选择账号后加载工单上下文。" />}</Form>}
+      {ticketContextLoading ? <Skeleton active paragraph={{ rows: 8 }} /> : ticketContextError ? <Alert type="error" showIcon message={ticketContextError} /> : <Form form={ticketForm} layout="vertical"><Form.Item name="sceneCode" hidden><Input /></Form.Item><Form.Item name="accountIds" label="关联账号" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个该学员名下的账号' }]}><Select mode="multiple" showSearch optionFilterProp="label" options={(detail?.accounts || []).map(account => ({ value: account.id, label: `${account.nickname || account.accountNo} - ${account.platformLabel || '平台未记录'}` }))} onChange={ids => void selectTicketAccounts(ids.map(Number))} /></Form.Item>{ticketAccountIds.map(id => { const profile = ticketProfiles[id]; const account = detail?.accounts.find(item => item.id === id); const homepageUrl = profile?.values.homepage_url; return <DetailFieldGrid key={id} columns={2} items={[{ key: 'account', label: '账号', value: `${account?.nickname || account?.accountNo || '账号'} - ${account?.platformLabel || '平台未记录'}` }, { key: 'homepage', label: '账号主页链接', value: typeof homepageUrl === 'string' && homepageUrl ? <ResourceLink href={homepageUrl} /> : '未填写' }, { key: 'cover', label: '主页封面图', value: profile?.files.cover?.previewUrl ? <Image width={120} src={profile.files.cover.previewUrl} /> : '未上传' }]} /> })}{ticketContext ? <><ProductionTicketPositioningCard snapshot={ticketContext.positioning} /><Form.Item name="assignmentType" label="指派方式" rules={[{ required: true }]}><Radio.Group optionType="button" options={ticketContext.allowedAssignmentTypes.map(value => ({ value, label: value === 'PERSON' ? '指定人' : value === 'AUTO' ? '自动派单' : '指定部门' }))} /></Form.Item><Form.Item noStyle shouldUpdate={(prev, next) => prev.assignmentType !== next.assignmentType}>{({ getFieldValue }) => getFieldValue('assignmentType') === 'DEPARTMENT' ? <Form.Item name="targetDeptId" label="接收部门" rules={[{ required: true }]}><Select options={ticketTargetDepartments.map(item => ({ value: item.id, label: item.name }))} /></Form.Item> : getFieldValue('assignmentType') === 'AUTO' ? <Alert type="info" showIcon message="系统将从已配置的剪拍专员中选择当前待处理工单最少的人。" /> : <Form.Item name="assigneeUserId" label="剪拍专员" rules={[{ required: true }]}><Select options={ticketContext.assigneeCandidates.map(item => ({ value: item.id, label: item.nickname }))} /></Form.Item>}</Form.Item>{(ticketContext.fields || []).filter(field => field.key !== 'account_link').map(field => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true }] : undefined}>{field.type === 'attachment' ? <WorkOrderAttachmentPicker /> : field.type === 'textarea' ? <Input.TextArea rows={3} /> : field.type === 'number' ? <InputNumber style={{ width: '100%' }} /> : field.type === 'date' || field.type === 'datetime' ? <DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /> : isWorkOrderLinkField(field, true) ? <ResourceLinkInput /> : <Input />}</Form.Item>)}<Form.Item name="operatorRemark" label="运营备注" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item><Form.Item label="附件"><WorkOrderAttachmentPicker value={ticketFiles} onChange={setTicketFiles} /></Form.Item></> : <Alert type="info" showIcon message="请选择账号后加载工单上下文。" />}</Form>}
     </Modal>
     <PositioningDialog title="定位卡内容" open={Boolean(positioningReadId || positioningDetail)} footer={null} onCancel={() => { positioningReadRun.current++; setPositioningReadId(undefined); setPositioningDetail(undefined) }}>
       {positioningReadLoading ? <Skeleton active /> : positioningReadError ? <Alert type="error" message={positioningReadError} action={<Button onClick={() => positioningReadId && void readPositioningCard(positioningReadId)}>重试</Button>} /> : positioningDetail && <PositioningSnapshot card={positioningDetail} />}

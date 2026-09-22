@@ -57,7 +57,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MATERIAL_SCHEMA_VERSION_CONFLICT = new ErrorCode(1_900_020_019, "素材表单已被其他人修改，请刷新后重试");
     ErrorCode CONTENT_REVIEW_CONFIG_INVALID = new ErrorCode(1_900_020_020, "生产内容审核配置尚未完成或已失效");
     ErrorCode CONTENT_REVIEW_BATCH_NOT_EXISTS = new ErrorCode(1_900_020_021, "生产内容审核批次不存在");
-    ErrorCode CONTENT_REVIEW_BATCH_ITEMS_INVALID = new ErrorCode(1_900_020_022, "审核批次必须包含同一账号的 1 至 20 条当前内容版本");
+    ErrorCode CONTENT_REVIEW_BATCH_ITEMS_INVALID = new ErrorCode(1_900_020_022,
+            "审核批次内容无效：请选择同一账号的 1 至 20 条当前内容版本，并将发布时间设置为当前时间之后");
     ErrorCode CONTENT_REVIEW_BATCH_STATE_INVALID = new ErrorCode(1_900_020_023, "当前审核批次状态不允许该操作");
     ErrorCode CONTENT_REVIEW_VERSION_CONFLICT = new ErrorCode(1_900_020_024, "审核批次或条目已变化，请刷新后重试");
     ErrorCode CONTENT_REVIEW_DIRECTOR_INVALID = new ErrorCode(1_900_020_025, "当前运营必须且只能关联一名启用的责任编导");
@@ -121,6 +122,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_SUBJECT_SNAPSHOT_INVALID = new ErrorCode(1_900_017_023, "支付主体快照缺失或异常，请核实原收款主体");
     ErrorCode PAYMENT_SCHOOL_SUBJECT_MISSING = new ErrorCode(1_900_017_024, "未配置学校支付主体，请联系管理员配置 school 主体");
     ErrorCode PAYMENT_COMPANY_SUBJECT_MISSING = new ErrorCode(1_900_017_025, "多产品支付主体冲突，但未配置公司支付主体，请联系管理员配置 company 主体");
+    ErrorCode PURCHASE_INTENT_BINDING_INVALID = new ErrorCode(1_900_017_026, "购买链路与当前订单不匹配，请刷新后重试");
+    ErrorCode PAYMENT_TRANSACTION_LOCKED = new ErrorCode(1_900_017_027, "线上已支付订单不能直接修改课程、规格或金额");
+    ErrorCode PAYMENT_AMOUNT_MISMATCH = new ErrorCode(1_900_017_028, "到账金额与订单金额不一致，请核实收款记录");
+    ErrorCode PURCHASE_INTENT_ITEMS_MISMATCH = new ErrorCode(1_900_017_029, "订单课程或金额与购买草稿不一致，请重新保存草稿");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
@@ -274,6 +279,9 @@ public interface ZsjosErrorCodeConstants {
             "当前客资存在审核中或待补正的成交订单，销售本人不可转派");
     ErrorCode LEAD_SUBMITTER_ASSIST_RECIPIENT_MISSING = new ErrorCode(1_900_003_079, "当前客资缺少可通知的提交人");
     ErrorCode LEAD_SUBMITTER_ASSIST_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_080, "幂等键已用于其他提交人协助请求");
+    ErrorCode LEAD_SUBMITTER_ASSIST_PENDING_EXISTS = new ErrorCode(1_900_003_081, "当前客资已有未完成的协助申请");
+    ErrorCode LEAD_SUBMITTER_ASSIST_NOT_EXISTS = new ErrorCode(1_900_003_082, "协助申请不存在或已处理");
+    ErrorCode LEAD_SUBMITTER_ASSIST_REPLY_FORBIDDEN = new ErrorCode(1_900_003_083, "当前用户不是该协助待办处理人");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");
@@ -562,6 +570,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode FEEDBACK_CHAIRMAN_INVALID = new ErrorCode(1_900_016_016, "boss 角色必须且只能配置一名启用用户");
     ErrorCode FEEDBACK_SURVEY_ALREADY_REQUESTED = new ErrorCode(1_900_016_017, "该反馈已发起过满意度调研");
     ErrorCode FEEDBACK_SURVEY_STATE_INVALID = new ErrorCode(1_900_016_018, "满意度调研尚未发起或已提交");
+    ErrorCode LEAD_SALES_STAGE_DEFAULT_INVALID = new ErrorCode(1_900_091_001, "默认销售阶段未配置或已停用，请联系管理员");
+    ErrorCode LEAD_SALES_STAGE_INVALID = new ErrorCode(1_900_091_002, "销售阶段不存在或已停用，请重新选择");
     ErrorCode POSITIONING_INTERVIEW_INVALID = new ErrorCode(1_900_090_001, "定位访谈字段无效或必填确认未完成");
     ErrorCode POSITIONING_INTERVIEW_STATE = new ErrorCode(1_900_090_002, "定位访谈尚未完成资料预审或已经完成");
     ErrorCode POSITIONING_INTERVIEW_VERSION = new ErrorCode(1_900_090_003, "定位访谈已被修改，请重新加载后重试");

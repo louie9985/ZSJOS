@@ -1,0 +1,84 @@
+/* Production inbox and pool share a compact, responsive detail canvas. */
+.production-tickets-page { min-height: 0; }
+.production-ticket-nav { display: flex; align-items: center; gap: var(--crm-gap); }
+.production-ticket-nav > .ant-tabs { flex: 1; min-width: 0; }
+.production-ticket-nav .ant-tabs-nav,.production-ticket-subtabs .ant-tabs-nav { margin-bottom: var(--crm-sp-3); }
+.production-ticket-inbox { display: grid; grid-template-columns: var(--crm-list-pane-w) minmax(0, 1fr); gap: var(--crm-gap); flex: 1; min-height: 0; }
+.production-ticket-list-pane { display: flex; flex-direction: column; min-height: 0; gap: var(--crm-sp-3); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); padding: var(--crm-card-pad); }
+.production-ticket-search { display: flex; flex-wrap: wrap; gap: var(--crm-sp-2); min-width: 0; }
+.production-ticket-search > .ant-input-search { flex: 1; min-width: 140px; }
+.production-ticket-filters { width: 100%; display: grid; gap: var(--crm-sp-2); }
+.production-ticket-filters > * { min-width: 0; width: 100%; }
+.production-ticket-list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.production-ticket-list-item { display: flex; width: 100%; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-card-pad); margin-bottom: var(--crm-sp-2); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); color: var(--crm-text); text-align: left; cursor: pointer; }
+.production-ticket-list-item > div,.production-ticket-pool-card > div { display: flex; justify-content: space-between; gap: var(--crm-sp-2); }
+.production-ticket-list-item > span,.production-ticket-list-item > time { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; }
+.production-ticket-list-item.active { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); border-left: 3px solid var(--crm-color-primary); }
+.production-ticket-list-item:hover { border-color: var(--crm-color-primary-border); }
+.production-ticket-count,.production-ticket-muted { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.production-ticket-detail-pane { container-type: inline-size; min-height: 0; }
+.production-ticket-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--crm-gap); margin-bottom: var(--crm-sp-4); }
+.production-ticket-heading h2 { font-size: var(--crm-font-display); margin: 0 0 var(--crm-sp-1); }
+.production-ticket-heading span { color: var(--crm-text-secondary); }
+.production-ticket-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--crm-gap); align-items: start; }
+.production-ticket-main { grid-column: span 9; min-width: 0; }
+.production-ticket-aside { grid-column: span 3; min-width: 0; display: grid; gap: var(--crm-gap); }
+.production-ticket-side-card { min-width: 0; padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); overflow-wrap: anywhere; }
+.production-ticket-side-card h3 { margin: 0 0 var(--crm-sp-3); font-size: var(--crm-font-lg); }
+.production-ticket-side-card p { white-space: pre-wrap; margin: var(--crm-sp-2) 0; }
+.production-ticket-deadline { display: flex; flex-direction: column; gap: var(--crm-sp-2); border-top: 3px solid currentColor; }
+.production-ticket-deadline > strong { font-size: var(--crm-font-display); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.production-ticket-deadline time,.production-ticket-deadline > span { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.production-tickets-page .tone-primary { color: var(--crm-color-primary); }
+.production-tickets-page .tone-warning { color: var(--crm-color-warning); }
+.production-tickets-page .tone-error { color: var(--crm-color-error); }
+.production-tickets-page .tone-neutral { color: var(--crm-text-secondary); }
+.production-ticket-actions { display: grid; gap: var(--crm-sp-2); }
+.production-ticket-actions .ant-btn { height: auto; min-height: 32px; white-space: normal; }
+.production-ticket-rework { border-left: 3px solid var(--crm-color-error); padding-left: var(--crm-sp-3); }
+.production-ticket-stages { display: grid; gap: var(--crm-sp-2); list-style: none; padding: 0; margin: 0; }
+.production-ticket-stages li { display: flex; align-items: center; gap: var(--crm-sp-2); color: var(--crm-text-secondary); }
+.production-ticket-stages li > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--crm-border); }
+.production-ticket-stages .current { color: var(--crm-color-primary); font-weight: 600; }
+.production-ticket-stages .current > span { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); }
+.production-ticket-event { display: flex; flex-direction: column; gap: var(--crm-sp-1); font-size: var(--crm-font-sm); }
+.production-ticket-event time,.production-ticket-event > span { color: var(--crm-text-secondary); }
+.production-ticket-request-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--crm-sp-4); margin-top: var(--crm-sp-3); }
+.production-ticket-request-fields > div { min-width: 0; display: flex; flex-direction: column; gap: var(--crm-sp-1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.production-ticket-request-fields > div > span { color: var(--crm-text-secondary); }
+.production-ticket-request-fields .wide { grid-column: 1 / -1; }
+.production-ticket-accounts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--crm-gap); margin-top: var(--crm-sp-3); }
+.production-ticket-accounts > div { min-width: 0; overflow-wrap: anywhere; }
+.production-ticket-accounts img { width: 64px; height: 64px; }
+.production-ticket-back { display: none; margin-bottom: var(--crm-sp-3); }
+.production-ticket-back.pool-back { display: inline-flex; }
+.production-ticket-pool-toolbar { display: flex; gap: var(--crm-gap); align-items: center; margin-bottom: var(--crm-sp-3); }
+.production-ticket-pool-toolbar > div { flex: 1; max-width: 620px; }
+.production-ticket-pool-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-bottom: var(--crm-sp-3); }
+.production-ticket-pool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--crm-gap); }
+.production-ticket-pool-card { display: flex; flex-direction: column; gap: var(--crm-sp-3); min-width: 0; padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); color: var(--crm-text); background: var(--crm-bg-container); box-shadow: var(--crm-shadow-card); text-align: left; cursor: pointer; }
+.production-ticket-pool-card:hover { box-shadow: var(--crm-shadow-raised); border-color: var(--crm-color-primary-border); }
+.production-ticket-pool-card h3,.production-ticket-pool-card p { margin: 0; overflow-wrap: anywhere; }
+.production-ticket-pool-card h3 { font-size: var(--crm-font-lg); }
+.production-ticket-summary { flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--crm-text-secondary); }
+.production-ticket-pool-card footer { display: flex; flex-direction: column; gap: var(--crm-sp-1); border-top: 1px solid var(--crm-border); padding-top: var(--crm-sp-3); }
+.production-ticket-pool-card footer time { color: var(--crm-text-secondary); }
+@container (max-width: 699px) {
+  .production-ticket-main,.production-ticket-aside { grid-column: 1 / -1; }
+  .production-ticket-aside { grid-row: 1; }
+  .production-ticket-request-fields,.production-ticket-accounts { grid-template-columns: minmax(0, 1fr); }
+  .production-ticket-stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .production-ticket-stages li { flex-direction: column; font-size: var(--crm-font-sm); }
+  .production-ticket-aside .ant-timeline { max-height: 180px; overflow-y: auto; }
+}
+@container (min-width: 500px) and (max-width: 699px) {
+  .production-ticket-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .production-ticket-aside > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) {
+  .production-tickets-page { height: 100%; }
+  .production-ticket-inbox { grid-template-columns: minmax(0, 1fr); }
+  .production-ticket-inbox.show-list > main,.production-ticket-inbox.show-detail > aside { display: none; }
+  .production-ticket-back { display: inline-flex; }
+  .production-ticket-pool-toolbar { flex-wrap: wrap; }
+}

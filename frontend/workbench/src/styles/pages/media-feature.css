@@ -70,3 +70,10 @@
   .production-positioning-card .detail-field-grid { grid-template-columns: minmax(0, 1fr); }
   .production-positioning-card .detail-field { grid-column: auto; }
 }
+
+.media-ticket-detail-grid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(180px, 240px); gap:var(--crm-gap); align-items:start; }
+.media-ticket-detail-grid > .media-ticket-action-bar { margin-top:0; flex-direction:column; align-items:stretch; position:sticky; top:0; }
+.media-ticket-action-bar > .ant-space { flex-wrap:wrap; }
+.media-ticket-detail .media-feature-fields { grid-template-columns:minmax(0,1fr); }
+.media-ticket-detail .media-feature-fields strong { min-width:0; overflow-wrap:anywhere; white-space:pre-wrap; }
+@media (max-width:768px) { .media-ticket-detail-grid { grid-template-columns:minmax(0,1fr); } .media-ticket-detail-grid > .media-ticket-action-bar { grid-row:1; position:static; } }

@@ -82,6 +82,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE, "销售回复提交人", ROLE_SUBMITTER),
                 scene(SUBMITTER_ASSIST_REQUESTED, "请求提交人协助", ROLE_SUBMITTER),
                 scene(PARTNER_ASSIST_REMINDER, "提醒兼职提交人协助", ROLE_PARTNER_OWNER),
+                scene(SUBMITTER_ASSIST_REPLIED, "提交人已回复协助申请", ROLE_REQUESTER),
                 scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_COMPLAINANT, ROLE_OWNER, ROLE_DIRECT_LEADER),
                 scene(COMPLAINT_UNFOUNDED, "销售投诉不成立", ROLE_COMPLAINANT),
                 scene(DUPLICATE_REACTIVATED, "重复客资重新激活", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER),
@@ -109,6 +110,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
         Set<Long> users = new LinkedHashSet<>();
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+        if (SUBMITTER_ASSIST_REPLIED.equals(event.getSceneCode())) {
+            Long requesterId = longValue(payload.get("assist.requesterUserId"));
+            return requesterId == null ? Set.of() : Set.of(NotifyRecipientDTO.admin(requesterId));
+        }
         // Feedback notifications retain the recipient selected when the immutable reply was created.
         if (cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE.equals(event.getSceneCode())) {
             Long recipientId = longValue(payload.get("feedback.recipientId"));
@@ -288,7 +293,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             copyContext(values, event.getPayload(), "supplement.remark", "supplement.attachmentCount");
             copyContext(values, event.getPayload(), "feedback.id", "feedback.summary");
             copyContext(values, event.getPayload(), "assist.requestId", "assist.problem",
-                    "assist.expectedAssistance", "assist.remark", "assist.attachmentNames");
+                    "assist.expectedAssistance", "assist.remark", "assist.attachmentNames", "assist.response");
             copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
         }
         return values;
@@ -372,6 +377,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("assist.expectedAssistance", "希望协助方式"));
             variables.add(variable("assist.remark", "备注"));
             variables.add(variable("assist.attachmentNames", "附件名称"));
+        } else if (SUBMITTER_ASSIST_REPLIED.equals(sceneCode)) {
+            variables.add(variable("assist.response", "协助回复"));
         } else if (Set.of(COMPLAINT_FOUNDED, COMPLAINT_UNFOUNDED).contains(sceneCode)) {
             variables.add(variable("complaint.result", "投诉处理结果"));
             variables.add(variable("complaint.handlerUserId", "投诉处理人编号"));

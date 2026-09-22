@@ -522,6 +522,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         }
         lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(submittedAt);
         providerAttributionService.apply(lead, identity.identity(), reqVO.getNewMediaProviderUserId(), submittedAt);
+        LeadSalesStageSnapshot.initialize(lead, dictDataApi);
         lead.setVersion(0); leadMapper.insert(lead);
         return lead;
     }

@@ -1,12 +1,13 @@
+import AttachmentCard from './AttachmentCard'
 import { DeleteOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, List, Space, Upload, message, type UploadProps } from 'antd'
 import { useRef } from 'react'
 import { workOrderApi, type WorkOrderFile } from '../services/workOrderApi'
 import { useClipboardPasteTarget } from './ClipboardPasteTarget'
 
-export default function WorkOrderAttachmentPicker({ value, onChange, disabled = false }: {
-  value: WorkOrderFile[]
-  onChange: (files: WorkOrderFile[]) => void
+export default function WorkOrderAttachmentPicker({ value = [], onChange = () => undefined, disabled = false }: {
+  value?: WorkOrderFile[]
+  onChange?: (files: WorkOrderFile[]) => void
   disabled?: boolean
 }) {
   const filesRef = useRef(value)
@@ -48,6 +49,6 @@ export default function WorkOrderAttachmentPicker({ value, onChange, disabled = 
       </Upload>
       <Button {...pasteButtonProps} icon={<PictureOutlined />}>上传剪贴板截图</Button>
     </div>
-    {value.length > 0 && <List size="small" dataSource={value} renderItem={file => <List.Item actions={[<Button key="remove" type="text" danger icon={<DeleteOutlined />} aria-label={`删除 ${file.name}`} onClick={() => { filesRef.current = filesRef.current.filter(item => item.id !== file.id); onChange(filesRef.current) }} />]}>{file.name}</List.Item>} />}
+    {value.length > 0 && <List size="small" dataSource={value} renderItem={file => <List.Item actions={[<Button key="remove" type="text" danger icon={<DeleteOutlined />} aria-label={`删除 ${file.name}`} onClick={() => { filesRef.current = filesRef.current.filter(item => item.id !== file.id); onChange(filesRef.current) }} />]}><AttachmentCard key={file.id} name={file.name} load={async () => file} /></List.Item>} />}
   </Space></div>
 }

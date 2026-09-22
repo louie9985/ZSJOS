@@ -38,7 +38,9 @@ Lead / Person 跟进 -> PurchaseIntent 草稿
 {"id":101,"version":2,"collectionMode":"online_link","purchaseType":"lead_first_purchase","leadId":2001,"personId":3001,"sourceKey":"lead_first_purchase:2001","draft":{"studentName":"示例姓名"},"items":[{"spuRef":"COURSE-1","skuRef":"SKU-1","actualAmount":1280.00}],"totalAmount":1280.00,"idempotencyKey":"客户端唯一命令键"}
 ```
 
-首购、全部复购和 successor 的现有订单提交请求可选携带 `purchaseIntentId`。携带时后端必须核对 Person、SKU、金额和草稿状态；线上路径还必须核对 PaymentIntent=`paid` 和 PaymentTransaction 到账金额。线上、线下仍都要求付款时间、支付方式和至少一份缴费凭证。
+首次首购、复购提交仍核对 Person、SKU、金额和草稿状态。successor 的购买链路由原订单决定，请求不得换绑 `purchaseIntentId`。按 2026-09-22 确认的补正规则，线下 `offline_paid` 重提允许纠正课程、SKU 和金额录入错误；保留 Person 与原订单绑定校验，重新校验商品、付款资料和凭证，在原事务内按版本条件更新购买意向的最新明细/总额，并创建新订单、新快照和完整审批。原订单、原审批快照、原草稿表单 JSON 不覆盖。金额更正不代表产生补款或退款，真实性由新一轮财务审批核验。
+
+线上 `online_link` 重提继续保持原课程、SKU、金额约束，并核对 PaymentIntent=`paid` 和 PaymentTransaction 到账金额。当前不支持通过补正处理线上同价换课或差额交易，此限制不是永久禁止换课的业务规则。线上、线下仍都要求付款时间、支付方式和至少一份缴费凭证。旧数据没有购买意向且没有渠道支付引用时按历史线下订单处理；存在渠道支付引用但缺少购买链路时拒绝重提并要求核实数据。
 
 ## 4. 公开支付接口
 
@@ -152,3 +154,16 @@ zsjos:
 数据库使用 `V162__zsjos_purchase_intent_payment_draft.sql` 升级，基线同步在 `schema/core.sql` 与 `00-bootstrap-schema.sql`。发布前须由通联确认正式接口域名、APPID 产品授权、通知白名单、证书格式、回调应答和关单状态语义，再启用配置。
 
 验收至少覆盖四种来源、草稿恢复、乐观锁、重复生成、失效后重新生成、两种路径切换、微信/支付宝报文、金额转分、签名/验签、回调与查单并发、金额/SKU 不一致、未支付提交、凭证校验、successor 继承，以及 H5 轮询超时。测试环境可在测试代码中使用假网关，但生产运行时不提供 Mock。
+
+### 2026-09-22 驳回接续与支付一致性
+
+线上接续先保存已验证的支付引用，通过显式置 NULL 的数据库更新释放旧订单唯一键，再给 successor 绑定原支付单和可信到账流水分配；购买意向指向新订单，以上步骤与 BPM 启动属于同一事务。历史分配记录保留，新分配按新订单幂等，不表示再次收款；汇总不得把历史被接续订单作为当前有效分配重复计算。
+
+错误码 `1900017026` 表示链路不匹配，`1900017027` 表示线上交易字段不可直接更改，`1900017028` 表示到账金额不符，`1900017029` 表示首次提交与草稿不一致。`1900017005` 不再用于订单重提的课程校验。
+
+
+## 在线到账业务通知落地（2026-09-22）
+
+`PurchaseIntentService.confirmPaid` 的可信确认分支，在记账同一事务发布 `zsjos.payment.paid`，回调与主动查单共用此入口。已到账或重复网关事件不再次发布，System outbox 按支付单事件键和规则去重。收件人冻结为当前购买意向负责人；缺少关系或负责人时不猜测替代账号，由 System 投递诊断暴露无收件人。内容只包含购买意向业务编号、支付单号和金额，提示在成交录单中核对补录；不包含客户姓名、手机号、链接令牌、网关签名或完整回调。
+
+站内信与企微使用独立规则，默认打开消息详情，不自动创建订单、不新增购买意向跳转。配置由开发 V274 引用 `script/sql/mysql/sales-notification-alignment.sql`，已有本地环境按该脚本的备份、验证及重复执行要求同步；共享/生产升级另行审查。新租户通过 System 默认规则 API 初始化。到账通知失败不会被标成真实企微已送达，历史支付记录不补发。详见[业务通知契约](../api/system-business-notifications.md)。

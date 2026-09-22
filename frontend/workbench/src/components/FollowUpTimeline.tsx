@@ -45,6 +45,9 @@ function TimelineNode({ record }: { record: LeadFollowUp }) {
             </Typography.Paragraph>
           )}
 
+          <span className="fu-node-meta">销售阶段：{record.salesStageBefore !== record.salesStageAfter
+            ? `${record.salesStageBeforeLabelSnapshot || '未记录'} → ${record.salesStageAfterLabelSnapshot || '未记录'}`
+            : record.salesStageAfterLabelSnapshot || '未记录'}</span>
           {record.categoryBefore !== record.categoryAfter && (
             <span className="fu-node-meta">分类：{categoryBefore} → {categoryAfter}</span>
           )}

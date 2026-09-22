@@ -58,11 +58,12 @@ import BusinessTable from '../components/BusinessTable'
 `render: (_, row) => formatTimestamp(row.submittedAt)`。仅 TypeScript 类型断言不能转换运行时节点。
 财务回归测试 `src/pages/finance-table-values.test.tsx` 使用实际 ProTable 验证提现、返现与订单展示；
 `test/finance-table.html` 是不连接业务服务的浏览器夹具，可验证中文筛选仍提交原状态编码。
+提现列表的状态、金额和提交/审核/打款时间均读取原始行字段；无法识别的状态保留“未知状态”，缺失或无效金额显示 `-`，不伪造零金额。
 
 ## 列与主题
 
 - 列使用稳定 `key` 或 `dataIndex`；渲染列应显式定义 `key`，避免列顺序修改影响偏好。
-- 普通列默认单行省略，默认宽度 160px、拖拽最小宽度 80px；页面可配置各列初始宽度。
+- 普通列默认单行省略，默认宽度 160px、拖拽最小宽度 32px；页面可配置各列初始宽度。已保存列宽低于 32px 时恢复为 32px，其余保留；页面整表滚动宽度仍可能使实际显示列宽大于设置值。
 - 操作列显式标记 `key: 'action'` 或 `valueType: 'option'`，默认固定右侧、不允许列设置隐藏，不提供拖拽。
 - 拖拽结束、取消和组件卸载均清理指针监听；存储不可用或损坏不影响操作，拖拽不触发排序。
 - 排序仅透传页面声明的 `sorter/onChange`，不替接口增加排序能力、不默认对服务端分页结果作本地排序。

@@ -8,4 +8,5 @@ public class WorkOrderFileRespVO {
     private String name;
     private String type;
     private Long size;
+    private String url;
 }

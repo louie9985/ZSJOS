@@ -112,7 +112,11 @@ public class LeadObjectPermissionService {
      * Unified Lead detail visibility. List scope remains owned by the individual business inboxes.
      */
     public boolean canReadDetail(LeadDO lead, Long userId) {
-        return hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId);
+        // Submitted-list department visibility grants reads only, not submitter-assistance commands.
+        return hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
+                || userId != null && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                    && securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
+                    && managesUserDepartment(userId, lead.getProviderOwnerId());
     }
 
     private boolean canReadDetailByRelationship(LeadDO lead, Long userId) {

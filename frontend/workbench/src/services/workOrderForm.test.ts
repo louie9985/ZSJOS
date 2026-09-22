@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { serializeWorkOrderDynamicValues } from './workOrderForm'
+import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from './workOrderForm'
 
 describe('work-order dynamic form serialization', () => {
   it('serializes attachment fields as file IDs and collects unique files', () => {
@@ -14,4 +14,11 @@ describe('work-order dynamic form serialization', () => {
     expect(result.values).toEqual({ request_files: [7, 8], evidence: [7], subject: '协作' })
     expect(result.attachmentFiles).toEqual([first, second])
   })
+})
+
+it('uses published legacy link keys only in production templates', () => {
+  expect(isWorkOrderLinkField({ key: 'reference_work_link', type: 'text' }, true)).toBe(true)
+  expect(isWorkOrderLinkField({ key: 'reference_work_link', type: 'text' })).toBe(false)
+  expect(isWorkOrderLinkField({ key: 'other_link', type: 'text' }, true)).toBe(false)
+  expect(isWorkOrderLinkField({ key: 'custom', type: 'url' })).toBe(true)
 })

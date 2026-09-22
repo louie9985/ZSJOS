@@ -37,8 +37,8 @@ describe('student positioning interview and account workspace boundary', () => {
     expect(page).toContain('location.key')
     expect(page).toContain("params.get('personId')")
     expect(page).toContain("params.get('accountId')")
-    expect(page).toContain("params.get('contentId')")
-    expect(page).toContain("params.get('positioningCardId')")
+    expect(page).toContain("detailParams.get('contentId')")
+    expect(page).toContain("detailParams.get('positioningCardId')")
     expect(page).not.toContain('roleName')
   })
   it('renders server-published outlines without a local field catalog', () => {

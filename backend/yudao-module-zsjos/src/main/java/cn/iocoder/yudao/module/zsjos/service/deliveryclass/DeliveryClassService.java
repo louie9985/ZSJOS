@@ -19,7 +19,8 @@ public interface DeliveryClassService {
     List<HomeroomCandidateRespVO> homeroomCandidates(Long userId);
     List<DeliveryClassCategoryOptionRespVO> categoryOptions();
     List<ExamProductScopeRespVO> productOptions();
-    List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson);
+    List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson,
+                                                    String selectedSkuIdsJson);
     AdminUserRespDTO validateHomeroom(Long userId);
     Long create(DeliveryClassSaveReqVO req, Long userId);
     void update(Long id, DeliveryClassSaveReqVO req, Long userId);

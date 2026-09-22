@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from './menuComponentRegistry'
 
 describe('workbench menu component registry', () => {
+  it('maps the sales follow-up calendar from its server component', () => {
+    expect(resolveWorkbenchComponent('zsjos/leadFollowUpCalendar/index')).toBe(WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR)
+  })
   it('maps the server-owned appeal component independently of its menu path', () => {
     expect(resolveWorkbenchComponent('zsjos/leadAppeal/index')).toBe(WORKBENCH_COMPONENT.LEAD_APPEAL)
     expect(resolveWorkbenchComponent('  zsjos/leadAppeal/index  ')).toBe(WORKBENCH_COMPONENT.LEAD_APPEAL)

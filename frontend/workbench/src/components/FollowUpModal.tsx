@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { App, Button, DatePicker, Empty, Form, Input, Modal, Select, Space, Spin } from 'antd'
+import { Alert, App, Button, DatePicker, Empty, Form, Input, Modal, Select, Space, Spin } from 'antd'
 import dayjs from 'dayjs'
+import { useLeadSalesStages } from '../services/useLeadSalesStages'
 import { api, type DictData, type LeadAttachment, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { applyFollowUpTimeShortcut, appendQuickNote, FOLLOW_UP_TIME_SHORTCUTS } from '../services/leadFollowUp'
@@ -9,12 +10,13 @@ import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferr
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
-type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
+type Values = { salesStage?: string; method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
 export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
   lead: ManagedLead; open: boolean; onClose: () => void; onSuccess: () => void
 }) {
   const { message } = App.useApp()
+  const stages = useLeadSalesStages(lead)
   const [form] = Form.useForm<Values>()
   const { submitting, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [images, setImages] = useState<DeferredUploadItem<LeadAttachment>[]>([])
@@ -40,9 +42,9 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
     }).catch(() => message.error('跟进字典加载失败，请重试'))
       .finally(() => setDictLoading(false))
     form.resetFields()
-    form.setFieldsValue({ leadCategory: lead.leadCategory })
+    form.setFieldsValue({ leadCategory: lead.leadCategory, salesStage: lead.salesStage })
     setImages([])
-  }, [open, lead.id, lead.leadCategory, form, message, resetIntent])
+  }, [open, lead.id, lead.leadCategory, lead.salesStage, form, message, resetIntent])
 
   const appendNote = (note: string) => {
     const current = form.getFieldValue('remark') || ''
@@ -50,6 +52,7 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
   }
 
   const prepareSubmit = async () => {
+    if (stages.loading || stages.error) return
     const values = await form.validateFields().catch(() => undefined)
     if (!values) return
     setPendingValues(values)
@@ -64,7 +67,7 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
       const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
       if (uploadResult.failed) { message.error('有跟进图片上传失败，请重试失败项'); return }
       await api.createLeadFollowUp(lead.id, {
-        method: values.method, result: values.result, leadCategory: values.leadCategory,
+        method: values.method, result: values.result, leadCategory: values.leadCategory, salesStage: values.salesStage,
         remark: values.remark?.trim() || undefined,
         nextFollowUpAt: values.nextFollowUpAt?.valueOf(),
         images: uploadResult.items.filter(image => image.uploaded).map(image => ({ infraFileId: image.uploaded!.infraFileId })),
@@ -93,7 +96,7 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
             onOpenChange={setConfirmOpen}
             onConfirm={submit}
           >
-            <Button type="primary" loading={submitting} onClick={() => void prepareSubmit()}>提交跟进</Button>
+            <Button type="primary" loading={submitting} disabled={stages.loading || Boolean(stages.error)} onClick={() => void prepareSubmit()}>提交跟进</Button>
           </IrreversiblePopconfirm>
         </Space>
       }
@@ -105,6 +108,10 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
           </Form.Item>
           <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}>
             <Select options={results.map(item => ({ value: item.value, label: item.label }))}/>
+          </Form.Item>
+          {stages.error && <Alert type="error" showIcon title={stages.error} action={<Button size="small" onClick={() => void stages.reload()}>重试</Button>}/>}
+          <Form.Item name="salesStage" label="跟进后销售阶段" rules={[{ required: true, message: '请选择销售阶段' }]}>
+            <Select loading={stages.loading} disabled={Boolean(stages.error)} options={stages.options} notFoundContent={stages.loading ? <Spin size="small"/> : '暂无可选销售阶段，请联系管理员'}/>
           </Form.Item>
           <Form.Item name="leadCategory" label="客资分类">
             <Select allowClear options={categories.map(item => ({ value: item.value, label: item.label }))}/>

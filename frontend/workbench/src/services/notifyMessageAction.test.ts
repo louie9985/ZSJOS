@@ -134,6 +134,36 @@ describe('notify message business actions', () => {
     expect(leadManagementDeepLink(29, 'complaints')).toContain('leadId=29&tab=complaints')
   })
 
+  it.each(['zsjos.sales_order.submitter_pending', 'zsjos.sales_order.submitter_effective'])(
+    'opens %s through Lead authorization without reading the order', async sceneCode => {
+      vi.spyOn(api, 'leadOrderNotificationTarget').mockResolvedValue({ id: 73 } as never)
+      const orderRead = vi.spyOn(api, 'salesOrder')
+      const navigate = vi.fn()
+      await executeNotifyMessageAction(message({ bizType: 'sales_order', bizId: 29, sceneCode }), {
+        navigate, warn: vi.fn(), refreshUnreadCount: vi.fn()
+      })
+      expect(api.leadOrderNotificationTarget).toHaveBeenCalledWith(29)
+      expect(orderRead).not.toHaveBeenCalled()
+      expect(navigate).toHaveBeenCalledWith('/zsjos/leads/manage?leadId=73&tab=overview')
+    })
+
+  it.each([
+    [1900003013, '当前账号无权查看该客资，已打开消息详情'],
+    [1900003009, '关联客资已失效或不存在，已打开消息详情'],
+    [500, '客资详情加载失败，请稍后重试']
+  ])('handles submitter target failure %s without opening an order', async (code, warning) => {
+    vi.spyOn(api, 'leadOrderNotificationTarget').mockRejectedValue(new ApiError(code as number, 'error'))
+    const orderRead = vi.spyOn(api, 'salesOrder')
+    const navigate = vi.fn()
+    const warn = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'sales_order', sceneCode: 'zsjos.sales_order.submitter_pending' }), {
+      navigate, warn, refreshUnreadCount: vi.fn()
+    })
+    expect(orderRead).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(warning)
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+  })
+
   it('resolves supervisor notifications to an exact approval task', async () => {
     vi.spyOn(api, 'salesOrderApprovalNotificationTarget').mockResolvedValue({
       workType: 'supervisor', orderId: 29, taskId: 'task/1', taskDefinitionKey: 'registrationReview',

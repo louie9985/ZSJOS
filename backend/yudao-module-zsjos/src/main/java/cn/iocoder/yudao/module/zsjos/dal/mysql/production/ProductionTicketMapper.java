@@ -29,9 +29,14 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId)
                 .last("LIMIT 100"));
     }
+    // Old envelopes own the frozen deadline when the ticket column is absent.
+    String EFFECTIVE_DEADLINE = "COALESCE(deadline_at, (SELECT CAST(REPLACE(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(wo.value_json, '$.deadline_at')), 'null'), NULLIF(JSON_UNQUOTE(JSON_EXTRACT(wo.value_json, '$.deadlineAt')), 'null')), 'T', ' ') AS DATETIME) FROM zsjos_work_order wo WHERE wo.business_type = 'PRODUCTION_TICKET' AND wo.business_id = zsjos_production_ticket.id AND wo.tenant_id = zsjos_production_ticket.tenant_id AND wo.deleted = 0 LIMIT 1))";
     default PageResult<ProductionTicketDO> selectPage(ProductionTicketPageReqVO req, Collection<Long> userIds, boolean all) {
         LambdaQueryWrapperX<ProductionTicketDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(ProductionTicketDO::getStatus, req.getStatus());
+        query.inIfPresent(ProductionTicketDO::getStatus, req.groupedStatuses())
+                .apply(req.getDeadlineFrom() != null, EFFECTIVE_DEADLINE + " >= {0}", req.getDeadlineFrom())
+                .apply(req.getDeadlineTo() != null, EFFECTIVE_DEADLINE + " <= {0}", req.getDeadlineTo());
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
             query.and(x -> x.like(ProductionTicketDO::getTicketNo, req.getKeyword())
                     .or().like(ProductionTicketDO::getScriptText, req.getKeyword()));
@@ -45,6 +50,17 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
         return selectPage(req, new LambdaQueryWrapperX<ProductionTicketDO>()
                 .eq(ProductionTicketDO::getStatus, "public_pool")
                 .likeIfPresent(ProductionTicketDO::getTicketNo, req.getKeyword())
+                .apply(req.getDeadlineFrom() != null, EFFECTIVE_DEADLINE + " >= {0}", req.getDeadlineFrom())
+                .apply(req.getDeadlineTo() != null, EFFECTIVE_DEADLINE + " <= {0}", req.getDeadlineTo())
+                .orderByAsc(ProductionTicketDO::getCreateTime).orderByAsc(ProductionTicketDO::getId));
+    }
+    default PageResult<ProductionTicketDO> selectPendingPage(ProductionTicketPageReqVO req, Long userId) {
+        return selectPage(req, new LambdaQueryWrapperX<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getAssigneeFilmingEditorUserId, userId)
+                .eq(ProductionTicketDO::getStatus, "pending_accept")
+                .likeIfPresent(ProductionTicketDO::getTicketNo, req.getKeyword())
+                .apply(req.getDeadlineFrom() != null, EFFECTIVE_DEADLINE + " >= {0}", req.getDeadlineFrom())
+                .apply(req.getDeadlineTo() != null, EFFECTIVE_DEADLINE + " <= {0}", req.getDeadlineTo())
                 .orderByAsc(ProductionTicketDO::getCreateTime).orderByAsc(ProductionTicketDO::getId));
     }
     default List<ProductionTicketDO> selectPendingByAssignee(Long userId) {

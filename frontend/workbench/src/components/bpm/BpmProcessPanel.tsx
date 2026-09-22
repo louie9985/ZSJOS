@@ -49,6 +49,8 @@ export default function BpmProcessPanel({
   allowDecision = false,
   decisionOnly = false,
   businessAdvance,
+  compact = false,
+  actionsOutside = false,
   onActionSuccess
 }: {
   processInstanceId?: string
@@ -61,11 +63,14 @@ export default function BpmProcessPanel({
   decisionOnly?: boolean
   /** 业务侧的推进动作，与流程类动作并列展示。 */
   businessAdvance?: BpmBusinessAdvanceAction
+  compact?: boolean
+  actionsOutside?: boolean
   onActionSuccess?: () => void
 }) {
   const [detail, setDetail] = useState<BpmApprovalDetail>()
   const [comments, setComments] = useState<BpmComment[]>([])
   const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState<boolean>()
   const [error, setError] = useState('')
   const [commentError, setCommentError] = useState('')
 
@@ -142,9 +147,21 @@ export default function BpmProcessPanel({
 
   if (!processInstanceId) return null
 
+  const actions = <>
+    {!loading && !todoTask && businessAdvance && <div className="bpm-approval-actions">
+      {businessAdvance.progress && <Typography.Text type="secondary">{businessAdvance.progress}</Typography.Text>}
+      <Space wrap>{advanceButton}</Space>
+    </div>}
+    {!loading && todoTask && <BpmApprovalActions task={todoTask} canUpdate={canUpdate} users={users}
+      allowDecision={allowDecision} decisionOnly={decisionOnly}
+      decisionHint={allowDecision ? undefined : '先逐条保存审核结论，再选择通过或退回运营修改；退回会结束本轮审批。'}
+      extraActions={advanceButton} extraHint={businessAdvance?.progress} onSuccess={refresh} />}
+  </>
+
   return <section className="bpm-process-panel">
     <Collapse
-      defaultActiveKey={['flow']}
+      activeKey={(expanded ?? !compact) ? ['flow'] : []}
+      onChange={keys => setExpanded(keys.length > 0)}
       items={[{
         key: 'flow',
         label: <Space size={8}>
@@ -186,28 +203,10 @@ export default function BpmProcessPanel({
             没有解析到本人待办任务时（例如审批详情未返回 todoTask），
             业务侧推进动作仍需可用：它由业务权限授权，不依赖 BPM 任务解析。
           */}
-          {!loading && !todoTask && businessAdvance && <div className="bpm-approval-actions">
-            {businessAdvance.progress && (
-              <Typography.Text type="secondary">{businessAdvance.progress}</Typography.Text>
-            )}
-            <Space wrap>{advanceButton}</Space>
-          </div>}
-
-          {!loading && todoTask && <BpmApprovalActions
-            task={todoTask}
-            canUpdate={canUpdate}
-            users={users}
-            allowDecision={allowDecision}
-            decisionOnly={decisionOnly}
-            decisionHint={allowDecision
-              ? undefined
-              : '先逐条保存审核结论，再选择通过或退回运营修改；退回会结束本轮审批。'}
-            extraActions={advanceButton}
-            extraHint={businessAdvance?.progress}
-            onSuccess={refresh}
-          />}
+          {!actionsOutside && actions}
         </>
       }]}
     />
+    {actionsOutside && actions}
   </section>
 }

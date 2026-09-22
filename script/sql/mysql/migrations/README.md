@@ -1,5 +1,21 @@
 # Versioned migrations
 
+## Sales stage upgrade
+
+`V275__lead_sales_stage.sql` follows V274 and adds nullable snapshot columns to Lead
+and both follow-up tables, runs the separately approved dictionary seed, freezes the
+historical ID/time scope, and initializes only undeleted, stage-null, non-won Leads.
+It preserves history, activity and role grants. Replay and scoped recovery are
+specified in the script and `docs/api/lead-sales-stage.md`. New migrations use the
+next continuous version regardless of author; odd/even reservations are cancelled.
+Existing applied migration checksums must not be reconciled to bypass drift checks.
+
+The fresh baseline and desired schema both include the same ten sales-stage columns
+on the three owning tables; V275 guards already-present columns. Existing deployed
+databases upgrade through V275 without replaying baseline files. The dedicated
+test_lead_sales_stage.py verifies the affected fresh/upgrade paths and repeatability;
+this scoped check does not replace full-chain release acceptance.
+
 ## Role-menu assignment policy (2026-09-17)
 
 Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer
@@ -1507,3 +1523,19 @@ unapplied migration.
 ## V258 定位卡独立与账号应用
 
 `V258__positioning_service_application.sql`：前置 V257 表结构，新增主卡/账号应用/应用记录，允许提交账号为空，保留历史并仅回填缺失关系；无删除、无角色授权，重复运行不换版。先 SQL 后新后端，回退保留关系表，存在无账号提交后不能恢复 NOT NULL。验证工具：`script/sql/mysql/tools/test_positioning_application.py`，使用独立保留的验证库，覆盖历史回填和重复执行；正在使用的开发数据库尚未同步，待启用授权。
+
+### V276 sales performance
+
+Execute `V276__sales_performance.sql` after V275 using utf8mb4. Creates four empty tenant tables, two Workbench-only pages and six action/view permissions; no role assignments, dictionary data or historical backfill. Repeatable missing-only metadata; retain facts on rollback. Verification: `python script/sql/mysql/tools/test_sales_performance.py`.
+
+### V277 sales Lead follow-up calendar
+
+Execute `V277__lead_follow_up_calendar.sql` after Core V276 using an utf8mb4 client.
+Requires exactly one existing `/calendar` directory (created by V146). Inserts one
+missing Workbench page with relative path `sales-lead-follow-up` and component
+`zsjos/leadFollowUpCalendar/index`; existing administrator metadata and checksums are
+preserved on repeat. No role grants, tables, dictionary data or business-row changes.
+Fresh installation uses the existing baseline then migration chain; no duplicate seed.
+Rollback retains metadata/version history and disables the page via System management.
+Verification: `python script/sql/mysql/tools/test_lead_calendar.py`; API and UI contract:
+[`docs/api/lead-follow-up-calendar.md`](../../../../docs/api/lead-follow-up-calendar.md).

@@ -1,8 +1,12 @@
+import ResourceLink, { LinkedText, resourceTarget } from '../components/ResourceLink';
+import ResourceLinkInput from '../components/ResourceLinkInput';
+import { ticketSnapshotText } from '../services/productionTicketPresentation';
+import AttachmentCard from '../components/AttachmentCard';
+import { TICKET_CHANGED, notifyTicketChanged } from '../services/productionTicketEvents';
 import { ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
-  Checkbox,
   DatePicker,
   Empty,
   Form,
@@ -18,7 +22,6 @@ import {
   Tooltip,
   Typography,
   message,
-  Upload,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -93,6 +96,7 @@ const actionLabels: Record<string, string> = {
   REJECT_CONTENT: "验收退回",
   START_CONTENT_REVISION: "开始修改",
   RESUBMIT_PRODUCTION: "重新提交",
+  CLAIM_TICKET: "抢单",
   ACCEPT_TICKET: "接单",
   START_TICKET: "开始制作",
   SUBMIT_TICKET: "提交成品",
@@ -228,7 +232,7 @@ export default function MediaFeaturePage({
   feature: MediaFeature;
   permissions?: string[];
 }) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const requestedId = detailQuery[feature]
     ? Number(params.get(detailQuery[feature]!)) || undefined
     : undefined;
@@ -933,7 +937,7 @@ function AccountActionModal({
   );
 }
 
-function requestActionReason(title: string): Promise<string | undefined> {
+function requestActionReason(title: string, required = true): Promise<string | undefined> {
   return new Promise((resolve) => {
     let value = "";
     Modal.confirm({
@@ -942,7 +946,7 @@ function requestActionReason(title: string): Promise<string | undefined> {
         <Input.TextArea
           autoFocus
           maxLength={500}
-          placeholder="请输入具体原因"
+          placeholder={required ? "请输入驳回理由" : "请输入通过说明（可选）"}
           rows={4}
           onChange={(event) => {
             value = event.target.value;
@@ -954,7 +958,7 @@ function requestActionReason(title: string): Promise<string | undefined> {
       onCancel: () => resolve(undefined),
       onOk: () => {
         const reason = value.trim();
-        if (!reason) {
+        if (required && !reason) {
           message.error("请填写退回原因");
           return Promise.reject();
         }
@@ -1244,80 +1248,38 @@ export function AccountsPage({ permissions = [] }: { permissions?: string[] }) {
 export function ContentPage({ permissions = [] }: { permissions?: string[] }) {
   return <MediaFeaturePage feature="content" permissions={permissions} />;
 }
-export function ProductionTicketsPage({
-  permissions = [],
-}: {
-  permissions?: string[];
-}) {
-  const [view, setView] = useState<'pending' | 'mine' | 'pool'>('mine');
-  const canAccept = hasPermission(permissions, 'zsjos:production-ticket:accept');
-  const [rows, setRows] = useState<ProductionTicket[]>([]);
-  const [selected, setSelected] = useState<ProductionTicket>();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [submitOpen, setSubmitOpen] = useState(false);
-  const [submitRemark, setSubmitRemark] = useState('');
-  const [videoSent, setVideoSent] = useState(false);
-  const [submitFile, setSubmitFile] = useState<{ id: number; name: string }>();
-  const [reviewReason, setReviewReason] = useState('');
-  const [reviewing, setReviewing] = useState(false);
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const result = view === 'pending' ? { list: await api.productionTicket.pendingAssignments(), total: 0 } : view === 'pool' ? await api.productionTicket.poolPage({ pageNo: 1, pageSize: 100 }) : await api.productionTicket.page({ pageNo: 1, pageSize: 100 });
-      setRows(result.list);
-      setSelected(current => result.list.find(ticket => ticket.id === current?.id) || result.list[0]);
-    } catch (cause) { setRows([]); setSelected(undefined); setError(errorText(cause)); } finally { setLoading(false); }
-  }, [view]);
-  useEffect(() => { void load(); }, [load]);
-  const act = async (ticket: ProductionTicket, action: string) => {
-    if (action === 'CLAIM_TICKET') {
-      try { await api.productionTicket.claim(ticket.id, ticket.version); message.success('抢单成功'); await load(); }
-      catch (cause) { message.error(errorText(cause)); }
-      return;
-    }
-    if (action === 'SUBMIT_TICKET') { setSelected(ticket); setSubmitRemark(''); setVideoSent(false); setSubmitFile(undefined); setSubmitOpen(true); return; }
-    if (action === 'REJECT_TICKET' && !reviewing) { setSelected(ticket); setReviewing(true); return; }
-    if (action === 'REJECT_TICKET' && !reviewReason.trim()) { message.error('请填写驳回理由'); return; }
-    try { await runAction('tickets', ticket as Row, action, reviewReason); message.success('操作成功'); setReviewing(false); setReviewReason(''); await load(); }
-    catch (cause) { message.error(errorText(cause)); }
-  };
-  const finishAssignment = async (accept: boolean) => {
-    if (!selected) return;
-    if (!accept && (!rejecting || !reason.trim())) { setRejecting(true); if (rejecting) message.error('请填写拒接原因'); return; }
-    try { setSaving(true); if (accept) await api.productionTicket.accept(selected.id, selected.version); else await api.productionTicket.rejectAssignment(selected.id, selected.version, reason.trim()); message.success(accept ? '已接单' : '已拒接'); setRejecting(false); setReason(''); await load(); }
-    catch (cause) { message.error(errorText(cause)); } finally { setSaving(false); }
-  };
-  const actionItems = selected?.availableActions.filter(action => !['CLAIM_TICKET', 'REJECT_TICKET_ASSIGNMENT', 'ACCEPT_TICKET'].includes(action)) || [];
-  return <section className="workspace-page media-tickets-page">
-    <header className="media-feature-heading"><div><Typography.Title level={4}>拍剪工单</Typography.Title><Typography.Text type="secondary">剪辑与拍摄共用同一套工单详情和操作流程</Typography.Text></div><Tooltip title="刷新"><Button icon={<ReloadOutlined />} onClick={() => void load()} /></Tooltip></header>
-    <Tabs activeKey={view} onChange={key => setView(key as typeof view)} items={[...(canAccept ? [{ key: 'pending', label: '待接单' }] : []), { key: 'mine', label: '我的工单' }, { key: 'pool', label: '公共池', disabled: !hasPermission(permissions, 'zsjos:production-ticket:pool-query') && !hasPermission(permissions, 'zsjos:production-ticket:claim') }]} />
-    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>} />}
-    <div className="media-feature-inbox-layout media-ticket-inbox-layout">
-      <aside className="media-feature-list-pane"><div className="media-feature-toolbar"><Typography.Text strong>{loading ? '加载中…' : `${rows.length} 条工单`}</Typography.Text></div><div className="media-feature-scroll">
-        {loading ? <Skeleton active paragraph={{ rows: 7 }} /> : rows.length ? rows.map(ticket => <button className={`media-feature-item media-ticket-item ${selected?.id === ticket.id ? 'active' : ''}`} key={ticket.id} onClick={() => setSelected(ticket)}><div><strong>{ticket.ticketNo}</strong><span>学员：{ticket.dispatchContext?.studentName || '未记录'}</span><span>账号：{ticket.dispatchContext?.accountName || ticket.dispatchContext?.accountNo || '未记录'}</span><span>提交人：{ticket.submitterName || '未记录'}</span><span>截止：{ticket.deadlineAt ? formatTimestamp(ticket.deadlineAt) : '未设置'}</span></div><Tag>{statusText(ticket.status)}</Tag></button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={view === 'pool' ? '公共池暂无可抢工单' : view === 'pending' ? '暂无待接指定单' : '暂无工单'} />}
-      </div></aside>
-      <main className="media-feature-detail-pane">{selected ? <><div className="media-feature-detail-title"><div><Typography.Title level={4}>{selected.ticketNo}</Typography.Title><Typography.Text type="secondary">{selected.dispatchContext?.studentName || '学员未记录'} · {selected.dispatchContext?.accountName || selected.dispatchContext?.accountNo || '账号未记录'}</Typography.Text></div><Tag color="blue">{statusText(selected.status)}</Tag></div><ProductionTicketDetail ticket={selected} /><section className="media-ticket-action-bar"><Typography.Text strong>操作区</Typography.Text><Space wrap>{selected.availableActions.includes('REJECT_TICKET_ASSIGNMENT') && <Button danger loading={saving} onClick={() => void finishAssignment(false)}>{rejecting ? '确认拒接' : '拒绝接单'}</Button>}{selected.availableActions.includes('ACCEPT_TICKET') && <Button type="primary" loading={saving} onClick={() => void finishAssignment(true)}>接单</Button>}{actionItems.map(action => <Button danger={action === 'REJECT_TICKET'} type={action === 'APPROVE_TICKET' || action === 'SUBMIT_TICKET' ? 'primary' : 'default'} key={action} onClick={() => void act(selected, action)}>{actionText(action)}</Button>)}</Space>{rejecting && <Input.TextArea rows={3} maxLength={500} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="请填写拒接原因" />}{reviewing && <Input.TextArea rows={3} maxLength={500} showCount value={reviewReason} onChange={event => setReviewReason(event.target.value)} placeholder="请填写驳回理由，然后再次点击驳回" />}</section><Modal title="提交成品" open={submitOpen} onCancel={() => setSubmitOpen(false)} okText="确认提交" onOk={async () => { if (!videoSent) { message.error('请确认视频已发送给运营'); return; } try { await api.productionTicket.submit(selected.id, { version: selected.version, remark: submitRemark, attachmentId: submitFile?.id, videoSentToOperator: videoSent }); message.success('成品已提交'); setSubmitOpen(false); await load(); } catch (cause) { message.error(errorText(cause)); } }}><Input.TextArea rows={4} maxLength={1000} showCount value={submitRemark} onChange={event => setSubmitRemark(event.target.value)} placeholder="备注（可选）" /><Upload maxCount={1} beforeUpload={async file => { try { const uploaded = await (await import('../services/workOrderApi')).workOrderApi.upload(file); setSubmitFile({ id: uploaded.id, name: uploaded.name }); message.success('附件已上传'); } catch (cause) { message.error(errorText(cause)); } return false; }} showUploadList={Boolean(submitFile)}><Button style={{ marginTop: 12 }}>上传成品附件（可选）</Button></Upload><Checkbox checked={videoSent} onChange={event => setVideoSent(event.target.checked)} style={{ display: 'block', marginTop: 16 }}>我已将视频发送给运营</Checkbox></Modal></> : <Empty description="请选择一张工单" />}</main>
-    </div>
-  </section>;
-}
+export { default as ProductionTicketsPage } from './ProductionTicketsPage';
 
-function ProductionTicketDetail({ ticket }: { ticket: ProductionTicket }) {
+export function ProductionTicketDetail({ ticket }: { ticket: ProductionTicket }) {
   const context = ticket.dispatchContext;
   const fields = ticket.formFields || [];
   const values = ticket.formValues || {};
-  const account = context?.accounts?.[0];
-  return <div className="media-ticket-detail"><div className="media-feature-meta"><span>提交人</span><strong>{ticket.submitterName || '未记录'}</strong><span>截止时间</span><strong>{ticket.deadlineAt ? formatTimestamp(ticket.deadlineAt) : formatTicketValue(values.deadline_at || values.deadlineAt)}</strong><span>平台</span><strong>{context?.platformLabel || '未记录'}</strong><span>账号编号</span><strong>{context?.accountNo || String(ticket.accountId || '未记录')}</strong></div>{account && <section className="media-feature-card media-ticket-account"><Typography.Title level={5}>账号资料</Typography.Title><div className="media-ticket-account-content">{account.coverUrl ? <img src={account.coverUrl} alt="账号封面" /> : <div className="media-ticket-account-placeholder">暂无封面图</div>}<div><Typography.Text strong>{account.accountName || context?.accountName || '未记录'}</Typography.Text><Typography.Paragraph><span>主页链接：</span>{account.homepageUrl ? <a href={account.homepageUrl} target="_blank" rel="noreferrer">{account.homepageUrl}</a> : '未填写'}</Typography.Paragraph></div></div></section>}{fields.length > 0 && <section className="media-feature-card"><Typography.Title level={5}>运营填写内容</Typography.Title><div className="media-feature-fields">{fields.map(field => <div key={field.key}><span>{field.label}</span><strong>{formatTicketValue(values[field.key])}</strong></div>)}</div></section>}{(context?.completionRemark || context?.completionAttachmentId || context?.videoSentToOperator !== undefined) && <section className="media-feature-card"><Typography.Title level={5}>成品提交信息</Typography.Title><div className="media-feature-fields"><div><span>视频已发送给运营</span><strong>{context.videoSentToOperator ? '是' : '否'}</strong></div><div><span>提交备注</span><strong>{context.completionRemark || '未填写'}</strong></div></div></section>}{ticket.requestAttachments?.length ? <section className="media-feature-card"><Typography.Title level={5}>工单附件</Typography.Title>{ticket.requestAttachments.map(file => <Typography.Paragraph key={file.id}>📎 {file.name}</Typography.Paragraph>)}</section> : null}<section className="media-ticket-operator-remark"><Typography.Text strong>运营备注</Typography.Text><Typography.Paragraph>{context?.operatorRemark || '未填写'}</Typography.Paragraph></section></div>;
+  const accounts = ticket.accounts?.length ? ticket.accounts : context?.accounts || [];
+  const attachedIds = new Set(fields.filter(field => field.type === 'attachment').flatMap(field => Array.isArray(values[field.key]) ? (values[field.key] as unknown[]).map(Number) : []));
+  const attachment = (file: NonNullable<ProductionTicket['requestAttachments']>[number]) => <AttachmentCard key={file.id} name={file.name} load={async () => {
+    const current = await api.productionTicket.get(ticket.id);
+    const resource = current.requestAttachments?.find(item => item.id === file.id);
+    if (!resource) throw new Error('附件不存在或不可访问');
+    return resource;
+  }} />;
+  return <div className="media-ticket-detail">
+    <section className="media-feature-card"><Typography.Title level={5}>制作需求</Typography.Title>
+      <p>提交人：{ticket.submitterName || '未记录'}</p>
+      <div className="production-ticket-request-fields">{fields.map(field => {
+        const text = formatTicketValue(values[field.key]);
+        const wide = field.type === 'attachment' || text.length > 120 || /https?:\/\//.test(text);
+        return <div key={field.key} className={wide ? 'wide' : ''}><span>{field.label}</span><div>{field.type === 'attachment' ? (ticket.requestAttachments || []).filter(file => Array.isArray(values[field.key]) && (values[field.key] as unknown[]).map(Number).includes(file.id)).map(attachment) : <LinkedText text={text} resource />}</div></div>;
+      })}</div>
+      <div className="media-ticket-operator-remark"><Typography.Text strong>运营备注</Typography.Text><Typography.Paragraph>{context?.operatorRemark || '未填写'}</Typography.Paragraph></div>
+      {(ticket.requestAttachments || []).filter(file => !attachedIds.has(file.id)).length > 0 && <div><Typography.Text strong>补充附件</Typography.Text>{(ticket.requestAttachments || []).filter(file => !attachedIds.has(file.id)).map(attachment)}</div>}
+    </section>
+    <section className="media-feature-card"><Typography.Title level={5}>关联账号</Typography.Title>{accounts.length ? <div className="production-ticket-accounts">{accounts.map((account, index) => <div key={account.accountId || index} className="media-ticket-account-content">{account.coverUrl && <img src={account.coverUrl} alt="账号封面" />}<div><Typography.Text strong>{account.accountName || account.accountNo || '未命名账号'}</Typography.Text><p>{account.accountNo}</p>{account.homepageUrl ? <ResourceLink href={account.homepageUrl} variant="resource" /> : <span>未填写主页链接</span>}</div></div>)}</div> : <p>未关联账号</p>}</section>
+    {(context?.completionRemark || context?.completionUrl) && <section className="media-feature-card"><Typography.Title level={5}>成品交付</Typography.Title><div className="production-ticket-request-fields"><div className="wide"><span>成品链接</span>{context.completionUrl ? <ResourceLink href={context.completionUrl} variant="resource" /> : '未填写'}</div><div className="wide"><span>提交备注</span><div>{context.completionRemark || '未填写'}</div></div></div></section>}
+  </div>;
 }
 
 function formatTicketValue(value: unknown) {
-  if (value === undefined || value === null || value === '') return '未填写';
-  if (Array.isArray(value)) return value.join('、');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
+  return ticketSnapshotText(value);
 }
 
 function ProductionTicketSnapshot({ ticket }: { ticket?: ProductionTicket }) {
@@ -1330,8 +1292,8 @@ export function ProductionTicketAssignmentHost({ permissions = [] }: { permissio
   const load = useCallback(async () => { if (!enabled) return; try { setPending(await api.productionTicket.pendingAssignments()); } catch { setPending([]); } }, [enabled]);
   useEffect(() => { void load(); if (!enabled) return; const timer = window.setInterval(() => void load(), 30000); return () => window.clearInterval(timer); }, [enabled, load]);
   const ticket = pending[0];
-  const finish = async (accept: boolean) => { if (!ticket) return; if (!accept && (!rejecting || !reason.trim())) { setRejecting(true); if (rejecting) message.error('请填写拒接原因'); return; } try { setSaving(true); if (accept) await api.productionTicket.accept(ticket.id, ticket.version); else await api.productionTicket.rejectAssignment(ticket.id, ticket.version, reason.trim()); message.success(accept ? '已接单' : '已拒接，工单已进入公共池'); setRejecting(false); setReason(''); await load(); } catch (cause) { message.error(errorText(cause)); } finally { setSaving(false); } };
-  return <Modal width="min(960px, calc(100vw - 32px))" title="拍剪指定派单" open={Boolean(ticket)} closable={false} maskClosable={false} keyboard={false} footer={<Space><Button danger loading={saving} disabled={!hasPermission(permissions, 'zsjos:production-ticket:reject-assignment')} onClick={() => void finish(false)}>{rejecting ? '确认拒接' : '拒绝接单'}</Button><Button type="primary" loading={saving} onClick={() => void finish(true)}>接单</Button></Space>}><ProductionTicketSnapshot ticket={ticket}/>{rejecting && <Input.TextArea autoFocus rows={3} maxLength={500} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="请填写拒接原因"/>}</Modal>;
+  const finish = async (accept: boolean) => { if (!ticket) return; if (!accept && (!rejecting || !reason.trim())) { setRejecting(true); if (rejecting) message.error('请填写拒接原因'); return; } try { setSaving(true); if (accept) await api.productionTicket.accept(ticket.id, ticket.version); else await api.productionTicket.rejectAssignment(ticket.id, ticket.version, reason.trim()); notifyTicketChanged(); message.success(accept ? '已接单' : '已拒接，工单已进入公共池'); setRejecting(false); setReason(''); await load(); } catch (cause) { message.error(errorText(cause)); } finally { setSaving(false); } };
+  return <Modal width="min(960px, calc(100vw - 32px))" title="拍剪指定派单" open={Boolean(ticket)} closable={false} maskClosable={false} keyboard={false} footer={null}><div className="media-ticket-detail-grid"><ProductionTicketSnapshot ticket={ticket}/><section className="media-ticket-action-bar"><Typography.Text strong>操作区</Typography.Text><Space wrap><Button danger loading={saving} disabled={!hasPermission(permissions, 'zsjos:production-ticket:reject-assignment')} onClick={() => void finish(false)}>{rejecting ? '确认拒接' : '拒绝接单'}</Button><Button type="primary" loading={saving} onClick={() => void finish(true)}>接单</Button></Space>{rejecting && <Input.TextArea autoFocus rows={3} maxLength={500} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="请填写拒接原因"/>}</section></div></Modal>;
 }
 export function PositioningPage({
   permissions = [],

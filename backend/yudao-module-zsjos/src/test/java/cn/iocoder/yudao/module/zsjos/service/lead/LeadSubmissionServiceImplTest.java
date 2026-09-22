@@ -96,6 +96,10 @@ class LeadSubmissionServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
+        var initialStage = new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO();
+        initialStage.setValue("pending_contact"); initialStage.setLabel("待触达"); initialStage.setStatus(0);
+        org.mockito.Mockito.lenient().when(dictDataApi.getDictDataList(LeadSalesStageSnapshot.DICT_TYPE))
+                .thenReturn(List.of(initialStage));
         org.mockito.Mockito.lenient().when(identityService.requireOrdinarySubmitter(1L)).thenReturn(
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
         org.mockito.Mockito.lenient().when(categorySnapshotService.requireEnabled(org.mockito.ArgumentMatchers.any()))

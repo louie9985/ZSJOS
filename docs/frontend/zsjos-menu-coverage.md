@@ -69,6 +69,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage` | `zsjos/mediaCalendar/index` |
 | 47.1 | 我的日历 | `/calendar/personal` | `PersonalCalendarPage` | `zsjos/personalCalendar/index` |
 | 47.2 | 考期日历（日历子菜单） | `/calendar/exam-calendar` | `ExamCalendarPage` | `zsjos/examCalendar/index` |
+| 47.3 | 销售客资跟进日历（日历子菜单） | `/calendar/sales-lead-follow-up` | `LeadFollowUpCalendarPage` | `zsjos/leadFollowUpCalendar/index` |
 | 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
@@ -131,3 +132,12 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 ### 公告原生管理（2026-09-21）
 
 `/messages/notice` 保留原菜单。React 阅读使用 `system:notice:read`，管理列表/详情使用 `system:notice:query`，各写操作复用已有按钮权限。管理预览不写已读；首页 `announcementId` 链接进入员工阅读。Vue 详情覆盖草稿、已发布、已下线。本次不修改实际角色授权或渲染配置；当前为 `admin_embed` 的菜单需由管理员配置为 `native` 才启用 React 原生页面。富文本核心按需加载；两端共享 System/Infra API，不共享框架组件。
+
+## 销售业绩（2026-09-22）
+
+用户明确要求两页仅员工工作台：`/zsjos/sales-performance`（`zsjos/salesPerformance/index`）和 `/zsjos/sales-performance-target`（`zsjos/salesPerformanceTarget/index`）。Vue Admin 过滤对应不可渲染组件；System 菜单与角色仍是唯一授权来源。见 [接口与口径](../api/sales-performance.md)。
+
+销售客资跟进日历仅由 React Workbench 渲染，Vue Admin 过滤其组件。页面权限
+`zsjos:lead-follow-up-calendar:query` 与现有客资读取权限累积生效；快捷跟进和历史读取
+继续使用现有独立按钮权限。V277 只新增菜单元数据，不写角色授权。
+详见 [销售客资跟进日历](../api/lead-follow-up-calendar.md)。

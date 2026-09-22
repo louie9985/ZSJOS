@@ -54,6 +54,7 @@ class LeadDispatchServiceImplTest {
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Mock private PartnerLeadAssignmentService partnerAssignmentService;
     @InjectMocks
     private LeadDispatchServiceImpl service;

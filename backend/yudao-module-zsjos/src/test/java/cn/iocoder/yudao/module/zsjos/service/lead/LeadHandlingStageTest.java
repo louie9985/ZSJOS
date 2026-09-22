@@ -11,6 +11,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class LeadHandlingStageTest {
 
     @Test
+    void followUpProjectionUsesFirstFactNotQualificationTimer() {
+        LeadDO lead = new LeadDO().setStatus(STATUS_SUBMITTED).setAssignmentStatus(ASSIGNMENT_OWNED);
+        lead.setCurrentAssignmentFirstFollowUpAt(LocalDateTime.now());
+        assertEquals(FOLLOW_UP_FOLLOWING, LeadStateProjection.followUp(lead, null));
+        lead.setCurrentAssignmentFirstFollowUpAt(null);
+        lead.setCurrentAssignmentFirstFollowUpDeadlineAt(LocalDateTime.now());
+        lead.setQualificationDeadlineAt(LocalDateTime.now().plusDays(3));
+        assertEquals(FOLLOW_UP_FIRST_PENDING, LeadStateProjection.followUp(lead, null));
+        lead.setCurrentAssignmentFirstFollowUpDeadlineAt(null);
+        assertEquals(FOLLOW_UP_FOLLOWING, LeadStateProjection.followUp(lead, null));
+    }
+
+    @Test
     void qualificationDeadlineDoesNotReplaceFirstFollowStage() {
         LeadDO lead = new LeadDO();
         lead.setStatus(STATUS_SUBMITTED);

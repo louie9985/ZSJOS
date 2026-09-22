@@ -19,8 +19,32 @@ import static org.mockito.Mockito.*;
 class AdvancedFilterServiceTest {
     @InjectMocks private AdvancedFilterService service;
     @Mock private AdvancedFilterMapper mapper;
+    @Mock private LeadFilterOrganizationService leadFilterOrganizations;
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(7L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
+
+    @Test void stageOrganizationAndIndependentStatusesComposeWithoutChangingTenant() {
+        when(leadFilterOrganizations.ownerIds(List.of("10"))).thenReturn(List.of(20L));
+        var filters = group("AND", condition("lead.salesStage", "in", List.of("contacted")),
+                condition("lead.ownerDeptId", "in", List.of("10")),
+                condition("lead.qualificationStatus", "in", List.of("valid")),
+                condition("lead.dealStatus", "in", List.of("not_won")));
+        service.matchLeadIds(filters);
+        var captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class); verify(mapper).selectLeadIds(captor.capture());
+        assertEquals(7L,captor.getValue().getParameters().get("tenantId"));
+        assertTrue(captor.getValue().getWhereSql().contains("l.sales_stage IN"));
+        assertTrue(captor.getValue().getWhereSql().contains("l.owner_user_id IN"));
+        assertTrue(captor.getValue().getWhereSql().contains("l.status IN ('valid','won')"));
+    }
+    @Test void templateValidationDoesNotQueryLiveOrganizationAndEmptyOwnersFailClosed() {
+        var filters = group("AND", condition("lead.ownerDeptId", "not_in", List.of("10")));
+        service.validate("lead",filters); verifyNoInteractions(leadFilterOrganizations);
+        when(leadFilterOrganizations.ownerIds(List.of("10"))).thenReturn(List.of());
+        service.matchLeadIds(filters);
+        var captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class); verify(mapper).selectLeadIds(captor.capture());
+        assertTrue(captor.getValue().getWhereSql().contains("1=0"));
+        assertFalse(captor.getValue().getWhereSql().contains("NOT (1=0)"));
+    }
 
     @Test void composesGroupsAndKeepsTenantParameter() {
         AdvancedFilterGroupReqVO root = group("AND", condition("person.name", "contains", "张三"));

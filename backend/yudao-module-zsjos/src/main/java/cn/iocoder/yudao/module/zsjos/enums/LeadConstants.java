@@ -99,6 +99,7 @@ public interface LeadConstants {
     String PERMISSION_OWNER_TRANSFER = "zsjos:lead:owner-transfer";
     String PERMISSION_OWNER_RELEASE_PUBLIC_SEA = "zsjos:lead:owner-release-public-sea";
     String PERMISSION_REQUEST_SUBMITTER_ASSIST = "zsjos:lead:request-submitter-assist";
+    String PERMISSION_SUBMITTER_ASSIST_READ = "zsjos:lead:submitter-assist:read";
     String PERMISSION_SUPERVISOR_RESTORE = "zsjos:subordinate-sales:lead-restore";
     String PERMISSION_SUPERVISOR_TRANSFER = "zsjos:subordinate-sales:lead-transfer";
     String PERMISSION_SUPERVISOR_RECYCLE = "zsjos:subordinate-sales:lead-recycle";
@@ -124,6 +125,7 @@ public interface LeadConstants {
     String DETAIL_TAB_COMPLAINTS = "complaints";
     String DETAIL_TAB_ORDERS = "orders";
     String DETAIL_TAB_FLOW_HISTORY = "flow-history";
+    String DETAIL_TAB_ASSIST_HISTORY = "assist-history";
     String INBOX_FILTER_FIELD_STATUS = "status";
     String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
     String INBOX_FILTER_FIELD_HANDLING_STAGE = "handling_stage";

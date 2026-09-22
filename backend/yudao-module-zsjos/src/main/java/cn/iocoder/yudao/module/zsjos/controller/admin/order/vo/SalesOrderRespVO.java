@@ -11,6 +11,9 @@ import java.util.Map;
 public class SalesOrderRespVO {
     private Long id;
     private String orderNo;
+    private String collectionMode;
+    private String paymentStatus;
+    private Boolean transactionLocked;
     private Long leadId;
     private Long opportunityId;
     private String status;

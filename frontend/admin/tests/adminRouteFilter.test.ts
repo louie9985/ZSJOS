@@ -73,3 +73,14 @@ test('keeps the admin_embed page renderable when a Workbench-only child is remov
   assert.deepEqual(routes[0].children?.map((route) => route.path), ['manage'])
   assert.deepEqual(routes[0].children?.[0].children, [])
 })
+
+test('sales performance remains Workbench-only without hiding other authorized pages', () => {
+ assert.deepEqual(filterAdminRoutes([{path:'stats',component:'zsjos/salesPerformance/index'},{path:'targets',component:'zsjos/salesPerformanceTarget/index'},{path:'roles',component:'system/role/index'}]).map(x=>x.path),['roles'])
+})
+
+test('sales follow-up calendar remains Workbench-only', () => {
+  assert.deepEqual(filterAdminRoutes([{ path: '/calendar', children: [
+    { path: 'sales-lead-follow-up', component: 'zsjos/leadFollowUpCalendar/index' },
+    { path: 'personal', component: 'zsjos/personalCalendar/index' }
+  ] }])[0].children?.map(route => route.path), ['personal'])
+})

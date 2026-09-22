@@ -13,6 +13,7 @@ import java.util.List;
 
 @Data
 public class LeadFollowUpCreateReqVO {
+    @Size(max = 100) private String salesStage;
     @NotBlank @Size(max = 100) private String method;
     @NotBlank @Size(max = 100) private String result;
     @Size(max = 100) private String leadCategory;

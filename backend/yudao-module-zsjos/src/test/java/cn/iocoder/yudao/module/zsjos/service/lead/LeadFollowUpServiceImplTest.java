@@ -34,6 +34,8 @@ import java.util.Map;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_TIME_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LeadFollowUpServiceImplTest {
     @InjectMocks private LeadFollowUpServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Mock private LeadMapper leadMapper;
     @Mock private LeadFollowUpRecordMapper recordMapper;
     @Mock private LeadFollowUpImageMapper imageMapper;
@@ -178,7 +181,7 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void validLeadFollowUpKeepsRecordedFirstFollowUpWhenTaskAlreadyCompleted() {
+    void validLeadFollowUpRecordsFactWhenTaskIsMissingOrCompleted() {
         LeadDO lead = validLead();
         lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         lead.setCurrentAssignmentHistoryId(88L);
@@ -195,7 +198,111 @@ class LeadFollowUpServiceImplTest {
 
         withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
 
+        assertNotNull(lead.getCurrentAssignmentFirstFollowUpAt());
+    }
+
+    @Test
+    void submittedFollowUpWithoutTaskStillRecordsFirstFact() {
+        LeadDO lead = validLead();
+        stubSuccessfulCreate(lead);
+        doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        var response = withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        assertEquals(response.getOccurredAt(), lead.getCurrentAssignmentFirstFollowUpAt());
+        assertTrue(response.getFirstInAssignment());
+        verify(lifecycleTaskService).completeFirstFollowUpTask(88L, response.getOccurredAt());
+        verify(lifecycleTaskService, never()).createQualificationTask(any(), any(), any());
+    }
+
+    @Test
+    void migratedCurrentCycleFirstRecordWinsOverNewSubmission() {
+        LeadDO lead = validLead();
+        stubSuccessfulCreate(lead);
+        LocalDateTime firstAt = LocalDateTime.now().minusDays(2);
+        LeadFollowUpRecordDO first = new LeadFollowUpRecordDO();
+        first.setId(39L); first.setOccurredAt(firstAt);
+        when(recordMapper.selectFirstByAssignment(1L, 88L, 20L)).thenReturn(first);
+        doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        var response = withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        assertEquals(firstAt, lead.getCurrentAssignmentFirstFollowUpAt());
+        assertFalse(response.getFirstInAssignment());
+        assertTrue(first.getFirstInAssignment());
+        verify(lifecycleTaskService).completeFirstFollowUpTask(88L, firstAt);
+    }
+
+    @Test
+    void subsequentFollowUpPreservesExistingFirstTime() {
+        LeadDO lead = validLead();
+        LocalDateTime firstAt = LocalDateTime.now().minusDays(2);
+        lead.setCurrentAssignmentFirstFollowUpAt(firstAt);
+        stubSuccessfulCreate(lead);
+        doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        assertEquals(firstAt, lead.getCurrentAssignmentFirstFollowUpAt());
+        verify(recordMapper, never()).selectFirstByAssignment(any(), any(), any());
+    }
+
+    @Test
+    void collaboratorCannotCompleteOwnersFirstFollowUp() {
+        LeadDO lead = validLead(); lead.setOwnerUserId(21L); lead.setStatus("valid");
+        stubSuccessfulCreate(lead);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(new OpportunityDO().setId(30L).setStatus("open"));
+        doAnswer(inv -> { inv.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L); return 1; })
+                .when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
         assertNull(lead.getCurrentAssignmentFirstFollowUpAt());
+        verify(lifecycleTaskService, never()).completeFirstFollowUpTask(any(), any());
+    }
+
+    @Test
+    void bothFollowUpPathsFreezeBeforeAfterAndUpdateLead() {
+        for (boolean opportunityPath : List.of(false, true)) {
+            reset(leadMapper, recordMapper, opportunityMapper, opportunityRecordMapper, dictDataApi,
+                    adminUserApi, attachmentService, imageMapper, opportunityImageMapper, lifecycleTaskService);
+            LeadDO lead = validLead().setSalesStage("contacted").setSalesStageLabelSnapshot("旧名称");
+            stubSuccessfulCreate(lead);
+            when(dictDataApi.getDictDataList(LeadSalesStageSnapshot.DICT_TYPE))
+                    .thenReturn(List.of(dict("intent_customer", "选择时名称")));
+            if (opportunityPath) {
+                lead.setStatus("valid");
+                when(opportunityMapper.selectByLeadId(1L)).thenReturn(new OpportunityDO().setId(30L).setStatus("open"));
+                doAnswer(inv -> { inv.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L); return 1; })
+                        .when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+            } else {
+                doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                        .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+            }
+            var req = request(LocalDateTime.now().plusHours(1)); req.setSalesStage("intent_customer");
+            var saved = withTenant(() -> service.create(1L, 20L, req));
+            assertEquals("contacted", saved.getSalesStageBefore());
+            assertEquals("旧名称", saved.getSalesStageBeforeLabelSnapshot());
+            assertEquals("intent_customer", saved.getSalesStageAfter());
+            assertEquals("选择时名称", saved.getSalesStageAfterLabelSnapshot());
+            assertEquals(saved.getSalesStageAfter(), lead.getSalesStage());
+            assertEquals(saved.getSalesStageAfterLabelSnapshot(), lead.getSalesStageLabelSnapshot());
+            verify(leadMapper).updateById(lead);
+        }
+    }
+
+    @Test
+    void omittedStagePreservesHistoricalSnapshotAndIdempotentReplayDoesNotReapplyIt() {
+        LeadDO lead = validLead().setSalesStage("contacted").setSalesStageLabelSnapshot("保存时名称");
+        stubSuccessfulCreate(lead);
+        doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        var response = withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        assertEquals("保存时名称", response.getSalesStageAfterLabelSnapshot());
+        var captor = ArgumentCaptor.forClass(LeadFollowUpRecordDO.class);
+        verify(recordMapper).insert(captor.capture());
+        when(recordMapper.selectByIdempotencyKey("request-1")).thenReturn(captor.getValue());
+        lead.setSalesStage("intent_customer").setSalesStageLabelSnapshot("后来阶段");
+        var replay = withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        assertEquals("保存时名称", replay.getSalesStageAfterLabelSnapshot());
+        assertEquals("intent_customer", lead.getSalesStage());
+        verify(leadMapper, times(1)).updateById(lead);
+        verify(dictDataApi, never()).getDictDataList(LeadSalesStageSnapshot.DICT_TYPE);
     }
 
     private void stubSuccessfulCreate(LeadDO lead) {

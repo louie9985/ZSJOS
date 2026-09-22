@@ -14,6 +14,14 @@ const menu = (path: string, name = path): WorkbenchMenu => ({
 })
 
 describe('Workbench tabs', () => {
+  it('reuses the menu identity while remembering the latest account address', () => {
+    const first = appendMenuTab([], menu('/zsjos/media-students', '媒体学员'), '/zsjos/media-students?personId=1&accountId=2')
+    const next = appendMenuTab(first, menu('/zsjos/media-students', '媒体学员'), '/zsjos/media-students?personId=3&accountId=4')
+    expect(next).toHaveLength(1)
+    expect(next[0].key).toBe('/zsjos/media-students')
+    expect(next[0].href).toBe('/zsjos/media-students?personId=3&accountId=4')
+    expect(appendMenuTab(next, menu('/zsjos/media-students'), next[0].href)).toBe(next)
+  })
   it('adds each menu once and keeps the first tab fixed', () => {
     const first = appendMenuTab([], menu('/page/0', '首页'))
     const duplicate = appendMenuTab(first, menu('/page/0', '首页'))

@@ -91,6 +91,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ContentReviewBatchService {
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper personMapper;
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ContentReviewBatchService.class);
@@ -105,6 +106,7 @@ public class ContentReviewBatchService {
     private static final String DICT_ACCOUNT_STAGE = "zsjos_media_account_stage";
 
     @Resource private ContentReviewBatchMapper batchMapper;
+    @Resource private ContentReviewObjectPermissionProvider reviewPermissionProvider;
     @Resource private ContentReviewBatchItemMapper itemMapper;
     @Resource private ContentReviewRelationMapper relationMapper;
     @Resource private ContentMapper contentMapper;
@@ -242,9 +244,10 @@ public class ContentReviewBatchService {
         // Return the complete revision chain: ancestors first, then descendants.
         List<ContentReviewBatchDO> ancestors = new ArrayList<>();
         Long parentId = current.getRevisionOfBatchId();
-        while (parentId != null && ancestors.size() < 20) {
+        Set<Long> ancestorIds = new HashSet<>(Set.of(batchId));
+        while (parentId != null && ancestorIds.add(parentId)) {
             ContentReviewBatchDO parent = batchMapper.selectById(parentId);
-            if (parent == null) break;
+            if (parent == null || !Objects.equals(parent.getTenantId(), current.getTenantId())) break;
             ancestors.add(0, parent);
             parentId = parent.getRevisionOfBatchId();
         }
@@ -252,14 +255,15 @@ public class ContentReviewBatchService {
         queue.add(current);
         queue.addAll(batchMapper.selectByRevisionOfBatchId(batchId));
         Set<Long> visited = new HashSet<>();
-        while (!queue.isEmpty() && result.size() < 20) {
+        while (!queue.isEmpty()) {
             ContentReviewBatchDO row = queue.removeFirst();
-            if (!visited.add(row.getId())) continue;
+            if (!visited.add(row.getId()) || !Objects.equals(row.getTenantId(), current.getTenantId())) continue;
+            queue.addAll(batchMapper.selectByRevisionOfBatchId(row.getId()));
+            if (!reviewPermissionProvider.hasPermission(row.getId(), "read", userId)) continue;
             List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(row.getId());
             Map<String, BpmTaskRespDTO> tasks = loadCurrentTasks(List.of(row), userId);
             result.add(toResponse(row, items, loadContentRecords(items),
                     tasks.get(row.getProcessInstanceId()), userId, true));
-            queue.addAll(batchMapper.selectByRevisionOfBatchId(row.getId()));
         }
         return result;
     }
@@ -270,10 +274,12 @@ public class ContentReviewBatchService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long createFromStudent(ContentReviewStudentDraftCreateReqVO request, Long userId) {
-        return createFromStudent(request, userId, null);
+        return createFromStudent(request, userId, null, null);
     }
 
-    private Long createFromStudent(ContentReviewStudentDraftCreateReqVO request, Long userId, ContentReviewBatchDO editing) {
+    private Long createFromStudent(ContentReviewStudentDraftCreateReqVO request, Long userId, ContentReviewBatchDO editing,
+                                   ContentReviewBatchDO snapshotSource) {
+        Map<String, Object> sourceContext = snapshotSource == null ? null : parseMap(snapshotSource.getContextSnapshotJson());
         List<Long> accountIds = request.getAccountIds().stream().filter(Objects::nonNull).distinct().toList();
         List<ContentReviewStudentDraftCreateReqVO.Work> works = request.getWorks().stream()
                 .filter(Objects::nonNull).toList();
@@ -441,7 +447,7 @@ public class ContentReviewBatchService {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("studentPersonId", request.getStudentPersonId());
         context.put("accountIds", accountIds);
-        context.put("accountSnapshots", accounts.stream().map(account -> draftAccountSnapshot(account,
+        context.put("accountSnapshots", accounts.stream().map(account -> reviewAccountSnapshot(account, sourceContext,
                 request.getAccountSnapshots() == null ? null : request.getAccountSnapshots().get(String.valueOf(account.getId())))).toList());
         batch.setContextSnapshotJson(JsonUtils.toJsonString(context));
         batchMapper.updateById(batch);
@@ -469,6 +475,25 @@ public class ContentReviewBatchService {
             references.add(reference);
         }
         return JsonUtils.toJsonString(references);
+    }
+
+    private Map<String, Object> reviewAccountSnapshot(MediaAccountDO account, Map<String, Object> sourceContext,
+                                                       Map<String, Object> overrides) {
+        if (sourceContext == null) return draftAccountSnapshot(account, overrides);
+        // A revision inherits server-stored context, never today's account or client-supplied labels.
+        Map<String, Object> snapshot = new LinkedHashMap<>(objectMapList(sourceContext.get("accountSnapshots")).stream()
+                .filter(row -> Objects.equals(longValue(row.get("id")), account.getId())).findFirst().orElseGet(() -> {
+                    if (sourceContext.get("account") instanceof Map<?, ?> legacy) {
+                        Map<String, Object> old = new LinkedHashMap<>();
+                        legacy.forEach((key, value) -> old.put(String.valueOf(key), value));
+                        if (Objects.equals(longValue(old.get("id")), account.getId())) return old;
+                    }
+                    return Map.of("id", account.getId());
+                }));
+        for (String field : List.of("nickname", "productGoal", "productFormLabel", "publishFrequency", "bottleneckLabel")) {
+            applyText(snapshot, overrides, field);
+        }
+        return snapshot;
     }
 
     private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> overrides) {
@@ -998,7 +1023,7 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVISION_ACCOUNTS_CHANGED);
         }
         validateRevisionSources(previous, request);
-        Long nextBatchId = createFromStudent(request, userId);
+        Long nextBatchId = createFromStudent(request, userId, null, previous);
         ContentReviewBatchDO nextBatch = lockBatch(nextBatchId);
         nextBatch.setRevisionOfBatchId(previous.getId());
         batchMapper.updateById(nextBatch);
@@ -1019,7 +1044,7 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
         validateRevisionSources(previous, request);
-        return createFromStudent(request, userId, previous);
+        return createFromStudent(request, userId, previous, previous);
     }
 
     private void validateRevisionSources(ContentReviewBatchDO previous, ContentReviewStudentDraftCreateReqVO request) {
@@ -1199,7 +1224,7 @@ public class ContentReviewBatchService {
     }
 
     private FrozenContext frozenContext(ContentReviewBatchDO batch) {
-        Map<String, Object> context = parseMap(batch.getContextSnapshotJson());
+        Map<String, Object> context = new LinkedHashMap<>(parseMap(batch.getContextSnapshotJson()));
         return new FrozenContext(text(context.get("productionMaterialTypeCode")),
                 longValue(context.get("productionMaterialSchemaVersionId")),
                 text(context.get("productionMaterialSchemaHash")),
@@ -1251,21 +1276,48 @@ public class ContentReviewBatchService {
                                                         Map<String, BpmTaskRespDTO> tasks, Long userId) {
         Map<Long, ContentDO> contents = loadContentRecords(items.values().stream()
                 .flatMap(Collection::stream).toList());
+        Set<Long> personIds = batches.stream().map(ContentReviewBatchDO::getStudentPersonId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO> persons = personIds.isEmpty()
+                ? Map.of() : personMapper.selectByIds(personIds).stream().collect(Collectors.toMap(
+                        cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO::getId, value -> value));
         return batches.stream().map(batch -> toResponse(batch, items.getOrDefault(batch.getId(), List.of()),
-                contents, tasks.get(batch.getProcessInstanceId()), userId, false)).toList();
+                contents, tasks.get(batch.getProcessInstanceId()), userId, false,
+                batch.getStudentPersonId() == null || !persons.containsKey(batch.getStudentPersonId())
+                        ? null : persons.get(batch.getStudentPersonId()).getName())).toList();
     }
 
     private ContentReviewBatchRespVO toResponse(ContentReviewBatchDO batch,
                                                  List<ContentReviewBatchItemDO> items,
                                                  Map<Long, ContentDO> contents,
                                                  BpmTaskRespDTO task, Long userId, boolean includeFiles) {
+        var person = batch.getStudentPersonId() == null ? null : personMapper.selectById(batch.getStudentPersonId());
+        return toResponse(batch, items, contents, task, userId, includeFiles, person == null ? null : person.getName());
+    }
+
+    private ContentReviewBatchRespVO toResponse(ContentReviewBatchDO batch,
+                                                 List<ContentReviewBatchItemDO> items,
+                                                 Map<Long, ContentDO> contents,
+                                                 BpmTaskRespDTO task, Long userId, boolean includeFiles,
+                                                 String studentName) {
         ContentReviewBatchRespVO response = BeanUtils.toBean(batch, ContentReviewBatchRespVO.class);
+        response.setStudentName(studentName);
         response.setRelationSnapshot(parseMap(batch.getRelationSnapshotJson()));
-        Map<String, Object> context = parseMap(batch.getContextSnapshotJson());
+        Map<String, Object> context = new LinkedHashMap<>(parseMap(batch.getContextSnapshotJson()));
         response.setAccountIds(parseLongList(batch.getAccountIdsJson()));
         // 账号快照里存的是用户编号，姓名按编号解析后回填，避免页面退化成展示内部 ID。
         // 早期冻结的快照没有姓名字段，同样在这里补齐；快照本身不改写。
         List<Map<String, Object>> accountSnapshots = objectMapList(context.get("accountSnapshots"));
+        if (accountSnapshots.isEmpty()) {
+            Map<String, Object> legacy = new LinkedHashMap<>();
+            if (context.get("account") instanceof Map<?, ?> old) old.forEach((key, value) -> legacy.put(String.valueOf(key), value));
+            legacy.putIfAbsent("id", batch.getAccountId());
+            legacy.put("ownerOperatorUserId", batch.getOperatorUserId());
+            legacy.put("directorUserId", batch.getDirectorUserId());
+            legacy.putIfAbsent("operatorName", response.getRelationSnapshot().get("operatorName"));
+            legacy.putIfAbsent("directorName", response.getRelationSnapshot().get("directorName"));
+            accountSnapshots = List.of(legacy);
+        }
         Set<Long> userIds = java.util.stream.Stream.concat(
                         java.util.stream.Stream.of(batch.getOperatorUserId(), batch.getDirectorUserId()),
                         accountSnapshots.stream().flatMap(snapshot -> java.util.stream.Stream.of(
@@ -1276,17 +1328,34 @@ public class ContentReviewBatchService {
         if (!accountSnapshots.isEmpty()) {
             context.put("accountSnapshots", accountSnapshots.stream().map(snapshot -> {
                 Map<String, Object> resolved = new LinkedHashMap<>(snapshot);
-                // 快照里可能存在显式 null，putIfAbsent 不会覆盖，这里按空值判断补齐。
+                // 缺失或空白姓名仅按原责任人关联补齐，不替换已有历史姓名。
                 if (blank(text(resolved.get("operatorName")))) {
                     resolved.put("operatorName", nickname(users, longValue(snapshot.get("ownerOperatorUserId"))));
+                    resolved.put("operatorNameResolved", true);
                 }
                 if (blank(text(resolved.get("directorName")))) {
                     resolved.put("directorName", nickname(users, longValue(snapshot.get("directorUserId"))));
+                    resolved.put("directorNameResolved", true);
                 }
                 return resolved;
             }).toList());
         }
         response.setContextSnapshot(context);
+        response.setAccounts(objectMapList(context.get("accountSnapshots")).stream().map(snapshot -> {
+            var account = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewAccountRespVO();
+            account.setAccountId(longValue(snapshot.get("id")));
+            account.setAccountName(text(snapshot.get("nickname")));
+            account.setAccountNo(text(snapshot.get("accountNo")));
+            account.setPlatformValue(text(snapshot.get("platformValue")));
+            account.setPlatformLabel(text(snapshot.get("platformLabel")));
+            account.setOperatorUserId(longValue(snapshot.get("ownerOperatorUserId")));
+            account.setOperatorName(text(snapshot.get("operatorName")));
+            account.setOperatorNameResolved(Boolean.TRUE.equals(snapshot.get("operatorNameResolved")));
+            account.setDirectorUserId(longValue(snapshot.get("directorUserId")));
+            account.setDirectorName(text(snapshot.get("directorName")));
+            account.setDirectorNameResolved(Boolean.TRUE.equals(snapshot.get("directorNameResolved")));
+            return account;
+        }).toList());
         response.setOperatorName(nickname(users, batch.getOperatorUserId()));
         response.setDirectorName(nickname(users, batch.getDirectorUserId()));
         if (task != null) {
@@ -1375,7 +1444,7 @@ public class ContentReviewBatchService {
     }
 
     private String expectedTaskKey(ContentReviewBatchDO batch) {
-        Map<String, Object> context = parseMap(batch.getContextSnapshotJson());
+        Map<String, Object> context = new LinkedHashMap<>(parseMap(batch.getContextSnapshotJson()));
         return STAGE_DIRECTOR.equals(batch.getCurrentStage()) ? text(context.get("directorTaskKey"))
                 : STAGE_FINAL.equals(batch.getCurrentStage()) ? text(context.get("finalTaskKey")) : null;
     }

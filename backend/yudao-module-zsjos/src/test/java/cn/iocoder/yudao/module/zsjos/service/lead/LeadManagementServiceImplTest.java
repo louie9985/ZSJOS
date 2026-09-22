@@ -65,6 +65,7 @@ class LeadManagementServiceImplTest {
     @InjectMocks
     private LeadManagementServiceImpl service;
     @Mock private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadSubmitterAssistRequestMapper submitterAssistRequestMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Mock
     private LeadMapper leadMapper;
@@ -101,6 +102,52 @@ class LeadManagementServiceImplTest {
     private PartnerMapper partnerMapper;
     @Mock
     private BusinessTaskMapper businessTaskMapper;
+
+    @Test
+    void pageTimestampsUsePendingReminderAndLatestFirstPurchase() {
+        LeadDO lead = lead(1L, 10L, 20L);
+        LeadManagementRespVO row = new LeadManagementRespVO();
+        row.setId(1L);
+        BusinessTaskDO reminder = new BusinessTaskDO();
+        reminder.setBizId(1L);
+        reminder.setDueAt(LocalDateTime.of(2026, 9, 23, 14, 18));
+        SalesOrderDO latest = new SalesOrderDO();
+        latest.setLeadId(1L);
+        latest.setSubmittedAt(LocalDateTime.of(2026, 9, 22, 12, 0));
+        SalesOrderDO previous = new SalesOrderDO();
+        previous.setLeadId(1L);
+        previous.setSubmittedAt(LocalDateTime.of(2026, 9, 21, 12, 0));
+        when(securityFrameworkService.hasPermission("zsjos:lead-detail:follow-up-read")).thenReturn(true);
+        when(businessTaskMapper.selectPendingFollowUpRemindersByLeadIds(List.of(1L))).thenReturn(List.of(reminder));
+        when(salesOrderMapper.selectFirstPurchaseTimestampsByLeadIds(List.of(1L))).thenReturn(List.of(latest, previous));
+        ReflectionTestUtils.invokeMethod(service, "populatePageTimestamps", List.of(lead), List.of(row), 20L);
+        assertEquals(reminder.getDueAt(), row.getNextFollowUpAt());
+        assertEquals(latest.getSubmittedAt(), row.getSalesOrderSubmittedAt());
+    }
+
+    @Test
+    void pageTimestampsDoNotExposeStaleOrUnauthorizedFollowUpTime() {
+        LeadDO lead = lead(1L, 10L, 20L);
+        LeadManagementRespVO row = new LeadManagementRespVO();
+        row.setId(1L);
+        row.setNextFollowUpAt(LocalDateTime.of(2026, 9, 23, 14, 18));
+        ReflectionTestUtils.invokeMethod(service, "populatePageTimestamps", List.of(lead), List.of(row), 20L);
+        assertNull(row.getNextFollowUpAt());
+        assertNull(row.getSalesOrderSubmittedAt());
+        verify(businessTaskMapper).selectPendingFollowUpRemindersByLeadIds(List.of());
+    }
+
+    @Test
+    void pageTimestampsRespectSubordinatePartnerVisibilityAndCancelledReminder() {
+        LeadDO lead = lead(1L, 10L, 20L);
+        LeadManagementRespVO row = new LeadManagementRespVO();
+        row.setId(1L);
+        row.setNextFollowUpAt(LocalDateTime.of(2026, 9, 23, 14, 18));
+        when(leadObjectPermissionService.canReadSubordinatePartnerLead(lead, 20L)).thenReturn(true);
+        ReflectionTestUtils.invokeMethod(service, "populatePageTimestamps", List.of(lead), List.of(row), 20L);
+        assertNull(row.getNextFollowUpAt());
+        verify(businessTaskMapper).selectPendingFollowUpRemindersByLeadIds(List.of(1L));
+    }
 
     @Test
     void formatSelectedAttrValues_shouldExposeOnlySnapshotValues() {

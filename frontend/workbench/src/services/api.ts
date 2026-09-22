@@ -427,6 +427,7 @@ export type ProductionTicketDispatchContext = {
   positioning?: PositioningTicketSnapshot;
   operatorRemark?: string;
   completionRemark?: string;
+  completionUrl?: string;
   completionAttachmentId?: number;
   videoSentToOperator?: boolean;
   accounts?: Array<{ accountId?: number; accountName?: string; accountNo?: string; homepageUrl?: string; coverUrl?: string }>;
@@ -449,6 +450,12 @@ export type PositioningTicketSnapshot = {
   professionalRisk?: boolean;
 };
 export type ProductionTicket = {
+  sceneName?: string;
+  assigneeName?: string;
+  serverNow?: number;
+  currentRound?: number;
+  timeline?: import('./workOrderApi').WorkOrderTimeline[];
+  accounts?: Array<{ accountId?: number; accountName?: string; accountNo?: string; homepageUrl?: string; coverUrl?: string }>;
   id: number;
   ticketNo: string;
   accountId: number;
@@ -1397,6 +1404,8 @@ export type ManagedLead = {
   cityCode?: string;
   cityName?: string;
   leadCategory?: string;
+  salesStage?: string;
+  salesStageLabelSnapshot?: string;
   leadCategoryLabelSnapshot?: string;
   remarkHistory?: ManagedLeadRemark[];
   remarkHistoryIncomplete?: boolean;
@@ -1603,6 +1612,7 @@ export type ManagedLeadPageParams = {
 export type LeadDetailTab =
   | "student-info"
   | "submitter-feedback"
+  | "assist-history"
   | "overview"
   | "follow-ups"
   | "orders"
@@ -1643,6 +1653,10 @@ export type LeadFollowUpImage = {
   url?: string;
 };
 export type LeadFollowUp = {
+  salesStageBefore?: string;
+  salesStageBeforeLabelSnapshot?: string;
+  salesStageAfter?: string;
+  salesStageAfterLabelSnapshot?: string;
   ownerIdentitySnapshot?: string;
   ownerIdentityLabel?: string;
   id: number;
@@ -1667,6 +1681,7 @@ export type LeadFollowUp = {
   images: LeadFollowUpImage[];
 };
 export type LeadFollowUpCreateRequest = {
+  salesStage?: string;
   method: string;
   result: string;
   leadCategory?: string;
@@ -1823,6 +1838,9 @@ export type PaymentRefund = {
   lastErrorMessage?: string;
 };
 export type SalesOrder = {
+  collectionMode?: CollectionMode;
+  paymentStatus?: string;
+  transactionLocked?: boolean;
   submitterUserName?: string
   formalSalesUserName?: string
   historyMissingFields?: Record<string, 'history_not_recorded' | 'invalid_snapshot'>
@@ -2725,6 +2743,15 @@ export type SubordinateSales = {
   canReceiveNewLeads: boolean;
   newcomerPoolStatus: "not_available";
   todayPendingCount: number;
+  todayFollowUpRemainingCount?: number;
+  todayFollowUpTotalCount?: number;
+  todayAssignedCount?: number;
+  todayMissedCount?: number;
+  todayReceivedCount?: number;
+  todayQualifiedCount?: number;
+  todayFollowUpRecordCount?: number;
+  todayOrderAmount?: number;
+  pendingQualificationCount?: number;
   todayFollowUpStatus: "completed" | "incomplete";
   firstFollowTimeoutCount: number;
   suspendedLeadCount: number;
@@ -3356,7 +3383,7 @@ export const api = {
     candidates: async () => unwrap<HomeroomCandidate[]>(await http.get('/zsjos/delivery-class/homeroom-candidates')),
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
-      exams: async (categoryId: number, productId?: number, selectedAttrs?: Record<string, string>) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}) } })),
+      exams: async (categoryId: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
     create: async (data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
     update: async (id: number, data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
@@ -3860,6 +3887,10 @@ export const api = {
       pageSize: number;
       status?: string;
       keyword?: string;
+      pendingAssignment?: boolean;
+      statusGroup?: string;
+      deadlineFrom?: string;
+      deadlineTo?: string;
     }) =>
       unwrap<PageResult<ProductionTicket>>(
         await http.get("/zsjos/production-ticket/page", { params }),
@@ -3872,6 +3903,8 @@ export const api = {
       pageNo: number;
       pageSize: number;
       keyword?: string;
+      deadlineFrom?: string;
+      deadlineTo?: string;
     }) =>
       unwrap<PageResult<ProductionTicket>>(
         await http.get("/zsjos/production-ticket/pool/page", { params }),
@@ -3905,7 +3938,7 @@ export const api = {
           { params: { version } },
         ),
       ),
-    submit: async (id: number, data: { version: number; remark?: string; attachmentId?: number; videoSentToOperator: boolean }) =>
+    submit: async (id: number, data: { version: number; remark?: string; attachmentId?: number; completionUrl?: string; videoSentToOperator?: boolean }) =>
       unwrap<boolean>(
         await http.post(`/zsjos/production-ticket/${id}/submit`, { ...data, idempotencyKey: createIdempotencyKey() }),
       ),
@@ -4243,6 +4276,8 @@ export const api = {
             { params },
           ),
         ),
+  leadOrderNotificationTarget: async (orderId: number) =>
+    unwrap<ManagedLead>(await http.get("/zsjos/lead/order-notification-target", { params: { orderId } })),
   managedLead: async (id: number) =>
     unwrap<ManagedLead>(await http.get("/zsjos/lead/get", { params: { id } })),
   managedLeadByNo: async (leadNo: string) =>

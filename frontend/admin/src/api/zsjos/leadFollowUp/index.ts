@@ -11,6 +11,10 @@ export interface LeadFollowUpImageVO {
 }
 
 export interface LeadFollowUpVO {
+  salesStageBefore?: string
+  salesStageBeforeLabelSnapshot?: string
+  salesStageAfter?: string
+  salesStageAfterLabelSnapshot?: string
   id: number
   operatorUserId: number
   operatorName?: string
