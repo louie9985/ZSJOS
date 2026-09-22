@@ -7,6 +7,7 @@ import { loadPositioningDraft } from '../src/services/positioningDraft'
 import { serializePositioningFormValues } from '../src/services/positioningJsonImport'
 import PositioningCardFields from '../src/components/PositioningCardFields'
 import PositioningCardMaterialPicker from '../src/components/PositioningCardMaterialPicker'
+import PositioningSnapshot from '../src/components/PositioningSnapshot'
 import ThemeProvider from '../src/components/Theme/ThemeProvider'
 import '../src/styles/index.css'
 
@@ -15,7 +16,13 @@ const fields: StudentContactFormField[] = [
   { key: 'pc_target_user', title: '目标用户', type: 'textarea', description: '说明计划服务的人群和需求。', enabled: true, systemField: false, required: false, sort: 2 },
   { key: 'pc_homepage_douyin', title: '抖音平台主页搭建', type: 'textarea', description: '主页搭建、头像选择、背景图设置、主页引导语设置、置顶视频描述等建议（暂时不做该平台就写“暂时不做”）', enabled: true, systemField: false, required: false, sort: 3 },
   { key: 'pc_homepage_douyin_refs', title: '参考账号', type: 'material_picker', materialTypeCode: 'viral_account', referenceFor: 'pc_homepage_douyin', recommendedCount: '1–3', enabled: true, systemField: false, required: false, sort: 4 },
+  ...Array.from({ length: 34 }, (_, index): StudentContactFormField => ({
+    key: `fixture_${index}`, title: `验收字段 ${index + 4}`, type: 'textarea',
+    description: '配置提示保持完整，输入框与本字段对应。', group: index % 2 ? '第二组' : '账号定位卡',
+    enabled: true, systemField: false, required: false, sort: index + 5,
+  })),
 ]
+fields.slice(0, 3).forEach(field => { field.group = '账号定位卡' })
 const cover = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="640"><rect width="400" height="640" fill="#e8f2fa"/><text x="200" y="320" text-anchor="middle" fill="#184a6b" font-size="24">参考账号封面</text></svg>')
 let saved: PositioningCard | undefined
 http.defaults.adapter = async config => {
@@ -26,7 +33,7 @@ http.defaults.adapter = async config => {
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data } }
 }
 function Editor() {
-  const [form] = Form.useForm(), [open, setOpen] = useState(false), [status, setStatus] = useState('未保存')
+  const [form] = Form.useForm(), [open, setOpen] = useState(false), [status, setStatus] = useState('未保存'), [snapshotOpen, setSnapshotOpen] = useState(false)
   const begin = async () => {
     const draft = await loadPositioningDraft(saved ? [{ id: saved.id, accountId: null }] : [], undefined, 30, api.positioningCard.get)
     form.resetFields(); form.setFieldsValue({ data: draft?.valuesSnapshot || {} }); setOpen(true)
@@ -35,11 +42,14 @@ function Editor() {
     saved = { id: 19, cardNo: 'fixture', serviceRelationId: 30, status: 'co_creating', version: 1, availableActions: [], fieldsSnapshot: fields, valuesSnapshot: JSON.parse(JSON.stringify(serializePositioningFormValues(form.getFieldValue('data') || {}, fields))) }
     setStatus('草稿已保存'); setOpen(false)
   }
-  return <><Button onClick={() => void begin()}>填写定位卡草稿</Button><p>{status}</p>
+  return <><Button onClick={() => void begin()}>填写定位卡草稿</Button><Button disabled={!saved} onClick={() => setSnapshotOpen(true)}>查看快照</Button><p>{status}</p>
     <Modal title="填写定位卡草稿" width="min(1480px, calc(100vw - 32px))" styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }} open={open} onCancel={() => setOpen(false)} onOk={save} okText="保存并关闭">
       <Form form={form} layout="vertical"><PositioningCardFields fields={fields} render={field => <Form.Item name={['data', field.key]} label={field.title}>
         {field.type === 'material_picker' ? <PositioningCardMaterialPicker field={field} canQuery /> : <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} />}
       </Form.Item>} /></Form>
+    </Modal>
+    <Modal title="定位卡快照" width="min(1480px, calc(100vw - 32px))" open={snapshotOpen} footer={null} onCancel={() => setSnapshotOpen(false)}>
+      {saved && <PositioningSnapshot card={saved} />}
     </Modal></>
 }
 createRoot(document.getElementById('root')!).render(<ThemeProvider><ConfigProvider><App><Editor /></App></ConfigProvider></ThemeProvider>)

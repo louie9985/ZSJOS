@@ -703,13 +703,12 @@
 .media-students-positioning-fields .ant-form-item { margin-bottom: 12px; }
 /* Positioning is one row per project; hints remain visible while composing the plan. */
 .positioning-card-fields { display: flex; flex-direction: column; width: 100%; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); }
-.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(130px, .85fr) minmax(180px, 1.3fr) minmax(280px, 2fr) minmax(230px, 1.5fr); gap: var(--crm-sp-4); padding: var(--crm-sp-4); }
+.positioning-card-field-head, .positioning-card-field-row { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 1.5fr); gap: var(--crm-sp-4); padding: var(--crm-sp-4); }
 .positioning-card-field-head { position: sticky; top: 0; z-index: 2; font-weight: 600; background: var(--crm-bg-sunken); border-bottom: 1px solid var(--crm-border); }
 .positioning-card-field-row { align-items: start; border-bottom: 1px solid var(--crm-border); background: var(--crm-bg-container); }
 .positioning-card-field-row:last-child { border-bottom: 0; }
 .positioning-card-field-row:nth-child(odd) { background: var(--crm-bg-sunken); }
 .positioning-card-field-title { line-height: 1.7; overflow-wrap: anywhere; }
-.positioning-card-field-group { display: flex; align-items: center; justify-content: center; min-height: 100%; margin: calc(var(--crm-sp-4) * -1) 0 calc(var(--crm-sp-4) * -1) calc(var(--crm-sp-4) * -1); padding: var(--crm-sp-4); color: var(--crm-text); background: var(--crm-color-primary-bg); white-space: pre-wrap; text-align: center; }
 .positioning-card-field-hint { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--crm-text-secondary); line-height: 1.7; }
 .positioning-card-field-control { min-width: 0; }
 .positioning-card-field-control .ant-form-item { margin-bottom: 0; }

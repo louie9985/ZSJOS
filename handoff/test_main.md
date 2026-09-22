@@ -1306,3 +1306,42 @@
 - Dependencies: Existing product catalog, permission boundaries, Maven, React/npm, Vue/pnpm and Chromium facilities. Target branch/integration order: None.
 - Decisions: Existing API documentation controls the product/SKU lock after any service relation; unchanged selections retain snapshots. No database migration needed.
 - Verification: Focused Java tests for scope/query/save/snapshot/lock, both frontend type checks and isolated real-browser creation/edit/error/race flows at desktop/mobile widths, scoped diff checks. No shared business writes or rollout.
+
+## Registration — 2026-09-22 09:16:00 +0800 — test-positioning-form-alignment
+
+- Owner: Codex /root; environment: test; branch: main; absolute worktree: /opt/zsjos; base/HEAD: e5e5cde4aabca41562cc0e045bf47785c793b563.
+- Goal: Fix the shared positioning form column regression affecting initial entry, draft continuation, returned edits and revision, and verify shared snapshot presentation.
+- Non-goals: No API/business-state/data/permission changes, deployment, service reconfiguration, dependency addition, branch, commit or push; preserve all existing unrelated changes.
+- Ownership: frontend/workbench/src/components/PositioningCardFields.tsx; frontend/workbench/src/styles/pages/media-students.css; frontend/workbench/test/positioning-card-editor.tsx and focused browser script; frontend/workbench/docs/ui-guidelines.md; handoff/test_main.md. Temporary browser/build artifacts stay under /tmp.
+- Decision: UI guidelines explicitly retain the four-column editing form; restore that documented layout instead of propagating the ticket-specific five-column implementation. Keep backend field sort and references intact. This is the existing dynamic form layout, not a new business-record table.
+- Dependencies: Existing React/Ant Design/Vite and template contract. Target branch/integration order: None.
+- Verification plan: Focused positioning tests, typecheck, real Chromium desktop/mobile checks of column geometry and save/reopen with isolated data, snapshot presentation, scoped diff. No real business writes. Existing root-owned dependency cache may require the established sudo test invocation.
+
+## Delivery Entry — 2026-09-22 09:23:00 +0800 — test-positioning-form-alignment
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. HEAD unchanged e5e5cde4aabca41562cc0e045bf47785c793b563.
+- User goal: Fix positioning form display regression and provide the repair plan, including subsequent editing.
+- Decisions/result: Restored the documented four-column dynamic form (project, hint, input, references). Removed the ticket-derived group cell and invalid cross-row Grid span; removed grouping-based reordering so server field sort remains authoritative. Shared responsive tracks use zero minimums to fit narrower desktop dialogs; mobile remains stacked. Initial entry, draft continuation, returned edits and revision share this corrected component; snapshot consumers receive the same correction. No field bindings, API or business transitions changed.
+- Changed files: frontend/workbench/src/components/PositioningCardFields.tsx; frontend/workbench/src/styles/pages/media-students.css; frontend/workbench/test/positioning-card-editor.tsx; frontend/workbench/test/positioning-card-layout-browser.mjs (new); frontend/workbench/docs/ui-guidelines.md; handoff/test_main.md. All pre-existing unrelated changes preserved.
+- Verification evidence: Workbench focused Vitest 27/27 passed (draft, manual save, JSON import, API, recovery, production snapshot); npm run typecheck passed; git diff --check passed. Isolated esbuild fixture uses real React/Ant Design/shared components. Chromium at 1440/1024/768/390 passed checks for 37 rows, four cells per row, desktop header/row geometry, no horizontal overflow, configured sort/reference placement, initial input/save/reopen/subsequent edit and read-only snapshot. Desktop/mobile screenshots inspected under /tmp/zsjos-positioning-layout-*.png. Running the same browser checker against a temporary bundle of HEAD's old component/CSS correctly failed on group-induced field-order corruption. Browser executable and test fonts downloaded only under /tmp; no npm/project dependency added.
+- Reproduction: With the existing isolated test page served locally, set POSITIONING_TEST_CHROME and optionally POSITIONING_TEST_URL/POSITIONING_TEST_FONT, then run `node frontend/workbench/test/positioning-card-layout-browser.mjs`. This run used POSITIONING_TEST_SITE=/tmp/zsjos-positioning-browser/site, an ephemeral loopback-only fixture server owned and closed by the checker; all API responses were synthetic.
+- Dependency/integration impact: None; no database writes, permission edits, shared-service changes, deployment, branch, commit or push. Production bundle was not built/published in this UI-only source fix; the isolated browser bundle and typecheck validate the affected source.
+- Remaining work: Test site still serves the prior release until a separately authorized frontend deployment. Actual operator/student rejection and revision backend transitions were not replayed against shared business data; their unchanged entry paths were inspected and all use the verified common editor.
+
+## Registration update — 2026-09-22 10:13:00 +0800 — test-positioning-form-alignment
+
+- User authorization: Commit this task's code and push it to the remote. Existing owner/environment/branch/worktree and file scope remain unchanged.
+- Scope: Stage only the five positioning source/style/documentation/fixture files and this workstream's handoff suffix; preserve earlier unrelated unstaged handoff records and all backend/SQL/build-artifact changes.
+- Remote check: origin/main remains f2e567d27ce0c37c4b16af68fda69a5e252f9ee9. Local main includes three unpublished ancestors: eb8995d1, f27b2039, e5e5cde4. eb8995d1 publishes the academic-planner V270 and server JAR; the conflict correction to V273 remains uncommitted outside this task.
+- Publication boundary: A direct main push would include those unrelated ancestors and the known duplicate V270 migration without its worktree correction. Prepare the scoped commit first; request the user's decision for the additional publication/integration scope before pushing.
+- Verification: Reuse the unchanged source's 27 tests/typecheck/four-width browser evidence, plus staged diff checks, exact staged-path/content verification and remote ancestry check.
+
+## Delivery Entry — 2026-09-22 10:13:00 +0800 — test-positioning-form-alignment
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. Pre-commit HEAD: e5e5cde4aabca41562cc0e045bf47785c793b563.
+- User goal: Commit and push the positioning layout repair.
+- Decisions/result: Prepared a commit containing only the four-column positioning repair, its browser regression fixture/checker, UI documentation and this task's handoff records. Interview remark rendering was inspected only and has no code/config change to commit. Remote publication is paused because a normal push additionally publishes the unrelated academic V270/JAR ancestor while its known V273 correction is still unstaged.
+- Changed files: frontend/workbench/src/components/PositioningCardFields.tsx; frontend/workbench/src/styles/pages/media-students.css; frontend/workbench/docs/ui-guidelines.md; frontend/workbench/test/positioning-card-editor.tsx; frontend/workbench/test/positioning-card-layout-browser.mjs; handoff/test_main.md (this workstream's suffix only).
+- Verification evidence: Remote fetch succeeded; origin/main is an ancestor with exactly three existing unpublished commits. Source unchanged since the passing 27 focused tests, typecheck and Chromium 1440/1024/768/390 layout/save/reopen/snapshot checks; staged diff/content checks are required before commit. No service, database, branch switch or deployment operation performed.
+- Dependency/integration impact: Remote main is not changed in this preparation. Unrelated staged work was absent; unrelated worktree changes and earlier unstaged handoff records remain preserved.
+- Remaining work: Obtain a decision on publishing/correcting existing unpublished ancestors versus separately integrating only this fix; then complete the authorized remote push. Commit identifier is returned in the user-facing delivery.
