@@ -170,7 +170,7 @@ public class ProductionTicketService {
         ticket.setReviewerUserId(userId);
         ticket.setAssigneeFilmingEditorUserId(effectiveAssignee);
         ticket.setPositioningSubmissionId(context == null ? null : context.getPositioningSubmissionId());
-        List<Map<String, Object>> accountSnapshots = contexts.stream().map(ProductionTicketService::accountSnapshot).toList();
+        List<Map<String, Object>> accountSnapshots = contexts.stream().map(this::accountSnapshot).toList();
         ticket.setAccountSnapshotJson(JsonUtils.toJsonString(accountSnapshots));
         ticket.setDispatchContextSnapshotJson(JsonUtils.toJsonString(contextSnapshot(context, accountSnapshots, operatorRemark)));
         ticket.setIdempotencyKey(req.getIdempotencyKey());
@@ -490,7 +490,7 @@ public class ProductionTicketService {
         return result;
     }
 
-    private static Map<String, Object> accountSnapshot(ProductionTicketCreateContextRespVO context) {
+    private Map<String, Object> accountSnapshot(ProductionTicketCreateContextRespVO context) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("accountId", context.getAccountId()); result.put("accountNo", context.getAccountNo());
         result.put("accountName", context.getAccountName()); result.put("platformLabel", context.getPlatformLabel());

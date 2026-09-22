@@ -1,4 +1,4 @@
--- UTF-8. V270: 旧库学习规划师客资归属回填 + 跟进记录迁移。
+-- UTF-8. V273: 旧库学习规划师客资归属回填 + 跟进记录迁移。
 --
 -- 背景
 --   旧库 parttimecrm 的「学习规划师」业务有两张表：
@@ -65,12 +65,12 @@ START TRANSACTION;
 --    400 是 9/16 批次的启用账号，当前只有 new_media_operator 角色。
 -- ---------------------------------------------------------------------------
 UPDATE `system_users`
-SET `nickname` = '周老师', `updater` = 'V270', `update_time` = NOW()
+SET `nickname` = '周老师', `updater` = 'V273', `update_time` = NOW()
 WHERE `id` = 400 AND `deleted` = b'0' AND `nickname` = '梁颖';
 
 INSERT INTO `system_user_role`
   (`user_id`, `role_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
-SELECT 400, r.`id`, 'V270', NOW(), 'V270', NOW(), b'0', 1
+SELECT 400, r.`id`, 'V273', NOW(), 'V273', NOW(), b'0', 1
 FROM `system_role` r
 WHERE r.`code` = 'study_planner' AND r.`deleted` = b'0'
   AND NOT EXISTS (SELECT 1 FROM `system_user_role` x
@@ -80,27 +80,27 @@ WHERE r.`code` = 'study_planner' AND r.`deleted` = b'0'
 -- 1) 停用重复/弃用账号（均无客资归属；业务确认后续只用 XX老师 账号）
 -- ---------------------------------------------------------------------------
 UPDATE `system_users`
-SET `deleted` = b'1', `status` = 1, `updater` = 'V270', `update_time` = NOW()
+SET `deleted` = b'1', `status` = 1, `updater` = 'V273', `update_time` = NOW()
 WHERE `id` IN (415, 524) AND `deleted` = b'0';
 
 UPDATE `system_user_role`
-SET `deleted` = b'1', `updater` = 'V270', `update_time` = NOW()
+SET `deleted` = b'1', `updater` = 'V273', `update_time` = NOW()
 WHERE `user_id` IN (415, 524) AND `deleted` = b'0';
 
 UPDATE `system_user_post`
-SET `deleted` = b'1', `updater` = 'V270', `update_time` = NOW()
+SET `deleted` = b'1', `updater` = 'V273', `update_time` = NOW()
 WHERE `user_id` IN (415, 524) AND `deleted` = b'0';
 
 -- ---------------------------------------------------------------------------
 -- 2) 归属回填
 --    2a) 对照表：旧 owner -> 新 user
 -- ---------------------------------------------------------------------------
-CREATE TEMPORARY TABLE `v270_owner_map` (
+CREATE TEMPORARY TABLE `v273_owner_map` (
   `legacy_owner_id` bigint NOT NULL PRIMARY KEY,
   `new_user_id`     bigint NOT NULL
 ) ENGINE=InnoDB;
 
-INSERT INTO `v270_owner_map` (`legacy_owner_id`, `new_user_id`) VALUES
+INSERT INTO `v273_owner_map` (`legacy_owner_id`, `new_user_id`) VALUES
   (163, 27),
   (157, 37),
   (156, 51),
@@ -109,13 +109,13 @@ INSERT INTO `v270_owner_map` (`legacy_owner_id`, `new_user_id`) VALUES
   (155, 15);
 
 --    2b) 客资对照表：新 lead_id -> 旧 owner_id（177 行，来自 academic_customer）
-CREATE TEMPORARY TABLE `v270_lead_owner_map` (
+CREATE TEMPORARY TABLE `v273_lead_owner_map` (
   `new_lead_id`     bigint NOT NULL PRIMARY KEY,
   `legacy_owner_id` bigint NOT NULL,
   KEY `idx_legacy_owner` (`legacy_owner_id`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `v270_lead_owner_map` (`new_lead_id`, `legacy_owner_id`) VALUES
+INSERT INTO `v273_lead_owner_map` (`new_lead_id`, `legacy_owner_id`) VALUES
   (771,156),
   (854,163),
   (1455,159),
@@ -302,10 +302,10 @@ INSERT INTO `zsjos_lead_assignment_history`
    `tenant_id`, `assignment_rule_id`, `attempt_no`, `candidate_user_id`, `expires_at`,
    `response_at`, `owner_identity_snapshot`)
 SELECT l.`id`, 'accept', NULL, m.`new_user_id`, m.`new_user_id`,
-       '旧库学习规划师客资归属回填', l.`submitted_at`, 'V270', NOW(), 'V270', NOW(), b'0',
+       '旧库学习规划师客资归属回填', l.`submitted_at`, 'V273', NOW(), 'V273', NOW(), b'0',
        l.`tenant_id`, NULL, 1, m.`new_user_id`, NULL, l.`submitted_at`, 'education'
-FROM `v270_lead_owner_map` lm
-JOIN `v270_owner_map` m ON m.`legacy_owner_id` = lm.`legacy_owner_id`
+FROM `v273_lead_owner_map` lm
+JOIN `v273_owner_map` m ON m.`legacy_owner_id` = lm.`legacy_owner_id`
 JOIN `zsjos_lead` l ON l.`id` = lm.`new_lead_id` AND l.`deleted` = b'0'
 JOIN `system_users` u ON u.`id` = m.`new_user_id` AND u.`deleted` = b'0'
 WHERE l.`owner_user_id` IS NULL
@@ -324,7 +324,7 @@ SET l.`owner_user_id` = h.`to_owner_user_id`,
     l.`assignment_status` = 'owned',
     l.`ownership_started_at` = h.`occurred_at`,
     l.`current_assignment_history_id` = h.`id`,
-    l.`updater` = 'V270',
+    l.`updater` = 'V273',
     l.`update_time` = NOW()
 WHERE l.`deleted` = b'0'
   AND l.`owner_user_id` IS NULL
@@ -334,7 +334,7 @@ WHERE l.`deleted` = b'0'
 -- 3) 跟进记录迁移（141 条）
 --    3a) 明细表（旧 academic_followup 全量，operator_legacy_id 为旧员工 ID）
 -- ---------------------------------------------------------------------------
-CREATE TEMPORARY TABLE `v270_follow_up_import` (
+CREATE TEMPORARY TABLE `v273_follow_up_import` (
   `legacy_id`          bigint NOT NULL PRIMARY KEY,
   `new_lead_id`        bigint NOT NULL,
   `operator_legacy_id` bigint NOT NULL,
@@ -346,7 +346,7 @@ CREATE TEMPORARY TABLE `v270_follow_up_import` (
   KEY `idx_new_lead`   (`new_lead_id`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `v270_follow_up_import`
+INSERT INTO `v273_follow_up_import`
   (`legacy_id`,`new_lead_id`,`operator_legacy_id`,`method`,`content`,
    `next_follow_at`,`closed_at`,`occurred_at`) VALUES
   (1,2616,155,'wechat','和学员规划二级公共营养师的考证学习，为了后续更好的找工作，目前可以考的区域是福建11月的二级公共营养师，或者中国营养学会的二级公共营养师','2026-08-27 11:25:00',NULL,'2026-08-25 15:10:21'),
@@ -507,24 +507,24 @@ SELECT l.`id`, l.`current_assignment_history_id`, l.`owner_user_id`, l.`owner_us
        IF(f.`closed_at` IS NULL, '其他', '已回访'),
        NULL, NULL, NULL, NULL,
        f.`content`, f.`next_follow_at`, f.`occurred_at`, b'0',
-       CONCAT('legacy-academic-followup-', f.`legacy_id`), 'V270', NOW(), 'V270', NOW(),
+       CONCAT('legacy-academic-followup-', f.`legacy_id`), 'V273', NOW(), 'V273', NOW(),
        b'0', l.`tenant_id`, 'education'
-FROM `v270_follow_up_import` f
+FROM `v273_follow_up_import` f
 JOIN `zsjos_lead` l ON l.`id` = f.`new_lead_id` AND l.`deleted` = b'0'
 JOIN `system_users` u ON u.`id` = l.`owner_user_id`
 WHERE l.`current_assignment_history_id` IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM `zsjos_lead_follow_up_record` r
                   WHERE r.`idempotency_key` = CONCAT('legacy-academic-followup-', f.`legacy_id`));
 
-DROP TEMPORARY TABLE `v270_follow_up_import`;
-DROP TEMPORARY TABLE `v270_lead_owner_map`;
-DROP TEMPORARY TABLE `v270_owner_map`;
+DROP TEMPORARY TABLE `v273_follow_up_import`;
+DROP TEMPORARY TABLE `v273_lead_owner_map`;
+DROP TEMPORARY TABLE `v273_owner_map`;
 
 -- ---------------------------------------------------------------------------
 -- 只读核对
 -- ---------------------------------------------------------------------------
 -- 1) 应为 0：对照表内的客资仍未归属
-SELECT 'V270-unowned-in-map' AS check_name, COUNT(*) AS cnt
+SELECT 'V273-unowned-in-map' AS check_name, COUNT(*) AS cnt
 FROM `zsjos_lead` l
 WHERE l.`deleted` = b'0' AND l.`owner_user_id` IS NULL
   AND l.`id` IN (771,854,1455,2548,2616,2673,2859,2861,2877,4188,4199,4210,4213,
@@ -533,24 +533,24 @@ WHERE l.`deleted` = b'0' AND l.`owner_user_id` IS NULL
                  5297,5298,5300,5849,5926,6013,6420,6423);
 
 -- 2) 已迁移的跟进记录数（应为 141）
-SELECT 'V270-migrated-follow-ups' AS check_name, COUNT(*) AS cnt
+SELECT 'V273-migrated-follow-ups' AS check_name, COUNT(*) AS cnt
 FROM `zsjos_lead_follow_up_record`
 WHERE `idempotency_key` LIKE 'legacy-academic-followup-%' AND `deleted` = b'0';
 
 -- 3) 账号状态核对
-SELECT 'V270-account-state' AS check_name, `id`, `nickname`, `status`, `deleted`
+SELECT 'V273-account-state' AS check_name, `id`, `nickname`, `status`, `deleted`
 FROM `system_users` WHERE `id` IN (400, 415, 524) ORDER BY `id`;
 
 COMMIT;
 
 INSERT INTO `zsjos_schema_version` (`version`, `description`, `checksum`, `installed_at`)
-VALUES ('V270', '旧库学习规划师客资归属回填与跟进记录迁移',
-        SHA2('V270__academic_planner_lead_ownership.sql', 256), NOW())
+VALUES ('V273', '旧库学习规划师客资归属回填与跟进记录迁移',
+        SHA2('V273__academic_planner_lead_ownership.sql', 256), NOW())
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`), `checksum` = VALUES(`checksum`);
 
 INSERT INTO `zsjos_module_schema_version`
 (`module_code`, `version`, `description`, `checksum`, `release_version`, `installed_at`)
-VALUES ('core', 'V270', '旧库学习规划师客资归属回填与跟进记录迁移',
-        SHA2('V270__academic_planner_lead_ownership.sql', 256), 'baseline', NOW())
+VALUES ('core', 'V273', '旧库学习规划师客资归属回填与跟进记录迁移',
+        SHA2('V273__academic_planner_lead_ownership.sql', 256), 'baseline', NOW())
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`), `checksum` = VALUES(`checksum`),
                         `release_version` = VALUES(`release_version`);

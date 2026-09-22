@@ -6431,6 +6431,12 @@ CREATE TABLE IF NOT EXISTS `zsjos_media_account` (
   `rebind_reviewer_user_id` bigint DEFAULT NULL,
   `rebind_status` varchar(24) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `rebind_result_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delete_process_instance_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delete_status` varchar(24) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delete_requested_by_user_id` bigint DEFAULT NULL,
+  `delete_reviewer_user_id` bigint DEFAULT NULL,
+  `delete_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delete_result_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `create_service_relation_id` bigint DEFAULT NULL,
   `create_operator_user_id` bigint DEFAULT NULL,
   `create_idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
@@ -6449,8 +6455,33 @@ CREATE TABLE IF NOT EXISTS `zsjos_media_account` (
   KEY `idx_tenant_director_stage` (`tenant_id`,`director_user_id`,`s_stage`,`run_status`),
   KEY `idx_tenant_student` (`tenant_id`,`student_person_id`,`run_status`),
   KEY `idx_tenant_rebind_status` (`tenant_id`,`rebind_status`,`rebind_reviewer_user_id`),
+  KEY `idx_media_account_delete_process` (`delete_process_instance_id`),
   KEY `idx_tenant_maintenance_dates` (`tenant_id`,`maintenance_start_date`,`maintenance_end_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='社交媒体账号';
+
+CREATE TABLE IF NOT EXISTS `zsjos_media_account_delete_request` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint NOT NULL,
+  `process_instance_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `account_snapshot_json` json NOT NULL,
+  `reason` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `requested_by_user_id` bigint NOT NULL,
+  `reviewer_user_id` bigint NOT NULL,
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `result_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `attempt_count` int NOT NULL DEFAULT '0',
+  `last_error` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '0',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_process` (`tenant_id`,`process_instance_id`,`deleted`),
+  KEY `idx_tenant_account` (`tenant_id`,`account_id`,`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='媒体账号删除审批快照';
 
 CREATE TABLE IF NOT EXISTS `zsjos_media_account_field_config` (
   `id` bigint NOT NULL AUTO_INCREMENT,

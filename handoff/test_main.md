@@ -1307,6 +1307,109 @@
 - Decisions: Existing API documentation controls the product/SKU lock after any service relation; unchanged selections retain snapshots. No database migration needed.
 - Verification: Focused Java tests for scope/query/save/snapshot/lock, both frontend type checks and isolated real-browser creation/edit/error/race flows at desktop/mobile widths, scoped diff checks. No shared business writes or rollout.
 
+## Registration — 2026-09-22 05:53:47 +0800 — test-origin-main-sync
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base/HEAD: eb8995d13d879767a4265c1fbe36a6ec956c6161.
+- Goal: Synchronize local test worktree  with , preserving the local V270 migration/service-package commit and integrating the two remote commits recorded in .
+- Non-goals: No branch/worktree switch, force push, database/service operation, permission change, dependency change, or source redesign; preserve unrelated user changes (none detected at registration).
+- Ownership: Git merge result and this synchronization record; all files changed by the selected merge are retained for verification. Target branch/integration order: current ; no separate integration branch.
+- Dependencies: Existing repository history and remote ; remote handoff entries are review context, not a substitute for conflict resolution or tests.
+- Verification: Confirm merge status, commit ancestry, conflict-free tree, changed-file summary, and scoped diff check; report runtime/build tests as not run unless needed to diagnose a merge conflict.
+
+## Registration correction — 2026-09-22 05:54:10 +0800 — test-origin-main-sync
+
+- The immediately preceding registration was appended through an unquoted shell here-document, so literal Git references were stripped by shell expansion. This correction supersedes those field values; no repository scope or authorization changed.
+- Goal: Synchronize the local test worktree `main` with `origin/main`, preserving local V270 migration/service-package commit and integrating the two remote commits recorded in `handoff/main.md`.
+- Ownership/verification: Same owner, environment, branch, worktree, base/HEAD, non-goals and verification plan as the preceding registration.
+
+## Delivery Entry — 2026-09-22 05:55:30 +0800 — test-origin-main-sync
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. Merge HEAD `f27b203939cd4f381677d30f99740667d558b1fb`; parents are local `eb8995d13d879767a4265c1fbe36a6ec956c6161` and remote `a7b90871c5e8496a1963ba7f1fe94c2ce52f1889`.
+- User goal: Pull the latest `origin/main` and merge its content according to the handoff records.
+- Result: Fetched remote history and completed a conflict-free `ort` merge. Remote commits `a1daf134` (consolidated BPM/System/ZSJOS/backend/frontend/docs/test updates) and `a7b90871` (main handoff delivery record) are integrated; the local V270 migration and service-package commit remain preserved. No force operation, branch/worktree switch, database write, service operation or permission change was performed.
+- Changed files: The merge commit contains the files from the two remote commits; this delivery record and the registration correction are appended to `handoff/test_main.md` and remain unstaged. No unrelated pre-existing worktree changes were present at registration.
+- Verification: `git merge` exited successfully with no conflicts; `origin/main` and the pre-merge local HEAD are both ancestors of merge HEAD; `git diff --check` passed; worktree status shows only the expected handoff append. No Maven/frontend/runtime tests were run because this turn performed history synchronization only.
+- Dependency/integration impact: Current local `main` is ahead of `origin/main` by the local commit plus the merge commit (`ahead 2`); pushing is a separate user-authorized operation and was not performed. The integrated remote handoff remains in `handoff/main.md`; test workstream history is recorded here.
+- Remaining work: Review the merged source and run affected builds/tests before deployment or push. No merge conflict remains.
+
+## Registration update — 2026-09-22 05:57:00 +0800 — test-origin-main-sync
+
+- Scope update: A new remote delivery range `0a68187f..f2e567d2` is now available on `origin/main` after the previous synchronization. Integrate it into the current `main` merge history while preserving the existing local merge commit and all unstaged handoff entries.
+- Current state: local HEAD `f27b203939cd4f381677d30f99740667d558b1fb`; remote target `f2e567d2`; worktree contains only the active `handoff/test_main.md` append.
+- Verification update: Reconfirm conflict-free ancestry, `git diff --check`, and expected handoff-only unstaged status after merge. No runtime tests or service operations are added to scope.
+
+## Delivery Entry — 2026-09-22 05:58:30 +0800 — test-origin-main-sync
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. Merge HEAD `e5e5cde4aabca41562cc0e045bf47785c793b563`; parents are previous merge `f27b203939cd4f381677d30f99740667d558b1fb` and remote `f2e567d27ce0c37c4b16af68fda69a5e252f9ee9`.
+- User goal: Pull the newly available `origin/main` changes and merge them using the handoff context.
+- Result: Completed a second conflict-free `ort` merge. Remote commits `0a68187f` and `f2e567d2` are integrated, including the pending BPM/ZSJOS/backend/frontend/documentation/test and migration updates. Existing local commits and the prior merge remain intact. No force operation, branch/worktree switch, database write, service operation or permission change was performed.
+- Changed files: The merge commit contains the files from the new remote range; registration and delivery updates are appended to `handoff/test_main.md` and remain unstaged. No unrelated worktree changes were present.
+- Verification: Merge exited successfully with no conflicts; `origin/main` and the previous merge HEAD are ancestors of the new HEAD; `git diff --check` passed; no conflict markers were found in committed source; worktree status shows only the expected handoff append. No Maven/frontend/runtime tests were run because this turn only synchronized Git history.
+- Dependency/integration impact: Local `main` is ahead of `origin/main` by three commits (the original local commit and two merge commits). Pushing remains a separate operation. No deployment or runtime restart was performed.
+- Remaining work: Review or test the newly integrated changes before deployment or push. No merge conflict remains.
+
+## Registration — 2026-09-22 06:05:00 +0800 — test-migration-version-collision
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base/HEAD: e5e5cde4aabca41562cc0e045bf47785c793b563.
+- Goal: Resolve the duplicate Core migration version by preserving the already documented/applied media-student `V270` and renumbering the newly added academic-planner migration to `V273`.
+- Non-goals: No database execution, migration ledger rewrite, service restart, deployment, role/permission assignment, dependency, branch, commit or push operation. Existing applied `V270`/`V271`/`V272` files and records remain unchanged.
+- Ownership: script/sql/mysql/migrations/V270__media_student_read_all.sql remains the occupied V270; the academic-planner migration, directly affected migration documentation, and this handoff entry are owned by this workstream. Preserve the existing unstaged handoff entries.
+- Decisions: Use unique sequential Core versions V270 (media student), V271 (account deletion), V272 (order snapshots), V273 (academic planner). Update migration-local version labels, temporary object names and ledger metadata to V273; preserve business idempotency keys and data scope.
+- Verification: Run `zsjos_db.py check`, duplicate-version scan, targeted SQL/reference scans, `git diff --check`, and inspect status. Do not execute SQL against any database.
+
+## Delivery Entry — 2026-09-22 06:08:30 +0800 — test-migration-version-collision
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. HEAD remains `e5e5cde4aabca41562cc0e045bf47785c793b563`; no branch or worktree operation.
+- User goal: Resolve the duplicate Core migration version discovered after the latest main synchronization.
+- Decisions/result: Kept the documented/applied media-student `V270`, `V271` media-account deletion approval and `V272` order actor snapshots unchanged. Renamed the local academic-planner migration from `V270__academic_planner_lead_ownership.sql` to `V273__academic_planner_lead_ownership.sql`; updated its internal version labels, audit/updater markers, temporary table/procedure identifiers, check names and both version-ledger writes to V273. Preserved the `legacy-academic-followup-*` idempotency keys and business data scope. Added the V273 deployment note to `docs/operations/database-migrations.md`.
+- Changed files: script/sql/mysql/migrations/V270__academic_planner_lead_ownership.sql removed and equivalent V273__academic_planner_lead_ownership.sql added; docs/operations/database-migrations.md; handoff/test_main.md. Existing handoff synchronization entries remain untouched.
+- Verification: Unique/sequential scan passed for Core versions V001..V273; `zsjos_db.py check` now reaches the existing desired-schema/fresh-baseline mismatch instead of the former duplicate-version error and exits with `Desired schema differs from the fresh baseline for core`; this unrelated baseline blocker was not changed. A source transformation comparison confirmed only V270/V273 and local temporary-name substitutions; no active academic script retains old V270 labels. `git diff --check` passed. No SQL was executed and no database rows, service, permissions, dependency, commit or push were changed.
+- Dependency/integration impact: V271 continues to depend on the media-student V270; V273 is now the final Core migration and must run after V272. Applied environments with an academic migration recorded under V270 require separately reviewed rollout/ledger handling; this source change does not rewrite deployed records.
+- Remaining work: Resolve the existing fresh-baseline/schema mismatch separately and review the V273 migration before controlled execution. Changes remain unstaged pending the user's normal commit/push workflow.
+
+## Registration — 2026-09-22 06:15:00 +0800 — test-production-ticket-file-api-compile
+
+- Owner: Codex /root; environment: test; branch: main; worktree: /opt/zsjos; base/HEAD: e5e5cde4aabca41562cc0e045bf47785c793b563.
+- Goal: Fix the ZSJOS compile error where `ProductionTicketService.accountSnapshot` is static but accesses injected instance field `fileApi`.
+- Non-goals: No behavior redesign, schema/data/permission changes, dependency, service restart, deployment, branch, commit or push operation; preserve the active V273 migration-renumbering changes and existing handoff entries.
+- Ownership: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/production/ProductionTicketService.java and this handoff entry only.
+- Decision: Remove `static` from `accountSnapshot`; retain file URL presigning, exception handling and all other logic unchanged.
+- Verification: Scoped diff check and ZSJOS Maven compile; report any unrelated pre-existing build blocker separately.
+
+## Delivery Entry — 2026-09-22 06:15:30 +0800 — test-production-ticket-file-api-compile
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. HEAD remains `e5e5cde4aabca41562cc0e045bf47785c793b563`; no branch/worktree operation.
+- User goal: Fix the `ProductionTicketService` compilation error reported for `fileApi` access from a static context.
+- Result: Changed `accountSnapshot` to an instance method and changed its stream method reference from `ProductionTicketService::accountSnapshot` to `this::accountSnapshot`. File URL presigning and exception fallback behavior are unchanged.
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/production/ProductionTicketService.java; handoff/test_main.md. Existing V273 migration-renumbering and documentation changes remain preserved.
+- Verification: Initial ordinary Maven compile reached the module but hit the known root-owned target metadata write permission; the same compile rerun with existing `sudo -n` practice passed: `sudo -n mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile`, reactor `BUILD SUCCESS`, including 1329 ZSJOS source files. `git diff --check` passed. The Unsafe warning and deprecation/unchecked notices remain warnings only.
+- Dependency/integration impact: No dependency, API, schema, permission, database, service, deployment, commit or push changes. Runtime behavior was not exercised; compile verification only.
+- Remaining work: None for this compile fix; normal review/commit/push/deployment remain separate operations.
+
+## Registration update — 2026-09-22 06:25:00 +0800 — test-bootstrap-v272-baseline-sync
+
+- Scope addition to the active test workstream: synchronize `script/sql/mysql/00-bootstrap-schema.sql` with `script/sql/mysql/schema/core.sql` for the two V272 order-supervisor name snapshot columns.
+- Goal: Clear the migrator preflight error that rejects a byte-different fresh baseline; keep V272 as the upgrade migration for already deployed databases.
+- Non-goals: No migration renumbering, deployed migration rewrite, database execution, service operation, permission/dependency change, branch, commit or push. Preserve the active V273 rename and ProductionTicket compile fix.
+- Verification: Compare baseline and desired schema bytes, run `python3 script/sql/mysql/tools/zsjos_db.py check`, and run `git diff --check`.
+
+## Registration update — 2026-09-22 06:28:00 +0800 — test-bootstrap-v271-schema-sync
+
+- Scope addition: synchronize both `script/sql/mysql/schema/core.sql` and `script/sql/mysql/00-bootstrap-schema.sql` with the V271 media-account deletion schema: six delete-state columns plus the immutable `zsjos_media_account_delete_request` table and its two indexes.
+- Reason: After the V272 baseline mismatch was corrected, `zsjos_db.py check` reported the Java mapped request table missing from Core desired schema. V271 already creates it for upgrades, so fresh baseline and desired schema must declare the same final structure.
+- Non-goals: No edits to V271, no database execution, no migration ledger changes, no service/deployment/permission/dependency/Git publication operation.
+- Verification: Re-run `zsjos_db.py check`, exact baseline/core byte comparison, mapped-table and schema diff checks, `git diff --check`.
+
+## Delivery Entry — 2026-09-22 06:30:00 +0800 — test-bootstrap-v271-v272-baseline-sync
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos. HEAD unchanged `e5e5cde4aabca41562cc0e045bf47785c793b563`.
+- User goal: Fix the database migrator preflight error reporting that desired Core schema differed from the fresh baseline.
+- Result: Synchronized `00-bootstrap-schema.sql` with `schema/core.sql`. Added V272 `requester_name_snapshot` and `supervisor_name_snapshot` columns. Added the V271 media-account deletion columns (`delete_process_instance_id`, `delete_status`, `delete_requested_by_user_id`, `delete_reviewer_user_id`, `delete_reason`, `delete_result_reason`), `idx_media_account_delete_process`, and the `zsjos_media_account_delete_request` table with its tenant/process uniqueness and tenant/account index. V271/V272 migration files remain unchanged and continue to support upgrades of existing databases.
+- Changed files: script/sql/mysql/00-bootstrap-schema.sql; script/sql/mysql/schema/core.sql; handoff/test_main.md. Existing ProductionTicket fix, V273 renumbering and documentation changes remain preserved.
+- Verification: `python3 script/sql/mysql/tools/zsjos_db.py check` passed: `PASS: manifests, migration order, desired schema, Java mappings, baseline versions, and verification are consistent.` Exact `cmp` between `schema/core.sql` and `00-bootstrap-schema.sql` passed; `git diff --check` passed. No Docker migrator, SQL migration, database write, service operation or deployment was executed.
+- Dependency/integration impact: Fresh bootstrap now includes the final V271/V272 structure; pending V271/V272 scripts remain idempotent for upgrade environments. No dependencies, permissions or public API changes.
+- Remaining work: Rebuild/use the migrator image from this worktree and run the normal environment-specific plan/migrate flow only after reviewing the combined pending changes and obtaining any required database-operation authorization. Changes remain uncommitted and unpushed.
+
 ## Registration — 2026-09-22 09:16:00 +0800 — test-positioning-form-alignment
 
 - Owner: Codex /root; environment: test; branch: main; absolute worktree: /opt/zsjos; base/HEAD: e5e5cde4aabca41562cc0e045bf47785c793b563.
@@ -1345,3 +1448,10 @@
 - Verification evidence: Remote fetch succeeded; origin/main is an ancestor with exactly three existing unpublished commits. Source unchanged since the passing 27 focused tests, typecheck and Chromium 1440/1024/768/390 layout/save/reopen/snapshot checks; staged diff/content checks are required before commit. No service, database, branch switch or deployment operation performed.
 - Dependency/integration impact: Remote main is not changed in this preparation. Unrelated staged work was absent; unrelated worktree changes and earlier unstaged handoff records remain preserved.
 - Remaining work: Obtain a decision on publishing/correcting existing unpublished ancestors versus separately integrating only this fix; then complete the authorized remote push. Commit identifier is returned in the user-facing delivery.
+
+## Registration update — 2026-09-22 10:15:00 +0800 — test-positioning-form-alignment
+
+- User clarification: Ignore the service JAR and consult the already completed V270 repair in handoff; continue the existing commit/push objective on main. No new branch is needed.
+- Scope addition: .gitignore; stop tracking yudao-server.jar (currently a local runtime symlink, preserve on disk); commit the existing handoff-documented ProductionTicket compile fix, academic V270-to-V273 renumbering, matching migration documentation and V271/V272 baseline/core synchronization. Preserve the generated tsconfig.tsbuildinfo change unstaged.
+- Decision correction: V270 collision was already repaired in the worktree, as recorded at 06:08 and 06:30. The remaining issue was commit inclusion, not an unresolved implementation defect; the proposed independent branch is withdrawn. No new SQL logic or runtime changes.
+- Verification: Migration preflight, exact version-only script transformation, baseline/core equality, staged diff/path review, Git ignore and local symlink preservation, normal non-force push and remote-HEAD comparison. Prior unchanged frontend/browser/backend compile evidence remains valid; no database execution or deployment is authorized/performed.

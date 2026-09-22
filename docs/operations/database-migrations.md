@@ -10,6 +10,18 @@ rows. Verify the child parent, uniqueness, Chinese `HEX(name)` and unchanged rol
 assignments. Rollback retains metadata and version records; reverting application code
 removes the new read behavior, and ordinary-role access is managed through System.
 
+## V273 Academic planner ownership backfill
+
+Apply `V273__academic_planner_lead_ownership.sql` after V272 with an utf8mb4
+client. V270 is reserved for the media-student full-read permission, V271 for
+media-account deletion approval, and V272 for order actor-name snapshots; the
+academic-planner backfill therefore uses V273. The script updates only the
+explicitly mapped legacy planner accounts and imported Lead/follow-up rows,
+uses `legacy-academic-followup-*` idempotency keys, and records the Core/global
+version as V273. It does not alter the existing V270/V271/V272 ledger rows.
+The backfill is forward-only for ownership values; account restoration and
+business-data recovery require the backup and scope documented in the SQL file.
+
 ## Role-menu assignment policy (2026-09-17)
 
 Migrations, bootstrap seeds, standalone deployment SQL and their generators no longer
