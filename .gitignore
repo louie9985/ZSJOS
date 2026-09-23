@@ -88,3 +88,4 @@ __pycache__/
 **/.cache/
 .superpowers/
 *.tsbuildinfo
+output/
