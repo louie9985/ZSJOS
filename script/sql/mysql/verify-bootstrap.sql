@@ -1204,16 +1204,24 @@ SELECT 'V080 migrated Lead-created sales rule contract' AS check_name,
        ),'PASS','FAIL') AS result;
 SELECT 'V075 Lead-created notification version' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V075'),'PASS','FAIL') AS result;
+-- V257 adds the submitter identity to the V080 default; verify the installed contract.
 SELECT 'V080 Lead-source provider template contract' AS check_name,
        IF((SELECT COUNT(*) FROM system_notify_template
+            CROSS JOIN (SELECT EXISTS (
+              SELECT 1 FROM zsjos_schema_version WHERE version='V257'
+            ) AS has_identity) version_contract
             WHERE code='ZSJOS_LEAD_SOURCE_LINKED'
               AND scene_code='zsjos.lead.created'
               AND title='新客资来源关联'
-              AND summary='{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。'
-              AND content='{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。'
-              AND JSON_LENGTH(params)=2
+              AND summary=content
+              AND content=IF(version_contract.has_identity,
+                '{{operator.name}}（{{lead.submitterIdentityLabel}}）提交客资{{lead.no}}（客资编号），已关联你为客资来源。',
+                '{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。')
+              AND JSON_LENGTH(params)=IF(version_contract.has_identity,3,2)
               AND JSON_CONTAINS(params,JSON_QUOTE('operator.name'))
               AND JSON_CONTAINS(params,JSON_QUOTE('lead.no'))
+              AND (NOT version_contract.has_identity
+                OR JSON_CONTAINS(params,JSON_QUOTE('lead.submitterIdentityLabel')))
               AND status=0 AND deleted=b'0')=1,'PASS','FAIL') AS result;
 SELECT 'V080 Lead-source provider rule contract' AS check_name,
        IF(NOT EXISTS (

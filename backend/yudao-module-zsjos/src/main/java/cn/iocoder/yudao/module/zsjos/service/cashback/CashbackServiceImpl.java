@@ -77,7 +77,7 @@ public class CashbackServiceImpl implements CashbackService {
         if (eligible == null) return null;
         LeadDO lead = eligible.lead();
         LeadIntendedProductDO primary = intendedProductMapper.selectPrimaryByLeadId(leadId);
-        if (primary == null || primary.getProductRef() == null) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
+        if (primary == null || primary.getProductRef() == null) throw exception(CASHBACK_PRODUCT_UNSPECIFIED);
         Rule rule = resolveRule(primary.getProductRef());
         log.info("valid cashback rule resolved leadId={}, leadNo={}, sourceType={}, sourceUserId={}, partnerId={}, productRef={}, ruleSource={}",
                 lead.getId(), lead.getLeadNo(), lead.getSourceType(), lead.getSourceUserId(), lead.getPartnerId(),

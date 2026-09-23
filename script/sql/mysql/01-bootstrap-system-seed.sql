@@ -1829,36 +1829,5 @@ WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'107','$') AND NOT JSON_CONTAI
 UPDATE `system_tenant_package` SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79912)
 WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'107','$') AND NOT JSON_CONTAINS(`menu_ids`,'79912','$');
 
--- Sales performance metadata; assignments remain administrator-owned.
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '业绩统计','zsjos:sales-performance:query',2,95,p.id,'sales-performance','ep:data-analysis','zsjos/salesPerformance/index',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.path='/zsjos' AND p.type=1 AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance:query' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '销售业绩设置','zsjos:sales-performance-target:query',2,95,p.id,'sales-performance-target','ep:data-analysis','zsjos/salesPerformanceTarget/index',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.path='/zsjos' AND p.type=1 AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance-target:query' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '销售本人业绩','zsjos:sales-performance:self',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance:self' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '销售部门业绩','zsjos:sales-performance:department',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance:department' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '销售中心业绩','zsjos:sales-performance:center',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance:center' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '业绩统计明细','zsjos:sales-performance:detail',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance:detail' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '修改销售业绩目标','zsjos:sales-performance-target:update',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance-target:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance-target:update' AND m.deleted=0);
-INSERT INTO system_menu(name,permission,type,sort,parent_id,path,icon,component,status,visible,keep_alive,always_show,creator,updater,deleted)
-SELECT '配置销售统计组织','zsjos:sales-performance-target:configure',3,10,p.id,'','','',0,b'1',b'1',b'0','V276','V276',b'0'
-FROM system_menu p WHERE p.permission='zsjos:sales-performance-target:query' AND p.deleted=0
-AND NOT EXISTS(SELECT 1 FROM system_menu m WHERE m.permission='zsjos:sales-performance-target:configure' AND m.deleted=0);
+-- V276 owns sales-performance menu creation after the historical fixed menu IDs exist.
+-- Early AUTO_INCREMENT inserts here can occupy V150's reserved menu 79920.

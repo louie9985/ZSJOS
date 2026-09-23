@@ -369,10 +369,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode EXPORT_TASK_NOT_EXISTS = new ErrorCode(1_900_007_007, "导出任务不存在或不属于当前账号");
     ErrorCode EXPORT_STATE_INVALID = new ErrorCode(1_900_007_008, "当前导出任务状态不允许该操作");
     ErrorCode EXPORT_FILTER_INVALID = new ErrorCode(1_900_007_009, "导出筛选条件格式无效");
-    ErrorCode CASHBACK_RULE_NOT_CONFIGURED = new ErrorCode(1_900_008_001, "主意向课程未配置有效返现规则");
-    ErrorCode CASHBACK_STATE_INVALID = new ErrorCode(1_900_008_002, "当前返现状态不允许该操作");
-    ErrorCode CASHBACK_SOURCE_INVALID = new ErrorCode(1_900_008_003, "返现来源客资、订单或明细无效");
-    ErrorCode CASHBACK_ORDER_REJECTION_LOCKED = new ErrorCode(1_900_008_004, "成交返现已进入提现中或已提现，禁止驳回订单");
+    ErrorCode CASHBACK_PRODUCT_UNSPECIFIED = new ErrorCode(1_900_008_001, "意向产品尚未明确具体课程，无法判定返现规则");
+    ErrorCode CASHBACK_RULE_NOT_CONFIGURED = new ErrorCode(1_900_008_002, "主意向课程未配置有效返现规则");
+    ErrorCode CASHBACK_STATE_INVALID = new ErrorCode(1_900_008_003, "当前返现状态不允许该操作");
+    ErrorCode CASHBACK_SOURCE_INVALID = new ErrorCode(1_900_008_004, "返现来源客资、订单或明细无效");
+    ErrorCode CASHBACK_ORDER_REJECTION_LOCKED = new ErrorCode(1_900_008_005, "成交返现已进入提现中或已提现，禁止驳回订单");
     ErrorCode WITHDRAWAL_PARTNER_INVALID = new ErrorCode(1_900_009_001, "仅启用的普通兼职可发起提现");
     ErrorCode WITHDRAWAL_CASHBACK_INVALID = new ErrorCode(1_900_009_002, "所选返现不存在、不属于本人或当前不可提现");
     ErrorCode WITHDRAWAL_AMOUNT_TOO_LOW = new ErrorCode(1_900_009_003, "申请金额低于当前最低提现金额");

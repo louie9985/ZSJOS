@@ -854,11 +854,6 @@ def make_migration(module_code: str, name: str) -> None:
         fail(f"No desired schema changes found for {module_code}")
     existing = migrations_for(module_code, manifest)
     next_number = (existing[-1].number + 1) if existing else 1
-    if next_number % 2 != 0:
-        fail(
-            f"Next migration for {module_code} would be V{next_number:03d}, an odd version reserved "
-            "for the colleague; wait until that migration is present before generating the next even version"
-        )
     version = f"V{next_number:03d}"
     output_path = resolve_sql_path(manifest["migrations"]) / f"{version}__{name}.sql"
     ddl = atlas_diff(baseline, desired)
@@ -1195,6 +1190,26 @@ def test_fresh() -> None:
         for migration in pending:
             docker_mysql_file(container, migration.path)
 
+        # V276 must run after V150/V185 have established the fixed Partner identities.
+        partner_identity = client.query(
+            "SELECT permission FROM system_menu WHERE id=79920 AND type=3 "
+            "AND parent_id=6852 AND deleted=b'0'"
+        ).strip()
+        if partner_identity != "zsjos:partner:manage-all":
+            fail("Fresh menu 79920 lost its historical Partner permission identity")
+        performance_menus = client.query(
+            "SELECT permission,HEX(name) FROM system_menu WHERE deleted=b'0' AND permission IN ("
+            "'zsjos:sales-performance:query','zsjos:sales-performance-target:query',"
+            "'zsjos:sales-performance:self','zsjos:sales-performance:department',"
+            "'zsjos:sales-performance:center','zsjos:sales-performance:detail',"
+            "'zsjos:sales-performance-target:update','zsjos:sales-performance-target:configure')"
+        ).splitlines()
+        if len(performance_menus) != 8 or len({line.split('\t')[0] for line in performance_menus}) != 8:
+            fail("Fresh V276 menus are missing or duplicated")
+        expected_configure = "zsjos:sales-performance-target:configure\t" + "配置销售统计组织".encode().hex().upper()
+        if expected_configure not in performance_menus:
+            fail("Fresh V276 organization permission label failed UTF-8 verification")
+
         output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
         if failure_lines:
@@ -1212,6 +1227,22 @@ def test_upgrade() -> None:
 
     def execute(container: str) -> None:
         docker_mysql_file(container, SQL_ROOT / "bootstrap.sql")
+        # This fixture exercises V019 -> V021, not the later business migration chain.
+        # Snapshot only the objects those two migrations must restore.
+        upgraded_tables = (
+            "'crm_owner_record','crm_performance_config',"
+            "'zsjos_module_schema_version','zsjos_lead_intended_product'"
+        )
+        schema_query = (
+            "SELECT table_name,column_name,column_type,is_nullable,"
+            "COALESCE(column_default,'<NULL>'),extra,generation_expression "
+            "FROM information_schema.columns WHERE table_schema=DATABASE() "
+            f"AND table_name IN ({upgraded_tables}) ORDER BY table_name,column_name; "
+            "SELECT table_name,index_name,non_unique,seq_in_index,column_name "
+            "FROM information_schema.statistics WHERE table_schema=DATABASE() "
+            f"AND table_name IN ({upgraded_tables}) ORDER BY table_name,index_name,seq_in_index"
+        )
+        expected_schema = docker_mysql_query(container, schema_query)
         docker_mysql_query(
             container,
             "ALTER TABLE zsjos_lead_intended_product "
@@ -1256,12 +1287,41 @@ def test_upgrade() -> None:
         ).strip()
         if result != "2:1":
             fail(f"V021 logical-delete uniqueness check failed: {result}")
-        output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
-        failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
-        if failure_lines:
-            fail("V019 to V021 upgrade verification failed:\n" + "\n".join(failure_lines))
+        if docker_mysql_query(container, schema_query) != expected_schema:
+            fail("V019-to-V021 upgrade did not restore its columns and indexes")
+        # The active-row constraint must still reject duplicates within one tenant.
+        duplicate_sql = (
+            "INSERT INTO zsjos_lead_intended_product "
+            "(lead_id,product_ref,product_name_snapshot,is_primary,sort,deleted,tenant_id) "
+            "VALUES (999999,'upgrade-test-course','Upgrade test',b'1',0,b'0',1);"
+        )
+        with tempfile.TemporaryDirectory(prefix="zsjos-upgrade-") as directory:
+            fixture = Path(directory) / "duplicate.sql"
+            fixture.write_text(duplicate_sql, encoding="utf-8")
+            duplicate = docker_mysql_file(container, fixture, expect_success=False)
+        if duplicate.returncode == 0 or b"ERROR 1062" not in duplicate.stderr:
+            fail("V021 did not reject a duplicate active product in the same tenant")
+        docker_mysql_query(container, duplicate_sql.replace(",b'0',1)", ",b'0',2)"))
+        rows_query = (
+            "SELECT id,tenant_id,lead_id,product_ref,deleted+0,active_product_ref "
+            "FROM zsjos_lead_intended_product WHERE lead_id=999999 ORDER BY id"
+        )
+        before_replay = docker_mysql_query(container, rows_query)
+        docker_mysql_file(container, migration_v020)
         docker_mysql_file(container, migration_v021)
-        info("PASS: V019-to-V021 upgrade, logical-delete uniqueness, and idempotent replay completed.")
+        if (docker_mysql_query(container, schema_query) != expected_schema
+                or docker_mysql_query(container, rows_query) != before_replay):
+            fail("V020/V021 replay changed upgraded schema or existing product rows")
+        client = DockerTestClient(container)
+        installed = installed_versions(client)
+        for version, path in (("V020", migration_v020), ("V021", migration_v021)):
+            if installed.get(("core", version), (None,))[0] != sha256(path):
+                fail(f"Upgrade module ledger does not retain the file checksum for {version}")
+        if client.query(
+            "SELECT COUNT(*) FROM zsjos_schema_version WHERE version IN ('V020','V021')"
+        ).strip() != "2":
+            fail("Upgrade did not register V020/V021 in the global ledger")
+        info("PASS: V019-to-V021 schema, version records, active-row uniqueness, tenant isolation, and replay.")
 
     with_test_mysql(execute)
 

@@ -1,5 +1,49 @@
 # Database migration operations
 
+## Core schema synchronization and numbering
+
+`check` compares `schema/core.sql` and `00-bootstrap-schema.sql` byte for byte,
+before `migrate` connects to the target database. A mismatch is a source-file
+error, not evidence of database drift. When a reviewed numbered migration already
+exists, synchronize its intended final definitions in both files; do not generate
+a reverse migration from a stale desired schema.
+
+The V274 assistance reply fields, status index and history permission are present
+in both files. The six delivery-table definitions introduced by V214 and updated
+by V264 include SQL statement terminators. These baseline corrections apply to
+fresh initialization and schema comparison; they do not rewrite any numbered
+migration, applied checksum, existing row or permission assignment. Existing
+databases continue through their pending migrations. Bootstrap remains a
+fresh-database entry point, not a repair command for an installed database;
+there is no data rollback associated with these source corrections.
+
+Each module starts at V001 and uses consecutive versions. The generator accepts
+both odd and even next versions; no author owns a version parity. Missing,
+duplicate or non-V001 starting versions remain errors. Some migration files rely
+on the executor's module-version registration rather than inserting their own
+row; that alone does not indicate a missing migration.
+
+The fresh-install menu collision was caused by premature V276 menu inserts in
+`01-bootstrap-system-seed.sql`: AUTO_INCREMENT assigned 79920 to
+`zsjos:sales-performance-target:configure`, conflicting with V150's fixed
+`zsjos:partner:manage` button. It was not a V150/V185 permission conflict.
+The baseline now leaves these eight menu/button definitions to V276, after older
+fixed IDs have been installed. The migration remains missing-only and repeatable;
+existing databases, role assignments and historical migration checksums are
+unchanged. No database cleanup or reverse migration is needed. Use the complete
+bootstrap-plus-pending-migrations sequence for a fresh installation; bootstrap
+alone does not install later business menus.
+
+`test-upgrade` specifically exercises V019-to-V021: it compares the four affected
+tables' columns and indexes, checks both version ledgers, verifies logical deletion,
+rejects duplicate active products within a tenant, allows the same product in another
+tenant, and checks replay preserves rows. It does not assert unrelated later-version
+artifacts. Use `test-fresh` for the current full initialization chain. The global
+provider-template verifier checks the V080 default before V257 and the
+submitter-identity wording/parameters after V257; neither contract is skipped.
+A scoped V274–V277 replay must include the V146 calendar-directory prerequisite
+and does not replace complete fresh/upgrade tests.
+
 ## V270 Media student full reads
 
 Apply `V270__media_student_read_all.sql` after V269 with an utf8mb4 client. It requires

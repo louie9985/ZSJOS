@@ -4184,13 +4184,22 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_submitter_assist_request` (
   `submitter_name_snapshot` varchar(128) DEFAULT NULL, `assignee_user_id_snapshot` bigint DEFAULT NULL,
   `assignee_name_snapshot` varchar(128) DEFAULT NULL, `requested_at` datetime NOT NULL,
   `request_fingerprint` varchar(64) NOT NULL, `idempotency_key` varchar(128) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'pending', `response_remark` varchar(2000) DEFAULT NULL,
+  `response_attachment_snapshots_json` json DEFAULT NULL, `responder_user_id_snapshot` bigint DEFAULT NULL,
+  `responder_name_snapshot` varchar(128) DEFAULT NULL, `responded_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
   KEY `idx_tenant_lead_requested` (`tenant_id`,`lead_id`,`requested_at`,`id`),
   KEY `idx_tenant_assignee_requested` (`tenant_id`,`assignee_user_id_snapshot`,`requested_at`,`id`)
+  ,KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资提交人协助请求快照';
+
+INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT '协助历史','zsjos:lead:submitter-assist:read',3,33,parent.id,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'
+FROM `system_menu` parent WHERE parent.permission='zsjos:lead:query' AND parent.type=2 AND parent.deleted=b'0'
+AND NOT EXISTS (SELECT 1 FROM `system_menu` existing WHERE existing.permission='zsjos:lead:submitter-assist:read' AND existing.deleted=b'0') ORDER BY parent.id LIMIT 1;
 
 
 CREATE TABLE IF NOT EXISTS `zsjos_lead_urge` (
@@ -7631,7 +7640,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_config` (
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_config_version` (`tenant_id`,`version`,`deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期配置'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期配置';
 
 -- zsjos_student_delivery_defer
 CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_defer` (
@@ -7657,7 +7666,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_defer` (
   `pending_stage_id` bigint GENERATED ALWAYS AS ((case when ((`deleted` = 0x00) and (`status` = _utf8mb4'PENDING')) then `stage_id` else NULL end)) STORED,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_pending` (`tenant_id`,`pending_stage_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付延期审批'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付延期审批';
 
 -- zsjos_student_delivery_form
 CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_form` (
@@ -7674,7 +7683,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_form` (
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_form` (`tenant_id`,`stage_code`,`version`,`deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认表单版本'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认表单版本';
 
 -- zsjos_student_delivery_plan
 CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_plan` (
@@ -7700,7 +7709,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_plan` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_live` (`tenant_id`,`live_account_id`),
   KEY `idx_delivery_plan_account` (`tenant_id`,`account_id`,`deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期计划'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付周期计划';
 
 -- zsjos_student_delivery_stage
 CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_stage` (
@@ -7729,7 +7738,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_stage` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_stage` (`tenant_id`,`plan_id`,`stage_code`,`deleted`),
   KEY `idx_delivery_stage_due` (`tenant_id`,`director_user_id`,`status`,`due_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付阶段任务'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付阶段任务';
 
 -- zsjos_student_delivery_submission
 CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_submission` (
@@ -7750,7 +7759,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_delivery_submission` (
   `idempotency_key` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_submission_stage` (`tenant_id`,`stage_id`,`deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认提交快照'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学员账号交付确认提交快照';
 
 -- 内容审核字典类型（业务字典项由管理员在字典管理中维护）
 INSERT IGNORE INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`updater`)
