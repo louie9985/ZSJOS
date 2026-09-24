@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.PerformanceVO.*;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -45,14 +46,21 @@ public class PerformanceAccess {
  public boolean commandDepartmentAllowed(Long deptId) {
   var scope=permissionApi.getDeptDataPermission(getLoginUserId());return deptId!=null&&scope!=null&&(Boolean.TRUE.equals(scope.getAll())||scope.getDeptIds()!=null&&scope.getDeptIds().contains(deptId));
  }
- public void targetWriteObject(String type,Long id){targetObject(type,id);Long deptId=id;if("USER".equals(type)){var u=user(id);if(u==null)throw denied();deptId=u.getDeptId();var scope=permissionApi.getDeptDataPermission(getLoginUserId());if(id.equals(getLoginUserId())&&scope!=null&&Boolean.TRUE.equals(scope.getSelf()))return;}if(!commandDepartmentAllowed(deptId))throw denied();}
+ public void targetWriteObject(String type,Long id){targetObject(type,id);Long deptId=id;if("USER".equals(type)){var u=user(id);if(u==null)throw denied();if(!CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))throw invalid("该人员已停用，请刷新后重新设置目标");deptId=u.getDeptId();var scope=permissionApi.getDeptDataPermission(getLoginUserId());if(id.equals(getLoginUserId())&&scope!=null&&Boolean.TRUE.equals(scope.getSelf()))return;}if(!commandDepartmentAllowed(deptId))throw denied();}
  public List<PerformanceOrgDO> orgs() {return orgMapper.selectList();}
  public AdminUserRespDTO user(Long id) {return userApi.getUser(id);}
  public DeptRespDTO dept(Long id) {return id==null?null:deptApi.getDept(id);}
  public List<DeptRespDTO> departments() {return deptApi.getChildDeptList(0L);}
  public List<AdminUserRespDTO> sales() {
   var post=postApi.getPostByCode("sales_specialist");
-  return post==null?List.of():userApi.getUserListByPostIds(List.of(post.getId()));
+  return post==null?List.of():userApi.getUserListByPostIds(List.of(post.getId())).stream()
+    .filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus())).toList();
+ }
+ public Set<Long> enabledUserIds(Collection<Long> ids) {
+  if(ids.isEmpty())return Set.of();
+  Set<Long> enabled=new HashSet<>();
+  userApi.getUserList(ids).stream().filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus())).forEach(u->enabled.add(u.getId()));
+  return enabled;
  }
  public PerformanceOrgDO mapping(Long deptId) {
   return orgs().stream().filter(x->Objects.equals(x.getDeptId(),deptId)).findFirst().orElse(null);

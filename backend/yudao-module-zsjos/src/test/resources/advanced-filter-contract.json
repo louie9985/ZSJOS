@@ -1,0 +1,658 @@
+{
+  "version": 1,
+  "scope": "已接入统一高级筛选的页面；关键字段是人工维护的回归要求，不等于完整业务字段全集。",
+  "scenes": {
+    "lead": {
+      "list": [
+        "lead.leadNo",
+        "lead.status",
+        "lead.ownerUserId",
+        "lead.submittedAt"
+      ],
+      "detail": [
+        "lead.invalidReason",
+        "lead.intendedProductRef",
+        "lead.intendedSkuRef",
+        "lead.qualificationDeadlineAt"
+      ],
+      "export": [
+        "lead.leadNo",
+        "lead.name",
+        "lead.mobile",
+        "lead.sourceChannel"
+      ]
+    },
+    "order": {
+      "list": [
+        "order.orderNo",
+        "order.status",
+        "order.totalAmount"
+      ],
+      "detail": [
+        "orderItem.productRef",
+        "orderItem.skuRef",
+        "order.paymentMethod",
+        "order.agreedExamTime"
+      ],
+      "export": [
+        "order.orderNo",
+        "order.studentName",
+        "order.studentMobile",
+        "order.effectiveAt"
+      ]
+    },
+    "lead_appeal": {
+      "list": [
+        "lead.leadNo",
+        "appeal.status",
+        "appeal.reviewStage"
+      ],
+      "detail": [
+        "appeal.reason",
+        "appeal.decisionReason",
+        "appeal.invalidReasonSnapshot"
+      ],
+      "export": [],
+      "exportNotApplicable": "申诉页面未登记独立导出；新增导出须补充契约。"
+    },
+    "duplicate_review": {
+      "list": [
+        "review.submittedName",
+        "review.submittedMobile",
+        "review.status"
+      ],
+      "detail": [
+        "review.resultType",
+        "review.opinion",
+        "review.matchRules"
+      ],
+      "export": [],
+      "exportNotApplicable": "本页未登记独立导出契约；新增导出必须补充关键字段与请求链路测试。"
+    },
+    "registration": {
+      "list": [
+        "order.orderNo",
+        "registration.status",
+        "registration.plannerUserId"
+      ],
+      "detail": [
+        "registration.checklistTitle",
+        "registration.checklistStatus",
+        "registration.routeDepartment"
+      ],
+      "export": [],
+      "exportNotApplicable": "本页未登记独立导出契约；新增导出必须补充关键字段与请求链路测试。"
+    },
+    "student": {
+      "list": [
+        "person.name",
+        "person.mobile",
+        "service.status"
+      ],
+      "detail": [
+        "service.ownerUserId",
+        "service.activatedAt",
+        "service.pauseReason",
+        "orderItem.skuRef"
+      ],
+      "export": [],
+      "exportNotApplicable": "本页未登记独立导出契约；新增导出必须补充关键字段与请求链路测试。"
+    },
+    "subordinate_sales": {
+      "list": [
+        "subordinate.name",
+        "subordinate.accountStatus",
+        "subordinate.todayPendingCount"
+      ],
+      "detail": [
+        "subordinate.todayAssignedCount",
+        "subordinate.todayOrderAmount",
+        "subordinate.canReceiveNewLeads"
+      ],
+      "export": [],
+      "exportNotApplicable": "本页未登记独立导出契约；新增导出必须补充关键字段与请求链路测试。"
+    },
+    "cashback": {
+      "list": [
+        "cashback.cashbackNo",
+        "cashback.type",
+        "cashback.status",
+        "cashback.amount"
+      ],
+      "detail": [
+        "cashback.baseAmount",
+        "cashback.rateSnapshot",
+        "cashback.observationDaysSnapshot"
+      ],
+      "export": [
+        "cashback.cashbackNo",
+        "cashback.leadNo",
+        "cashback.productName",
+        "cashback.amount"
+      ]
+    },
+    "withdrawal": {
+      "list": [
+        "withdrawal.withdrawalNo",
+        "withdrawal.status",
+        "withdrawal.applicationAmount"
+      ],
+      "detail": [
+        "withdrawal.verificationStatus",
+        "withdrawal.approvedAmount",
+        "withdrawal.hasProof"
+      ],
+      "export": [
+        "withdrawal.withdrawalNo",
+        "withdrawal.bankTransactionNo",
+        "withdrawal.paidAt",
+        "withdrawal.rejectionReason"
+      ]
+    }
+  },
+  "pages": [
+    {
+      "scene": "lead",
+      "pageKey": "lead_management",
+      "consumers": {
+        "workbench": "LeadManagementPage.tsx",
+        "admin": "lead/index.vue"
+      }
+    },
+    {
+      "scene": "lead",
+      "pageKey": "lead_claim_pool",
+      "consumers": {
+        "workbench": "LeadClaimPoolPage.tsx",
+        "admin": "leadClaimPool/index.vue"
+      }
+    },
+    {
+      "scene": "lead",
+      "pageKey": "lead_aging_pool",
+      "consumers": {
+        "workbench": "LeadAgingPoolPage.tsx",
+        "admin": "leadAgingPool/index.vue"
+      }
+    },
+    {
+      "scene": "lead",
+      "pageKey": "subordinate_sales_leads",
+      "consumers": {
+        "workbench": "SubordinateSalesPage.tsx"
+      }
+    },
+    {
+      "scene": "order",
+      "pageKey": "sales_order_management",
+      "consumers": {
+        "workbench": "MySalesOrderPage.tsx",
+        "admin": "mySalesOrder/index.vue"
+      }
+    },
+    {
+      "scene": "order",
+      "pageKey": "sales_order_approval:registration",
+      "consumers": {
+        "workbench": "SalesOrderApprovalPage.tsx"
+      }
+    },
+    {
+      "scene": "order",
+      "pageKey": "sales_order_approval:finance",
+      "consumers": {
+        "workbench": "SalesOrderApprovalPage.tsx"
+      }
+    },
+    {
+      "scene": "order",
+      "pageKey": "sales_order_approval",
+      "consumers": {
+        "admin": "salesOrderApproval/index.vue"
+      }
+    },
+    {
+      "scene": "order",
+      "pageKey": "sales_order_supervisor_confirm",
+      "consumers": {
+        "workbench": "../components/SalesOrderSupervisorInbox.tsx",
+        "admin": "salesOrderSupervisorConfirmation/index.vue"
+      }
+    },
+    {
+      "scene": "lead_appeal",
+      "pageKey": "lead_appeal",
+      "consumers": {
+        "workbench": "LeadAppealPage.tsx",
+        "admin": "leadAppeal/index.vue"
+      }
+    },
+    {
+      "scene": "duplicate_review",
+      "pageKey": "lead_duplicate_review",
+      "consumers": {
+        "workbench": "LeadDuplicateReviewPage.tsx",
+        "admin": "leadDuplicateReview/index.vue"
+      }
+    },
+    {
+      "scene": "registration",
+      "pageKey": "registration_pool",
+      "consumers": {
+        "workbench": "RegistrationPages.tsx",
+        "admin": "registration-pool.vue"
+      }
+    },
+    {
+      "scene": "student",
+      "pageKey": "student_my",
+      "consumers": {
+        "workbench": "RegistrationPages.tsx",
+        "admin": "my-students.vue"
+      }
+    },
+    {
+      "scene": "subordinate_sales",
+      "pageKey": "subordinate_sales",
+      "consumers": {
+        "workbench": "SubordinateSalesPage.tsx",
+        "admin": "subordinateSales/index.vue"
+      }
+    },
+    {
+      "scene": "cashback",
+      "pageKey": "cashback",
+      "consumers": {
+        "workbench": "ManagementPages.tsx",
+        "admin": "cashback/index.vue"
+      }
+    },
+    {
+      "scene": "withdrawal",
+      "pageKey": "withdrawal",
+      "consumers": {
+        "workbench": "ManagementPages.tsx",
+        "admin": "withdrawal/index.vue"
+      }
+    }
+  ],
+  "embeddedOptionAuthorities": {
+    "lead.sourceType": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "lead.ownerIdentity": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "lead.qualificationStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "order.formalOwnerIdentity": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "appeal.reviewStage": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "review.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "review.resultType": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "review.duplicateFlag": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "review.duplicateResult": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "order.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/SalesOrderConstants.java",
+    "order.type": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/SalesOrderConstants.java",
+    "opportunity.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java",
+    "registration.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationConstants.java",
+    "cashback.type": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/CashbackConstants.java",
+    "cashback.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/CashbackConstants.java",
+    "withdrawal.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/WithdrawalConstants.java",
+    "withdrawal.verificationStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/WithdrawalConstants.java",
+    "subordinate.accountStatus": "backend/yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/enums/CommonStatusEnum.java",
+    "person.identityStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationServiceImpl.java",
+    "service.status": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationServiceImpl.java",
+    "subordinate.presence": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "subordinate.accepting": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "subordinate.eligible": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "subordinate.newcomerPoolStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "subordinate.todayFollowUpStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "subordinate.canReceiveNewLeads": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesServiceImpl.java",
+    "lead.dealStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java",
+    "order.hasVoucher": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/OrderFilterFields.java",
+    "appeal.hasEvidence": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AppealFilterFields.java",
+    "review.hasAttachments": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/DuplicateReviewFilterFields.java",
+    "registration.checklistStatus": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/RegistrationFilterFields.java",
+    "registration.hasChecklistAttachment": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/RegistrationFilterFields.java",
+    "withdrawal.hasProof": "backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/WithdrawalFilterFields.java"
+  },
+  "forbiddenFields": [
+    "withdrawal.bankCardNo",
+    "withdrawal.proofUrl",
+    "person.id",
+    "lead.id",
+    "order.processInstanceId",
+    "review.candidateSnapshot"
+  ],
+  "pending": [
+    "G10 审批轮次口径尚待确认",
+    "G23 动态字段开放策略尚待确认",
+    "G16 媒体学员尚未接入统一目录",
+    "其他缺项以 advanced-filter-inventory.md 为准"
+  ],
+  "wireExamples": [
+    {
+      "scene": "withdrawal",
+      "field": {
+        "fieldKey": "withdrawal.bankNameSnapshot",
+        "group": "补充信息",
+        "label": "开户银行",
+        "valueType": "text",
+        "operators": [
+          "contains",
+          "not_contains",
+          "eq",
+          "ne",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "options": [],
+        "optionsState": "empty",
+        "supportedScenes": [
+          "withdrawal"
+        ],
+        "supportedPages": [
+          "withdrawal"
+        ],
+        "permission": "inherit_query_authorization",
+        "dataScope": "inherit_query_data_scope",
+        "sensitive": true,
+        "sensitivity": "personal",
+        "sortable": false,
+        "deprecated": false,
+        "optionSourceType": "none"
+      },
+      "filter": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "fieldKey": "withdrawal.bankNameSnapshot",
+            "operator": "contains",
+            "value": "contract-probe"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "scene": "withdrawal",
+      "field": {
+        "fieldKey": "withdrawal.status",
+        "group": "状态与进度",
+        "label": "提现状态",
+        "valueType": "select",
+        "operators": [
+          "in",
+          "not_in",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "options": [
+          {
+            "value": "pending_review",
+            "label": "待审核"
+          },
+          {
+            "value": "approved",
+            "label": "待打款"
+          },
+          {
+            "value": "rejected",
+            "label": "已驳回"
+          },
+          {
+            "value": "paid",
+            "label": "已打款"
+          },
+          {
+            "value": "cancelled",
+            "label": "已取消"
+          }
+        ],
+        "optionsState": "ready",
+        "supportedScenes": [
+          "withdrawal"
+        ],
+        "supportedPages": [
+          "withdrawal"
+        ],
+        "permission": "inherit_query_authorization",
+        "dataScope": "inherit_query_data_scope",
+        "sensitive": false,
+        "sensitivity": "standard",
+        "sortable": false,
+        "deprecated": false,
+        "optionSourceType": "business_contract"
+      },
+      "filter": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "fieldKey": "withdrawal.status",
+            "operator": "in",
+            "value": [
+              "pending_review"
+            ]
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "scene": "withdrawal",
+      "field": {
+        "fieldKey": "withdrawal.applicationAmount",
+        "group": "金额与付款",
+        "label": "申请金额（元）",
+        "valueType": "number",
+        "operators": [
+          "eq",
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "between",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "options": [],
+        "optionsState": "empty",
+        "supportedScenes": [
+          "withdrawal"
+        ],
+        "supportedPages": [
+          "withdrawal"
+        ],
+        "permission": "inherit_query_authorization",
+        "dataScope": "inherit_query_data_scope",
+        "sensitive": true,
+        "sensitivity": "financial",
+        "sortable": false,
+        "deprecated": false,
+        "optionSourceType": "none"
+      },
+      "filter": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "fieldKey": "withdrawal.applicationAmount",
+            "operator": "gte",
+            "value": 7
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "scene": "withdrawal",
+      "field": {
+        "fieldKey": "withdrawal.submittedAt",
+        "group": "时间",
+        "label": "提交时间",
+        "valueType": "date",
+        "operators": [
+          "eq",
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "between",
+          "relative",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "options": [],
+        "optionsState": "empty",
+        "supportedScenes": [
+          "withdrawal"
+        ],
+        "supportedPages": [
+          "withdrawal"
+        ],
+        "permission": "inherit_query_authorization",
+        "dataScope": "inherit_query_data_scope",
+        "sensitive": false,
+        "sensitivity": "standard",
+        "sortable": false,
+        "deprecated": false,
+        "optionSourceType": "none"
+      },
+      "filter": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "fieldKey": "withdrawal.submittedAt",
+            "operator": "gte",
+            "value": "2026-09-23T12:00:00"
+          }
+        ],
+        "groups": []
+      }
+    },
+    {
+      "scene": "withdrawal",
+      "field": {
+        "fieldKey": "duration.diff",
+        "group": "时间",
+        "label": "时间作差",
+        "valueType": "duration",
+        "operators": [
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "between"
+        ],
+        "options": [
+          {
+            "value": "withdrawal.submittedAt",
+            "label": "提交时间"
+          },
+          {
+            "value": "withdrawal.reviewedAt",
+            "label": "审核时间"
+          },
+          {
+            "value": "withdrawal.paidAt",
+            "label": "打款时间"
+          },
+          {
+            "value": "withdrawal.cancelledAt",
+            "label": "撤销时间"
+          }
+        ],
+        "optionsState": "ready",
+        "supportedScenes": [
+          "withdrawal"
+        ],
+        "supportedPages": [
+          "withdrawal"
+        ],
+        "permission": "inherit_query_authorization",
+        "dataScope": "inherit_query_data_scope",
+        "sensitive": false,
+        "sensitivity": "standard",
+        "sortable": false,
+        "deprecated": false,
+        "optionSourceType": "catalog_dates"
+      },
+      "filter": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "fieldKey": "duration.diff",
+            "operator": "gte",
+            "value": 7,
+            "startFieldKey": "withdrawal.submittedAt",
+            "endFieldKey": "withdrawal.reviewedAt",
+            "unit": "hour"
+          }
+        ],
+        "groups": []
+      }
+    }
+  ],
+  "wireTypes": {
+    "valueType": [
+      "text",
+      "select",
+      "number",
+      "date",
+      "duration"
+    ],
+    "optionSourceType": [
+      "none",
+      "business_contract",
+      "business_api",
+      "dictionary",
+      "visible_users",
+      "visible_departments",
+      "catalog_dates"
+    ],
+    "sensitivity": [
+      "standard",
+      "personal",
+      "financial",
+      "free_text"
+    ]
+  },
+  "operatorsByType": {
+    "text": [
+      "contains",
+      "not_contains",
+      "eq",
+      "ne",
+      "is_empty",
+      "is_not_empty"
+    ],
+    "select": [
+      "in",
+      "not_in",
+      "is_empty",
+      "is_not_empty"
+    ],
+    "number": [
+      "eq",
+      "gt",
+      "gte",
+      "lt",
+      "lte",
+      "between",
+      "is_empty",
+      "is_not_empty"
+    ],
+    "date": [
+      "eq",
+      "gt",
+      "gte",
+      "lt",
+      "lte",
+      "between",
+      "relative",
+      "is_empty",
+      "is_not_empty"
+    ],
+    "duration": [
+      "gt",
+      "gte",
+      "lt",
+      "lte",
+      "between"
+    ]
+  }
+}

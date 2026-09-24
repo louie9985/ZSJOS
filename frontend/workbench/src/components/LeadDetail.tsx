@@ -7,7 +7,7 @@ import { DICT_TYPE } from '../constants'
 import { defaultLeadDetailTab, resolveLeadDetailTab, resolveVisibleLeadDetailTabs, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
-import LeadDetailOverview from './LeadDetailOverview'
+import LeadDetailOverview, { type LeadProfileVariant } from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
 import LeadAppealPanel from './LeadAppealPanel'
 import LeadFlowHistoryPanel from './LeadFlowHistoryPanel'
@@ -34,7 +34,7 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner }: {
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
@@ -54,6 +54,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   studentService?: MyStudent['services'][number]
   studentToolbarActions?: ToolbarAction[]
   overviewContent?: ReactNode
+  profileVariant?: LeadProfileVariant
   hideProviderOwner?: boolean
 }) {
   const readOnly = mode === 'student-readonly'
@@ -102,7 +103,6 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [urgeReason, setUrgeReason] = useState('')
   const [complaintReason, setComplaintReason] = useState('')
   const [submitterActionSaving, setSubmitterActionSaving] = useState(false)
-  const [validConfirmOpen, setValidConfirmOpen] = useState(false)
   const [repurchaseOpen, setRepurchaseOpen] = useState(false)
   const [qualificationAction, setQualificationAction] = useState<QualificationAction>()
   const [qualificationSupervisorAction, setQualificationSupervisorAction] = useState(false)
@@ -114,7 +114,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const { submitting: dispositionSaving, run: runDisposition, resetIntent: resetDispositionIntent } = useSubmissionGuard()
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
-  const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
+  const closeValid = () => { setValidOpen(false) }
   const projectedActions = lead.availableActions || []
   const actions = readOnly ? new Map<string, NonNullable<ManagedLead['availableActions']>[number]>()
     : new Map(projectedActions.filter(item => !managerMode
@@ -125,13 +125,12 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     [basicInfoDirty, feedbackDirty, followUpFormDirty, onDirtyChange, readOnly])
 
   const judgeValid = async () => {
-    setValidConfirmOpen(false)
+    if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
     await runQualification(async ({ idempotencyKey, complete }) => {
       await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey })
       complete(); message.success('已判定为有效客资'); setValidOpen(false); setValidRemark(''); onChanged()
     }).catch(error => message.error(error instanceof Error ? error.message : '有效判定失败'))
   }
-  const prepareJudgeValid = () => { if (!validRemark.trim()) message.warning('请填写有效备注'); else setValidConfirmOpen(true) }
   const openValid = async () => {
     resetQualificationIntent(); setValidCategory(lead.leadCategory); setValidRemark(''); setValidOpen(true); setValidTemplateError('')
     try { setValidTemplates(await api.dictDataByType(DICT_TYPE.LEAD_VALID_REMARK_TEMPLATE)) }
@@ -299,7 +298,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     if (tab === 'student-info') return { key: tab, label: '学员信息', children: <StudentInfoPanel key={lead.id} leadId={lead.id}/> }
     if (tab === 'submitter-feedback') return { key: tab, label: '销售反馈', children: <LeadSubmitterFeedbackPanel key={lead.id} lead={lead} canCreate={!readOnly && actions.has('REPLY_SUBMITTER')} onChanged={onChanged} onDirtyChange={setFeedbackDirty}/> }
     if (tab === 'assist-history') return { key: tab, label: '协助历史', children: <LeadSubmitterAssistHistoryPanel key={lead.id} lead={lead} canReply={!readOnly && actions.has('SUBMITTER_ASSIST_REPLY')} onChanged={onChanged}/> }
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview followUpRefreshVersion={followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner}/>}</div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview followUpRefreshVersion={followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={handleStandaloneFollowUpSuccess} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
@@ -340,7 +339,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
           <Typography.Text strong>附件</Typography.Text><LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence} disabled={qualificationSaving}/>
         </Space>
       </Modal>
-      <Modal title="判定为有效客资" open={validOpen} onCancel={closeValid} footer={<Space><Button onClick={closeValid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为有效`} open={validConfirmOpen} onOpenChange={setValidConfirmOpen} onConfirm={judgeValid}><Button type="primary" loading={qualificationSaving} onClick={prepareJudgeValid}>确认判有效</Button></IrreversiblePopconfirm></Space>}>
+      <Modal title="判定为有效客资" open={validOpen} onCancel={closeValid} footer={<Space><Button onClick={closeValid}>取消</Button><Button type="primary" loading={qualificationSaving} onClick={() => void judgeValid()}>确认判有效</Button></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}><Typography.Text strong>客资分类</Typography.Text><Select allowClear value={validCategory} onChange={setValidCategory} placeholder="可不选择" options={categories.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/>{validTemplateError && <Alert type="error" showIcon message={validTemplateError}/>} {validTemplates.length > 0 && <Space wrap>{validTemplates.map(template => <Button size="small" key={template.value} onClick={() => setValidRemark(current => [current.trim(), template.label].filter(Boolean).join('\n'))}>{template.label}</Button>)}</Space>}<Form.Item label="有效备注" required><Input.TextArea value={validRemark} onChange={event => setValidRemark(event.target.value)} rows={4} maxLength={2000} showCount/></Form.Item></Space>
       </Modal>
       <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)} onDirtyChange={setBasicInfoDirty} onChanged={onChanged}/>

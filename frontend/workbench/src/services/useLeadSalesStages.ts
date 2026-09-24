@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type DictData, type ManagedLead } from './api'
 import { DICT_TYPE } from '../constants'
 
-export function useLeadSalesStages(lead: ManagedLead) {
+export function useLeadSalesStages(lead: ManagedLead, active = true) {
   const requestVersion = useRef(0)
   const [items, setItems] = useState<DictData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const reload = useCallback(async () => {
+    if (!active) return
     const version = ++requestVersion.current
     setLoading(true); setError('')
     try {
@@ -16,7 +17,7 @@ export function useLeadSalesStages(lead: ManagedLead) {
     } catch (cause) {
       if (version === requestVersion.current) setError(cause instanceof Error ? cause.message : '销售阶段加载失败')
     } finally { if (version === requestVersion.current) setLoading(false) }
-  }, [])
+  }, [active, lead.id])
   useEffect(() => { void reload(); return () => { requestVersion.current++ } }, [reload])
   const options = useMemo(() => {
     const values = items.map(item => ({ value: item.value,

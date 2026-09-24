@@ -17,10 +17,39 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class) class PerformanceAccessTest {
  @InjectMocks PerformanceAccess access;
  @Mock PermissionApi permissionApi; @Mock AdminUserApi userApi; @Mock PerformanceOrgMapper orgMapper;
+ @Mock cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
+ @Mock cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
  MockedStatic<SecurityFrameworkUtils> security;
  @BeforeEach void setup(){security=mockStatic(SecurityFrameworkUtils.class);security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(1L);}
  @AfterEach void close(){security.close();}
  Query q(String type,long id){var q=new Query();q.setScopeType(type);q.setScopeId(id);return q;}
+ AdminUserRespDTO person(long id,Integer status){var u=new AdminUserRespDTO();u.setId(id);u.setStatus(status);u.setDeptId(10L);return u;}
+ @Test void bothTreesExcludeDisabledAndUnknownStatusUsers(){
+  var post=new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();post.setId(7L);
+  when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+  var enabled=person(2,0);
+  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(enabled,person(3,1),person(4,null)));
+  when(userApi.getUser(2L)).thenReturn(enabled);
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance-target:query")).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);
+  assertEquals(List.of(2L),access.tree(true).stream().map(n->n.scopeId()).toList());
+  assertEquals(List.of(2L),access.tree(false).stream().map(n->n.scopeId()).toList());
+  verify(userApi,never()).getUser(3L);verify(userApi,never()).getUser(4L);
+  assertEquals(List.of(2L),access.sales().stream().map(AdminUserRespDTO::getId).toList());
+ }
+ @Test void enabledHistoricalContributorsNeedNotStillHoldSalesPost(){
+  when(userApi.getUserList(Set.of(2L,3L,4L))).thenReturn(List.of(person(2,0),person(3,1)));
+  assertEquals(Set.of(2L),access.enabledUserIds(Set.of(2L,3L,4L)));
+  assertTrue(access.enabledUserIds(Set.of()).isEmpty());verifyNoInteractions(postApi);
+ }
+ @Test void disabledTargetCannotBeSavedDespiteReadAndWritePermissions(){
+  when(userApi.getUser(2L)).thenReturn(person(2,1));
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance-target:query")).thenReturn(true);
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  var ex=assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->access.targetWriteObject("USER",2L));
+  assertTrue(ex.getMessage().contains("停用"));
+ }
  PerformanceOrgDO org(long id,long center,String kind){var o=new PerformanceOrgDO();o.setDeptId(id);o.setCenterId(center);o.setKind(kind);return o;}
  @Test void selfCannotSpoofUser(){when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(true);assertEquals(1L,access.authorize(q("SELF",999),false).getScopeId());}
  @Test void selfNeedsViewPermission(){assertThrows(RuntimeException.class,()->access.authorize(q("SELF",1),false));}

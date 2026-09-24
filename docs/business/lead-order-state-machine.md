@@ -697,21 +697,40 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 租户管理员在“工作台 → 客资筛选方案”分别维护提交人视角和负责人视角。配置分为草稿与已发布版本：保存草稿不改变员工视图，发布后才切换运行时映射，每次发布保留不可变版本；回滚会把历史快照作为一个新的版本重新发布，不覆盖历史记录。
 
-管理员可以调整分组和筛选项的名称、顺序、显隐，以及从系统白名单中选择条件和值；不能修改 Lead 真实状态、填写 SQL 或引用未注册字段。当前白名单为 `status` 和 `assignment_status`。新增跟进、成交审核等筛选能力时，必须先完成对应业务对象和查询字段，再由后端扩展白名单。
+管理员可以调整分组和筛选项的名称、顺序、显隐，以及从系统白名单中选择条件和值；不能修改 Lead 真实状态、填写 SQL 或引用未注册字段。当前白名单为 `status`、`assignment_status`、`handling_stage`、`sales_progress`、`source_type` 和 `follow_up_condition`。新增跟进、成交审核等筛选能力时，必须先完成对应业务对象和查询字段，再由后端扩展白名单。
 
 初始化时发布的默认一级归类为：
 
 | 归类编码 | 展示名称 | 当前映射 |
 | --- | --- | --- |
 | `all` | 全部客资 | 当前视角下属于当前用户的全部客资 |
-| `pending_qualification` | 待判定客资 | `lead.status = submitted` |
+| `pending_qualification` | 待判定客资 | `lead.status in (submitted, suspended)` |
 | `valid` | 有效客资 | `lead.status in (valid, won)` |
 | `invalid` | 无效客资 | `lead.status = invalid` |
 | `closed` | 已关闭客资 | `lead.status = closed` |
+| `manual` | 手动录入客资 | `lead.source_type in (sales_self_sourced, education_self_sourced)` |
 
-统一客资管理不再按提交人/负责人拆分页面，但保留一行互斥的简单状态标签。标签条件由后端在 `relationScope=all` 的授权关系并集内执行：待首跟与待判定的处理阶段按当前归属周期首次跟进事实区分，判定截止时间不作为已完成首跟的证据；待跟进对应已判有效且 Opportunity 未进入成交审批或成交；其余标签直接对应成交待审核、已成交、已判无效、已关闭和已挂起状态。待分配、待接单和抢单池属于分配流程，不进入该标签行。简单状态可与关键词和高级筛选取交集，不改变对象权限。
+`suspended` 归入待判定客资：挂起由判定超时产生，业务上仍属待判定，不单列一级归类。手动录入客资复用已有的自拓语义（销售自拓录、教务自拓录），与 `dispatch_mode = self` 等价，不新增存储字段；新媒体提交与兼职提交不属于手动录入。
 
-提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端正交状态区分有效性、跟进和挂起。新判有效或申诉改判均创建唯一 `initial_conversion` Opportunity；V019 负责补齐历史 `valid` 客资。成交审核和已成交仅作为预留跟进状态，由未来订单/BPM投影驱动；本期不提供暂缓成交入口。
+统一客资管理不再按提交人/负责人拆分页面，改为三行分级筛选：一级业务归类（取自上表，互斥）× 二级当前环节 × 三级快捷条件，三行各取一个选中项并按交集执行。筛选项全部由服务端筛选方案（视角 `management`）下发，前端不维护静态筛选数组。各行的映射为：
+
+| 二级行 | 选项编码 | 映射 |
+| --- | --- | --- |
+| 当前环节 | `unassigned` / `pending_acceptance` / `public_pool` / `recycle_pending` | 对应 `assignment_status` |
+| 当前环节 | `first_follow_pending` / `qualification_pending` | 按当前归属周期首次跟进事实区分；判定截止时间不作为已完成首跟的证据 |
+| 当前环节 | `following` | `status = valid` 且 Opportunity 未进入成交审批或成交 |
+| 当前环节 | `deal_pending_approval` / `won` | Opportunity 分别处于成交审批或成交 |
+| 当前环节 | `suspended` | `status = suspended` |
+| 快捷条件 | `today` / `overdue` | 存在 `task_type in (lead_first_follow_up, lead_follow_up_reminder)` 且 `status = pending` 的待办，`due_at` 分别落在今日自然日或早于今日零点 |
+| 快捷条件 | `transferred_pending` | 当前归属周期由主管转派产生，且本周期尚未产生首跟事实 |
+
+快捷条件的权威数据源是 `zsjos_business_task.due_at`，不是 `zsjos_lead.next_follow_up_at`：后者可能保留已完成或已取消提醒的过期值。直属主管转派只创建判定任务、不重建首跟任务，因此转派后的客资不会进入“今日待跟进”待办，需要“有效转派待跟进”单独暴露。
+
+一级归类内的二级选项只保留与该归类条件相容的项，避免交集恒为空；例如有效客资不提供待首跟、待判定选项。
+
+三行筛选可与关键词和高级筛选取交集，不改变对象权限。待分配、待接单和抢单池属于分配流程，仅作为“当前环节”的选项，不再作为一级归类出现。
+
+提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端正交状态区分有效性、跟进和挂起。新判有效或申诉改判均创建唯一 `initial_conversion` Opportunity；V019 负责补齐历史 `valid` 客资。成交审核和已成交仅作为预留跟进状态，由未来订单/BPM投影驱动；本期不提供暂缓成交入口，因此筛选项中不存在“暂缓成交”。
 
 ## 12. 完整场景
 

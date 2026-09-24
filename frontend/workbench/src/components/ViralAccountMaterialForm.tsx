@@ -1,7 +1,8 @@
 import ResourceLinkInput from './ResourceLinkInput'
+import ResourceLink from './ResourceLink'
 import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Alert, Button, Collapse, Input, Select, Space, Spin, Typography, Upload } from 'antd'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { materialApi, type Material, type MaterialFieldDefinition, type MaterialSaveRequest, type MaterialType } from '../services/materialApi'
 import { ClipboardUploadButtons } from './ClipboardPasteTarget'
 
@@ -145,9 +146,10 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
   }
   const label = <span>{field.label}{field.required && <Typography.Text type="danger"> *</Typography.Text>}</span>
   if (readonly) return <div className="viral-field-readonly"><Typography.Text type="secondary">{label}</Typography.Text>
-    <Typography.Paragraph className="viral-field-value">{field.type === 'dict-single' || field.type === 'dict-multi'
+    {field.type === 'https-link' && value ? <ResourceLink href={String(value)} variant="resource" />
+    : <Typography.Paragraph className="viral-field-value">{field.type === 'dict-single' || field.type === 'dict-multi'
       ? dictionaryText(value, snapshot, dicts[field.dictType || ''] || [])
-      : Array.isArray(value) ? value.join('、') : String(value ?? '未填写')}</Typography.Paragraph></div>
+      : Array.isArray(value) ? value.join('、') : String(value ?? '未填写')}</Typography.Paragraph>}</div>
   if (field.type === 'dict-single' || field.type === 'dict-multi') {
     return <label className="viral-field"><Typography.Text type="secondary">{label}</Typography.Text>
       <Select className="viral-field-control" mode={field.type === 'dict-multi' ? 'multiple' : undefined}
@@ -164,14 +166,15 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
         onChange={event => onChange(event.target.value)} />}</label>
 }
 
-export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true, requireDraftContent = false, onDirty }: {
+export default function ViralAccountMaterialForm({ mode, type, material, dicts, onClose, onSaved, onRetry, titleFieldKey = 'account_name', coverLabel = '账号主页截图', coverRequiredMessage = '请上传账号主页截图', sectionLabels, submitAllowed = true, requireDraftContent = false, onDirty, onBusyChange }: {
   onDirty?: () => void
+  onBusyChange?: (busy: boolean) => void
   mode: Mode
   type: MaterialType
   material?: Material
   dicts: Record<string, DictOption[]>
   onClose: () => void
-  onSaved: (result: { materialId: number; submitted: boolean }) => void
+  onSaved: (result: { materialId: number; submitted: boolean; hasUnsavedChanges?: boolean }) => void
   onRetry?: () => void
   titleFieldKey?: string
   coverLabel?: string
@@ -188,18 +191,26 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
   const [coverPreviewUrl, setCoverPreviewUrl] = useState(material?.coverPreviewUrl || material?.currentVersion?.coverPreviewUrl)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const busy = useRef(false), revision = useRef(0)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [error, setError] = useState('')
   const [persistedMaterialId, setPersistedMaterialId] = useState<number>()
-  const readonly = mode === 'view'
+  const readonly = mode === 'view' || submitting
   const draftEmpty = requireDraftContent && !fields.some(field => hasMaterialDraftContent(values[field.key]))
   const layout = useMemo(() => buildViralAccountLayout(fields), [fields])
-  const update = (key: string, value: unknown) => { onDirty?.(); setValues(current => ({ ...current, [key]: value })) }
+  const markDirty = () => { revision.current++; onDirty?.() }
+  const update = (key: string, value: unknown) => { markDirty(); setValues(current => ({ ...current, [key]: value })) }
   const persist = async (submitApproval: boolean) => {
+    if (busy.current) return
     if (!submitApproval && draftEmpty) return setError('请先填写爆款内容拆解内容，再保存草稿')
     const problem = fields.map(field => validateField(field, values[field.key], submitApproval && Boolean(field.required), field.label)).find(Boolean)
     if (problem) return setError(problem as string)
     if (submitApproval && !coverFileId) return setError(coverRequiredMessage)
-    setSaving(true); setError('')
+    const savedRevision = revision.current
+    busy.current = true; onBusyChange?.(true)
+    setSaving(true); setSubmitting(submitApproval); setError('')
     try {
       const request: MaterialSaveRequest = {
         materialTypeId: type.id,
@@ -211,35 +222,47 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
       const existingId = mode === 'edit' && material ? material.id : persistedMaterialId
       if (existingId) {
         const current = await materialApi.get(existingId)
+        if (!mounted.current) return
         request.expectedMaterialVersion = current.version
         await materialApi.update(existingId, request)
         materialId = existingId
       } else {
         materialId = await materialApi.create(request)
+        if (!mounted.current) return
         setPersistedMaterialId(materialId)
       }
+      // Auth/tenant invalidation may destroy a retained editor while a request is pending.
+      if (!mounted.current) return
       if (submitApproval) {
         const saved = await materialApi.get(materialId)
+        if (!mounted.current) return
         await materialApi.submit(materialId, saved.version)
       }
-      onSaved({ materialId, submitted: submitApproval })
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败') }
-    finally { setSaving(false) }
+      if (!mounted.current) return
+      onSaved({ materialId, submitted: submitApproval, hasUnsavedChanges: revision.current !== savedRevision })
+    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : '保存失败') }
+    finally { busy.current = false; if (mounted.current) { onBusyChange?.(false); setSaving(false); setSubmitting(false) } }
   }
   const submit = async () => { if (!readonly) await persist(true) }
   const saveDraft = async () => { if (!readonly) await persist(false) }
   const uploadCover = async (file: File) => {
+    if (busy.current) return
+    busy.current = true; onBusyChange?.(true)
     setUploading(true); setError('')
-    try { const result = await materialApi.uploadCover(file); onDirty?.(); setCoverFileId(result.fileId); setCoverPreviewUrl(result.previewUrl) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '截图上传失败') }
-    finally { setUploading(false) }
+    try {
+      const result = await materialApi.uploadCover(file)
+      if (!mounted.current) return
+      markDirty(); setCoverFileId(result.fileId); setCoverPreviewUrl(result.previewUrl)
+    }
+    catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : '截图上传失败') }
+    finally { busy.current = false; if (mounted.current) { onBusyChange?.(false); setUploading(false) } }
   }
-  const fieldGrid = (runFields: MaterialFieldDefinition[]) => <div className="viral-account-field-grid">{runFields.map(field => <div key={field.key} className={field.type === 'textarea' || field.type === 'rich-text' || field.type === 'repeat-group' ? 'viral-account-field-wide' : ''}>
+  const fieldGrid = (runFields: MaterialFieldDefinition[]) => <div className="viral-account-field-grid">{runFields.map(field => <div key={field.key} className={['textarea', 'rich-text', 'repeat-group', 'https-link'].includes(field.type) ? 'viral-account-field-wide' : ''}>
     <FieldEditor field={field} value={values[field.key]} snapshot={initialSnapshots[field.key]} dicts={dicts} readonly={readonly} onChange={value => update(field.key, value)} />
   </div>)}</div>
-  const actions = readonly
+  const actions = mode === 'view'
     ? <Button onClick={onClose}>关闭</Button>
-    : <><Button onClick={onClose}>取消</Button><Button loading={saving} disabled={draftEmpty || uploading} onClick={() => void saveDraft()}>保存草稿</Button>{draftEmpty && <Typography.Text type="secondary">请先填写拆解内容，再保存草稿</Typography.Text>}{submitAllowed && <Button type="primary" loading={saving} onClick={() => void submit()}>提交审批</Button>}</>
+    : <><Button disabled={saving || uploading} onClick={onClose}>取消</Button><Button loading={saving} disabled={draftEmpty || uploading} onClick={() => void saveDraft()}>保存草稿</Button>{draftEmpty && <Typography.Text type="secondary">请先填写拆解内容，再保存草稿</Typography.Text>}{submitAllowed && <Button type="primary" loading={saving} disabled={uploading} onClick={() => void submit()}>提交审批</Button>}</>
   if (!fields.length) return <Alert type="error" showIcon title="拆解模板不可用"
     description="模板缺失或未配置字段，请联系管理员检查素材类型与已发布模板后重试。"
     action={<Button onClick={onRetry || onClose}>{onRetry ? '重试' : '关闭'}</Button>} />
@@ -258,8 +281,8 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
                 </div>}
           </div>
           <div className="viral-account-side-actions">
-            {!readonly && !coverFileId && <ClipboardUploadButtons disabled={uploading} canPaste={() => !uploading} onFiles={files => { const file = files[0]; if (file) void uploadCover(file) }}><Upload accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void uploadCover(file); return false }}><Button block icon={<UploadOutlined />} loading={uploading}>上传图片</Button></Upload></ClipboardUploadButtons>}
-            {!readonly && coverFileId && <Button danger block icon={<DeleteOutlined />} disabled={uploading} onClick={() => { onDirty?.(); setCoverFileId(undefined); setCoverPreviewUrl(undefined) }}>删除图片</Button>}
+            {!readonly && !coverFileId && <ClipboardUploadButtons disabled={uploading || saving} canPaste={() => !busy.current} onFiles={files => { const file = files[0]; if (file) void uploadCover(file) }}><Upload disabled={uploading || saving} accept="image/*" maxCount={1} showUploadList={false} beforeUpload={file => { void uploadCover(file); return false }}><Button block icon={<UploadOutlined />} disabled={saving} loading={uploading}>上传图片</Button></Upload></ClipboardUploadButtons>}
+            {!readonly && coverFileId && <Button danger block icon={<DeleteOutlined />} disabled={uploading || saving} onClick={() => { markDirty(); setCoverFileId(undefined); setCoverPreviewUrl(undefined) }}>删除图片</Button>}
             <Space className="viral-account-actions" direction="vertical" size={8}>{actions}</Space>
           </div>
         </div>
@@ -281,6 +304,6 @@ export default function ViralAccountMaterialForm({ mode, type, material, dicts, 
         {fieldGrid(layout.unassignedFields)}
       </section>}
     </div>
-    {saving && <Spin fullscreen />}
+    {saving && !onBusyChange && <Spin fullscreen />}
   </div>
 }

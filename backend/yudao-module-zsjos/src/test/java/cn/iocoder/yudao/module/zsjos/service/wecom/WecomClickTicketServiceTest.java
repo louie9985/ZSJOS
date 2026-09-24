@@ -93,6 +93,15 @@ class WecomClickTicketServiceTest {
         assertNull(service.resolve(ticket(service.createClickUrl(context))).getTargetPath());
     }
 
+    @Test void dispatchCardCarriesRoundToAssignmentHost() {
+        when(leadMapper.selectById(42L)).thenReturn(new LeadDO().setId(42L).setLeadNo("KZ202609240001"));
+        var context = NotifyDeliveryContext.builder().tenantId(1L).userType(2).userId(15L)
+                .bizType("lead").bizId(42L).actionType("business_detail").sceneCode("zsjos.lead.assigned")
+                .variables(java.util.Map.of("assignment.historyId", 99L)).build();
+        assertEquals("/zsjos/leads/manage?assignmentLeadId=42&assignmentHistoryId=99",
+                service.resolve(ticket(service.createClickUrl(context))).getTargetPath());
+    }
+
     @Test void oneTimeAndShortLivedContractIsPreserved() {
         String ticket = ticket(service.createClickUrl(context(3, "withdrawal")));
         verify(values).set(anyString(), anyString(), eq(Duration.ofMinutes(30)));

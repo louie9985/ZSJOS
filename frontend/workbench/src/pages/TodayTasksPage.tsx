@@ -1,17 +1,17 @@
+import HomeAnnouncementPanel from '../components/HomeAnnouncementPanel'
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Badge, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
-import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, NotificationOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
+import { Alert, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
+import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, api, type Announcement, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
+import { ApiError, api, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
 import { APP_ROUTES } from '../constants'
 import { formatTimestamp } from '../services/time'
 
 import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 
 const PAGE_SIZE = 6
-const ANNOUNCEMENT_LIMIT = 5
 type TaskView = 'pending' | 'done'
 
 export const canQueryBpmTasks = (permissions: readonly string[]) => permissions.includes('bpm:task:query')
@@ -366,91 +366,6 @@ function HomeCalendarPanel({ enabled }: { enabled: boolean }) {
   )
 }
 
-function AnnouncementPanel({ enabled }: { enabled: boolean }) {
-  const navigate = useNavigate()
-  const [items, setItems] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(enabled)
-  const [error, setError] = useState('')
-
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setItems([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError('')
-    try {
-      setItems(
-        (
-          await api.announcementPage({
-            pageNo: 1,
-            pageSize: ANNOUNCEMENT_LIMIT
-          })
-        ).list
-      )
-    } catch (loadError) {
-      setError(errorText(loadError, '公告加载失败'))
-    } finally {
-      setLoading(false)
-    }
-  }, [enabled])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const openAnnouncement = (id: number) => navigate(`${APP_ROUTES.ANNOUNCEMENTS}?announcementId=${id}`)
-
-  return (
-    <section className="home-panel home-announcement-panel" aria-label="公告栏">
-      <header className="home-panel-header compact">
-        <Typography.Title level={4}>
-          <NotificationOutlined /> 公告栏
-        </Typography.Title>
-        {enabled && <Button type="text" icon={<ReloadOutlined />} aria-label="刷新公告" onClick={() => void load()} />}
-      </header>
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          action={
-            <Button size="small" onClick={() => void load()}>
-              重试
-            </Button>
-          }
-        />
-      )}
-      <div className="home-announcement-list">
-        {!enabled ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无公告查看权限" />
-        ) : loading ? (
-          <Skeleton active paragraph={{ rows: 5 }} />
-        ) : items.length ? (
-          items.map((item) => (
-            <button type="button" className={`home-announcement-item${item.read ? '' : ' unread'}${item.highlighted ? ' highlighted' : ''}`} key={item.id} onClick={() => openAnnouncement(item.id)}>
-              <span className="home-announcement-title">
-                <Badge status={item.read ? 'default' : 'processing'} />
-                {item.highlighted && <Tag color="gold">置顶</Tag>}
-                <span className="home-announcement-title-text">{item.title}</span>
-              </span>
-              <time>{formatTimestamp(item.publishTime)}</time>
-            </button>
-          ))
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无公告" />
-        )}
-      </div>
-      {enabled && (
-        <Button className="home-announcement-all" type="link" onClick={() => navigate(APP_ROUTES.ANNOUNCEMENTS)}>
-          查看所有公告 <RightOutlined />
-        </Button>
-      )}
-    </section>
-  )
-}
-
 export default function TodayTasksPage({ permissions, onOpenAssignment, tenantReadAll = false }: { permissions: string[]; onOpenAssignment: () => void; tenantReadAll?: boolean }) {
   const showBpmTasks = canQueryBpmTasks(permissions)
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
@@ -496,7 +411,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
         />
         <HomeCalendarPanel enabled={canOpenPersonalCalendar(permissions)} />
         <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
-        <AnnouncementPanel enabled={canReadAnnouncements(permissions)} />
+        <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>
   )

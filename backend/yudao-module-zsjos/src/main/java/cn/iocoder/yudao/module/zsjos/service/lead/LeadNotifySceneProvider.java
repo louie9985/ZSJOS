@@ -39,6 +39,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL);
 
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private DictDataApi dictDataApi;
@@ -202,6 +203,39 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         return recipients;
     }
 
+    @Override
+    public NotifySendResult evaluateRule(NotifyBusinessEvent event, Set<String> recipientRoles,
+                                         Set<Long> specifiedUserIds) {
+        // Explicit recipients and mixed roles remain administrator-owned unions, never suppress the whole rule.
+        if (!CREATED.equals(event.getSceneCode()) || !recipientRoles.equals(Set.of(ROLE_NEW_MEDIA_PROVIDER))
+                || !specifiedUserIds.isEmpty()) return null;
+        LeadDO lead = leadMapper.selectById(event.getBizId());
+        if (lead == null) return NotifySendResult.failure("LEAD_SOURCE_RECORD_MISSING", "客资记录不可用", false);
+        if (lead.getSourceType() == null) return NotifySendResult.failure(
+                "LEAD_SOURCE_SNAPSHOT_MISSING", "缺少客资来源快照", false);
+        if (SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType()) || SOURCE_PARTNER.equals(lead.getSourceType())) {
+            return NotifySendResult.skipped("LEAD_SOURCE_LINK_NOT_APPLICABLE");
+        }
+        if (!isSelfSourced(lead.getSourceType())) return NotifySendResult.failure(
+                "LEAD_SOURCE_SNAPSHOT_MISSING", "客资来源快照无法识别", false);
+        if (!Boolean.TRUE.equals(lead.getSourceProviderRecorded())) return NotifySendResult.failure(
+                "LEAD_SOURCE_SNAPSHOT_MISSING", "来源提供方选择快照缺失，需核对历史写入", false);
+        Long selected = lead.getSourceProviderUserId();
+        if (selected == null) {
+            if (lead.getProviderOwnerId() != null || lead.getProviderOwnerType() != null) {
+                return NotifySendResult.failure("LEAD_SOURCE_ATTRIBUTION_MISMATCH", "提供方选择与归属不一致", false);
+            }
+            return NotifySendResult.skipped("LEAD_SOURCE_PROVIDER_NOT_SELECTED");
+        }
+        if (!PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                || !Objects.equals(selected, lead.getProviderOwnerId())) return NotifySendResult.failure(
+                "LEAD_SOURCE_ATTRIBUTION_MISMATCH", "提供方选择与归属不一致", false);
+        if (event.getOperatorUserId() == null) return NotifySendResult.failure(
+                "LEAD_SOURCE_OPERATOR_MISSING", "缺少实际提交人", false);
+        return Objects.equals(selected, event.getOperatorUserId())
+                ? NotifySendResult.skipped("LEAD_SOURCE_PROVIDER_IS_OPERATOR") : null;
+    }
+
     private Long resolveNewMediaProvider(LeadDO lead, Long operatorUserId) {
         if (lead == null || !cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 || !Boolean.TRUE.equals(lead.getSourceProviderRecorded())
@@ -212,6 +246,27 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             return null;
         }
         return lead.getProviderOwnerId();
+    }
+
+    @Override
+    public String deliverySkipReason(NotifyBusinessEvent event) {
+        if (!ASSIGNED.equals(event.getSceneCode()) && !REASSIGNED.equals(event.getSceneCode())) return null;
+        if (!Objects.equals(event.getTenantId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId())) {
+            throw new IllegalStateException("Notification tenant mismatch");
+        }
+        Map<String, Object> payload = event.getPayload();
+        Long historyId = payload == null ? null : longValue(payload.get("assignment.historyId"));
+        Long candidate = payload == null ? null : longValue(payload.get("pendingSalesUserId"));
+        if (historyId == null || candidate == null) return "LEAD_ASSIGNMENT_SNAPSHOT_MISSING";
+        LeadDO lead = leadMapper.selectById(event.getBizId());
+        if (lead == null || !ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
+                || !Objects.equals(candidate, lead.getPendingAssigneeUserId())) return "LEAD_ASSIGNMENT_OBSOLETE";
+        if (lead.getPendingExpiresAt() != null && !lead.getPendingExpiresAt().isAfter(java.time.LocalDateTime.now())) {
+            return "LEAD_ASSIGNMENT_EXPIRED";
+        }
+        var history = assignmentHistoryMapper.selectLatestDispatch(lead.getId(), false);
+        return history != null && Objects.equals(historyId, history.getId())
+                && Objects.equals(candidate, history.getCandidateUserId()) ? null : "LEAD_ASSIGNMENT_OBSOLETE";
     }
 
     @Override
@@ -273,7 +328,15 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         putUser(values, "owner", lead.getOwnerUserId(), blindIdentity
                 && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(recipientUserId, lead.getProviderOwnerId()));
-        putUser(values, "pendingSales", lead.getPendingAssigneeUserId(), false);
+        Map<String, Object> dispatchPayload = event.getPayload() == null ? Map.of() : event.getPayload();
+        boolean dispatchEvent = ASSIGNED.equals(event.getSceneCode()) || REASSIGNED.equals(event.getSceneCode());
+        putUser(values, "pendingSales", dispatchEvent ? longValue(dispatchPayload.get("pendingSalesUserId"))
+                : lead.getPendingAssigneeUserId(), false);
+        if (dispatchEvent) {
+            values.put("lead.pendingExpiresAt", dispatchPayload.get("lead.pendingExpiresAt"));
+            values.put("assignment.historyId", dispatchPayload.get("assignment.historyId"));
+            values.put("assignment.dispatchedAt", dispatchPayload.get("assignment.dispatchedAt"));
+        }
         Long operatorType = event.getPayload() == null ? null : longValue(event.getPayload().get("operatorUserType"));
         if (Objects.equals(operatorType, UserTypeEnum.PARTNER.getValue().longValue())) {
             putPartner(values, "operator", event.getOperatorUserId(), false);
@@ -342,6 +405,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("agingPool.dueAt", "进入公海时间"));
         }
         if (ASSIGNED.equals(sceneCode) || REASSIGNED.equals(sceneCode)) {
+            variables.add(variable("assignment.historyId", "派单历史编号"));
+            variables.add(variable("assignment.dispatchedAt", "派出时间"));
             variables.add(variable("assignment.attempt", "派单轮次"));
             variables.add(variable("assignment.reason", "分配原因"));
         } else if (PUBLIC_POOL.equals(sceneCode) || EXPIRED.equals(sceneCode)) {

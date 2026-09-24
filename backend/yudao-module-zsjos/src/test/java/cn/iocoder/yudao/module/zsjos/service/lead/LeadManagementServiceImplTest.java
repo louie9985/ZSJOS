@@ -208,7 +208,7 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(10L), List.of(10L), false,
-                List.of(), List.of(), List.of(), false, null))
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null))
                 .thenReturn(new PageResult<>(List.of(lead), 1L));
         when(intendedProductMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
@@ -219,7 +219,7 @@ class LeadManagementServiceImplTest {
         assertEquals(List.of("submitter"), result.getList().getFirst().getRelationTypes());
         assertEquals("13800138000", result.getList().getFirst().getSubmittedMobile());
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(10L), List.of(10L), false,
-                List.of(), List.of(), List.of(), false, null);
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null);
     }
 
     @Test
@@ -243,12 +243,12 @@ class LeadManagementServiceImplTest {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null);
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null);
     }
 
     @Test
@@ -575,6 +575,14 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void wonFollowUpActionRequiresConfiguredPermission() {
+        LeadDO lead = actionLead("won", "owned", true);
+        assertActions(lead, null, "ENTER_REPURCHASE");
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
+        assertActions(lead, null, "ADD_FOLLOW_UP", "ENTER_REPURCHASE");
+    }
+
+    @Test
     void detailProjectsQualificationAndFollowUpIndependently() {
         LeadDO firstFollow = actionLead("submitted", "owned", false);
         assertProjection(firstFollow, null, "pending", "first_follow_pending", "active");
@@ -605,14 +613,14 @@ class LeadManagementServiceImplTest {
         reqVO.setSortOrder("ascend");
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null)).thenReturn(PageResult.empty());
 
         service.getLeadCursor(reqVO, 99L);
 
         assertNull(reqVO.getSortField());
         assertNull(reqVO.getSortOrder());
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null);
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null);
     }
 
     @Test
@@ -807,11 +815,12 @@ class LeadManagementServiceImplTest {
     @Test
     void inboxFilterProfileSeparatesFirstFollowAndQualificationStages() {
         LeadInboxFilterConfigVO config = filterConfig();
-        config.getGroups().get(1).getOptions().getFirst().setKey("first_follow_pending");
+        LeadInboxFilterConfigVO.SectionVO stage = config.getGroups().get(1).getSections().getFirst();
+        stage.getOptions().getFirst().setKey("first_follow_pending");
         LeadInboxFilterConfigVO.OptionVO qualification = new LeadInboxFilterConfigVO.OptionVO();
         qualification.setKey("qualification_pending"); qualification.setLabel("待判定");
         qualification.setSort(20); qualification.setEnabled(true);
-        config.getGroups().get(1).setOptions(List.of(config.getGroups().get(1).getOptions().getFirst(), qualification));
+        stage.setOptions(List.of(stage.getOptions().getFirst(), qualification));
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
         when(inboxFilterConfigService.getPublishedConfig("submitter")).thenReturn(config);
         LeadInboxFilterProfileRespVO result = service.getInboxFilterProfile(10L, "submitter");
@@ -827,12 +836,12 @@ class LeadManagementServiceImplTest {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
-                List.of(), List.of(), List.of(), false, null);
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null);
     }
 
     @Test
@@ -843,17 +852,19 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "first_follow_pending"))
+        when(inboxFilterConfigService.resolveQuery(config, "pending", Map.of("current_stage", "first_follow_pending")))
                 .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
                         Set.of("first_follow_pending"), false, Map.of()));
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
-                List.of("submitted"), List.of("owned"), List.of("first_follow_pending"), false, null))
+                new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
+                        Set.of("first_follow_pending"), false, Map.of()), null))
                 .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
-                List.of("submitted"), List.of("owned"), List.of("first_follow_pending"), false, null);
+                new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
+                        Set.of("first_follow_pending"), false, Map.of()), null);
     }
 
     @Test
@@ -865,17 +876,17 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
-        when(inboxFilterConfigService.resolveQuery(config, "pending", null))
+        when(inboxFilterConfigService.resolveQuery(config, "pending", Map.of()))
                 .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false));
         when(advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter())).thenReturn(List.of(7L, 8L));
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
-                List.of("submitted"), List.of("owned"), List.of(), false, List.of(7L, 8L)))
+                new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false), List.of(7L, 8L)))
                 .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
-                List.of("submitted"), List.of("owned"), List.of(), false, List.of(7L, 8L));
+                new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false), List.of(7L, 8L));
     }
 
     @Test
@@ -909,13 +920,13 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L, 20L, 21L));
         when(leadMapper.selectManagementPageByScope(reqVO, List.of(10L, 20L, 21L),
-                List.of(10L, 20L, 21L), false, List.of(), List.of(), List.of(), false, null))
+                List.of(10L, 20L, 21L), false, new LeadInboxFilterQuery(Set.of(), Set.of(), false), null))
                 .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
         verify(leadMapper).selectManagementPageByScope(reqVO, List.of(10L, 20L, 21L),
-                List.of(10L, 20L, 21L), false, List.of(), List.of(), List.of(), false, null);
+                List.of(10L, 20L, 21L), false, new LeadInboxFilterQuery(Set.of(), Set.of(), false), null);
     }
 
     @Test
@@ -1030,10 +1041,12 @@ class LeadManagementServiceImplTest {
         all.setKey("all"); all.setLabel("全部"); all.setSort(0); all.setEnabled(true);
         LeadInboxFilterConfigVO.GroupVO pending = new LeadInboxFilterConfigVO.GroupVO();
         pending.setKey("pending"); pending.setLabel("待判定"); pending.setSort(10); pending.setEnabled(true);
-        pending.setSectionLabel("当前环节");
         LeadInboxFilterConfigVO.OptionVO owned = new LeadInboxFilterConfigVO.OptionVO();
         owned.setKey("owned"); owned.setLabel("已归属"); owned.setSort(10); owned.setEnabled(true);
-        pending.setOptions(List.of(owned));
+        LeadInboxFilterConfigVO.SectionVO stage = new LeadInboxFilterConfigVO.SectionVO();
+        stage.setKey("current_stage"); stage.setLabel("当前环节"); stage.setSort(0);
+        stage.setOptions(new java.util.ArrayList<>(List.of(owned)));
+        pending.setSections(new java.util.ArrayList<>(List.of(stage)));
         config.setGroups(List.of(all, pending));
         return config;
     }

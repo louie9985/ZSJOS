@@ -791,6 +791,21 @@
 .media-students-inbox-layout.is-list-collapsed .media-students-item { flex: none; justify-content: center; min-height: 48px; padding: var(--crm-sp-2) 0; }
 .media-students-inbox-layout.is-list-collapsed .media-students-item.active { background: var(--crm-color-primary-bg); box-shadow: none; }
 .media-students-item:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
+
+/* Separate native controls keep account links out of the student-selection button. */
+.media-students-account-card { flex: none; flex-direction: column; align-items: stretch; gap: var(--crm-sp-2); }
+.media-students-card-select { display: flex; align-items: center; gap: var(--crm-sp-3); width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.media-students-card-select:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.media-students-card-accounts { display: grid; gap: var(--crm-sp-1); width: 100%; min-width: 0; }
+.media-students-account-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: var(--crm-sp-2); }
+.media-students-account-platform { display: flex; align-items: baseline; gap: var(--crm-sp-1); min-width: 0; }
+.media-students-account-platform .ant-tag { margin: 0; white-space: normal; overflow-wrap: anywhere; }
+.media-students-account-link { display: flex; justify-content: flex-end; align-items: baseline; gap: var(--crm-sp-1); color: var(--crm-color-primary); text-align: right; min-width: 0; }
+.media-students-account-link .anticon { flex: none; }
+.media-students-account-link span:last-child, .media-students-account-name { overflow-wrap: anywhere; min-width: 0; text-align: right; }
+.media-students-account-empty, .media-students-account-name { color: var(--crm-text-secondary); }
+.media-students-inbox-layout.is-list-collapsed .media-students-card-select { justify-content: center; }
+@media (pointer: coarse) { .media-students-account-link { min-height: 44px; align-items: center; } }
 .media-students-rail-pagination { display: flex; flex: none; flex-direction: column; align-items: center; gap: var(--crm-sp-1); font-size: var(--crm-font-sm); }
 .media-students-rail-pagination > span { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
 .media-students-rail-empty { text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
@@ -948,4 +963,6 @@
 .media-students-item-copy > .media-students-item-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--crm-sp-2); color: var(--crm-text); }
 .media-students-item-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .media-students-item-heading > span { flex: none; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.media-students-account-card .media-students-item-heading { flex-wrap: wrap; white-space: normal; overflow: visible; }
+.media-students-account-card .media-students-item-heading > span { flex: 0 1 auto; overflow-wrap: anywhere; }
 .media-students-load-more { flex: none; padding: var(--crm-sp-2); text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; }

@@ -1,71 +1,3 @@
-.material-library-page {
-  display: flex;
-  min-height: 0;
-  height: 100%;
-  flex-direction: column;
-  gap: var(--crm-gap);
-}
-
-.material-library-filter-shell {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--crm-gap);
-  border-bottom: 1px solid var(--crm-border);
-}
-
-.material-library-filter-shell .ant-tabs-nav {
-  margin: 0;
-}
-
-.material-library-toolbar {
-  display: grid;
-  min-width: min(680px, 68vw);
-  padding-bottom: var(--crm-sp-2);
-  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.65fr) minmax(180px, 0.8fr) auto;
-  gap: var(--crm-sp-2);
-}
-
-.material-library-layout {
-  display: grid;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  grid-template-columns: var(--crm-list-pane-w) minmax(0, 1fr);
-  gap: var(--crm-gap);
-}
-
-.material-library-list-pane,
-.material-library-detail-pane {
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid var(--crm-border);
-  border-radius: var(--crm-radius-md);
-  background: var(--crm-bg-container);
-  box-shadow: var(--crm-shadow-card);
-}
-
-.material-library-list-pane {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Material feed overrides the legacy inbox layout. */
-.material-library-filter-shell { align-items: flex-start; }
-.material-library-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(140px, .6fr) minmax(180px, .8fr) auto auto; grid-template-areas: "search type account refresh actions"; }
-.material-library-toolbar > :nth-child(1) { grid-area: search; }
-.material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1; }
-.material-library-layout { display: block; overflow: auto; }
-.material-library-list-pane { width: 100%; overflow: visible; }
-.material-library-scroll { column-count: 5; column-gap: 16px; display: block; overflow: visible; padding: 16px; }
-.material-library-item { display: inline-block; width: 100%; margin: 0 0 16px; padding: 0; overflow: hidden; text-align: left; border: 1px solid var(--crm-border); border-radius: 10px; background: var(--crm-bg-container); break-inside: avoid; }
-.material-library-cover { display: flex; width: 100%; min-height: 120px; border-radius: 0; }
-.material-library-cover img { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--crm-fill-secondary); }
-.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
-.material-library-detail-pane { display: none; }
-.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
-.material-library-load-more { grid-column: 1 / -1; min-height: 32px; text-align: center; color: var(--crm-text-secondary); }
 /* 独立拆解页：撑满内容区高度，让四列各自滚动，页面本身不滚。
    素材库抽屉里的同一个表单不加此类，沿用抽屉自身的高度与滚动。
 
@@ -89,108 +21,8 @@
   }
 }
 
-@media (max-width: 768px) {
-  .material-library-filter-shell { display: block; }
-  .material-library-toolbar { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: none; }
-  .material-library-toolbar > * { grid-area: auto !important; grid-column: auto !important; grid-row: auto !important; }
-  .material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1 !important; }
-  .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-}
-
-.material-library-list-pane { width: 100%; }
-.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; overflow: auto; }
-.material-library-item { display: block; width: 100%; text-align: left; border: 1px solid var(--crm-border); border-radius: 10px; overflow: hidden; background: var(--crm-bg-container); }
-.material-library-cover { display: block; width: 100%; aspect-ratio: 4 / 5; background: var(--crm-fill-secondary); }
-.material-library-cover img { width: 100%; height: 100%; object-fit: contain; background: var(--crm-fill-secondary); }
-.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
-.material-library-load-more { grid-column: 1 / -1; min-height: 32px; text-align: center; color: var(--crm-text-secondary); }
-@media (max-width: 768px) { .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
-
 /* Browse is a feed; the detail pane is opened as a Drawer. */
-.material-library-layout { display: block; overflow: auto; }
-.material-library-detail-pane { display: none; }
-.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
 .material-detail-close { position: sticky; top: 0; float: right; z-index: 1; }
-.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-direction: initial; gap: 16px; overflow: visible; }
-@media (max-width: 768px) { .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
-
-.material-library-scroll {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  flex-direction: column;
-}
-
-.material-library-list-pane > .ant-pagination {
-  padding: var(--crm-sp-3);
-  border-top: 1px solid var(--crm-border);
-}
-
-.material-library-item {
-  display: grid;
-  width: 100%;
-  padding: var(--crm-sp-3);
-  border: 0;
-  border-bottom: 1px solid var(--crm-border);
-  color: var(--crm-text);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: var(--crm-sp-3);
-}
-
-.material-library-item:hover,
-.material-library-item.active {
-  background: var(--crm-bg-sunken);
-}
-
-.material-library-item.active {
-  box-shadow: inset 3px 0 0 var(--crm-color-primary);
-}
-
-.material-library-cover {
-  display: flex;
-  width: 76px;
-  height: 58px;
-  overflow: hidden;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--crm-radius-sm);
-  color: var(--crm-text-secondary);
-  background: var(--crm-bg-sunken);
-}
-
-.material-library-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.material-library-item-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--crm-sp-1);
-}
-
-.material-library-item-copy strong,
-.material-library-item-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.material-library-item-copy span {
-  color: var(--crm-text-secondary);
-  font-size: var(--crm-font-sm);
-}
-
-.material-library-detail-pane {
-  padding: var(--crm-pane-pad);
-  overflow-y: auto;
-}
 
 .material-detail-heading {
   display: flex;
@@ -238,14 +70,6 @@
 @media (max-width: 1000px) { .material-four-column-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .material-four-column-layout { grid-template-columns: 1fr; } }
 
-/* Xiaohongshu style masonry feed: preserve source image ratio and let card heights vary. */
-.material-library-scroll { display: block !important; column-count: 5; column-gap: 16px; padding: 16px; }
-.material-library-item { display: inline-block !important; width: 100% !important; height: auto !important; margin: 0 0 var(--crm-sp-5); break-inside: avoid; border: 1px solid var(--crm-border-strong); box-shadow: var(--crm-shadow-card); }
-.material-library-cover { aspect-ratio: auto !important; height: auto; min-height: 0; overflow: hidden; }
-.material-library-cover img { display: block; width: 100%; height: auto !important; object-fit: contain !important; }
-@media (max-width: 1200px) { .material-library-scroll { column-count: 4; } }
-@media (max-width: 900px) { .material-library-scroll { column-count: 3; } }
-@media (max-width: 600px) { .material-library-scroll { column-count: 2; } }
 
 .material-field {
   display: flex;
@@ -592,55 +416,14 @@
   gap: var(--crm-sp-3);
 }
 
-@media (max-width: 900px) {
-  .material-library-filter-shell {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .material-library-toolbar {
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr) auto;
-  }
-
-  .material-library-toolbar > :nth-child(3) {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-}
-
 @media (max-width: 768px) {
-  .material-library-page {
-    height: auto;
-  }
 
-  .material-library-layout {
-    display: flex;
-    overflow: visible;
-    flex-direction: column;
-  }
-
-  .material-library-list-pane,
-  .material-library-detail-pane {
-    overflow: visible;
-  }
-
-  .material-library-scroll {
-    max-height: 42vh;
-  }
-
-  .material-library-toolbar,
   .material-field-grid,
   .material-repeat-row,
   .material-reference-targets,
   .material-reference-row,
   .material-reference-preview {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .material-library-toolbar > :nth-child(3) {
-    grid-column: auto;
-    grid-row: auto;
   }
 
   .material-detail-heading {
@@ -699,135 +482,38 @@
   }
 }
 
-/* Final feed rules intentionally follow the legacy responsive inbox rules. */
-.material-library-filter-shell { align-items: flex-start; }
-.material-library-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(140px, .6fr) minmax(180px, .8fr) auto auto; }
-.material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1; }
-.material-library-layout { display: block; overflow: auto; }
-.material-library-list-pane { width: 100%; overflow: visible; }
-.material-library-scroll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-direction: initial; gap: 16px; overflow: visible; max-height: none; }
-.material-library-item { display: block; width: 100%; padding: 0; overflow: hidden; text-align: left; border-radius: 8px; }
-.material-library-cover { display: flex; width: 100%; aspect-ratio: 4 / 5; border-radius: 0; }
-.material-library-cover img { width: 100%; height: 100%; object-fit: contain; background: var(--crm-fill-secondary); }
-.material-library-item-copy { display: grid; gap: 6px; padding: 10px; }
-.material-library-detail-pane { display: none; }
-.material-library-detail-pane.open { display: block; position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 20; width: min(720px, 92vw); padding: var(--crm-pane-pad); overflow: auto; border-radius: 0; }
-
-@media (max-width: 768px) {
-  .material-library-filter-shell { display: block; }
-  .material-library-toolbar { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
-  .material-library-toolbar > * { grid-column: auto !important; grid-row: auto !important; }
-  .material-library-toolbar > .material-library-type-tabs { grid-column: 1 / -1 !important; }
-  .material-library-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-}
-
-/* Keep all desktop search, filters, refresh, and create actions on one row. */
-.material-library-filter-shell {
-  display: block;
-  padding: var(--crm-sp-3);
-  border: 1px solid var(--crm-border);
-  border-radius: var(--crm-radius-md);
-  background: var(--crm-bg-container);
-  box-shadow: var(--crm-shadow-card);
-}
-
-.material-library-toolbar {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  padding: 0;
-  flex-wrap: nowrap;
-  gap: var(--crm-sp-2);
-}
-
-.material-library-view-tabs {
-  padding-inline-end: var(--crm-sp-3);
-  border-inline-end: 1px solid var(--crm-border);
-  flex: 0 0 auto;
-}
-
-.material-library-view-tabs .ant-tabs-nav {
-  margin: 0;
-}
-
-.material-library-search {
-  min-width: 210px;
-  flex: 1 1 260px;
-}
-
-.material-library-category-checks {
-  display: flex;
-  align-items: center;
-  gap: var(--crm-sp-3);
-  padding-inline: var(--crm-sp-2);
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.material-library-category-checks .ant-checkbox-wrapper {
-  margin: 0;
-  color: var(--crm-text);
-}
-
-.material-library-select {
-  width: 150px;
-  flex: 0 1 150px;
-}
-
-.material-library-refresh,
-.material-library-actions {
-  flex: 0 0 auto;
-}
-
-.material-library-actions {
-  white-space: nowrap;
-}
-
-@media (max-width: 1100px) {
-  .material-library-toolbar {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .material-library-view-tabs {
-    border-inline-end: 0;
-  }
-
-  .material-library-search {
-    min-width: min(220px, 100%);
-  }
-}
-
-@media (max-width: 768px) {
-  .material-library-toolbar {
-    display: flex;
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .material-library-search {
-    min-width: 0;
-    flex-basis: 100%;
-  }
-
-  .material-library-view-tabs {
-    width: 100%;
-    padding-inline-end: 0;
-    border-bottom: 1px solid var(--crm-border);
-  }
-
-  .material-library-category-checks {
-    width: 100%;
-  }
-
-  .material-library-select {
-    min-width: 0;
-    flex: 1 1 160px;
-  }
-
-  .material-library-actions {
-    max-width: 100%;
-    overflow-x: auto;
-  }
+.material-library-page { display: flex; height: 100%; min-height: 0; flex-direction: column; gap: var(--crm-gap); }
+.material-library-filter-shell { padding: var(--crm-sp-3); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.material-library-toolbar { display: flex; min-width: 0; align-items: center; flex-wrap: wrap; gap: var(--crm-sp-3); }
+.material-library-view-tabs { flex: 1 0 100%; min-width: 0; }
+.material-library-view-tabs .ant-tabs-nav { margin: 0; }
+.material-library-search { flex: 1 1 240px; min-width: 0; }
+.material-library-select { width: 170px; }
+.material-library-actions { flex-wrap: wrap; }
+.material-library-layout { flex: 1; min-height: 0; overflow: auto; }
+.material-library-list-pane { min-width: 0; }
+.material-library-scroll { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: start; gap: var(--crm-sp-4); padding: var(--crm-sp-1); }
+.material-library-item { display: flex; min-width: 0; width: 100%; padding: 0; flex-direction: column; overflow: hidden; text-align: left; color: var(--crm-text); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); box-shadow: var(--crm-shadow-card); cursor: pointer; }
+.material-library-item:hover { border-color: var(--crm-color-primary); box-shadow: var(--crm-shadow-raised); }
+.material-library-item.active { border-color: var(--crm-color-primary); }
+.material-library-item:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.material-library-cover { display: flex; width: 100%; aspect-ratio: 4 / 3; align-items: center; justify-content: center; overflow: hidden; background: var(--crm-bg-sunken); color: var(--crm-text-secondary); }
+.material-library-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.material-library-item-copy { display: flex; width: 100%; min-width: 0; padding: var(--crm-card-pad); flex-direction: column; gap: var(--crm-sp-2); }
+.material-library-item-copy strong { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.material-library-item-copy > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.material-library-item-copy .material-card-status { display: flex; flex-wrap: wrap; gap: var(--crm-sp-1); white-space: normal; }
+.material-library-load-more { grid-column: 1 / -1; text-align: center; padding: var(--crm-sp-3); color: var(--crm-text-secondary); }
+.material-mine-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--crm-sp-3); }
+.material-mine-filters .ant-select { width: 190px; }
+.material-library-mine .material-library-scroll { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.material-library-mine .material-library-item { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; }
+.material-library-mine .material-library-cover { aspect-ratio: 3 / 4; margin: var(--crm-sp-3); width: calc(100% - var(--crm-sp-3)); border-radius: var(--crm-radius-sm); }
+.material-layout-summary-actions { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .material-library-scroll, .material-library-mine .material-library-scroll { grid-template-columns: minmax(0, 1fr); }
+  .material-library-search { flex-basis: 100%; }
+  .material-library-select { flex: 1; min-width: 0; }
+  .material-library-actions { width: 100%; }
+  .material-layout-summary-actions { margin-left: 0; }
 }

@@ -33,6 +33,14 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                     .apply("EXISTS (SELECT 1 FROM zsjos_material_type mt WHERE mt.id=zsjos_material.material_type_id "
                             + "AND mt.tenant_id=zsjos_material.tenant_id AND mt.status=0 AND mt.deleted=b'0')");
         }
+        // A published material stays EFFECTIVE while its revision is under review.
+        // Personal filters must follow the selected revision, not the public material status.
+        if (Boolean.TRUE.equals(req.getMine()) && req.getVersionStatus() != null) {
+            query.apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
+                    + "mv.id=COALESCE(zsjos_material.current_draft_version_id,zsjos_material.current_effective_version_id) "
+                    + "AND mv.tenant_id=zsjos_material.tenant_id AND mv.deleted=b'0' AND mv.status={0})",
+                    req.getVersionStatus());
+        }
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
             query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
                     .or().like(MaterialDO::getTitle, req.getKeyword())

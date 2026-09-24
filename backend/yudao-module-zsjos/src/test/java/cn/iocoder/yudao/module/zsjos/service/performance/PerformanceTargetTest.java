@@ -18,6 +18,20 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class) class PerformanceTargetTest {
  @InjectMocks PerformanceTargetService service; @Mock PerformanceTargetMapper mapper; @Mock PerformanceRevisionMapper revisions; @Mock PerformanceAccess access;
  @BeforeEach void allowHistory(){lenient().when(access.historicalRowAllowed(any(),any())).thenReturn(true);}
+ @Test void disabledRecordedTargetStillContributesWithoutMissingUnconfiguredDisabledUsers(){
+  when(mapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(row("USER",2,"100")));
+  when(access.sales()).thenReturn(List.of());
+  var result=service.resolve("DEPT",10L,"month",LocalDate.of(2026,9,1));
+  assertEquals(new BigDecimal("100"),result.automaticFloor());assertTrue(result.complete());assertEquals(0,result.missing());
+ }
+ @Test void disabledMemberRejectsEntireBatchBeforeAnyWrites(){
+  when(access.has("zsjos:sales-performance-target:update")).thenReturn(true);
+  var first=new TargetEdit();first.setScopeType("USER");first.setScopeId(1L);first.setPeriodType("month");first.setPeriodStart(LocalDate.of(2026,9,1));first.setFloorAmount(BigDecimal.ONE);first.setSprintAmount(BigDecimal.TEN);
+  var disabled=new TargetEdit();disabled.setScopeType("USER");disabled.setScopeId(2L);
+  doThrow(PerformanceAccess.invalid("该人员已停用")).when(access).targetWriteObject("USER",2L);
+  var batch=new TargetBatch();batch.setItems(List.of(first,disabled));
+  assertThrows(RuntimeException.class,()->service.save(batch));verifyNoInteractions(mapper,revisions);
+ }
  PerformanceTargetDO row(String type,long id,String amount){var x=new PerformanceTargetDO();x.setId(id);x.setScopeType(type);x.setScopeId(id);x.setDeptId(10L);x.setCenterId(9L);x.setFloorAmount(new BigDecimal(amount));x.setSprintAmount(new BigDecimal(amount).multiply(BigDecimal.TWO));x.setManual(true);x.setVersion(0);return x;}
  @Test void manualDepartmentRetainedAndAutomaticDifferenceVisible(){when(mapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(row("USER",1,"100"),row("DEPT",10,"300")));var u=new AdminUserRespDTO();u.setId(1L);u.setDeptId(10L);u.setNickname("销售甲");when(access.sales()).thenReturn(List.of(u));when(access.user(1L)).thenReturn(u);var d=new DeptRespDTO();d.setName("一部");when(access.dept(10L)).thenReturn(d);var t=service.resolve("DEPT",10L,"month",LocalDate.of(2026,9,1));assertEquals(new BigDecimal("100"),t.automaticFloor());assertEquals(new BigDecimal("300"),t.floorAmount());assertTrue(t.manual());assertTrue(t.complete());}
  @Test void missingPersonIsNotZeroComplete(){when(mapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of());var t=service.resolve("USER",1L,"month",LocalDate.of(2026,9,1));assertFalse(t.complete());assertNull(t.floorAmount());assertEquals(1,t.missing());}

@@ -36,6 +36,53 @@ class NotifyBusinessEventProcessorTest {
     @Mock
     private NotifySceneProvider provider;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"in_app", "wecom"})
+    void inapplicableRuleSkipsBeforeRecipientResolution(String channel) {
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L).build();
+        var rule = NotifyRuleDO.builder().id(20L).channelCode(channel).recipientRoles(List.of("new_media_provider"))
+                .specifiedUserIds(List.of()).build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(provider.evaluateRule(event, Set.of("new_media_provider"), Set.of())).thenReturn(
+                cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult.skipped("LEAD_SOURCE_LINK_NOT_APPLICABLE"));
+        var result = "wecom".equals(channel) ? processor.prepareWecom(event).failure() : processor.processConfirmed(event);
+        assertTrue(result.isSkipped()); assertFalse(result.isRetryable());
+        org.mockito.Mockito.verify(provider, org.mockito.Mockito.never()).resolveRecipients(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoInteractions(messageCreator, notifyTemplateService);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"in_app", "wecom"})
+    void brokenSourceSnapshotRemainsSpecificFailure(String channel) {
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L).build();
+        var rule = NotifyRuleDO.builder().id(20L).channelCode(channel).recipientRoles(List.of("new_media_provider"))
+                .specifiedUserIds(List.of()).build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(provider.evaluateRule(event, Set.of("new_media_provider"), Set.of())).thenReturn(
+                cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult.failure("LEAD_SOURCE_SNAPSHOT_MISSING", "missing", false));
+        var result = "wecom".equals(channel) ? processor.prepareWecom(event).failure() : processor.processConfirmed(event);
+        assertFalse(result.isSuccess()); assertFalse(result.isRetryable());
+        org.junit.jupiter.api.Assertions.assertEquals("LEAD_SOURCE_SNAPSHOT_MISSING", result.getErrorCode());
+        org.mockito.Mockito.verifyNoInteractions(messageCreator, notifyTemplateService);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"in_app", "wecom"})
+    void applicableRuleWithNoRecipientStillFailsAndRetries(String channel) {
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L).build();
+        var rule = NotifyRuleDO.builder().id(20L).templateId(30L).channelCode(channel)
+                .recipientRoles(List.of()).specifiedUserIds(List.of()).build();
+        var template = NotifyTemplateDO.builder().id(30L).sceneCode("test.scene").channelCode(channel).status(0).build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
+        var result = "wecom".equals(channel) ? processor.prepareWecom(event).failure() : processor.processConfirmed(event);
+        assertFalse(result.isSuccess()); assertTrue(result.isRetryable());
+        org.junit.jupiter.api.Assertions.assertEquals("NOTIFY_RECIPIENT_MISSING", result.getErrorCode());
+    }
+
     @Test void preparesTypedRenderedWecomSnapshot() {
         var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L).build();
         var rule = NotifyRuleDO.builder().id(20L).templateId(30L).channelCode("wecom")

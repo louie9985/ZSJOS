@@ -20,7 +20,8 @@ import { APP_ROUTES } from '../constants'
 import dayjs from 'dayjs'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
-import { NameAvatar } from '../components/LeadDetailOverview'
+import MediaStudentInboxCard, { ACCOUNT_PLATFORM_DICT, mediaStudentAccountHref } from '../components/MediaStudentInboxCard'
+import type { MediaStudentListItem } from '../services/api'
 import StudentDetail from '../components/StudentDetail'
 import OperatorAssignmentDialog from '../components/OperatorAssignmentDialog'
 import OverflowToolbar, { type ToolbarAction } from '../components/OverflowToolbar'
@@ -30,7 +31,7 @@ import ProductionTicketPositioningCard from '../components/ProductionTicketPosit
 import WorkOrderAttachmentPicker from '../components/WorkOrderAttachmentPicker'
 import ResourceLink from '../components/ResourceLink'
 import ResourceLinkInput from '../components/ResourceLinkInput'
-import { ApiError, api, type AreaNode, type DictData, type DirectorTemplateSnapshot, type MediaStudentDetail, type MyStudent, type PositioningCard, type PositioningCardImportSource, type ProductionTicketCreateContext, type StudentContactContext } from '../services/api'
+import { ApiError, api, type AreaNode, type DictData, type DirectorTemplateSnapshot, type MediaStudentDetail, type PositioningCard, type PositioningCardImportSource, type ProductionTicketCreateContext, type StudentContactContext } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { hasPermission } from '../services/managementAccess'
 import { formatTimestamp } from '../services/time'
@@ -39,7 +40,7 @@ import { mergePositioningJsonValues, parsePositioningJson, serializePositioningF
 import { workOrderApi, type WorkOrderDepartment, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
 import AccountPublishedWorks from '../components/AccountPublishedWorks'
 import { StudentDeliveryPanel } from '../components/StudentDeliveryPanel'
-import { contentReviewApi, partnerStudentInvitationApi, type PartnerStudentInvitation, type PartnerStudentInvitationContext } from '../services/materialApi'
+import { contentReviewApi, partnerStudentInvitationApi, type PartnerStudentInvitation, type MediaStudentPartnerContext } from '../services/materialApi'
 import PositioningCardMaterialPicker from '../components/PositioningCardMaterialPicker'
 import PositioningCardAttachments from '../components/PositioningCardAttachments'
 import PositioningCardFields from '../components/PositioningCardFields'
@@ -48,6 +49,7 @@ import { accountProfileApi, type AccountProfile } from '../services/mediaAccount
 import { StudentPlannerOperations } from './RegistrationPages'
 import { positioningInterviewApi, type InterviewContext } from '../services/positioningInterviewApi'
 import { PositioningManualSave, isPendingPositioningFile } from '../services/positioningManualSave'
+import { createIdempotencyKey } from '../services/idempotency'
 
 const LIST_COLLAPSED_KEY = 'zsjos.media-students.list-collapsed'
 const PAGE_SIZE = 20
@@ -213,7 +215,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     listScrollRef.current?.scrollTo({ top: position.top, left: position.left })
     if (!listCollapsed && focusSearch.current) { searchRef.current?.focus(); focusSearch.current = false }
   }, [listCollapsed])
-  const [rows, setRows] = useState<MyStudent[]>([]), [detail, setDetail] = useState<MediaStudentDetail>()
+  const [rows, setRows] = useState<MediaStudentListItem[]>([]), [detail, setDetail] = useState<MediaStudentDetail>()
+  const [accountPlatforms, setAccountPlatforms] = useState<DictData[]>([])
+  const [platformError, setPlatformError] = useState('')
+  const [platformRetry, setPlatformRetry] = useState(0)
+  useEffect(() => {
+    let disposed = false
+    setPlatformError('')
+    api.dictDataByType(ACCOUNT_PLATFORM_DICT).then(values => { if (!disposed) setAccountPlatforms(values) })
+      .catch(cause => { if (!disposed) setPlatformError(errorText(cause)) })
+    return () => { disposed = true }
+  }, [platformRetry])
   const [selectedServiceId, setSelectedServiceId] = useState<number>(), [selectedAccountId, setSelectedAccountId] = useState<number>()
   const [accountMissing, setAccountMissing] = useState<Record<number, number>>({})
   const updateMissing = useCallback((id: number, count: number) => setAccountMissing(current => current[id] === count ? current : { ...current, [id]: count }), [])
@@ -274,30 +286,30 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [shareLink, setShareLink] = useState<string>()
   const [studentInvitation, setStudentInvitation] = useState<PartnerStudentInvitation>()
   const [bindingStudent, setBindingStudent] = useState<{ id: number; name: string }>()
-  const [invitationContext, setInvitationContext] = useState<PartnerStudentInvitationContext>()
+  const [invitationContext, setInvitationContext] = useState<MediaStudentPartnerContext>()
   const [invitationLoading, setInvitationLoading] = useState(false), [invitationError, setInvitationError] = useState('')
   const [invitationOperators, setInvitationOperators] = useState<Array<{ id: number; nickname: string }>>([])
   const [invitationOperatorsLoading, setInvitationOperatorsLoading] = useState(false), [invitationOperatorsError, setInvitationOperatorsError] = useState('')
   const invitationRequest = useRef(0)
   const invitationStudentId = detail?.student.personId
   useEffect(() => { setBindingStudent(undefined) }, [invitationStudentId])
-  const canInviteStudent = hasPermission(permissions, 'zsjos:partner-invitation:create-student')
+  const canInviteStudent = invitationContext?.canInviteStudent === true
   const refreshInvitation = useCallback(async () => {
-    if (!invitationStudentId || !canInviteStudent) return undefined
+    if (!invitationStudentId) return undefined
     const request = ++invitationRequest.current
     setInvitationLoading(true); setInvitationError('')
     try {
-      const context = await partnerStudentInvitationApi.context(invitationStudentId)
+      const context = await partnerStudentInvitationApi.mediaContext(invitationStudentId)
       if (request !== invitationRequest.current) return undefined
       setInvitationContext(context)
-      setStudentInvitation(current => current && context.invitation?.status === 'active' ? context.invitation : undefined)
-      if (context.opened) setDialog(current => current === 'student-partner' ? undefined : current)
+      setStudentInvitation(current => current && context.canInviteStudent && context.invitation?.status === 'active' ? context.invitation : undefined)
+      if (context.opened || !context.canInviteStudent) setDialog(current => current === 'student-partner' ? undefined : current)
       return context
     } catch (cause) {
       if (request === invitationRequest.current) { setInvitationContext(undefined); setStudentInvitation(undefined); setInvitationError(errorText(cause)) }
       return undefined
     } finally { if (request === invitationRequest.current) setInvitationLoading(false) }
-  }, [invitationStudentId, canInviteStudent])
+  }, [invitationStudentId])
   useEffect(() => {
     setInvitationContext(undefined); setStudentInvitation(undefined)
     void refreshInvitation()
@@ -330,7 +342,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const positioningDraft = useRef<{ id: number; version: number } | undefined>(undefined)
   const autoSaveCoordinator = useRef<DirectorAutoSaveCoordinator | undefined>(undefined)
   if (!autoSaveCoordinator.current) {
-    autoSaveCoordinator.current = new DirectorAutoSaveCoordinator(AUTO_SAVE_DELAY_MS, setAutoSave, () => crypto.randomUUID(), cause => cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code))
+    autoSaveCoordinator.current = new DirectorAutoSaveCoordinator(AUTO_SAVE_DELAY_MS, setAutoSave, createIdempotencyKey, cause => cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code))
   }
   useWorkbenchPageGuard(APP_ROUTES.MEDIA_STUDENTS, async destination => {
     if (destination) {
@@ -372,6 +384,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           positioningCardId: Number(detailParams.get('positioningCardId')) || undefined,
         })
       if (run === detailRun.current) {
+        // Detail refreshes after account edits also refresh the already-loaded card without moving the list.
+        setRows(current => current.map(row => row.personId === personId ? { ...row, accounts: value.accounts } : row))
         setDetail(value); setSelectedServiceId(service?.serviceRelationId); setSelectedAccountId(accountId); setDirectorContext(context)
         setTab(accountId ? mediaAccountTabKey(accountId) : 'overview')
       }
@@ -777,7 +791,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         if (!selectedService || !directorContext) throw new Error('当前学员服务上下文不可用，请刷新后再试')
         const requestValues = { studentPersonId: detail.student.personId, serviceRelationId: selectedService.serviceRelationId, version: directorContext.version, detailValues: {} }
         const fingerprint = JSON.stringify(requestValues)
-        if (!accountCreatePending.current || accountCreatePending.current.fingerprint !== fingerprint) accountCreatePending.current = { fingerprint, key: crypto.randomUUID() }
+        if (!accountCreatePending.current || accountCreatePending.current.fingerprint !== fingerprint) accountCreatePending.current = { fingerprint, key: createIdempotencyKey() }
         const accountId = await api.mediaAccount.create({ ...requestValues, idempotencyKey: accountCreatePending.current.key })
         accountCreatePending.current = undefined
         setDialog(undefined); message.success('账号已创建')
@@ -847,7 +861,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         setContentSubmitAfterSave(false)
       }
       if (dialog === 'student-partner') {
-        if (invitationLoading || !invitationContext || invitationContext.opened || invitationOperatorsLoading || invitationOperatorsError) return
+        if (!canInviteStudent || invitationLoading || !invitationContext || invitationContext.opened || invitationOperatorsLoading || invitationOperatorsError) return
         const invitation = await partnerStudentInvitationApi.create({
           studentPersonId: detail.student.personId,
           assignedOperatorUserId: Number(values.assignedOperatorUserId),
@@ -880,7 +894,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         const data = {}
         const requestBody = { interviewAt, data, version: stageDraftVersion.current ?? directorContext.directorForms?.[stage]?.version ?? 0 }
         const fingerprint = JSON.stringify(requestBody)
-        if (precheckPending.current?.fingerprint !== fingerprint) precheckPending.current = { fingerprint, key: crypto.randomUUID() }
+        if (precheckPending.current?.fingerprint !== fingerprint) precheckPending.current = { fingerprint, key: createIdempotencyKey() }
         const request = { ...requestBody, idempotencyKey: precheckPending.current.key }
         await api.studentDirectorPrecheckSubmit(selectedService.serviceRelationId, request)
         precheckPending.current = undefined
@@ -905,7 +919,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const openStudentPartnerInvitation = async () => {
     if (!detail) return
     const context = await refreshInvitation()
-    if (!context || context.opened) return
+    if (!context || !context.canInviteStudent || context.opened) return
     if (context.invitation?.status === 'active') { setStudentInvitation(context.invitation); return }
     form.resetFields()
     form.setFieldsValue({ studentName: detail.student.name || '', studentMobile: detail.student.mobile || '', assignedOperatorUserId: context.defaultOperatorUserId, invitationExpiresAt: dayjs().add(7, 'day').startOf('second') })
@@ -971,7 +985,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       { key: 'CREATE_MEDIA_DESIGN_EDIT_TICKET', icon: <EditOutlined />, label: '发起剪辑设计工单', onClick: () => void openTicket('media_design_edit'), disabled: saving },
       { key: 'CREATE_FILMING_FIELD_WORK_TICKET', icon: <PlayCircleOutlined />, label: '发起拍摄外勤工单', onClick: () => void openTicket('filming_field_work'), disabled: saving },
     ] : []),
-    ...(hasPermission(permissions, 'zsjos:partner:manage-all') && detail && !invitationContext?.opened ? [{
+    ...(hasPermission(permissions, 'zsjos:partner:manage-all') && detail && invitationContext && !invitationContext.opened && !invitationLoading && !invitationError ? [{
       key: 'BIND_EXISTING_STUDENT_PARTNER', icon: <LinkOutlined />, label: '绑定已有兼职账号',
       onClick: () => setBindingStudent({ id: detail.student.personId, name: detail.student.name || '未填写姓名' }), disabled: saving,
     }] : []),
@@ -988,7 +1002,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       }),
       disabled: saving,
     }] : []),
-    ...(canInviteStudent && invitationContext && !invitationContext.opened ? [{
+    ...(canInviteStudent && invitationContext && !invitationContext.opened && !invitationLoading && !invitationError ? [{
       key: 'CREATE_STUDENT_PARTNER',
       icon: <PlusOutlined />,
       label: invitationContext.invitation?.status === 'active' ? '查看兼职邀请码' : invitationContext.invitation ? '重新生成兼职邀请码' : '开通兼职账号',
@@ -1028,9 +1042,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     const statusContent = <div className="student-overview-base-status">
       <div><Typography.Text type="secondary">服务状态</Typography.Text><Tag>{statusLabel(selectedService?.status)}</Tag></div>
       <div><Typography.Text type="secondary">兼职账号</Typography.Text>
-        {!canInviteStudent ? <Typography.Text type="secondary">暂无查看权限</Typography.Text>
-          : invitationLoading ? <Skeleton.Input active size="small" />
-          : invitationError ? <Alert type="error" showIcon message={invitationError} action={<Button size="small" onClick={() => void refreshInvitation()}>重试加载兼职状态</Button>} />
+        {invitationLoading ? <Skeleton.Input active size="small" />
+          : invitationError ? <Alert type="error" showIcon message={invitationError} description={<Button size="small" onClick={() => void refreshInvitation()}>重试加载兼职状态</Button>} />
           : invitationContext ? <Tag color={invitationContext.opened ? 'success' : 'default'}>{invitationContext.opened ? '兼职账号已开通' : '未开通'}</Tag>
           : <Typography.Text type="secondary">暂无状态信息</Typography.Text>}
       </div>
@@ -1107,13 +1120,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
+        {platformError && <Tooltip title={`平台样式加载失败：${platformError}`}><Button size="small" aria-label="重试平台样式" icon={<ReloadOutlined />} onClick={() => setPlatformRetry(value => value + 1)}>{!listCollapsed && '平台样式加载失败，重试'}</Button></Tooltip>}
         <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
-          {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <Tooltip key={x.personId} title={listCollapsed ? `${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}>
-            <button type="button" aria-label={`${x.name || '未填写姓名'} · ${x.personNo || '暂无学员编号'}`} aria-current={selectedId === x.personId ? 'true' : undefined} className={`lead-inbox-item media-students-item${selectedId === x.personId ? ' active' : ''}`} onClick={() => { cancelPendingList(); if (workspaceNavigation) void workspaceNavigation.open(`${APP_ROUTES.MEDIA_STUDENTS}?personId=${x.personId}`); else { listSelectionNavigation.current = true; setParams({ personId: String(x.personId) }, { replace: true }); void loadDetail(x.personId) } }}>
-              <NameAvatar name={x.name || '学员'} seed={x.personNo} size={36} subjectType="student" />
-              <span className="media-students-item-copy"><span className="media-students-item-heading"><strong title={x.name}>{x.name || '未填写姓名'}</strong><span title={x.personNo}>{x.personNo || '暂无学员编号'}</span></span><span title={x.mobile}>手机：{x.mobile || '未填写'}</span><span title={x.wechatId}>微信：{x.wechatId || '未填写'}</span></span>
-            </button>
-          </Tooltip>) : !error && (listCollapsed ? <Tooltip title="暂无可见学员"><span className="media-students-rail-empty" role="status">暂无<br />学员</span></Tooltip> : <Empty description="暂无可见学员" />)}
+          {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <MediaStudentInboxCard key={x.personId} student={x} selected={selectedId === x.personId} collapsed={listCollapsed}
+            platforms={accountPlatforms} canOpenAccount={hasPermission(permissions, 'zsjos:media-account:query')}
+            onOpen={accountId => { cancelPendingList(); const href = mediaStudentAccountHref(x.personId, accountId); if (workspaceNavigation) void workspaceNavigation.open(href); else { listSelectionNavigation.current = true; setParams(new URLSearchParams(href.split('?')[1]), { replace: true }); void loadDetail(x.personId, undefined, accountId) } }} />)
+            : !error && (listCollapsed ? <Tooltip title="暂无可见学员"><span className="media-students-rail-empty" role="status">暂无<br />学员</span></Tooltip> : <Empty description="暂无可见学员" />)}
           <div ref={loadMoreRef} className="media-students-load-more" role="status">
             {moreError ? <><span>{!listCollapsed && moreError}</span><Button size="small" aria-label="重试加载更多学员" onClick={() => void loadPage(pageNo + 1, undefined, true)}>重试</Button></>
               : loading && rows.length > 0 ? '加载中…' : rows.length > 0 && !hasMore ? (listCollapsed ? '到底了' : '已全部加载') : null}

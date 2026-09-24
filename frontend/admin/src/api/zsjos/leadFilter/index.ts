@@ -1,7 +1,7 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
 
-export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer' | 'agingPool'
+export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer' | 'agingPool' | 'management'
 export interface LeadFilterConditionVO {
   field: string
   values: string[]
@@ -13,14 +13,22 @@ export interface LeadFilterOptionVO {
   enabled: boolean
   conditions: LeadFilterConditionVO[]
 }
+/** 二级筛选行，例如“当前环节”“快捷条件”。 */
+export interface LeadFilterSectionVO {
+  key: string
+  label: string
+  sort: number
+  options: LeadFilterOptionVO[]
+}
 export interface LeadFilterGroupVO {
   key: string
   label: string
   sort: number
   enabled: boolean
+  /** 单行时代的标题，仅为兼容既有已发布配置保留。 */
   sectionLabel?: string
   conditions: LeadFilterConditionVO[]
-  options: LeadFilterOptionVO[]
+  sections: LeadFilterSectionVO[]
 }
 export interface LeadFilterAdminVO {
   audience: LeadFilterAudience

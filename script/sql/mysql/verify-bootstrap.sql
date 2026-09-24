@@ -410,11 +410,11 @@ SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
--- The baseline seeds four audiences: submitter, owner, reviewer (V005) and agingPool (V034's
--- public-sea view, seeded by 02-bootstrap-zsjos-seed.sql). Each publishes exactly one version-1
--- snapshot, so four schemes produce four rows here.
+-- The baseline seeds five audiences: submitter, owner, reviewer (V005), agingPool (V034's
+-- public-sea view) and management (unified Lead management graded filtering). Each publishes
+-- exactly one version-1 snapshot, so five schemes produce five rows here.
 SELECT 'lead_filter_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=4, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=5, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6773 AND permission='zsjos:lead-filter:query' AND component='zsjos/leadFilter/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_v005' AS check_name,

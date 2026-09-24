@@ -58,3 +58,17 @@ V208 以确认的 V2 字段内容发布不可变 V3：36 个一级字段按账�
 ## 当前租户管理员读取
 
 当前租户管理员可读取他人草稿、历史版本及素材审批历史。列表保持 mine、收藏、状态等用户筛选；响应选取草稿不改变 availableActions 的原始管理判断。推荐账号读取扩大，内容引用等生产操作候选保留原规则。编辑、提交、停用、恢复与审批不继承读取能力。
+
+## 素材浏览与个人审核进度（2026-09-24）
+
+Workbench 浏览页采用响应式封面卡片；“我的素材”采用紧凑摘要卡，展示当前修订版本状态、当前审核人、最近提交时间和驳回原因。主页、最火作品及重复组中的 HTTPS 链接统一使用 ResourceLink 展示、复制与安全打开。
+
+`GET /admin-api/zsjos/material/page?mine=true&versionStatus=IN_APPROVAL` 按当前草稿版本（不存在时按生效版本）筛选，保留本人、租户、逻辑删除限制。`versionStatus` 可取 DRAFT、IN_APPROVAL、EFFECTIVE、REJECTED，仅在 mine=true 时生效；原有 status 仍筛选素材主状态，两者不互相替代。主记录为 EFFECTIVE 的在审修订也能进入个人审批中列表。流程没有独立的“已读／开始处理”状态，因此 IN_APPROVAL 展示为“待审核／审批中”。
+
+版本响应新增 `pendingApproverNames: string[]`，仅审批中通过 BPM 公共任务 API 获取实际当前指派人（含加签），姓名通过 System 公共 API 解析；不按部门名称、角色或管理权限推断。未分配／已不可用人员明确显示占位信息，已结束版本为空数组；此字段不构成审批权限或历史审核人快照。原有素材和版本读取授权继续适用。
+
+已通过记录有 UPDATE 动作及 `zsjos:material:update` 时展示“修改并重新送审”；复用 `PUT /admin-api/zsjos/material/{id}` 创建修订草稿，再以 `zsjos:material:submit` 调用 `POST /admin-api/zsjos/material/{id}/submit`。旧生效版本直到新版本通过前保持可用。
+
+审批中仅当前版本的提交人且具有 `bpm:process-instance:cancel` 时返回 CANCEL 动作。Workbench 同时检查动作和权限，填写原因后调用既有 `DELETE /admin-api/bpm/process-instance/cancel-by-start-user`（JSON `{id, reason}`）；BPM 独立校验真实发起人、运行状态及流程是否允许撤回，拒绝原因原样反馈，不自动调整配置或授权。该入口不是管理员代撤回。
+
+新的 BPM CANCEL 事件将版本恢复 DRAFT，主记录无生效版本时恢复 DRAFT、有生效版本时保持 EFFECTIVE；审批轮次记为 CANCELLED，并保留撤回原因和结束时间。重复事件无重复变更；旧审批轮次和历史取消记录不回写。重新提交创建新轮次。Admin 消费的原有字段、状态枚举及接口均保留；新增字段可忽略，Admin 未增加员工端专用按钮。本次不修改审批人策略、菜单授权或 SQL。

@@ -70,6 +70,7 @@ public class LeadObjectPermissionService {
             case "sales-history-read" -> canReadDetail(lead, userId);
             case "follow-up-create" -> canOperateAsSales(lead, userId)
                     && (STATUS_INVALID.equals(lead.getStatus())
+                    || STATUS_WON.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
             case "qualify" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null

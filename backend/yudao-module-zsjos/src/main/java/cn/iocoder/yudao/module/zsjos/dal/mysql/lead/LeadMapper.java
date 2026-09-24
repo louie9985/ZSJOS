@@ -9,7 +9,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -23,16 +25,42 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadHandlingStage;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery;
 
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ACTION_TRANSFER;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_OWNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PUBLIC_POOL;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_RECYCLE_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_UNASSIGNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_CONDITION_OVERDUE;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_CONDITION_TODAY;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_CONDITION_TRANSFERRED_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_DEAL_PENDING_APPROVAL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_FOLLOWING;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_WON;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_ASSIGNMENT_STATUS;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_HANDLING_STAGE;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_SALES_PROGRESS;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_SOURCE_TYPE;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_STATUS;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.OPPORTUNITY_STATUS_WON;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_SUBMITTED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_VALID;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_WON;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_STATUS_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FIRST_FOLLOW_UP;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FOLLOW_UP_REMINDER;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+
+    /** 待办分桶使用北京时间自然日，与下属销售与业绩统计口径一致。 */
+    ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
     @Select("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} AND status IN ('valid','converted','won') AND submitted_at >= #{from} AND submitted_at < #{to}")
     long countDeliveryWeeklyLeads(@Param("tenantId") Long tenantId,@Param("partnerId") Long partnerId,@Param("from") LocalDateTime from,@Param("to") LocalDateTime to);
 
@@ -194,34 +222,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     }
 
     default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
-                                                     List<String> inboxStatuses,
-                                                     List<String> inboxAssignmentStatuses,
-                                                     boolean inboxMatchNone) {
-        return selectManagementPage(reqVO, visibleUserId, List.of(), inboxStatuses,
-                inboxAssignmentStatuses, inboxMatchNone);
+                                                     LeadInboxFilterQuery inboxFilter) {
+        return selectManagementPage(reqVO, visibleUserId, List.of(), inboxFilter, null);
     }
     default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
                                                      List<Long> managedOwnerUserIds,
-                                                     List<String> inboxStatuses,
-                                                     List<String> inboxAssignmentStatuses,
-                                                     boolean inboxMatchNone) {
-        return selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds, inboxStatuses,
-                inboxAssignmentStatuses, inboxMatchNone, null);
+                                                     LeadInboxFilterQuery inboxFilter) {
+        return selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds, inboxFilter, null);
     }
     default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
                                                      List<Long> managedOwnerUserIds,
-                                                     List<String> inboxStatuses,
-                                                     List<String> inboxAssignmentStatuses,
-                                                     boolean inboxMatchNone, List<Long> matchedLeadIds) {
-        return selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds, inboxStatuses,
-                inboxAssignmentStatuses, List.of(), inboxMatchNone, matchedLeadIds);
-    }
-    default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
-                                                     List<Long> managedOwnerUserIds,
-                                                     List<String> inboxStatuses,
-                                                     List<String> inboxAssignmentStatuses,
-                                                     List<String> inboxHandlingStages,
-                                                     boolean inboxMatchNone, List<Long> matchedLeadIds) {
+                                                     LeadInboxFilterQuery inboxFilter, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -230,25 +241,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getSourceUserId, reqVO.getSourceUserId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
-        if (inboxMatchNone) {
+        if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);
-        } else {
-            if (inboxStatuses != null && !inboxStatuses.isEmpty()) {
-                query.in(LeadDO::getStatus, inboxStatuses);
-            }
-            if (inboxAssignmentStatuses != null && !inboxAssignmentStatuses.isEmpty()) {
-                query.in(LeadDO::getAssignmentStatus, inboxAssignmentStatuses);
-            }
-            if (inboxHandlingStages != null && !inboxHandlingStages.isEmpty()) {
-                query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
-                if (inboxHandlingStages.size() == 1
-                        && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
-                    query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
-                } else if (inboxHandlingStages.size() == 1
-                        && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
-                    query.isNotNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
-                }
-            }
+        } else if (inboxFilter != null) {
+            applyInboxFilter(query, inboxFilter);
         }
         if (matchedLeadIds != null) {
             if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L);
@@ -284,10 +280,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                             List<Long> visibleSourceUserIds,
                                                             List<Long> visibleOwnerUserIds,
                                                             boolean queryAll,
-                                                            List<String> inboxStatuses,
-                                                            List<String> inboxAssignmentStatuses,
-                                                            List<String> inboxHandlingStages,
-                                                            boolean inboxMatchNone,
+                                                            LeadInboxFilterQuery inboxFilter,
                                                             List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
@@ -299,23 +292,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getProviderOwnerId, reqVO.getProviderOwnerId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
-        if (inboxMatchNone) {
+        if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);
-        } else {
-            if (inboxStatuses != null && !inboxStatuses.isEmpty()) query.in(LeadDO::getStatus, inboxStatuses);
-            if (inboxAssignmentStatuses != null && !inboxAssignmentStatuses.isEmpty()) {
-                query.in(LeadDO::getAssignmentStatus, inboxAssignmentStatuses);
-            }
-            if (inboxHandlingStages != null && !inboxHandlingStages.isEmpty()) {
-                query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
-                if (inboxHandlingStages.size() == 1
-                        && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
-                    query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
-                } else if (inboxHandlingStages.size() == 1
-                        && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
-                    query.isNotNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
-                }
-            }
+        } else if (inboxFilter != null) {
+            applyInboxFilter(query, inboxFilter);
         }
         applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
         if (matchedLeadIds != null) {
@@ -406,13 +386,109 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         if (!filter.assignmentStatuses().isEmpty()) {
             query.in(LeadDO::getAssignmentStatus, filter.assignmentStatuses());
         }
-        if (filter.handlingStages().contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
-            query.isNull(LeadDO::getQualificationDeadlineAt);
-        } else if (filter.handlingStages().contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
-            query.isNotNull(LeadDO::getQualificationDeadlineAt);
-        }
+        applyHandlingStage(query, filter.handlingStages());
         applyOpportunityStatus(query, filter.requiredOpportunityStatuses(), false);
         applyOpportunityStatus(query, filter.excludedOpportunityStatuses(), true);
+    }
+
+    /**
+     * 应用收件箱分级筛选条件。各维度取交集，与列表投影使用同一口径，
+     * 避免筛选结果与页面展示的状态标签互相矛盾。
+     */
+    private static void applyInboxFilter(LambdaQueryWrapperX<LeadDO> query, LeadInboxFilterQuery filter) {
+        Set<String> statuses = filter.values(INBOX_FILTER_FIELD_STATUS);
+        if (!statuses.isEmpty()) query.in(LeadDO::getStatus, statuses);
+        Set<String> assignments = filter.values(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS);
+        if (!assignments.isEmpty()) query.in(LeadDO::getAssignmentStatus, assignments);
+        Set<String> sourceTypes = filter.values(INBOX_FILTER_FIELD_SOURCE_TYPE);
+        if (!sourceTypes.isEmpty()) query.in(LeadDO::getSourceType, sourceTypes);
+        applyHandlingStage(query, filter.values(INBOX_FILTER_FIELD_HANDLING_STAGE));
+        applySalesProgress(query, filter.values(INBOX_FILTER_FIELD_SALES_PROGRESS));
+        applyFollowUpCondition(query, filter.values(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION));
+    }
+
+    /**
+     * 处理阶段按当前归属周期的首跟事实区分。权威判据是
+     * {@code current_assignment_first_follow_up_at}；判定截止时间不作为已完成首跟的证据。
+     */
+    private static void applyHandlingStage(LambdaQueryWrapperX<LeadDO> query, Set<String> handlingStages) {
+        if (handlingStages.isEmpty()) return;
+        boolean firstFollow = handlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING);
+        boolean qualification = handlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING);
+        if (!firstFollow && !qualification) return;
+        query.eq(LeadDO::getStatus, STATUS_SUBMITTED).eq(LeadDO::getAssignmentStatus, ASSIGNMENT_OWNED);
+        // 同时选中两个阶段等于“待首跟或待判定”，即全部尚未判定的已归属客资，不再加首跟事实条件。
+        if (firstFollow && !qualification) {
+            query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
+        } else if (qualification && !firstFollow) {
+            query.isNotNull(LeadDO::getCurrentAssignmentFirstFollowUpAt);
+        }
+    }
+
+    /**
+     * 销售推进维度。与 {@link LeadSimpleStatusQuery} 的成交分支保持同一口径：
+     * 跟进中排除已进入成交审批或已成交的机会。
+     */
+    private static void applySalesProgress(LambdaQueryWrapperX<LeadDO> query, Set<String> progress) {
+        if (progress.isEmpty()) return;
+        Set<String> statuses = new java.util.LinkedHashSet<>();
+        Set<String> required = new java.util.LinkedHashSet<>();
+        Set<String> excluded = new java.util.LinkedHashSet<>();
+        for (String value : progress) {
+            switch (value) {
+                case FOLLOW_UP_FOLLOWING -> {
+                    statuses.add(STATUS_VALID);
+                    excluded.add(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
+                    excluded.add(OPPORTUNITY_STATUS_WON);
+                }
+                case FOLLOW_UP_DEAL_PENDING_APPROVAL -> {
+                    statuses.add(STATUS_VALID);
+                    required.add(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
+                }
+                case FOLLOW_UP_WON -> statuses.add(STATUS_WON);
+                default -> throw new IllegalArgumentException("Unsupported Lead sales progress: " + value);
+            }
+        }
+        if (!statuses.isEmpty()) query.in(LeadDO::getStatus, statuses);
+        applyOpportunityStatus(query, required, false);
+        applyOpportunityStatus(query, excluded, true);
+    }
+
+    /**
+     * 快捷条件基于待办任务与分配历史，而非客资自身列。
+     * 权威截止时间来自 {@code zsjos_business_task.due_at}；{@code zsjos_lead.next_follow_up_at}
+     * 可能保留已完成或已取消提醒的过期值，不能作为判据。
+     */
+    private static void applyFollowUpCondition(LambdaQueryWrapperX<LeadDO> query, Set<String> conditions) {
+        if (conditions.isEmpty()) return;
+        LocalDateTime todayStart = LocalDate.now(BEIJING).atStartOfDay();
+        if (conditions.contains(FOLLOW_UP_CONDITION_TODAY)) {
+            // 今日待跟进：[今日0点, 明日0点)，与下属销售待办分桶口径一致。
+            applyPendingFollowUpTask(query, "t.due_at >= {3} AND t.due_at < {4}",
+                    todayStart, todayStart.plusDays(1));
+        } else if (conditions.contains(FOLLOW_UP_CONDITION_OVERDUE)) {
+            applyPendingFollowUpTask(query, "t.due_at < {3}", todayStart);
+        } else if (conditions.contains(FOLLOW_UP_CONDITION_TRANSFERRED_PENDING)) {
+            // 转派后新归属周期尚未产生首跟事实。主管转派只创建判定任务、不重建首跟任务，
+            // 因此这类客资不会进入“今日待跟进”待办，需要独立条件暴露。
+            query.isNull(LeadDO::getCurrentAssignmentFirstFollowUpAt)
+                    .exists("SELECT 1 FROM zsjos_lead_assignment_history h "
+                            + "WHERE h.id = zsjos_lead.current_assignment_history_id "
+                            + "AND h.tenant_id = zsjos_lead.tenant_id AND h.deleted = b'0' "
+                            + "AND h.action_type = {0}", ACTION_TRANSFER);
+        }
+    }
+
+    private static void applyPendingFollowUpTask(LambdaQueryWrapperX<LeadDO> query, String timeClause,
+                                                 Object... timeParameters) {
+        Object[] parameters = new Object[timeParameters.length + 3];
+        parameters[0] = TASK_TYPE_FIRST_FOLLOW_UP;
+        parameters[1] = TASK_TYPE_FOLLOW_UP_REMINDER;
+        parameters[2] = TASK_STATUS_PENDING;
+        System.arraycopy(timeParameters, 0, parameters, 3, timeParameters.length);
+        query.exists("SELECT 1 FROM zsjos_business_task t WHERE t.biz_id = zsjos_lead.id "
+                + "AND t.tenant_id = zsjos_lead.tenant_id AND t.deleted = b'0' AND t.biz_type = 'lead' "
+                + "AND t.status = {2} AND t.task_type IN ({0},{1}) AND " + timeClause, parameters);
     }
 
     private static void applyOpportunityStatus(LambdaQueryWrapperX<LeadDO> query, java.util.Set<String> statuses,

@@ -1,7 +1,7 @@
 import { Alert, App, Button, Image, Modal, Space, Tag, Typography, theme } from 'antd'
 import { BellOutlined, ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { leadManagementDeepLink } from '../services/notifyMessageAction'
 import { api, type PendingLead } from '../services/api'
 import { protocolDisplayLabel, resolvedDisplayLabel } from '../services/leadManagement'
@@ -14,7 +14,9 @@ import {
   remainingSecondsAt,
   shouldFocusAssignmentEvent,
   shouldShowAssignmentModal,
-  sortPendingLeads
+  sortPendingLeads,
+  assignmentLinkTarget,
+  matchesAssignmentLink
 } from '../services/leadAssignment'
 import { markLeadUnseen } from '../services/leadInboxUnseen'
 import { NameAvatar } from './LeadDetailOverview'
@@ -30,6 +32,14 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
 }) {
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const location = useLocation()
+  const linkTarget = useMemo(() => assignmentLinkTarget(location.search), [location.search])
+  const [linkState, setLinkState] = useState<'loading' | 'ready' | 'expired' | 'error'>('loading')
+  const clearLink = () => {
+    const params = new URLSearchParams(location.search)
+    params.delete('assignmentLeadId'); params.delete('assignmentHistoryId')
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true })
+  }
   const { token } = theme.useToken()
   const { businessOverlayCount } = useOverlayCoordinator()
   const { status: realtimeStatus } = useRealtime()
@@ -49,16 +59,25 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
     try {
       const items = await api.myPendingLeads()
       if (!mountedRef.current || requestId !== requestSequence.current) return undefined
+      if (linkTarget) {
+        const matched = items.find(item => matchesAssignmentLink(item, linkTarget))
+        setLinkState(matched ? 'ready' : 'expired')
+        if (matched) {
+          setFocusLeadId(matched.id)
+          setDeferred(ids => { const next = new Set(ids); next.delete(matched.id); return next })
+        }
+      }
       setPending(items)
       setElapsedSeconds(0)
       setError('')
       return items
     } catch (loadError) {
       if (!mountedRef.current || requestId !== requestSequence.current) return undefined
+      if (linkTarget) setLinkState('error')
       setError(loadError instanceof Error ? loadError.message : '待接客资加载失败')
       return undefined
     }
-  }, [canAccept])
+  }, [canAccept, linkTarget])
 
   const refreshForLead = useCallback(async (leadId: number) => {
     const refreshId = ++targetedRefreshSequence.current
@@ -136,8 +155,10 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
   const expiredCount = pending.length - ordered.length
   useEffect(() => { if (expiredCount > 0) void loadPending() }, [expiredCount, loadPending])
 
-  const current = ordered.find(item => item.id === focusLeadId && !deferred.has(item.id))
-    ?? ordered.find(item => !deferred.has(item.id))
+  const current = linkTarget
+    ? linkState === 'ready' ? ordered.find(item => matchesAssignmentLink(item, linkTarget)) : undefined
+    : ordered.find(item => item.id === focusLeadId && !deferred.has(item.id))
+      ?? ordered.find(item => !deferred.has(item.id))
   const blocked = businessOverlayCount > 0
   const reminderLead = ordered[0]
   const showReminder = ordered.length > 0 && (blocked || !current || deferred.has(reminderLead.id))
@@ -150,7 +171,7 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
     if (!current || processing) return
     setProcessing(true)
     try {
-      if (action === 'accept') await api.acceptLead(current.id)
+      if (action === 'accept') await api.acceptLead(current.id, current.assignmentHistoryId)
       else await api.rejectLead(current.id)
       setDeferred(ids => { const next = new Set(ids); next.delete(current.id); return next })
       // 标记要在刷新之前：客资列表页监听该事件自行拉取，标记晚到会漏掉高亮
@@ -159,6 +180,7 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
         message.success('接单成功，首次跟进任务已经开始计时')
         navigate(leadManagementDeepLink(current.id, 'overview'))
       } else {
+        if (linkTarget) clearLink()
         message.success('已拒绝，客资将继续派发')
       }
       // 接单已经成功，刷新待接列表只影响下一条提醒，不应阻断客资跳转。
@@ -170,10 +192,16 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
     } finally { setProcessing(false) }
   }
 
-  if (!canAccept) return null
+  if (!canAccept) return linkTarget ? <Alert type="error" showIcon title="无权接单"
+    description="当前账号没有客资接单权限，请使用被派单的账号登录。"
+    action={<Button onClick={clearLink}>返回</Button>} /> : null
   const countdown = current ? remainingSecondsAt(current, elapsedSeconds) : undefined
 
   return <>
+    {linkTarget && linkState !== 'ready' && <Alert showIcon
+      type={linkState === 'expired' ? 'warning' : linkState === 'error' ? 'error' : 'info'}
+      title={linkState === 'expired' ? '本次派单已失效' : linkState === 'error' ? '待接客资加载失败' : '正在核对派单状态'}
+      action={<Space><Button onClick={() => void loadPending()}>重试</Button><Button onClick={clearLink}>返回</Button></Space>} />}
     {error && <Alert className="pending-load-error" type="error" showIcon title={error}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadPending()}>重试</Button>} />}
     {showReminder && reminderLead && <div className="pending-reminder" role="status">
@@ -207,7 +235,7 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
         {current.rejectable
           ? <Button size="large" danger loading={processing} onClick={() => void handle('reject')}>不接单</Button>
           : <Button size="large" disabled={!current.deferrable}
-            onClick={() => setDeferred(ids => new Set(ids).add(current.id))}>稍后接单</Button>}
+            onClick={() => { setDeferred(ids => new Set(ids).add(current.id)); if (linkTarget) clearLink() }}>稍后接单</Button>}
         <Button className="assignment-accept-btn" size="large" type="primary" loading={processing}
           onClick={() => void handle('accept')}>接单</Button>
       </div>}

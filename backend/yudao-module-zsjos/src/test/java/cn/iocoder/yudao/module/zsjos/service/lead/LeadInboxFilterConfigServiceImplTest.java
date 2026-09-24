@@ -16,10 +16,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_INBOX_FILTER_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.AGING_POOL_ASSIGNED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -78,9 +80,9 @@ class LeadInboxFilterConfigServiceImplTest {
         verify(schemeMapper).updateById(updateCaptor.capture());
         LeadInboxFilterConfigVO saved = JsonUtils.parseObject(updateCaptor.getValue().getDraftConfigJson(),
                 LeadInboxFilterConfigVO.class);
-        assertEquals("registration_review", saved.getGroups().getFirst().getOptions().get(1).getKey());
+        assertEquals("registration_review", saved.getGroups().getFirst().getSections().getFirst().getOptions().get(1).getKey());
         assertEquals("registrationReview",
-                saved.getGroups().getFirst().getOptions().get(1).getConditions().getFirst().getValues().getFirst());
+                saved.getGroups().getFirst().getSections().getFirst().getOptions().get(1).getConditions().getFirst().getValues().getFirst());
     }
 
     @Test
@@ -92,8 +94,8 @@ class LeadInboxFilterConfigServiceImplTest {
 
         var result = service.getAdminConfig("reviewer");
 
-        assertEquals("registration_review", result.getDraftGroups().getFirst().getOptions().get(1).getKey());
-        assertEquals("registrationReview", result.getDraftGroups().getFirst().getOptions().get(1)
+        assertEquals("registration_review", result.getDraftGroups().getFirst().getSections().getFirst().getOptions().get(1).getKey());
+        assertEquals("registrationReview", result.getDraftGroups().getFirst().getSections().getFirst().getOptions().get(1)
                 .getConditions().getFirst().getValues().getFirst());
     }
 
@@ -113,25 +115,35 @@ class LeadInboxFilterConfigServiceImplTest {
 
         LeadInboxFilterConfigVO.GroupVO normalized = result.getDraftGroups().get(1);
         assertEquals(List.of("won"), normalized.getConditions().getFirst().getValues());
-        assertEquals("won", normalized.getOptions().get(1).getKey());
-        assertEquals("已成交", normalized.getOptions().get(1).getLabel());
-        assertEquals(List.of("won"), normalized.getOptions().get(1).getConditions().getFirst().getValues());
+        assertEquals("won", normalized.getSections().getFirst().getOptions().get(1).getKey());
+        assertEquals("已成交", normalized.getSections().getFirst().getOptions().get(1).getLabel());
+        assertEquals(List.of("won"), normalized.getSections().getFirst().getOptions().get(1)
+                .getConditions().getFirst().getValues());
     }
 
     @Test
     void getAdminConfigKeepsCustomConvertedOptionWithoutLegacyStatusCondition() {
-        LeadInboxFilterSaveReqVO config = validRequest();
+        // 旧结构（仅 sectionLabel + options）应被迁移为单行 sections，且不误改自定义编码。
+        LeadInboxFilterSaveReqVO config = new LeadInboxFilterSaveReqVO();
+        config.setAudience("submitter");
+        LeadInboxFilterConfigVO.GroupVO all = group("all", "全部客资", 0);
+        LeadInboxFilterConfigVO.GroupVO pending = group("pending", "待判定", 10);
+        pending.setSectionLabel("当前环节");
+        pending.setConditions(List.of(condition("status", "submitted")));
         LeadInboxFilterConfigVO.OptionVO custom = option("converted", "自定义选项", 20);
         custom.setConditions(List.of(condition("assignment_status", "owned")));
-        config.getGroups().get(1).setOptions(new java.util.ArrayList<>(config.getGroups().get(1).getOptions()));
-        config.getGroups().get(1).getOptions().add(custom);
+        pending.setOptions(new java.util.ArrayList<>(
+                List.of(option("all", "全部", 0), owned(), custom)));
+        config.setGroups(List.of(all, pending));
         LeadInboxFilterSchemeDO scheme = scheme(config);
         when(schemeMapper.selectByAudience("submitter")).thenReturn(scheme);
 
         var result = service.getAdminConfig("submitter");
 
-        assertEquals("converted", result.getDraftGroups().get(1).getOptions().get(2).getKey());
-        assertEquals("自定义选项", result.getDraftGroups().get(1).getOptions().get(2).getLabel());
+        LeadInboxFilterConfigVO.GroupVO normalized = result.getDraftGroups().get(1);
+        assertEquals("当前环节", normalized.getSections().getFirst().getLabel());
+        assertEquals("converted", normalized.getSections().getFirst().getOptions().get(2).getKey());
+        assertEquals("自定义选项", normalized.getSections().getFirst().getOptions().get(2).getLabel());
     }
 
     @Test
@@ -210,8 +222,7 @@ class LeadInboxFilterConfigServiceImplTest {
         LeadInboxFilterSaveReqVO config = validRequest();
         LeadInboxFilterConfigVO.OptionVO firstFollow = option("first_follow_pending", "待首跟", 20);
         firstFollow.setConditions(List.of(condition("handling_stage", "first_follow_pending")));
-        config.getGroups().get(1).setOptions(new java.util.ArrayList<>(config.getGroups().get(1).getOptions()));
-        config.getGroups().get(1).getOptions().add(firstFollow);
+        sectionOf(config, 1).getOptions().add(firstFollow);
 
         LeadInboxFilterQuery query = service.resolveQuery(config, "pending", "first_follow_pending");
 
@@ -220,9 +231,27 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
+    void resolveQueryAcceptsPerSectionSelections() {
+        LeadInboxFilterSaveReqVO config = validRequest();
+        LeadInboxFilterConfigVO.OptionVO today = option("today", "今日待跟进", 10);
+        today.setConditions(List.of(condition("follow_up_condition", "today")));
+        LeadInboxFilterConfigVO.GroupVO pending = config.getGroups().get(1);
+        pending.setSections(new java.util.ArrayList<>(pending.getSections()));
+        pending.getSections().add(section("quick_condition", "快捷条件", 10,
+                option("all", "全部", 0), today));
+
+        LeadInboxFilterQuery query = service.resolveQuery(config, "pending",
+                Map.of("current_stage", "owned", "quick_condition", "today"));
+
+        assertEquals(Set.of("submitted"), query.statuses());
+        assertEquals(Set.of("owned"), query.assignmentStatuses());
+        assertEquals(Set.of("today"), query.values(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION));
+    }
+
+    @Test
     void saveDraftRejectsUnsupportedHandlingStage() {
         LeadInboxFilterSaveReqVO reqVO = validRequest();
-        reqVO.getGroups().get(1).getOptions().get(1)
+        sectionOf(reqVO, 1).getOptions().get(1)
                 .setConditions(List.of(condition("handling_stage", "invented")));
 
         ServiceException error = assertThrows(ServiceException.class, () -> service.saveDraft(reqVO));
@@ -238,7 +267,7 @@ class LeadInboxFilterConfigServiceImplTest {
         LeadInboxFilterConfigVO.OptionVO allOption = option("all", "全部", 0);
         LeadInboxFilterConfigVO.OptionVO assigned = option("assigned", "协同跟进中", 10);
         assigned.setConditions(List.of(condition("pool_status", AGING_POOL_ASSIGNED)));
-        all.setOptions(List.of(allOption, assigned));
+        all.setSections(List.of(section("pool_status", "公海状态", 0, allOption, assigned)));
         reqVO.setGroups(List.of(all));
         LeadInboxFilterSchemeDO scheme = scheme(reqVO);
         scheme.setAudience("agingPool");
@@ -264,14 +293,30 @@ class LeadInboxFilterConfigServiceImplTest {
 
         LeadInboxFilterConfigVO.GroupVO all = group("all", "全部客资", 0);
         LeadInboxFilterConfigVO.GroupVO pending = group("pending", "待判定", 10);
-        pending.setSectionLabel("当前环节");
         pending.setConditions(List.of(condition("status", "submitted")));
-        LeadInboxFilterConfigVO.OptionVO allOption = option("all", "全部", 0);
-        LeadInboxFilterConfigVO.OptionVO owned = option("owned", "已归属", 10);
-        owned.setConditions(List.of(condition("assignment_status", "owned")));
-        pending.setOptions(List.of(allOption, owned));
+        pending.setSections(List.of(section("current_stage", "当前环节", 0,
+                option("all", "全部", 0), owned())));
         config.setGroups(List.of(all, pending));
         return config;
+    }
+
+    private static LeadInboxFilterConfigVO.OptionVO owned() {
+        LeadInboxFilterConfigVO.OptionVO owned = option("owned", "已归属", 10);
+        owned.setConditions(List.of(condition("assignment_status", "owned")));
+        return owned;
+    }
+
+    private static LeadInboxFilterConfigVO.SectionVO section(String key, String label, int sort,
+                                                              LeadInboxFilterConfigVO.OptionVO... options) {
+        LeadInboxFilterConfigVO.SectionVO section = new LeadInboxFilterConfigVO.SectionVO();
+        section.setKey(key); section.setLabel(label); section.setSort(sort);
+        section.setOptions(new java.util.ArrayList<>(List.of(options)));
+        return section;
+    }
+
+    /** 取指定分组的首个二级行，用于在既有配置上追加筛选项。 */
+    private static LeadInboxFilterConfigVO.SectionVO sectionOf(LeadInboxFilterSaveReqVO config, int groupIndex) {
+        return config.getGroups().get(groupIndex).getSections().getFirst();
     }
 
     private static LeadInboxFilterSaveReqVO reviewerRequest() {

@@ -14,18 +14,18 @@ import { buildCrmVars } from './themeTokens'
  */
 const ThemeVars = () => {
   const { token } = theme.useToken()
-  const { backgroundValue, density, fontScale, borderRadius, animation, glassOpacity, glassBlur } = useTheme()
+  const { backgroundValue, density, fontScale, borderRadius, animation, glassOpacity, glassBlur, isDark } = useTheme()
   const hasBackground = Boolean(backgroundValue)
   // 背景模糊是否真正生效：需同时有自定义背景与非零半径
   const frosted = hasBackground && glassBlur > 0
 
   useLayoutEffect(() => {
     const root = document.documentElement
-    const vars = buildCrmVars(token, { hasBackground, glassOpacity, glassBlur })
+    const vars = buildCrmVars(token, { hasBackground, glassOpacity, glassBlur, isDark })
     Object.entries(vars).forEach(([name, value]) => root.style.setProperty(name, value))
     // 卸载时移除，避免残留覆盖 tokens.css 里的静态兜底值
     return () => Object.keys(vars).forEach(name => root.style.removeProperty(name))
-  }, [token, hasBackground, glassOpacity, glassBlur])
+  }, [token, hasBackground, glassOpacity, glassBlur, isDark])
 
   // 密度、字号、圆角、动画、背景状态以 data 属性驱动
   useLayoutEffect(() => {

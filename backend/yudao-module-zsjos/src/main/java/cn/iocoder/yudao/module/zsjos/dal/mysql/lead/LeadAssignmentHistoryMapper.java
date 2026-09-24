@@ -41,6 +41,15 @@ public interface LeadAssignmentHistoryMapper extends BaseMapperX<LeadAssignmentH
         return result;
     }
 
+    default LeadAssignmentHistoryDO selectLatestDispatch(Long leadId, boolean forUpdate) {
+        return selectOne(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
+                .eq(LeadAssignmentHistoryDO::getLeadId, leadId)
+                .eq(LeadAssignmentHistoryDO::getActionType, "dispatch")
+                .orderByDesc(LeadAssignmentHistoryDO::getOccurredAt)
+                .orderByDesc(LeadAssignmentHistoryDO::getId)
+                .last(forUpdate ? "LIMIT 1 FOR UPDATE" : "LIMIT 1"));
+    }
+
     default List<LeadAssignmentHistoryDO> selectByLeadId(Long leadId) {
         return selectList(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
                 .eq(LeadAssignmentHistoryDO::getLeadId, leadId)

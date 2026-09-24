@@ -109,6 +109,8 @@ public interface LeadConstants {
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";
     String INBOX_AUDIENCE_AGING_POOL = "agingPool";
+    /** 统一客资管理页视角：不按提交人/负责人拆分，只要求 zsjos:lead:query。 */
+    String INBOX_AUDIENCE_MANAGEMENT = "management";
     String AGING_POOL_RELATION_OWNED = "owned";
     String AGING_POOL_RELATION_FOLLOWING = "following";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
@@ -132,6 +134,17 @@ public interface LeadConstants {
     String INBOX_FILTER_FIELD_HANDLED = "handled";
     String INBOX_FILTER_FIELD_TASK_DEFINITION_KEY = "task_definition_key";
     String INBOX_FILTER_FIELD_POOL_STATUS = "pool_status";
+    String INBOX_FILTER_FIELD_OPPORTUNITY_STATUS = "opportunity_status";
+    /** 销售推进维度：值域与 {@code LeadSimpleStatusQuery} 的成交相关分支一致。 */
+    String INBOX_FILTER_FIELD_SALES_PROGRESS = "sales_progress";
+    String INBOX_FILTER_FIELD_SOURCE_TYPE = "source_type";
+    String INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION = "follow_up_condition";
+    String INBOX_FILTER_SECTION_CURRENT_STAGE = "current_stage";
+    String INBOX_FILTER_SECTION_QUICK_CONDITION = "quick_condition";
+    String INBOX_FILTER_SECTION_POOL_STATUS = "pool_status";
+    String FOLLOW_UP_CONDITION_TODAY = "today";
+    String FOLLOW_UP_CONDITION_OVERDUE = "overdue";
+    String FOLLOW_UP_CONDITION_TRANSFERRED_PENDING = "transferred_pending";
     String DISPATCH_AUTO = "auto";
     String DISPATCH_SPECIFIED = "specified";
     String DISPATCH_SELF = "self";

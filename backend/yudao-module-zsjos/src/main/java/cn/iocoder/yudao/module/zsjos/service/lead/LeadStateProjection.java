@@ -19,6 +19,10 @@ public final class LeadStateProjection {
 
     public static String followUp(LeadDO lead, OpportunityDO opportunity) {
         if (STATUS_INVALID.equals(lead.getStatus())) return null;
+        // Legacy won Leads may predate Opportunity rows. Keep the user-visible
+        // follow-up projection aligned with the authoritative Lead lifecycle
+        // status so those records still render as 已成交 in the inbox.
+        if (STATUS_WON.equals(lead.getStatus())) return FOLLOW_UP_WON;
         if (opportunity != null) {
             if (OPPORTUNITY_STATUS_WON.equals(opportunity.getStatus())) return FOLLOW_UP_WON;
             if (OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL.equals(opportunity.getStatus())) {

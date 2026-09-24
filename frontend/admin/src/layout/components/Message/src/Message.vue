@@ -90,6 +90,10 @@ const showPersistedNotification = async (messageId: number) => {
         notification.close()
         if (!detail.readStatus) await NotifyMessageApi.updateNotifyMessageRead(detail.id)
         emitter.emit(NOTIFY_MESSAGE_CHANGED_EVENT)
+        if (detail.actionType === 'business_detail' && detail.bizType === 'withdrawal' && detail.bizId) {
+          await router.push({ path: '/zsjos/withdrawal', query: { withdrawalId: detail.bizId } })
+          return
+        }
         if (detail.actionType === 'business_detail' && detail.bizType === 'feedback' && detail.bizId) {
           try {
             const feedback = await FeedbackApi.getFeedback(detail.bizId)

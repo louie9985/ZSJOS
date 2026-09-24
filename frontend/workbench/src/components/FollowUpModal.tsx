@@ -1,67 +1,34 @@
 import { useEffect, useState } from 'react'
-import { Alert, App, Button, DatePicker, Empty, Form, Input, Modal, Select, Space, Spin } from 'antd'
-import dayjs from 'dayjs'
+import { App, Button, Form, Modal, Space } from 'antd'
 import { useLeadSalesStages } from '../services/useLeadSalesStages'
-import { api, type DictData, type LeadAttachment, type ManagedLead } from '../services/api'
-import { DICT_TYPE } from '../constants'
-import { applyFollowUpTimeShortcut, appendQuickNote, FOLLOW_UP_TIME_SHORTCUTS } from '../services/leadFollowUp'
-import DeferredAttachmentPicker from './DeferredAttachmentPicker'
+import { api, type LeadAttachment, type ManagedLead } from '../services/api'
+import FollowUpFormFields from './FollowUpFormFields'
+import { useFollowUpDictionaries } from '../services/useFollowUpDictionaries'
+import type { FollowUpValues } from '../services/followUpForm'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
-import IrreversiblePopconfirm from './IrreversiblePopconfirm'
-
-type Values = { salesStage?: string; method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
 export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
   lead: ManagedLead; open: boolean; onClose: () => void; onSuccess: () => void
 }) {
   const { message } = App.useApp()
-  const stages = useLeadSalesStages(lead)
-  const [form] = Form.useForm<Values>()
+  const stages = useLeadSalesStages(lead, open)
+  const [form] = Form.useForm<FollowUpValues>()
   const { submitting, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [images, setImages] = useState<DeferredUploadItem<LeadAttachment>[]>([])
-  const [methods, setMethods] = useState<DictData[]>([])
-  const [results, setResults] = useState<DictData[]>([])
-  const [categories, setCategories] = useState<DictData[]>([])
-  const [quickNotes, setQuickNotes] = useState<DictData[]>([])
-  const [dictLoading, setDictLoading] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [pendingValues, setPendingValues] = useState<Values>()
-
+  const dictionaries = useFollowUpDictionaries(lead.id, open)
+  const blocked = dictionaries.blocked || stages.loading || Boolean(stages.error) || !stages.options.length
   useEffect(() => {
     if (!open) return
     resetIntent()
-    setDictLoading(true)
-    Promise.all([
-      api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_METHOD),
-      api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_RESULT),
-      api.dictDataByType(DICT_TYPE.LEAD_CATEGORY),
-      api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_QUICK_NOTE)
-    ]).then(([methodData, resultData, categoryData, notes]) => {
-      setMethods(methodData); setResults(resultData); setCategories(categoryData); setQuickNotes(notes)
-    }).catch(() => message.error('跟进字典加载失败，请重试'))
-      .finally(() => setDictLoading(false))
     form.resetFields()
     form.setFieldsValue({ leadCategory: lead.leadCategory, salesStage: lead.salesStage })
     setImages([])
-  }, [open, lead.id, lead.leadCategory, lead.salesStage, form, message, resetIntent])
-
-  const appendNote = (note: string) => {
-    const current = form.getFieldValue('remark') || ''
-    form.setFieldValue('remark', appendQuickNote(current, note))
-  }
-
-  const prepareSubmit = async () => {
-    if (stages.loading || stages.error) return
-    const values = await form.validateFields().catch(() => undefined)
-    if (!values) return
-    setPendingValues(values)
-    setConfirmOpen(true)
-  }
+  }, [open, lead.id, form, resetIntent])
 
   const submit = async () => {
-    const values = pendingValues
-    setConfirmOpen(false)
+    if (blocked) return
+    const values = await form.validateFields().catch(() => undefined)
     if (!values) return
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
@@ -84,69 +51,22 @@ export default function FollowUpModal({ lead, open, onClose, onSuccess }: {
     <Modal
       title="新增跟进"
       open={open}
-      onCancel={onClose}
+      onCancel={() => { if (!submitting) onClose() }}
+      closable={!submitting}
+      maskClosable={!submitting}
+      keyboard={!submitting}
       destroyOnClose
-      width={520}
+      width={720}
       footer={
         <Space>
-          <Button onClick={onClose}>取消</Button>
-          <IrreversiblePopconfirm
-            action={`提交客资「${lead.submittedName}」的跟进记录`}
-            open={confirmOpen}
-            onOpenChange={setConfirmOpen}
-            onConfirm={submit}
-          >
-            <Button type="primary" loading={submitting} disabled={stages.loading || Boolean(stages.error)} onClick={() => void prepareSubmit()}>提交跟进</Button>
-          </IrreversiblePopconfirm>
+          <Button disabled={submitting} onClick={onClose}>取消</Button>
+          <Button type="primary" loading={submitting} disabled={blocked} onClick={() => void submit()}>提交跟进</Button>
         </Space>
       }
     >
-      {dictLoading ? <Spin/> : (
-        <Form form={form} layout="vertical" className="follow-up-form" disabled={submitting}>
-          <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}>
-            <Select options={methods.map(item => ({ value: item.value, label: item.label }))}/>
-          </Form.Item>
-          <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}>
-            <Select options={results.map(item => ({ value: item.value, label: item.label }))}/>
-          </Form.Item>
-          {stages.error && <Alert type="error" showIcon title={stages.error} action={<Button size="small" onClick={() => void stages.reload()}>重试</Button>}/>}
-          <Form.Item name="salesStage" label="跟进后销售阶段" rules={[{ required: true, message: '请选择销售阶段' }]}>
-            <Select loading={stages.loading} disabled={Boolean(stages.error)} options={stages.options} notFoundContent={stages.loading ? <Spin size="small"/> : '暂无可选销售阶段，请联系管理员'}/>
-          </Form.Item>
-          <Form.Item name="leadCategory" label="客资分类">
-            <Select allowClear options={categories.map(item => ({ value: item.value, label: item.label }))}/>
-          </Form.Item>
-          {quickNotes.length > 0 && (
-            <Space wrap className="follow-up-quick-notes" style={{ marginBottom: 16 }}>
-              {quickNotes.map(note => (
-                <Button size="small" key={note.value} onClick={() => appendNote(note.label)}>{note.label}</Button>
-              ))}
-            </Space>
-          )}
-          {quickNotes.length === 0 && !dictLoading && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无快捷备注" style={{ margin: '0 0 16px' }}/>}
-          <Form.Item name="remark" label="跟进备注" rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }]}>
-            <Input.TextArea rows={3} maxLength={2000} showCount/>
-          </Form.Item>
-          <Form.Item
-            name="nextFollowUpAt"
-            label="下次跟进时间"
-            rules={[
-              { required: true, message: '请选择下次跟进时间' },
-              { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }
-            ]}
-          >
-            <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} disabledDate={date => date.endOf('day').isBefore(dayjs())}/>
-          </Form.Item>
-          <Space wrap className="follow-up-day-shortcuts" style={{ marginBottom: 16 }}>
-            {FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => (
-              <Button size="small" key={shortcut.key} onClick={() => form.setFieldValue('nextFollowUpAt', applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>
-            ))}
-          </Space>
-          <Form.Item label={`跟进图片${images.some(image => image.status === 'uploading') ? '（上传中）' : ''}`}>
-            <DeferredAttachmentPicker value={images} onChange={setImages} accept="image/jpeg,image/png,image/webp"/>
-          </Form.Item>
-        </Form>
-      )}
+      <Form form={form} layout="vertical" className="follow-up-form follow-up-form--shared" disabled={submitting}>
+        <FollowUpFormFields key={lead.id} lead={lead} form={form} dictionaries={dictionaries} stages={stages} images={images} onImagesChange={setImages} disabled={submitting}/>
+      </Form>
     </Modal>
   )
 }

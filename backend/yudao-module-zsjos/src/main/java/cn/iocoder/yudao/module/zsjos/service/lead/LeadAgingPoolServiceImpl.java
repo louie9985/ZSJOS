@@ -100,13 +100,16 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         List<LeadInboxFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
                 .map(group -> {
-                    List<LeadInboxFilterProfileRespVO.OptionVO> options = group.getOptions().stream()
-                            .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
-                            .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel()))
+                    List<LeadInboxFilterProfileRespVO.SectionVO> sections = group.getSections().stream()
+                            .map(section -> new LeadInboxFilterProfileRespVO.SectionVO(section.getKey(),
+                                    section.getLabel(),
+                                    section.getOptions().stream()
+                                            .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
+                                            .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(
+                                                    option.getKey(), option.getLabel()))
+                                            .toList()))
+                            .filter(section -> !section.getOptions().isEmpty())
                             .toList();
-                    List<LeadInboxFilterProfileRespVO.SectionVO> sections = options.isEmpty() ? List.of() : List.of(
-                            new LeadInboxFilterProfileRespVO.SectionVO("pool_status",
-                                    group.getSectionLabel() == null ? "公海状态" : group.getSectionLabel(), options));
                     return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), sections);
                 }).toList();
         return new LeadInboxFilterProfileRespVO(groups);

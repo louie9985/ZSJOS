@@ -1,12 +1,21 @@
-import { Alert, App, Button, Empty, Select, Space, Spin } from 'antd'
+import { Alert, App, Button, ConfigProvider, Empty, Select, Space, Spin } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../services/api'
 import { materialApi, type Material, type MaterialType } from '../services/materialApi'
 import ViralAccountMaterialForm from './ViralAccountMaterialForm'
 import ViralContentMaterialForm from './ViralContentMaterialForm'
+import { APP_ROUTES } from '../constants'
+import { useWorkbenchPageGuard } from './WorkbenchPageNavigation'
+import { useRetainedPageActive } from '../layouts/RetainedReviewRoutes'
 
 export default function ViralDecomposeWorkspace({ code }: { code: 'viral_account' | 'viral_content' }) {
   const { message, modal } = App.useApp()
+  const active = useRetainedPageActive()
+  const activeRef = useRef(active); activeRef.current = active
+  const popupHost = useRef<HTMLElement>(null)
+  const busy = useRef(false)
+  const [busyState, setBusyState] = useState(false)
+  const onBusyChange = (value: boolean) => { busy.current = value; setBusyState(value) }
   const [type, setType] = useState<MaterialType>()
   const [dicts, setDicts] = useState<Record<string, Array<{ value: string; label: string }>>>({})
   const [drafts, setDrafts] = useState<Material[]>([])
@@ -43,7 +52,20 @@ export default function ViralDecomposeWorkspace({ code }: { code: 'viral_account
     finally { if (run === generation.current) setLoading(false) }
   }, [code])
   useEffect(() => { void load(); return () => { generation.current++ } }, [load])
-  const discard = async () => !dirty.current || await modal.confirm({ title: '放弃尚未保存的修改？', content: '已保存的草稿会保留。', okText: '放弃修改', cancelText: '继续填写' })
+  const discard = async () => {
+    if (busy.current) { message.warning('正在保存或上传，请完成后再关闭或更换草稿'); return false }
+    return !dirty.current || await modal.confirm({ title: '放弃尚未保存的修改？', content: '已保存的草稿会保留。', okText: '放弃修改', cancelText: '继续填写' })
+  }
+  const path = code === 'viral_account' ? APP_ROUTES.VIRAL_ACCOUNT_DECOMPOSE : APP_ROUTES.VIRAL_CONTENT_DECOMPOSE
+  // Activating this tab preserves its editor. Only destruction needs confirmation.
+  useWorkbenchPageGuard(path, async destination => destination !== undefined || await discard())
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty.current || busy.current) { event.preventDefault(); event.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [])
   const choose = async (id?: number) => {
     if (!await discard()) return
     const run = ++generation.current; setLoading(true); setError('')
@@ -55,23 +77,24 @@ export default function ViralDecomposeWorkspace({ code }: { code: 'viral_account
     } catch (cause) { if (run === generation.current) setError(cause instanceof Error ? cause.message : '草稿读取失败') }
     finally { if (run === generation.current) setLoading(false) }
   }
-  const saved = async ({ submitted }: { materialId: number; submitted: boolean }) => {
-    dirty.current = false
-    message.success(submitted ? '已提交审批' : '草稿已保存，可继续填写')
+  const saved = async ({ submitted, hasUnsavedChanges = false }: { materialId: number; submitted: boolean; hasUnsavedChanges?: boolean }) => {
+    dirty.current = hasUnsavedChanges
+    if (activeRef.current) message.success(submitted ? '已提交审批' : '草稿已保存，可继续填写')
     // Keep the editor mounted on draft save, including when refreshing the list fails.
     if (submitted) { setEditing(false); setMaterial(undefined) }
-    try { if (type) setDrafts(await readDrafts(type.id)) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '草稿已保存，列表刷新失败') }
+    const run = generation.current
+    try { if (type) { const rows = await readDrafts(type.id); if (run === generation.current) setDrafts(rows) } }
+    catch (cause) { if (run === generation.current) setError(cause instanceof Error ? cause.message : '草稿已保存，列表刷新失败') }
   }
   const Editor = code === 'viral_content' ? ViralContentMaterialForm : ViralAccountMaterialForm
-  return <section className="workspace-page standalone-viral-decompose">
-    <Space wrap><Select aria-label="选择已保存草稿" placeholder="选择已保存草稿" value={material?.id} disabled={loading} style={{ minWidth: 240 }}
+  return <ConfigProvider getPopupContainer={() => popupHost.current || document.body}><section ref={popupHost} className="workspace-page standalone-viral-decompose">
+    <Space wrap><Select aria-label="选择已保存草稿" placeholder="选择已保存草稿" value={material?.id} disabled={loading || busyState} style={{ minWidth: 240 }}
       options={drafts.map(row => ({ value: row.id, label: `${row.title} · ${row.materialNo}`, disabled: !row.availableActions.includes('UPDATE') }))} onChange={id => void choose(id)} />
-      <Button disabled={loading || !type || !ready} onClick={() => void choose()}>新建拆解</Button>
-      <Button disabled={loading} onClick={() => { void discard().then(allowed => { if (allowed) void load() }) }}>刷新草稿列表</Button></Space>
+      <Button disabled={loading || busyState || !type || !ready} onClick={() => void choose()}>新建拆解</Button>
+      <Button disabled={loading || busyState} onClick={() => { void discard().then(allowed => { if (allowed) void load() }) }}>刷新草稿列表</Button></Space>
     {error && <Alert type="error" showIcon message={error} />}
     {editing && type ? <Spin spinning={loading}><Editor key={formKey} mode={material ? 'edit' : 'create'} type={type} material={material} dicts={dicts}
-      onDirty={() => { dirty.current = true }} onClose={() => { void discard().then(allowed => { if (allowed) { setEditing(false); dirty.current = false } }) }} onSaved={saved}
+      onBusyChange={onBusyChange} onDirty={() => { dirty.current = true }} onClose={() => { void discard().then(allowed => { if (allowed) { setEditing(false); dirty.current = false } }) }} onSaved={saved}
       {...(code === 'viral_content' ? { showDraftNavigation: false } : {})} /></Spin> : loading ? <Spin /> : !type ? <Empty description="拆解模板尚未发布" /> : !error && <Empty description={drafts.length ? '请选择草稿继续填写，或新建拆解' : '暂无草稿，点击新建拆解开始填写'} />}
-  </section>
+  </section></ConfigProvider>
 }

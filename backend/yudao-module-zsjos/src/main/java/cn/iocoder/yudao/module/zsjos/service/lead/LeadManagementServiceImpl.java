@@ -110,16 +110,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
                 : inboxFilterConfigService.resolveQuery(
                         inboxFilterConfigService.getPublishedConfig(reqVO.getAudience()),
-                        reqVO.getInboxGroup(), reqVO.getInboxStage());
+                        reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
         LeadVisibilityScope visibility = resolveVisibilityScope(relationScope, userId);
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        List<String> statuses = List.copyOf(inboxQuery.statuses());
-        List<String> assignmentStatuses = List.copyOf(inboxQuery.assignmentStatuses());
-        List<String> handlingStages = List.copyOf(inboxQuery.handlingStages());
-        boolean matchNone = inboxQuery.matchNone();
         PageResult<LeadDO> page = leadMapper.selectManagementPageByScope(reqVO,
                 visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
-                statuses, assignmentStatuses, handlingStages, matchNone, matchedLeadIds);
+                inboxQuery, matchedLeadIds);
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -217,7 +213,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         reqVO.setRelationScope("owned");
         reqVO.setOwnerUserId(ownerUserId);
         PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, ownerUserId,
-                List.of(), List.of(), List.of(), false, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
+                List.of(), null, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
@@ -311,6 +307,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         String permission = switch (audience) {
             case INBOX_AUDIENCE_SUBMITTER -> PERMISSION_QUERY_SUBMITTED;
             case INBOX_AUDIENCE_OWNER -> PERMISSION_QUERY_OWNED;
+            // 统一客资管理页不按提交人/负责人拆分，只需列表查询权限。
+            case INBOX_AUDIENCE_MANAGEMENT -> null;
             case null -> null;
             default -> throw exception(LEAD_PERMISSION_DENIED);
         };
@@ -320,13 +318,14 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private LeadInboxFilterProfileRespVO.GroupVO toProfileGroup(LeadInboxFilterConfigVO.GroupVO group) {
-        List<LeadInboxFilterProfileRespVO.SectionVO> sections = group.getOptions().isEmpty() ? List.of() : List.of(
-                new LeadInboxFilterProfileRespVO.SectionVO("current_stage",
-                        group.getSectionLabel() == null || group.getSectionLabel().isBlank()
-                                ? "当前环节" : group.getSectionLabel(),
-                        group.getOptions().stream().filter(option -> Boolean.TRUE.equals(option.getEnabled()))
+        List<LeadInboxFilterProfileRespVO.SectionVO> sections = group.getSections().stream()
+                .map(section -> new LeadInboxFilterProfileRespVO.SectionVO(section.getKey(), section.getLabel(),
+                        section.getOptions().stream()
+                                .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
                                 .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel()))
-                                .toList()));
+                                .toList()))
+                .filter(section -> !section.getOptions().isEmpty())
+                .toList();
         return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), sections);
     }
 
@@ -696,6 +695,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 }
             }
         } else if (STATUS_WON.equals(lead.getStatus())) {
+            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")
                     && lead.getSuspendedAt() == null
                     && agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)

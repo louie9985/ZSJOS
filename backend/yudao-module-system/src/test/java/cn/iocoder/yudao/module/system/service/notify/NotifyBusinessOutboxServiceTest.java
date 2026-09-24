@@ -27,6 +27,24 @@ class NotifyBusinessOutboxServiceTest {
     @Mock private NotifyMessageMapper notifyMessageMapper;
     @Mock private WecomOutboxDeliveryService wecomDeliveryService;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void inapplicableRuleIsTerminalSkippedWithAuditableReason(boolean wecom) {
+        var row = row(1L, "event:skip"); row.setAttemptCount(2);
+        if (wecom) row.setPayload(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(new WecomOutboxPayload()));
+        when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(row));
+        when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> { row.setClaimToken(call.getArgument(1)); return row; });
+        var skipped = NotifySendResult.skipped("LEAD_SOURCE_LINK_NOT_APPLICABLE");
+        if (wecom) when(wecomDeliveryService.deliver(eq(row), any())).thenReturn(skipped);
+        else when(eventProcessor.processConfirmed(any())).thenReturn(skipped);
+        service.deliverDue();
+        assertEquals("skipped", row.getStatus());
+        assertEquals("LEAD_SOURCE_LINK_NOT_APPLICABLE", row.getLastError());
+        assertEquals(2, row.getAttemptCount()); assertNull(row.getLeaseUntil()); assertNull(row.getClaimToken());
+        assertNotNull(row.getSucceededAt());
+    }
+
     @Test
     void permanentFailureIsNotRetriedAndUpdateUsesClaimToken() {
         NotifyBusinessOutboxDO row = row(1L, "event:1");

@@ -79,7 +79,6 @@ import { Dialog } from '@/components/Dialog'
 import * as Api from '@/api/zsjos/advancedFilter'
 import * as TemplateApi from '@/api/zsjos/advancedFilterTemplate'
 import * as DictDataApi from '@/api/system/dict/dict.data'
-import * as UserApi from '@/api/system/user'
 import ZsjosAdvancedFilterGroup from './ZsjosAdvancedFilterGroup.vue'
 
 const props = defineProps<{
@@ -245,8 +244,7 @@ const summarize = (condition: Api.AdvancedFilterCondition) => {
 const sourceOptions = async (source?: string): Promise<Api.AdvancedFilterOption[]> => {
   if (!source) return []
   if (source.startsWith('dict:')) return (await DictDataApi.getDictDataByType(source.slice(5))).map((item) => ({ value: item.value, label: item.label }))
-  if (source === 'visible-users') return (await UserApi.getSimpleUserList()).map((item) => ({ value: item.id, label: item.nickname }))
-  return []
+  throw new Error(`不支持的筛选选项来源: ${source}`)
 }
 const retryOptions = async (fieldKey: string) => {
   const field = fields.value.find((item) => item.fieldKey === fieldKey)

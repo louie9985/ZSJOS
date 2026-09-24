@@ -12,6 +12,8 @@ public class MaterialPageReqVO extends PageParam {
     private Long materialTypeId;
     private Long accountId;
     private String status;
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|IN_APPROVAL|EFFECTIVE|REJECTED")
+    private String versionStatus;
     private String source;
     private Boolean mine;
     private Boolean favorite;

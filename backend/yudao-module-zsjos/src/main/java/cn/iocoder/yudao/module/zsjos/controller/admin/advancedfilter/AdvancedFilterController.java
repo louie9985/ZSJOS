@@ -18,8 +18,10 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/advanced-filter")
 public class AdvancedFilterController {
     @Resource private AdvancedFilterService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService financeTrace;
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.LeadFilterOrganizationService organizations;
     @Resource private AdvancedFilterVisibleUserService visibleUserService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterProductOptions productOptions;
 
     @GetMapping("/catalog")
     @Operation(summary = "获得高级筛选字段目录")
@@ -35,7 +37,9 @@ public class AdvancedFilterController {
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
             + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
-            + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))")
+            + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))"
+            + " || (#scene == 'cashback' && @ss.hasAnyPermissions('zsjos:cashback:my-query','zsjos:cashback:finance-query'))"
+            + " || (#scene == 'withdrawal' && @ss.hasAnyPermissions('zsjos:withdrawal:my-query','zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {
         var userScope = visibleUserService.resolve(scene, getLoginUserId());
         var catalog = userScope.supported() ? service.catalog(scene, userScope.options())
@@ -44,10 +48,15 @@ public class AdvancedFilterController {
             var organizationOptions = organizations.options(userScope.options());
             catalog = new AdvancedFilterCatalogRespVO(catalog.fields().stream().map(field ->
                     "visible-departments".equals(field.optionSource())
-                            ? new AdvancedFilterCatalogRespVO.FieldVO(field.fieldKey(), field.group(), field.label(),
-                            field.valueType(), field.operators(), null, organizationOptions) : field).toList(),
+                            ? field.withResolvedOptions(organizationOptions) : field).toList(),
                     catalog.relativeDateOptions());
         }
-        return success(catalog);
+        if (java.util.Set.of("cashback", "withdrawal").contains(scene)) {
+            catalog = new AdvancedFilterCatalogRespVO(catalog.fields().stream().filter(field -> {
+                String kind = AdvancedFilterService.financeSourceKind(field.fieldKey());
+                return kind == null || financeTrace.canQuerySource(kind);
+            }).toList(), catalog.relativeDateOptions());
+        }
+        return success(productOptions.resolve(catalog));
     }
 }

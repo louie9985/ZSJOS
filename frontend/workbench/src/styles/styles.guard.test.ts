@@ -130,7 +130,7 @@ describe('spacing and sizing anchors', () => {
       /\.business-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.media-students-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
       ,/\.media-feature-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
-      ,/\.material-library-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
+      ,/\.material-library-item-copy \{[^}]*padding:\s*var\(--crm-card-pad\)/
       ,/\.content-review-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
       ,/\.announcement-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
     ]
@@ -206,15 +206,14 @@ describe('spacing and sizing anchors', () => {
     expect(detailFields).toMatch(/@media \(max-width: 768px\)[\s\S]*\.detail-field-grid\.columns-3[\s\S]*grid-template-columns: minmax\(0, 1fr\)/)
   })
 
-  it('keeps home announcements single-line with pinned highlight styling', () => {
+  it('keeps announcement titles stable above theme-aware status metadata', () => {
     const todayTasks = readFileSync(join(ROOT, 'pages/today-tasks.css'), 'utf8')
-
-    expect(todayTasks).toMatch(/\.home-announcement-item \{[^}]*display: flex[^}]*align-items: center[^}]*justify-content: space-between/)
-    expect(todayTasks).toMatch(/\.home-announcement-title \{[^}]*flex: 1 1 auto[^}]*min-width: 0/)
+    expect(todayTasks).toMatch(/\.home-announcement-item \{[^}]*flex-direction: column/)
     expect(todayTasks).toMatch(/\.home-announcement-title-text \{[^}]*overflow: hidden[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/)
-    expect(todayTasks).toMatch(/\.home-announcement-item time \{[^}]*flex: 0 0 auto[^}]*white-space: nowrap/)
-    expect(todayTasks).toMatch(/\.home-announcement-item\.highlighted \{[^}]*background: var\(--crm-color-primary-bg\)/)
-    expect(todayTasks).toMatch(/\.home-announcement-item\.highlighted:hover,[\s\S]*\.home-announcement-item\.highlighted:focus-visible \{[^}]*background: color-mix\(in srgb, var\(--crm-color-primary-bg\)/)
+    expect(todayTasks).toContain('background: var(--crm-notice-pin-bg)')
+    expect(todayTasks).toContain('color: var(--crm-color-error-text)')
+    expect(todayTasks).toContain('prefers-reduced-motion: reduce')
+    expect(todayTasks).toContain('animation-play-state: paused !important')
   })
 
   it('aligns detail field labels left and values right in the component itself', () => {

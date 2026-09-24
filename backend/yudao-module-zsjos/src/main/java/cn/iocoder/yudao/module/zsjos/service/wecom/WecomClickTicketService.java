@@ -70,6 +70,11 @@ public class WecomClickTicketService {
             LeadDO lead = context.getBizId() == null ? null : leadMapper.selectById(context.getBizId());
             if (lead == null || StrUtil.isBlank(lead.getLeadNo())) return null;
             payload.setLeadNo(lead.getLeadNo());
+            if (("zsjos.lead.assigned".equals(context.getSceneCode())
+                    || "zsjos.lead.reassigned".equals(context.getSceneCode())) && context.getVariables() != null) {
+                Object historyId = context.getVariables().get("assignment.historyId");
+                if (historyId != null) payload.setAssignmentHistoryId(Long.valueOf(historyId.toString()));
+            }
         }
         if (AUDIENCE_PARTNER.equals(audience) && "sales_order".equals(context.getBizType())) {
             var order = context.getBizId() == null ? null : orderMapper.selectById(context.getBizId());
@@ -113,12 +118,22 @@ public class WecomClickTicketService {
         }
         if (AUDIENCE_ADMIN.equals(payload.getAudience())) {
             if ("lead".equals(payload.getBizType())) {
+                if (payload.getAssignmentHistoryId() != null
+                        && ("zsjos.lead.assigned".equals(payload.getSceneCode())
+                        || "zsjos.lead.reassigned".equals(payload.getSceneCode()))) {
+                    return UriComponentsBuilder.fromPath("/zsjos/leads/manage")
+                            .queryParam("assignmentLeadId", payload.getBizId())
+                            .queryParam("assignmentHistoryId", payload.getAssignmentHistoryId()).build().toUriString();
+                }
                 return StrUtil.isBlank(payload.getLeadNo()) ? null
                         : UriComponentsBuilder.fromPath("/zsjos/leads/manage")
                         .queryParam("leadNo", payload.getLeadNo()).build().toUriString();
             }
             if ("sales_order".equals(payload.getBizType())) {
                 return "/zsjos/sales-order-approvals?workType=approval&orderId=" + payload.getBizId();
+            }
+            if ("withdrawal".equals(payload.getBizType())) {
+                return "/zsjos/withdrawal?withdrawalId=" + payload.getBizId();
             }
             if ("student".equals(payload.getBizType())) {
                 return "/zsjos/my-students?personId=" + payload.getBizId();
@@ -185,5 +200,6 @@ public class WecomClickTicketService {
         private Long bizId;
         private String leadNo;
         private Long orderLeadId;
+        private Long assignmentHistoryId;
     }
 }

@@ -89,6 +89,76 @@ class LeadDispatchServiceImplTest {
     @Mock
     private LeadClaimDailyCounterMapper claimDailyCounterMapper;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void rejectionAndTimeoutPublishReassignment(boolean timeout) {
+        LeadDO lead = retryableLead(); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L);
+        lead.setPendingExpiresAt(java.time.LocalDateTime.now().minusSeconds(1));
+        if (timeout) when(leadMapper.selectExpiredPending(any())).thenReturn(List.of(lead));
+        else when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("unassigned"), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(1);
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of(10L));
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(11L)));
+        when(dispatchRedisRepository.poolSize()).thenReturn(1L);
+        when(dispatchRedisRepository.rotateNext()).thenReturn(11L);
+        when(dispatchRedisRepository.isOnline(11L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(11L)).thenReturn(true);
+        when(dispatchRedisRepository.tryReserve(1L, 11L, 120)).thenReturn(true);
+        when(leadMapper.updateUnassignedToPending(eq(1L), eq(11L), any(), eq(2), any())).thenReturn(1);
+        doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(92L); return 1; }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+        if (timeout) assertEquals(1, service.processExpired()); else service.reject(1L, 10L);
+        verify(notifyEventPublisher).publish(eq("zsjos.lead.reassigned"), eq(1L), eq("lead-dispatch:92"), any(), any(),
+                org.mockito.ArgumentMatchers.argThat(context -> Long.valueOf(11L).equals(context.get("pendingSalesUserId"))
+                        && Integer.valueOf(2).equals(context.get("assignment.attempt"))));
+    }
+
+    @Test
+    void oldRoundCannotAcceptNewAssignmentToSameSalesUser() {
+        LeadDO lead = lead(); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var latest = new LeadAssignmentHistoryDO(); latest.setId(90L); latest.setCandidateUserId(10L);
+        when(historyMapper.selectLatestDispatch(1L, true)).thenReturn(latest);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.accept(1L, 10L, 89L));
+        verify(leadMapper, never()).updatePendingResult(any(), any(), any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(lifecycleTaskService);
+    }
+
+    @Test
+    void currentRoundAcceptsUnderLeadLock() {
+        LeadDO lead = lead(); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var latest = new LeadAssignmentHistoryDO(); latest.setId(90L); latest.setCandidateUserId(10L);
+        when(historyMapper.selectLatestDispatch(1L, true)).thenReturn(latest);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
+        service.accept(1L, 10L, 90L);
+        var order = org.mockito.Mockito.inOrder(leadMapper, historyMapper);
+        order.verify(leadMapper).selectByIdForUpdate(1L, 1L);
+        order.verify(historyMapper).selectLatestDispatch(1L, true);
+        order.verify(leadMapper).updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any());
+    }
+
+    @Test
+    void expiredRoundCannotAcceptBeforeTimeoutScannerRuns() {
+        LeadDO lead = lead(); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L);
+        lead.setPendingExpiresAt(java.time.LocalDateTime.now().minusSeconds(1));
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var latest = new LeadAssignmentHistoryDO(); latest.setId(90L); latest.setCandidateUserId(10L);
+        when(historyMapper.selectLatestDispatch(1L, true)).thenReturn(latest);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.accept(1L, 10L, 90L));
+        verify(leadMapper, never()).updatePendingResult(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void specifiedDispatchPublishesRoundAndNullDeadline() {
+        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
+        doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(91L); return 1; }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+        service.start(lead, 10L, 20L);
+        verify(notifyEventPublisher).publish(eq("zsjos.lead.assigned"), eq(1L), eq("lead-dispatch:91"), eq(20L), any(),
+                org.mockito.ArgumentMatchers.argThat(context -> context.containsKey("lead.pendingExpiresAt")
+                        && context.get("lead.pendingExpiresAt") == null && Long.valueOf(91L).equals(context.get("assignment.historyId"))));
+    }
+
     @Test
     void specifiedEducationAcceptanceFreezesEducationHistory() {
         LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
@@ -244,7 +314,10 @@ class LeadDispatchServiceImplTest {
         verify(dispatchRedisRepository).tryReserve(1L, 10L, 120);
         verify(lifecycleTaskService).createAssignmentTask(eq(1L), eq(10L), eq(88L), any(), eq("auto"));
         verify(applicationEventPublisher).publishEvent(any(LeadAssignmentRealtimeEvent.class));
-        verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
+        verify(notifyEventPublisher).publish(eq("zsjos.lead.assigned"), eq(1L), eq("lead-dispatch:88"), any(), any(),
+                org.mockito.ArgumentMatchers.argThat(context -> Long.valueOf(88L).equals(context.get("assignment.historyId"))
+                        && Long.valueOf(10L).equals(context.get("pendingSalesUserId"))
+                        && context.get("lead.pendingExpiresAt") != null));
     }
 
     @Test

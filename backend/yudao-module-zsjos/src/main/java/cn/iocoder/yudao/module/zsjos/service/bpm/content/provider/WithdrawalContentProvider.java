@@ -29,6 +29,7 @@ public class WithdrawalContentProvider implements BpmApprovalContentProvider {
     public static final String PREFIX = "withdrawal:";
     /** 财务视角才能看到打款凭证、流水号等结清信息。 */
     private static final String PERMISSION_FINANCE_QUERY = "zsjos:withdrawal:finance-query";
+    private static final String PERMISSION_ADMIN_QUERY = "zsjos:withdrawal:admin-query";
 
     @Resource
     private WithdrawalService withdrawalService;
@@ -99,7 +100,7 @@ public class WithdrawalContentProvider implements BpmApprovalContentProvider {
 
         card.getGroups().add(group("收款信息", List.of(
                 BpmApprovalFieldVO.of("收款人", item.getAccountNameSnapshot()),
-                BpmApprovalFieldVO.of("银行卡", item.getMaskedCardNumber()),
+                BpmApprovalFieldVO.of("银行卡", item.getCardNumber() != null ? item.getCardNumber() : item.getMaskedCardNumber()),
                 BpmApprovalFieldVO.of("开户行", item.getBankNameSnapshot()),
                 BpmApprovalFieldVO.of("支行", item.getBranchNameSnapshot()))));
 
@@ -124,7 +125,8 @@ public class WithdrawalContentProvider implements BpmApprovalContentProvider {
      * 权限不足时业务侧抛异常，这里降级为"不展示业务内容"。
      */
     private WithdrawalRespVO load(Long id, Long viewerId) {
-        boolean finance = viewerId != null && permissionApi.hasAnyPermissions(viewerId, PERMISSION_FINANCE_QUERY);
+        boolean finance = viewerId != null && permissionApi.hasAnyPermissions(viewerId,
+                PERMISSION_FINANCE_QUERY, PERMISSION_ADMIN_QUERY);
         try {
             return withdrawalService.getDetail(id, viewerId, finance);
         } catch (Exception ex) {

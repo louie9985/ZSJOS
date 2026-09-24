@@ -34,6 +34,15 @@ class LeadLifecycleTaskServiceTest {
     @Mock private LeadFollowUpRuleService followUpRuleService;
 
     @Test
+    void omittedNextTimeCompletesCurrentReminderWithoutCreatingAnother() {
+        LocalDateTime now = LocalDateTime.now();
+        service.replaceFollowUpReminder(1L, 20L, "opportunity", 50L, null, now);
+        verify(taskCommandService).complete("lead_follow_up_reminder", 1L, 20L, now);
+        org.mockito.Mockito.verifyNoMoreInteractions(taskCommandService);
+        org.mockito.Mockito.verifyNoInteractions(performanceSnapshotService);
+    }
+
+    @Test
     void createsFirstFollowUpTaskFromCurrentRuleSnapshot() {
         LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO();
         rule.setId(7L); rule.setVersion(3); rule.setFirstFollowUpTimeoutMinutes(90);

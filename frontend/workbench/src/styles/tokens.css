@@ -20,6 +20,12 @@
   --crm-color-success: #52c41a;
   --crm-color-warning: #faad14;
   --crm-color-error: #ff4d4f;
+  --crm-color-error-text: #a8071a;
+  --crm-notice-pin: #1677ff;
+  --crm-notice-pin-text: #003eb3;
+  --crm-notice-pin-bg: #e6f4ff;
+  --crm-notice-pin-border: #91caff;
+  --crm-notice-glow-opacity: 0.28;
 
   /* ---- 状态色的淡背景与描边 ----
    * 与主色族的 4 件套结构对齐。运行时由 ThemeVars 取 antd 的 colorSuccessBg /

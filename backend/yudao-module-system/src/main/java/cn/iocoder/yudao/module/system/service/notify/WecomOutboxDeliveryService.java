@@ -34,6 +34,13 @@ public class WecomOutboxDeliveryService {
         }
         WecomOutboxPayload state = JsonUtils.parseObjectQuietly(row.getPayload(), WecomOutboxPayload.class);
         if (state == null) return NotifySendResult.failure("NOTIFY_PAYLOAD_INVALID", "企微投递快照无法解析", false);
+        if (state.getRecipients() != null && state.getRecipients().stream()
+                .anyMatch(recipient -> "pending".equals(recipient.getStatus()) || recipient.isRetryable())) {
+            var rule = ruleService.getEnabledRules(event.getSceneCode()).stream()
+                    .filter(value -> Objects.equals(value.getId(), row.getTargetRuleId())).findFirst().orElseThrow();
+            NotifySendResult applicability = processor.evaluateRule(event, rule);
+            if (applicability != null) return applicability;
+        }
         if (state.getRecipients() == null) {
             var prepared = processor.prepareWecom(event);
             if (prepared.failure() != null) return prepared.failure();
@@ -56,6 +63,13 @@ public class WecomOutboxDeliveryService {
             }
             if (!"pending".equals(recipient.getStatus()) && !recipient.isRetryable()) continue;
             try {
+                String skipReason = processor.deliverySkipReason(event);
+                if (skipReason != null) {
+                    recipient.setStatus("skipped"); recipient.setRetryable(false);
+                    recipient.setErrorCode(skipReason);
+                    checkpoint(row, state);
+                    continue;
+                }
                 recipient.setContext(adapter.prepare(recipient.getContext()));
             } catch (RuntimeException exception) {
                 recipient.setStatus("failed"); recipient.setRetryable(true);

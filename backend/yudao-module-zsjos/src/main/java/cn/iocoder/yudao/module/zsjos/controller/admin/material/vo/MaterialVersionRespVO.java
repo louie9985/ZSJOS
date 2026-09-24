@@ -22,6 +22,7 @@ public class MaterialVersionRespVO {
     private Map<String, Object> dictSnapshot;
     private List<MaterialFileRespVO> files;
     private String processInstanceId;
+    private List<String> pendingApproverNames;
     private String processDefinitionId;
     private String processDefinitionKey;
     private Integer processDefinitionVersion;

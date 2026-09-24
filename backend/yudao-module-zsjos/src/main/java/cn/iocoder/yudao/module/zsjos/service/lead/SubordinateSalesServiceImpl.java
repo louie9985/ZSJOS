@@ -96,6 +96,16 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
             case "subordinate.convertedLeadCount" -> row.getConvertedLeadCount();
             case "subordinate.effectiveOrderCount" -> row.getEffectiveOrderCount();
             case "subordinate.effectiveOrderAmount" -> row.getEffectiveOrderAmount();
+            case "subordinate.todayAssignedCount" -> row.getTodayAssignedCount();
+            case "subordinate.todayMissedCount" -> row.getTodayMissedCount();
+            case "subordinate.todayReceivedCount" -> row.getTodayReceivedCount();
+            case "subordinate.todayQualifiedCount" -> row.getTodayQualifiedCount();
+            case "subordinate.todayFollowUpRecordCount" -> row.getTodayFollowUpRecordCount();
+            case "subordinate.todayOrderAmount" -> row.getTodayOrderAmount();
+            case "subordinate.pendingQualificationCount" -> row.getPendingQualificationCount();
+            case "subordinate.todayFollowUpTotalCount" -> row.getTodayFollowUpTotalCount();
+            case "subordinate.todayFollowUpRemainingCount" -> row.getTodayFollowUpRemainingCount();
+            case "subordinate.canReceiveNewLeads" -> row.getCanReceiveNewLeads();
             default -> null;
         };
     }

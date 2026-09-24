@@ -37,8 +37,11 @@ public interface WithdrawalMapper extends BaseMapperX<WithdrawalDO> {
                 .geIfPresent(WithdrawalDO::getPaidAt, req.getPaidAtFrom())
                 .leIfPresent(WithdrawalDO::getPaidAt, req.getPaidAtTo());
         query.likeIfPresent(WithdrawalDO::getWithdrawalNo, req.getWithdrawalNo())
-                .likeIfPresent(WithdrawalDO::getWithdrawalNo, req.getKeyword())
                 .likeIfPresent(WithdrawalDO::getBankTransactionNo, req.getBankTransactionNo());
+        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+            query.and(q -> q.like(WithdrawalDO::getWithdrawalNo, req.getKeyword().trim())
+                    .or().like(WithdrawalDO::getBankTransactionNo, req.getKeyword().trim()));
+        }
         return selectPage(req, query);
     }
     default PageResult<WithdrawalDO> selectPartnerPage(WithdrawalPageReqVO req, Long partnerId) {

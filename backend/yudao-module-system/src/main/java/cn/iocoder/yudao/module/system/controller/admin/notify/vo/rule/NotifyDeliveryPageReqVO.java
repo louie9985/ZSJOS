@@ -10,6 +10,6 @@ import lombok.EqualsAndHashCode;
 public class NotifyDeliveryPageReqVO extends PageParam {
     private Long ruleId;
     private String sceneCode;
-    @Pattern(regexp = "pending|processing|succeeded|failed")
+    @Pattern(regexp = "pending|processing|succeeded|failed|skipped")
     private String status;
 }

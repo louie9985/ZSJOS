@@ -28,6 +28,19 @@ class LeadFollowUpTimeJsonContractTest {
     }
 
     @Test
+    void optionalTimeAcceptsOmittedAndExplicitNullAtTheRequestBoundary() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            for (String next : new String[]{"", ",\"nextFollowUpAt\":null"}) {
+                String json = "{\"method\":\"phone\",\"result\":\"interested\","
+                        + "\"remark\":\"已联系\",\"idempotencyKey\":\"request-1\"" + next + "}";
+                var request = JsonUtils.parseObject(json, LeadFollowUpCreateReqVO.class);
+                org.junit.jupiter.api.Assertions.assertNull(request.getNextFollowUpAt());
+                assertTrue(factory.getValidator().validate(request).isEmpty());
+            }
+        }
+    }
+
+    @Test
     void responseSerializesDateTimesAsEpochMilliseconds() {
         LeadFollowUpRespVO response = new LeadFollowUpRespVO();
         response.setOccurredAt(LocalDateTime.ofInstant(Instant.ofEpochMilli(NEXT_FOLLOW_UP_AT),

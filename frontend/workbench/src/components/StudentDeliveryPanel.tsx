@@ -4,6 +4,7 @@ import { api, type StudentDeliveryPlan, type PositioningCard } from '../services
 import { formatTimestamp } from '../services/time'
 import PositioningDialog from './PositioningDialog'
 import { MaterialReference } from './PositioningSnapshot'
+import { createIdempotencyKey } from '../services/idempotency'
 
 export type StudentDeliveryPanelProps = { accountId:number;submittedBy:number;canQuery:boolean;canSubmit:boolean;canDefer:boolean;onChanged?:()=>void }
 const labels:Record<string,string>={ACTIVE:'交付进行中',WAITING_SOURCE:'等待定位卡生效',WAITING_PREDECESSOR:'等待前序阶段确认',EFFECTIVE:'延期已生效',PENDING:'待交付',OVERDUE:'已逾期',COMPLETED:'已完成',DEFER_PENDING:'历史延期审批中',WAITING:'待开始',MONITORING:'每周客资监测中',REPOSITIONING:'等待新版定位卡生效',CLOSED:'历史轮次',NEEDS_REVIEW:'缺少计时依据，待核实'}
@@ -17,7 +18,7 @@ export function StudentDeliveryPanel({accountId,submittedBy,canQuery,onChanged}:
  const open=(stageId:number,kind:'submit'|'defer')=>{form.resetFields();request.current=undefined;setEdit({stageId,kind})};
  const submit=async()=>{if(!stage||saving)return;let values:Record<string,unknown>;try{values=await form.validateFields()}catch{return}setSaving(true);setError('');try{
    const data=edit?.kind==='submit'?{deliveryCompleted:'是',diagnosis:values.diagnosis,improvement:values.improvement}:values;
-   const fingerprint=JSON.stringify(data);if(request.current?.fingerprint!==fingerprint)request.current={fingerprint,key:crypto.randomUUID()};
+   const fingerprint=JSON.stringify(data);if(request.current?.fingerprint!==fingerprint)request.current={fingerprint,key:createIdempotencyKey()};
    const base={stageId:stage.id,version:stage.version,idempotencyKey:request.current.key};
    if(edit?.kind==='submit')await api.studentDelivery.submit({...base,submittedBy,fieldValuesJson:JSON.stringify(data)});
    else await api.studentDelivery.defer({...base,requestedBy:submittedBy,newDueAt:(values.newDueAt as {valueOf:()=>number}).valueOf(),reason:String(values.reason).trim()});

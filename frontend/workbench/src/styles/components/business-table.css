@@ -17,6 +17,13 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+.business-table .ant-table-sticky-holder {
+  z-index: var(--crm-z-sticky);
+  background: var(--crm-bg-container);
+}
+.business-table .ant-table-thead > tr > th {
+  background: var(--crm-bg-container);
+}
 .business-table .business-table-action-cell { white-space: nowrap; }
 .business-table-resizable-header { touch-action: pan-y; }
 .business-table .ant-pro-table-list-toolbar-container {

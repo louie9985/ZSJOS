@@ -12,7 +12,7 @@ public class AdvancedFilterTemplateSaveReqVO {
     private Long id;
 
     @NotBlank(message = "筛选场景不能为空")
-    @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|subordinate_sales",
+    @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|subordinate_sales|cashback|withdrawal",
             message = "筛选场景无效")
     private String scene;
 

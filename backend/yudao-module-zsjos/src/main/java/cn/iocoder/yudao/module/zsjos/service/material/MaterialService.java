@@ -114,6 +114,8 @@ public class MaterialService {
     @Resource
     private BpmProcessInstanceApi processInstanceApi;
     @Resource
+    private cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi processTaskApi;
+    @Resource
     private PermissionApi permissionApi;
     @Resource
     private AdminUserApi adminUserApi;
@@ -655,16 +657,17 @@ public class MaterialService {
             }
             round.setStatus(VERSION_EFFECTIVE);
         } else {
-            if (versionMapper.transition(version.getId(), VERSION_IN_APPROVAL, VERSION_REJECTED,
-                    null, now, event.getReason()) != 1) {
+            boolean cancelled = BpmProcessInstanceStatusEnum.CANCEL.getStatus().equals(event.getStatus());
+            if (versionMapper.transition(version.getId(), VERSION_IN_APPROVAL, cancelled ? VERSION_DRAFT : VERSION_REJECTED,
+                    null, cancelled ? null : now, cancelled ? null : event.getReason()) != 1) {
                 return;
             }
             String status = material.getCurrentEffectiveVersionId() == null
-                    ? MATERIAL_REJECTED : MATERIAL_EFFECTIVE;
+                    ? (cancelled ? MATERIAL_DRAFT : MATERIAL_REJECTED) : MATERIAL_EFFECTIVE;
             if (materialMapper.finishRejectedVersion(material, status) != 1) {
                 throw exception(MATERIAL_VERSION_CONFLICT);
             }
-            round.setStatus(VERSION_REJECTED);
+            round.setStatus(cancelled ? "CANCELLED" : VERSION_REJECTED);
             round.setResultReason(event.getReason());
         }
         round.setLastEventKey(eventKey);
@@ -693,6 +696,18 @@ public class MaterialService {
         response.setValues(parseMap(version.getValuesJson()));
         response.setFields(JsonUtils.parseArray(version.getFieldSnapshotJson(), MaterialFieldDefinition.class));
         response.setDictSnapshot(parseMap(version.getDictSnapshotJson()));
+        if (VERSION_IN_APPROVAL.equals(version.getStatus()) && version.getProcessInstanceId() != null) {
+            var tasks = processTaskApi.getPendingTasks(version.getProcessInstanceId());
+            Set<Long> assigneeIds = tasks.stream().map(task -> task.assigneeUserId())
+                    .filter(Objects::nonNull).collect(Collectors.toSet());
+            Map<Long, AdminUserRespDTO> assignees = assigneeIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(assigneeIds);
+            response.setPendingApproverNames(tasks.stream().map(task -> {
+                AdminUserRespDTO user = task.assigneeUserId() == null ? null : assignees.get(task.assigneeUserId());
+                return user == null ? "待分配或审核人不可用" : user.getNickname();
+            }).distinct().toList());
+        } else {
+            response.setPendingApproverNames(List.of());
+        }
         List<MaterialFileDO> files = materialFileMapper.selectByVersionId(version.getId());
         response.setFiles(files.stream().map(this::toFileResp).toList());
         MaterialFileDO cover = files.stream().filter(file -> "__cover__".equals(file.getFieldKey())).findFirst()
@@ -741,12 +756,18 @@ public class MaterialService {
         return responses;
     }
 
-    private List<String> availableActions(MaterialDO material, MaterialVersionDO selected, Long userId,
+    List<String> availableActions(MaterialDO material, MaterialVersionDO selected, Long userId,
                                           boolean canManage) {
         LinkedHashSet<String> actions = new LinkedHashSet<>();
         boolean owner = Objects.equals(material.getOwnerUserId(), userId);
         MaterialVersionDO draft = material.getCurrentDraftVersionId() == null ? null
                 : versionMapper.selectById(material.getCurrentDraftVersionId());
+        // BPM still checks the starter, tenant, live state and model's cancellation setting.
+        if (draft != null && VERSION_IN_APPROVAL.equals(draft.getStatus())
+                && Objects.equals(draft.getSubmittedByUserId(), userId)
+                && permissionApi.hasAnyPermissions(userId, "bpm:process-instance:cancel")) {
+            actions.add("CANCEL");
+        }
         if (!MATERIAL_DISABLED.equals(material.getStatus()) && (owner || canManage)
                 && (draft == null || !VERSION_IN_APPROVAL.equals(draft.getStatus()))) {
             if (permissionApi.hasAnyPermissions(userId, "zsjos:material:update")) actions.add("UPDATE");

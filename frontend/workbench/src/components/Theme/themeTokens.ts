@@ -1,4 +1,26 @@
-import type { GlobalToken } from 'antd'
+import { theme, type GlobalToken } from 'antd'
+
+const noticePalettes = {
+  light: theme.getDesignToken({ token: { colorPrimary: '#1677ff' } }),
+  dark: theme.getDesignToken({ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#1677ff' } }),
+}
+
+function luminance(hex: string): number {
+  const rgb = hex.replace('#', '')
+  const full = rgb.length === 3 ? [...rgb].map(c => c + c).join('') : rgb
+  const linear = [0, 2, 4].map(i => {
+    const c = parseInt(full.slice(i, i + 2), 16) / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722
+}
+
+/** Pastel presets need a deeper text shade, while retaining their own status background. */
+function readableNoticeText(text: string, background: string, fallback: string) {
+  if (!/^#[\da-f]{3}([\da-f]{3})?$/i.test(text ?? '') || !/^#[\da-f]{6}$/i.test(background ?? '')) return fallback
+  const a = luminance(text), b = luminance(background)
+  return (Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 4.5 ? text : fallback
+}
 
 /**
  * Tier 1 桥接层：把当前 antd token 映射成 --crm-* CSS 变量。
@@ -15,6 +37,7 @@ import type { GlobalToken } from 'antd'
  */
 
 export interface CrmVarOptions {
+  isDark?: boolean
   /** 是否启用了自定义渐变背景（BACKGROUND_METAS 中非 'theme' 的项） */
   hasBackground: boolean
   /** 玻璃不透明度 0–100（默认 60），仅 hasBackground 时生效 */
@@ -52,6 +75,7 @@ const NO_EDGE = 'inset 0 0 0 0 transparent'
 const CHROME_TINT = 30
 
 export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record<string, string> {
+  const noticePalette = options.isDark ? noticePalettes.dark : noticePalettes.light
   const { hasBackground, glassOpacity = 60, glassBlur = 20 } = options
   const fontSize = token.fontSize ?? 14
   const fontSizeSM = token.fontSizeSM ?? fontSize
@@ -85,6 +109,12 @@ export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record
     '--crm-color-success': token.colorSuccess,
     '--crm-color-warning': token.colorWarning,
     '--crm-color-error': token.colorError,
+    '--crm-color-error-text': readableNoticeText(token.colorErrorTextActive, token.colorErrorBg, noticePalette.red9),
+    '--crm-notice-pin': noticePalette.colorPrimary,
+    '--crm-notice-pin-text': options.isDark ? noticePalette.blue9 : noticePalette.blue8,
+    '--crm-notice-pin-bg': noticePalette.colorPrimaryBg,
+    '--crm-notice-pin-border': noticePalette.colorPrimaryBorder,
+    '--crm-notice-glow-opacity': options.isDark ? '0.16' : '0.28',
 
     // ---- 状态色的淡背景与描边 ----
     // 取 antd 派生的 Bg / Border 色阶，而非在业务侧用 color-mix 手搓百分比：

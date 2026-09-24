@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkbenchMenu } from '../services/api'
 import { appendMenuTab, MAX_TABS, type TabItem } from './TabBar'
+import { RETAINED_PAGE_PATHS } from '../retainedPagePaths'
 
 const menu = (path: string, name = path): WorkbenchMenu => ({
   id: Number(path.replace(/\D/g, '')) || 1,
@@ -14,6 +15,13 @@ const menu = (path: string, name = path): WorkbenchMenu => ({
 })
 
 describe('Workbench tabs', () => {
+  it('never evicts a retained editor when opening more than the tab limit', () => {
+    let tabs = appendMenuTab([], menu('/home'))
+    for (const path of RETAINED_PAGE_PATHS) tabs = appendMenuTab(tabs, menu(path))
+    for (let index = 0; index < MAX_TABS * 2; index++) tabs = appendMenuTab(tabs, menu(`/other/${index}`))
+    expect(tabs).toHaveLength(MAX_TABS)
+    for (const path of RETAINED_PAGE_PATHS) expect(tabs.some(tab => tab.key === path)).toBe(true)
+  })
   it('reuses the menu identity while remembering the latest account address', () => {
     const first = appendMenuTab([], menu('/zsjos/media-students', '媒体学员'), '/zsjos/media-students?personId=1&accountId=2')
     const next = appendMenuTab(first, menu('/zsjos/media-students', '媒体学员'), '/zsjos/media-students?personId=3&accountId=4')

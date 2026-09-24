@@ -25,4 +25,20 @@ describe('Lead detail source dispatch tag', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
     expect(page).toContain('hideProviderOwner/>')
   })
+
+  it('keeps the mobile priority block separate from the auxiliary sidebar', () => {
+    const source = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
+    expectSourceToContainTokens(source, '<div className="lead-overview-side">')
+    expectSourceToContainTokens(source, '<div className="lead-overview-priority">')
+    expectSourceToContainTokens(source, '<aside className="lead-overview-aside">')
+    expect(source.indexOf('lead-overview-priority')).toBeLessThan(source.indexOf('lead-overview-aside'))
+
+    const styles = readFileSync('src/styles/components/lead-detail-v2.css', 'utf8')
+    expectSourceToContainTokens(styles, '.lead-overview-side {')
+    expectSourceToContainTokens(styles, 'display: contents;')
+    expectSourceToContainTokens(styles, '.lead-overview-priority {')
+    expectSourceToContainTokens(styles, 'order: -1;')
+    expectSourceToContainTokens(styles, '.lead-overview-aside {')
+    expectSourceToContainTokens(styles, 'order: 1;')
+  })
 })

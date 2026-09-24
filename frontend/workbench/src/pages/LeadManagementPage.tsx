@@ -1,4 +1,5 @@
 import BusinessTable from '../components/BusinessTable'
+import { createIdempotencyKey } from '../services/idempotency'
 import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -22,9 +23,9 @@ import {
   Tooltip,
   Typography
 } from 'antd'
-import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SwapOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SortAscendingOutlined, SwapOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type AdvancedFilterGroup, type AssignmentUser, type DictData, type LeadBatchAction, type LeadSimpleStatus, type LeadSortField, type ManagedLead, type ManagedLeadPageParams, type SubordinateBatchResult } from '../services/api'
+import { api, type AdvancedFilterGroup, type AssignmentUser, type DictData, type LeadBatchAction, type LeadInboxFilterProfile, type LeadSortField, type ManagedLead, type ManagedLeadPageParams, type SubordinateBatchResult } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { NameAvatar } from '../components/LeadDetailOverview'
@@ -45,6 +46,7 @@ import {
   DICT_TYPE,
   LEAD_ASSIGNMENT_STATUS_LABELS,
   LEAD_DISPATCH_MODE_LABELS,
+  LEAD_FILTER_SECTION,
   LEAD_HANDLING_STAGE_LABELS,
   LEAD_OPERATIONAL_STATUS_LABELS,
   LEAD_QUALIFICATION_STATUS_LABELS,
@@ -67,7 +69,6 @@ import {
 
 const PAGE_SIZE = 20
 type LeadAudience = 'all'
-type LeadSimpleStatusSelection = 'all' | LeadSimpleStatus
 type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean; pageSize?: number }
 type LeadBatchFormAction = LeadBatchAction
 
@@ -103,6 +104,18 @@ const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
   updateTime: 'updateTime',
 }
 
+const LEAD_INBOX_SORT_OPTIONS: Array<{ field?: LeadSortField; order?: 'ascend' | 'descend'; label: string }> = [
+  { label: '默认排序（最近活动时间）' },
+  { field: 'lastActivityAt', order: 'descend', label: '最近活动时间（从新到旧）' },
+  { field: 'lastActivityAt', order: 'ascend', label: '最近活动时间（从旧到新）' },
+  { field: 'updateTime', order: 'descend', label: '更新时间（从新到旧）' },
+  { field: 'updateTime', order: 'ascend', label: '更新时间（从旧到新）' },
+  { field: 'submittedAt', order: 'descend', label: '提交时间（从新到旧）' },
+  { field: 'submittedAt', order: 'ascend', label: '提交时间（从旧到新）' },
+  { field: 'leadNo', order: 'ascend', label: '客资编号（从小到大）' },
+  { field: 'leadNo', order: 'descend', label: '客资编号（从大到小）' },
+]
+
 const LEAD_BATCH_ACTIONS: Array<{ type: LeadBatchFormAction; label: string; permissions: string[]; icon: React.ReactNode; danger?: boolean }> = [
   { type: 'transfer', label: '批量转派', permissions: ['zsjos:lead:owner-transfer', 'zsjos:subordinate-sales:lead-transfer', 'zsjos:lead:qualification:manage'], icon: <SwapOutlined /> },
   { type: 'restore', label: '批量恢复', permissions: ['zsjos:subordinate-sales:lead-restore', 'zsjos:lead:qualification:manage'], icon: <RollbackOutlined /> },
@@ -131,17 +144,7 @@ function LeadBatchResultModal({ result, open, onClose }: { result?: SubordinateB
   </Modal>
 }
 
-const SIMPLE_STATUS_OPTIONS: Array<{ key: LeadSimpleStatusSelection; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'first_follow_pending', label: '待首跟' },
-  { key: 'following', label: '待跟进' },
-  { key: 'qualification_pending', label: '待判定' },
-  { key: 'deal_pending_approval', label: '成交待审核' },
-  { key: 'won', label: '已成交' },
-  { key: 'invalid', label: '已判无效' },
-  { key: 'closed', label: '已关闭' },
-  { key: 'suspended', label: '已挂起' }
-]
+const LEAD_FILTER_ALL = 'all'
 
 function productText(lead: ManagedLead) {
   const product = lead.primaryProduct
@@ -187,7 +190,11 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [loadMoreError, setLoadMoreError] = useState('')
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
-  const [simpleStatus, setSimpleStatus] = useState<LeadSimpleStatusSelection>('all')
+  // 分级筛选：服务端下发一级归类与各二级行的选项，三个选中项取交集。
+  const [filterProfile, setFilterProfile] = useState<LeadInboxFilterProfile>({ groups: [] })
+  const [filterProfileError, setFilterProfileError] = useState('')
+  const [inboxGroup, setInboxGroup] = useState<string>(LEAD_FILTER_ALL)
+  const [sectionOptions, setSectionOptions] = useState<Record<string, string>>({})
   const [categories, setCategories] = useState<DictData[]>([])
   const [channels, setChannels] = useState<DictData[]>([])
   const [categoryError, setCategoryError] = useState(false)
@@ -231,7 +238,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     setSelectedLeadMap(new Map())
   }, [])
 
-  useEffect(() => { clearLeadSelection() }, [advancedFilter, clearLeadSelection, keyword, simpleStatus])
+  useEffect(() => { clearLeadSelection() }, [advancedFilter, clearLeadSelection, inboxGroup, keyword, sectionOptions])
 
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
@@ -246,6 +253,17 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     else { setCategories([]); setCategoryError(true) }
     if (results[1].status === 'fulfilled') setChannels(results[1].value)
     else { setChannels([]); setChannelError(true) }
+  }, [])
+
+  const loadFilterProfile = useCallback(async () => {
+    setFilterProfileError('')
+    try {
+      setFilterProfile(await api.leadInboxFilterProfile('management'))
+    } catch (profileError) {
+      // 管理员维护的筛选项不可用时不得回退到硬编码选项，只提示并保留关键词与高级筛选。
+      setFilterProfile({ groups: [] })
+      setFilterProfileError(profileError instanceof Error ? profileError.message : '客资筛选方案加载失败')
+    }
   }, [])
 
   const loadPage = useCallback(async (
@@ -269,7 +287,13 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         pageSize: options.pageSize ?? leadPageSize,
         keyword: keyword || undefined, advancedFilter,
         relationScope: routeState?.relationScope,
-        simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus,
+        // 方案未加载成功时不带 audience 与筛选项，避免服务端因缺少方案而拒绝列表请求。
+        ...(filterProfile.groups.length ? {
+          audience: 'management' as const,
+          inboxGroup,
+          inboxStage: sectionOptions[LEAD_FILTER_SECTION.CURRENT_STAGE],
+          inboxQuick: sectionOptions[LEAD_FILTER_SECTION.QUICK_CONDITION],
+        } : {}),
         sortField,
         sortOrder,
       }
@@ -301,7 +325,10 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         preferredId: options.preferredSelectedId,
         currentId: current,
         requestedId: routeSelectionRef.current ?? requestedLeadId,
-        preserveRequestedId: routeSelectionRef.current !== undefined
+        preserveRequestedId: routeSelectionRef.current !== undefined,
+        // Table view is a paged data grid; loading it must not implicitly open its first row.
+        // Keep an explicit deep link or an already selected row, but leave a fresh visit empty.
+        fallbackToFirst: !useTableLayout
       }))
       return result.list
     } catch (loadError) {
@@ -323,9 +350,9 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         }
       }
     }
-  }, [advancedFilter, audience, keyword, leadPageSize, requestedLeadId, routeState?.relationScope, simpleStatus, sortField, sortOrder])
+  }, [advancedFilter, audience, inboxGroup, keyword, leadPageSize, requestedLeadId, routeState?.relationScope, sectionOptions, sortField, sortOrder, useTableLayout])
 
-  useEffect(() => { void loadMetadata() }, [loadMetadata])
+  useEffect(() => { void loadMetadata(); void loadFilterProfile() }, [loadFilterProfile, loadMetadata])
   useEffect(() => {
     if (detailOnly) return
     const version = ++requestVersion.current
@@ -475,6 +502,8 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     setSelectedId(id)
     if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
+  // 一级归类决定二级行内容；归类不可用时退回首个分组，与服务端默认一致。
+  const activeGroup = filterProfile.groups.find(group => group.key === inboxGroup) ?? filterProfile.groups[0]
   const detailContent = detailLoading
     ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError
@@ -483,7 +512,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
-          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} hideProviderOwner/>
+          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} profileVariant="contact-rows" hideProviderOwner/>
         : <Empty description="从左侧选择一条客资"/>
 
   const allLeadTableColumns: ProColumns<ManagedLead>[] = [
@@ -559,7 +588,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const openBatchAction = async (action: LeadBatchFormAction) => {
     if (!selectedRowKeys.length) return
     setBatchAction(action)
-    batchIdempotencyKey.current = crypto.randomUUID()
+    batchIdempotencyKey.current = createIdempotencyKey()
     batchForm.resetFields()
     if (action === 'transfer' || action === 'release-public-sea') {
       try {
@@ -577,7 +606,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     try {
       const result = await api.batchLeadAction(batchAction, selectedRowKeys.map(Number), {
         reason: values.reason?.trim() || '', targetUserId: values.targetUserId, collaboratorUserId: values.collaboratorUserId,
-        idempotencyKey: batchIdempotencyKey.current || crypto.randomUUID(),
+        idempotencyKey: batchIdempotencyKey.current || createIdempotencyKey(),
       })
       setBatchResult(result); setBatchResultOpen(true); setBatchAction(undefined); clearLeadSelection(); batchIdempotencyKey.current = undefined
       const version = ++requestVersion.current
@@ -622,17 +651,42 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   }
 
   return <><section className={`workspace-page lead-management-page${useTableLayout ? ' lead-management-table-page' : ''}`}>
-    <header className="lead-simple-status-shell" role="group" aria-label="客资状态筛选">
+    <header className="lead-simple-status-shell" role="group" aria-label="客资分级筛选">
       {returnTo && <Button icon={<ArrowLeftOutlined/>} onClick={() => navigate(returnTo)}>返回订单审批</Button>}
-      {SIMPLE_STATUS_OPTIONS.map(option => <button
-        type="button"
-        key={option.key}
-        className={simpleStatus === option.key ? 'active' : ''}
-        aria-pressed={simpleStatus === option.key}
-        onClick={() => setSimpleStatus(option.key)}
-      >{option.label}</button>)}
-      <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
+      {filterProfileError && <Typography.Text type="secondary">{filterProfileError}</Typography.Text>}
     </header>
+    {activeGroup && <>
+      <div className="lead-filter-sections">
+        <div className="lead-filter-row" role="group" aria-label="客资业务归类">
+          <span className="lead-filter-row-label">业务归类</span>
+          {filterProfile.groups.map(group => <button
+            type="button"
+            key={group.key}
+            className={inboxGroup === group.key ? 'active' : ''}
+            aria-pressed={inboxGroup === group.key}
+            onClick={() => { setInboxGroup(group.key); setSectionOptions({}) }}
+          >{group.label}</button>)}
+        </div>
+        {activeGroup.sections.map(section => <div
+          className="lead-filter-row"
+          role="group"
+          key={section.key}
+          aria-label={section.label}
+        >
+          <span className="lead-filter-row-label">{section.label}</span>
+          {section.options.map(option => <button
+            type="button"
+            key={`${section.key}:${option.key}`}
+            className={(sectionOptions[section.key] ?? LEAD_FILTER_ALL) === option.key ? 'active' : ''}
+            aria-pressed={(sectionOptions[section.key] ?? LEAD_FILTER_ALL) === option.key}
+            onClick={() => setSectionOptions(current => ({ ...current, [section.key]: option.key }))}
+          >{option.label}</button>)}
+        </div>)}
+      </div>
+      <div className="lead-filter-actions">
+        <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadFilterProfile(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
+      </div>
+    </>}
     <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
       {useTableLayout ? <>
         <BusinessTable<ManagedLead> tableKey="lead-management-page-1"
@@ -672,7 +726,26 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       </> : <>
       <aside className="lead-inbox-list-pane">
         <div className="inbox-avatar-toolbar"><InboxAvatarControls label="客资" listId="lead-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
-        <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div></div></div>
+        <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
+          <AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+          <Dropdown menu={{
+            selectable: true,
+            selectedKeys: [sortField ? `${sortField}:${sortOrder}` : 'default'],
+            items: LEAD_INBOX_SORT_OPTIONS.map(option => ({
+              key: option.field ? `${option.field}:${option.order}` : 'default',
+              label: option.label,
+            })),
+            onClick: ({ key }) => {
+              const option = LEAD_INBOX_SORT_OPTIONS.find(item => (item.field ? `${item.field}:${item.order}` : 'default') === key)
+              if (!option) return
+              clearLeadSelection()
+              setSortField(option.field)
+              setSortOrder(option.order)
+            },
+          }}>
+            <Button aria-label="选择客资排序" icon={<SortAscendingOutlined />}>排序</Button>
+          </Dropdown>
+        </div></div></div>
         {initialError && (avatarRail.collapsed ? <InboxAvatarError message={initialError} expand={() => avatarRail.change(false)} retry={isLeadInboxUnauthorized(initialError) ? undefined : () => void loadPage(1, true, requestVersion.current)} /> : <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
           message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}
           action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>)}

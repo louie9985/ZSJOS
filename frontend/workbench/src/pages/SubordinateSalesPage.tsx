@@ -1,4 +1,6 @@
 import SubordinateSalesCard from "../components/SubordinateSalesCard";
+import SubordinateSalesStatusFilter from "../components/SubordinateSalesStatusFilter";
+import { createIdempotencyKey } from '../services/idempotency'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Empty, Form, Input, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
@@ -289,7 +291,7 @@ function SalesDetail({
       return;
     }
     setBatchType(type);
-    batchIdempotencyKey.current = crypto.randomUUID();
+    batchIdempotencyKey.current = createIdempotencyKey();
     form.resetFields();
     setBatchOpen(true);
     if (type !== "transfer" && type !== "publicSea") return;
@@ -312,7 +314,7 @@ function SalesDetail({
         reason: values.reason.trim(),
         targetUserId: values.targetUserId,
         collaboratorUserId: values.collaboratorUserId,
-        idempotencyKey: batchIdempotencyKey.current ||= crypto.randomUUID(),
+        idempotencyKey: batchIdempotencyKey.current ||= createIdempotencyKey(),
       });
       setBatchResult(result);
       setResultOpen(true);
@@ -704,7 +706,7 @@ export default function SubordinateSalesPage({
   const [keyword, setKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [presence, setPresence] = useState<string>();
-  const [accountStatus, setAccountStatus] = useState<number>();
+  const [accountStatus, setAccountStatus] = useState<number | undefined>(0);
   const [accepting, setAccepting] = useState<boolean>();
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -859,6 +861,7 @@ export default function SubordinateSalesPage({
     <section className="workspace-page subordinate-sales-page">
       <div className="subordinate-toolbar">
         <Space wrap>
+          <SubordinateSalesStatusFilter value={accountStatus} onChange={setAccountStatus} />
           <AdvancedFilterToolbar
             scene="subordinate_sales"
             pageKey="subordinate_sales"
@@ -871,19 +874,6 @@ export default function SubordinateSalesPage({
             onChange={(value) => {
               setAdvancedFilter(value);
             }}
-          />
-          <Select
-            allowClear
-            placeholder="账号状态"
-            value={accountStatus}
-            onChange={(value) => {
-              setAccountStatus(value);
-            }}
-            style={{ width: 130 }}
-            options={[
-              { value: 0, label: "启用" },
-              { value: 1, label: "停用" },
-            ]}
           />
           <Select
             allowClear

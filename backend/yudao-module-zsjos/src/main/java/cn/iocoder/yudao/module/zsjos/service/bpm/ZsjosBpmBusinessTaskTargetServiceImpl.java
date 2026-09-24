@@ -46,6 +46,7 @@ public class ZsjosBpmBusinessTaskTargetServiceImpl implements ZsjosBpmBusinessTa
     @Resource private FeedbackMapper feedbackMapper;
     @Resource private FeedbackObjectPermissionProvider permissionProvider;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.withdrawal.WithdrawalMapper withdrawalMapper;
     @Resource private AdminUserApi adminUserApi;
 
     @Override
@@ -54,6 +55,16 @@ public class ZsjosBpmBusinessTaskTargetServiceImpl implements ZsjosBpmBusinessTa
         BpmTaskRespDTO task = done ? processTaskApi.getDoneTask(userId, taskId) : processTaskApi.getTodoTask(userId, taskId);
         if (task == null) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
+        }
+        if (cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey())) {
+            var withdrawal = withdrawalMapper.selectByProcessInstanceId(task.getProcessInstanceId());
+            if (withdrawal == null || !Objects.equals("withdrawal:" + withdrawal.getId(), task.getBusinessKey())
+                    || !permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query")) {
+                throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.WITHDRAWAL_PERMISSION_DENIED);
+            }
+            var target = supported("withdrawal", "/zsjos/withdrawal");
+            target.getQuery().put("withdrawalId", withdrawal.getId());
+            return target;
         }
         if (PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey())) {
             return salesOrderTarget(taskId, userId, done);

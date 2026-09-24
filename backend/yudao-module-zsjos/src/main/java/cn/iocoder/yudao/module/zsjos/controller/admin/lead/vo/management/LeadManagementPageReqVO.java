@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Min;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_SECTION_CURRENT_STAGE;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_SECTION_QUICK_CONDITION;
 import static cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery.VALIDATION_PATTERN;
 
 @Data
@@ -31,7 +33,7 @@ public class LeadManagementPageReqVO extends PageParam {
     private String status;
     private String assignmentStatus;
 
-    @Pattern(regexp = "submitter|owner", message = "客资收件箱视角不正确")
+    @Pattern(regexp = "submitter|owner|management", message = "客资收件箱视角不正确")
     private String audience;
 
     @Pattern(regexp = "all|submitted|owned", message = "客资关系范围不正确")
@@ -54,6 +56,10 @@ public class LeadManagementPageReqVO extends PageParam {
 
     @Pattern(regexp = "[a-z][a-z0-9_]{1,63}", message = "客资收件箱环节不正确")
     private String inboxStage;
+
+    /** 三级“快捷条件”行的选中项，与一级归类、二级环节取交集。 */
+    @Pattern(regexp = "[a-z][a-z0-9_]{1,63}", message = "客资收件箱快捷条件不正确")
+    private String inboxQuick;
     private String sourceChannel;
     private String leadCategory;
     private Long sourceUserId;
@@ -69,4 +75,19 @@ public class LeadManagementPageReqVO extends PageParam {
     @Min(1) @Max(100) private Integer limit = 20;
     @Schema(hidden = true) private LocalDateTime cursorActivityAt;
     @Schema(hidden = true) private Long cursorId;
+
+    /**
+     * 各二级行的选中项，键为二级行 key。未选中的行不下发，服务端按“全部”处理。
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public java.util.Map<String, String> getInboxSectionOptions() {
+        java.util.Map<String, String> selections = new java.util.LinkedHashMap<>();
+        if (inboxStage != null && !inboxStage.isBlank()) {
+            selections.put(INBOX_FILTER_SECTION_CURRENT_STAGE, inboxStage);
+        }
+        if (inboxQuick != null && !inboxQuick.isBlank()) {
+            selections.put(INBOX_FILTER_SECTION_QUICK_CONDITION, inboxQuick);
+        }
+        return selections;
+    }
 }

@@ -37,6 +37,92 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LeadNotifySceneProviderTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    void sourceAssociationDistinguishesInapplicableAndBrokenSnapshots(String source) {
+        var lead = new LeadDO().setId(1L).setSourceType(source);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        var event = NotifyBusinessEvent.builder().sceneCode(CREATED).bizId(1L).operatorUserId(10L).build();
+        var roles = Set.of(ROLE_NEW_MEDIA_PROVIDER);
+        var missing = provider.evaluateRule(event, roles, Set.of());
+        assertEquals("LEAD_SOURCE_SNAPSHOT_MISSING", missing.getErrorCode());
+        assertFalse(missing.isSuccess()); assertFalse(missing.isRetryable());
+        lead.setSourceProviderRecorded(true);
+        assertEquals("LEAD_SOURCE_PROVIDER_NOT_SELECTED", provider.evaluateRule(event, roles, Set.of()).getErrorCode());
+        assertTrue(provider.evaluateRule(event, roles, Set.of()).isSkipped());
+        lead.setSourceProviderUserId(20L);
+        assertEquals("LEAD_SOURCE_ATTRIBUTION_MISMATCH", provider.evaluateRule(event, roles, Set.of()).getErrorCode());
+        lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER); lead.setProviderOwnerId(20L);
+        org.junit.jupiter.api.Assertions.assertNull(provider.evaluateRule(event, roles, Set.of()));
+        assertEquals(Set.of(NotifyRecipientDTO.admin(20L)), provider.resolveRecipients(event, roles));
+        lead.setSourceProviderUserId(10L); lead.setProviderOwnerId(10L);
+        assertEquals("LEAD_SOURCE_PROVIDER_IS_OPERATOR", provider.evaluateRule(event, roles, Set.of()).getErrorCode());
+    }
+
+    @Test void sourceAssociationNeverSuppressesOtherRolesOrExplicitRecipients() {
+        var event = NotifyBusinessEvent.builder().sceneCode(CREATED).bizId(1L).build();
+        org.junit.jupiter.api.Assertions.assertNull(provider.evaluateRule(event, Set.of(ROLE_OPERATOR), Set.of()));
+        org.junit.jupiter.api.Assertions.assertNull(provider.evaluateRule(event, Set.of(ROLE_NEW_MEDIA_PROVIDER, ROLE_OPERATOR), Set.of()));
+        org.junit.jupiter.api.Assertions.assertNull(provider.evaluateRule(event, Set.of(ROLE_NEW_MEDIA_PROVIDER), Set.of(30L)));
+        org.mockito.Mockito.verifyNoInteractions(leadMapper);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"internal_new_media", "partner"})
+    void sourceAssociationSkipsOrdinarySubmission(String source) {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType(source));
+        var event = NotifyBusinessEvent.builder().sceneCode(CREATED).bizId(1L).build();
+        var result = provider.evaluateRule(event, Set.of(ROLE_NEW_MEDIA_PROVIDER), Set.of());
+        assertTrue(result.isSkipped()); assertFalse(result.isRetryable());
+        assertEquals("LEAD_SOURCE_LINK_NOT_APPLICABLE", result.getErrorCode());
+    }
+
+
+    @Test void dispatchVariablesUseOriginalRoundAfterLeadChanges() {
+        var lead = new LeadDO().setId(1L).setPendingAssigneeUserId(99L)
+                .setPendingExpiresAt(java.time.LocalDateTime.now().plusHours(1));
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("pendingSalesUserId", 10L); payload.put("assignment.historyId", 20L);
+        payload.put("lead.pendingExpiresAt", null);
+        var event = NotifyBusinessEvent.builder().tenantId(1L).sceneCode(ASSIGNED).bizId(1L).payload(payload).build();
+        var values = provider.resolveVariables(event, NotifyRecipientDTO.admin(10L));
+        org.junit.jupiter.api.Assertions.assertNull(values.get("lead.pendingExpiresAt"));
+        assertEquals(20L, values.get("assignment.historyId"));
+        org.mockito.Mockito.verify(adminUserApi).getUser(10L);
+        org.mockito.Mockito.verify(adminUserApi, org.mockito.Mockito.never()).getUser(99L);
+        org.junit.jupiter.api.Assertions.assertNull(provider.deliverySkipReason(
+                NotifyBusinessEvent.builder().sceneCode(PUBLIC_POOL).build()));
+    }
+
+    @Test void dispatchDeliveryChecksCandidateRoundDeadlineAndTenant() {
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            var lead = new LeadDO().setId(1L).setAssignmentStatus(ASSIGNMENT_PENDING).setPendingAssigneeUserId(10L);
+            when(leadMapper.selectById(1L)).thenReturn(lead);
+            var history = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
+            history.setId(20L); history.setCandidateUserId(10L);
+            when(assignmentHistoryMapper.selectLatestDispatch(1L, false)).thenReturn(history);
+            var event = NotifyBusinessEvent.builder().tenantId(1L).sceneCode(ASSIGNED).bizId(1L)
+                    .payload(Map.of("pendingSalesUserId", 10L, "assignment.historyId", 20L)).build();
+            org.junit.jupiter.api.Assertions.assertNull(provider.deliverySkipReason(event));
+            history.setId(21L);
+            assertEquals("LEAD_ASSIGNMENT_OBSOLETE", provider.deliverySkipReason(event));
+            history.setId(20L); lead.setPendingExpiresAt(java.time.LocalDateTime.now().minusSeconds(1));
+            assertEquals("LEAD_ASSIGNMENT_EXPIRED", provider.deliverySkipReason(event));
+            lead.setPendingExpiresAt(null); lead.setPendingAssigneeUserId(11L);
+            assertEquals("LEAD_ASSIGNMENT_OBSOLETE", provider.deliverySkipReason(event));
+            lead.setPendingAssigneeUserId(10L); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
+            assertEquals("LEAD_ASSIGNMENT_OBSOLETE", provider.deliverySkipReason(event));
+            when(leadMapper.selectById(1L)).thenReturn(null);
+            assertEquals("LEAD_ASSIGNMENT_OBSOLETE", provider.deliverySkipReason(event));
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(2L);
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> provider.deliverySkipReason(event));
+        } finally { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
+    }
+
     @Test
     void partnerNamesNeverResolveThroughSameIdEmployee() {
         LeadDO lead = new LeadDO().setId(1L).setPartnerId(70L).setSourceUserId(10L);

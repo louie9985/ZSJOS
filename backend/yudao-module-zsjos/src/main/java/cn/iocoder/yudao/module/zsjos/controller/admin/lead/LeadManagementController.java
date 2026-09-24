@@ -43,6 +43,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAss
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_MANAGEMENT;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_OWNER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_SUBMITTER;
 
@@ -275,5 +276,12 @@ public class LeadManagementController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<LeadInboxFilterProfileRespVO> getOwnedInboxFilterProfile() {
         return success(leadManagementService.getInboxFilterProfile(getLoginUserId(), INBOX_AUDIENCE_OWNER));
+    }
+
+    @GetMapping("/inbox/management/filter-profile")
+    @Operation(summary = "获得统一客资管理的筛选配置")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<LeadInboxFilterProfileRespVO> getManagementInboxFilterProfile() {
+        return success(leadManagementService.getInboxFilterProfile(getLoginUserId(), INBOX_AUDIENCE_MANAGEMENT));
     }
 }

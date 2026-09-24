@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,22 +39,38 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_I
 public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigService {
 
     private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER,
-            INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_AGING_POOL);
+            INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_AGING_POOL, INBOX_AUDIENCE_MANAGEMENT);
     private static final Pattern CONFIG_KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{1,63}");
+    private static final Set<String> LEAD_FIELDS = Set.of(INBOX_FILTER_FIELD_STATUS,
+            INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, INBOX_FILTER_FIELD_HANDLING_STAGE,
+            INBOX_FILTER_FIELD_SALES_PROGRESS, INBOX_FILTER_FIELD_SOURCE_TYPE,
+            INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION);
     private static final Map<String, Set<String>> ALLOWED_FIELDS_BY_AUDIENCE = Map.of(
-            INBOX_AUDIENCE_SUBMITTER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
-                    INBOX_FILTER_FIELD_HANDLING_STAGE),
-            INBOX_AUDIENCE_OWNER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
-                    INBOX_FILTER_FIELD_HANDLING_STAGE),
+            INBOX_AUDIENCE_SUBMITTER, LEAD_FIELDS,
+            INBOX_AUDIENCE_OWNER, LEAD_FIELDS,
+            INBOX_AUDIENCE_MANAGEMENT, LEAD_FIELDS,
             INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY),
             INBOX_AUDIENCE_AGING_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
-            INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "invalid", "closed", "won")),
+            // suspended 参与一级“待判定客资”：判定超时挂起的客资业务上仍属待判定。
+            INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "suspended", "valid",
+                    "invalid", "closed", "won")),
+            // recycle_pending 是主管回收后的中间态，属于分配流程，可作二级“回收待处理”。
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
-            new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")),
+            new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned",
+                    "recycle_pending")),
             INBOX_FILTER_FIELD_HANDLING_STAGE,
             new LinkedHashSet<>(List.of(LeadHandlingStage.FIRST_FOLLOW_PENDING,
                     LeadHandlingStage.QUALIFICATION_PENDING)),
+            // 值域与 LeadSimpleStatusQuery 的成交分支一致：following 排除已进入成交审批或已成交的机会。
+            INBOX_FILTER_FIELD_SALES_PROGRESS,
+            new LinkedHashSet<>(List.of(FOLLOW_UP_FOLLOWING, FOLLOW_UP_DEAL_PENDING_APPROVAL, FOLLOW_UP_WON)),
+            INBOX_FILTER_FIELD_SOURCE_TYPE,
+            new LinkedHashSet<>(List.of(SOURCE_INTERNAL_NEW_MEDIA, SOURCE_PARTNER, SOURCE_SALES_SELF,
+                    SOURCE_EDUCATION_SELF)),
+            INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION,
+            new LinkedHashSet<>(List.of(FOLLOW_UP_CONDITION_TODAY, FOLLOW_UP_CONDITION_OVERDUE,
+                    FOLLOW_UP_CONDITION_TRANSFERRED_PENDING)),
             INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
             INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")),
             INBOX_FILTER_FIELD_POOL_STATUS, new LinkedHashSet<>(List.of(AGING_POOL_WAITING_ASSIGNMENT,
@@ -149,14 +166,27 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
-                        value("submitted", "已提交"), value("valid", "已判有效"), value("invalid", "已判无效"),
-                        value("closed", "已关闭"), value("won", "已成交"))),
+                        value(STATUS_SUBMITTED, "已提交"), value(STATUS_SUSPENDED, "已挂起"),
+                        value(STATUS_VALID, "已判有效"), value(STATUS_INVALID, "已判无效"),
+                        value(STATUS_CLOSED, "已关闭"), value(STATUS_WON, "已成交"))),
                 capability(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, "分配状态", List.of(
-                        value("unassigned", "待分配"), value("pending_acceptance", "待接单"),
-                        value("public_pool", "抢单池"), value("owned", "已归属"))),
+                        value(ASSIGNMENT_UNASSIGNED, "待分配"), value(ASSIGNMENT_PENDING, "待接单"),
+                        value(ASSIGNMENT_PUBLIC_POOL, "抢单池"), value(ASSIGNMENT_OWNED, "已归属"),
+                        value(ASSIGNMENT_RECYCLE_PENDING, "回收待处理"))),
                 capability(INBOX_FILTER_FIELD_HANDLING_STAGE, "处理阶段", List.of(
                         value(LeadHandlingStage.FIRST_FOLLOW_PENDING, "待首跟"),
-                        value(LeadHandlingStage.QUALIFICATION_PENDING, "待判定"))));
+                        value(LeadHandlingStage.QUALIFICATION_PENDING, "待判定"))),
+                capability(INBOX_FILTER_FIELD_SALES_PROGRESS, "销售推进", List.of(
+                        value(FOLLOW_UP_FOLLOWING, "正常推进"),
+                        value(FOLLOW_UP_DEAL_PENDING_APPROVAL, "成交待审核"),
+                        value(FOLLOW_UP_WON, "已成交"))),
+                capability(INBOX_FILTER_FIELD_SOURCE_TYPE, "客资来源", List.of(
+                        value(SOURCE_INTERNAL_NEW_MEDIA, "新媒体提交"), value(SOURCE_PARTNER, "兼职提交"),
+                        value(SOURCE_SALES_SELF, "销售自拓录"), value(SOURCE_EDUCATION_SELF, "教务自拓录"))),
+                capability(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION, "快捷条件", List.of(
+                        value(FOLLOW_UP_CONDITION_TODAY, "今日待跟进"),
+                        value(FOLLOW_UP_CONDITION_OVERDUE, "跟进已逾期"),
+                        value(FOLLOW_UP_CONDITION_TRANSFERRED_PENDING, "有效转派待跟进"))));
     }
 
     @Override
@@ -172,15 +202,48 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
 
     @Override
     public LeadInboxFilterQuery resolveQuery(LeadInboxFilterConfigVO config, String groupKey, String optionKey) {
+        // 兼容入口：调用方只有一个选中项，不知道它属于哪一行，因此按行顺序查找。
         String effectiveGroup = groupKey == null ? "all" : groupKey;
-        String effectiveOption = optionKey == null ? "all" : optionKey;
         LeadInboxFilterConfigVO.GroupVO group = config.getGroups().stream()
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && effectiveGroup.equals(item.getKey()))
                 .findFirst().orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID));
         List<LeadInboxFilterConfigVO.ConditionVO> conditions = new ArrayList<>(group.getConditions());
-        if (!"all".equals(effectiveOption)) {
-            LeadInboxFilterConfigVO.OptionVO option = group.getOptions().stream()
-                    .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && effectiveOption.equals(item.getKey()))
+        if (optionKey != null && !"all".equals(optionKey)) {
+            conditions.addAll(findOption(group, optionKey).getConditions());
+        }
+        return compile(conditions);
+    }
+
+    /** 在各二级行内查找选中项；兼容尚未归一化的旧结构（仅有 {@code options}）。 */
+    private static LeadInboxFilterConfigVO.OptionVO findOption(LeadInboxFilterConfigVO.GroupVO group,
+                                                               String optionKey) {
+        List<LeadInboxFilterConfigVO.OptionVO> candidates = new ArrayList<>();
+        for (LeadInboxFilterConfigVO.SectionVO section : group.getSections()) {
+            candidates.addAll(section.getOptions());
+        }
+        candidates.addAll(group.getOptions());
+        return candidates.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && optionKey.equals(item.getKey()))
+                .findFirst().orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID));
+    }
+
+    /**
+     * 解析一级归类与各二级行当前选中项。每一行独立取一个选项，各行的条件与一级条件取交集。
+     * 传空 Map 表示各行都停在“全部”。
+     */
+    @Override
+    public LeadInboxFilterQuery resolveQuery(LeadInboxFilterConfigVO config, String groupKey,
+                                             Map<String, String> sectionOptionKeys) {
+        String effectiveGroup = groupKey == null ? "all" : groupKey;
+        LeadInboxFilterConfigVO.GroupVO group = config.getGroups().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && effectiveGroup.equals(item.getKey()))
+                .findFirst().orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID));
+        List<LeadInboxFilterConfigVO.ConditionVO> conditions = new ArrayList<>(group.getConditions());
+        for (LeadInboxFilterConfigVO.SectionVO section : group.getSections()) {
+            String selected = sectionOptionKeys.get(section.getKey());
+            if (selected == null || "all".equals(selected)) continue;
+            LeadInboxFilterConfigVO.OptionVO option = section.getOptions().stream()
+                    .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && selected.equals(item.getKey()))
                     .findFirst().orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID));
             conditions.addAll(option.getConditions());
         }
@@ -262,43 +325,80 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
             group.setConditions(nonNull(group.getConditions()));
-            group.setOptions(nonNull(group.getOptions()));
-            if (group.getConditions().size() > 2 || group.getOptions().size() > 20) {
+            normalizeLegacySections(group, audience);
+            if (group.getConditions().size() > 2 || group.getSections().size() > 3) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
             validateConditions(group.getConditions(), audience);
             if ("all".equals(group.getKey())) {
                 hasAll = Boolean.TRUE.equals(group.getEnabled()) && group.getConditions().isEmpty();
             }
-            if (group.getOptions().stream().anyMatch(option -> option == null || option.getSort() == null)) {
+            if (group.getSections().stream().anyMatch(section -> section == null || section.getSort() == null)) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
-            group.getOptions().sort(Comparator.comparing(LeadInboxFilterConfigVO.OptionVO::getSort));
-            Set<String> optionKeys = new HashSet<>();
-            for (LeadInboxFilterConfigVO.OptionVO option : group.getOptions()) {
-                normalizeLegacyOptionKey(option, audience);
-                if (!isValidKey(option.getKey()) || !optionKeys.add(option.getKey()) || isInvalidLabel(option.getLabel())
-                        || option.getSort() == null || option.getEnabled() == null) {
+            group.getSections().sort(Comparator.comparing(LeadInboxFilterConfigVO.SectionVO::getSort));
+            Set<String> sectionKeys = new HashSet<>();
+            for (LeadInboxFilterConfigVO.SectionVO section : group.getSections()) {
+                if (!isValidKey(section.getKey()) || !sectionKeys.add(section.getKey())
+                        || isInvalidLabel(section.getLabel())) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
                 }
-                option.setConditions(nonNull(option.getConditions()));
-                if (option.getConditions().size() > 2) {
+                section.setOptions(nonNull(section.getOptions()));
+                if (section.getOptions().size() > 20) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
                 }
-                validateConditions(option.getConditions(), audience);
-                LeadInboxFilterQuery combined = compileCombined(group.getConditions(), option.getConditions());
-                if (combined.matchNone()) {
+                if (section.getOptions().stream().anyMatch(option -> option == null || option.getSort() == null)) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
                 }
-            }
-            if (!group.getOptions().isEmpty() && group.getOptions().stream().noneMatch(item ->
-                    "all".equals(item.getKey()) && Boolean.TRUE.equals(item.getEnabled()) && item.getConditions().isEmpty())) {
-                throw exception(LEAD_INBOX_FILTER_INVALID);
+                section.getOptions().sort(Comparator.comparing(LeadInboxFilterConfigVO.OptionVO::getSort));
+                Set<String> optionKeys = new HashSet<>();
+                for (LeadInboxFilterConfigVO.OptionVO option : section.getOptions()) {
+                    normalizeLegacyOptionKey(option, audience);
+                    if (!isValidKey(option.getKey()) || !optionKeys.add(option.getKey())
+                            || isInvalidLabel(option.getLabel())
+                            || option.getSort() == null || option.getEnabled() == null) {
+                        throw exception(LEAD_INBOX_FILTER_INVALID);
+                    }
+                    option.setConditions(nonNull(option.getConditions()));
+                    if (option.getConditions().size() > 2) {
+                        throw exception(LEAD_INBOX_FILTER_INVALID);
+                    }
+                    validateConditions(option.getConditions(), audience);
+                    LeadInboxFilterQuery combined = compileCombined(group.getConditions(), option.getConditions());
+                    if (combined.matchNone()) {
+                        throw exception(LEAD_INBOX_FILTER_INVALID);
+                    }
+                }
+                if (!section.getOptions().isEmpty() && section.getOptions().stream().noneMatch(item ->
+                        "all".equals(item.getKey()) && Boolean.TRUE.equals(item.getEnabled())
+                                && item.getConditions().isEmpty())) {
+                    throw exception(LEAD_INBOX_FILTER_INVALID);
+                }
             }
         }
         if (!INBOX_AUDIENCE_REVIEWER.equals(audience) && !hasAll) {
             throw exception(LEAD_INBOX_FILTER_INVALID);
         }
+    }
+
+    /**
+     * 兼容单行时代的配置：只有 {@code sectionLabel} 时归一化为一行。
+     * 已发布配置因此无需改库即可继续提供筛选项。
+     */
+    private static void normalizeLegacySections(LeadInboxFilterConfigVO.GroupVO group, String audience) {
+        List<LeadInboxFilterConfigVO.SectionVO> sections = nonNull(group.getSections());
+        if (sections.isEmpty() && group.getOptions() != null && !group.getOptions().isEmpty()) {
+            boolean agingPool = INBOX_AUDIENCE_AGING_POOL.equals(audience);
+            LeadInboxFilterConfigVO.SectionVO migrated = new LeadInboxFilterConfigVO.SectionVO();
+            migrated.setKey(agingPool ? INBOX_FILTER_SECTION_POOL_STATUS : INBOX_FILTER_SECTION_CURRENT_STAGE);
+            migrated.setLabel(group.getSectionLabel() == null || group.getSectionLabel().isBlank()
+                    ? agingPool ? "公海状态" : "当前环节" : group.getSectionLabel());
+            migrated.setSort(0);
+            migrated.setOptions(new ArrayList<>(group.getOptions()));
+            sections = new ArrayList<>(List.of(migrated));
+        }
+        group.setSections(sections);
+        group.setOptions(new ArrayList<>());
     }
 
     private static void validateConditions(List<LeadInboxFilterConfigVO.ConditionVO> conditions, String audience) {

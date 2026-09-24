@@ -90,6 +90,7 @@ export default function BusinessTable<T extends object>(props: BusinessTableProp
         columnsState={proProps.columnsState || (mode === 'full' ? { persistenceKey: `crm-table:${tableKey}:columns`, persistenceType: 'localStorage' } : undefined)}
         pagination={pagination === false ? false : { defaultPageSize: 20, showSizeChanger: pagination?.current === undefined, pageSizeOptions: [20, 50, 100], ...pagination }}
         scroll={{ ...scroll, x: Math.max(totalWidth(columns) + (props.rowSelection ? 48 : 0), typeof scroll?.x === 'number' ? scroll.x : 0) }}
+        sticky={{ offsetHeader: 0 }}
         locale={{ ...locale, emptyText: error ? '数据加载失败，请重试' : locale?.emptyText ?? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} /> }}
         tableAlertRender={false}
         tableAlertOptionRender={false}

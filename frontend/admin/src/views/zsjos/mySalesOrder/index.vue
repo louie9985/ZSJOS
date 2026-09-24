@@ -174,6 +174,11 @@ const loadDetail = async () => {
     detailLoading.value = false
   }
 }
+const route = useRoute()
+watch(() => route.query.orderId, value => {
+  const id = Number(value)
+  if (Number.isSafeInteger(id) && id > 0) { selectedId.value = id; detailOpen.value = true; void loadDetail() }
+}, { immediate: true })
 const showDetail = (row: Api.WorkbenchListItem, reloadListPage: () => Promise<void>) => {
   selectedId.value = row.id
   reloadList = reloadListPage

@@ -297,6 +297,15 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   won: '已成交'
 }
 
+/**
+ * 客资筛选三个二级行的稳定 key。由服务端筛选方案下发，与后端
+ * LeadConstants.INBOX_FILTER_SECTION_* 一一对应。
+ */
+export const LEAD_FILTER_SECTION = {
+  CURRENT_STAGE: 'current_stage',
+  QUICK_CONDITION: 'quick_condition'
+} as const
+
 export const LEAD_ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
   unassigned: '未分配',
   pending_acceptance: '待接单',

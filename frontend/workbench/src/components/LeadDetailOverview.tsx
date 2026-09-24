@@ -1,8 +1,9 @@
 import ProductSpecs from './ProductSpecs'
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Empty, Image, Tag, Typography } from 'antd'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, App, Button, Empty, Image, Tag, Typography } from 'antd'
 import {
   CopyOutlined,
+  CheckOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
@@ -10,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { api, type LeadFollowUp, type ManagedLead, type ManagedLeadProduct, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { formatTimestamp } from '../services/time'
+import { copyText } from '../services/copyText'
 import {
   LEAD_DISPATCH_MODE_LABELS,
   LEAD_QUALIFICATION_STATUS_LABELS,
@@ -35,11 +37,17 @@ function NameAvatar({
 /* ========== 行内复制按钮 ========== */
 
 function CopyButton({ value }: { value: string }) {
+  const { message } = App.useApp()
   const [copied, setCopied] = useState(false)
   const copy = async () => {
-    await navigator.clipboard.writeText(value)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await copyText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+      message.error('复制失败，请手动选择文本复制')
+    }
   }
   return (
     <button type="button" className={`lead-field-copy-btn ${copied ? 'copied' : ''}`} onClick={copy} title="复制">
@@ -47,6 +55,36 @@ function CopyButton({ value }: { value: string }) {
     </button>
   )
 }
+
+// This interaction is opt-in so other overview entrypoints retain their existing presentation.
+function ProfileCopyButton({ value, label }: { value: string; label: string }) {
+  const { message } = App.useApp()
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const active = useRef(false)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false; clearTimeout(timer.current) }
+  }, [])
+  const copy = async () => {
+    try {
+      await copyText(value)
+      if (!active.current) return
+      setCopied(true)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1500)
+    } catch {
+      if (!active.current) return
+      setCopied(false)
+      message.error('复制失败，请手动选择文本复制')
+    }
+  }
+  return <Button type="text" size="small" className="lead-profile-copy-button"
+    icon={copied ? <CheckOutlined /> : <CopyOutlined />} onClick={() => void copy()}
+    aria-label={copied ? '已复制' : `复制${label}`} title={copied ? '已复制' : `复制${label}`} />
+}
+
+export type LeadProfileVariant = 'default' | 'contact-rows'
 
 /* ========== 时效进度 ========== */
 
@@ -591,7 +629,7 @@ export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) 
   }
 }
 
-export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots, followUpRefreshVersion = 0 }: {
+export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots, profileVariant = 'default', followUpRefreshVersion = 0 }: {
   lead?: ManagedLead
   student?: MyStudent
   categoryLabel: (value?: string) => string
@@ -601,6 +639,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   toolbar?: React.ReactNode
   studentContext?: StudentOverviewContext
   studentService?: MyStudent['services'][number]
+  profileVariant?: LeadProfileVariant
   hideProviderOwner?: boolean
   followUpRefreshVersion?: number
   slots?: LeadOverviewSlots
@@ -608,6 +647,11 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   const sourceDispatchTag = lead ? leadSourceDispatchTag(lead) : undefined
   const service = studentContext?.service || studentService
   const identity = studentProfileIdentity(lead, student)
+  const contactRows = profileVariant === 'contact-rows'
+  const rawName = student?.name || lead?.submittedName
+  const copyField = (value: string, label: string) => contactRows
+    ? <ProfileCopyButton key={`${lead?.id ?? student?.personId}:${label}:${value}`} value={value} label={label} />
+    : <CopyButton value={value} />
   return (
     <div className="lead-detail-overview-v2">
       <div className="lead-overview-grid">
@@ -623,10 +667,12 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 <div className="lead-card-header">
                   <Typography.Text strong>客户档案</Typography.Text>
                 </div>
-                <div className="lead-profile-fields">
+                <div className={contactRows ? "lead-profile-contact-container" : undefined}><div className={`lead-profile-fields${contactRows ? ' lead-profile-fields--contact-rows' : ''}`}>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">姓名</span>
-                    <span className="lead-field-value">{identity.name}</span>
+                    {contactRows && rawName
+                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.name}</span>{copyField(rawName, '姓名')}</span>
+                      : <span className="lead-field-value">{identity.name}</span>}
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">{identity.numberLabel}</span>
@@ -635,17 +681,18 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                   <div className="lead-profile-row">
                     <span className="lead-field-label">手机号</span>
                     {identity.mobile
-                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.mobile}</span><CopyButton value={identity.mobile} /></span>
+                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.mobile}</span>{copyField(identity.mobile, '手机号')}</span>
                       : <span className="lead-field-value lead-field-empty">未填写</span>
                     }
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">微信号</span>
                     {identity.wechatId
-                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.wechatId}</span><CopyButton value={identity.wechatId} /></span>
+                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.wechatId}</span>{copyField(identity.wechatId, '微信号')}</span>
                       : <span className="lead-field-value lead-field-empty">未填写</span>
                     }
                   </div>
+                </div>
                 </div>
                 {studentContext && !lead && <div className="lead-profile-meta">
                   <div className="lead-profile-row"><span className="lead-field-label">客资</span><span className="lead-field-value lead-field-empty">未关联客资</span></div>
@@ -766,23 +813,29 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
           </div>
         </div>
 
-        {/* 右侧边栏 3 列：提示 → 工具条 → 状态卡 → 跟进图表 */}
-        <aside className="lead-overview-aside">
-          {/* 磨砂工具条 */}
-          {!studentContext && lead && <AsideAlerts lead={lead} />}
-          {toolbar}
-          {slots?.sidebarBeforeStatus}
-          {/* 状态卡：Pipeline + 色条标签墙 */}
-          <section className="lead-card lead-status-card">
-            <div className="lead-status-card-body">
-              {slots?.taskStatus || (studentContext
-                ? <><StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /><div className="lead-status-divider" /><StudentTaskLabels context={studentContext.contactContext} /></>
-                : lead ? <><LeadStatusPipeline lead={lead} /><div className="lead-status-divider" /><LeadStatusLabels lead={lead} /></>
-                : null)}
+        {/* 右侧边栏 3 列：桌面端保持提示 → 工具条 → 状态卡 → 跟进图表 */}
+        <div className="lead-overview-side">
+          {/* 窄屏时优先置顶的状态提示与操作区；桌面端仍位于右侧栏顶部 */}
+          {(!studentContext && lead || toolbar) && (
+            <div className="lead-overview-priority">
+              {!studentContext && lead && <AsideAlerts lead={lead} />}
+              {toolbar}
             </div>
-          </section>
-          {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
-        </aside>
+          )}
+          <aside className="lead-overview-aside">
+            {slots?.sidebarBeforeStatus}
+            {/* 状态卡：Pipeline + 色条标签墙 */}
+            <section className="lead-card lead-status-card">
+              <div className="lead-status-card-body">
+                {slots?.taskStatus || (studentContext
+                  ? <><StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /><div className="lead-status-divider" /><StudentTaskLabels context={studentContext.contactContext} /></>
+                  : lead ? <><LeadStatusPipeline lead={lead} /><div className="lead-status-divider" /><LeadStatusLabels lead={lead} /></>
+                  : null)}
+              </div>
+            </section>
+            {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
+          </aside>
+        </div>
       </div>
     </div>
   )

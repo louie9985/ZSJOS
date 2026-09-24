@@ -155,6 +155,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
     deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
     return
   }
+  if (detail.bizType === 'withdrawal' && isPositiveId(detail.bizId)) {
+    deps.navigate(`${APP_ROUTES.WITHDRAWAL}?withdrawalId=${detail.bizId}`)
+    return
+  }
   if (detail.sceneCode === 'zsjos.registration.task_created' && isPositiveId(detail.bizId)) {
     deps.navigate(APP_ROUTES.REGISTRATION_POOL, { state: { registrationCaseId: detail.bizId } })
     return

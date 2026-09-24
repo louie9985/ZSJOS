@@ -41,3 +41,16 @@ export const formatCountdown = (seconds?: number) => {
 
 export const shouldShowAssignmentModal = (hasCurrent: boolean, businessOverlayCount: number) =>
   hasCurrent && businessOverlayCount === 0
+
+export function assignmentLinkTarget(search: string) {
+  const params = new URLSearchParams(search)
+  if (!params.has('assignmentLeadId') && !params.has('assignmentHistoryId')) return undefined
+  return { leadId: Number(params.get('assignmentLeadId')), historyId: Number(params.get('assignmentHistoryId')) }
+}
+
+export function matchesAssignmentLink(lead: PendingLead, target: { leadId: number; historyId: number }) {
+  return Number.isSafeInteger(target.leadId) && target.leadId > 0
+    && Number.isSafeInteger(target.historyId) && target.historyId > 0
+    && lead.id === target.leadId && lead.assignmentHistoryId === target.historyId
+    && !isPendingLeadExpired(lead, 0)
+}

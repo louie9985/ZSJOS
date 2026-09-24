@@ -40,6 +40,19 @@ public class NotifyBusinessEventProcessor {
         return result.get();
     }
 
+    public String deliverySkipReason(NotifyBusinessEvent event) {
+        NotifySceneProvider provider = sceneRegistry.getProvider(event.getSceneCode());
+        if (provider == null) throw new IllegalStateException("Notification scene missing");
+        return provider.deliverySkipReason(event);
+    }
+
+    public NotifySendResult evaluateRule(NotifyBusinessEvent event, NotifyRuleDO rule) {
+        var provider = sceneRegistry.getProvider(event.getSceneCode());
+        if (provider == null) return NotifySendResult.failure("NOTIFY_SCENE_MISSING", "通知场景未注册", false);
+        return provider.evaluateRule(event, new LinkedHashSet<>(rule.getRecipientRoles()),
+                new LinkedHashSet<>(rule.getSpecifiedUserIds()));
+    }
+
     public record PreparedWecom(List<NotifyDeliveryContext> recipients, NotifySendResult failure) {}
 
     /** Called inside the event tenant; freeze the same scene/rule contract used for immediate delivery. */
@@ -52,6 +65,8 @@ public class NotifyBusinessEventProcessor {
                         && NotifyChannelType.WECOM.equals(value.getChannelCode())).findFirst().orElse(null);
         if (rule == null) return new PreparedWecom(List.of(),
                 NotifySendResult.failure("NOTIFY_RULE_MISSING", "企微规则不存在、已停用或渠道已变更", false));
+        NotifySendResult applicability = evaluateRule(event, rule);
+        if (applicability != null) return new PreparedWecom(List.of(), applicability);
         NotifyTemplateDO template = notifyTemplateService.getNotifyTemplate(rule.getTemplateId());
         if (template == null || !Integer.valueOf(0).equals(template.getStatus())
                 || !event.getSceneCode().equals(template.getSceneCode())
@@ -91,13 +106,17 @@ public class NotifyBusinessEventProcessor {
             return NotifySendResult.failure("NOTIFY_RULE_MISSING", "未找到启用的通知规则", false);
         }
         try {
+            NotifySendResult skipped = null;
+            boolean delivered = false;
             for (NotifyRuleDO rule : rules) {
                 NotifySendResult ruleResult = deliverConfirmed(event, provider, rule);
+                if (ruleResult.isSkipped()) { skipped = ruleResult; continue; }
+                delivered = true;
                 if (!ruleResult.isSuccess()) {
                     return ruleResult;
                 }
             }
-            return NotifySendResult.success(null);
+            return !delivered && skipped != null ? skipped : NotifySendResult.success(null);
         } catch (Exception exception) {
             log.warn("[processConfirmedInTenant][scene({}) targetRuleId({}) failed]",
                     event.getSceneCode(), event.getTargetRuleId(), exception);
@@ -107,6 +126,8 @@ public class NotifyBusinessEventProcessor {
 
     private NotifySendResult deliverConfirmed(NotifyBusinessEvent event, NotifySceneProvider provider,
                                               NotifyRuleDO rule) {
+        NotifySendResult applicability = evaluateRule(event, rule);
+        if (applicability != null) return applicability;
         String channelCode = rule.getChannelCode() == null || rule.getChannelCode().isBlank()
                 ? NotifyChannelType.IN_APP : rule.getChannelCode();
         if (NotifyChannelType.WEBSOCKET.equals(channelCode)) {
@@ -165,6 +186,12 @@ public class NotifyBusinessEventProcessor {
                 continue;
             }
             try {
+                NotifySendResult applicability = evaluateRule(event, rule);
+                if (applicability != null) {
+                    if (!applicability.isSkipped()) log.warn("[processInTenant][ruleId({}) applicability({})]",
+                            rule.getId(), applicability.getErrorCode());
+                    continue;
+                }
                 String channelCode = rule.getChannelCode() == null || rule.getChannelCode().isBlank()
                         ? NotifyChannelType.IN_APP : rule.getChannelCode();
                 if (NotifyChannelType.WEBSOCKET.equals(channelCode)) {

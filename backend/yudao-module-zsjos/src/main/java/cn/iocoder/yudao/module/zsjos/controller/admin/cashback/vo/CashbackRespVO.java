@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 
 @Data
 public class CashbackRespVO {
+    private String beneficiaryName;
+    private String partnerName;
+    private FinanceSourceRespVO source;
     private Long id;
     private String cashbackNo;
     private String type;

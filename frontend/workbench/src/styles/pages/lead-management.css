@@ -49,6 +49,61 @@
   outline-offset: 1px;
 }
 
+/* 分级筛选：一级业务归类与随其变化的二级行。 */
+.lead-filter-sections {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+  margin-bottom: var(--crm-sp-3);
+  padding-bottom: var(--crm-sp-2);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.lead-filter-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-1);
+  overflow-x: auto;
+}
+
+.lead-filter-row-label {
+  flex: none;
+  min-width: 5em;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-xs);
+}
+
+.lead-filter-row button {
+  min-height: 30px;
+  flex: none;
+  padding: var(--crm-sp-1) var(--crm-sp-4);
+  border: 0;
+  border-radius: var(--crm-radius-sm);
+  background: transparent;
+  color: var(--crm-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.lead-filter-row button:hover,
+.lead-filter-row button.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.lead-filter-row button:focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: 1px;
+}
+
+.lead-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--crm-sp-2);
+}
+
 .lead-inbox-group-tabs .ant-tabs-nav {
   margin-bottom: 0;
 }
@@ -564,13 +619,14 @@
   .student-avatar-layout.is-avatar-collapsed .lead-inbox-detail-pane { display: block; }
 }
 
-.inbox-avatar-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--crm-sp-2); align-items: center; padding-right: calc(var(--inbox-scrollbar-width, 0px) + var(--crm-sp-1)); margin-bottom: var(--crm-sp-3); }
+.inbox-avatar-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--crm-sp-2); align-items: center; padding-right: calc(var(--inbox-scrollbar-width, 0px) + var(--crm-sp-1)); margin-bottom: var(--crm-sp-3); }
 .inbox-avatar-toolbar .inbox-avatar-controls { grid-column: 1; grid-row: 1; margin: 0; }
 .inbox-avatar-filters:not([hidden]),
 .inbox-avatar-filters .lead-inbox-toolbar { display: contents; }
 .inbox-avatar-filters .advanced-filter-toolbar { grid-column: 2; grid-row: 1; min-width: 0; gap: var(--crm-sp-2); }
 .inbox-avatar-filters .advanced-filter-toolbar > .ant-input-affix-wrapper { width: 0; min-width: 0; }
 .inbox-avatar-filters .advanced-filter-toolbar > .ant-badge { flex: none; }
+.inbox-avatar-filters .lead-inbox-toolbar > .ant-dropdown { grid-column: 3; grid-row: 1; }
 .inbox-avatar-filters .advanced-filter-tags { grid-column: 1 / -1; }
 .inbox-avatar-secondary-filters { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--crm-sp-2); }
 .inbox-avatar-secondary-filters > .ant-select { min-width: 0; }

@@ -361,6 +361,15 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   }
 
   const selectTask = (task: BpmTask) => {
+    if (task.processDefinitionKey === 'zsjos_partner_withdrawal') {
+      void api.bpmBusinessTaskTarget(task.id, view).then(target => {
+        if (!target.supported) { message.error(target.message || '提现任务定位失败'); return }
+        const query = new URLSearchParams()
+        Object.entries(target.query).forEach(([key, value]) => { if (value != null) query.set(key, String(value)) })
+        navigate(`${target.route}?${query.toString()}`)
+      }).catch(() => message.error('提现任务定位失败，请刷新后重试'))
+      return
+    }
     setSelectedId(task.id)
     if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
@@ -374,7 +383,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const detail = <BpmApprovalDetail
     task={selectedTask}
     view={view}
-    canUpdate={canUpdate}
+    canUpdate={canUpdate && selectedTask?.processDefinitionKey !== 'zsjos_partner_withdrawal'}
     users={users}
     businessBrief={selectedTask ? briefs[selectedTask.id] : undefined}
     businessRoute={selectedTask ? (briefs[selectedTask.id]?.route

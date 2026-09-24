@@ -44,3 +44,12 @@ Admin 请求层新增可选 `preserveBusinessError`，本流程状态、候选�
 工作台未开通显示“开通兼职账号”，待注册显示“查看兼职邀请码”，过期/作废显示“重新生成兼职邀请码”及旧码失效说明；已注册并绑定显示“兼职账号已开通”，不等待首次登录。状态从服务端读取，在学员切换、页面重新进入、窗口恢复焦点及打开表单时刷新；关闭结果弹窗和刷新页面不丢失邀请码。加载失败显示错误和重试，不当作未开通。运营加载失败可重试，无候选或无效选中值不得提交。
 
 验证入口：`PartnerInvitationServiceImplTest`、`PartnerInvitationControllerPermissionTest`；工作台 `test/student-partner-invitation.html` 与 `python frontend/workbench/test/student-partner-invitation.py` 使用隔离的合成传输，不修改真实账号。
+
+
+### 运营学员详情兼职状态（2026-09-24）
+
+Workbench 使用 `GET /admin-api/zsjos/media-students/{personId}/partner-context` 读取兼职状态，要求既有 `zsjos:media-student:query-my` 功能权限、`student/read` 对象权限，并复用媒体学员详情可见范围与租户隔离。无邀请资格的读者仅取得有效绑定的 `opened` 状态和 `canInviteStudent=false`，不返回邀请码或默认运营。
+
+仅同时拥有 `zsjos:partner-invitation:create-student` 且为该学员 active/accepted 服务的当前编导时，返回 `canInviteStudent=true` 及原邀请上下文。页面以服务端资格显示创建/查看邀请码入口；加载、失败和重试独立保留，失败不视为未开通，也不开放绑定/邀请操作。切换学员和恢复焦点重新读取状态。
+
+既有 `/zsjos/partner-invitation/student/context`、创建接口及 Admin 绑定状态接口权限与响应保持不变。Admin 不消费新增接口；不授予角色权限、不修改数据或历史邀请。上线顺序为后端后 Workbench。

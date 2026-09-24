@@ -91,6 +91,43 @@ class WecomOutboxDeliveryServiceTest {
         assertTrue(state.getRecipients().stream().allMatch(item -> "skipped".equals(item.getStatus())));
     }
 
+    @Test void obsoleteAssignmentIsSkippedBeforePreparingOrSending() {
+        prepareTwo();
+        when(processor.deliverySkipReason(event)).thenReturn("LEAD_ASSIGNMENT_OBSOLETE");
+        assertTrue(service.deliver(row, event).isSuccess());
+        verifyNoInteractions(adapter);
+        var state = JsonUtils.parseObject(row.getPayload(), WecomOutboxPayload.class);
+        assertTrue(state.getRecipients().stream().allMatch(item -> "skipped".equals(item.getStatus())
+                && "LEAD_ASSIGNMENT_OBSOLETE".equals(item.getErrorCode()) && !item.isRetryable()));
+    }
+
+    @Test void eligibilityLookupFailureDoesNotBecomeSuccessfulSkip() {
+        prepareTwo();
+        when(processor.deliverySkipReason(event)).thenThrow(new IllegalStateException("lookup unavailable"));
+        var result = service.deliver(row, event);
+        assertFalse(result.isSuccess()); assertTrue(result.isRetryable());
+        verifyNoInteractions(adapter);
+    }
+
+    @Test void failedSendIsSkippedIfAssignmentExpiresBeforeRetry() {
+        prepareTwo();
+        when(adapter.send(any())).thenReturn(NotifySendResult.failure("WECOM_TOKEN_FAILED", "retry", true));
+        assertFalse(service.deliver(row, event).isSuccess());
+        when(processor.deliverySkipReason(event)).thenReturn("LEAD_ASSIGNMENT_EXPIRED");
+        assertTrue(service.deliver(row, event).isSuccess());
+        verify(adapter, times(2)).send(any());
+        var state = JsonUtils.parseObject(row.getPayload(), WecomOutboxPayload.class);
+        assertTrue(state.getRecipients().stream().allMatch(item -> "skipped".equals(item.getStatus())));
+    }
+
+    @Test void inapplicableSourceRuleNeverPreparesOrSendsWecom() {
+        when(processor.prepareWecom(event)).thenReturn(new NotifyBusinessEventProcessor.PreparedWecom(
+                List.of(), NotifySendResult.skipped("LEAD_SOURCE_LINK_NOT_APPLICABLE")));
+        var result = service.deliver(row, event);
+        assertTrue(result.isSkipped()); assertFalse(result.isRetryable());
+        verifyNoInteractions(adapter);
+    }
+
     private void prepareTwo() {
         when(processor.prepareWecom(event)).thenReturn(new NotifyBusinessEventProcessor.PreparedWecom(
                 List.of(context(2), context(3)), null));

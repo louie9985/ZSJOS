@@ -217,7 +217,6 @@ import { Dialog } from '@/components/Dialog'
 import * as AdvancedFilterApi from '@/api/zsjos/advancedFilter'
 import * as TemplateApi from '@/api/zsjos/advancedFilterTemplate'
 import * as DictDataApi from '@/api/system/dict/dict.data'
-import * as UserApi from '@/api/system/user'
 import { formatNullableDate } from '@/utils/formatTime'
 import ZsjosAdvancedFilterGroup from '../components/ZsjosAdvancedFilterGroup.vue'
 
@@ -236,7 +235,9 @@ const sceneOptions: Array<{ label: string; value: AdvancedFilterApi.AdvancedFilt
   { label: '重复复核', value: 'duplicate_review' },
   { label: '报名池', value: 'registration' },
   { label: '我的学员', value: 'student' },
-  { label: '下属销售', value: 'subordinate_sales' }
+  { label: '下属销售', value: 'subordinate_sales' },
+  { label: '返现', value: 'cashback' },
+  { label: '提现', value: 'withdrawal' }
 ]
 
 const pageOptions: PageOption[] = [
@@ -245,6 +246,7 @@ const pageOptions: PageOption[] = [
   { label: '老客资协作池', scene: 'lead', pageKey: 'lead_aging_pool' },
   { label: '下属销售 · 名下客资', scene: 'lead', pageKey: 'subordinate_sales_leads' },
   { label: '订单管理', scene: 'order', pageKey: 'sales_order_management' },
+  { label: '成交审批 · 管理端', scene: 'order', pageKey: 'sales_order_approval' },
   { label: '订单审批 · 报名中心', scene: 'order', pageKey: 'sales_order_approval:registration' },
   { label: '订单审批 · 财务中心', scene: 'order', pageKey: 'sales_order_approval:finance' },
   { label: '销售主管确认', scene: 'order', pageKey: 'sales_order_supervisor_confirm' },
@@ -252,7 +254,9 @@ const pageOptions: PageOption[] = [
   { label: '重复客资复核', scene: 'duplicate_review', pageKey: 'lead_duplicate_review' },
   { label: '报名池', scene: 'registration', pageKey: 'registration_pool' },
   { label: '我的学员', scene: 'student', pageKey: 'student_my' },
-  { label: '下属销售', scene: 'subordinate_sales', pageKey: 'subordinate_sales' }
+  { label: '下属销售', scene: 'subordinate_sales', pageKey: 'subordinate_sales' },
+  { label: '返现管理', scene: 'cashback', pageKey: 'cashback' },
+  { label: '提现管理', scene: 'withdrawal', pageKey: 'withdrawal' }
 ]
 
 const message = useMessage()
@@ -321,10 +325,7 @@ const sourceOptions = async (source?: string): Promise<AdvancedFilterApi.Advance
       label: item.label
     }))
   }
-  if (source === 'visible-users') {
-    return (await UserApi.getSimpleUserList()).map((item) => ({ value: item.id, label: item.nickname }))
-  }
-  return []
+  throw new Error(`不支持的筛选选项来源: ${source}`)
 }
 const retryOptions = async (fieldKey: string) => {
   const field = fields.value.find((item) => item.fieldKey === fieldKey)

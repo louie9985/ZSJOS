@@ -660,7 +660,7 @@ otherwise
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询只消费已发布版本；筛选标签不返回数量且不执行额外统计查询。保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
 - 管理端只能从后端按视角返回的条件能力白名单选择字段和值，不得提交 SQL、列名或任意表达式。`submitter` 与 `owner` 只允许客资主状态和分配状态；`reviewer` 只允许处理状态和 BPM 任务节点。不同视角的字段不得混用。
 - 收件箱归类是对客资主状态和分配状态的只读投影，不是新的持久化状态。前端只能展示服务端返回的筛选项，不得自行补齐尚未实现的跟进、申诉、机会或订单状态。
-- 客资状态由后端拆分投影：`qualificationStatus` 表示待判定大类/已判有效/已判无效，`followUpStatus` 表示待首跟/跟进中/成交待审核/已成交，`handlingStage` 进一步区分待分配、待接单、待首跟和有效性判定计时中，`assignmentStatus` 表示分配生命周期，`operationalStatus` 表示挂起等控制状态。有效性判定计时从当前归属周期首次跟进成功开始；前端不得根据 `status`、分配字段或机会状态自行拼装按钮和用户状态，写操作只能消费 `availableActions`，任务提醒按 `handlingStage` 和对应非空截止时间展示。
+- 客资状态由后端拆分投影：`qualificationStatus` 表示待判定大类/已判有效/已判无效，`followUpStatus` 表示待首跟/跟进中/成交待审核/已成交，`handlingStage` 进一步区分待分配、待接单、待首跟和有效性判定计时中，`assignmentStatus` 表示分配生命周期，`operationalStatus` 表示挂起等控制状态。有效性判定计时从当前归属周期首次跟进成功开始；历史兼容数据即使没有 Opportunity 行，只要 Lead 主状态为 `won`，服务端仍投影为 `followUpStatus=won`；前端不得根据 `status`、分配字段或机会状态自行拼装按钮和用户状态，写操作只能消费 `availableActions`，任务提醒按 `handlingStage` 和对应非空截止时间展示。
 - Full submitted mobile and WeChat values are returned to an authorized submitter,
   owner, or `query-all` administrator. After automatic assignment, ordinary submitter
   and owner views blind the counterpart employee identity (name and user ID). A new-media
@@ -754,7 +754,7 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
 
 ### Subordinate-sales management
 
-The server-owned `下属销售` menu is available only with `zsjos:subordinate-sales:query`. Runtime scope is resolved from System department-leader relationships, including every child department, and then limited to users holding the stable `sales_specialist` post. Disabled accounts remain visible; no role name or department label creates access.
+The server-owned `下属销售` menu is available only with `zsjos:subordinate-sales:query`. Runtime scope is resolved from System department-leader relationships, including every child department, and then limited to users holding the stable `sales_specialist` post. Disabled accounts remain accessible through the Workbench's all/disabled quick filters; each page entry defaults to enabled accounts (`accountStatus=0`). The enabled/all/disabled control uses labels from the server's subordinate-sales filter catalog; all omits `accountStatus`, disabled sends `1`. Search and other filters intersect with the selected account status. Account status is independent of presence and dispatch preference. Admin and backend default-query behavior are unchanged; no role name or department label creates access.
 
 The independent `zsjos:subordinate-sales:pause-all` command resolves that same live scope on the server and never accepts frontend target IDs, filters, or loaded rows. It persists only the sales dispatch preference as paused, including for disabled accounts, and records per-user changes in the existing subordinate-sales audit log. The first V092 installation grants this capability to enabled `sales_manager` roles, but the permission does not expand the manager hierarchy or subordinate visibility.
 
@@ -984,3 +984,6 @@ Administrator read scopes are resolved at explicit read boundaries. Task/feedbac
 ## Sales performance
 
 Sales performance uses configured self/department/center view permissions plus System data scope; details require a separate permission. Historical facts retain event-time organization and are checked against that frozen department. Target writes do not inherit tenant-read-all. ZSJOS owns target/org associations and facts; System owns the organization tree and grants. See [the contract](../api/sales-performance.md).
+
+
+Media student partner status reads use the existing media-student query permission, student object read authorization and media student visibility/tenant scope. The new media-students/{personId}/partner-context projection returns only binding status to non-inviting readers. Invitation codes and canInviteStudent require both create-student permission and a current active/accepted director relationship; original invitation creation and Admin binding APIs remain unchanged. See [student partner invitation](../api/student-partner-invitation.md).

@@ -7,6 +7,15 @@ import java.util.List;
 
 @Data
 public class WithdrawalRespVO {
+    private String applicantName;
+    private String partnerName;
+    private String paidByName;
+    private Integer cashbackCount;
+    private Integer version;
+    private String reviewedByName;
+    private String reviewReason;
+    private List<String> availableActions = List.of();
+    private String reviewUnavailableReason;
     private Long id;
     private String withdrawalNo;
     private Long applicantUserId;

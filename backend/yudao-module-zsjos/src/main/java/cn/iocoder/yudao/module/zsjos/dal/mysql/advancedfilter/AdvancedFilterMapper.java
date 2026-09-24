@@ -11,10 +11,10 @@ import java.util.Map;
 
 @Mapper
 public interface AdvancedFilterMapper {
-    @SelectProvider(type = SqlProvider.class, method = "financeSql")
+    @SelectProvider(type = SqlProvider.class, method = "cashbackSql")
     List<Long> selectCashbackIds(@Param("query") AdvancedFilterQuery query);
 
-    @SelectProvider(type = SqlProvider.class, method = "financeSql")
+    @SelectProvider(type = SqlProvider.class, method = "withdrawalSql")
     List<Long> selectWithdrawalIds(@Param("query") AdvancedFilterQuery query);
     @SelectProvider(type = SqlProvider.class, method = "leadSql")
     List<Long> selectLeadIds(@Param("query") AdvancedFilterQuery query);
@@ -47,7 +47,12 @@ public interface AdvancedFilterMapper {
     List<Long> selectDuplicateReviewIdsByKeyword(@Param("tenantId") Long tenantId, @Param("keyword") String keyword);
 
     final class SqlProvider {
-        public static String financeSql(Map<String, Object> ignored) { return "SELECT c.id FROM zsjos_cashback c WHERE 1=0"; }
+        public static String cashbackSql(Map<String, Object> ignored) {
+            return "SELECT c.id FROM zsjos_cashback c WHERE c.deleted=b'0' AND c.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
+        }
+        public static String withdrawalSql(Map<String, Object> ignored) {
+            return "SELECT w.id FROM zsjos_withdrawal w WHERE w.deleted=b'0' AND w.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
+        }
         public static String leadSql(Map<String, Object> ignored) {
             return "SELECT l.id FROM zsjos_lead l WHERE l.deleted=b'0' AND l.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
         }

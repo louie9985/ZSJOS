@@ -52,6 +52,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 @Slf4j
 public class CashbackServiceImpl implements CashbackService {
+
     static final String OBSERVATION_DAYS_KEY = "zsjos.cashback.observation-days";
     static final int DEFAULT_OBSERVATION_DAYS = 7;
     static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
@@ -146,7 +147,8 @@ public class CashbackServiceImpl implements CashbackService {
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         PageResult<CashbackRespVO> result = BeanUtils.toBean(
-                mapper.selectCashbackPage(request, beneficiaryUserId), CashbackRespVO.class);
+                (request.getAdvancedFilter() == null ? mapper.selectCashbackPage(request, beneficiaryUserId)
+                : mapper.selectCashbackPage(request, beneficiaryUserId, advancedFilterService.matchFinanceIds("cashback", request.getAdvancedFilter()))), CashbackRespVO.class);
         Set<Long> leadIds = new HashSet<>();
         result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
         Map<Long, String> leadNumbers = new HashMap<>();

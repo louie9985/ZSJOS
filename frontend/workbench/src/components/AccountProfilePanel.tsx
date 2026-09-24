@@ -3,6 +3,7 @@ import AccountDiagnosisForm from "./AccountDiagnosisForm";
 import AccountReviewRecord from "./AccountReviewRecord";
 import { useWorkbenchPageGuard } from './WorkbenchPageNavigation';
 import { APP_ROUTES } from '../constants';
+import { createIdempotencyKey } from '../services/idempotency';
 import {
   EditOutlined,
   FileImageOutlined,
@@ -337,7 +338,7 @@ export default function AccountProfilePanel({
   const key = (data: unknown) => {
     const fingerprint = JSON.stringify(data);
     if (pending.current?.fingerprint !== fingerprint)
-      pending.current = { fingerprint, key: crypto.randomUUID() };
+      pending.current = { fingerprint, key: createIdempotencyKey() };
     return pending.current!.key;
   };
   const save = async (close: boolean) => {
@@ -561,7 +562,7 @@ export default function AccountProfilePanel({
       const payload = { ...values, version: profile.account.version, configVersionId: profile.config.id,
         previousEntryId: diagnosisPrevious, taskId: diagnosisTask?.taskId, templateType: diagnosisType, cycle: diagnosisType === 'diagnosis_initial' ? 0 : Number(diagnosisPrevious != null ? diagnosisSeed.cycle : diagnosisTask?.cycle) };
       const fingerprint = JSON.stringify(payload);
-      if (diagnosisRequest.current?.fingerprint !== fingerprint) diagnosisRequest.current = { fingerprint, key: crypto.randomUUID() };
+      if (diagnosisRequest.current?.fingerprint !== fingerprint) diagnosisRequest.current = { fingerprint, key: createIdempotencyKey() };
       await accountProfileApi.diagnosis(account.id, { ...payload, idempotencyKey: diagnosisRequest.current.key } as DiagnosisRequest);
       if (gen !== generation.current) return;
       message.success("诊断已提交"); setDiagnosisOpen(false); await load(); await loadHistory(); await onSaved();

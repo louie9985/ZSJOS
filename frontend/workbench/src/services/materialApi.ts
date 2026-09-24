@@ -99,6 +99,7 @@ export type MaterialVersion = {
   dictSnapshot: Record<string, unknown>
   files: MaterialFile[]
   processInstanceId?: string
+  pendingApproverNames?: string[]
   processDefinitionId?: string
   processDefinitionKey?: string
   processDefinitionVersion?: number
@@ -152,6 +153,7 @@ export type MaterialSaveRequest = {
 }
 
 export type MaterialPageParams = {
+  versionStatus?: MaterialVersion['status']
   platform?: string
   pageNo: number
   pageSize: number
@@ -300,6 +302,8 @@ export type PartnerStudentInvitationContext = {
   invitation?: PartnerStudentInvitation
 }
 
+export type MediaStudentPartnerContext = PartnerStudentInvitationContext & { canInviteStudent: boolean }
+
 export const materialApi = {
   types: async () => unwrap<MaterialType[]>(await http.get('/zsjos/material-type/list')),
   page: async (params: MaterialPageParams) =>
@@ -438,6 +442,8 @@ export const contentReviewApi = {
 }
 
 export const partnerStudentInvitationApi = {
+  mediaContext: async (studentPersonId: number) => unwrap<MediaStudentPartnerContext>(
+    await http.get(`/zsjos/media-students/${studentPersonId}/partner-context`)),
   create: async (data: { studentPersonId: number; assignedOperatorUserId: number; name: string; mobile: string; expiresAt?: Timestamp }) =>
     unwrap<PartnerStudentInvitation>(await http.post('/zsjos/partner-invitation/student/create', data)),
   context: async (studentPersonId: number) => unwrap<PartnerStudentInvitationContext>(

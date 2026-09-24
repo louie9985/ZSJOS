@@ -1,11 +1,12 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type Announcement, type AnnouncementUnreadSummary } from '../services/api'
 import { useRealtimeEvent } from './RealtimeProvider'
 
 type AnnouncementContextValue = AnnouncementUnreadSummary & {
   loading: boolean
   error: string
-  refresh: () => Promise<void>
+  hasLoaded: boolean
+  refresh: () => Promise<boolean>
   markRead: (announcement: Announcement) => Promise<void>
 }
 
@@ -15,17 +16,26 @@ export function AnnouncementProvider({ enabled, children }: PropsWithChildren<{ 
   const [summary, setSummary] = useState<AnnouncementUnreadSummary>({ unreadCount: 0 })
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState('')
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const requestVersion = useRef(0)
 
   const refresh = useCallback(async () => {
-    if (!enabled) { setSummary({ unreadCount: 0 }); setLoading(false); return }
+    const request = ++requestVersion.current
+    if (!enabled) { setSummary({ unreadCount: 0 }); setHasLoaded(false); setError(''); setLoading(false); return false }
     setLoading(true)
     try {
-      setSummary(await api.announcementUnreadSummary())
+      const next = await api.announcementUnreadSummary()
+      // Reading and publication can refresh concurrently; an older response must not restore a stale count.
+      if (request !== requestVersion.current) return false
+      setSummary(next)
+      setHasLoaded(true)
       setError('')
+      return true
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '公告加载失败')
+      if (request === requestVersion.current) setError(loadError instanceof Error ? loadError.message : '公告加载失败')
+      return false
     } finally {
-      setLoading(false)
+      if (request === requestVersion.current) setLoading(false)
     }
   }, [enabled])
 
@@ -34,11 +44,11 @@ export function AnnouncementProvider({ enabled, children }: PropsWithChildren<{ 
     await refresh()
   }, [refresh])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { void refresh(); return () => { requestVersion.current++ } }, [refresh])
   useRealtimeEvent('notice-published', () => { void refresh() })
 
-  const value = useMemo(() => ({ ...summary, loading, error, refresh, markRead }),
-    [error, loading, markRead, refresh, summary])
+  const value = useMemo(() => ({ ...summary, loading, error, hasLoaded, refresh, markRead }),
+    [error, hasLoaded, loading, markRead, refresh, summary])
   return <AnnouncementContext.Provider value={value}>{children}</AnnouncementContext.Provider>
 }
 

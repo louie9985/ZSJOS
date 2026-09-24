@@ -10,7 +10,8 @@ import '../src/styles/index.css'
 const account = { id: 1, accountNo: 'TEST-ACCOUNT', nickname: '测试账号', version: 1, availableActions: ['MAINTAIN_ACCOUNT'] }
 const service = { serviceRelationId: 1, status: 'active' }
 const students = Array.from({ length: 45 }, (_, i) => ({ personId: i + 1, personNo: `TEST-${i + 1}`, name: `测试学员${i + 1}`, services: [service] }))
-const fixture = { mode: 'success', calls: 0, delay: 0, opened: false, operator: 9 as number | undefined, conflict: false, invitation: JSON.parse(sessionStorage.getItem('test-student-invitation') || 'null') as Record<string, unknown> | null, created: 0 }
+const scenario = new URLSearchParams(location.search)
+const fixture = { canInviteStudent: !scenario.has('operator') && !scenario.has('no-permission'), mode: scenario.has('context-error') ? 'context-error' : 'success', calls: 0, delay: 0, opened: scenario.has('bound'), operator: 9 as number | undefined, conflict: false, invitation: JSON.parse(sessionStorage.getItem('test-student-invitation') || 'null') as Record<string, unknown> | null, created: 0 }
 
 Object.assign(window, { railFixture: fixture })
 http.defaults.adapter = async config => {
@@ -18,10 +19,11 @@ http.defaults.adapter = async config => {
   fixture.calls++
   const url = config.url || ''
   let data: unknown = []
-  if (url.endsWith('/student/context')) {
+  if (url.endsWith('/student/context')) throw new Error('Legacy director-only context must not be requested')
+  if (url.endsWith('/partner-context')) {
     if (fixture.mode === 'context-error') throw new Error('兼职状态加载失败')
     if (fixture.mode === 'denied') return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 403, msg: '无权查看兼职状态' } }
-    data = { opened: fixture.opened, defaultOperatorUserId: fixture.operator, operatorAssignmentConflict: fixture.conflict, invitation: fixture.opened ? undefined : fixture.invitation }
+    data = { opened: fixture.opened, canInviteStudent: fixture.canInviteStudent, defaultOperatorUserId: fixture.canInviteStudent ? fixture.operator : undefined, operatorAssignmentConflict: fixture.canInviteStudent && fixture.conflict, invitation: !fixture.canInviteStudent || fixture.opened ? undefined : fixture.invitation }
   } else if (url.endsWith('/operator-candidates')) {
     if (fixture.mode === 'operator-error') throw new Error('运营加载失败')
     data = { list: fixture.mode === 'empty-operators' ? [] : [{ id: 9, nickname: '测试运营甲' }, { id: 10, nickname: '测试运营乙' }], total: fixture.mode === 'empty-operators' ? 0 : 2 }
@@ -45,8 +47,8 @@ http.defaults.adapter = async config => {
   } else if (url.endsWith('/profile')) {
     data = { account, config: { id: 1, versionNo: 1, fields: [{ key: 'nickname', label: '账号昵称', type: 'text', group: 'PROFILE', enabled: true, ownerType: 'DIRECTOR' }] }, values: { nickname: '测试账号' }, snapshots: [], files: {}, sourceNotes: {}, editableFields: ['nickname'], missingFields: [], missingByOwner: {}, canViewHistory: false }
   } else if (url.includes('contact-context')) {
-    data = { availableActions: [], visibleTabs: [], currentStage: 'active', version: 1 }
+    data = { serviceRelationId: 1, availableActions: [], visibleTabs: [], currentStage: 'active', version: 1 }
   }
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data } }
 }
-createRoot(document.getElementById('root')!).render(<ConfigProvider><ThemeProvider><App><MemoryRouter initialEntries={['/zsjos/media-students?personId=1']}><div style={{ height: '100vh', padding: 12 }}><MediaStudentsPage permissions={location.search.includes('no-permission') ? [] : ['zsjos:media-account:query', 'zsjos:partner-invitation:create-student']} /></div></MemoryRouter></App></ThemeProvider></ConfigProvider>)
+createRoot(document.getElementById('root')!).render(<ConfigProvider><ThemeProvider><App><MemoryRouter initialEntries={['/zsjos/media-students?personId=1']}><div style={{ height: '100vh', padding: 12 }}><button onClick={() => { fixture.mode = 'success' }}>恢复测试接口</button><MediaStudentsPage permissions={location.search.includes('no-permission') ? [] : ['zsjos:media-account:query', 'zsjos:partner-invitation:create-student']} /></div></MemoryRouter></App></ThemeProvider></ConfigProvider>)

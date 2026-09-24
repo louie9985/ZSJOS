@@ -62,7 +62,8 @@
                       </div>
                       <!-- 情况二：业务表单 -->
                       <div v-if="processDefinition?.formType === BpmModelFormType.CUSTOM">
-                        <BusinessFormComponent :id="processInstance.businessKey" />
+                        <el-button v-if="withdrawalId" type="primary" @click="withdrawalRouter.push({ path: '/zsjos/withdrawal', query: { withdrawalId } })">打开提现详情</el-button>
+                        <BusinessFormComponent v-else :id="processInstance.businessKey" />
                       </div>
                     </div>
                   </el-col>
@@ -121,6 +122,7 @@
         <div class="b-t-solid border-t-1px border-[var(--el-border-color)]">
           <!-- 操作栏按钮 -->
           <ProcessInstanceOperationButton
+            v-if="!withdrawalId"
             ref="operationButtonRef"
             :process-instance="processInstance"
             :process-definition="processDefinition"
@@ -170,7 +172,11 @@ const props = defineProps<{
 const message = useMessage() // 消息弹窗
 const processInstanceLoading = ref(false) // 流程实例的加载中
 const processInstance = ref<any>({}) // 流程实例
+const withdrawalRouter = useRouter()
 const processDefinition = ref<any>({}) // 流程定义
+const withdrawalId = computed(() => processDefinition.value.key === 'zsjos_partner_withdrawal'
+  && /^withdrawal:[1-9]\d*$/.test(processInstance.value.businessKey || '')
+  ? processInstance.value.businessKey.slice('withdrawal:'.length) : undefined)
 const processModelView = ref<any>({}) // 流程模型视图
 const operationButtonRef = ref() // 操作按钮组件 ref
 const commentListRef = ref() // 评论列表组件 ref

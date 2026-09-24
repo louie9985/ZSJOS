@@ -71,7 +71,7 @@ public interface NotifyBusinessOutboxMapper extends BaseMapperX<NotifyBusinessOu
     @TenantIgnore
     @Delete("""
             DELETE FROM system_notify_business_outbox
-            WHERE (status='succeeded' AND succeeded_at < #{successBefore})
+            WHERE (status IN ('succeeded','skipped') AND succeeded_at < #{successBefore})
                OR (status='failed' AND update_time < #{failedBefore})
             """)
     int deleteExpired(@Param("successBefore") LocalDateTime successBefore,

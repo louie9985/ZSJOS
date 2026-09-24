@@ -73,6 +73,21 @@ describe('unavailable template', () => {
 
 
 describe('available template', () => {
+  it('renders readonly links, including repeated works, with the shared safe resource component', () => {
+    const fields = [
+      { ...field('homepage', 1, 'ACCOUNT_DETAIL'), type: 'https-link' },
+      { ...field('works', 2, 'DIRECTOR_ANALYSIS'), type: 'repeat-group', children: [{ key: 'url', label: '作品链接', type: 'https-link' }] }
+    ]
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(ViralAccountMaterialForm, {
+      mode: 'view', type: { id: 1 } as MaterialType,
+      material: { id: 7, currentVersion: { fields, values: { homepage: 'https://example.com/home', works: [{ url: 'https://example.com/work' }, { url: 'javascript:alert(1)' }] }, dictSnapshot: {} } } as unknown as import('../services/materialApi').Material,
+      dicts: {}, onClose: () => {}, onSaved: () => {}
+    })))
+    expect(html.match(/class="resource-link-card"/g)).toHaveLength(2)
+    expect(html).toContain('href="https://example.com/work"')
+    expect(html).toContain('复制链接')
+    expect(html).not.toContain('href="javascript:')
+  })
   it.each([ViralAccountMaterialForm, ViralContentMaterialForm])('renders all sections from backend fields', component => {
     const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(component, {
       mode: 'create', type: { id: 1, currentSchema: { fields: [

@@ -2,7 +2,8 @@ import { Tabs } from 'antd'
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { WorkbenchMenu } from '../services/api'
-import { APP_ROUTES, type TabStyle } from '../constants'
+import { type TabStyle } from '../constants'
+import { RETAINED_PAGE_PATHS } from '../retainedPagePaths'
 import { useWorkbenchPageNavigation } from './WorkbenchPageNavigation'
 
 export interface TabItem {
@@ -24,7 +25,7 @@ export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu, href
   ]
   if (next.length > MAX_TABS) {
     const index = next.findIndex(tab => tab.closable && tab.key !== currentMenu.path
-      && tab.key !== APP_ROUTES.CONTENT_REVIEW && tab.key !== APP_ROUTES.MEDIA_STUDENTS)
+      && !RETAINED_PAGE_PATHS.includes(tab.key))
     if (index >= 0) next.splice(index, 1)
   }
   return next

@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest'
 describe('student positioning interview and account workspace boundary', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
   const dialog = readFileSync('src/components/PositioningInterviewDialog.tsx', 'utf8')
+  const inboxCard = readFileSync('src/components/MediaStudentInboxCard.tsx', 'utf8')
   it('preserves the original shell and keeps screenshot-only account sheets as peer tabs', () => {
     for (const restored of ['ProductionTicketPositioningCard', 'api.positioningCard', 'AccountMaintenancePanel', 'partnerStudentInvitationApi', 'extraTabs={tabs}', 'mediaAccountTabKey(account.id)']) expect(page).toContain(restored)
     expect(page).toContain("from '../components/StudentDetail'")
-    expect(page).toContain('NameAvatar')
+    expect(inboxCard).toContain('NameAvatar')
+    expect(page).toContain('MediaStudentInboxCard')
     expect(page).toContain('lead-profile-fields')
     expect(page).toContain('lead-profile-meta')
     expect(page).toContain('OverflowToolbar')
@@ -15,7 +17,7 @@ describe('student positioning interview and account workspace boundary', () => {
     expect(page).toContain("ASSIGN_OPERATOR: '指派运营'")
     expect(page).toContain('OperatorAssignmentDialog')
     expect(page).toContain('loadPage(1, undefined, false, true)')
-    expect(page).toContain('media-students-item-copy')
+    expect(inboxCard).toContain('media-students-item-copy')
     expect(page).toContain("label: '新增账号'")
     expect(page).toContain("label: '发起剪辑设计工单'")
     expect(page).toContain("label: '发起拍摄外勤工单'")
@@ -40,6 +42,14 @@ describe('student positioning interview and account workspace boundary', () => {
     expect(page).toContain("detailParams.get('contentId')")
     expect(page).toContain("detailParams.get('positioningCardId')")
     expect(page).not.toContain('roleName')
+  })
+  it('reads partner binding independently of director invitation eligibility', () => {
+    expect(page).toContain('partnerStudentInvitationApi.mediaContext(invitationStudentId)')
+    expect(page).toContain('invitationContext?.canInviteStudent === true')
+    expect(page).not.toContain('partnerStudentInvitationApi.context(invitationStudentId)')
+    expect(page).not.toContain('!invitationStudentId || !canInviteStudent')
+    expect(page).toContain('if (!context || !context.canInviteStudent || context.opened) return')
+    expect(page).toContain('!invitationLoading && !invitationError')
   })
   it('renders server-published outlines without a local field catalog', () => {
     expect(dialog).toContain('context.fields.filter')

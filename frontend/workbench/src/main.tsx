@@ -68,6 +68,7 @@ import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
 import RetainedReviewRoute from './layouts/RetainedReviewRoutes'
+import { RETAINED_PAGE_PATHS } from './retainedPagePaths'
 import { WorkbenchPageNavigation } from './components/WorkbenchPageNavigation'
 import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbedPage'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
@@ -483,14 +484,14 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
               title={currentMenu?.name}
               onRouteChange={handleAdminRouteChange}
             />}
-          {[APP_ROUTES.CONTENT_REVIEW, APP_ROUTES.MEDIA_STUDENTS].map(path => {
+          {RETAINED_PAGE_PATHS.map(path => {
             const menu = findMenuByPath(authorizedMenus, path)
             if (!menu || menu.workbenchRenderMode === 'admin_only' || findAdminEmbedPath(authorizedMenus, path) || (location.pathname !== path && (!tabsEnabled || !tabs.some(tab => tab.key === path)))) return null
             return <RetainedReviewRoute key={`${path}:${readSharedTenantId()}:${info.user.id}:${JSON.stringify(info.permissions)}`} active={location.pathname === path}>
               <RouteHost tenantReadAll={info.dataAccess?.tenantReadAll === true} menu={menu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
             </RetainedReviewRoute>
           })}
-          {!activeAdminEmbedPath && !(currentMenu && currentMenu.workbenchRenderMode !== 'admin_only' && [APP_ROUTES.CONTENT_REVIEW, APP_ROUTES.MEDIA_STUDENTS].some(path => path === location.pathname)) && <Routes>
+          {!activeAdminEmbedPath && !(currentMenu && currentMenu.workbenchRenderMode !== 'admin_only' && RETAINED_PAGE_PATHS.includes(location.pathname)) && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu

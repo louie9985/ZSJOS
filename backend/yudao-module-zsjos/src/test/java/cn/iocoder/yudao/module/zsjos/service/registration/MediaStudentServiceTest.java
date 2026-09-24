@@ -39,6 +39,36 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
     @Test
+    void pageProjectsOnlyReadableAccountsWithoutLoadingDetails() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        var first = new MyStudentRespVO(); first.setPersonId(1L);
+        var second = new MyStudentRespVO(); second.setPersonId(2L);
+        when(myStudentService.getMediaPage(10L, request)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(first, second), 12L));
+        var visible = new MediaAccountDO().setId(20L).setStudentPersonId(1L)
+                .setNickname("账号").setPlatformValue("douyin").setPlatformLabelSnapshot("历史平台名");
+        var hidden = new MediaAccountDO().setId(21L).setStudentPersonId(1L);
+        when(accountMapper.selectByStudents(List.of(1L, 2L))).thenReturn(List.of(visible, hidden));
+        when(accountPermissionProvider.filterReadable(List.of(visible, hidden), 10L)).thenReturn(List.of(visible));
+        var result = service.getPage(10L, request);
+        assertEquals(12L, result.getTotal());
+        assertEquals(1, result.getList().get(0).getAccounts().size());
+        assertEquals("历史平台名", result.getList().get(0).getAccounts().get(0).getPlatformLabel());
+        assertEquals("douyin", result.getList().get(0).getAccounts().get(0).getPlatformValue());
+        assertTrue(result.getList().get(1).getAccounts().isEmpty());
+        verifyNoInteractions(accountService, positioningMapper, contentMapper, ticketMapper);
+    }
+
+    @Test
+    void emptyPageDoesNotQueryAccounts() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        when(myStudentService.getMediaPage(10L, request)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L));
+        assertTrue(service.getPage(10L, request).getList().isEmpty());
+        verifyNoInteractions(accountMapper, accountPermissionProvider);
+    }
+
+    @Test
     void fullReadDoesNotAuthorizeLegacyTalkWrite() {
         org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.createTalkRecord(30L, 2L,

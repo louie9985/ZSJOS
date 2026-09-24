@@ -41,11 +41,14 @@ public class LeadAgingPoolTenantInitializer {
         LeadInboxFilterConfigVO config = new LeadInboxFilterConfigVO();
         LeadInboxFilterConfigVO.GroupVO group = new LeadInboxFilterConfigVO.GroupVO();
         group.setKey("all"); group.setLabel("全部公海客资"); group.setSort(0); group.setEnabled(true);
-        group.setSectionLabel("公海状态"); group.setConditions(List.of());
-        group.setOptions(List.of(option("all", "全部", 0, null),
+        group.setConditions(List.of());
+        LeadInboxFilterConfigVO.SectionVO section = new LeadInboxFilterConfigVO.SectionVO();
+        section.setKey(INBOX_FILTER_SECTION_POOL_STATUS); section.setLabel("公海状态"); section.setSort(0);
+        section.setOptions(List.of(option("all", "全部", 0, null),
                 option(AGING_POOL_WAITING_ASSIGNMENT, "待指派", 10, AGING_POOL_WAITING_ASSIGNMENT),
                 option(AGING_POOL_ASSIGNED, "协同跟进中", 20, AGING_POOL_ASSIGNED),
                 option(AGING_POOL_DEAL_PENDING, "成交审批中", 30, AGING_POOL_DEAL_PENDING)));
+        group.setSections(List.of(section));
         config.setGroups(List.of(group));
         String json = JsonUtils.toJsonString(config);
         LocalDateTime now = LocalDateTime.now();

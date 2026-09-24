@@ -19,19 +19,26 @@ describe('unified Lead management route', () => {
     expect(page).toContain('relationScope: routeState?.relationScope')
   })
 
-  it('keeps all simple status filters without restoring relation tabs', () => {
+  it('drives graded filters from the server profile without restoring relation tabs', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
-    for (const label of ['全部', '待首跟', '待跟进', '待判定',
-      '成交待审核', '已成交', '已判无效', '已关闭', '已挂起']) {
-      expect(page).toContain(`label: '${label}'`)
-    }
-    expectSourceToContainTokens(page, "simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus")
+    // 分级筛选由服务端筛选方案下发，页面不得再维护静态筛选项数组。
+    expectSourceToContainTokens(page, "await api.leadInboxFilterProfile('management')")
+    expect(page).toContain('filterProfile.groups.map')
+    expect(page).toContain('activeGroup.sections.map')
+    expect(page).not.toContain('SIMPLE_STATUS_OPTIONS')
+    expect(page).not.toContain('simpleStatus')
+    // 二级行选项一律来自服务端下发的 section.options。
+    expect(page).toContain('section.options.map')
     expect(page).not.toContain('我提交的')
     expect(page).not.toContain('我负责的')
+    // 分配环节属于服务端配置内容，不得重新硬编码进页面。
     expect(page).not.toContain("label: '待分配'")
     expect(page).not.toContain("label: '待接单'")
     expect(page).not.toContain("label: '抢单池'")
+    // 服务端筛选项不可用时只提示，不得回退到硬编码选项。
+    expect(page).toContain("setFilterProfileError")
+    expect(page).toContain('setFilterProfile({ groups: [] })')
   })
 
   it('silently refreshes the changed lead without losing its selection', () => {

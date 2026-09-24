@@ -216,3 +216,18 @@ Workbench 只把未查看客资和通知深链目标等特殊集合移到顶部�
 ### Media student overview background collection (2026-09-18)
 
 The Workbench overview reuses `studentInfoApi.detail` with `selectedService.leadId ?? student.leadId`, the same association as StudentDetail. Both `zsjos:student-info-form:read` and the contact context `visibleTabs` entry `student-info` are required before loading. Backend Lead object/tenant authorization remains authoritative; denial is shown without fallback data. General details remain masked, while the existing full-info panel separately gates sensitive-read/export. Missing association, no grant, unsubmitted form, loading and failure are distinct. Student/service changes discard stale responses. No endpoint, permission or Admin/H5 contract changed.
+
+### 新媒体学员收件箱账号摘要
+
+`GET /zsjos/media-students/page` 在原分页字段上增加必返 `accounts` 数组，元素为 `id/accountNo/nickname/platformValue/platformLabel`。媒体列表使用独立 `MediaStudentListItem`，普通 `MyStudent` 不变。后端先取得可见学员分页，再批量读取账号及授权所需服务关系；账号范围与详情现有对象读取权限一致，按更新时间及 ID 倒序，不按平台合并或截断。平台标签保留 `platformLabelSnapshot`；详情账号同步返回 `platformValue`，用于刷新左侧摘要。
+
+左侧账号链接复用 `/zsjos/media-students?personId=…&accountId=…` 和受控导航，不访问外部平台主页。缺少 `zsjos:media-account:query` 时不提供链接；目标详情仍独立验证。成功的详情刷新同时更新已加载卡片账号，不清空搜索和滚动位置。旧后端缺少 accounts 时显示未加载提示，不伪装为空账号。平台字典失败仅降级颜色并支持重试，快照标签及已有账号入口保留。
+
+
+### 运营学员详情兼职状态（2026-09-24）
+
+Workbench 使用 `GET /admin-api/zsjos/media-students/{personId}/partner-context` 读取兼职状态，要求既有 `zsjos:media-student:query-my` 功能权限、`student/read` 对象权限，并复用媒体学员详情可见范围与租户隔离。无邀请资格的读者仅取得有效绑定的 `opened` 状态和 `canInviteStudent=false`，不返回邀请码或默认运营。
+
+仅同时拥有 `zsjos:partner-invitation:create-student` 且为该学员 active/accepted 服务的当前编导时，返回 `canInviteStudent=true` 及原邀请上下文。页面以服务端资格显示创建/查看邀请码入口；加载、失败和重试独立保留，失败不视为未开通，也不开放绑定/邀请操作。切换学员和恢复焦点重新读取状态。
+
+既有 `/zsjos/partner-invitation/student/context`、创建接口及 Admin 绑定状态接口权限与响应保持不变。Admin 不消费新增接口；不授予角色权限、不修改数据或历史邀请。上线顺序为后端后 Workbench。

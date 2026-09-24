@@ -387,6 +387,18 @@ class LeadObjectPermissionServiceTest {
         assertFalse(service.canReadMediaStudentLead(new LeadDO().setId(2L), 30L));
     }
 
+    @Test
+    void wonFollowUpAllowsOwnerButNotReadOnlyViewer() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L).setStatus("won"));
+        assertActionAllowed(20L, "follow-up-create");
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(10L);
+            ServiceException error = assertThrows(ServiceException.class,
+                    () -> service.check(1L, "follow-up-create"));
+            assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        }
+    }
+
     private void assertActionAllowed(Long userId, String action) {
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);

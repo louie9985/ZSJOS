@@ -47,7 +47,7 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
                     .or().apply("EXISTS (SELECT 1 FROM zsjos_lead fl WHERE fl.id=zsjos_cashback.lead_id AND fl.tenant_id=zsjos_cashback.tenant_id AND fl.deleted=0 AND fl.lead_no LIKE {0})", "%" + request.getKeyword().trim() + "%"));
         }
         if (request.getOrderNo() != null && !request.getOrderNo().isBlank()) {
-            query.apply("EXISTS (SELECT 1 FROM zsjos_sales_order fo WHERE fo.id=zsjos_cashback.order_id AND fo.tenant_id=zsjos_cashback.tenant_id AND fo.deleted=0 AND fo.order_no LIKE {0})", "%" + request.getOrderNo().trim() + "%");
+            query.apply("EXISTS (SELECT 1 FROM zsjos_order fo WHERE fo.id=zsjos_cashback.order_id AND fo.tenant_id=zsjos_cashback.tenant_id AND fo.deleted=0 AND fo.order_no LIKE {0})", "%" + request.getOrderNo().trim() + "%");
         }
         return selectPage(request, query);
     }

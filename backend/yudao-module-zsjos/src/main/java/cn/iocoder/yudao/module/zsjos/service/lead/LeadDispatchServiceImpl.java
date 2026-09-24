@@ -204,7 +204,27 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
     public void accept(Long leadId, Long userId) {
-        LeadDO lead = requireLead(leadId);
+        accept(leadId, userId, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
+    public void accept(Long leadId, Long userId, Long expectedAssignmentHistoryId) {
+        // Hold the Lead row across round validation and ownership update; history uses a current read.
+        LeadDO lead = expectedAssignmentHistoryId == null ? requireLead(leadId)
+                : leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (expectedAssignmentHistoryId != null) {
+            var dispatch = historyMapper.selectLatestDispatch(leadId, true);
+            if (!ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
+                    || !Objects.equals(userId, lead.getPendingAssigneeUserId())
+                    || dispatch == null || !Objects.equals(expectedAssignmentHistoryId, dispatch.getId())
+                    || !Objects.equals(userId, dispatch.getCandidateUserId())
+                    || lead.getPendingExpiresAt() != null && !lead.getPendingExpiresAt().isAfter(LocalDateTime.now())) {
+                throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
+            }
+        }
         String acceptedIdentity = SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
                 ? lead.getPendingOwnerIdentity() : OWNER_SALES;
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
@@ -618,9 +638,11 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
 
     private void publishDispatchEvent(String scene, LeadDO lead, Long salesUserId, Long operatorUserId,
                                       LeadAssignmentHistoryDO history, String reason) {
-        if (ASSIGNED.equals(scene) || REASSIGNED.equals(scene)) return;
         Map<String, Object> context = eventContext(lead, salesUserId, lead.getOwnerUserId(), reason);
         context.put("assignment.attempt", history.getAttemptNo());
+        context.put("assignment.historyId", history.getId());
+        context.put("assignment.dispatchedAt", history.getOccurredAt());
+        context.put("lead.pendingExpiresAt", history.getExpiresAt());
         notifyEventPublisher.publish(scene, lead.getId(), "lead-dispatch:" + history.getId(), operatorUserId,
                 history.getOccurredAt(), context);
     }

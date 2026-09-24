@@ -25,12 +25,13 @@ export function prioritizeLeads<T extends { id: number }>(items: T[], priorityId
 
 export function resolveLeadSelection<T extends { id: number }>(
   items: T[],
-  options: { preferredId?: number; currentId?: number; requestedId?: number; preserveRequestedId?: boolean }
+  options: { preferredId?: number; currentId?: number; requestedId?: number; preserveRequestedId?: boolean; fallbackToFirst?: boolean }
 ): number | undefined {
   const availableIds = new Set(items.map(item => item.id))
   if (options.preserveRequestedId && options.requestedId !== undefined) return options.requestedId
   const candidates = [options.preferredId, options.currentId, options.requestedId]
-  return candidates.find(id => id !== undefined && availableIds.has(id)) ?? items[0]?.id
+  return candidates.find(id => id !== undefined && availableIds.has(id))
+    ?? (options.fallbackToFirst === false ? undefined : items[0]?.id)
 }
 
 export function sumStatusCounts(counts: Record<string, number>): number {

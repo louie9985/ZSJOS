@@ -46,7 +46,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead/inbox/submitted/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-submitted` |
 | `GET /zsjos/lead/inbox/owned/page` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
 | `GET /zsjos/lead/inbox/owned/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
-| `GET /zsjos/lead/page?relationScope=all&simpleStatus=...` | 统一客资管理；按提交/负责权限返回本人及当前管理部门、子部门员工的关系并集。前端不再提供“我提交的/我负责的”切换，但保留独立于关系范围的简单状态筛选。详情中的订单和申诉记录按客资关系显示，后端仍执行对象权限校验 |
+| `GET /zsjos/lead/page?relationScope=all&audience=management&inboxGroup=...&inboxStage=...&inboxQuick=...` | 统一客资管理；按提交/负责权限返回本人及当前管理部门、子部门员工的关系并集。前端不再提供“我提交的/我负责的”切换，筛选改为服务端筛选方案（视角 `management`）下发的三行分级条件。详情中的订单和申诉记录按客资关系显示，后端仍执行对象权限校验 |
+| `GET /zsjos/lead/inbox/management/filter-profile` | `zsjos:lead:query`；统一客资管理页的一级归类与二级行选项 |
 | `POST /zsjos/lead/inbox/submitted/search-page` | 提交人固定范围内组合关键词与高级条件；忽略可选状态分组 |
 | `POST /zsjos/lead/inbox/owned/search-page` | 负责人固定范围内组合关键词与高级条件；忽略可选状态分组 |
 | `POST /zsjos/lead/{id}/judge-valid` | `zsjos:lead:qualify` + 当前负责人对象权限 |
@@ -68,7 +69,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
-统一客资页的 `simpleStatus` 支持 `first_follow_pending`（待首跟）、`following`（待跟进）、`qualification_pending`（待判定）、`deal_pending_approval`（成交待审核）、`won`（已成交）、`invalid`（已判无效）、`closed`（已关闭）和 `suspended`（已挂起）；不传或传 `all` 表示全部。该参数只追加生命周期条件，不改变 `relationScope=all` 已计算的对象可见范围。待跟进固定表示已判有效且 Opportunity 尚未进入成交审批或成交；待分配、待接单和抢单池属于分配流程，不作为统一页简单状态标签。
+统一客资管理页不再使用 `simpleStatus`，改由 `audience=management` 的已发布筛选方案解析 `inboxGroup`（一级业务归类）、`inboxStage`（二级当前环节）与 `inboxQuick`（三级快捷条件）三个互斥选中项，各行条件与一级条件取交集，且不改变 `relationScope=all` 已计算的对象可见范围。一级归类为 `all`、`pending_qualification`、`valid`、`invalid`、`closed`、`manual`；`manual` 复用自拓语义（`source_type in (sales_self_sourced, education_self_sourced)`）。二级“当前环节”的待首跟与待判定按当前归属周期首次跟进事实区分，判定截止时间不作为已完成首跟的证据；“正常推进”表示已判有效且 Opportunity 尚未进入成交审批或成交。三级“快捷条件”的 `today`/`overdue` 以 `zsjos_business_task.due_at` 为准（待办 `pending` 且 `task_type in (lead_first_follow_up, lead_follow_up_reminder)`），`transferred_pending` 表示当前归属周期由主管转派产生且本周期尚未首跟。`simpleStatus` 参数保留给兼职端 H5 等既有调用方，语义不变。
 
 统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时仍使用 `lastActivityAt DESC, id DESC`。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `lastActivityAt + id`，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
 
@@ -139,7 +140,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 客资提交、跟进、有效性判定和异常处置中的 `idempotencyKey` 表示一次用户操作意图。前端在打开或重置为新操作时生成一次键，同一操作的快速重复点击、上传失败、网络失败和超时重试必须复用该键，只有服务端确认成功后才能轮换。前端提交状态必须使用同步互斥保护，按钮 loading 仅作为交互反馈，不能作为唯一防重手段。
 
-跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按可选的下次跟进时间替换 `lead_follow_up_reminder`。`nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
+成交前跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按必填的下次跟进时间替换 `lead_follow_up_reminder`；已成交跟进不补写首跟事实，下次时间可选。填写的 `nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
 
 客资归属成立时立即创建 `lead_first_follow_up` 和 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。系统不再因无进展预警或宽限期自动释放客资到抢单池；抢单池进入仅由明确的分配或主管处置动作触发。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
 
@@ -226,3 +227,56 @@ ADMIN 客资分页（含下属销售列表）与详情采用一致的时间来�
 
 新增跟进不再依赖首跟任务存在或 UPDATE 成功才写首跟时间。当前负责人、当前归属周期的最早跟进记录决定缺失的首跟事实，已有首跟时间不被覆盖；任务完成保持同步且不重置判定轮次。合作人的跟进不能代替负责人首跟。`followUpStatus` 不再因缺少判定截止时间把已首跟客资显示为待首跟；主管直接进入判定的既有例外保持。
 Admin/Workbench 继续读取同一 `followUpStatus`、`handlingStage`、`currentAssignmentFirstFollowUpAt` 和判定时间字段，接口类型、菜单和对象权限不变。历史数据恢复必须显式执行，不能在 GET 请求中补任务或重计时。
+
+
+## 企微待接单通知与轮次校验（2026-09-24）
+
+首次派单 `zsjos.lead.assigned`、重新派单 `zsjos.lead.reassigned` 恢复通过 System
+通知总线按已启用规则进入 outbox。分配历史编号构成 `lead-dispatch:<historyId>` 幂等键；
+事件与派单变更使用同一事务。事件保存候选销售、派单历史编号、派出时间、截止时间，
+指定派单保留空截止时间。站内信及企微各自遵循原有规则，不补发历史派单，不恢复抢单成功通知。
+
+企微每次发送或重试前由 Lead 场景校验租户、待接状态、候选及最新派单历史。
+已超时返回 `LEAD_ASSIGNMENT_EXPIRED`，失效或换轮次返回 `LEAD_ASSIGNMENT_OBSOLETE`，
+缺少轮次快照返回 `LEAD_ASSIGNMENT_SNAPSHOT_MISSING`。逐人记录为 skipped，不调用企微接口；
+查询异常保持失败/重试，不能记为成功跳过。总任务完成不能证明每人收件。
+
+派单卡片通过现有一次性企微票据跳至 Workbench
+`/zsjos/leads/manage?assignmentLeadId=<internal-id>&assignmentHistoryId=<history-id>`，
+复用全局接单弹窗，并通过我的待接列表重新确认轮次。URL 标识仅用于定位；页面仍使用 `leadNo`。
+旧票据和其他业务卡片沿用原跳转。卡片已失效时不自动打开另一条客资。
+
+`POST /zsjos/lead/{id}/accept` 增加可选查询参数 `expectedAssignmentHistoryId`。
+携带参数时，在租户 Lead 行锁下读取最新派单历史并校验候选、轮次和截止时间，
+再执行原条件更新；旧调用不传参数保持兼容。控制器权限及 Service 对象授权保持生效。
+Workbench 所有现有接单动作提交当前轮次；Admin 当前没有此接口或待接列表消费者，
+仅维护派单关系，不新增 Admin 接单页面。
+
+Workbench 保留 WebSocket、15 秒轮询、页面恢复可见及重连刷新。
+企微发送前检查无法撤回已发消息；点击校验与接单的后端轮次校验共同处理状态变化。
+生产时限不自动调整，发布前须测量实际企微收件与接单耗时。
+诊断与验收限制见 [派单通知诊断记录](wecom-lead-dispatch-diagnosis.md)。
+
+
+### 来源关联通知的适用性与异常
+
+来源关联的接收范围仍遵循本文第 65 行所述自拓可选提供方契约，不扩大到普通新媒体或兼职。
+仅来源关联角色且未指定用户的规则：普通新媒体/兼职返回
+`LEAD_SOURCE_LINK_NOT_APPLICABLE`；明确记录未选提供方返回
+`LEAD_SOURCE_PROVIDER_NOT_SELECTED`；选择自己返回 `LEAD_SOURCE_PROVIDER_IS_OPERATOR`。
+以上在站内信和企微均记为 skipped，不发送、不重试。
+
+`sourceProviderRecorded` 不是 true 的历史自拓记录不能当作明确未选，返回
+`LEAD_SOURCE_SNAPSHOT_MISSING`；选中提供方与正式归属不一致返回
+`LEAD_SOURCE_ATTRIBUTION_MISMATCH`；客资不存在或提交人缺失分别返回
+`LEAD_SOURCE_RECORD_MISSING` / `LEAD_SOURCE_OPERATOR_MISSING`。这些异常保留失败记录，
+不靠重试掩盖，不推测或补写历史来源。自定义混合角色、指定用户规则保持原有并集语义。
+
+
+### 已成交客资继续跟进
+
+已成交客资仍通过 `POST /zsjos/lead/{id}/follow-ups` 新增跟进，沿用 `zsjos:lead-follow-up:create` 和对象操作关系、租户隔离；服务端投影 `ADD_FOLLOW_UP`。仅 `status=won` 的 `nextFollowUpAt` 可省略或为 null，其他可跟进状态仍必填；提供的时间必须为未来 epoch 毫秒。成交审批中、无效、挂起和关闭状态不因此放开。
+
+首购订单生效仍取消旧首跟任务和跟进提醒。成交后新跟进完成当前操作人的现有提醒；不填时间不新建提醒，填未来时间则生成新的提醒，不恢复已取消任务、不补写首跟事实。有商机沿用商机跟进记录，历史无商机的成交客资沿用客资跟进记录，不创建虚构商机。更新跟进次数、最近活动与分类/销售阶段快照，保留成交状态及订单。销售阶段可继续按字典修改，不回填历史快照。下次跟进展示继续只读取待处理提醒任务。
+
+Workbench 弹窗和详情表单同步支持可选时间；Vue Admin 保持跟进历史只读并兼容空时间。学员服务联系不在此接口范围内。

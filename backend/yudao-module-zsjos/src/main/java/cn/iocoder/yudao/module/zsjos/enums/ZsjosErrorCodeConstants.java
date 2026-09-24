@@ -384,6 +384,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WITHDRAWAL_TRANSACTION_DUPLICATE = new ErrorCode(1_900_009_008, "银行流水号已登记");
     ErrorCode WITHDRAWAL_PROOF_INVALID = new ErrorCode(1_900_009_009, "打款凭证不存在、无权使用或文件类型不支持");
     ErrorCode WITHDRAWAL_PERMISSION_DENIED = new ErrorCode(1_900_009_010, "无权查看或处理该提现单");
+    ErrorCode WITHDRAWAL_REVIEW_STALE = new ErrorCode(1_900_009_011, "提现记录已处理或已变更，请刷新后重试");
+    ErrorCode WITHDRAWAL_REVIEW_REASON_INVALID = new ErrorCode(1_900_009_012, "驳回原因不能为空，审核意见最多500字");
+    ErrorCode WITHDRAWAL_REVIEW_UNSUPPORTED = new ErrorCode(1_900_009_013, "提现审批仅支持通过或驳回，请在提现管理中办理");
+    ErrorCode WITHDRAWAL_REVIEW_REPAIR_INVALID = new ErrorCode(1_900_009_014, "审批历史或返现关系不完整，不能自动补同步，请联系管理员核对");
+
 
     ErrorCode REGISTRATION_CASE_NOT_EXISTS = new ErrorCode(1_900_010_001, "报名履约任务不存在");
     ErrorCode REGISTRATION_ITEM_NOT_EXISTS = new ErrorCode(1_900_010_002, "报名履约清单项不存在");

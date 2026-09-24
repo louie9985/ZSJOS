@@ -34,8 +34,9 @@ public class LeadDispatchController {
     @PostMapping("/{id}/accept")
     @Operation(summary = "接单")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:accept')")
-    public CommonResult<Boolean> accept(@PathVariable("id") Long id) {
-        dispatchService.accept(id, getLoginUserId()); return success(true);
+    public CommonResult<Boolean> accept(@PathVariable("id") Long id,
+            @RequestParam(value = "expectedAssignmentHistoryId", required = false) Long expectedAssignmentHistoryId) {
+        dispatchService.accept(id, getLoginUserId(), expectedAssignmentHistoryId); return success(true);
     }
 
     @PostMapping("/{id}/reject")

@@ -1,6 +1,7 @@
 import BusinessTable from '../components/BusinessTable'
 import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
+import { createIdempotencyKey } from '../services/idempotency'
 import { productSpecText } from '../services/productSpecs'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ClipboardEvent as ReactClipboardEvent } from "react";
 import {
@@ -1547,7 +1548,7 @@ export function RegistrationChecklistConfigPage() {
     return next;
   };
   const addItem = () => updateItems((items) => [...items, {
-    id: -Date.now(), itemKey: `custom_${crypto.randomUUID().replaceAll("-", "")}`,
+    id: -Date.now(), itemKey: `custom_${createIdempotencyKey().replaceAll("-", "")}`,
     itemType: "checkbox", title: "新清单项", sort: (items.length + 1) * 10,
     enabled: true, systemRequired: false, attachmentRequired: false,
   }]);
@@ -1555,7 +1556,7 @@ export function RegistrationChecklistConfigPage() {
     const department = departments[0];
     if (!department) { message.warning("系统暂无可用部门"); return; }
     updateRoutes((routes) => [...routes, {
-      id: -Date.now(), optionKey: `custom_${crypto.randomUUID().replaceAll("-", "")}`,
+      id: -Date.now(), optionKey: `custom_${createIdempotencyKey().replaceAll("-", "")}`,
       departmentId: department.id, departmentName: department.name, assigneeType: "study_planner",
       assigneeTypeLabel: "学习规划师", sort: (routes.length + 1) * 10,
       enabled: true, systemRequired: false,

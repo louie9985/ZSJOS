@@ -19,6 +19,7 @@ public interface WithdrawalService {
     void rejectApproved(Long id, Long userId, String reason);
     void recordPayout(Long id, Long userId, WithdrawalPayoutReqVO request);
     void handleProcessResult(String processInstanceId, Integer processStatus, String reason);
+    PageResult<WithdrawalRespVO> getManagementPage(WithdrawalPageReqVO request);
     PageResult<WithdrawalRespVO> getPage(WithdrawalPageReqVO request, Long applicantUserId);
     PageResult<PartnerWithdrawalRespVO> getPartnerPage(WithdrawalPageReqVO request, Long partnerId);
     WithdrawalRespVO getDetail(Long id, Long userId, boolean fullCard);

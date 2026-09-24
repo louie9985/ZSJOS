@@ -783,6 +783,14 @@ export type MyStudent = {
     directorInterviewAt?: Timestamp;
   }>;
 };
+export type MediaStudentAccountSummary = {
+  id: number;
+  accountNo?: string;
+  nickname?: string;
+  platformValue?: string;
+  platformLabel?: string;
+};
+export type MediaStudentListItem = MyStudent & { accounts: MediaStudentAccountSummary[] };
 export type MediaStudentDetail = {
   student: MyStudent;
   accounts: Array<{
@@ -790,6 +798,7 @@ export type MediaStudentDetail = {
     accountNo: string;
     nickname?: string;
     platformLabel?: string;
+    platformValue?: string;
     stage?: string;
     stageLabelSnapshot?: string;
     currentStatusValue?: string;
@@ -1153,6 +1162,16 @@ export type AdvancedFilterScene =
   | "cashback"
   | "withdrawal";
 export type AdvancedFilterField = {
+  supportedScenes: string[];
+  supportedPages: string[];
+  permission: "inherit_query_authorization";
+  dataScope: "inherit_query_data_scope";
+  sensitive: boolean;
+  sensitivity: "standard" | "personal" | "financial" | "free_text";
+  sortable: boolean;
+  deprecated: boolean;
+  optionSourceType: "none" | "business_contract" | "business_api" | "dictionary" | "visible_users" | "visible_departments" | "catalog_dates";
+  declaredOptionSource?: string | null;
   fieldKey: string;
   group: string;
   label: string;
@@ -1161,7 +1180,7 @@ export type AdvancedFilterField = {
   optionSource?: string;
   options: Array<{ value: string | number; label: string }>;
   optionsLoading?: boolean;
-  optionsState?: 'ready' | 'empty' | 'loading' | 'error';
+  optionsState?: 'ready' | 'empty' | 'unresolved' | 'loading' | 'error';
   optionsErrorCode?: string;
   optionsError?: boolean;
   retryOptions?: () => void;
@@ -1601,8 +1620,11 @@ export type ManagedLeadPageParams = {
   pageSize: number;
   keyword?: string;
   status?: string;
+  // 决定服务端用哪套筛选方案解析 inboxGroup/inboxStage/inboxQuick。
+  audience?: "submitter" | "owner" | "management";
   inboxGroup?: string;
   inboxStage?: string;
+  inboxQuick?: string;
   relationScope?: "all" | "submitted" | "owned";
   simpleStatus?: LeadSimpleStatus;
   sortField?: LeadSortField;
@@ -4220,8 +4242,10 @@ export const api = {
     unwrap<SalesDispatchStatus>(
       await http.post("/zsjos/lead/dispatch-status/offline"),
     ),
-  acceptLead: async (id: number) =>
-    unwrap<boolean>(await http.post(`/zsjos/lead/${id}/accept`)),
+  acceptLead: async (id: number, expectedAssignmentHistoryId?: number) =>
+    unwrap<boolean>(await http.post(`/zsjos/lead/${id}/accept`, undefined, {
+      params: { expectedAssignmentHistoryId },
+    })),
   rejectLead: async (id: number) =>
     unwrap<boolean>(await http.post(`/zsjos/lead/${id}/reject`)),
   claimPoolPage: async (params: {
@@ -4502,10 +4526,12 @@ export const api = {
     unwrap<boolean>(
       await http.post(`/zsjos/lead/${id}/release-to-claim-pool`, data),
     ),
-  leadInboxFilterProfile: async (audience: "submitter" | "owner") =>
+  leadInboxFilterProfile: async (audience: "submitter" | "owner" | "management") =>
     unwrap<LeadInboxFilterProfile>(
       await http.get(
-        `/zsjos/lead/inbox/${audience === "submitter" ? "submitted" : "owned"}/filter-profile`,
+        audience === "management"
+          ? "/zsjos/lead/inbox/management/filter-profile"
+          : `/zsjos/lead/inbox/${audience === "submitter" ? "submitted" : "owned"}/filter-profile`,
       ),
     ),
   leadFollowUpPage: async (
@@ -5825,7 +5851,7 @@ export const api = {
       pageSize: number;
       keyword?: string;
     }) =>
-      unwrap<PageResult<MyStudent>>(
+      unwrap<PageResult<MediaStudentListItem>>(
         await http.get("/zsjos/media-students/page", { params }),
       ),
     get: async (personId: number) =>
@@ -6071,7 +6097,7 @@ export const api = {
     unwrap<number>(
       await http.post("/zsjos/registration-checklist-config/draft/copy", {
         version,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createIdempotencyKey(),
       }),
     ),
   saveRegistrationChecklistDraft: async (data: {
@@ -6104,7 +6130,7 @@ export const api = {
     unwrap<boolean>(
       await http.post("/zsjos/registration-checklist-config/publish", {
         version,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createIdempotencyKey(),
       }),
     ),
 };

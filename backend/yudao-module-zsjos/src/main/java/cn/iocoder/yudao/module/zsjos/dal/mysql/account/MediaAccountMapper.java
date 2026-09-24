@@ -155,6 +155,13 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
     }
 
+    default List<MediaAccountDO> selectByStudents(Collection<Long> personIds) {
+        if (personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
+                .in(MediaAccountDO::getStudentPersonId, personIds)
+                .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
+    }
+
     default int updateOwnerOperator(Long id, Long operatorUserId, Integer version) {
         return update(null, new LambdaUpdateWrapper<MediaAccountDO>()
                 .eq(MediaAccountDO::getId, id)

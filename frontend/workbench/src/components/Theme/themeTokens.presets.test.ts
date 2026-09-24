@@ -13,10 +13,27 @@ import { buildCrmVars } from './themeTokens'
  */
 const varsFor = (isDark: boolean, primary = '#1677ff', compact = false) => {
   const config = buildDefaultConfig(isDark, primary, compact, 10).theme as ThemeConfig
-  return buildCrmVars(theme.getDesignToken(config), { hasBackground: false })
+  return buildCrmVars(theme.getDesignToken(config), { hasBackground: false, isDark })
 }
 
 describe('buildCrmVars across default presets', () => {
+  it('keeps pinned blue independent of the primary hue, adapting its surface to darkness', () => {
+    for (const dark of [false, true]) {
+      const blue = varsFor(dark)
+      const pink = varsFor(dark, '#ed4192')
+      for (const key of ['--crm-notice-pin', '--crm-notice-pin-bg', '--crm-notice-pin-text', '--crm-notice-pin-border']) {
+        expect(pink[key]).toBe(blue[key])
+      }
+    }
+    expect(varsFor(true)['--crm-notice-pin-bg']).not.toBe(varsFor(false)['--crm-notice-pin-bg'])
+  })
+
+  it('uses a legible red text shade for pastel error palettes', () => {
+    const token = theme.getDesignToken({ token: { colorError: '#DA8787' } })
+    const vars = buildCrmVars(token, { hasBackground: false })
+    expect(vars['--crm-color-error-text']).not.toBe(token.colorErrorTextActive)
+    expect(vars['--crm-color-error-bg']).toBe(token.colorErrorBg)
+  })
   it('resolves the configured primary colour', () => {
     expect(varsFor(false)['--crm-color-primary']).toBe('#1677ff')
   })

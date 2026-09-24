@@ -24,6 +24,13 @@ class LeadHandlingStageTest {
     }
 
     @Test
+    void legacyWonLeadWithoutOpportunityStillProjectsAsWon() {
+        LeadDO lead = new LeadDO().setStatus(STATUS_WON);
+
+        assertEquals(FOLLOW_UP_WON, LeadStateProjection.followUp(lead, null));
+    }
+
+    @Test
     void qualificationDeadlineDoesNotReplaceFirstFollowStage() {
         LeadDO lead = new LeadDO();
         lead.setStatus(STATUS_SUBMITTED);

@@ -20,7 +20,7 @@
     >
     <el-form inline @submit.prevent>
       <el-form-item label="状态">
-        <el-select v-model="query.status" clearable class="!w-160px">
+        <el-select v-model="query.status" :loading="optionsLoading" :disabled="optionsLoading || !!optionsError" clearable class="!w-160px">
           <el-option v-for="item in statuses" :key="item.value" v-bind="item" />
         </el-select>
       </el-form-item>
@@ -31,6 +31,8 @@
         </el-button>
       </el-form-item>
     </el-form>
+    <el-alert v-if="optionsError" :title="optionsError" type="error" :closable="false"><el-button link @click="reloadOptions">重试</el-button></el-alert>
+<ZsjosAdvancedFilter scene="withdrawal" page-key="withdrawal" placeholder="提现单号 / 银行流水号" @search="value => { query.keyword = value; query.pageNo = 1; load() }" @change="value => { query.advancedFilter = value; query.pageNo = 1; load() }" />
     <el-alert v-if="error" :title="error" type="error" show-icon
       ><el-button link @click="load">重试</el-button></el-alert
     >
@@ -49,7 +51,9 @@
         :selectable="(row: Api.WithdrawalVO) => row.status === 'approved'"
       />
       <el-table-column prop="withdrawalNo" label="提现单号" min-width="210" />
-      <el-table-column prop="applicantUserId" label="申请人" width="100" />
+      <el-table-column v-if="!own" prop="applicantName" label="申请人" min-width="150" />
+      <el-table-column v-if="!own" prop="partnerName" label="归属合作方" min-width="150" />
+      <el-table-column v-if="!own" prop="cashbackCount" label="来源返现笔数" width="120" />
       <el-table-column label="金额" width="120"
         ><template #default="scope"
           >¥{{ money(scope.row.applicationAmount) }}</template
@@ -58,7 +62,9 @@
       <el-table-column label="状态" width="110"
         ><template #default="scope">{{ statusName(scope.row.status) }}</template></el-table-column
       >
-      <el-table-column prop="maskedCardNumber" label="银行卡" min-width="180" />
+      <el-table-column prop="cardNumber" label="银行卡" min-width="180">
+        <template #default="{ row }">{{ row.cardNumber || row.maskedCardNumber || '-' }}</template>
+      </el-table-column>
       <el-table-column prop="submittedAt" label="申请时间" min-width="170" />
       <el-table-column label="操作" width="210" fixed="right">
         <template #default="scope">
@@ -104,6 +110,15 @@
   <Dialog v-model="detailVisible" title="提现详情" width="620px">
     <el-button v-if="detail && userStore.dataAccess.tenantReadAll && !detail.cardNumber" @click="viewFullCard">查看完整收款信息</el-button>
     <el-descriptions v-if="detail" :column="1" border>
+      <el-descriptions-item label="状态">{{ statusName(detail.status) }}</el-descriptions-item>
+      <el-descriptions-item label="审核人">{{ detail.reviewedByName || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="审核时间">{{ formatDate(detail.reviewedAt) || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="审核意见">{{ detail.reviewReason || '-' }}</el-descriptions-item>
+      <el-descriptions-item v-if="!own" label="申请人">{{ detail.applicantName || '-' }}</el-descriptions-item>
+      <el-descriptions-item v-if="!own" label="合作方">{{ detail.partnerName || '-' }}</el-descriptions-item>
+      <el-descriptions-item v-if="!own" label="申请时可用余额">{{ detail.availableBalanceSnapshot == null ? '-' : money(detail.availableBalanceSnapshot) }}</el-descriptions-item>
+      <el-descriptions-item v-if="!own" label="批准金额">{{ detail.approvedAmount == null ? '-' : money(detail.approvedAmount) }}</el-descriptions-item>
+      <el-descriptions-item v-if="!own" label="打款登记人">{{ detail.paidByName || '-' }}</el-descriptions-item>
       <el-descriptions-item label="提现单号">{{ detail.withdrawalNo }}</el-descriptions-item>
       <el-descriptions-item label="金额"
         >¥{{ money(detail.applicationAmount) }}</el-descriptions-item
@@ -129,6 +144,27 @@
         detail.payoutRemark || '-'
       }}</el-descriptions-item>
     </el-descriptions>
+    <WithdrawalSources v-if="detail && !own" :id="detail.id" />
+    <el-alert v-if="detail?.status === 'pending_review' && detail.reviewUnavailableReason" :title="detail.reviewUnavailableReason" type="warning" :closable="false" />
+    <template #footer>
+      <template v-if="detail && !own">
+        <el-button v-if="detail.availableActions?.includes('approve')" v-hasPermi="['zsjos:withdrawal:review']" type="primary" @click="openReview(true)">通过</el-button>
+        <el-button v-if="detail.availableActions?.includes('reject')" v-hasPermi="['zsjos:withdrawal:review']" type="danger" @click="openReview(false)">驳回</el-button>
+        <el-button v-if="detail.status === 'approved'" v-hasPermi="['zsjos:withdrawal:review']" type="danger" @click="openReject(detail.id)">驳回已通过申请</el-button>
+        <el-button v-if="detail.status === 'approved'" v-hasPermi="['zsjos:withdrawal:payout']" type="primary" @click="openPayout(detail.id)">登记打款</el-button>
+      </template>
+    </template>
+  </Dialog>
+  <Dialog v-model="reviewVisible" :title="reviewApprove ? '通过提现审核' : '驳回提现申请'" width="min(480px, calc(100vw - 32px))" :before-close="(done: () => void) => { if (!saving) done() }">
+    <el-form label-position="top" :disabled="saving">
+      <el-form-item :label="reviewApprove ? '通过理由（选填）' : '驳回原因'" :required="!reviewApprove">
+        <el-input v-model="reviewReason" type="textarea" :rows="4" maxlength="500" show-word-limit />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button :disabled="saving" @click="reviewVisible = false">取消</el-button>
+      <el-button :type="reviewApprove ? 'primary' : 'danger'" :loading="saving" @click="submitReview">{{ reviewApprove ? '确认通过' : '确认驳回' }}</el-button>
+    </template>
   </Dialog>
   <Dialog v-model="applyVisible" title="申请提现" width="720px">
     <el-alert
@@ -227,8 +263,12 @@
   </Dialog>
 </template>
 <script setup lang="ts">
+import WithdrawalSources from '../components/WithdrawalSources.vue'
+import { useFinanceFilterOptions } from '../components/useFinanceFilterOptions'
+import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
+import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
 import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Api from '@/api/zsjos/withdrawal'
 import * as CashbackApi from '@/api/zsjos/cashback'
 import * as ExportTaskApi from '@/api/zsjos/exportTask'
@@ -238,6 +278,8 @@ import { formatDate } from '@/utils/formatTime'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
 const router = useRouter()
+const route = useRoute()
+const reviewVisible = ref(false), reviewApprove = ref(true), reviewReason = ref('')
 const own = computed(() => withdrawalDataScope(userStore.getPermissions) === 'own')
 const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
 const readOnly = computed(() => own.value && readScope.value.readScope !== 'SELF')
@@ -275,9 +317,9 @@ const canPayout = computed(
 const canViewFinance = computed(
   () =>
     userStore.getPermissions.has('*:*:*') ||
-    userStore.getPermissions.has('zsjos:withdrawal:finance-query')
+    userStore.getPermissions.has('zsjos:withdrawal:finance-query') || userStore.getPermissions.has('zsjos:withdrawal:admin-query')
 )
-const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined })
+const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined, keyword: undefined as string | undefined, advancedFilter: undefined as AdvancedFilterGroup | undefined })
 const canExport = computed(
   () =>
     (userStore.getPermissions.has('*:*:*') ||
@@ -286,7 +328,7 @@ const canExport = computed(
 )
 const exportCurrent = async () => {
   try {
-    await ElMessageBox.confirm('将导出符合当前状态条件的全部记录。', '导出提现记录', {
+    await ElMessageBox.confirm('将导出符合当前筛选条件的全部记录。', '导出提现记录', {
       confirmButtonText: '加入导出队列',
       cancelButtonText: '取消',
       type: 'warning'
@@ -297,7 +339,7 @@ const exportCurrent = async () => {
   }
   exporting.value = true
   try {
-    await ExportTaskApi.createExportTask('withdrawal', JSON.stringify({ status: query.status }))
+    await ExportTaskApi.createExportTask('withdrawal', JSON.stringify({ status: query.status, keyword: query.keyword, advancedFilter: query.advancedFilter }))
     ElMessageBox.confirm('已加入导出队列', '导出任务', {
       confirmButtonText: '查看导出任务',
       cancelButtonText: '关闭',
@@ -313,14 +355,9 @@ const payoutForm = reactive({
   paidAt: undefined as string | undefined,
   remark: ''
 })
-const statuses = [
-  { value: 'pending_review', label: '待审核' },
-  { value: 'approved', label: '待打款' },
-  { value: 'rejected', label: '已驳回' },
-  { value: 'paid', label: '已打款' },
-  { value: 'cancelled', label: '已取消' }
-]
-const statusName = (v: string) => statuses.find((i) => i.value === v)?.label || v,
+const { statuses, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFinanceFilterOptions('withdrawal')
+const statusName = (v: string) => statuses.value.find((i) => i.value === v)?.label
+    || (optionsLoading.value ? '状态加载中' : '状态暂不可用'),
   money = (v: number) => Number(v).toFixed(2)
 let loadSequence = 0
 const load = async () => {
@@ -333,7 +370,7 @@ const load = async () => {
     const scope = withdrawalDataScope(userStore.getPermissions)
     if (scope === 'unauthorized') throw new Error('暂无提现查询权限')
     if (own.value && readScope.value.readScope === 'USER' && !readScope.value.targetUserId) { total.value = 0; return }
-    const data = await (scope === 'own' ? Api.getMyPage({ ...query, ...readScope.value }) : Api.getPage(query))
+    const params = { ...query, ...(scope === 'own' ? readScope.value : {}) }; const data = await (scope === 'own' ? (query.advancedFilter ? Api.searchMyPage(params) : Api.getMyPage(params)) : (query.advancedFilter ? Api.searchPage(params) : Api.getPage(params)))
     if (sequence !== loadSequence) return
     list.value = data.list
     total.value = data.total
@@ -358,6 +395,27 @@ const openDetail = async (id: number) => {
     : Api.getMyDetail(id))
   detailVisible.value = true
 }
+const openReview = (approve: boolean) => {
+  reviewApprove.value = approve; reviewReason.value = ''; reviewVisible.value = true
+}
+const submitReview = async () => {
+  if (saving.value || !detail.value || detail.value.version == null) return
+  const reason = reviewReason.value.trim()
+  if (!reviewApprove.value && !reason) { ElMessage.warning('请填写驳回原因'); return }
+  saving.value = true
+  try {
+    await Api.review(detail.value.id, reviewApprove.value, { version: detail.value.version, reason: reason || undefined })
+    reviewVisible.value = false
+    ElMessage.success(reviewApprove.value ? '审核通过，待打款' : '已驳回提现')
+    await openDetail(detail.value.id)
+    await load()
+  } catch { /* The request client reports the stable business error; keep the entered reason. */ }
+  finally { saving.value = false }
+}
+watch(() => route.query.withdrawalId, value => {
+  const id = Number(value)
+  if (Number.isSafeInteger(id) && id > 0) void openDetail(id).catch(() => { error.value = '提现详情加载失败，请重试' })
+}, { immediate: true })
 const openReject = (id: number) => {
   currentId.value = id
   rejectReason.value = ''
@@ -392,11 +450,12 @@ const cancelOwn = async (id: number) => {
   await load()
 }
 const submitReject = async () => {
-  if (!rejectReason.value.trim()) return
+  if (saving.value || !rejectReason.value.trim()) return
   saving.value = true
   try {
     await Api.rejectApproved(currentId.value, rejectReason.value)
     rejectVisible.value = false
+    if (detailVisible.value && detail.value) await openDetail(detail.value.id)
     await load()
   } finally {
     saving.value = false
@@ -426,6 +485,7 @@ const submitPayout = async () => {
     if (batchPayout.value) await Api.batchPayout({ ...data, ids: payoutIds.value })
     else await Api.payout(payoutIds.value[0], data)
     payoutVisible.value = false
+    if (detailVisible.value && detail.value) await openDetail(detail.value.id)
     await load()
   } catch {
     // The request client displays the business error; retain this selection and form for retry.

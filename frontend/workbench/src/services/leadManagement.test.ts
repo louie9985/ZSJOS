@@ -55,6 +55,10 @@ describe('lead management paging helpers', () => {
     expect(resolveLeadSelection(filtered, { preferredId: 2, currentId: 2 })).toBe(1)
   })
 
+  it('can leave table selection empty when no row was explicitly selected', () => {
+    expect(resolveLeadSelection([lead(1, '表格首行')], { fallbackToFirst: false })).toBeUndefined()
+  })
+
   it('preserves a manual selection instead of restoring a stale route request', () => {
     const rows = [lead(1, '路由客资'), lead(2, '手工选择客资')]
 

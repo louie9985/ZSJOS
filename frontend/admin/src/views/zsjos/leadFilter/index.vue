@@ -53,13 +53,6 @@
               <el-form-item label="稳定编码">
                 <el-input v-model="group.key" :disabled="group.key === 'all'" maxlength="64" />
               </el-form-item>
-              <el-form-item label="二级标题">
-                <el-input
-                  v-model="group.sectionLabel"
-                  placeholder="无二级项时可留空"
-                  maxlength="20"
-                />
-              </el-form-item>
             </div>
 
             <div class="editor-section">
@@ -120,96 +113,140 @@
 
             <div class="editor-section">
               <div class="section-heading">
-                <strong>二级筛选项</strong>
+                <strong>二级筛选行</strong>
                 <el-button
                   text
                   type="primary"
-                  :disabled="group.options.length >= 20"
-                  @click="addOption(group)"
-                  ><Icon icon="ep:plus" /> 添加筛选项</el-button
+                  :disabled="group.sections.length >= 3"
+                  @click="addSection(group)"
+                  ><Icon icon="ep:plus" /> 添加筛选行</el-button
                 >
               </div>
-              <el-table :data="group.options" row-key="key" empty-text="该分组不显示二级筛选">
-                <el-table-column label="显示" width="72"
-                  ><template #default="scope"><el-switch v-model="scope.row.enabled" /></template
-                ></el-table-column>
-                <el-table-column label="名称" min-width="150"
-                  ><template #default="scope"
-                    ><el-input v-model="scope.row.label" maxlength="20" /></template
-                ></el-table-column>
-                <el-table-column label="编码" min-width="160"
-                  ><template #default="scope"
-                    ><el-input
-                      v-model="scope.row.key"
-                      :disabled="scope.row.key === 'all'"
-                      maxlength="64" /></template
-                ></el-table-column>
-                <el-table-column label="条件" min-width="360">
-                  <template #default="scope">
-                    <div class="option-conditions">
-                      <div
-                        v-for="(condition, conditionIndex) in scope.row.conditions"
-                        :key="conditionIndex"
-                        class="condition-row compact"
-                      >
-                        <el-select v-model="condition.field" @change="condition.values = []">
-                          <el-option
-                            v-for="capability in capabilities"
-                            :key="capability.field"
-                            :label="capability.label"
-                            :value="capability.field"
-                          />
-                        </el-select>
-                        <el-select v-model="condition.values" multiple collapse-tags>
-                          <el-option
-                            v-for="value in capabilityValues(condition.field)"
-                            :key="value.value"
-                            :label="value.label"
-                            :value="value.value"
-                          />
-                        </el-select>
-                        <el-button
-                          :icon="Delete"
-                          circle
-                          text
-                          type="danger"
-                          @click="scope.row.conditions.splice(conditionIndex, 1)"
-                        />
-                      </div>
-                      <el-button
-                        v-if="scope.row.key !== 'all' && scope.row.conditions.length < 2"
-                        link
-                        type="primary"
-                        @click="addCondition(scope.row.conditions)"
-                        >添加条件</el-button
-                      >
-                      <el-text v-if="scope.row.key === 'all'" type="info">继承分组条件</el-text>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="150" fixed="right">
-                  <template #default="scope">
+              <el-text v-if="!group.sections.length" type="info">该分组不显示二级筛选。</el-text>
+              <div
+                v-for="(section, sectionIndex) in group.sections"
+                :key="section.key"
+                class="section-block"
+              >
+                <div class="field-grid">
+                  <el-form-item label="行名称">
+                    <el-input v-model="section.label" maxlength="20" show-word-limit />
+                  </el-form-item>
+                  <el-form-item label="稳定编码">
+                    <el-input v-model="section.key" maxlength="64" />
+                  </el-form-item>
+                  <el-form-item label="操作">
                     <el-button-group>
                       <el-button
                         :icon="ArrowUp"
-                        :disabled="scope.$index === 0"
-                        @click="move(group.options, scope.$index, -1)"
+                        :disabled="sectionIndex === 0"
+                        @click="move(group.sections, sectionIndex, -1)"
                       />
                       <el-button
                         :icon="ArrowDown"
-                        :disabled="scope.$index === group.options.length - 1"
-                        @click="move(group.options, scope.$index, 1)"
+                        :disabled="sectionIndex === group.sections.length - 1"
+                        @click="move(group.sections, sectionIndex, 1)"
                       />
                       <el-button
                         :icon="Delete"
                         type="danger"
-                        :disabled="scope.row.key === 'all'"
-                        @click="group.options.splice(scope.$index, 1)"
+                        @click="group.sections.splice(sectionIndex, 1)"
                       />
                     </el-button-group>
-                  </template>
-                </el-table-column>
-              </el-table>
+                  </el-form-item>
+                </div>
+                <div class="section-heading">
+                  <span>{{ section.label || '筛选行' }}筛选项</span>
+                  <el-button
+                    text
+                    type="primary"
+                    :disabled="section.options.length >= 20"
+                    @click="addOption(section)"
+                    ><Icon icon="ep:plus" /> 添加筛选项</el-button
+                  >
+                </div>
+                <el-table :data="section.options" row-key="key" empty-text="该行暂无筛选项">
+                  <el-table-column label="显示" width="72"
+                    ><template #default="scope"><el-switch v-model="scope.row.enabled" /></template
+                  ></el-table-column>
+                  <el-table-column label="名称" min-width="150"
+                    ><template #default="scope"
+                      ><el-input v-model="scope.row.label" maxlength="20" /></template
+                  ></el-table-column>
+                  <el-table-column label="编码" min-width="160"
+                    ><template #default="scope"
+                      ><el-input
+                        v-model="scope.row.key"
+                        :disabled="scope.row.key === 'all'"
+                        maxlength="64" /></template
+                  ></el-table-column>
+                  <el-table-column label="条件" min-width="360">
+                    <template #default="scope">
+                      <div class="option-conditions">
+                        <div
+                          v-for="(condition, conditionIndex) in scope.row.conditions"
+                          :key="conditionIndex"
+                          class="condition-row compact"
+                        >
+                          <el-select v-model="condition.field" @change="condition.values = []">
+                            <el-option
+                              v-for="capability in capabilities"
+                              :key="capability.field"
+                              :label="capability.label"
+                              :value="capability.field"
+                            />
+                          </el-select>
+                          <el-select v-model="condition.values" multiple collapse-tags>
+                            <el-option
+                              v-for="value in capabilityValues(condition.field)"
+                              :key="value.value"
+                              :label="value.label"
+                              :value="value.value"
+                            />
+                          </el-select>
+                          <el-button
+                            :icon="Delete"
+                            circle
+                            text
+                            type="danger"
+                            @click="scope.row.conditions.splice(conditionIndex, 1)"
+                          />
+                        </div>
+                        <el-button
+                          v-if="scope.row.key !== 'all' && scope.row.conditions.length < 2"
+                          link
+                          type="primary"
+                          @click="addCondition(scope.row.conditions)"
+                          >添加条件</el-button
+                        >
+                        <el-text v-if="scope.row.key === 'all'" type="info">继承分组条件</el-text>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="150" fixed="right">
+                    <template #default="scope">
+                      <el-button-group>
+                        <el-button
+                          :icon="ArrowUp"
+                          :disabled="scope.$index === 0"
+                          @click="move(section.options, scope.$index, -1)"
+                        />
+                        <el-button
+                          :icon="ArrowDown"
+                          :disabled="scope.$index === section.options.length - 1"
+                          @click="move(section.options, scope.$index, 1)"
+                        />
+                        <el-button
+                          :icon="Delete"
+                          type="danger"
+                          :disabled="scope.row.key === 'all'"
+                          @click="section.options.splice(scope.$index, 1)"
+                        />
+                      </el-button-group>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
             </div>
 
             <div class="group-actions">
@@ -322,7 +359,8 @@ const audienceOptions = [
   { label: '提交人视角', value: 'submitter' },
   { label: '负责人视角', value: 'owner' },
   { label: '审批人视角', value: 'reviewer' },
-  { label: '公海池视角', value: 'agingPool' }
+  { label: '公海池视角', value: 'agingPool' },
+  { label: '统一客资管理视角', value: 'management' }
 ]
 const audienceLabel = computed(
   () => audienceOptions.find((item) => item.value === audience.value)?.label || audience.value
@@ -392,20 +430,27 @@ const addGroup = () => {
     label: '新分组',
     sort: groups.value.length * 10,
     enabled: true,
-    sectionLabel: '当前环节',
     conditions: [],
-    options: []
+    sections: []
   })
   activeGroups.value.push(key)
 }
-const addOption = (group: LeadFilterApi.LeadFilterGroupVO) => {
-  if (!group.options.length) {
-    group.options.push({ key: 'all', label: '全部', sort: 0, enabled: true, conditions: [] })
+const addSection = (group: LeadFilterApi.LeadFilterGroupVO) => {
+  group.sections.push({
+    key: `section_${Date.now()}`,
+    label: '新筛选行',
+    sort: group.sections.length * 10,
+    options: []
+  })
+}
+const addOption = (section: LeadFilterApi.LeadFilterSectionVO) => {
+  if (!section.options.length) {
+    section.options.push({ key: 'all', label: '全部', sort: 0, enabled: true, conditions: [] })
   }
-  group.options.push({
+  section.options.push({
     key: `option_${Date.now()}`,
     label: '新筛选项',
-    sort: group.options.length * 10,
+    sort: section.options.length * 10,
     enabled: true,
     conditions: []
   })
@@ -419,8 +464,11 @@ const move = <T,>(items: T[], index: number, offset: number) => {
 const normalizeSort = () => {
   groups.value.forEach((group, groupIndex) => {
     group.sort = groupIndex * 10
-    group.options.forEach((option, optionIndex) => {
-      option.sort = optionIndex * 10
+    group.sections.forEach((section, sectionIndex) => {
+      section.sort = sectionIndex * 10
+      section.options.forEach((option, optionIndex) => {
+        option.sort = optionIndex * 10
+      })
     })
   })
 }
@@ -442,24 +490,35 @@ const validate = () => {
     groupKeys.add(group.key)
     if (group.conditions.some((condition) => !condition.field || !condition.values.length))
       throw new Error(`分组“${group.label}”存在未完成的条件`)
-    if (group.options.length > 20) throw new Error(`分组“${group.label}”的筛选项不能超过 20 个`)
-    if (
-      group.options.length &&
-      !group.options.some(
-        (option) => option.key === 'all' && option.enabled && option.conditions.length === 0
+    if (group.sections.length > 3) throw new Error(`分组“${group.label}”的筛选行不能超过 3 行`)
+    const sectionKeys = new Set<string>()
+    for (const section of group.sections) {
+      if (!section.key || !section.label) throw new Error(`分组“${group.label}”存在未命名筛选行`)
+      if (!keyPattern.test(section.key))
+        throw new Error(`筛选行“${section.label}”的编码只能使用小写字母、数字和下划线`)
+      if (sectionKeys.has(section.key))
+        throw new Error(`分组“${group.label}”中的筛选行编码“${section.key}”不能重复`)
+      sectionKeys.add(section.key)
+      if (section.options.length > 20)
+        throw new Error(`筛选行“${section.label}”的筛选项不能超过 20 个`)
+      if (
+        section.options.length &&
+        !section.options.some(
+          (option) => option.key === 'all' && option.enabled && option.conditions.length === 0
+        )
       )
-    )
-      throw new Error(`分组“${group.label}”必须保留无条件的“全部”筛选项`)
-    const optionKeys = new Set<string>()
-    for (const option of group.options) {
-      if (!option.key || !option.label) throw new Error(`分组“${group.label}”存在未命名筛选项`)
-      if (!keyPattern.test(option.key))
-        throw new Error(`筛选项“${option.label}”的编码只能使用小写字母、数字和下划线`)
-      if (optionKeys.has(option.key))
-        throw new Error(`分组“${group.label}”中的筛选项编码“${option.key}”不能重复`)
-      optionKeys.add(option.key)
-      if (option.conditions.some((condition) => !condition.field || !condition.values.length))
-        throw new Error(`筛选项“${option.label}”存在未完成的条件`)
+        throw new Error(`筛选行“${section.label}”必须保留无条件的“全部”筛选项`)
+      const optionKeys = new Set<string>()
+      for (const option of section.options) {
+        if (!option.key || !option.label) throw new Error(`筛选行“${section.label}”存在未命名筛选项`)
+        if (!keyPattern.test(option.key))
+          throw new Error(`筛选项“${option.label}”的编码只能使用小写字母、数字和下划线`)
+        if (optionKeys.has(option.key))
+          throw new Error(`筛选行“${section.label}”中的筛选项编码“${option.key}”不能重复`)
+        optionKeys.add(option.key)
+        if (option.conditions.some((condition) => !condition.field || !condition.values.length))
+          throw new Error(`筛选项“${option.label}”存在未完成的条件`)
+      }
     }
   }
 }

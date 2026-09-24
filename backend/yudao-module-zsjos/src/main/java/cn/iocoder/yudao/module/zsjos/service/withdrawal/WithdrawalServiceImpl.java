@@ -57,6 +57,7 @@ import static cn.iocoder.yudao.module.zsjos.service.audit.AuditActionCatalog.*;
 @Service
 @Slf4j
 public class WithdrawalServiceImpl implements WithdrawalService {
+
     private static final BigDecimal DEFAULT_MIN_AMOUNT = new BigDecimal("10.00");
     private static final Pattern CARD_PATTERN = Pattern.compile("\\d{12,32}");
     private static final Set<String> PROOF_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
@@ -176,6 +177,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (!Objects.equals(record.getApplicantUserId(), userId)) throw exception(WITHDRAWAL_PERMISSION_DENIED);
         if (!STATUS_PENDING.equals(record.getStatus())) throw exception(WITHDRAWAL_STATE_INVALID);
         record.setStatus(STATUS_CANCELLED).setCancelledByUserId(userId).setCancelledAt(LocalDateTime.now());
+        record.setVersion(record.getVersion() + 1);
         withdrawalMapper.updateById(record); releaseCashbacks(record.getId());
         processInstanceApi.cancelProcessInstanceByStartUser(userId, record.getProcessInstanceId(), "兼职撤销提现申请");
     }
@@ -187,6 +189,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (!Objects.equals(record.getPartnerId(), partnerId)) throw exception(WITHDRAWAL_PERMISSION_DENIED);
         if (!STATUS_PENDING.equals(record.getStatus())) throw exception(WITHDRAWAL_STATE_INVALID);
         record.setStatus(STATUS_CANCELLED).setCancelledByUserId(null).setCancelledAt(LocalDateTime.now());
+        record.setVersion(record.getVersion() + 1);
         withdrawalMapper.updateById(record);
         releaseCashbacks(record.getId());
         processInstanceApi.cancelProcessInstanceByStartSubject(
@@ -202,6 +205,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (!STATUS_APPROVED.equals(record.getStatus())) throw exception(WITHDRAWAL_STATE_INVALID);
         record.setStatus(STATUS_REJECTED).setReviewedByUserId(userId).setReviewedAt(LocalDateTime.now())
                 .setRejectionReason(reason.trim());
+        record.setVersion(record.getVersion() + 1);
         withdrawalMapper.updateById(record); releaseCashbacks(record.getId());
         auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_REJECTED, "withdrawal", String.valueOf(id),
                 "finance", Map.of("amount", record.getApplicationAmount(), "reason", record.getRejectionReason()));
@@ -225,6 +229,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         }
         record.setStatus(STATUS_PAID).setPayoutRemark(StrUtil.trim(request.getRemark()))
                 .setPaidByUserId(userId).setPaidAt(request.getPaidAt());
+        record.setVersion(record.getVersion() + 1);
         withdrawalMapper.updateById(record);
         auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_PAYOUT, "withdrawal", String.valueOf(id),
                 "finance", Map.of("amount", record.getApplicationAmount()));
@@ -264,6 +269,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                                 "reason", StrUtil.nullToEmpty(reason)));
             }
         }
+        record.setVersion(record.getVersion() + 1);
         withdrawalMapper.updateById(record);
         notifyPublisher.publish(STATUS_APPROVED.equals(record.getStatus()) ? SCENE_APPROVED : SCENE_REJECTED,
                 record.getId(), "withdrawal-process-result:" + processInstanceId, 0L,
@@ -271,11 +277,19 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     @Override
+    public PageResult<WithdrawalRespVO> getManagementPage(WithdrawalPageReqVO request) {
+        PageResult<WithdrawalDO> page = (request.getAdvancedFilter() == null ? withdrawalMapper.selectPageByApplicant(request, null)
+                : withdrawalMapper.selectPageByApplicant(request, null, advancedFilterService.matchFinanceIds("withdrawal", request.getAdvancedFilter())));
+        return new PageResult<>(page.getList().stream().map(item -> toResponse(item, true)).toList(), page.getTotal());
+    }
+
+    @Override
     public PageResult<WithdrawalRespVO> getPage(WithdrawalPageReqVO request, Long applicantUserId) {
         if (applicantUserId != null && (request.getReadScope() != null || request.getTargetUserId() != null)) {
             applicantUserId = readScopeService.resolve(request.getReadScope(), request.getTargetUserId(), applicantUserId);
         }
-        PageResult<WithdrawalDO> page = withdrawalMapper.selectPageByApplicant(request, applicantUserId);
+        PageResult<WithdrawalDO> page = (request.getAdvancedFilter() == null ? withdrawalMapper.selectPageByApplicant(request, applicantUserId)
+                : withdrawalMapper.selectPageByApplicant(request, applicantUserId, advancedFilterService.matchFinanceIds("withdrawal", request.getAdvancedFilter())));
         return new PageResult<>(page.getList().stream().map(item -> toResponse(item, false)).toList(), page.getTotal());
     }
 
@@ -290,12 +304,15 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     public WithdrawalRespVO getDetail(Long id, Long userId, boolean fullCard) {
         WithdrawalDO record = withdrawalMapper.selectById(id);
         if (record == null) throw exception(WITHDRAWAL_NOT_EXISTS);
+        // Management query permission includes complete account and payout data.
+        boolean managementView = permissionApi.hasAnyPermissions(userId,
+                "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query");
         if (fullCard && !permissionApi.hasTenantReadAllAccess(userId)
-                && !permissionApi.hasAnyPermissions(userId, "zsjos:withdrawal:finance-query")) {
+                && !managementView) {
             throw exception(WITHDRAWAL_PERMISSION_DENIED);
         }
-        WithdrawalRespVO response = toResponse(record, fullCard);
-        if (fullCard) auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_CARD_VIEW, "withdrawal",
+        WithdrawalRespVO response = toResponse(record, fullCard || managementView);
+        if (fullCard || managementView) auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_CARD_VIEW, "withdrawal",
                 String.valueOf(id), "finance", Map.of("purpose", "withdrawal_review"));
         return response;
     }

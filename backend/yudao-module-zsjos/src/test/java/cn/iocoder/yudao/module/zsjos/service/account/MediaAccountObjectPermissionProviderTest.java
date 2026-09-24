@@ -17,6 +17,32 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MediaAccountObjectPermissionProviderTest {
+    @Test
+    void batchReadMatchesSingleReadIncludingBrokenRelationsAndTenantBoundaries() {
+        var relation = new ServiceRelationDO();
+        relation.setId(30L); relation.setPersonId(40L); relation.setTenantId(1L);
+        relation.setStatus("active"); relation.setAcceptanceStatus("accepted"); relation.setOperatorUserId(10L);
+        var related = new MediaAccountDO().setId(1L).setStudentPersonId(40L).setCreateServiceRelationId(30L);
+        related.setTenantId(1L);
+        var crossTenant = new MediaAccountDO().setId(2L).setStudentPersonId(40L).setCreateServiceRelationId(30L);
+        crossTenant.setTenantId(2L);
+        var legacy = new MediaAccountDO().setId(3L).setOwnerOperatorUserId(10L);
+        var denied = new MediaAccountDO().setId(4L).setOwnerOperatorUserId(20L);
+        var accounts = java.util.List.of(related, crossTenant, legacy, denied);
+        when(relationMapper.selectByIds(java.util.List.of(30L))).thenReturn(java.util.List.of(relation));
+        when(relationMapper.selectById(30L)).thenReturn(relation);
+        accounts.forEach(account -> when(mapper.selectById(account.getId())).thenReturn(account));
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(related, legacy), provider.filterReadable(accounts, 10L));
+        org.junit.jupiter.api.Assertions.assertEquals(accounts.stream().filter(a -> provider.hasPermission(a.getId(), "read", 10L)).toList(), provider.filterReadable(accounts, 10L));
+        relation.setStatus("paused");
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(legacy), provider.filterReadable(accounts, 10L));
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertEquals(accounts.stream().filter(a -> provider.hasPermission(a.getId(), "read", 10L)).toList(), provider.filterReadable(accounts, 10L));
+        when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(10L, "zsjos:media-account:query-all")).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertEquals(accounts.stream().filter(a -> provider.hasPermission(a.getId(), "read", 10L)).toList(), provider.filterReadable(accounts, 10L));
+    }
+
     @InjectMocks private MediaAccountObjectPermissionProvider provider;
     @Mock private MediaAccountMapper mapper;
     @Mock private PermissionApi permissionApi;

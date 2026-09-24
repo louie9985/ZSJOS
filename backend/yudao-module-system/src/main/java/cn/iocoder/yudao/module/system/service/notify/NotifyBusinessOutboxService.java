@@ -97,8 +97,9 @@ public class NotifyBusinessOutboxService {
                     : eventProcessor.processConfirmed(event);
             now = LocalDateTime.now();
             if (result.isSuccess()) {
-                outbox.setStatus("succeeded"); outbox.setSucceededAt(now); outbox.setLeaseUntil(null);
-                outbox.setLastError(null); outbox.setClaimToken(null);
+                outbox.setStatus(result.isSkipped() ? "skipped" : "succeeded");
+                outbox.setSucceededAt(now); outbox.setLeaseUntil(null);
+                outbox.setLastError(result.isSkipped() ? result.getErrorCode() : null); outbox.setClaimToken(null);
                 outboxMapper.updateDeliveryState(outbox, claimToken, now); return;
             }
             fail(outbox, result.getErrorCode() + ": " + result.getErrorMessage(), result.isRetryable(), claimToken, now);

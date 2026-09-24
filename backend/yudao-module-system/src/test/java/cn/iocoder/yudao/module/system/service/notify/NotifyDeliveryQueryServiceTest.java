@@ -22,6 +22,17 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NotifyDeliveryQueryServiceTest {
+    @Test void skippedRuleExposesStatusAndReasonWithoutPayload() {
+        var row = new NotifyBusinessOutboxDO(); row.setStatus("skipped");
+        row.setLastError("LEAD_SOURCE_LINK_NOT_APPLICABLE");
+        row.setPayload(JsonUtils.toJsonString(new WecomOutboxPayload()));
+        var result = new NotifyDeliveryQueryService().project(row);
+        assertEquals("skipped", result.getStatus());
+        assertEquals("LEAD_SOURCE_LINK_NOT_APPLICABLE", result.getErrorCode());
+        assertEquals("wecom", result.getChannelCode());
+        assertTrue(result.getRecipients().isEmpty());
+    }
+
     @Configuration @EnableMethodSecurity static class Config {
         @Bean(name="ss") SecurityFrameworkService security() { return mock(SecurityFrameworkService.class); }
         @Bean NotifyRuleController controller() { return new NotifyRuleController(); }

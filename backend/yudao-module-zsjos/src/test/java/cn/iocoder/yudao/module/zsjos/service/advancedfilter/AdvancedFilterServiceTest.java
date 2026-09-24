@@ -23,6 +23,66 @@ class AdvancedFilterServiceTest {
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(7L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Test void productAndSkuConditionsMustMatchTheSameItem() {
+        service.matchOrderIds(group("AND", condition("orderItem.productRef", "in", List.of("p-1")),
+                condition("orderItem.skuRef", "in", List.of("sku-1"))));
+        var capture = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectOrderIds(capture.capture());
+        var sql = capture.getValue().getWhereSql();
+        assertEquals(1, sql.split("EXISTS", -1).length - 1);
+        assertTrue(sql.contains("oi.product_ref IN"));
+        assertTrue(sql.contains("oi.sku_ref IN"));
+        assertTrue(sql.contains("oi.tenant_id=o.tenant_id"));
+        service.matchLeadIds(group("AND", condition("lead.intendedProductRef", "in", List.of("p-1")),
+                condition("lead.intendedSkuRef", "not_in", List.of("sku-1"))));
+        verify(mapper).selectLeadIds(capture.capture());
+        assertTrue(capture.getValue().getWhereSql().contains("NOT EXISTS"));
+        assertTrue(capture.getValue().getWhereSql().contains("lip.tenant_id=l.tenant_id"));
+    }
+
+    @Test void addedScalarFieldsParticipateInQueries() {
+        service.matchLeadIds(group("AND", condition("lead.invalidReason", "in", List.of("configured-code")),
+                condition("lead.currentAssignmentFirstFollowUpAt", "is_empty", null),
+                condition("lead.qualificationDeadlineAt", "lt", "2026-09-23T00:00:00"),
+                condition("order.repurchaseReason", "contains", "renewal")));
+        var capture = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectLeadIds(capture.capture());
+        var query = capture.getValue();
+        assertEquals(7L, query.getParameters().get("tenantId"));
+        assertTrue(query.getWhereSql().contains("l.invalid_reason IN"));
+        assertTrue(query.getWhereSql().contains("l.current_assignment_first_follow_up_at IS NULL"));
+        assertTrue(query.getWhereSql().contains("l.qualification_deadline_at <"));
+        assertTrue(query.getWhereSql().contains("ro.repurchase_reason LIKE"));
+        assertTrue(query.getWhereSql().contains("ro.tenant_id=l.tenant_id"));
+        assertFalse(query.getWhereSql().contains("renewal"));
+        assertFalse(query.getWhereSql().contains("configured-code"));
+        var fields = AdvancedFilterFieldCatalog.fields();
+        assertEquals("text", fields.get("order.agreedExamTime").type());
+        assertEquals("dict:zsjos_lead_invalid_reason", fields.get("lead.invalidReason").optionSource());
+        assertEquals("a.invalid_reason_snapshot", fields.get("appeal.invalidReasonSnapshot")
+                .bindings().get("lead_appeal").expression());
+        assertNull(fields.get("appeal.invalidReasonSnapshot").optionSource());
+    }
+
+    @Test void addedSubordinateMetricsUseActualResponseValues() {
+        var row = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesRespVO();
+        var evaluator = new cn.iocoder.yudao.module.zsjos.service.lead.SubordinateSalesServiceImpl();
+        for (String key : List.of("todayAssignedCount", "todayMissedCount", "todayReceivedCount",
+                "todayQualifiedCount", "todayFollowUpRecordCount", "pendingQualificationCount",
+                "todayFollowUpTotalCount", "todayFollowUpRemainingCount", "todayOrderAmount")) {
+            Object value = key.equals("todayOrderAmount") ? new java.math.BigDecimal("12.50") : Long.valueOf(12);
+            org.springframework.test.util.ReflectionTestUtils.setField(row, key, value);
+            java.util.function.Function<String, Object> values = field ->
+                    org.springframework.test.util.ReflectionTestUtils.invokeMethod(evaluator, "subordinateFilterValue", row, field);
+            assertTrue(service.matches("subordinate_sales", group("AND", condition("subordinate." + key, "gt", "10")), values), key);
+            assertFalse(service.matches("subordinate_sales", group("AND", condition("subordinate." + key, "gt", "20")), values), key);
+        }
+        row.setCanReceiveNewLeads(false);
+        assertTrue(service.matches("subordinate_sales", group("AND",
+                condition("subordinate.canReceiveNewLeads", "in", List.of("false"))),
+                field -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(evaluator, "subordinateFilterValue", row, field)));
+    }
+
     @Test void stageOrganizationAndIndependentStatusesComposeWithoutChangingTenant() {
         when(leadFilterOrganizations.ownerIds(List.of("10"))).thenReturn(List.of(20L));
         var filters = group("AND", condition("lead.salesStage", "in", List.of("contacted")),
@@ -138,7 +198,7 @@ class AdvancedFilterServiceTest {
     @Test void catalogContainsControlledOptionsAndRejectsUnknownScene() {
         var catalog = service.catalog("lead");
         assertTrue(catalog.fields().stream().allMatch(field -> field.fieldKey().contains(".")));
-        assertFalse(catalog.fields().stream().filter(field -> field.fieldKey().equals("lead.status")).findFirst().orElseThrow().options().isEmpty());
+        assertEquals("dict:zsjos_lead_status", catalog.fields().stream().filter(field -> field.fieldKey().equals("lead.status")).findFirst().orElseThrow().optionSource());
         var duration = catalog.fields().stream().filter(field -> field.fieldKey().equals("duration.diff")).findFirst().orElseThrow();
         assertEquals("时间作差", duration.label());
         assertEquals("时间", duration.group());
@@ -301,6 +361,31 @@ class AdvancedFilterServiceTest {
         assertTrue(sql.contains("vsr.status='active'"));
         assertTrue(sql.contains("vcr.tenant_id=vsr.tenant_id"));
         assertTrue(sql.contains("vsr.tenant_id=p.tenant_id"));
+    }
+
+    @Test void financeCompilesParameterizedQueriesAndRejectsCrossSceneFields() {
+        when(mapper.selectCashbackIds(any())).thenReturn(List.of(41L));
+        assertEquals(List.of(41L), service.matchFinanceIds("cashback", group("AND",
+                condition("cashback.orderNo", "contains", "order-token"),
+                condition("cashback.amount", "gte", "100"))));
+        var query = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectCashbackIds(query.capture());
+        assertEquals(7L, query.getValue().getParameters().get("tenantId"));
+        assertTrue(query.getValue().getWhereSql().contains("fo.tenant_id=c.tenant_id"));
+        assertTrue(query.getValue().getWhereSql().contains("FROM zsjos_order fo"));
+        assertFalse(query.getValue().getWhereSql().contains("order-token"));
+        assertThrows(ServiceException.class, () -> service.matchFinanceIds("withdrawal",
+                group("AND", condition("cashback.amount", "gte", "100"))));
+        service.matchFinanceIds("withdrawal", group("AND", condition("withdrawal.bankTransactionNo", "eq", "bank-token")));
+        verify(mapper).selectWithdrawalIds(query.capture());
+        assertTrue(query.getValue().getWhereSql().contains("w.bank_transaction_no"));
+        assertNull(service.matchFinanceIds("cashback", null));
+        for (String sql : List.of(AdvancedFilterMapper.SqlProvider.cashbackSql(java.util.Map.of()),
+                AdvancedFilterMapper.SqlProvider.withdrawalSql(java.util.Map.of()))) {
+            assertTrue(sql.contains("deleted=b'0'"));
+            assertTrue(sql.contains("tenant_id=#{query.parameters.tenantId}"));
+            assertTrue(sql.contains("(${query.whereSql})"));
+        }
     }
 
     private static AdvancedFilterGroupReqVO group(String logic, AdvancedFilterConditionReqVO... conditions) { AdvancedFilterGroupReqVO value = new AdvancedFilterGroupReqVO(); value.setLogic(logic); value.getConditions().addAll(List.of(conditions)); return value; }

@@ -7,7 +7,9 @@ import {
   isPendingLeadExpired,
   shouldFocusAssignmentEvent,
   shouldShowAssignmentModal,
-  sortPendingLeads
+  sortPendingLeads,
+  assignmentLinkTarget,
+  matchesAssignmentLink
 } from './leadAssignment'
 
 const pending = (id: number, remainingSeconds?: number, submittedAt = 1786240800000): PendingLead => ({
@@ -51,5 +53,21 @@ describe('lead assignment queue', () => {
     expect(ASSIGNMENT_REFRESH_RETRY_DELAYS_MS).toEqual([0, 300, 900])
     expect(hasPendingLead([pending(1), pending(2)], 2)).toBe(true)
     expect(hasPendingLead([pending(1)], 2)).toBe(false)
+  })
+})
+
+describe('WeCom assignment round links', () => {
+  it('matches only the current unexpired round', () => {
+    const lead = { ...pending(1, 30), assignmentHistoryId: 20 }
+    expect(matchesAssignmentLink(lead, { leadId: 1, historyId: 20 })).toBe(true)
+    expect(matchesAssignmentLink(lead, { leadId: 1, historyId: 19 })).toBe(false)
+    expect(matchesAssignmentLink({ ...lead, remainingSeconds: 0 }, { leadId: 1, historyId: 20 })).toBe(false)
+    expect(matchesAssignmentLink({ ...lead, remainingSeconds: undefined }, { leadId: 1, historyId: 20 })).toBe(true)
+  })
+  it('rejects malformed links without losing their explicit intent', () => {
+    expect(assignmentLinkTarget('')).toBeUndefined()
+    const invalid = assignmentLinkTarget('?assignmentLeadId=1&assignmentHistoryId=no')!
+    expect(matchesAssignmentLink({ ...pending(1), assignmentHistoryId: 20 }, invalid)).toBe(false)
+    expect(matchesAssignmentLink(pending(1), assignmentLinkTarget('?assignmentLeadId=1')!)).toBe(false)
   })
 })

@@ -299,3 +299,7 @@ UTF-8 `.json` 文件或粘贴文本，原始文件不会上传。JSON 顶层必�
 定位卡独立提交、历史主卡选择与账号应用版本见 [独立定位卡契约](positioning-service-application.md)。创建账号不再绑定草稿，运营及学员确认不依赖账号，最新确认版本不会自动应用。
 
 Workbench 学员搜索完成后保留结果内的当前学员，否则选中首条；无结果时清空详情、服务上下文和操作，并废弃旧详情请求。主动搜索不沿用地址栏中不在结果内的学员及其账号定位参数；首次外部链接仍按明确的学员/账号定位。用户点击名单后，之前的搜索响应不再覆盖名单与选择。详情及服务上下文身份一致且搜索/详情加载完成后才允许指派；弹窗固定本次学员和服务目标，提交前再次核对。既有未保存编辑切换确认继续生效。
+
+### Media student inbox account summaries
+
+The media-only `/zsjos/media-students/page` response adds a required `accounts` array per student (`id`, `accountNo`, `nickname`, `platformValue`, `platformLabel`). Existing pagination, student fields and read scopes are unchanged. The media service batch-loads accounts for the authorized page and filters them through the account permission provider using batch-loaded service relations. Account read predicates are shared with single-object checks; student visibility does not broaden account access. Ordering remains update time descending then ID descending. `platformLabel` is the persisted dictionary snapshot, never a current-label repair. Detail account projections additionally expose `platformValue` so saved changes can refresh inbox cards without reloading the list. Generic student responses and Vue Admin APIs remain unchanged. No SQL or grants are required.

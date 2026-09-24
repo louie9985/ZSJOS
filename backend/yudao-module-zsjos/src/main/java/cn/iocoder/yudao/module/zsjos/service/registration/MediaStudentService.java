@@ -1,5 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.service.registration;
 
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentListRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO;
+
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentDetailRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTargetRespVO;
@@ -35,6 +39,25 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_
 
 @Service
 public class MediaStudentService {
+    public PageResult<MediaStudentListRespVO> getPage(
+            Long userId, MyStudentPageReqVO request) {
+        var page = myStudentService.getMediaPage(userId, request);
+        var personIds = page.getList().stream().map(MyStudentRespVO::getPersonId).toList();
+        var accounts = personIds.isEmpty() ? List.<MediaAccountDO>of()
+                : accountPermissionProvider.filterReadable(accountMapper.selectByStudents(personIds), userId);
+        var grouped = accounts.stream().collect(java.util.stream.Collectors.groupingBy(MediaAccountDO::getStudentPersonId));
+        var rows = page.getList().stream().map(student -> {
+            var row = BeanUtils.toBean(student, MediaStudentListRespVO.class);
+            row.setAccounts(grouped.getOrDefault(student.getPersonId(), List.of()).stream().map(account -> {
+                var summary = BeanUtils.toBean(account, MediaStudentListRespVO.AccountVO.class);
+                summary.setPlatformLabel(account.getPlatformLabelSnapshot());
+                return summary;
+            }).toList());
+            return row;
+        }).toList();
+        return new PageResult<>(rows, page.getTotal());
+    }
+
     @Resource private MyStudentService myStudentService;
     @Resource private MediaAccountMapper accountMapper;
     @Resource private PositioningCardMapper positioningMapper;

@@ -68,6 +68,10 @@ const submit = async () => {
   <WorkbenchListPage
     title="成交审批"
     show-order-identity
+    advanced-scene="order"
+    advanced-page-key="sales_order_approval"
+    advanced-search-endpoint="/zsjos/sales-order/approval/search-page"
+    advanced-placeholder="订单号 / 客户信息"
     endpoint="/zsjos/sales-order/approval/inbox-page"
     description="成交订单审批队列"
     :query="{ handled: false }"

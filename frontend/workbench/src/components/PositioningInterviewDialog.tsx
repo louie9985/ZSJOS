@@ -4,6 +4,7 @@ import { Alert, App, Button, DatePicker, Empty, Input, Modal, Radio, Space, Spin
 import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { positioningInterviewApi, interviewMissingFields, type InterviewContext, type InterviewItem, type InterviewCommand } from '../services/positioningInterviewApi'
+import { createIdempotencyKey } from '../services/idempotency'
 
 export default function PositioningInterviewDialog({ relationId, onClose, onChanged, forceReadOnly = false }: {
   relationId: number; onClose: () => void; onChanged: () => void; forceReadOnly?: boolean
@@ -44,7 +45,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
     }
     const body = { studentPersonId: context.studentPersonId, serviceRelationId: relationId, version: context.version, templateVersionId: context.templateVersionId, items, collectedAt: date, attachmentIds: context.attachments.map(file => file.fileId) }
     const fingerprint = JSON.stringify({ body, complete })
-    if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() }
+    if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: createIdempotencyKey() }
     const command: InterviewCommand = { ...body, idempotencyKey: pending.current.key }
     setBusy(true); setError('')
     try { apply(await positioningInterviewApi.save(relationId, command, complete)); pending.current = undefined; message.success(complete ? '定位访谈已完成' : '草稿已保存'); onChanged() }
@@ -73,7 +74,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
     setBusy(true); setError('')
     try {
       const operation = `${fileId}:${context.version}`
-      if (!removalKeys.current.has(operation)) removalKeys.current.set(operation, crypto.randomUUID())
+      if (!removalKeys.current.has(operation)) removalKeys.current.set(operation, createIdempotencyKey())
       await positioningInterviewApi.remove(relationId, fileId, context.version, removalKeys.current.get(operation)!)
       // Reload only the concurrency token. Unsaved answers and other uploaded files must survive removal.
       const latest = await positioningInterviewApi.context(relationId)

@@ -31,6 +31,7 @@ import BusinessTable from '../components/BusinessTable'
 - 服务端分页使用受控 `current/pageSize/total/onChange`。只有接口和回调确实处理每页数量时才显式设置 `showSizeChanger: true`；固定条数分页默认不显示切换器。切换每页数量时页面应回到第一页。
 - `error` 展示失败与重试，不混同空数据；`unauthorized` 阻止展示可能残留的数据，不提供无效重试。页面依据既有错误类型判断权限，组件不从角色名或错误文案猜测权限。
 - `pagination={false}` 用于完整静态明细；错误与空数据不能替代后端真实数据。
+- 表头默认吸顶，使用页面内容区的滚动容器；长列表滚动时仍可看到字段名称。横向滚动仍由表格自身处理。
 
 ## 紧凑模式与兼容列
 

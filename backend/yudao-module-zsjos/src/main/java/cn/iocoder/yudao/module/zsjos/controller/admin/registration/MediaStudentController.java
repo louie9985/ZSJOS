@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.registration;
 
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentListRespVO;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -11,6 +13,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStude
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.service.registration.MyStudentService;
 import cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentService;
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentPartnerContextService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentPartnerContextRespVO;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,11 +27,18 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class MediaStudentController {
     @Resource private MyStudentService studentService;
     @Resource private MediaStudentService mediaStudentService;
+    @Resource private MediaStudentPartnerContextService partnerContextService;
+
+    @GetMapping("/{personId}/partner-context")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
+    public CommonResult<MediaStudentPartnerContextRespVO> partnerContext(@PathVariable Long personId) {
+        return success(partnerContextService.getContext(SecurityFrameworkUtils.getLoginUserId(), personId));
+    }
 
     @GetMapping("/page")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
-    public CommonResult<PageResult<MyStudentRespVO>> page(@Valid MyStudentPageReqVO req) {
-        return success(studentService.getMediaPage(SecurityFrameworkUtils.getLoginUserId(), req));
+    public CommonResult<PageResult<MediaStudentListRespVO>> page(@Valid MyStudentPageReqVO req) {
+        return success(mediaStudentService.getPage(SecurityFrameworkUtils.getLoginUserId(), req));
     }
 
     @GetMapping("/{personId}")

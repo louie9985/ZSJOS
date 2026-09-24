@@ -1,6 +1,7 @@
 import { Alert, App, Button, Empty, Form, Input, Modal, Select, Skeleton } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError, type StudentContactContext, type StudyPlanner } from '../services/api'
+import { createIdempotencyKey } from '../services/idempotency'
 
 export function operatorReasonRequired(context: Pick<StudentContactContext, 'operatorUserId' | 'operatorAssignmentConflict'> | undefined, userId?: number, serverRequired = false) {
   return serverRequired || Boolean(context?.operatorAssignmentConflict)
@@ -67,7 +68,7 @@ export default function OperatorAssignmentDialog({ relationId, studentName, stud
       const body = { collaboratorType: 'operator' as const, userId: values.userId, version: context.version,
         correctionReason: values.correctionReason?.trim() || undefined }
       const fingerprint = JSON.stringify(body)
-      if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() }
+      if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: createIdempotencyKey() }
       await api.studentAssignCollaborator(relationId, { ...body, idempotencyKey: pending.current.key })
       if (!alive.current) return
       message.success('运营指派已保存')

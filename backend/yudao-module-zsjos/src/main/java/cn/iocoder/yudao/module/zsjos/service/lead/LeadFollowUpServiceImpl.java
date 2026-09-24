@@ -28,6 +28,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpImageMapper;
 import jakarta.annotation.Resource;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +63,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(rollbackFor = Exception.class)
     public LeadFollowUpRespVO create(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO) {
         LocalDateTime occurredAt = LocalDateTime.now();
@@ -85,7 +88,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                     opportunityImageMapper.selectListByRecordIds(List.of(existingOpportunity.getId())),
                     adminUserApi.getUserMap(List.of(existingOpportunity.getOperatorUserId())), null);
         }
-        if (reqVO.getNextFollowUpAt() == null || !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
+        boolean won = STATUS_WON.equals(lead.getStatus());
+        if (reqVO.getNextFollowUpAt() == null ? !won : !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
 
@@ -99,8 +103,11 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         AdminUserRespDTO operator = adminUserApi.getUser(operatorUserId);
         Map<Long, FileInfoRespDTO> files = attachmentService.validateReferences(reqVO.getImages(), operatorUserId);
 
-        if (STATUS_VALID.equals(lead.getStatus())) {
-            return createOpportunityFollowUp(lead, operatorUserId, reqVO, occurredAt, method, result,
+        OpportunityDO opportunity = STATUS_VALID.equals(lead.getStatus()) || won
+                ? opportunityMapper.selectByLeadId(leadId) : null;
+        // Historical won Leads may predate Opportunity rows; retain their Lead record scope.
+        if (STATUS_VALID.equals(lead.getStatus()) || opportunity != null) {
+            return createOpportunityFollowUp(lead, opportunity, operatorUserId, reqVO, occurredAt, method, result,
                     beforeCategory, afterCategory, categoryAfter, operator, files);
         }
 
@@ -154,7 +161,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setLeadCategory(categoryAfter);
             lead.setLeadCategoryLabelSnapshot(labelOf(afterCategory, categoryAfter));
         }
-        if (Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+        if (!won && Objects.equals(operatorUserId, lead.getOwnerUserId())) {
             // Migrated records can outlive their task. The current-cycle record is
             // the business fact; completing a task is a consequence, not evidence.
             if (lead.getCurrentAssignmentFirstFollowUpAt() == null) {
@@ -179,7 +186,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         lead.setSalesStage(record.getSalesStageAfter());
         lead.setSalesStageLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
-        leadMapper.updateById(lead);
+        updateFollowUpLead(lead);
         BusinessEventDO followUpEvent = addEvent(EVENT_LEAD_FOLLOW_UP_RECORDED, lead, operatorUserId,
                 record.getId(), occurredAt, null, null);
         Map<String, Object> followUpContext = eventContext(lead, operatorUserId);
@@ -253,17 +260,17 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     }
 
     private boolean canFollow(LeadDO lead) {
-        return STATUS_VALID.equals(lead.getStatus())
+        return STATUS_WON.equals(lead.getStatus()) || STATUS_VALID.equals(lead.getStatus())
                 || STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && lead.getCurrentAssignmentHistoryId() != null;
     }
 
-    private LeadFollowUpRespVO createOpportunityFollowUp(LeadDO lead, Long operatorUserId,
+    private LeadFollowUpRespVO createOpportunityFollowUp(LeadDO lead, OpportunityDO opportunity, Long operatorUserId,
             LeadFollowUpCreateReqVO reqVO, LocalDateTime occurredAt, DictDataRespDTO method,
             DictDataRespDTO result, DictDataRespDTO beforeCategory, DictDataRespDTO afterCategory,
             String categoryAfter, AdminUserRespDTO operator, Map<Long, FileInfoRespDTO> files) {
-        OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
-        if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+        boolean won = STATUS_WON.equals(lead.getStatus());
+        if (opportunity == null || !won && !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         OpportunityFollowUpRecordDO record = new OpportunityFollowUpRecordDO();
         record.setOpportunityId(opportunity.getId()); record.setLeadId(lead.getId());
@@ -296,7 +303,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
         }
         // A public-sea collaborator must not complete the owner's first follow-up.
-        if (Objects.equals(operatorUserId, lead.getOwnerUserId())
+        if (!won && Objects.equals(operatorUserId, lead.getOwnerUserId())
                 && lead.getCurrentAssignmentHistoryId() != null) {
             if (lead.getCurrentAssignmentFirstFollowUpAt() == null) {
                 LeadFollowUpRecordDO first = recordMapper.selectFirstByAssignment(
@@ -311,14 +318,27 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         lead.setSalesStage(record.getSalesStageAfter());
         lead.setSalesStageLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
-        leadMapper.updateById(lead);
-        opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        updateFollowUpLead(lead);
+        if (!won) opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         opportunity.setNextFollowUpAt(reqVO.getNextFollowUpAt()); opportunityMapper.updateById(opportunity);
+        if (reqVO.getNextFollowUpAt() == null) {
+            opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>()
+                    .eq(OpportunityDO::getId, opportunity.getId()).set(OpportunityDO::getNextFollowUpAt, null));
+        }
         lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         return convertOpportunity(record, opportunityImageMapper.selectListByRecordIds(List.of(record.getId())),
                 operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
+    }
+
+    private void updateFollowUpLead(LeadDO lead) {
+        leadMapper.updateById(lead);
+        // updateById skips null fields; omitting the next appointment must clear the stored value.
+        if (lead.getNextFollowUpAt() == null) {
+            leadMapper.update(null, new LambdaUpdateWrapper<LeadDO>()
+                    .eq(LeadDO::getId, lead.getId()).set(LeadDO::getNextFollowUpAt, null));
+        }
     }
 
     private DictDataRespDTO requireEnabledDict(String type, String value) {

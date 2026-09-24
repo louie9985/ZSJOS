@@ -168,6 +168,7 @@
 <script lang="ts" setup>
 import { dateFormatter } from '@/utils/formatTime'
 import * as TaskApi from '@/api/bpm/task'
+import { taskTarget } from '@/api/zsjos/withdrawal'
 import { CategoryApi, CategoryVO } from '@/api/bpm/category'
 import * as DefinitionApi from '@/api/bpm/definition'
 
@@ -216,7 +217,12 @@ const resetQuery = () => {
 }
 
 /** 处理审批按钮 */
-const handleAudit = (row: any) => {
+const handleAudit = async (row: any) => {
+  const target = await taskTarget(row.id)
+  if (target.supported && target.route === '/zsjos/withdrawal') {
+    await push({ path: target.route, query: target.query })
+    return
+  }
   push({
     name: 'BpmProcessInstanceDetail',
     query: {

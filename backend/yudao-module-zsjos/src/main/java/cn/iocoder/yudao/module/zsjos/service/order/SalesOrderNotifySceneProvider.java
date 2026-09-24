@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -28,7 +29,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants
 public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper roundMapper;
     @Resource private SalesOrderMapper orderMapper;
-    @Resource private CashbackService cashbackService;
+    // Scene registration needs only metadata; resolving cashback here would re-enter the registry via rules.
+    @Resource @Lazy private CashbackService cashbackService;
     @Resource private PartnerAccountMapper partnerAccountMapper;
 
     @Override

@@ -10,6 +10,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AdvancedFilterTemplateControllerPermissionTest {
 
+    @Test void financeCatalogGuardAllowsOnlyMatchingQueryPermissions() throws Exception {
+        String guard = AdvancedFilterController.class.getMethod("catalog", String.class)
+                .getAnnotation(PreAuthorize.class).value();
+        assertEquals(guard, visibleListGuard().value());
+        var parser = new org.springframework.expression.spel.standard.SpelExpressionParser();
+        for (String permission : List.of("zsjos:cashback:my-query", "zsjos:cashback:finance-query",
+                "zsjos:withdrawal:my-query", "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query")) {
+            for (String scene : List.of("cashback", "withdrawal", "lead")) {
+                var context = new org.springframework.expression.spel.support.StandardEvaluationContext();
+                context.setVariable("scene", scene);
+                context.setBeanResolver((ctx, name) -> new PermissionProbe(permission));
+                assertEquals(permission.startsWith("zsjos:" + scene + ":"),
+                        parser.parseExpression(guard).getValue(context, Boolean.class));
+            }
+        }
+    }
+    public static class PermissionProbe {
+        private final String permission;
+        PermissionProbe(String permission) { this.permission = permission; }
+        public boolean hasAnyPermissions(String... values) { return List.of(values).contains(permission); }
+        public boolean hasPermission(String value) { return permission.equals(value); }
+    }
+
     private static final String VISIBLE_LIST = "visibleList";
 
     private PreAuthorize visibleListGuard() throws NoSuchMethodException {
@@ -34,14 +57,14 @@ class AdvancedFilterTemplateControllerPermissionTest {
     @Test
     void visibleListGuardIsSceneAware() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
-        assertEquals(7, guard.split("#scene").length - 1, "七个场景各需一条分支");
+        assertEquals(9, guard.split("#scene").length - 1, "九个场景各需一条分支");
     }
 
     @Test
     void visibleListGuardCoversEverySupportedScene() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
         List<String> scenes = List.of("lead", "order", "lead_appeal", "duplicate_review",
-                "registration", "student", "subordinate_sales");
+                "registration", "student", "subordinate_sales", "cashback", "withdrawal");
         for (String scene : scenes) {
             assertTrue(guard.contains("(#scene == '" + scene + "'"),
                     "场景 " + scene + " 缺少授权分支");

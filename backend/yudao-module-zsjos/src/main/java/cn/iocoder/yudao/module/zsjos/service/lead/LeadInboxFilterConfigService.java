@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadIn
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterVersionRespVO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface LeadInboxFilterConfigService {
 
@@ -27,4 +28,8 @@ public interface LeadInboxFilterConfigService {
     LeadInboxFilterConfigVO getPublishedConfig(String audience);
 
     LeadInboxFilterQuery resolveQuery(LeadInboxFilterConfigVO config, String groupKey, String optionKey);
+
+    /** 按二级行分别取选中项解析筛选条件；{@code sectionOptionKeys} 以二级行 key 为键。 */
+    LeadInboxFilterQuery resolveQuery(LeadInboxFilterConfigVO config, String groupKey,
+                                      Map<String, String> sectionOptionKeys);
 }

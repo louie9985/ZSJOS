@@ -130,11 +130,64 @@ class WithdrawalServiceImplTest {
         verify(fileApi, never()).presignGetUrl(anyLong(), anyInt());
     }
 
+    @Test void managementPageReturnsFullCardAndPayoutFields() {
+        WithdrawalPageReqVO request = new WithdrawalPageReqVO();
+        WithdrawalDO row = withdrawal(50L, "paid").setCardNumberSnapshot("622200001234")
+                .setPayoutRemark("paid").setPaidAt(LocalDateTime.of(2026, 9, 23, 10, 0));
+        when(withdrawalMapper.selectPageByApplicant(request, null)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(row), 1L));
+        WithdrawalRespVO response = service.getManagementPage(request).getList().getFirst();
+        assertEquals(row.getCardNumberSnapshot(), response.getCardNumber());
+        assertEquals(row.getPayoutRemark(), response.getPayoutRemark());
+        assertEquals(row.getPaidAt(), response.getPaidAt());
+    }
+
+    @Test void exportQueryRetainsRedactionAndDoesNotPresignProof() {
+        WithdrawalPageReqVO request = new WithdrawalPageReqVO();
+        when(withdrawalMapper.selectPageByApplicant(request, null)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(
+                        withdrawal(50L, "paid").setCardNumberSnapshot("622200001234")
+                                .setBankTransactionNo("TX1").setProofFileId(90L)), 1L));
+        WithdrawalRespVO response = service.getPage(request, null).getList().getFirst();
+        assertNull(response.getCardNumber());
+        assertNull(response.getBankTransactionNo());
+        verifyNoInteractions(fileApi);
+    }
+
+    @Test void personalAllScopeStillRedactsCard() {
+        WithdrawalPageReqVO request = new WithdrawalPageReqVO(); request.setReadScope("ALL");
+        when(readScopeService.resolve("ALL", null, 7L)).thenReturn(null);
+        when(withdrawalMapper.selectPageByApplicant(request, null)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(
+                        withdrawal(50L, "paid").setCardNumberSnapshot("622200001234")), 1L));
+        assertNull(service.getPage(request, 7L).getList().getFirst().getCardNumber());
+    }
+
+    @Test void managementOrdinaryDetailReturnsFullDataWithoutExtraAction() {
+        WithdrawalDO row = withdrawal(50L, "paid").setCardNumberSnapshot("622200001234")
+                .setBankTransactionNo("TX1").setPayoutRemark("paid");
+        when(withdrawalMapper.selectById(50L)).thenReturn(row);
+        when(permissionApi.hasAnyPermissions(20L, "zsjos:withdrawal:finance-query",
+                "zsjos:withdrawal:admin-query")).thenReturn(true);
+        WithdrawalRespVO response = service.getDetail(50L, 20L, false);
+        assertEquals(row.getCardNumberSnapshot(), response.getCardNumber());
+        assertEquals("TX1", response.getBankTransactionNo());
+        assertEquals("paid", response.getPayoutRemark());
+        verify(auditService).record(any(), any(), any(), eq("50"), eq("finance"), any());
+    }
+
+    @Test void personalOnlyReaderCannotRequestFullFinanceDetail() {
+        when(withdrawalMapper.selectById(50L)).thenReturn(withdrawal(50L, "paid"));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.getDetail(50L, 7L, true));
+        verifyNoInteractions(fileApi, auditService);
+    }
+
     @Test void financeDetailReturnsFinanceFieldsAndAuditsAccess() {
         WithdrawalDO row = withdrawal(50L, "paid");
         row.setCardNumberSnapshot("622200001234"); row.setBankTransactionNo("TX1"); row.setProofFileId(90L);
         when(withdrawalMapper.selectById(50L)).thenReturn(row);
-        when(permissionApi.hasAnyPermissions(30L, "zsjos:withdrawal:finance-query")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(30L, "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query")).thenReturn(true);
         when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of());
         when(fileApi.presignGetUrl(90L, 600)).thenReturn("https://signed.test/proof");
 

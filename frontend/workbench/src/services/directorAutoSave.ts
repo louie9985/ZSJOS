@@ -1,3 +1,5 @@
+import { createIdempotencyKey } from './idempotency'
+
 export type DirectorAutoSaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict'
 
 export type DirectorAutoSaveState = {
@@ -30,7 +32,7 @@ export class DirectorAutoSaveCoordinator {
   constructor(
     private readonly delayMs: number,
     private readonly onState: (state: DirectorAutoSaveState) => void,
-    private readonly keyFactory: () => string = () => crypto.randomUUID(),
+    private readonly keyFactory: () => string = createIdempotencyKey,
     private readonly isTerminalError: (error: unknown) => boolean = () => false
   ) {}
 

@@ -35,9 +35,9 @@ describe('today task permissions', () => {
     expect(source).toContain('home-summary-region')
     expect(source).toContain('home-calendar-panel')
     expect(source).toContain('home-business-panel')
-    expect(source).toContain('home-announcement-panel')
+    expect(source).toContain('HomeAnnouncementPanel')
     expect(source).toContain('APP_ROUTES.PERSONAL_CALENDAR')
-    expect(source).toContain('APP_ROUTES.ANNOUNCEMENTS')
+    expect(readFileSync(new URL('../components/HomeAnnouncementPanel.tsx', import.meta.url), 'utf8')).toContain('APP_ROUTES.ANNOUNCEMENTS')
     expect(source).toContain('const bucketOrder: BusinessTaskBucket[]')
     expect(source).toContain("'overdue'")
     expect(source).toContain("'unscheduled'")
@@ -83,9 +83,9 @@ describe('today task permissions', () => {
   })
 
   it('labels highlighted home announcements as pinned entries', () => {
-    const announcementPanel = source.split('function AnnouncementPanel')[1] ?? ''
+    const announcementPanel = readFileSync(new URL('../components/HomeAnnouncementPanel.tsx', import.meta.url), 'utf8')
     expect(announcementPanel).toContain("item.highlighted ? ' highlighted' : ''")
-    expect(announcementPanel).toContain('<Tag color="gold">置顶</Tag>')
+    expect(announcementPanel).toContain('home-announcement-pin')
     expect(announcementPanel).toContain('home-announcement-title-text')
     expect(announcementPanel).not.toContain('<Tag color="gold">高亮</Tag>')
   })

@@ -21,6 +21,7 @@ public interface LeadDispatchService {
     List<LeadPendingRespVO> getMyPending(Long userId);
     PageResult<LeadPendingRespVO> getClaimPoolPage(LeadClaimPoolPageReqVO reqVO, Long userId);
     void accept(Long leadId, Long userId);
+    void accept(Long leadId, Long userId, Long expectedAssignmentHistoryId);
     void reject(Long leadId, Long userId);
     void claim(Long leadId, Long userId);
     LeadAssignmentRuleRespVO getRule();

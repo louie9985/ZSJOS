@@ -7,6 +7,7 @@ import CardSnapshot from './PositioningSnapshot'
 import PositioningDialog from './PositioningDialog'
 import { createPortal } from 'react-dom'
 import { SwapOutlined } from '@ant-design/icons'
+import { createIdempotencyKey } from '../services/idempotency'
 
 export { default as CardSnapshot } from './PositioningSnapshot'
 
@@ -14,7 +15,7 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
   const { modal, message } = App.useApp()
   const [options, setOptions] = useState<Awaited<ReturnType<typeof api.positioningCard.applicationOptions>>>()
   const [selectOpen, setSelectOpen] = useState(false), [selected, setSelected] = useState<number>(), [busy, setBusy] = useState(false)
-  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID())
+  const [requestKey, setRequestKey] = useState(createIdempotencyKey)
   const [data, setData] = useState<Awaited<ReturnType<typeof api.positioningCard.accountOverview>>>()
   const [error, setError] = useState(''), [loading, setLoading] = useState(true), [retry, setRetry] = useState(0)
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
   if (!canQuery) return statusArea(<Typography.Text type="secondary">暂无查看定位卡权限</Typography.Text>)
   if (loading) return <><Skeleton active />{statusTarget && statusArea(<Skeleton active title={false} paragraph={{ rows: 2 }} />)}</>
   if (error) return statusArea(<Alert type="error" message={error} action={<Button onClick={() => setRetry(value => value + 1)}>重试</Button>} />)
-  const choose = () => { setSelected(options?.submissionId); setRequestKey(crypto.randomUUID()); setSelectOpen(true) }
+  const choose = () => { setSelected(options?.submissionId); setRequestKey(createIdempotencyKey()); setSelectOpen(true) }
   const selectedCard = options?.candidates.find(card => card.submissionId === selected)
   const apply = () => {
     if (!selected || !options || busy) return
@@ -56,7 +57,7 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
       onCancel={() => { if (!busy) setSelectOpen(false) }} onOk={apply} okText="应用所选版本" confirmLoading={busy} okButtonProps={{ disabled: !selected || selected === options?.submissionId }}>
       {options?.candidates.length ? <div className="positioning-version-sheet">
         <div className="positioning-version-picker">
-          <Radio.Group className="positioning-version-options" value={selected} onChange={e => { setSelected(e.target.value); setRequestKey(crypto.randomUUID()) }}>
+          <Radio.Group className="positioning-version-options" value={selected} onChange={e => { setSelected(e.target.value); setRequestKey(createIdempotencyKey()) }}>
             <Space orientation="vertical" style={{ width: '100%' }}>{options.candidates.map(card =>
               <Radio key={card.submissionId} value={card.submissionId}>
                 {card.cardNo} · 第 {card.submissionNo} 次提交 · 确认于 {card.studentDecidedAt ? String(card.studentDecidedAt) : '历史未记录'}

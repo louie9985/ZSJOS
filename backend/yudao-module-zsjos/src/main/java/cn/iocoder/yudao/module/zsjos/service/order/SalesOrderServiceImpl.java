@@ -686,8 +686,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<SalesOrderApprovalFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
                 .map(group -> {
-                    LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), "all");
-                    List<SalesOrderApprovalFilterProfileRespVO.OptionVO> options = group.getOptions().stream()
+                    LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), Map.of());
+                    List<SalesOrderApprovalFilterProfileRespVO.OptionVO> options = group.getSections().stream()
+                            .flatMap(section -> section.getOptions().stream())
                             .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
                             .filter(option -> optionTaskKey(option.getKey()) == null || allowedTaskKeys.contains(optionTaskKey(option.getKey())))
                             .map(option -> new SalesOrderApprovalFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel(),
