@@ -1,0 +1,86 @@
+{
+  "key": "zsjos_viral_account_review",
+  "name": "爆款账号拆解审核",
+  "category": "zsjos_material",
+  "description": "爆款账号拆解审核的单节点审批骨架，节点 id 与线上定义一致。审批人按角色（ROLE）模板交由引擎解析：资产内 candidateParam 固定为占位符 \"0\"，导入后必须在 BPM 设计中绑定当前租户的有效审核角色，不支持携带用户编号跨环境复制。本资产描述的是可移植模板；租户 1 的线上定义按指定用户绑定，两者口径不同，勿直接比对。",
+  "type": 20,
+  "formType": 10,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "importForm": {
+    "name": "爆款账号拆解审核表单",
+    "conf": "{\"form\":{\"labelWidth\":\"120px\"},\"submitBtn\":false,\"resetBtn\":false}",
+    "fields": [
+      "{\"type\":\"input\",\"field\":\"materialNo\",\"title\":\"素材编号\",\"props\":{\"disabled\":true,\"type\":\"text\",\"autosize\":{\"minRows\":2,\"maxRows\":14}}}",
+      "{\"type\":\"input\",\"field\":\"materialVersionNo\",\"title\":\"素材版本\",\"props\":{\"disabled\":true,\"type\":\"text\",\"autosize\":{\"minRows\":2,\"maxRows\":14}}}",
+      "{\"type\":\"input\",\"field\":\"materialTitle\",\"title\":\"拆解标题\",\"props\":{\"disabled\":true,\"type\":\"text\",\"autosize\":{\"minRows\":2,\"maxRows\":14}}}",
+      "{\"type\":\"input\",\"field\":\"materialSummary\",\"title\":\"拆解摘要\",\"props\":{\"disabled\":true,\"type\":\"textarea\",\"autosize\":{\"minRows\":2,\"maxRows\":14}}}",
+      "{\"type\":\"input\",\"field\":\"materialContent\",\"title\":\"拆解内容快照\",\"props\":{\"disabled\":true,\"type\":\"textarea\",\"autosize\":{\"minRows\":2,\"maxRows\":14}}}"
+    ],
+    "status": 0,
+    "remark": "由素材版本快照填充；字段名是业务启动契约，布局可在 BPM 编辑。"
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "Activity_0d6b214f-86a9-4adc-a255-8976344f5c70",
+      "type": 11,
+      "name": "爆款审核",
+      "showText": "按角色解析审核人，导入后在 BPM 绑定本租户角色",
+      "candidateStrategy": 10,
+      "candidateParam": "0",
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [
+        {
+          "field": "materialNo",
+          "permission": "1"
+        },
+        {
+          "field": "materialVersionNo",
+          "permission": "1"
+        },
+        {
+          "field": "materialTitle",
+          "permission": "1"
+        },
+        {
+          "field": "materialSummary",
+          "permission": "1"
+        },
+        {
+          "field": "materialContent",
+          "permission": "1"
+        }
+      ],
+      "signEnable": false,
+      "reasonRequire": true,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@
     {
       "processKey": "zsjos_viral_account_review",
       "assetVersion": "1.0.0",
-      "recommended": true,
+      "recommended": false,
       "assetFormat": "simple",
       "taskKeys": [
         "viralReview"
@@ -35,9 +35,42 @@
       "requiresTenantRoleConfiguration": true
     },
     {
+      "processKey": "zsjos_viral_account_review",
+      "assetVersion": "1.1.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "Activity_0d6b214f-86a9-4adc-a255-8976344f5c70"
+      ],
+      "businessVariables": [
+        "materialId",
+        "materialVersionId",
+        "materialNo",
+        "materialVersionNo",
+        "materialTitle",
+        "materialSummary",
+        "materialContent"
+      ],
+      "assigneeVariables": [],
+      "runtimeOnlyVariables": [
+        "materialId",
+        "materialVersionId",
+        "materialNo",
+        "materialVersionNo",
+        "materialTitle",
+        "materialSummary",
+        "materialContent"
+      ],
+      "businessKeyFormat": "material-version:{materialVersionId}",
+      "minimumMigration": "V194",
+      "path": "zsjos_viral_account_review/1.1.0/process-model.json",
+      "sha256": "c41691f23184da9afebea1f54b8f4318b7532bf9a641b2713a94a7978b6628ce",
+      "requiresTenantRoleConfiguration": true
+    },
+    {
       "processKey": "zsjos_viral_content_review",
       "assetVersion": "1.0.0",
-      "recommended": true,
+      "recommended": false,
       "assetFormat": "simple",
       "taskKeys": [
         "viralReview"
@@ -65,6 +98,39 @@
       "minimumMigration": "V194",
       "path": "zsjos_viral_content_review/1.0.0/process-model.json",
       "sha256": "c89e75a2c870b81348f3d0b96358a0ef865a1d74a7e462f1d6469e1630d01bdc",
+      "requiresTenantRoleConfiguration": true
+    },
+    {
+      "processKey": "zsjos_viral_content_review",
+      "assetVersion": "1.1.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "Activity_fb10be5a-1a42-4ac0-8feb-25edcff284cf"
+      ],
+      "businessVariables": [
+        "materialId",
+        "materialVersionId",
+        "materialNo",
+        "materialVersionNo",
+        "materialTitle",
+        "materialSummary",
+        "materialContent"
+      ],
+      "assigneeVariables": [],
+      "runtimeOnlyVariables": [
+        "materialId",
+        "materialVersionId",
+        "materialNo",
+        "materialVersionNo",
+        "materialTitle",
+        "materialSummary",
+        "materialContent"
+      ],
+      "businessKeyFormat": "material-version:{materialVersionId}",
+      "minimumMigration": "V194",
+      "path": "zsjos_viral_content_review/1.1.0/process-model.json",
+      "sha256": "f73a6d0c409e33ea841673144f5f443f2fca7e98472c1030bec9eeeb18d200b6",
       "requiresTenantRoleConfiguration": true
     },
     {

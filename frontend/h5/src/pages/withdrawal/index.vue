@@ -13,8 +13,8 @@ const activeTab = ref('all')
 const tabs = [
   { key: 'all', label: '全部' },
   { key: 'pending_review', label: '待审核' },
-  { key: 'approved', label: '已批准' },
-  { key: 'rejected', label: '已拒绝' },
+  { key: 'approved', label: '待打款' },
+  { key: 'rejected', label: '已驳回' },
   { key: 'paid', label: '已打款' },
   { key: 'cancelled', label: '已取消' }
 ]
@@ -35,10 +35,12 @@ function onTabChange() { refresh() }
 function goDetail(id: number) { router.push(`/withdrawal/${id}`) }
 function goApply() { router.push('/withdrawal/apply') }
 
+// 与后台口径一致：approved 是「财务已通过、钱还没出去」，对学员/兼职而言就是等打款。
+// 说「已批准」会让人以为流程已经走完，实际还要等线下转账登记，是投诉来源。
 const statusMap: Record<string, { text: string; color: string }> = {
   pending_review: { text: '待审核', color: 'var(--h5-warning)' },
-  approved: { text: '已批准', color: 'var(--h5-info)' },
-  rejected: { text: '已拒绝', color: 'var(--h5-danger)' },
+  approved: { text: '待打款', color: 'var(--h5-info)' },
+  rejected: { text: '已驳回', color: 'var(--h5-danger)' },
   paid: { text: '已打款', color: 'var(--h5-success)' },
   cancelled: { text: '已取消', color: 'var(--h5-text-secondary)' }
 }

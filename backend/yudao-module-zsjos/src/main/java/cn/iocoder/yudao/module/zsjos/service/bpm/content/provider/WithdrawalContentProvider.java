@@ -151,17 +151,7 @@ public class WithdrawalContentProvider implements BpmApprovalContentProvider {
     }
 
     private static String statusText(String status) {
-        if (status == null) {
-            return null;
-        }
-        return switch (status) {
-            case WithdrawalConstants.STATUS_PENDING -> "待审核";
-            case WithdrawalConstants.STATUS_APPROVED -> "已通过";
-            case WithdrawalConstants.STATUS_REJECTED -> "已驳回";
-            case WithdrawalConstants.STATUS_PAID -> "已打款";
-            case WithdrawalConstants.STATUS_CANCELLED -> "已撤销";
-            default -> status;
-        };
+        return WithdrawalConstants.statusLabel(status);
     }
 
     private static String verificationText(String verification) {

@@ -22,7 +22,8 @@ final class WithdrawalFilterFields {
         add(result, date(Sensitivity.STANDARD, "withdrawal.cancelledAt", TIME, "撤销时间", bind("withdrawal", "w.cancelled_at", null)));
         add(result, text(Sensitivity.FREE_TEXT, "withdrawal.rejectionReason", EXTRA, "驳回原因", bind("withdrawal", "w.rejection_reason", null)));
         add(result, text(Sensitivity.FREE_TEXT, "withdrawal.payoutRemark", EXTRA, "打款备注", bind("withdrawal", "w.payout_remark", null)));
-        add(result, select(Sensitivity.STANDARD, "withdrawal.status", STATUS, "提现状态", options(STATUS_PENDING, "待审核", STATUS_APPROVED, "待打款", STATUS_REJECTED, "已驳回", STATUS_PAID, "已打款", STATUS_CANCELLED, "已取消"), bind("withdrawal", "w.status", null)));
+        // 标签一律取自 statusLabel，避免审批中心等其它展示面再维护一份映射而漂移。
+        add(result, select(Sensitivity.STANDARD, "withdrawal.status", STATUS, "提现状态", options(STATUS_PENDING, statusLabel(STATUS_PENDING), STATUS_APPROVED, statusLabel(STATUS_APPROVED), STATUS_REJECTED, statusLabel(STATUS_REJECTED), STATUS_PAID, statusLabel(STATUS_PAID), STATUS_CANCELLED, statusLabel(STATUS_CANCELLED)), bind("withdrawal", "w.status", null)));
         add(result, select(Sensitivity.STANDARD, "withdrawal.verificationStatus", STATUS, "核验状态", options(VERIFY_NORMAL, "正常", VERIFY_AMOUNT, "金额异常", VERIFY_DUPLICATE, "重复申请", VERIFY_BALANCE, "余额异常"), bind("withdrawal", "w.verification_status", null)));
         add(result, select(Sensitivity.FINANCIAL, "withdrawal.hasProof", EXTRA, "打款凭证", options("present", "有凭证", "absent", "无凭证"), bind("withdrawal", "CASE WHEN w.proof_file_id IS NULL THEN 'absent' ELSE 'present' END", null)));
         add(result, text(Sensitivity.PERSONAL, "withdrawal.partnerName", PEOPLE, "归属合作方", bind("withdrawal", "fp.name", "SELECT 1 FROM zsjos_partner fp WHERE fp.id=w.partner_id AND fp.tenant_id=w.tenant_id AND fp.deleted=b'0'")));

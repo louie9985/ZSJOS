@@ -98,6 +98,25 @@ class AdvancedFilterFieldCatalogTest {
                 .findFirst().orElseThrow().sensitive());
     }
 
+    @Test void withdrawalStatusOptionsTrackTheSharedBizLabels() {
+        // 财务列表和审批中心都读这份目录，所以目录必须等于 WithdrawalConstants 的共享口径。
+        // 此前审批卡片自己写了一份映射，把 approved 显示成「已通过」，看着像流程已结束。
+        var options = AdvancedFilterFieldCatalog.fields().get("withdrawal.status").options();
+        var expected = List.of(
+                cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.STATUS_PENDING,
+                cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.STATUS_APPROVED,
+                cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.STATUS_REJECTED,
+                cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.STATUS_PAID,
+                cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.STATUS_CANCELLED);
+        assertEquals(expected, options.stream().map(option -> option.value()).toList());
+        for (var option : options) {
+            assertEquals(cn.iocoder.yudao.module.zsjos.enums.WithdrawalConstants.statusLabel(option.value()),
+                    option.label(), option.value());
+        }
+        assertEquals("待打款", options.stream().filter(o -> expected.get(1).equals(o.value()))
+                .findFirst().orElseThrow().label());
+    }
+
     @Test void retainsCatalogCoverageForBothFrontendSceneContracts() {
         Map<String, Integer> expected = Map.of("lead", 80, "order", 72, "lead_appeal", 80,
                 "duplicate_review", 18, "registration", 79, "student", 77,

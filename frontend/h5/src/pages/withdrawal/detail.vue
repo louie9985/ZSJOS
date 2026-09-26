@@ -44,10 +44,11 @@ async function handleCancel() {
   }
 }
 
+// 与后台口径一致：approved 是「财务已通过、钱还没出去」，这里应显示为待打款。
 const statusMap: Record<string, { text: string; color: string }> = {
   pending_review: { text: '待审核', color: 'var(--h5-warning)' },
-  approved: { text: '已批准', color: 'var(--h5-info)' },
-  rejected: { text: '已拒绝', color: 'var(--h5-danger)' },
+  approved: { text: '待打款', color: 'var(--h5-info)' },
+  rejected: { text: '已驳回', color: 'var(--h5-danger)' },
   paid: { text: '已打款', color: 'var(--h5-success)' },
   cancelled: { text: '已取消', color: 'var(--h5-text-secondary)' }
 }
