@@ -399,6 +399,59 @@ class LeadObjectPermissionServiceTest {
         }
     }
 
+    @Test
+    void recycledLeadStaysReadableByOriginalOwner() {
+        LeadDO lead = lead(59L, null);
+        lead.setAssignmentStatus("recycle_pending");
+        lead.setRecycleSourceOwnerUserId(20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(salesOrderMapper.selectByLeadId(1L)).thenReturn(List.of());
+
+        for (String action : List.of("read", "follow-up-read", "flow-read", "sales-history-read")) {
+            assertActionAllowed(20L, action);
+        }
+    }
+
+    @Test
+    void recycledLeadDetailReadDoesNotGrantCommands() {
+        LeadDO lead = lead(59L, null);
+        lead.setAssignmentStatus("recycle_pending");
+        lead.setRecycleSourceOwnerUserId(20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
+            for (String action : List.of("request-submitter-assist", "basic-info-update",
+                    "follow-up-create", "owner-transfer", "owner-release-public-sea",
+                    "qualify", "enter-deal")) {
+                assertEquals(LEAD_PERMISSION_DENIED.getCode(), assertThrows(ServiceException.class,
+                        () -> service.check(1L, action)).getCode());
+            }
+        }
+    }
+
+    @Test
+    void recycledLeadReadsAreRestrictedToItsOriginalOwner() {
+        LeadDO lead = lead(59L, null);
+        lead.setAssignmentStatus("recycle_pending");
+        lead.setRecycleSourceOwnerUserId(20L);
+        when(salesOrderMapper.selectByLeadId(1L)).thenReturn(List.of());
+
+        assertTrue(service.canReadDetail(lead, 20L));
+        assertFalse(service.canReadDetail(lead, 30L));
+        assertFalse(service.canReadDetail(lead, null));
+    }
+
+    @Test
+    void recycleSourceOwnerDoesNotLeakIntoNonRecycledLeads() {
+        LeadDO owned = lead(59L, 20L);
+        owned.setRecycleSourceOwnerUserId(30L);
+        when(salesOrderMapper.selectByLeadId(1L)).thenReturn(List.of());
+
+        // An owned lead must not become readable by a stale recycle-source owner.
+        assertFalse(service.canReadDetail(owned, 30L));
+    }
+
     private void assertActionAllowed(Long userId, String action) {
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);

@@ -115,9 +115,25 @@ public class LeadObjectPermissionService {
     public boolean canReadDetail(LeadDO lead, Long userId) {
         // Submitted-list department visibility grants reads only, not submitter-assistance commands.
         return hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
+                || canReadRecycledSourceOwner(lead, userId)
                 || userId != null && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                     && securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
                     && managesUserDepartment(userId, lead.getProviderOwnerId());
+    }
+
+    /**
+     * A supervisor-recycled lead keeps its original owner in {@code recycleSourceOwnerUserId} with
+     * {@code ownerUserId} cleared. The management list already surfaces those rows to the original
+     * owner (see {@code LeadMapper.applyManagementScope}), so without the matching branch here the
+     * row is listed but its detail page answers 无权查看.
+     *
+     * Deliberately kept out of {@link #canReadDetailByRelationship}: that helper also backs the
+     * submitter-assistance command, which a read-only recycled viewer must not gain.
+     */
+    private boolean canReadRecycledSourceOwner(LeadDO lead, Long userId) {
+        return userId != null
+                && ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
+                && Objects.equals(userId, lead.getRecycleSourceOwnerUserId());
     }
 
     private boolean canReadDetailByRelationship(LeadDO lead, Long userId) {
