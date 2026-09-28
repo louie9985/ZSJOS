@@ -45,7 +45,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     private static final int MAX_POOL_SCAN_ROUNDS = 3;
 
     @Resource private LeadMapper leadMapper;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
@@ -626,7 +625,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         history.setAttemptNo(attempt); history.setExpiresAt(expiresAt);
         if (!ACTION_DISPATCH.equals(action)) history.setResponseAt(occurredAt);
         historyMapper.insert(history);
-        if (ACTION_DISPATCH.equals(action) || ACTION_TIMEOUT.equals(action)) performanceSnapshotService.activity("DISPATCH", history.getId(), lead.getId(), candidate);
+        // 绩效快照属于旁路统计，放到事务提交后执行，避免埋点失败回滚派单主流程
+        if (ACTION_DISPATCH.equals(action) || ACTION_TIMEOUT.equals(action)) {
+            applicationEventPublisher.publishEvent(new LeadAttributionEvent("DISPATCH", history.getId(), lead.getId(), candidate));
+        }
         return history;
     }
 

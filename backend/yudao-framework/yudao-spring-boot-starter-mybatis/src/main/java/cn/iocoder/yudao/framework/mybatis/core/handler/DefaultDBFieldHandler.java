@@ -17,6 +17,15 @@ import java.util.Objects;
  */
 public class DefaultDBFieldHandler implements MetaObjectHandler {
 
+    /**
+     * 无登录上下文（定时任务、消息消费等后台线程）时的操作人兜底值，对应 system_users.id=1（admin）。
+     *
+     * creator / updater 在部分表上是 NOT NULL，而 MyBatis-Plus 会把带 {@code fill} 的字段强制写进
+     * INSERT 语句并显式绑定 NULL，从而覆盖掉 DDL 的 DEFAULT ''，触发 "Column 'creator' cannot be null"。
+     * 这里不回填的话，后台线程的任何写入都会失败。
+     */
+    private static final String SYSTEM_OPERATOR = "1";
+
     @Override
     @SuppressWarnings("PatternVariableCanBeUsed")
     public void insertFill(MetaObject metaObject) {
@@ -38,13 +47,15 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
             }
 
             Long userId = SecurityFrameworkUtils.getLoginUserId();
-            // 当前登录用户不为空，创建人为空，则当前登录用户为创建人
-            if (Objects.nonNull(userId) && Objects.isNull(baseDO.getCreator())) {
-                baseDO.setCreator(userId.toString());
+            // 当前登录用户不为空，则以当前登录用户为创建人/更新人；否则回落到系统操作人，避免向 NOT NULL 列写入 NULL
+            String operator = Objects.nonNull(userId) ? userId.toString() : SYSTEM_OPERATOR;
+            // 创建人为空，则填充操作人
+            if (Objects.isNull(baseDO.getCreator())) {
+                baseDO.setCreator(operator);
             }
-            // 当前登录用户不为空，更新人为空，则当前登录用户为更新人
-            if (Objects.nonNull(userId) && Objects.isNull(baseDO.getUpdater())) {
-                baseDO.setUpdater(userId.toString());
+            // 更新人为空，则填充操作人
+            if (Objects.isNull(baseDO.getUpdater())) {
+                baseDO.setUpdater(operator);
             }
         }
     }
@@ -60,11 +71,11 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
             setFieldValByName("lastActivityAt", LocalDateTime.now(), metaObject);
         }
 
-        // 当前登录用户不为空，更新人为空，则当前登录用户为更新人
+        // 当前登录用户不为空，则以当前登录用户为更新人；否则回落到系统操作人
         Object modifier = getFieldValByName("updater", metaObject);
         Long userId = SecurityFrameworkUtils.getLoginUserId();
-        if (Objects.nonNull(userId) && Objects.isNull(modifier)) {
-            setFieldValByName("updater", userId.toString(), metaObject);
+        if (Objects.isNull(modifier)) {
+            setFieldValByName("updater", Objects.nonNull(userId) ? userId.toString() : SYSTEM_OPERATOR, metaObject);
         }
     }
 }

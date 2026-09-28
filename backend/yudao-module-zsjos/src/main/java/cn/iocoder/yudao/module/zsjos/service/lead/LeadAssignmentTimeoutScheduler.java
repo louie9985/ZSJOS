@@ -20,11 +20,16 @@ public class LeadAssignmentTimeoutScheduler {
         if (maintenanceModeApi.isEnabled()) return;
         for (Long tenantId : tenantFrameworkService.getTenantIds()) {
             TenantUtils.execute(tenantId, () -> {
+                // 两段处理互相独立：任一段失败不能拖垮另一段，否则未分配重试会在超时回收故障期间一并停摆
                 try {
                     dispatchService.processExpired();
-                    dispatchService.processUnassignedRetries();
                 } catch (RuntimeException ex) {
                     log.error("[processExpiredAssignments][tenantId({}) 处理客资派单超时失败]", tenantId, ex);
+                }
+                try {
+                    dispatchService.processUnassignedRetries();
+                } catch (RuntimeException ex) {
+                    log.error("[processExpiredAssignments][tenantId({}) 重试未分配客资失败]", tenantId, ex);
                 }
             });
         }
