@@ -7805,7 +7805,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_revision (
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_attribution (
  id bigint NOT NULL AUTO_INCREMENT,
- outcome varchar(32) NULL, completed_at datetime NULL, fact_type varchar(16) NOT NULL, fact_id bigint NOT NULL, user_id bigint NULL, user_name varchar(100) NULL, dept_id bigint NULL, dept_name varchar(100) NULL, center_id bigint NULL, center_name varchar(100) NULL, lead_id bigint NULL, assignment_id bigint NULL, received_at datetime NULL, source_group varchar(32) NULL, channel_code varchar(100) NULL, channel_label varchar(255) NULL,
+ outcome varchar(32) NULL, completed_at datetime NULL, fact_type varchar(16) NOT NULL, fact_id bigint NOT NULL, user_id bigint NULL, user_name varchar(100) NULL, dept_id bigint NULL, dept_name varchar(100) NULL, center_id bigint NULL, center_name varchar(100) NULL, lead_id bigint NULL, assignment_id bigint NULL, received_at datetime NULL, org_source varchar(16) NULL, source_group varchar(32) NULL, channel_code varchar(100) NULL, channel_label varchar(255) NULL,
   creator varchar(64) NOT NULL DEFAULT '',
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updater varchar(64) NOT NULL DEFAULT '',
@@ -7814,3 +7814,15 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_attribution (
   tenant_id bigint NOT NULL DEFAULT 0,
  PRIMARY KEY(id), UNIQUE KEY uk_fact(tenant_id,fact_type,fact_id,deleted), KEY idx_user(tenant_id,user_id,fact_type,received_at), KEY idx_dept(tenant_id,dept_id,fact_type,received_at), KEY idx_center(tenant_id,center_id,fact_type,received_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 一次性数据修正的执行标记。列级粒度记录某次修正是否已对某个表的某个列执行过，
+-- 使「加/减固定偏移」这类修正可以安全重复执行而不会二次偏移（仅凭值域无法判定是否已修正）。
+CREATE TABLE IF NOT EXISTS zsjos_data_repair_marker (
+ id bigint NOT NULL AUTO_INCREMENT,
+ repair_key varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '修正批次标识',
+ table_name varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标表',
+ column_name varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标列',
+ row_count int NULL COMMENT '本次修正影响行数',
+ applied_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(id), UNIQUE KEY uk_repair_marker(repair_key,table_name,column_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 一次性数据修正执行标记';

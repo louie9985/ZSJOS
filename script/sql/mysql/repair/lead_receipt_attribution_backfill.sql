@@ -172,11 +172,13 @@ SELECT l.id,
 INSERT INTO zsjos_performance_attribution
   (outcome, completed_at, fact_type, fact_id, user_id, user_name,
    dept_id, dept_name, center_id, center_name, lead_id, assignment_id,
-   received_at, source_group, channel_code, channel_label,
+   received_at, org_source, source_group, channel_code, channel_label,
    creator, create_time, updater, update_time, deleted, tenant_id)
 SELECT NULL, NULL, 'ASSIGNMENT', h.id, h.to_owner_user_id, u.nickname,
        u.dept_id, d.name, m.center_id, cd.name,
        h.lead_id, h.id, h.occurred_at,
+       -- 本批快照的部门/中心取补写时点的当前归属，不是接收当时的历史组织，显式标注。
+       'current',
        CASE COALESCE(l.source_type,'')
          WHEN 'internal_new_media' THEN 'inbound'
          WHEN 'partner' THEN 'inbound'

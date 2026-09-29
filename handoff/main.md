@@ -28017,3 +28017,14 @@ pm test -- --run src/components/LeadDetailOverview.lifecycle.test.ts passed 4/4;
 - Credential configuration: 按用户要求配置 `credential.helper = store`（global）并写入 `~/.git-credentials`（权限 600），凭据经 `git fetch` 只读验证通过后用于推送，后续同仓库推送无需再输入账密。该文件为明文存储；如需换用私人令牌可随时替换。仓库级 `user.name/user.email` 已设为 `ljc <1487407653@qq.com>`，与历史发布提交一致。
 - Dependency/integration impact: 远程 `main` 由 `91822f58` 前进到 `fefccf42`。未强制推送、未切换分支或 worktree、未安装依赖、未执行数据库写操作、未重启或部署服务。
 - Remaining: 提交并推送本回执，然后复核本地与远程最终一致。运行时/部署验收仍以各特性交付记录为准；上述三项既有问题待另行授权处理。
+
+## 客资接收归属补齐与组织来源标注 — 2026-09-28
+
+- Workstream ID: `main-lead-receipt-attribution-backfill-20260928`; Owner: ai; Environment: test (租户 1)。
+- User goal: 依据 `parttimecrm-cst+0800-20260920-222103` dump 补齐历史客资接收事实与业绩归属，恢复真实接收/领取/转派记录、接收人、实际接收时间、部门与中心，并把首购订单关联到提交时所属接收批次；随后拆分「新媒体运营/学习规划师」双身份账号。
+- Key decisions: ① 旧库 cst+0800 导出为东八区本地时间，2026-09-02 前导入的数据被按 UTC 解析，提交类时间整体早 8 小时，本次一并修正，接收类时间本就正确故不触碰；② 部门/中心快照按用户确认取「接收人当前归属」，与 `PerformanceSnapshotService.base()` 既有口径一致；③ 接收批次全部还原，不只首批。
+- Execution or analysis result: 时间轴修正 8 列（客资 4 列 3,152/3,097/3,086/1,774 行、订单 2 列 259/249、跟进 2 列 11,847、分配历史 `other` 行 3,152）。旧库 `dashboard_lead_sales_receipt_event` 还原全部接收批次：接收批次 1,474→5,073，接收快照 152→5,073，无接收记录客资 3,971→307，重复批次组 184→0，孤儿快照 0。身份映射以手机号（次选 username）为准，1,234 条已导入接收记录校验为 1,230 正确 / 0 错人。V279 新增 `org_source` 区分 `frozen`（事实发生时写入，807 行）与 `current`（事后补写，非历史证据，6,411 行），并把用户 400「周老师【梁颖】」的 `new_media_operator` 拆出（保留 `study_planner`/`normal_user`），527 `LiangYing` 为新媒体运营身份，未改动。
+- Changed files: new `script/sql/mysql/migrations/V279__attribution_org_provenance_and_identity_split.sql`、new `script/sql/mysql/repair/lead_receipt_attribution_backfill.sql`、new `script/sql/mysql/repair/lead_receipt_duplicate_cleanup.sql`；`script/sql/mysql/schema/core.sql`、`script/sql/mysql/00-bootstrap-schema.sql` 同步 `org_source`；`PerformanceAttributionDO.java` 加字段；`PerformanceSnapshotService.base()` 写 `frozen`；`docs/api/sales-performance.md` 加组织来源小节。本记录。
+- Verification evidence: V279 在隔离库 `v279_rehearsal` 连跑两次 rc=0 且结果不变（807 frozen / 6,411 current，`system_schema_version` 单行）；生产应用后同样比对一致。补齐脚本对生产重复执行 rc=0 且计数不变（5,077 / 5,077 / 0 孤儿）。`org_source` 判定与滞后交叉校验：`frozen` 807 行全部落在 received_at 后 60 分钟内，0 例外；`current` 中 0 行落在窗口内。`mvn -o -pl yudao-module-zsjos -am -DskipTests compile` 通过。备份：`/opt/zsjos-runtime/backups/lead-receipt-backfill-20260928/`（before_backfill ×2、before_cleanup、before_v279）。
+- Pre-existing issues (not introduced here): 工作树中 `LeadObjectPermissionService.java` 及其测试的既有改动在本轮开始后被移除，非本轮操作；`script/sql/merge/backfill-sales-selfsourced-media-attribution-20260928.sql` 为其他任务于 18:32 新建，未跟踪，未纳入本轮。
+- Remaining: 307 个客资仍无可识别接收（102 个旧库本就 unassigned、205 个旧库有分配记录但无对应接收事件，188 个仅有 `assignment_log` 一条），未凭分配状态反推接收，保留为未知。旧库无组织主数据，`current` 快照无法进一步还原真实历史组织。新环境 `bootstrap.sql` 未包含 `zsjos_data_repair_marker` 表，待确认是否补入。
