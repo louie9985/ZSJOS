@@ -11,6 +11,8 @@ public class WecomOutboxPayload {
     public static final String FORMAT = "wecom-outbox-v1";
     private String deliveryFormat = FORMAT;
     private Map<String, Object> eventPayload;
+    private String recipientMode;
+    private List<cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO> fixedRecipients;
     private List<Recipient> recipients;
 
     @Data
@@ -21,5 +23,6 @@ public class WecomOutboxPayload {
         private boolean retryable;
         private String errorCode;
         private String providerMessageId;
+        private java.time.LocalDateTime completedTime;
     }
 }

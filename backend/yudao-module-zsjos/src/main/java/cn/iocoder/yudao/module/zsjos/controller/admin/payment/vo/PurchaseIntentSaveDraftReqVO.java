@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -17,8 +18,8 @@ public class PurchaseIntentSaveDraftReqVO {
     private Long opportunityId;
     @NotBlank @Size(max = 64) private String sourceKey;
     @NotNull private Map<String, Object> draft;
-    @NotEmpty private List<Item> items;
-    @NotNull @DecimalMin("0.01") @Digits(integer = 16, fraction = 2) private BigDecimal totalAmount;
+    @Valid @NotEmpty private List<@NotNull Item> items;
+    @NotNull @DecimalMin("0.00") @Digits(integer = 16, fraction = 2) private BigDecimal totalAmount;
     @NotBlank @Size(max = 128) private String idempotencyKey;
     private Integer version;
 

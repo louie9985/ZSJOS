@@ -56,6 +56,21 @@ public class NotifyBusinessEventApiImpl implements NotifyBusinessEventApi {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
+    public int publishDurable(NotifyBusinessEvent event) {
+        NotifyBusinessEvent normalized = normalize(event);
+        return TenantUtils.execute(normalized.getTenantId(), () -> {
+            var rules = notifyRuleService.getEnabledRules(normalized.getSceneCode()).stream()
+                    .filter(rule -> normalized.getTargetRuleId() == null || normalized.getTargetRuleId().equals(rule.getId()))
+                    .filter(rule -> rule.getChannelCode() == null || rule.getChannelCode().isBlank()
+                            || NotifyChannelType.IN_APP.equals(rule.getChannelCode()) || NotifyChannelType.WECOM.equals(rule.getChannelCode()))
+                    .toList();
+            if (!rules.isEmpty()) outboxService.enqueue(normalized, rules);
+            return rules.size();
+        });
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED)
     public NotifySendResult publishConfirmed(NotifyBusinessEvent event) {
         NotifyBusinessEvent normalized = normalize(event);
         java.util.concurrent.atomic.AtomicReference<NotifySendResult> result = new java.util.concurrent.atomic.AtomicReference<>();
@@ -85,18 +100,12 @@ public class NotifyBusinessEventApiImpl implements NotifyBusinessEventApi {
         Long tenantId = event.getTenantId() != null
                 ? event.getTenantId() : TenantContextHolder.getRequiredTenantId();
         LocalDateTime occurredAt = Objects.requireNonNullElseGet(event.getOccurredAt(), LocalDateTime::now);
-        return NotifyBusinessEvent.builder()
-                .tenantId(tenantId).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
-                .targetRuleId(event.getTargetRuleId())
-                .bizType(event.getBizType()).bizId(event.getBizId()).operatorUserId(event.getOperatorUserId())
-                .occurredAt(occurredAt).payload(event.getPayload()).build();
+        var recipients = event.validatedFixedRecipients();
+        return event.toBuilder().tenantId(tenantId).occurredAt(occurredAt)
+                .fixedRecipients("FIXED".equals(event.getRecipientMode()) ? recipients : null).build();
     }
 
     private NotifyBusinessEvent copyForRule(NotifyBusinessEvent event, Long targetRuleId) {
-        return NotifyBusinessEvent.builder()
-                .tenantId(event.getTenantId()).sceneCode(event.getSceneCode())
-                .sourceEventKey(event.getSourceEventKey()).targetRuleId(targetRuleId)
-                .bizType(event.getBizType()).bizId(event.getBizId()).operatorUserId(event.getOperatorUserId())
-                .occurredAt(event.getOccurredAt()).payload(event.getPayload()).build();
+        return event.toBuilder().targetRuleId(targetRuleId).build();
     }
 }

@@ -130,15 +130,23 @@ public class ContentReviewContentProvider implements BpmApprovalContentProvider 
             List<BpmApprovalFieldVO.Attachment> attachments = toAttachments(item.getFiles());
             BpmApprovalFieldVO field = BpmApprovalFieldVO.attachments(
                     "内容 " + index + itemSuffix(item), attachments);
-            if (field == null) {
-                continue;
+            // 作品意见独立于附件；纯文本作品也必须保留两级审核反馈。
+            List<BpmApprovalFieldVO> fields = new ArrayList<>();
+            fields.add(BpmApprovalFieldVO.wide("编导意见", reviewComment(item.getDirectorComment(), item.getDirectorDecision())));
+            fields.add(BpmApprovalFieldVO.wide("终审意见", reviewComment(item.getFinalComment(), item.getFinalDecision())));
+            if (field != null) {
+                fields.add(field);
             }
             BpmApprovalDetailVO.Group group = new BpmApprovalDetailVO.Group();
             group.setTitle("内容 " + index + itemSuffix(item));
-            group.setFields(new ArrayList<>(List.of(field)));
+            group.setFields(fields);
             group.setSpan(true);
             card.getGroups().add(group);
         }
+    }
+
+    private static String reviewComment(String comment, String decision) {
+        return comment != null && !comment.isBlank() ? comment : decision == null ? "尚未审核" : "未填写意见";
     }
 
     /** 条目后缀：带上审阅结论，便于审批人快速分辨。 */

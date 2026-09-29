@@ -1,3 +1,5 @@
+import MaterialCover from '../components/MaterialCover'
+import MaterialSearchContent, { MaterialHighlight } from '../components/MaterialSearchContent'
 import ResourceLink from '../components/ResourceLink'
 import {
   BookOutlined,
@@ -37,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
 import SafeRichText from '../components/SafeRichText'
+import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
 import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
@@ -47,7 +50,6 @@ import {
   materialApi,
   type Material,
   type MaterialFieldDefinition,
-  type MaterialRecommendationAccount,
   type MaterialReferenceField,
   type MaterialReferenceTarget,
   type MaterialVersion,
@@ -55,7 +57,7 @@ import {
 } from '../services/materialApi'
 
 const PAGE_SIZE = 20
-type ViewKey = 'recommendation' | 'all' | 'favorite' | 'mine'
+type ViewKey = 'all' | 'favorite' | 'mine'
 
 const statusLabel: Record<string, string> = {
   DRAFT: '草稿／待提交',
@@ -401,23 +403,24 @@ function ReferenceDialog({ material, open, onClose, onSuccess }: {
   </Modal>
 }
 
-export default function MaterialLibraryPage({ permissions = [], management = false }: { permissions?: string[]; management?: boolean }) {
+export default function MaterialLibraryPage({ permissions = [] }: { permissions?: string[]; management?: boolean }) {
   const [searchParams] = useSearchParams()
   const { message } = App.useApp()
-  const [view, setView] = useState<ViewKey>(searchParams.get('view') === 'mine' ? 'mine' : management ? 'all' : 'recommendation')
+  const [view, setView] = useState<ViewKey>(searchParams.get('view') === 'mine' ? 'mine' : 'all')
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
+  const [searchRevision, setSearchRevision] = useState(0)
+  const searchMaterials = (value: string) => {
+    setKeywordInput(value.trim()); setKeyword(value.trim())
+    setSearchRevision(current => current + 1)
+  }
   const [versionStatus, setVersionStatus] = useState<MaterialVersion['status']>()
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelSaving, setCancelSaving] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState<number>()
-  const [accountId, setAccountId] = useState<number>()
   const [types, setTypes] = useState<MaterialType[]>([])
-  const [accounts, setAccounts] = useState<MaterialRecommendationAccount[]>([])
-  const [accountLoading, setAccountLoading] = useState(false)
-  const [accountError, setAccountError] = useState('')
   const [rows, setRows] = useState<Material[]>([])
   const [selectedId, setSelectedId] = useState<number>()
   const [selected, setSelected] = useState<Material>()
@@ -447,10 +450,8 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
   const [dictLoading, setDictLoading] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const [hasMore, setHasMore] = useState(true)
-  const accountRequestRef = useRef(0)
   const listRequestRef = useRef(0)
   const detailRequestRef = useRef(0)
-  const accountSearchTimerRef = useRef<number | undefined>(undefined)
 
   const loadMetadata = useCallback(async () => {
     setMetadataLoading(true)
@@ -483,32 +484,10 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     setDictLoading(false)
   }, [])
 
-  const loadAccounts = useCallback(async (keyword = '') => {
-    const requestId = ++accountRequestRef.current
-    setAccountLoading(true)
-    setAccountError('')
-    try {
-      const result = await materialApi.recommendationAccounts(keyword.trim() || undefined)
-      if (accountRequestRef.current === requestId) setAccounts(result)
-    } catch (cause) {
-      if (accountRequestRef.current === requestId) {
-        setAccounts([])
-        setAccountError(errorText(cause))
-      }
-    } finally {
-      if (accountRequestRef.current === requestId) setAccountLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     void loadMetadata()
-    void loadAccounts()
     void loadDictionaries()
-    return () => {
-      if (accountSearchTimerRef.current) window.clearTimeout(accountSearchTimerRef.current)
-      accountRequestRef.current += 1
-    }
-  }, [loadAccounts, loadDictionaries, loadMetadata])
+  }, [loadDictionaries, loadMetadata])
 
   const loadDetail = useCallback(async (id: number) => {
     const requestId = ++detailRequestRef.current
@@ -539,17 +518,6 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
 
   const load = useCallback(async (targetPage = 1, preferredId?: number) => {
     const requestId = ++listRequestRef.current
-    if (view === 'recommendation' && !accountId) {
-      setRows([])
-      setSelected(undefined)
-      setSelectedId(undefined)
-      setTotal(0)
-      setPage(1)
-      setError('')
-      setLoading(false)
-      setHasMore(false)
-      return
-    }
     setLoading(true)
     setError('')
     try {
@@ -558,8 +526,6 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
         pageSize: PAGE_SIZE,
         keyword: keyword || undefined,
         materialTypeId,
-        accountId: view === 'recommendation' ? accountId : undefined,
-        recommendation: view === 'recommendation' || undefined,
         favorite: view === 'favorite' || undefined,
         mine: view === 'mine' || undefined,
         versionStatus: view === 'mine' ? versionStatus : undefined
@@ -578,7 +544,7 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     } finally {
       if (requestId === listRequestRef.current) setLoading(false)
     }
-  }, [accountId, keyword, loadDetail, materialTypeId, view, versionStatus])
+  }, [keyword, loadDetail, materialTypeId, view, versionStatus, searchRevision])
 
   useEffect(() => { setRows([]); setHasMore(false); void load(1) }, [load])
   useEffect(() => {
@@ -698,26 +664,15 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
     <header className="material-library-filter-shell">
       <div className="material-library-toolbar">
         <Tabs className="material-library-view-tabs" activeKey={view} onChange={key => setView(key as ViewKey)} items={[
-          { key: 'recommendation', label: '推荐' },
           { key: 'all', label: '全部' },
           { key: 'favorite', label: '收藏' },
           { key: 'mine', label: '我的素材' }
         ]} />
         <Input.Search className="material-library-search" allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
-          onSearch={value => setKeyword(value.trim())} placeholder="搜索标题、摘要或内容" />
+          onSearch={searchMaterials} placeholder="搜索素材编号、标题、摘要或可检索字段" aria-label="搜索素材" />
         <Select className="material-library-select" allowClear placeholder="素材类型" value={materialTypeId} onChange={setMaterialTypeId}
           loading={metadataLoading} disabled={metadataLoading || Boolean(metadataError)}
           options={types.map(type => ({ value: type.id, label: type.name }))} />
-        {view === 'recommendation' && <Select className="material-library-select" allowClear showSearch filterOption={false} placeholder="搜索账号画像"
-          loading={accountLoading}
-          value={accountId} onChange={setAccountId} options={accounts.map(account => ({
-            value: account.id,
-            label: account.nickname || account.accountNo
-          }))} notFoundContent={accountLoading ? '加载中...' : '暂无可用账号'}
-          onSearch={value => {
-            if (accountSearchTimerRef.current) window.clearTimeout(accountSearchTimerRef.current)
-            accountSearchTimerRef.current = window.setTimeout(() => void loadAccounts(value), 250)
-          }} />}
         <Tooltip title="刷新"><Button aria-label="刷新素材" className="material-library-refresh" icon={<ReloadOutlined />} onClick={() => void load(1, selectedId)} /></Tooltip>
         {hasPermission(permissions, 'zsjos:material:create') && <Space className="material-library-actions"><Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>创建爆款账号</Button><Button type="primary" icon={<PlusOutlined />} onClick={openContentCreate}>创建爆款内容</Button></Space>}
       </div>
@@ -731,20 +686,18 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
       action={<Button size="small" onClick={() => void loadMetadata()}>重试</Button>} />}
     {dictError && <Alert type="error" showIcon message={dictError}
       action={<Button size="small" loading={dictLoading} onClick={() => void loadDictionaries()}>重试</Button>} />}
-    {view === 'recommendation' && accountError && <Alert type="error" showIcon
-      message={`账号候选加载失败：${accountError}`}
-      action={<Button size="small" onClick={() => void loadAccounts()}>重试</Button>} />}
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load(rows.length ? page + 1 : 1)}>重试</Button>} />}
     <div className="material-library-layout">
       <aside className="material-library-list-pane">
         <div className="material-library-scroll">
           {loading && !rows.length ? <Skeleton active paragraph={{ rows: 10 }} /> : rows.length ? rows.map(item =>
-            <button type="button" key={item.id} className={`material-library-item${selectedId === item.id ? ' active' : ''}`}
-              onClick={() => void openMaterial(item.id)}>
-              <span className="material-library-cover">{item.coverPreviewUrl
-                ? <img src={item.coverPreviewUrl} alt="" loading="lazy" /> : <BookOutlined />}</span>
-              <span className="material-library-item-copy">
-                <strong>{view === 'mine' ? item.currentVersion?.title || item.title : item.title}</strong>
+            <article key={item.id} className={`material-library-item${selectedId === item.id ? ' active' : ''}`}>
+              <button type="button" className="material-library-open" aria-label={`查看素材：${item.currentVersion?.title || item.title}`}
+                onClick={() => void openMaterial(item.id)}><MaterialCover src={item.coverPreviewUrl} /></button>
+              <div className="material-library-item-copy">
+                <button type="button" className="material-library-title" onClick={() => void openMaterial(item.id)}>
+                  <strong><MaterialHighlight text={item.currentVersion?.title || item.title} keyword={keyword} /></strong>
+                </button>
                 <span className="material-card-status"><Tag color={item.currentVersion?.status === 'IN_APPROVAL' ? 'processing' : item.currentVersion?.status === 'REJECTED' ? 'error' : item.currentVersion?.status === 'EFFECTIVE' ? 'success' : 'default'}>{statusLabel[item.currentVersion?.status || item.status]}</Tag>
                   {item.currentEffectiveVersionId && item.currentDraftVersionId && <Tag>旧版已生效</Tag>}</span>
                 <span>{item.materialTypeName} · {item.materialNo}</span>
@@ -753,11 +706,13 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
                   {item.currentVersion?.submittedAt && <span>最近提交：<DateTimeText value={item.currentVersion.submittedAt} /></span>}
                   {item.currentVersion?.rejectionReason && <span title={item.currentVersion.rejectionReason}>驳回原因：{item.currentVersion.rejectionReason}</span>}
                 </> : <span><LikeOutlined /> {item.likeCount}　<LinkOutlined /> {item.referenceCount}</span>}
-              </span>
-            </button>) : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={view === 'recommendation' && !accountId ? '请选择账号查看推荐素材' : '暂无素材'} />}
-          <div ref={loadMoreRef} className="material-library-load-more">{loading && rows.length ? '加载中...' : hasMore ? '' : rows.length ? `已加载全部 ${total} 条素材` : ''}</div>
+                <MaterialSearchContent material={item} keyword={keyword} onSearch={searchMaterials}
+                  onLocate={() => void openMaterial(item.id)} />
+              </div>
+            </article>) : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无素材" />}
         </div>
+        <div ref={loadMoreRef} className="material-library-load-more">{loading && rows.length ? '加载中...' : hasMore ? '' : rows.length ? `已加载全部 ${total} 条素材` : ''}</div>
       </aside>
     </div>
     <ReferenceDialog material={selected} open={referenceOpen} onClose={() => setReferenceOpen(false)}
@@ -782,7 +737,7 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
       {cancelError && <Alert type="error" showIcon title={cancelError} />}
       <Input.TextArea aria-label="撤回原因" value={cancelReason} onChange={event => setCancelReason(event.target.value)} maxLength={500} rows={3} placeholder="请填写撤回原因" />
     </Modal>
-    {(viralType || viralContentType) && <Drawer
+    <Drawer
       title={formMode === 'create' ? (formTypeCode === 'viral_content' ? '创建爆款内容拆解' : '创建爆款账号拆解') : formMode === 'edit' ? '编辑爆款拆解' : '查看爆款拆解'}
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
       {detailLoading && formMode !== 'create' ? <Skeleton active /> : detailError && formMode !== 'create'
@@ -801,12 +756,26 @@ export default function MaterialLibraryPage({ permissions = [], management = fal
           {canReject && <Button danger onClick={() => setApprovalAction('reject')}>驳回审批</Button>}
         </div>
       </div>}
+      {/* 只读流程轨迹：编导需要看到自己的件走到哪个节点、由谁在审。与素材审批页同款接入，
+          同样受 bpm:process-instance:query 约束（面板走 BPM 审批详情接口）。
+          canUpdate=false 与 users=[] 的理由见 MaterialApprovalPage：审批结论由本页的
+          「通过审批 / 驳回审批」按钮经 zsjos/material-approval 接口产生，不从这里推进。 */}
+      {formMode === 'view' && currentVersion?.processInstanceId && currentVersion.status === 'IN_APPROVAL'
+        && hasPermission(permissions, 'bpm:process-instance:query') && <BpmProcessPanel
+        compact
+        decisionOnly
+        allowDecision={false}
+        canUpdate={false}
+        users={[]}
+        processInstanceId={currentVersion.processInstanceId}
+        taskId={approvalTaskId}
+      />}
       {displayedTypeCode === 'viral_content'
         ? viralContentType && <ViralContentMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
         : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />}
       </>}
-    </Drawer>}
+    </Drawer>
   </section>
 }

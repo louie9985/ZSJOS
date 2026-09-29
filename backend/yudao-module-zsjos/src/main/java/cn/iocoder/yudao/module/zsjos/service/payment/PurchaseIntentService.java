@@ -117,10 +117,13 @@ public class PurchaseIntentService {
     @Transactional(rollbackFor = Exception.class)
     public PurchaseIntentRespVO createPaymentLink(PurchaseIntentSaveDraftReqVO request, Long userId) {
         if (!"online_link".equals(request.getCollectionMode())) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+        validateOnlineAmount(request.getTotalAmount());
         if (!allinpayProperties.isEnabled() || StrUtil.isBlank(allinpayProperties.getPublicBaseUrl())
                 || StrUtil.isBlank(allinpayProperties.getLinkHmacSecret())) throw exception(PAYMENT_GATEWAY_UNAVAILABLE);
         PurchaseIntentRespVO saved = saveDraft(request, userId);
         PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(saved.getId());
+        // 幂等重试可能返回已保存快照，复用支付单前也必须核对持久化金额。
+        validateOnlineAmount(intent.getTotalAmount());
         PaymentIntentDO existing = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
         if (existing != null && List.of("created", "waiting", "paid").contains(existing.getStatus())) return convert(intent);
 
@@ -417,9 +420,27 @@ public class PurchaseIntentService {
     }
 
     private void validateDraft(PurchaseIntentSaveDraftReqVO request) {
-        if (!List.of("online_link", "offline_paid").contains(request.getCollectionMode()) || request.getPersonId() == null || request.getItems() == null || request.getItems().isEmpty()) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
-        BigDecimal sum = request.getItems().stream().map(PurchaseIntentSaveDraftReqVO.Item::getActualAmount).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
-        if (sum.compareTo(scale(request.getTotalAmount())) != 0 || sum.signum() <= 0) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+        if (!("online_link".equals(request.getCollectionMode()) || "offline_paid".equals(request.getCollectionMode()))
+                || request.getPersonId() == null || request.getItems() == null || request.getItems().isEmpty()) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+        validateAmount(request.getTotalAmount());
+        BigDecimal sum = BigDecimal.ZERO;
+        for (PurchaseIntentSaveDraftReqVO.Item item : request.getItems()) {
+            if (item == null || StrUtil.isBlank(item.getSpuRef()) || StrUtil.isBlank(item.getSkuRef())) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+            validateAmount(item.getActualAmount());
+            sum = sum.add(item.getActualAmount());
+        }
+        if (sum.compareTo(request.getTotalAmount()) != 0) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+        if ("online_link".equals(request.getCollectionMode())) validateOnlineAmount(sum);
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.signum() < 0 || amount.scale() > 2
+                || amount.precision() - amount.scale() > 16) throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+    }
+
+    private void validateOnlineAmount(BigDecimal amount) {
+        validateAmount(amount);
+        if (amount.signum() == 0) throw exception(PURCHASE_INTENT_ONLINE_AMOUNT_INVALID);
     }
     private void resolvePerson(PurchaseIntentSaveDraftReqVO request, boolean createExternal) {
         if (request.getPersonId() != null) return;

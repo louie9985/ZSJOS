@@ -3,8 +3,9 @@
     <div v-loading="loading">
       <el-alert v-if="error" :title="error" type="error" :closable="false"><el-button link @click="load">重试</el-button></el-alert>
       <template v-if="detail">
+        <el-alert v-if="detail.status === 'blocked'" type="warning" show-icon title="该笔返现已禁止提现" :description="detail.blockReason" :closable="false" />
         <el-alert v-if="optionsError" :title="optionsError" type="error" :closable="false"><el-button link @click="reloadOptions">重试</el-button></el-alert>
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="width < 768 ? 1 : 2" border>
           <el-descriptions-item label="返现编号">{{ detail.cashbackNo }}</el-descriptions-item>
           <el-descriptions-item label="返现受益人">{{ detail.beneficiaryName || '历史归属信息缺失' }}</el-descriptions-item>
           <el-descriptions-item label="合作方">{{ detail.partnerName || '-' }}</el-descriptions-item>
@@ -21,6 +22,7 @@
           <el-descriptions-item label="取消时间">{{ formatDate(detail.cancelledAt) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="取消原因">{{ detail.cancelReason || '-' }}</el-descriptions-item>
         </el-descriptions>
+        <CashbackControlHistory :id="detail.id" :revision="detail.version" />
         <FinanceSource :source="detail.source" />
         <h4>提现记录</h4>
         <el-alert v-if="!canViewWithdrawals" title="无权查看提现记录" type="info" :closable="false" />
@@ -36,16 +38,21 @@
         </template>
       </template>
     </div>
+    <template #footer><CashbackControl v-if="detail" :row="detail" :status-label="statuses.find(x => x.value === detail?.status)?.label" @changed="changed" /></template>
   </el-drawer>
 </template>
 <script setup lang="ts">
+import { useWindowSize } from '@vueuse/core'
+import CashbackControl from './CashbackControl.vue'
+import CashbackControlHistory from './CashbackControlHistory.vue'
 import * as Api from '@/api/zsjos/cashback'
 import FinanceSource from './FinanceSource.vue'
 import { useFinanceFilterOptions } from './useFinanceFilterOptions'
 import { useUserStore } from '@/store/modules/user'
 import { formatDate } from '@/utils/formatTime'
+const { width } = useWindowSize()
 const props = defineProps<{ id?: number }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; changed: [] }>()
 const router = useRouter(), user = useUserStore()
 const canViewWithdrawals = computed(() => ['*:*:*', 'zsjos:withdrawal:finance-query', 'zsjos:withdrawal:admin-query'].some(p => user.getPermissions.has(p)))
 const detail = ref<Api.CashbackVO>(), loading = ref(false), error = ref('')
@@ -70,6 +77,7 @@ const load = async () => {
   catch (e: any) { if (current === sequence) error.value = e?.message || '返现详情加载失败' }
   finally { if (current === sequence) loading.value = false }
 }
+const changed = () => { void load(); emit('changed') }
 watch(() => props.id, () => { historyPage.value = 1; void load(); void loadHistory() }, { immediate: true })
 onBeforeUnmount(() => { sequence++; historySequence++ })
 </script>

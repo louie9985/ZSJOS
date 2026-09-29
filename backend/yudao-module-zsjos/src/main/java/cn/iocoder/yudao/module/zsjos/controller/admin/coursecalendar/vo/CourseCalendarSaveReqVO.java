@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 @Data
 public class CourseCalendarSaveReqVO {
+    @jakarta.validation.Valid private cn.iocoder.yudao.module.zsjos.controller.admin.calendar.vo.CalendarMaintenanceNotifyReqVO notification;
     @NotBlank @Size(max=200) private String courseName;
     @NotBlank @Size(max=64) private String courseFormValue;
     @NotNull private LocalDateTime startTime;

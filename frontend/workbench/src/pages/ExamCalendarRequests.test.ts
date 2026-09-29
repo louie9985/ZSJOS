@@ -29,7 +29,7 @@ function deferred<T>() {
 }
 
 describe('exam calendar latest request wins', () => {
-  it.each(['load', 'loadRough', 'loadProducts'])('%s ignores stale successes and failures', async name => {
+  it.each(['load', 'loadRough'])('%s ignores stale successes and failures', async name => {
     for (const fails of [false, true]) {
       const old = deferred<unknown>(), latest = deferred<unknown>()
       let calls = 0
@@ -57,11 +57,8 @@ describe('exam calendar latest request wins', () => {
     }
   })
 
-  it('submits independently retained conditions instead of only registered form fields', () => {
-    expect(source).toContain('scheduleInput({ ...values, selectedAttrs })')
-    expect(source).toContain('setSelectedAttrs({ ...schedule.selectedAttrs })')
-    expect(source).toContain('clearedInvalidAttrs')
-    expect(source).not.toContain("name={['selectedAttrs'")
+  it('refreshes current views after save and transition', () => {
+    expect(source).toContain('scheduleInput(values)')
     expect(source.match(/const current = latestReload.current/g)).toHaveLength(2)
     expect(source).not.toContain('Promise.all([load(), roughOpen')
   })

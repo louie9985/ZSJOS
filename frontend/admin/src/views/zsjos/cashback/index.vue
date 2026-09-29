@@ -20,7 +20,7 @@
       >
     </el-form>
     <el-alert v-if="optionsError" :title="optionsError" type="error" :closable="false"><el-button link @click="reloadOptions">重试</el-button></el-alert>
-    <ZsjosAdvancedFilter scene="cashback" page-key="cashback" placeholder="返现编号 / 客资编号" @search="value => { query.keyword = value; query.pageNo = 1; load() }" @change="value => { query.advancedFilter = value; query.pageNo = 1; load() }" />
+    <ZsjosAdvancedFilter scene="cashback" page-key="cashback" placeholder="返现编号 / 客资编号 / 姓名" @search="value => { query.keyword = value; query.pageNo = 1; load() }" @change="value => { query.advancedFilter = value; query.pageNo = 1; load() }" />
     <el-alert v-if="error" :title="error" type="error" show-icon
       ><template #default><el-button link @click="load">重试</el-button></template></el-alert
     >
@@ -29,7 +29,7 @@
     <el-table v-loading="loading" :data="list">
       <el-table-column label="返现编号" prop="cashbackNo" min-width="210"><template #default="{ row }"><el-link v-if="finance" type="primary" @click="openDetail(row.id)">{{ row.cashbackNo }}</el-link><span v-else>{{ row.cashbackNo }}</span></template></el-table-column>
       <el-table-column v-if="finance" label="返现受益人" prop="beneficiaryName" min-width="140" />
-      <el-table-column v-if="finance" label="归属合作方" prop="partnerName" min-width="140" />
+      <el-table-column v-if="finance" label="兼职姓名" prop="partnerName" min-width="140" />
       <el-table-column v-if="finance" label="客户／学员" min-width="140"><template #default="{ row }">{{ row.source?.studentName || row.source?.customerName || '-' }}</template></el-table-column>
       <el-table-column v-if="finance" label="来源单据" min-width="200"><template #default="{ row }">{{ row.source?.orderNo || row.source?.leadNo || '来源不可查看' }}</template></el-table-column>
       <el-table-column v-if="finance" label="返现基数" min-width="120"><template #default="{ row }">{{ row.type === 'valid' ? '不适用' : money(row.baseAmount) }}</template></el-table-column>
@@ -46,10 +46,11 @@
         ></el-table-column
       >
       <el-table-column label="状态" width="110"
-        ><template #default="scope">{{ statusName(scope.row.status) }}</template></el-table-column
+        ><template #default="scope"><el-tag :type="scope.row.status === 'blocked' ? 'warning' : 'info'">{{ statusName(scope.row.status) }}</el-tag></template></el-table-column
       >
       <el-table-column label="生成时间" prop="generatedAt" min-width="170" />
       <el-table-column label="可提现时间" prop="availableAt" min-width="170" />
+      <el-table-column v-if="finance" label="操作" fixed="right" width="170"><template #default="{ row }"><el-button link type="primary" @click="openDetail(row.id)">详情</el-button><CashbackControl :row="row" :status-label="statusName(row.status)" @changed="load" /></template></el-table-column>
       <template #empty><el-empty description="暂无返现记录" /></template>
     </el-table>
     <Pagination
@@ -59,10 +60,11 @@
       @pagination="load"
     />
   </ContentWrap>
-  <CashbackDetail v-if="finance && cashbackId" :id="cashbackId" @close="openDetail()" />
+  <CashbackDetail v-if="finance && cashbackId" :id="cashbackId" @changed="load" @close="openDetail()" />
 </template>
 
 <script setup lang="ts">
+import CashbackControl from '../components/CashbackControl.vue'
 import CashbackDetail from '../components/CashbackDetail.vue'
 import { useFinanceFilterOptions } from '../components/useFinanceFilterOptions'
 import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
@@ -95,7 +97,7 @@ let loadSequence = 0
 const load = async () => {
   const sequence = ++loadSequence
   list.value = []
-  total.value = 0
+  // Keep the pager range while loading; clearing it resets an in-flight page to 1.
   loading.value = true
   error.value = ''
   try {

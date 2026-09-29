@@ -29,9 +29,9 @@ describe('delivery class review fixes', () => {
     expect(source).not.toContain('loadStudents')
   })
 
-  it('reloads exam options with selected SKUs and restores edit snapshots', () => {
-    expect(source).toContain('selectedAttrs: attrs')
-    expect(source).toContain('loadExams(row.categoryId, row.productId, attrs, row.selectedSkus.map(sku => sku.id))')
-    expect(source).toContain('onChange={value => void skuChanged(value as number[])}')
+  it('loads exam choices directly without a product prerequisite', () => {
+    expect(source).toContain('api.deliveryClasses.exams()')
+    expect(source).toContain('examScheduleId: row.examScheduleId')
+    expect(source).not.toContain('selectedSkuIds')
   })
 })

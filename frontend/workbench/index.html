@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <!-- 缺少 viewport 时移动浏览器按约 980px 桌面宽度布局再整体缩放，
-         所有 max-width 媒体查询与 matchMedia 均不会命中移动分支。 -->
+         所有 max-width 媒体查询与 matchMedia 均不会命中移动分支。
+
+         刻意不设 viewport-fit=cover：它会让内容延伸进刘海与底部小黑条，
+         而安全区补偿必须贯穿 shell 高度、抽屉与底部操作条才能安全落地
+         （见 layout.css 的 .crm-header / .content-layout 高度链）。
+         默认 viewport-fit 已让移动浏览器把内容限制在安全区内。
+         同样不设 maximum-scale / user-scalable —— 聚焦自动放大改由
+         antd-overrides.css 的移动端 16px 表单字号从根因消除。 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>中世健员工工作台</title>
   </head>

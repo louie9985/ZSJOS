@@ -39,7 +39,9 @@ public class StudentInfoFormService {
     @Resource private SecurityFrameworkService security;
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private TenantFrameworkService tenants;
-    @Value("${zsjos.student-info.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}") private String publicBaseUrl;
+    // Keep collection links on the same public H5 origin as positioning links unless a
+    // collection-specific override is explicitly configured.
+    @Value("${zsjos.student-info.public-base-url:${zsjos.positioning.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}}") private String publicBaseUrl;
     private static final SecureRandom RANDOM=new SecureRandom();
 
     @ZsjosPermission(bizType="student-info",bizId="#leadId",action="create")

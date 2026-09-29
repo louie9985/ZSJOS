@@ -33,6 +33,25 @@ class AdvancedFilterTemplateControllerPermissionTest {
         public boolean hasPermission(String value) { return permission.equals(value); }
     }
 
+    @Test void personalWritePermissionUsesRequestedScene() throws Exception {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterTemplateSaveReqVO();
+        var parser = new org.springframework.expression.spel.standard.SpelExpressionParser();
+        for (String method : List.of("createPersonal", "updatePersonal")) {
+            String guard = AdvancedFilterTemplateController.class.getMethod(method, request.getClass())
+                    .getAnnotation(PreAuthorize.class).value();
+            for (String permission : List.of("zsjos:media-student:query-my", "zsjos:lead:query")) {
+                for (String scene : List.of("media_student", "lead")) {
+                    request.setScene(scene);
+                    var context = new org.springframework.expression.spel.support.StandardEvaluationContext();
+                    context.setVariable("reqVO", request);
+                    context.setBeanResolver((ctx, name) -> new PermissionProbe(permission));
+                    assertEquals(scene.equals("media_student") == permission.equals("zsjos:media-student:query-my"),
+                            parser.parseExpression(guard).getValue(context, Boolean.class));
+                }
+            }
+        }
+    }
+
     private static final String VISIBLE_LIST = "visibleList";
 
     private PreAuthorize visibleListGuard() throws NoSuchMethodException {
@@ -57,14 +76,14 @@ class AdvancedFilterTemplateControllerPermissionTest {
     @Test
     void visibleListGuardIsSceneAware() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
-        assertEquals(9, guard.split("#scene").length - 1, "九个场景各需一条分支");
+        assertEquals(10, guard.split("#scene").length - 1, "十个场景各需一条分支");
     }
 
     @Test
     void visibleListGuardCoversEverySupportedScene() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
         List<String> scenes = List.of("lead", "order", "lead_appeal", "duplicate_review",
-                "registration", "student", "subordinate_sales", "cashback", "withdrawal");
+                "registration", "student", "media_student", "subordinate_sales", "cashback", "withdrawal");
         for (String scene : scenes) {
             assertTrue(guard.contains("(#scene == '" + scene + "'"),
                     "场景 " + scene + " 缺少授权分支");

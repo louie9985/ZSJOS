@@ -1,5 +1,6 @@
 ---
-description: "创建新的 workbench 页面骨架（含路由、组件、CSS、guard 注册）。当用户说"新建页面"/"加一个XX页"/"创建XX模块"时触发。"
+name: new-page
+description: 创建新的 workbench 页面骨架（含路由、组件、CSS、guard 注册）。当用户说「新建页面」/「加一个XX页」/「创建XX模块」时触发。
 ---
 
 # 新页面脚手架

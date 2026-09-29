@@ -25,7 +25,8 @@ describe('named product specifications across runtimes', () => {
   })
   it('keeps equal values belonging to different fields and marks legacy labels', () => {
     expect(productSpecs({ selectedAttrValues: '{"first":"same","second":"same"}' })).toHaveLength(2)
-    expect(productSpecText({ attrValues: { level: '2' } })).toBe('level：2（历史标签缺失）')
+    expect(productSpecText({ attrValues: { level: '2' } })).toBe('历史规格标签缺失')
+    expect(productSpecText({ specs: [{ attrKey: 'level', attrName: '考试等级', value: 'retired', label: 'retired', labelMissing: true }] })).toBe('考试等级：历史标签缺失')
   })
   it('does not invent specs for missing or malformed legacy payloads', () => {
     expect(productSpecs({ selectedAttrValues: 'invalid' })).toEqual([])

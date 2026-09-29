@@ -241,6 +241,46 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
+    void waitingPoolAllowsOwnerFollowUpButRejectsOtherVisibleUsers() {
+        LeadDO lead = lead(10L, 20L);
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setStatus("waiting_assignment");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
+            assertDoesNotThrow(() -> service.check(1L, "follow-up-create"));
+            assertThrows(ServiceException.class, () -> service.check(1L, "basic-info-update"));
+            assertThrows(ServiceException.class, () -> service.check(1L, "qualify"));
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            assertEquals(LEAD_PERMISSION_DENIED.getCode(), assertThrows(ServiceException.class,
+                    () -> service.check(1L, "follow-up-create")).getCode());
+        }
+    }
+
+    @Test
+    void assignedAndHistoricalPendingPoolsAllowOnlyOwnerAndConfiguredCollaboratorFollowUp() {
+        LeadDO lead = lead(10L, 20L); lead.setStatus("valid");
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(30L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            for (String status : List.of("assigned", "deal_pending")) {
+                cycle.setStatus(status);
+                for (Long userId : List.of(20L, 30L)) {
+                    security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);
+                    assertDoesNotThrow(() -> service.check(1L, "follow-up-create"));
+                }
+                security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(40L);
+                assertThrows(ServiceException.class, () -> service.check(1L, "follow-up-create"));
+            }
+        }
+    }
+
+    @Test
     void publicSeaSubmitterAssistOnlyAllowsOwnerAndCollaborator() {
         LeadDO lead = lead(10L, 20L);
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();

@@ -124,6 +124,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
                 .findFirst().orElseThrow(() -> exception(LEAD_INVALID_REASON_INVALID));
         LocalDateTime now = LocalDateTime.now();
+        if (previouslyValid) lifecycleTaskService.startManualRoundAfterAutomatic(lead, userId, now);
         lead.setStatus(STATUS_INVALID);
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);

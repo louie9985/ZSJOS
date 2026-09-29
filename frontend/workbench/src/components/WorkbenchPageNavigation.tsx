@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 type Guard = (destination?: string) => Promise<boolean>
 type Navigation = { canOpen: (path: string) => boolean; open: (path: string) => Promise<void>; canClose: (path: string) => Promise<boolean>; validate: (path: string, destination?: string) => Promise<boolean>; register: (path: string, guard: Guard) => () => void }
 const Context = createContext<Navigation | undefined>(undefined)
 
-export function WorkbenchPageNavigation({ canOpen, children }: { canOpen: (path: string) => boolean; children: ReactNode }) {
+export function WorkbenchPageNavigation({ canOpen, canRetain, children }: { canOpen: (path: string) => boolean; canRetain?: (path: string) => boolean; children: ReactNode }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const guards = useRef(new Map<string, Set<Guard>>())
   const register = useCallback((path: string, guard: Guard) => {
     const group = guards.current.get(path) || new Set<Guard>()
@@ -21,9 +22,12 @@ export function WorkbenchPageNavigation({ canOpen, children }: { canOpen: (path:
   const open = useCallback(async (path: string) => {
     const pathname = path.split(/[?#]/, 1)[0]
     if (!canOpen(pathname)) return
+    // A non-retained source will be destroyed, so run its close guard first.
+    if (pathname !== location.pathname && canRetain && !canRetain(location.pathname)
+      && !await check(location.pathname)) return
     if (!await check(pathname, path)) return
     navigate(path)
-  }, [canOpen, navigate, check])
+  }, [canOpen, canRetain, location.pathname, navigate, check])
   return <Context.Provider value={{ canOpen, open, register, canClose, validate: check }}>{children}</Context.Provider>
 }
 

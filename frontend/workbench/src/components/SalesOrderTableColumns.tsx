@@ -27,15 +27,15 @@ const textColumn = (title: string, dataIndex: keyof SalesOrderListItem, width = 
 export function buildSalesOrderTableColumns(onDetail: (item: SalesOrderListItem) => void): ProColumns<SalesOrderListItem>[] {
   return [
     { title: '订单号', dataIndex: 'orderNo', width: 180, fixed: 'left', ellipsis: true },
-    { title: '订单类型', dataIndex: 'orderType', width: 110, render: (_, row) => ORDER_TYPE_LABELS[String(row.orderType)] || row.orderType || '-' },
+    { title: '订单类型', dataIndex: 'orderType', width: 110, render: (_, row) => ORDER_TYPE_LABELS[String(row.orderType)] || (row.orderType ? '未知类型' : '—') },
     {
       title: '订单状态', dataIndex: 'status', width: 130,
-      render: (_, row) => <Tag color={SALES_ORDER_STATUS_COLORS[row.status as SalesOrder['status']]}>{SALES_ORDER_STATUS_LABELS[row.status as SalesOrder['status']] || String(row.status)}</Tag>
+      render: (_, row) => <Tag color={SALES_ORDER_STATUS_COLORS[row.status as SalesOrder['status']]}>{SALES_ORDER_STATUS_LABELS[row.status as SalesOrder['status']] || (row.status == null ? '—' : '未知状态')}</Tag>
     },
     { title: '审批轮次', dataIndex: 'approvalRoundNo', width: 100, render: (_, row) => row.approvalRoundNo ? `第 ${row.approvalRoundNo} 轮` : '-' },
     { title: '当前审批节点', dataIndex: 'taskDefinitionKey', width: 150, render: (_, row) => SALES_ORDER_TASK_LABELS[String(row.taskDefinitionKey)] || '-' },
-    { title: '审批结果', dataIndex: 'taskStatus', width: 110, render: (_, row) => row.taskStatus == null ? '-' : TASK_STATUS_LABELS[Number(row.taskStatus)] || `状态 ${row.taskStatus}` },
-    { title: '主管确认状态', dataIndex: 'supervisorConfirmationStatus', width: 130, render: (_, row) => row.supervisorConfirmationStatus ? SUPERVISOR_STATUS_LABELS[String(row.supervisorConfirmationStatus)] || row.supervisorConfirmationStatus : '-' },
+    { title: '审批结果', dataIndex: 'taskStatus', width: 110, render: (_, row) => row.taskStatus == null ? '-' : TASK_STATUS_LABELS[Number(row.taskStatus)] || '未知状态' },
+    { title: '主管确认状态', dataIndex: 'supervisorConfirmationStatus', width: 130, render: (_, row) => row.supervisorConfirmationStatus ? SUPERVISOR_STATUS_LABELS[String(row.supervisorConfirmationStatus)] || '未知状态' : '—' },
     textColumn('主管确认申请人', 'supervisorRequesterName', 150),
     textColumn('购买方', 'buyerName'),
     textColumn('学员姓名', 'studentName', 130),

@@ -943,3 +943,21 @@
 @container (max-width: 480px) {
   .lead-profile-fields--contact-rows { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 客资管理的客户档案卡片：手机上一行一列，键左对齐、值右对齐。
+   用 :has 限定在带 .lead-profile-contact-container 的卡片内 —— 该容器只在
+   contact-rows 变体（LeadManagementPage 专用）下渲染，故不会波及学员页、
+   订单详情等复用同一套 lead-profile-* 类的场景。
+   meta 是容器的兄弟节点而非后代，容器查询够不到，故用媒体查询。 */
+@media (max-width: 768px) {
+  .lead-card:has(.lead-profile-contact-container) .lead-profile-fields,
+  .lead-card:has(.lead-profile-contact-container) .lead-profile-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* contact-rows 为容纳换行的长值把值改成了左对齐（见上方 929 行附近），
+     单列下恢复右对齐，让值在行的右边界成列。 */
+  .lead-card:has(.lead-profile-contact-container) .lead-field-value {
+    text-align: right;
+  }
+}

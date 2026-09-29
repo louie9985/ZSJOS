@@ -23,6 +23,8 @@ public interface EamAssetService {
 
     void updateAsset(@Valid EamAssetSaveReqVO reqVO, Long operatorUserId);
 
+    void changeStatus(Long assetId, Integer status, String reason, Long operatorUserId);
+
     void clearUsageAndSetIdle(Long assetId, Integer expectedVersion, Long operatorUserId);
 
     void deleteAsset(Long id);

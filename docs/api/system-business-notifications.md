@@ -81,6 +81,30 @@ All paths below are under the administration API prefix and use the standard res
 | `DELETE` | `/system/notify-rule/delete?id=` | Delete a rule |
 | `PUT` | `/system/notify-rule/update-status` | Enable or disable after validation |
 | `GET` | `/system/notify-message/my-get?id=` | Read one message owned by the current user |
+| `GET` | `/system/notify-message/my-page` | Page the current user's messages |
+| `GET` | `/system/notify-message/my-cursor` | Cursor-page the current user's messages |
+| `GET` | `/system/notify-message/my-categories` | Message-centre category catalog |
+
+### Message categories
+
+`NotifyMessageCategory` (in `yudao-module-system`) is the single authority for the message-centre
+category of a message. The SQL filter used by `my-page`/`my-cursor` and the `category` field on the
+message response are both derived from the same ordered definition, so they cannot drift apart.
+
+Categories are **mutually exclusive**: they are evaluated in descending priority order
+(`appeal` → `withdrawal` → `lead`), the first match wins, and `system` is the remainder. This
+matters for lead-based scenes such as `zsjos.lead.appeal_submitted`, which carry both a lead
+`bizType` and an appeal `sceneCode`; without exclusion they would surface under two categories at
+once. The generated SQL mirrors the ordering by negating every higher-priority predicate, and wraps
+each negation in `COALESCE` so rows with all-null context columns are not lost to SQL three-valued
+logic.
+
+The response carries the resolved `category`; it is not a persisted column. An unrecognised or
+blank `category` request parameter applies no filter rather than silently narrowing to one
+category. `my-categories` returns the catalog (`all`, `appeal`, `withdrawal`, `lead`, `system`) in
+display order for clients to render filters and labels, so no client maintains its own category
+mapping. There is deliberately no `reward`/`cashback`/`commission` category: no notification scene
+publishes such a `bizType`, so the filter could never match.
 
 Existing template and message APIs include `title`, `summary`, `sceneCode`, and controlled action
 metadata. Lead templates use `{{lead.no}}` for the user-visible 客资编号. `{{lead.id}}` remains a
@@ -208,3 +232,58 @@ Admin 和 Partner H5 的消息响应及入口保持既有契约。本次新增�
 销售/教务自拓选择提供人后，提交范围列表按 `provider_owner_type=system_user`、`provider_owner_id`
 及 `zsjos:lead:query-submitted` 配置累计授权。仅有 `zsjos:lead:query-owned` 不代表可查看本人提供给
 其他负责人的客资。缺失角色授权应由管理员配置；通知修复不自动修改 `system_role_menu`。
+
+## 固定收件人事件契约
+
+`NotifyBusinessEventApi.publishDurable` 在调用者事务内将启用的站内信和企微规则写入现有 outbox，返回受理规则数；无规则返回 0，不同步调用渠道或发布额外外部渠道事件。ZSJOS 用它把业务批次、固定接收人和 outbox 放在同一受理事务中，0 条规则转为配置不可用并回滚。规则数不是接收人数，也不代表渠道已经送达。既有 `publish` 和 `publishConfirmed` 契约保留。
+
+`NotifyBusinessEvent` 默认使用 `recipientMode=RULE`，保留既有规则收件人行为。
+指定范围的业务事件使用 `recipientMode=FIXED` 和 `fixedRecipients`，每个元素包含
+`userType`、`userId`；不使用可能错位的两条平行数组。用户身份以类型和编号共同识别，
+ADMIN 与 PARTNER 即使编号相同也不是同一个收件人。
+
+固定模式必须提供非空、有效类型、正数编号的名单。两个日历场景
+`zsjos.calendar.exam`、`zsjos.calendar.course` 强制固定模式且只允许 ADMIN；
+空名单、未知模式、非法身份或缺失固定元数据均拒绝，不回退为规则收件人。
+规则中的指定人员和业务角色不得扩大固定名单；渠道、模板和启停配置仍由 System 管理。
+固定名单是身份契约，不替代业务调用方的租户、权限及员工有效性校验。
+
+事件标准化、按规则复制和 outbox 恢复均保留类型化名单。站内固定事件保存为
+`notify-fixed-event-v1` envelope，业务变量位于 `eventPayload`；企微继续使用
+`wecom-outbox-v1`，新增 `recipientMode` 和 `fixedRecipients`，检查点更新必须保留这两个字段。
+旧的普通站内 payload 和未声明固定模式的旧企微 envelope 继续按 RULE 读取；
+日历事件缺少固定名单时拒绝恢复。未知保留格式版本拒绝读取，避免损坏事件扩大收件范围。
+
+固定元数据贯穿链路的验证入口为 `NotifyBusinessEventApiImplTest`、
+`NotifyOutboxEventCodecTest`、`NotifyBusinessOutboxServiceTest` 和
+`NotifyBusinessEventProcessorTest`；企微检查点与原重试行为继续由
+`WecomOutboxDeliveryServiceTest` 覆盖。此契约不表示日历批次结果同步、生命周期触发、
+双端面板或真实渠道验收已完成，相关能力须在日历功能交付中分别验证。
+
+### 固定事件逐人投递事实公共查询
+
+`NotifyDeliveryApi.queryFixedEvent(sceneCode, sourceEventKey, recipients, afterOutboxId, limit)` 是跨模块内部只读 API，不新增 HTTP 入口。业务调用方先校验自己的业务对象权限；租户只取当前 TenantContext，不接收客户端传入的租户。ZSJOS 不读取 System DAL。
+
+- recipients 是业务持久化固定名单的一个分页切片，每次 1–200 个类型化身份；接口再与 outbox 中固定名单取交集，不扩大发送范围。ADMIN/PARTNER 同号仍分别处理，日历只允许 ADMIN。
+- afterOutboxId 从 0 开始，按 outbox ID 升序分页；limit 为 1–100。响应含 rules、nextCursor、hasMore；同一事件不同规则独立返回，调用方逐页读取，不把某一规则结果覆盖为整个渠道结果。
+- 每条规则含 outboxId、ruleId、保存时渠道、outboxStatus、安全错误码及所选人员的事实。人员含身份、status、messageId/providerMessageId、retryScheduled、completedTime。没有通知正文、变量、票据链接或原始异常。
+- 站内信按当前租户、场景、事件、规则、身份查询实际消息。消息已保存即 SUCCEEDED，即使整个规则后来失败；消息不存在时读取已保存的逐人检查点。两种证据均缺失且 outbox 已成功，返回 UNKNOWN/NOTIFY_RECIPIENT_EVIDENCE_MISSING，不能仅凭批次成功推断已送达。消息创建时间及检查点中的原消息创建时间表示站内持久化完成，不代表已读。
+- 企微读取持久化逐人检查点：SUCCEEDED、SKIPPED、FAILED、UNCERTAIN、PENDING 分别保留。sending 在查询中保守呈现 UNCERTAIN/WECOM_DELIVERY_UNCONFIRMED，不自动成为补发候选；查询不会修改检查点。只在失败项标记可重试且 outbox 仍 pending/processing 时返回 retryScheduled=true，不能据此盲目启动新批次。
+- 排队但尚无逐人检查点返回 PENDING；规则失败／跳过影响未产生独立证据的人员。未知格式、错误身份上下文或旧 RULE 模式返回明确证据不可用原因，不把查询参数当成旧事件的原收件人名单。企微的新检查点保存已知终态完成时间；旧检查点没有该字段时返回 null。结果不确定或仍可自动重试时没有完成时间，不伪造为整批完成时间。
+- 查不到事件返回空页。这可能是未入队或证据已清理，不能当作成功。业务仍须保存最终投递事实；该公共查询本身不提供长期归档，不改变现有 outbox 清理策略。
+
+本次查询复用现有 outbox、企微检查点和站内信消息，只读且不触发发送。ZSJOS 最终状态同步、渠道定向补发及清理前证据归档仍需继续实现；查询接口不能替代这些闭环能力。
+
+### 固定名单逐人检查点
+
+固定站内事件在现有 `notify-fixed-event-v1` envelope 中兼容增加 `recipients`，保存类型化身份、pending/succeeded/skipped/failed、稳定原因、已确认消息 ID 和完成时间。旧事件缺省该字段时按原固定名单初始化；恢复时校验检查点完整覆盖名单，不允许额外身份、重复身份或缺少消息证据的成功记录。RULE 事件沿用原处理器。
+
+`FixedInAppOutboxDeliveryService` 使用原 outbox claim token 和租约检查点，不建立新投递队列。每人发送前查询实际消息，恢复“消息事务已提交、检查点未写完”的崩溃窗口；实际消息优先于当前员工状态，不把已有成功改为停用跳过。未送达 ADMIN 再校验当前租户、启用和逻辑删除状态，并复核场景是否仍适用。停用、删除及非当前租户员工记录 `EMPLOYEE_UNAVAILABLE`；业务失效保留场景原因。企微偏好或绑定缺失不影响站内信。
+
+创建失败记录逐人失败并继续其他人员；按现有 outbox 重试日程只重试失败/待处理项。成功和跳过不会在原批次重新发送。重复键必须能查询到本规则、事件和身份的实际消息才计为成功。租约丢失停止检查点更新；站内消息仍复用原唯一键及独立事务保证幂等。只有实际消息持久化成功才保存成功检查点，失败重试不记录虚构完成时间。
+
+企微 ADMIN 跳过原因区分 `EMPLOYEE_UNAVAILABLE`、`WECOM_PERSONAL_PUSH_DISABLED`、`WECOM_BINDING_MISSING` 和通用 `WECOM_RECIPIENT_UNAVAILABLE`。地址与原因两次读取间状态变化时仍跳过本次，不隐式恢复发送。旧 `WECOM_RECIPIENT_SKIPPED` 标记兼容读取，但不作为企微消息 ID 返回。企微请求在途/结果不确定保持 UNCERTAIN，不自动盲目重发。
+
+企微固定事件在恢复及首次生成渠道上下文时，都校验检查点完整覆盖原类型化名单，且租户、场景、事件键、规则一致。额外、遗漏、重复或换租户的身份在网络发送前拒绝；查询同样返回 `NOTIFY_PAYLOAD_INVALID`，不会把损坏记录解释成正常投递结果。旧 RULE 事件不套用固定名单契约。
+
+以上结果仍位于 System outbox；当前清理期限没有变化。只有后续业务归档与清理协调完成，才能承诺日历结果长期保留。本节不代表双端历史展示、独立渠道补发或真实渠道验收已完成。

@@ -31,6 +31,6 @@ describe('supervisor Lead action eligibility', () => {
 
   it('uses a stable label and exposes unknown historical values', () => {
     expect(subordinateAssignmentStatusLabel('recycle_pending')).toBe('回收待处理')
-    expect(subordinateAssignmentStatusLabel('legacy')).toBe('未知分配状态（legacy）')
+    expect(subordinateAssignmentStatusLabel('legacy')).toBe('未知状态')
   })
 })

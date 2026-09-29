@@ -1,3 +1,5 @@
+import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import type { AdvancedFilterGroup } from '../services/api'
 import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
 import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
 import StudentContentDraftPicker from '../components/StudentContentDraftPicker'
@@ -9,7 +11,7 @@ import StudentOverviewBackground from '../components/StudentOverviewBackground'
 import PositioningDialog from '../components/PositioningDialog'
 import StudentPartnerBindingDialog from '../components/StudentPartnerBindingDialog'
 import PositioningSnapshot from '../components/PositioningSnapshot'
-import { MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined, ExclamationCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
+import { MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, FileSearchOutlined, ImportOutlined, LinkOutlined, PlusOutlined, PlayCircleOutlined, ReloadOutlined,
   SendOutlined, UploadOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Cascader, Checkbox, DatePicker, Empty, Form, Image, Input, InputNumber, Modal, Radio, Select, Skeleton, Space, Switch, Tabs, Tag, Tooltip, Typography, Upload } from 'antd'
 import type { InputRef } from 'antd'
@@ -216,6 +218,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     if (!listCollapsed && focusSearch.current) { searchRef.current?.focus(); focusSearch.current = false }
   }, [listCollapsed])
   const [rows, setRows] = useState<MediaStudentListItem[]>([]), [detail, setDetail] = useState<MediaStudentDetail>()
+  const [listScrollbarWidth, setListScrollbarWidth] = useState(0)
+  useLayoutEffect(() => {
+    const scroll = listScrollRef.current
+    if (!scroll) return
+    const measure = () => setListScrollbarWidth(scroll.offsetWidth - scroll.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroll)
+    if (scroll.firstElementChild) observer.observe(scroll.firstElementChild)
+    return () => observer.disconnect()
+  }, [rows, listCollapsed])
   const [accountPlatforms, setAccountPlatforms] = useState<DictData[]>([])
   const [platformError, setPlatformError] = useState('')
   const [platformRetry, setPlatformRetry] = useState(0)
@@ -233,11 +246,16 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [selectedId, setSelectedId] = useState<number>()
   const selectedStudent = useRef<number | undefined>(undefined)
   const firstListLoad = useRef(true)
+  const [servicePeriodTab, setServicePeriodTab] = useState('in')
+  const [servicePeriodSaving, setServicePeriodSaving] = useState(false)
+  const servicePeriodBusy = useRef(false)
+  const selectFirstOnLoad = useRef(false)
   const loadedKeyword = useRef('')
   const searchIntent = useRef(0)
   const operatorBusy = useRef(false)
   const [assignmentTarget, setAssignmentTarget] = useState<{ personId: number; personNo?: string; name?: string; relationId: number }>()
-  const [keyword, setKeyword] = useState(''), [search, setSearch] = useState(''), [pageNo, setPageNo] = useState(1)
+  const [keyword, setKeyword] = useState(''), [pageNo, setPageNo] = useState(1)
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
@@ -349,6 +367,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       const requested = new URL(destination, window.location.origin).searchParams
       if (Number(requested.get('personId')) === selectedId && (Number(requested.get('accountId')) || undefined) === selectedAccountId) return true
     }
+    if (servicePeriodBusy.current) { message.warning('正在保存，请稍后再切换'); return false }
     if (!dialog) return true
     if (saving || operatorBusy.current || positioningLock.current || autoSave.status === 'saving') { message.warning('正在保存，请稍后再切换'); return false }
     return new Promise(resolve => modal.confirm({ title: '学员页面有正在编辑的内容', content: '放弃未保存内容后切换，或继续编辑。',
@@ -385,7 +404,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         })
       if (run === detailRun.current) {
         // Detail refreshes after account edits also refresh the already-loaded card without moving the list.
-        setRows(current => current.map(row => row.personId === personId ? { ...row, accounts: value.accounts } : row))
+        setRows(current => current.map(row => row.personId === personId ? { ...row, inServicePeriod: value.student.inServicePeriod, accounts: value.accounts } : row))
         setDetail(value); setSelectedServiceId(service?.serviceRelationId); setSelectedAccountId(accountId); setDirectorContext(context)
         setTab(accountId ? mediaAccountTabKey(accountId) : 'overview')
       }
@@ -402,7 +421,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     listBusy.current = true
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
     try {
-      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined })
+      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined,
+        inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter })
       if (run !== listRun.current) return
       firstListLoad.current = false
       if (!append) loadedKeyword.current = keyword
@@ -411,7 +431,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       // Appending students must not reload the selected detail or discard its editor state.
       if (!append && !keepDetail) {
         listScrollRef.current?.scrollTo({ top: 0, left: 0 })
-        const current = preferred ?? selectedStudent.current
+        const current = selectFirstOnLoad.current ? undefined : preferred ?? selectedStudent.current
+        selectFirstOnLoad.current = false
         const linked = initialLink ? Number(params.get('personId')) || undefined : undefined
         const target = linked || result.list.find(row => row.personId === current)?.personId || result.list[0]?.personId
         if (!linked) {
@@ -435,7 +456,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         else { setRows([]); if (!keepDetail) setDetail(undefined); setError(errorText(cause)) }
       }
     } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
-  }, [keyword, loadDetail, params])
+  }, [keyword, loadDetail, params, servicePeriodTab, advancedFilter])
   const cancelPendingList = () => {
     ++searchIntent.current; ++listRun.current; listBusy.current = false; setLoading(false)
   }
@@ -451,10 +472,57 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     if (next === keyword) void loadPage(1)
     else setKeyword(next)
   }
+  const changeAdvancedFilter = async (next?: AdvancedFilterGroup) => {
+    if (servicePeriodBusy.current) return false
+    const intent = ++searchIntent.current
+    const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS) ?? !dialog
+    if (!allowed || intent !== searchIntent.current) return false
+    cancelPendingList()
+    firstListLoad.current = false
+    ++detailRun.current; setDetailLoading(false)
+    setRows([]); setPageNo(1); setHasMore(false); setLoading(true)
+    if (next === advancedFilter) void loadPage(1)
+    else setAdvancedFilter(next)
+    return true
+  }
+  const changeServicePeriodTab = async (next: string) => {
+    if (next === servicePeriodTab || servicePeriodBusy.current) return
+    const intent = ++searchIntent.current
+    const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS) ?? !dialog
+    if (!allowed || intent !== searchIntent.current) return
+    cancelPendingList()
+    firstListLoad.current = false
+    selectFirstOnLoad.current = true
+    ++detailRun.current
+    selectedStudent.current = undefined
+    setSelectedId(undefined); setDetail(undefined); setDetailLoading(false)
+    setRows([]); setPageNo(1); setHasMore(false); setLoading(true)
+    setServicePeriodTab(next)
+  }
+  const updateServicePeriod = async (checked: boolean) => {
+    if (!detail || servicePeriodBusy.current) return
+    const personId = detail.student.personId
+    servicePeriodBusy.current = true; setServicePeriodSaving(true)
+    try {
+      const saved = await api.mediaStudents.updateServicePeriod(personId, checked)
+      setDetail(current => current?.student.personId === personId
+        ? { ...current, student: { ...current.student, inServicePeriod: saved } } : current)
+      message.success('已更新服务期归类')
+      cancelPendingList()
+      if (servicePeriodTab === 'all') {
+        await loadPage(1, personId, false, true)
+      } else {
+        const index = rows.findIndex(row => row.personId === personId)
+        const next = rows[index + 1]?.personId
+        await loadPage(1, next)
+      }
+    } catch (cause) { message.error(errorText(cause)) }
+    finally { servicePeriodBusy.current = false; setServicePeriodSaving(false) }
+  }
   useEffect(() => {
     const initialLink = firstListLoad.current
     void loadPage(1, undefined, false, false, initialLink)
-  }, [keyword])
+  }, [keyword, servicePeriodTab, advancedFilter])
   useEffect(() => () => { ++listRun.current; ++detailRun.current }, [])
   useEffect(() => {
     if (location.key === initialLocationKey.current) return
@@ -1040,6 +1108,12 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       {summaryError && <Alert type="error" message={summaryError} action={selectedId ? <Button onClick={() => void loadDetail(selectedId, selectedServiceId, selectedAccountId)}>重试</Button> : undefined} />}
     </section>
     const statusContent = <div className="student-overview-base-status">
+      <div><Typography.Text type="secondary">是否在服务期</Typography.Text>
+        <Switch aria-label="是否在服务期" checked={detail?.student.inServicePeriod === true}
+          checkedChildren="是" unCheckedChildren="否" loading={servicePeriodSaving}
+          disabled={!detail?.canUpdateServicePeriod || !hasPermission(permissions, 'zsjos:media-student:update-service-period') || loading || Boolean(dialog)}
+          onChange={checked => void updateServicePeriod(checked)} />
+      </div>
       <div><Typography.Text type="secondary">服务状态</Typography.Text><Tag>{statusLabel(selectedService?.status)}</Tag></div>
       <div><Typography.Text type="secondary">兼职账号</Typography.Text>
         {invitationLoading ? <Skeleton.Input active size="small" />
@@ -1110,13 +1184,19 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   </div>
 
   return <section className="workspace-page media-students-page">
-    <header className="media-students-filter-shell"><Typography.Title level={4}>{hasPermission(permissions, 'zsjos:media-student:query-all') ? '学员管理' : '我的学员'}</Typography.Title><Tooltip title="刷新"><Button aria-label="刷新学员" icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
+    <header className="media-students-filter-shell"><Tabs className="media-students-service-period-tabs" activeKey={servicePeriodTab}
+      onChange={key => void changeServicePeriodTab(key)} items={[
+        { key: 'in', label: '服务期', disabled: servicePeriodSaving },
+        { key: 'out', label: '非服务期', disabled: servicePeriodSaving },
+        { key: 'all', label: '全部', disabled: servicePeriodSaving },
+      ]} /><Tooltip title="刷新"><Button aria-label="刷新学员" disabled={servicePeriodSaving} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
     <div className={`media-students-inbox-layout${listCollapsed ? ' is-list-collapsed' : ''}`}>
       <aside className="media-students-list-pane" aria-label="学员列表">
-        <div className="media-students-toolbar">
-          <Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip>
-          <div className="media-students-search" hidden={listCollapsed}><Input.Search ref={searchRef} allowClear value={search} onChange={e => { setSearch(e.target.value); if (!e.target.value) void searchStudents('') }} onSearch={value => void searchStudents(value)} placeholder="搜索姓名或手机号" /></div>
-          {listCollapsed && <Tooltip title={keyword ? '搜索学员（已筛选）' : '搜索学员'}><Button size="small" aria-label="搜索学员" type={keyword ? 'primary' : 'text'} icon={<SearchOutlined />} onClick={() => changeListCollapsed(false, true)} /></Tooltip>}
+        <div className="media-students-toolbar" style={{ paddingRight: listCollapsed ? 0 : listScrollbarWidth }}>
+          <AdvancedFilterToolbar scene="media_student" pageKey="media_students" placeholder="搜索姓名或手机号"
+            keyword={keyword} value={advancedFilter} onKeyword={value => void searchStudents(value)} onChange={changeAdvancedFilter}
+            collapsed={listCollapsed} disabled={servicePeriodSaving} inputRef={searchRef}
+            leading={<Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip>} />
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}

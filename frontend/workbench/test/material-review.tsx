@@ -49,7 +49,21 @@ http.defaults.adapter = async config => {
     if (body.id !== 'synthetic-process' || !body.reason.trim()) throw new Error('撤回参数无效')
     rows[1].currentVersion!.status = 'DRAFT'; rows[1].availableActions = ['UPDATE']
     document.documentElement.dataset.cancelled = 'true'; data = true
-  } else if (url.endsWith('/version/list')) {
+  } else if (url.includes('/bpm/process-instance/get-approval-detail')) {
+    data = {
+      status: 1,
+      activityNodes: [
+        { id: 'StartUserNode', name: '发起人', nodeType: 10, status: 2, tasks: [
+          { id: 't-start', assigneeUser: { id: 10, nickname: '测试作者' }, endTime: '2026-09-18T08:00:00Z' }] },
+        { id: 'Activity_0d6b214f', name: '爆款审核', nodeType: 11, status: 0, tasks: [
+          { id: 't-review', assigneeUser: { id: 12, nickname: '程伟' }, createTime: '2026-09-18T08:05:00Z' }] },
+        { id: 'EndEvent', name: '结束', nodeType: 99, status: -1, tasks: [] }
+      ],
+      todoTask: { id: 't-review', name: '爆款审核', status: 1, processInstanceId: 'synthetic-process' },
+      processInstance: { id: 'synthetic-process', name: '爆款账号拆解审核', status: 1, businessKey: 'material-version:11' }
+    }
+  } else if (url.includes('/bpm/comment/list-by-process-instance-id')) data = []
+  else if (url.endsWith('/version/list')) {
     const id = Number(url.split('/').at(-3)); data = [rows.find(row => row.id === id)!.currentVersion]
   } else if (/\/material\/\d+$/.test(url)) {
     const row = rows.find(item => item.id === Number(url.split('/').pop()))!
@@ -66,7 +80,9 @@ http.defaults.adapter = async config => {
   else throw new Error(`Unexpected mutation ${config.method} ${url}`)
   return { data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config }
 }
-const permissions = ['zsjos:material:update', 'zsjos:material:submit', ...(params.has('no-cancel') ? [] : ['bpm:process-instance:cancel'])]
+const permissions = ['zsjos:material:update', 'zsjos:material:submit',
+  ...(params.has('no-cancel') ? [] : ['bpm:process-instance:cancel']),
+  ...(params.has('bpm') ? ['bpm:process-instance:query'] : [])]
 createRoot(document.getElementById('root')!).render(<MemoryRouter initialEntries={['/?view=mine']}><App>
   <MaterialLibraryPage permissions={permissions} />
 </App></MemoryRouter>)

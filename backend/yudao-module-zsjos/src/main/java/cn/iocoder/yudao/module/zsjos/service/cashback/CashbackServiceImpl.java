@@ -59,6 +59,7 @@ public class CashbackServiceImpl implements CashbackService {
     static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService advancedFilterService;
     @Resource private CashbackMapper mapper;
+    @Resource private FinanceTraceService financeTraceService;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private PartnerMapper partnerMapper;
@@ -147,7 +148,11 @@ public class CashbackServiceImpl implements CashbackService {
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         PageResult<CashbackRespVO> result = BeanUtils.toBean(
-                (request.getAdvancedFilter() == null ? mapper.selectCashbackPage(request, beneficiaryUserId)
+                (request.getKeyword() != null && !request.getKeyword().isBlank()
+                ? mapper.selectCashbackPage(request, beneficiaryUserId,
+                    request.getAdvancedFilter() == null ? null : advancedFilterService.matchFinanceIds("cashback", request.getAdvancedFilter()),
+                    financeTraceService.matchCashbackNameIds(request.getKeyword().trim()))
+                : request.getAdvancedFilter() == null ? mapper.selectCashbackPage(request, beneficiaryUserId)
                 : mapper.selectCashbackPage(request, beneficiaryUserId, advancedFilterService.matchFinanceIds("cashback", request.getAdvancedFilter()))), CashbackRespVO.class);
         Set<Long> leadIds = new HashSet<>();
         result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
@@ -225,7 +230,7 @@ public class CashbackServiceImpl implements CashbackService {
             if (STATUS_WITHDRAWING.equals(cashback.getStatus()) || STATUS_WITHDRAWN.equals(cashback.getStatus())) {
                 throw exception(CASHBACK_ORDER_REJECTION_LOCKED);
             }
-            if (Set.of(STATUS_PENDING, STATUS_AVAILABLE).contains(cashback.getStatus())) {
+            if (Set.of(STATUS_PENDING, STATUS_AVAILABLE, STATUS_BLOCKED).contains(cashback.getStatus())) {
                 mapper.cancel(cashback.getId(), cashback.getVersion(), cashback.getStatus(), now, reason);
             }
         }

@@ -1,7 +1,7 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
 
-export type AdvancedFilterScene = 'lead' | 'order' | 'lead_appeal' | 'duplicate_review' | 'registration' | 'student' | 'subordinate_sales' | 'cashback' | 'withdrawal'
+export type AdvancedFilterScene = 'lead' | 'order' | 'lead_appeal' | 'duplicate_review' | 'registration' | 'student' | 'media_student' | 'subordinate_sales' | 'cashback' | 'withdrawal'
 export interface AdvancedFilterCondition { fieldKey: string; operator: string; startFieldKey?: string; endFieldKey?: string; unit?: 'minute' | 'hour' | 'day'; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
 export interface AdvancedFilterGroup { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
 export interface AdvancedFilterOption { value: string | number; label: string }

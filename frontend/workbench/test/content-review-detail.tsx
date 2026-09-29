@@ -37,9 +37,10 @@ const batch: ContentReviewBatch = {
     ] },
   ],
 }
+Object.assign(window, { reviewOpinionFixture: batch })
 const previous: ContentReviewBatch = { ...batch, id: 2, batchNo: 'CR-TEST-2', status: 'RESUBMITTED', currentStage: 'DONE',
   availableActions: [], currentTaskId: undefined, processInstanceId: 'process-2',
-  items: batch.items.map(item => ({ ...item, id: 20, contentSnapshot: { ...item.contentSnapshot,
+  items: batch.items.map(item => ({ ...item, id: 20, directorDecision: 'APPROVED', directorComment: '历史编导意见：调整开场\n保留主体内容', finalDecision: 'RETURNED', finalComment: '历史终审意见：补充来源', contentSnapshot: { ...item.contentSnapshot,
     topicSnapshot: '历史选题', deliverableUrl: 'https://example.com/finished', detailUrl: 'https://example.com/detail',
     leadResourceUrl: 'https://example.com/lead', referenceWorkUrl: 'https://example.com/reference' } })) }
 api.bpmApprovalDetail = async ({ processInstanceId }) => ({ processInstance: { id: processInstanceId, status: 2 }, activityNodes: [

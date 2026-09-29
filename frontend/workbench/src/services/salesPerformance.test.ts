@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest'
-import { periodRange,percent,money,normalizePerformanceDates } from './salesPerformance'
+import { periodRange,percent,money,normalizePerformanceDates,averageFormula,conversionRule,type Metric } from './salesPerformance'
 describe('performance periods',()=>{
  it('week crosses year and rolling seven includes today',()=>{const now=new Date(2026,0,1,12);expect(periodRange('week',now).start).toBe('2025-12-29');expect(periodRange('last7',now).start).toBe('2025-12-26')})
  it('calendar quarter begins on first day',()=>expect(periodRange('quarter',new Date(2026,8,22)).start).toBe('2026-07-01'))
@@ -29,5 +29,22 @@ describe('performance HTTP timestamps', () => {
  })
  it('rejects invalid timestamps before rendering', () => {
   expect(() => normalizePerformanceDates({start:NaN})).toThrow('业绩数据时间格式无效')
+ })
+})
+
+
+describe('performance calculation presentation',()=>{
+ it('uses eligible average inputs rather than unfiltered totals',()=>{
+  const metric={amount:100.01,orders:2,averageAmount:100,averageOrders:1,average:100} as Metric
+  expect(averageFormula(metric)).toContain('¥100.00 ÷ 1 笔 = ¥100.00')
+  expect(averageFormula(metric)).not.toContain('100.01')
+ })
+ it('distinguishes monthly validity from rolling receipt cohorts',()=>{
+  expect(conversionRule('last90')).toContain('不限60日')
+  expect(conversionRule('lastMonth')).toContain('往期接收60日内')
+ })
+ it('normalizes drilldown deadlines and comparison bounds',()=>{
+  const time=Date.parse('2026-09-28T01:00:00Z')
+  expect(normalizePerformanceDates({dueAt:time,receivedAt:time,previousStart:time,previousEnd:time})).toEqual({dueAt:'2026-09-28T09:00:00',receivedAt:'2026-09-28T09:00:00',previousStart:'2026-09-28T09:00:00',previousEnd:'2026-09-28T09:00:00'})
  })
 })

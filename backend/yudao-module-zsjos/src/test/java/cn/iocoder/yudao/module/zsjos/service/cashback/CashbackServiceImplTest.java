@@ -46,6 +46,22 @@ class CashbackServiceImplTest {
         ReflectionTestUtils.setField(service, "orderMapper", orderMapper); ReflectionTestUtils.setField(service, "configApi", configApi);
     }
 
+    @Test void repeatedGenerationDoesNotRestoreBlockedCashback() {
+        when(mapper.selectByBusinessKey("valid:1")).thenReturn(new CashbackDO().setId(99L).setStatus("blocked"));
+        assertEquals(99L, service.ensureValidCashback(1L));
+        verifyNoInteractions(leadMapper, partnerMapper, intendedMapper);
+        verify(mapper, never()).restoreValid(anyLong(), anyInt(), any(), any());
+    }
+
+    @Test void sourceCancellationAlsoCancelsBlockedDealCashback() {
+        TenantContextHolder.setTenantId(9L);
+        try {
+            when(mapper.selectByOrderIdForUpdate(4L,9L)).thenReturn(List.of(new CashbackDO().setId(99L).setType("deal").setStatus("blocked").setVersion(3)));
+            service.cancelDealCashbacks(4L,"订单取消");
+            verify(mapper).cancel(eq(99L),eq(3),eq("blocked"),any(),eq("订单取消"));
+        } finally { TenantContextHolder.clear(); }
+    }
+
     @Test void nonPartnerDoesNotGenerate() {
         when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType("new_media"));
         assertNull(service.ensureValidCashback(1L));

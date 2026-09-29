@@ -1,6 +1,10 @@
 -- UTF-8. Development bootstrap correction: exam product scope and Lead spec labels.
 -- Prerequisites: current core bootstrap through V188, including the two target tables.
--- Scope: nullable columns only on zsjos_exam_schedule and zsjos_lead_intended_product.
+-- Scope: nullable columns on zsjos_exam_schedule and zsjos_lead_intended_product.
+-- 2026-09-28 development correction: independent schedule_name; relax obsolete category NOT NULL.
+-- Existing rows and immutable notification snapshots are never backfilled.
+-- Run this file explicitly after V188 for existing development databases; fresh core contains these fields.
+-- This standalone correction does not write or reconcile either version ledger.
 -- No business rows, menus, roles or account permissions are inserted, deleted or updated.
 -- Repeatable: each column is guarded by information_schema. Existing history stays NULL.
 -- DDL commits implicitly. Recovery: retain additive columns and roll application code back;
@@ -14,6 +18,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V188')
      OR NOT EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V188') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Exam product scope requires core V188';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                 AND table_name='zsjos_exam_schedule' AND column_name='schedule_name') THEN
+    ALTER TABLE zsjos_exam_schedule ADD COLUMN schedule_name varchar(100) DEFAULT NULL COMMENT '手工填写的考期名称';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                 AND table_name='zsjos_exam_schedule' AND column_name IN ('category_id','category_name_snapshot','category_path_snapshot') AND is_nullable='NO') THEN
+    ALTER TABLE zsjos_exam_schedule
+      MODIFY category_id bigint DEFAULT NULL COMMENT '产品分类编号',
+      MODIFY category_name_snapshot varchar(100) DEFAULT NULL COMMENT '分类名称快照',
+      MODIFY category_path_snapshot json DEFAULT NULL COMMENT '分类路径快照';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                  AND table_name='zsjos_exam_schedule' AND column_name='product_id') THEN
@@ -38,6 +53,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                  AND table_name='zsjos_lead_intended_product' AND column_name='selected_specs_json') THEN
     ALTER TABLE zsjos_lead_intended_product ADD COLUMN selected_specs_json json DEFAULT NULL COMMENT 'SKU规格标签快照';
+  END IF;
+  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+        AND table_name='zsjos_exam_schedule' AND column_name IN ('schedule_name','category_id','category_name_snapshot','category_path_snapshot') AND is_nullable='YES') <> 4 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Exam free-form schema postcondition failed';
   END IF;
 END$$
 DELIMITER ;

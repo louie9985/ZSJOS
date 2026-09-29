@@ -48,8 +48,9 @@ describe('employee detail drawer breakpoints', () => {
         expectSourceToContainTokens(source, 'shouldOpenDetailDrawer')
         for (const line of openLines)
           expect(line, `${page}: ${line.trim()}`).toContain('shouldOpenDetailDrawer')
-        expect(source).toContain('message-inbox-detail-pane')
-        expect(source).toContain('message-inbox-table-drawer')
+        // 详情面板与抽屉已统一到共享骨架（与申诉/投诉/查重/BPM 一致）。
+        expect(source).toContain('business-inbox-detail-pane')
+        expect(source).toContain('business-inbox-mobile-drawer')
         expect(source).toContain('placement="right"')
         expectSourceNotToContainTokens(source, 'if (selected) setDrawerOpen(true)')
       } else if (page.includes('SalesOrderSupervisorInbox.tsx'))

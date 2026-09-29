@@ -35,6 +35,7 @@ class ExamScheduleServiceTest {
     @Mock private ZsjosProductCategoryMapper categoryMapper;
     @Mock private PermissionApi permissionApi;
     @Mock private ConfigApi configApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationSnapshotService notificationSnapshots;
     @Mock private cn.iocoder.yudao.module.zsjos.service.product.ProductCategoryLocks categoryLocks;
     @Mock private cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService productSkuService;
 
@@ -51,40 +52,25 @@ class ExamScheduleServiceTest {
         assertEquals("REVOKED", service.displayStatus(schedule, examDate, 3));
     }
 
-    @Test
-    void productScopeIsFrozenAtPublicationAndQueriesNeverResolveCurrentCatalog() {
+
+
+
+
+    @Test void revokePreviewKeepsFrozenContentAndRejectsDraft() {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        var spec = new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO("level", "考试等级", "2", "二级", false);
-        var sku = new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO.Sku(1L, "sku1", "二级班", java.util.Map.of("level", "2"), List.of(spec));
-        var scope = new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO(8L, "computer", "计算机考试", 2L,
-                List.of(new ZsjosProductCategoryPathNodeVO(2L, "考试")), List.of(), List.of(spec), List.of(sku));
-        when(productSkuService.resolveExamScope(8L, java.util.Map.of("level", "2"))).thenReturn(scope);
-        ExamScheduleSaveReqVO req = exactReq(); req.setCategoryId(null); req.setProductId(8L); req.setSelectedAttrs(java.util.Map.of("level", "2"));
-        service.create(req, 20L);
-        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
-        verify(mapper).insert(saved.capture());
-        assertNull(saved.getValue().getFrozenSkusJson());
-        saved.getValue().setId(9L);
-        when(mapper.selectForUpdate(9L)).thenReturn(saved.getValue());
-        service.publish(9L, 20L);
-        assertTrue(saved.getValue().getFrozenSkusJson().contains("sku1"));
-        clearInvocations(productSkuService);
-        var query = new ExamSchedulePageReqVO(); query.setPageNo(1); query.setPageSize(20);
-        when(mapper.selectExactList(query, true)).thenReturn(List.of(saved.getValue()));
-        var response = service.exactPage(query, 20L).getList().getFirst();
-        assertEquals("计算机考试，考试等级：二级", response.getScheduleName());
-        assertEquals(1, response.getFrozenSkus().size());
-        verifyNoInteractions(productSkuService);
-        assertEquals(1_900_018_005, assertThrows(ServiceException.class, () -> service.update(9L, req, 20L)).getCode());
+        var published = new ExamScheduleDO().setId(9L).setCalendarVersion(3).setRecordStatus("PUBLISHED")
+                .setFrozenSkusJson("[]").setProductNameSnapshot("历史产品");
+        when(mapper.selectById(9L)).thenReturn(published);
+        var preview = service.previewTransition(9L, "REVOKED", 20L);
+        assertEquals("REVOKED", preview.getRecordStatus()); assertEquals(4, preview.getCalendarVersion());
+        assertEquals("历史产品", preview.getProductNameSnapshot()); assertEquals("[]", preview.getFrozenSkusJson());
+        assertEquals("PUBLISHED", published.getRecordStatus());
+        published.setRecordStatus("DRAFT");
+        assertThrows(ServiceException.class, () -> service.previewTransition(9L, "REVOKED", 20L));
+        verifyNoInteractions(categoryLocks, productSkuService, notificationSnapshots);
     }
 
-    @Test void productOptionsRequireManageAndCategoryRejectsSkuConditions() {
-        assertThrows(ServiceException.class, () -> service.productOptions(20L));
-        verifyNoInteractions(productSkuService);
-        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        var req = exactReq(); req.setSelectedAttrs(java.util.Map.of("level", "2"));
-        assertEquals(1_900_018_009, assertThrows(ServiceException.class, () -> service.create(req, 20L)).getCode());
-    }
+
 
     @Test
     void configuredDaysFallsBackForMissingNegativeAndInvalidValues() {
@@ -96,38 +82,9 @@ class ExamScheduleServiceTest {
         assertEquals(3, service.configuredUpcomingDays());
     }
 
-    @Test void unchangedProductKeepsHistoricalPathAfterCatalogMove() {
-        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        var current = new ExamScheduleDO().setId(9L).setRecordStatus("DRAFT").setProductId(8L).setCategoryId(2L)
-                .setProductNameSnapshot("原产品").setCategoryNameSnapshot("原分类").setCategoryPathSnapshot("[]")
-                .setSelectedAttrsJson("{}").setSelectedSpecsJson("[]");
-        when(mapper.selectForUpdate(9L)).thenReturn(current);
-        var scope = new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO(8L, "p", "新名称", 3L,
-                List.of(new ZsjosProductCategoryPathNodeVO(3L, "新分类")), List.of(), List.of(), List.of());
-        when(productSkuService.resolveExamScope(8L, java.util.Map.of())).thenReturn(scope);
-        var req = exactReq(); req.setCategoryId(null); req.setProductId(8L); req.setSelectedAttrs(java.util.Map.of());
-        service.update(9L, req, 20L);
-        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
-        verify(mapper).update(saved.capture(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
-        assertEquals("原产品", saved.getValue().getProductNameSnapshot());
-        assertEquals("原分类", saved.getValue().getCategoryNameSnapshot());
-        assertEquals("[]", saved.getValue().getCategoryPathSnapshot());
-    }
 
-    @Test void removedConditionRequiresExplicitClearAndDoesNotWriteOnFailure() {
-        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        when(mapper.selectForUpdate(9L)).thenReturn(new ExamScheduleDO().setId(9L).setRecordStatus("DRAFT")
-                .setProductId(8L).setCategoryId(2L).setSelectedAttrsJson("{\"removed\":\"old\"}"));
-        var scope = new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO(8L, "p", "产品", 2L,
-                List.of(new ZsjosProductCategoryPathNodeVO(2L, "分类")), List.of(), List.of(), List.of());
-        when(productSkuService.resolveExamScope(8L, java.util.Map.of())).thenReturn(scope);
-        var req = exactReq(); req.setCategoryId(null); req.setProductId(8L); req.setSelectedAttrs(java.util.Map.of());
-        assertEquals(1_900_018_010, assertThrows(ServiceException.class, () -> service.update(9L, req, 20L)).getCode());
-        verify(mapper, never()).update(any(ExamScheduleDO.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
-        req.setClearedInvalidAttrs(java.util.Set.of("removed"));
-        service.update(9L, req, 20L);
-        verify(mapper).update(any(ExamScheduleDO.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
-    }
+
+
 
     @Test
     void createRequiresManagePermissionBeforeWriting() {
@@ -137,30 +94,10 @@ class ExamScheduleServiceTest {
         verify(mapper, never()).insert(any(ExamScheduleDO.class));
     }
 
-    @Test
-    void createExactSnapshotsEnabledCategoryPath() {
-        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        ZsjosProductCategoryDO root = category(1L, 0L, "教师资格", 0);
-        ZsjosProductCategoryDO leaf = category(2L, 1L, "笔试", 0);
-        when(categoryLocks.paths(List.of(2L))).thenReturn(java.util.Map.of(1L, root, 2L, leaf));
-        doAnswer(invocation -> { invocation.<ExamScheduleDO>getArgument(0).setId(9L); return 1; })
-                .when(mapper).insert(any(ExamScheduleDO.class));
 
-        assertEquals(9L, service.create(exactReq(), 20L));
-
-        ArgumentCaptor<ExamScheduleDO> captor = ArgumentCaptor.forClass(ExamScheduleDO.class);
-        verify(mapper).insert(captor.capture());
-        ExamScheduleDO saved = captor.getValue();
-        assertEquals("DRAFT", saved.getRecordStatus());
-        assertEquals("笔试", saved.getCategoryNameSnapshot());
-        assertNull(saved.getRoughStartDate());
-        List<ZsjosProductCategoryPathNodeVO> path = JsonUtils.parseArray(
-                saved.getCategoryPathSnapshot(), ZsjosProductCategoryPathNodeVO.class);
-        assertEquals(List.of(1L, 2L), path.stream().map(ZsjosProductCategoryPathNodeVO::id).toList());
-    }
 
     @Test
-    void rejectsDisabledCategoryAndInvalidDateShapes() {
+    void rejectsInvalidDateShapes() {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
         ExamScheduleSaveReqVO exact = exactReq();
         exact.setRoughStartDate(exact.getExactDate());
@@ -172,9 +109,7 @@ class ExamScheduleServiceTest {
         assertEquals(1_900_018_003, assertThrows(ServiceException.class,
                 () -> service.create(rough, 20L)).getCode());
 
-        when(categoryLocks.paths(List.of(2L))).thenReturn(java.util.Map.of(2L, category(2L, 0L, "停用分类", 1)));
-        assertEquals(1_900_018_004, assertThrows(ServiceException.class,
-                () -> service.create(exactReq(), 20L)).getCode());
+
     }
 
     @Test
@@ -194,15 +129,32 @@ class ExamScheduleServiceTest {
     @Test
     void publishAndRevokeEnforceLifecycle() {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        when(categoryLocks.paths(List.of(2L))).thenReturn(java.util.Map.of(2L, category(2L, 0L, "考试", 0)));
-        when(mapper.selectForUpdate(9L)).thenReturn(new ExamScheduleDO().setId(9L).setCategoryId(2L).setRecordStatus("DRAFT"),
-                new ExamScheduleDO().setId(9L).setRecordStatus("PUBLISHED"));
+        when(mapper.selectForUpdate(9L)).thenReturn(new ExamScheduleDO().setId(9L).setCategoryId(2L).setRecordStatus("DRAFT").setCalendarVersion(3),
+                new ExamScheduleDO().setId(9L).setRecordStatus("PUBLISHED").setCalendarVersion(4));
         service.publish(9L, 20L);
         service.revoke(9L, 20L);
         ArgumentCaptor<ExamScheduleDO> updates = ArgumentCaptor.forClass(ExamScheduleDO.class);
         verify(mapper, times(2)).updateById(updates.capture());
         assertEquals(List.of("PUBLISHED", "REVOKED"),
                 updates.getAllValues().stream().map(ExamScheduleDO::getRecordStatus).toList());
+        assertEquals(List.of(4, 5), updates.getAllValues().stream().map(ExamScheduleDO::getCalendarVersion).toList());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void draftVersionOnlyChangesWithNotificationContent(boolean changed) {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var req = exactReq();
+        var current = new ExamScheduleDO().setId(9L).setRecordStatus("DRAFT").setCalendarVersion(5)
+                .setScheduleType(req.getScheduleType()).setExactDate(req.getExactDate()).setRemark(req.getRemark())
+                .setScheduleName(req.getScheduleName());
+        when(mapper.selectForUpdate(9L)).thenReturn(current);
+        if (changed) req.setRemark("下午场");
+        service.update(9L, req, 20L);
+        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
+        verify(mapper).update(saved.capture(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        assertEquals(changed ? 6 : 5, saved.getValue().getCalendarVersion());
+        assertEquals(req.getScheduleName(), saved.getValue().getScheduleName());
     }
 
     @Test
@@ -223,17 +175,60 @@ class ExamScheduleServiceTest {
         verify(mapper, never()).updateById(any(ExamScheduleDO.class));
     }
 
+    @Test void createsAndPublishesWithoutCatalogAndKeepsManualName() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var req = exactReq(); req.setScheduleName("  自定义秋季场  ");
+        // Even obsolete client fields cannot reinstate a product association.
+        req.setProductId(8L); req.setCategoryId(2L);
+        service.create(req, 20L);
+        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
+        verify(mapper).insert(saved.capture());
+        var row = saved.getValue(); row.setId(9L);
+        assertEquals("自定义秋季场", row.getScheduleName()); assertNull(row.getProductId()); assertNull(row.getCategoryId());
+        when(mapper.selectForUpdate(9L)).thenReturn(row);
+        when(mapper.selectById(9L)).thenReturn(row);
+        var preview = service.previewTransition(9L, "PUBLISHED", 20L);
+        assertEquals("自定义秋季场", preview.getScheduleName()); assertEquals("DRAFT", row.getRecordStatus());
+        service.publish(9L, 20L);
+        assertEquals("PUBLISHED", row.getRecordStatus());
+        assertEquals("自定义秋季场", cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationSnapshotService.projectExam(row, "PUBLISHED").getTitleSnapshot());
+        verifyNoInteractions(categoryLocks, categoryMapper, productSkuService);
+    }
+
+    @Test void renamingIncrementsVersionAndClearsLegacyAssociation() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var req = exactReq();
+        var legacy = new ExamScheduleDO().setId(9L).setRecordStatus("DRAFT").setCalendarVersion(4)
+                .setProductId(8L).setProductNameSnapshot("历史名称").setSelectedSpecsJson("[]");
+        assertEquals("历史名称", ExamScheduleService.displayName(legacy));
+        when(mapper.selectForUpdate(9L)).thenReturn(legacy);
+        service.update(9L, req, 20L);
+        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
+        verify(mapper).update(saved.capture(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        assertEquals(5, saved.getValue().getCalendarVersion()); assertNull(saved.getValue().getProductId());
+        assertEquals("自由考期", saved.getValue().getScheduleName());
+        assertEquals("历史名称", legacy.getProductNameSnapshot());
+        verifyNoInteractions(categoryLocks, categoryMapper, productSkuService);
+    }
+
+    @Test void manualNamesAreRequiredAtHttpBoundary() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var req = exactReq(); req.setScheduleName("  ");
+            assertTrue(factory.getValidator().validate(req).stream().anyMatch(v -> v.getPropertyPath().toString().equals("scheduleName")));
+        }
+    }
+
     private static ExamScheduleSaveReqVO exactReq() {
         ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
         req.setScheduleType("EXACT"); req.setExactDate(LocalDate.of(2026, 10, 10));
-        req.setCategoryId(2L); req.setRemark("上午场");
+        req.setScheduleName("自由考期"); req.setRemark("上午场");
         return req;
     }
 
     private static ExamScheduleSaveReqVO roughReq() {
         ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
         req.setScheduleType("ROUGH"); req.setRoughStartDate(LocalDate.of(2026, 10, 1));
-        req.setRoughEndDate(LocalDate.of(2026, 10, 15)); req.setCategoryId(2L);
+        req.setRoughEndDate(LocalDate.of(2026, 10, 15)); req.setScheduleName("自由考期");
         return req;
     }
 

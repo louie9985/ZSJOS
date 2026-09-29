@@ -69,7 +69,8 @@ describe('business inbox alignment', () => {
     const appeals = readFileSync('src/pages/LeadAppealPage.tsx', 'utf8')
     const duplicateReviews = readFileSync('src/pages/LeadDuplicateReviewPage.tsx', 'utf8')
 
-    expectSourceToContainTokens(messageInbox, 'if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
+    // 消息中心的游标加载收进共享 hook，页面只保留哨兵接线与表格模式短路。
+    expectSourceToContainTokens(messageInbox, 'if (useTableLayout || !node || !feed.hasMore || feed.loading || feed.loadingMore) return')
     expectSourceToContainTokens(announcements, 'if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
     expectSourceToContainTokens(appeals, 'if (useTableLayout || !node || !hasMore || loading || loadingMore || !cursor) return')
     expect(duplicateReviews).toContain('loadedPageRef.current + 1')
@@ -98,23 +99,44 @@ describe('business inbox alignment', () => {
 
   it('contains long message content and aligns message metadata', () => {
     const messageInbox = readFileSync('src/pages/MessageInboxPage.tsx', 'utf8')
+    const feed = readFileSync('src/services/useNotifyMessageFeed.ts', 'utf8')
     const styles = readFileSync('src/styles/pages/message-inbox.css', 'utf8')
+    const sharedStyles = readFileSync('src/styles/components/business-inbox.css', 'utf8')
 
     expect(messageInbox).toContain('IntersectionObserver')
-    expect(messageInbox).toContain('buildNotifyMessageCursorParams')
+    // 游标参数构造与加载收在共享 hook，弹窗与列表页共用同一份。
+    expect(feed).toContain('buildNotifyMessageCursorParams')
     expect(messageInbox).toContain('api.myNotifyMessagePage')
     expect(messageInbox).toContain('pagination={{ current: tablePage')
-    expect(messageInbox).toContain('message-inbox-table-shell')
-    expect(messageInbox).toContain('message-inbox-table-drawer')
+    // 表格模式改为裸 BusinessTable：去掉仅用于撑高的包裹层后，共享层
+    // `.business-inbox-table-page > .business-inbox-table{flex:1}` 的直接子选择器才能生效。
+    expect(messageInbox).not.toContain('message-inbox-table-shell')
+    expect(messageInbox).toContain('business-inbox-mobile-drawer')
     expect(messageInbox).toContain('message-inbox-load-more')
     expect(messageInbox).toContain('BusinessTable')
     expect(messageInbox).toContain('columnsState')
 
     expect(styles).toMatch(/\.message-center-item \{[^}]*flex: none;/)
-    expect(styles).toMatch(/\.message-center-item-copy > \.message-center-item-summary \{[^}]*overflow-wrap: anywhere;[^}]*word-break: break-word;[^}]*-webkit-line-clamp: 2;/)
+    expect(styles).toMatch(/\.message-center-item-copy > \.message-center-item-summary \{[^}]*overflow-wrap: anywhere;[^}]*word-break: break-word;[^}]*line-clamp: 2;/)
     expect(styles).toMatch(/\.message-inbox-detail \.message-detail-section \.ant-typography \{[^}]*word-break: break-word;/)
-    expect(styles).toMatch(/\.message-inbox-table-shell \{/)
-    expect(styles).toMatch(/\.message-inbox-table \.ant-table-tbody > tr\.active > td \{/)
+    // 列表独立；统一底色的详情面板内部正文九列、状态三列。
+    expect(styles).toMatch(/\.message-detail-layout \{[^}]*grid-template-columns: repeat\(12, minmax\(0, 1fr\)\)/)
+    expect(styles).toMatch(/\.message-detail-layout > \.message-detail-main,[^}]*grid-column: span 9/)
+    expect(styles).toMatch(/\.message-detail-layout > \.message-detail-side \{[^}]*grid-column: span 3/)
+    expect(messageInbox).not.toContain('message-inbox-content-grid')
+    expect(sharedStyles).toMatch(/\.business-inbox-detail-pane \{[^}]*background:/)
+    expect(styles).not.toContain('--message-detail-side-w')
+    expect(styles).toContain('@container message-detail (width < 700px)')
+    const detail = readFileSync('src/components/MessageDetail.tsx', 'utf8')
+    expect(detail).not.toContain('DetailFieldGrid')
+    expect(detail).not.toContain('business-inbox-card message-detail-side')
+    expect(detail).toContain('<dl className="message-status-fields">')
+    expect(messageInbox).toContain('<main className="business-inbox-detail-pane"><MessageDetail {...detailProps} layout="pane"/></main>')
+    expect(detail).toContain("props.layout === 'pane' ? 'message-detail-pane-content' : 'message-detail-drawer-content'")
+    // 表格行状态已提升到共享层，与列表项的 .business-inbox-item 语义对齐。
+    expect(sharedStyles).toMatch(/\.business-inbox-table \.ant-table-tbody > tr\.active > td \{/)
+    expect(sharedStyles).toMatch(/\.business-inbox-table \.ant-table-tbody > tr\.unread > td \{/)
+    expect(sharedStyles).toMatch(/\.business-inbox-item\.unread \{/)
 
     // 「标签左、值右」与长值换行已提升为 DetailFieldGrid 的基础样式，
     // 此处的页面级覆盖随之删除（见 styles.guard.test.ts 的组件断言）。

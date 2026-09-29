@@ -30,10 +30,11 @@ import {
 import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import LeadDetail from "../components/LeadDetail";
 import { DICT_TYPE, LEAD_STATUS_LABELS } from "../constants";
-import { dictionaryDisplayLabel } from "../services/leadManagement";
+import { dictionaryDisplayLabel, leadSnapshotLabel, protocolDisplayLabel } from "../services/leadManagement";
 import { formatTimestamp } from "../services/time";
 import {
   formatCurrency,
+  subordinateTaskTypeLabel,
   appendSubordinateSalesRows,
   receiveStatusLabel,
   summarizeBatchResult,
@@ -354,7 +355,7 @@ function SalesDetail({
       title: "客资状态",
       dataIndex: "status",
       width: 110,
-      render: (value) => <Tag>{LEAD_STATUS_LABELS[value] || value}</Tag>,
+      render: (value) => <Tag>{value ? protocolDisplayLabel(LEAD_STATUS_LABELS, value, '未知状态') : '—'}</Tag>,
     },
     {
       title: "分配状态",
@@ -366,13 +367,13 @@ function SalesDetail({
       title: "分类",
       dataIndex: "leadCategory",
       width: 120,
-      render: (value) => value || "未配置",
+      render: (_, row) => leadSnapshotLabel(row.leadCategoryLabelSnapshot, row.leadCategory),
     },
     {
       title: "来源",
       dataIndex: "sourceChannel",
       width: 120,
-      render: (value) => value || "-",
+      render: (_, row) => leadSnapshotLabel(row.sourceChannelLabelSnapshot, row.sourceChannel),
     },
     {
       title: "提交时间",
@@ -387,7 +388,7 @@ function SalesDetail({
       dataIndex: "leadName",
       render: (value, row) => `${row.leadNo} · ${value || '未命名客资'}`,
     },
-    { title: "任务类型", dataIndex: "taskType", width: 180 },
+    { title: "任务类型", dataIndex: "taskType", width: 180, render: (_, row) => subordinateTaskTypeLabel(row.taskType) },
     {
       title: "截止时间",
       dataIndex: "dueAt",

@@ -32,6 +32,8 @@ import { NameAvatar } from '../components/LeadDetailOverview'
 import LeadDetail from '../components/LeadDetail'
 import {
   dictionaryDisplayLabel,
+  leadRelationTypesLabel,
+  leadSnapshotLabel,
   hasNextLeadInboxPage,
   isLeadInboxUnauthorized,
   mergeUniqueLeads,
@@ -39,7 +41,6 @@ import {
   prioritizeLeads,
   protocolDisplayLabel,
   resolveLeadSelection,
-  snapshotOrDictionaryDisplayLabel,
   tryStartLeadPageRequest
 } from '../services/leadManagement'
 import {
@@ -520,20 +521,20 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       { key: 'submittedName', title: '姓名', dataIndex: 'submittedName', width: 130 },
       { key: 'submittedMobile', title: '手机号', dataIndex: 'submittedMobile', width: 130, render: (_, item) => item.submittedMobile || '-' },
       { key: 'submittedWechatId', title: '微信号', dataIndex: 'submittedWechatId', width: 140, render: (_, item) => item.submittedWechatId || '-' },
-      { key: 'source', title: '来源', render: (_: unknown, item: ManagedLead) => item.sourceLabel || item.sourceType || '-' },
+      { key: 'source', title: '来源', render: (_: unknown, item: ManagedLead) => item.sourceLabel || (item.sourceType ? '来源名称未配置' : '—') },
       { key: 'sourceUser', title: '提交人', render: (_: unknown, item: ManagedLead) => item.sourceUserName || '-' },
       { key: 'owner', title: '负责人', render: (_: unknown, item: ManagedLead) => [item.ownerUserName, item.ownerIdentity ? item.ownerIdentityLabel : undefined].filter(Boolean).join(' · ') || '-' },
       { key: 'salesStage', title: '销售阶段', render: (_: unknown, item: ManagedLead) => item.salesStageLabelSnapshot || '未记录' },
-      { key: 'category', title: '分类', render: (_: unknown, item: ManagedLead) => snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError) },
-      { key: 'channel', title: '渠道', render: (_: unknown, item: ManagedLead) => channelLabel(item.sourceChannel) },
+      { key: 'category', title: '分类', render: (_: unknown, item: ManagedLead) => leadSnapshotLabel(item.leadCategoryLabelSnapshot, item.leadCategory) },
+      { key: 'channel', title: '渠道', render: (_: unknown, item: ManagedLead) => leadSnapshotLabel(item.sourceChannelLabelSnapshot, item.sourceChannel) },
       { key: 'region', title: '地区', render: (_: unknown, item: ManagedLead) => [item.provinceName, item.cityName].filter(Boolean).join(' / ') || '-' },
       { key: 'product', title: '意向产品', render: (_: unknown, item: ManagedLead) => productText(item) },
-      { key: 'qualificationStatus', title: '有效性状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, item.qualificationStatus, '未知') },
-      { key: 'followUpStatus', title: '跟进状态', render: (_: unknown, item: ManagedLead) => item.followUpStatus ? protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, item.followUpStatus, '未知') : '-' },
-      { key: 'operationalStatus', title: '运营状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_OPERATIONAL_STATUS_LABELS, item.operationalStatus, item.operationalStatus || '-') },
-      { key: 'handlingStage', title: '处理阶段', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_HANDLING_STAGE_LABELS, item.handlingStage, item.handlingStage || '-') },
-      { key: 'assignmentStatus', title: '分配状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, item.assignmentStatus, item.assignmentStatus || '-') },
-      { key: 'dispatchMode', title: '分配方式', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, item.dispatchMode, item.dispatchMode || '-') },
+      { key: 'qualificationStatus', title: '有效性状态', render: (_: unknown, item: ManagedLead) => item.qualificationStatus ? protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, item.qualificationStatus, '未知状态') : '—' },
+      { key: 'followUpStatus', title: '跟进状态', render: (_: unknown, item: ManagedLead) => item.followUpStatus ? protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, item.followUpStatus, '未知状态') : '—' },
+      { key: 'operationalStatus', title: '运营状态', render: (_: unknown, item: ManagedLead) => item.operationalStatus ? protocolDisplayLabel(LEAD_OPERATIONAL_STATUS_LABELS, item.operationalStatus, '未知状态') : '—' },
+      { key: 'handlingStage', title: '处理阶段', render: (_: unknown, item: ManagedLead) => item.handlingStage ? protocolDisplayLabel(LEAD_HANDLING_STAGE_LABELS, item.handlingStage, '未知阶段') : '—' },
+      { key: 'assignmentStatus', title: '分配状态', render: (_: unknown, item: ManagedLead) => item.assignmentStatus ? protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, item.assignmentStatus, '未知状态') : '—' },
+      { key: 'dispatchMode', title: '分配方式', render: (_: unknown, item: ManagedLead) => item.dispatchMode ? protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, item.dispatchMode, '未知方式') : '—' },
       { key: 'assignmentAttemptCount', title: '分配尝试次数', dataIndex: 'assignmentAttemptCount', render: (_, item) => item.assignmentAttemptCount ?? '-' },
       { key: 'publicPoolAt', title: '进入公海时间', dataIndex: 'publicPoolAt', width: 170, render: (_, item) => formatTimestamp(item.publicPoolAt) },
       { key: 'countedAt', title: '计入业绩时间', dataIndex: 'countedAt', width: 170, render: (_, item) => formatTimestamp(item.countedAt) },
@@ -545,12 +546,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       { key: 'qualifiedBy', title: '判定人', render: (_: unknown, item: ManagedLead) => item.qualifiedByUserName || '-' },
       { key: 'validDescription', title: '有效说明', dataIndex: 'validDescription', width: 220, ellipsis: true, render: (_, item) => item.validDescription || '-' },
       { key: 'salesOrderSubmittedAt', title: '订单提交时间', dataIndex: 'salesOrderSubmittedAt', width: 170, render: (_, item) => formatTimestamp(item.salesOrderSubmittedAt) },
-      { key: 'invalidReason', title: '无效原因', render: (_: unknown, item: ManagedLead) => item.invalidReasonLabelSnapshot || item.invalidReason || '-' },
+      { key: 'invalidReason', title: '无效原因', render: (_: unknown, item: ManagedLead) => leadSnapshotLabel(item.invalidReasonLabelSnapshot, item.invalidReason) },
       { key: 'invalidDescription', title: '无效说明', dataIndex: 'invalidDescription', width: 220, ellipsis: true, render: (_, item) => item.invalidDescription || '-' },
       { key: 'appealDeadlineAt', title: '申诉截止时间', dataIndex: 'appealDeadlineAt', width: 170, render: (_, item) => formatTimestamp(item.appealDeadlineAt) },
       { key: 'closedAt', title: '关闭时间', dataIndex: 'closedAt', width: 170, render: (_, item) => formatTimestamp(item.closedAt) },
       { key: 'closeReason', title: '关闭原因', dataIndex: 'closeReason', width: 220, ellipsis: true, render: (_, item) => item.closeReason || '-' },
-      { key: 'relationTypes', title: '当前关系', dataIndex: 'relationTypes', render: (_, item) => item.relationTypes?.join(' / ') || '-' },
+      { key: 'relationTypes', title: '当前关系', dataIndex: 'relationTypes', render: (_, item) => leadRelationTypesLabel(item.relationTypes) },
       { key: 'nextFollowUpAt', title: '下次跟进时间', dataIndex: 'nextFollowUpAt', width: 170, render: (_, item) => formatTimestamp(item.nextFollowUpAt) },
       { key: 'submittedAt', title: '提交时间', dataIndex: 'submittedAt', width: 170, render: (_, item) => formatTimestamp(item.submittedAt) },
       { key: 'lastActivityAt', title: '最近活动时间', dataIndex: 'lastActivityAt', width: 170, render: (_, item) => formatTimestamp(item.lastActivityAt) },
@@ -775,7 +776,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>
               </div>
-              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{item.salesStageLabelSnapshot || '未记录'} · {channelLabel(item.sourceChannel)} · {snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError)} · {formatTimestamp(item.submittedAt)}</span></div>
+              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{item.salesStageLabelSnapshot || '未记录'} · {channelLabel(item.sourceChannel)} · {leadSnapshotLabel(item.leadCategoryLabelSnapshot, item.leadCategory)} · {formatTimestamp(item.submittedAt)}</span></div>
             </button></Tooltip>
           })}
           {!initialLoading && items.length > 0 && <div ref={listSentinelRef} className="lead-list-sentinel">

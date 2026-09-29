@@ -1,6 +1,6 @@
 import ProductSpecs from '../components/ProductSpecs'
 import { ReloadOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Card, Cascader, Col, Descriptions, Form, Input, Radio, Row, Select, Space, Spin, Steps, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Cascader, Col, DatePicker, Descriptions, Form, Input, Radio, Row, Select, Space, Spin, Steps, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DICT_TYPE, LEAD_ASSIGNMENT_MODE, LEAD_ASSIGNMENT_OPTIONS, PHONE_PATTERN } from '../constants'
 import { api, type AreaNode, type LeadAttachment, type LeadCatalog, type LeadCreateResult } from '../services/api'
@@ -13,12 +13,16 @@ import EmployeeSelect from '../components/EmployeeSelect'
 import type { SalesUser } from '../services/api'
 import { createIdempotencyKey } from '../services/idempotency'
 
+import type { Dayjs } from 'dayjs'
+import { formatTimestamp } from '../services/time'
+
 const { Title, Text } = Typography
 type Option = { label: string; value: string }
 type FormValues = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
   sourceChannel: string; leadCategory: string; remark?: string; dispatchMode: 'auto' | 'specified'; specifiedSalesUserId?: number
   newMediaProviderUserId?: number
+  selfSourcedNextFollowUpAt?: Dayjs
 }
 type RemoteState = { loading: boolean; error?: string }
 type StepKey = 'info' | 'product' | 'confirm'
@@ -27,7 +31,7 @@ type StepKey = 'info' | 'product' | 'confirm'
 const STEP_FIELDS: Record<StepKey, Array<keyof FormValues>> = {
   info: ['name', 'mobile', 'wechatId', 'regionPath', 'sourceChannel', 'leadCategory', 'remark'],
   product: [],
-  confirm: ['dispatchMode', 'specifiedSalesUserId', 'newMediaProviderUserId']
+  confirm: ['dispatchMode', 'specifiedSalesUserId', 'newMediaProviderUserId', 'selfSourcedNextFollowUpAt']
 }
 
 /** 两种派单模式的后果说明，写在选项卡片里让提交人选之前就知道区别。 */
@@ -44,6 +48,13 @@ export default function LeadSubmissionPage({
   const [form] = Form.useForm<FormValues>()
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
+  const providerId = Form.useWatch('newMediaProviderUserId', form)
+  const nextFollowUpAt = Form.useWatch('selfSourcedNextFollowUpAt', form)
+  const automatic = selfSourced && !educationSelfSourced && providerId == null
+  useEffect(() => {
+    if (!automatic) form.setFieldValue('selfSourcedNextFollowUpAt', undefined)
+    form.setFields([{ name: 'remark', errors: [] }])
+  }, [automatic, form])
   const { message, modal } = App.useApp()
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [areaState, setAreaState] = useState<RemoteState>({ loading: true })
@@ -227,8 +238,10 @@ export default function LeadSubmissionPage({
     }
     if (result.outcome === 'created') {
       return modal.success({
-        title: '客资提交成功',
-        content: result.leadNo ? `客资编号 ${result.leadNo} 已创建，可在客资列表中查看跟进。` : '客资已创建，可在客资列表中查看跟进。',
+        title: result.automaticQualificationApplied && result.qualificationStatus === 'valid' ? '客资已判有效' : '客资提交成功',
+        content: result.automaticQualificationApplied && result.qualificationStatus === 'valid'
+          ? [result.leadNo ? '客资编号 ' + result.leadNo : '客资', '已生成首跟记录并判定有效，商机已创建。'].join(' ')
+          : result.leadNo ? `客资编号 ${result.leadNo} 已创建，可在客资列表中查看跟进。` : '客资已创建，可在客资列表中查看跟进。',
         okText: '知道了'
       })
     }
@@ -292,7 +305,8 @@ export default function LeadSubmissionPage({
           .map(file => ({ infraFileId: file.uploaded!.infraFileId })),
         dispatchMode: selfSourced ? 'auto' : values.dispatchMode,
         specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId,
-        newMediaProviderUserId: selfSourced ? values.newMediaProviderUserId : undefined, idempotencyKey
+        newMediaProviderUserId: selfSourced ? values.newMediaProviderUserId : undefined,
+        selfSourcedNextFollowUpAt: selfSourced && !educationSelfSourced && values.newMediaProviderUserId == null ? values.selfSourcedNextFollowUpAt?.valueOf() : undefined, idempotencyKey
       })
       showResult(result)
       resetAll(); setFiles([]); idempotencyKeyRef.current = undefined
@@ -322,7 +336,7 @@ export default function LeadSubmissionPage({
           title: step.title, description: step.description,
           status: invalidSteps.includes(step.key) && index !== current ? 'error' : undefined
         }))} />
-      <Form<FormValues> form={form} layout="vertical" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
+      <Form<FormValues> form={form} layout="vertical" onValuesChange={() => setPendingValues(undefined)} initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
         {/* 各步用 hidden 收起而不是卸载：保留已填值与校验状态，回退不丢数据。 */}
         <div className="lead-form-step" hidden={current !== 0}>
           <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
@@ -338,10 +352,14 @@ export default function LeadSubmissionPage({
               message={currentContactResult.error || (currentContactResult.matched ? '客资已存在，已激活提醒' : '未发现重复客资，可继续填写提交。')}
               action={currentContactResult.error && <Button onClick={() => void checkContact()}>重试</Button>} />}
           </Space>
+          {selfSourced && <><Title level={5}>客资提供方</Title><Row gutter={[24, 0]}>
+            <Col xs={24} md={12}><Form.Item name="newMediaProviderUserId" preserve={false} extra="选填；提交后不可补选或更改"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear placeholder="请选择新媒体提供方" notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></Col>
+          </Row></>}
+          {automatic && <Alert showIcon type="info" message="提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。" description="仅查重通过并新建客资时自动处理；激活已有客资或进入复核仍按原流程。" />}
           <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
             <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true, message: '请选择来源渠道' }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
-            <Col xs={24}><Form.Item name="remark" label="备注信息"><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="remark" label="备注信息" required={automatic} rules={[{ validator: (_, value) => !automatic || value?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写已联系客户及意向情况，作为首跟内容和判有效依据')) }]}><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
             <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" /></Form.Item></Col>
           </Row>
         </div>
@@ -370,9 +388,9 @@ export default function LeadSubmissionPage({
                 </div>)}
               </Radio.Group>
             </Form.Item></>}
-          {selfSourced && <><Title level={5}>客资提供方</Title><Row gutter={[24, 0]}>
-            <Col xs={24} md={12}><Form.Item name="newMediaProviderUserId" preserve={false} extra="选填；提交后不可补选或更改"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear placeholder="请选择新媒体提供方" notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></Col>
-          </Row></>}
+          {automatic && <Form.Item name="selfSourcedNextFollowUpAt" label="下次跟进时间" preserve={false} extra="选填，不填写则不安排后续提醒" rules={[{ validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
+            <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%', maxWidth: 360 }} />
+          </Form.Item>}
           <Title level={5}>信息确认</Title>
           <Descriptions className="lead-form-summary" column={{ xs: 1, md: 2 }} size="small" bordered
             items={[
@@ -398,6 +416,7 @@ export default function LeadSubmissionPage({
                   </Tag>)}</Space>
                   : '—'
               },
+              ...(automatic ? [{ key: 'automation', label: '提交处理', children: '查重通过并新建后：归属本人、自动首跟、判有效、生成商机' }, { key: 'reminder', label: '后续提醒', children: nextFollowUpAt ? formatTimestamp(nextFollowUpAt.valueOf()) : '不安排' }] : []),
               { key: 'files', label: '附件图片', children: files.length ? `${files.length} 张` : '未上传' },
               { key: 'remark', label: '备注信息', span: { xs: 1, md: 2 }, children: summary?.remark?.trim() || '—' }
             ]} />

@@ -1,7 +1,7 @@
 import ResourceLinkInput from './ResourceLinkInput'
 import ResourceLink from './ResourceLink'
 import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, Button, Collapse, Input, Select, Space, Spin, Typography, Upload } from 'antd'
+import { Alert, Button, Collapse, Input, Select, Space, Spin, Tag, Typography, Upload } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { materialApi, type Material, type MaterialFieldDefinition, type MaterialSaveRequest, type MaterialType } from '../services/materialApi'
 import { ClipboardUploadButtons } from './ClipboardPasteTarget'
@@ -81,14 +81,20 @@ export function hasMaterialDraftContent(value: unknown): boolean {
   return true
 }
 
-function dictionaryText(value: unknown, snapshot: unknown, options: DictOption[]) {
-  const snapshotValues = Array.isArray(snapshot) ? snapshot : snapshot == null ? [] : [snapshot]
-  const values = Array.isArray(value) ? value : value == null ? [] : [value]
-  return values.map((item, index) => {
-    const saved = snapshotValues[index]
-    if (saved && typeof saved === 'object' && 'label' in saved) return String((saved as { label: unknown }).label)
-    return options.find(option => option.value === String(item))?.label || String(item)
-  }).join('、') || '未填写'
+const materialTagColors = ['blue', 'cyan', 'purple', 'green', 'gold', 'magenta', 'geekblue'] as const
+
+function MaterialValueTags({ value, snapshot, dictionary }: { value: unknown; snapshot?: unknown; dictionary: boolean }) {
+  const values = Array.isArray(value) ? value : empty(value) ? [] : [value]
+  const snapshots = Array.isArray(snapshot) ? snapshot : snapshot == null ? [] : [snapshot]
+  if (!values.length) return <Typography.Text type="secondary">未填写</Typography.Text>
+  return <div className="material-value-tags">{values.map((item, index) => {
+    const saved = snapshots[index]
+    const label = dictionary
+      ? saved && typeof saved === 'object' && 'label' in saved && saved.label != null && String(saved.label).trim()
+        ? String(saved.label) : '历史标签未记录'
+      : String(item)
+    return <Tag key={index} color={materialTagColors[index % materialTagColors.length]}>{label}</Tag>
+  })}</div>
 }
 
 function validateField(field: MaterialFieldDefinition, value: unknown, required: boolean, path: string): string {
@@ -147,9 +153,9 @@ function FieldEditor({ field, value, dicts, onChange, readonly, snapshot }: {
   const label = <span>{field.label}{field.required && <Typography.Text type="danger"> *</Typography.Text>}</span>
   if (readonly) return <div className="viral-field-readonly"><Typography.Text type="secondary">{label}</Typography.Text>
     {field.type === 'https-link' && value ? <ResourceLink href={String(value)} variant="resource" />
-    : <Typography.Paragraph className="viral-field-value">{field.type === 'dict-single' || field.type === 'dict-multi'
-      ? dictionaryText(value, snapshot, dicts[field.dictType || ''] || [])
-      : Array.isArray(value) ? value.join('、') : String(value ?? '未填写')}</Typography.Paragraph>}</div>
+    : field.type === 'dict-single' || field.type === 'dict-multi' || field.key === 'account_id'
+      ? <MaterialValueTags value={value} snapshot={snapshot} dictionary={field.type !== 'text'} />
+      : <Typography.Paragraph className="viral-field-value">{Array.isArray(value) ? value.join('、') : String(value ?? '未填写')}</Typography.Paragraph>}</div>
   if (field.type === 'dict-single' || field.type === 'dict-multi') {
     return <label className="viral-field"><Typography.Text type="secondary">{label}</Typography.Text>
       <Select className="viral-field-control" mode={field.type === 'dict-multi' ? 'multiple' : undefined}

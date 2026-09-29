@@ -9,10 +9,15 @@ public class CashbackRespVO {
     private String beneficiaryName;
     private String partnerName;
     private FinanceSourceRespVO source;
+    private Integer version;
     private Long id;
     private String cashbackNo;
     private String type;
     private String status;
+    private String blockedFromStatus;
+    private String blockReason;
+    private Long blockedByUserId;
+    private LocalDateTime blockedAt;
     private Long beneficiaryUserId;
     private Long leadId;
     private String leadNo;

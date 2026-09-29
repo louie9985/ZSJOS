@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { noticeActions, noticeManagement, noticeRecipientTree, noticeView, type NoticeInput } from './noticeManagement'
+import { noticeActions, noticeManagement, noticeReadStatistics, noticeRecipientTree, noticeView, type NoticeInput } from './noticeManagement'
 import { http } from './api'
 
 vi.mock('./api', () => ({
@@ -35,6 +35,14 @@ describe('announcement authorization and lifecycle', () => {
 })
 describe('management API contract', () => {
   beforeEach(() => { vi.clearAllMocks(); for (const method of [http.get, http.post, http.put, http.delete]) vi.mocked(method).mockResolvedValue({ data: true }) })
+  it('queries reading summary and paged people without changing read status', async () => {
+    await noticeReadStatistics.summary(7)
+    const query = { id: 7, scope: 'EXTRA' as const, pageNo: 2, pageSize: 20, name: '测试', deptId: 10 }
+    await noticeReadStatistics.page(query)
+    expect(http.get).toHaveBeenCalledWith('/system/notice/read-summary', { params: { id: 7 } })
+    expect(http.get).toHaveBeenCalledWith('/system/notice/read-page', { params: query })
+    expect(http.put).not.toHaveBeenCalled(); expect(http.post).not.toHaveBeenCalled()
+  })
   it('fetches management details without writing read records', async () => {
     await noticeManagement.get(7)
     expect(http.get).toHaveBeenCalledWith('/system/notice/get', { params: { id: 7 } })

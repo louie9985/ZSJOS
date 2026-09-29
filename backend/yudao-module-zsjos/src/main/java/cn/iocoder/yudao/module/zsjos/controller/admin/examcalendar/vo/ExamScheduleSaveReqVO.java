@@ -9,6 +9,7 @@ import java.time.LocalDate;
 
 @Data
 public class ExamScheduleSaveReqVO {
+    @NotBlank @Size(max = 100) private String scheduleName;
     @NotBlank @Size(max = 16) private String scheduleType;
     private LocalDate exactDate;
     private LocalDate roughStartDate;

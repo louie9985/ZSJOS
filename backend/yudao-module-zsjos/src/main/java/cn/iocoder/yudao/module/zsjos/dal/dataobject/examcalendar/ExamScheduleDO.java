@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 public class ExamScheduleDO extends TenantBaseDO {
     @TableId private Long id;
     private String scheduleType;
+    private String scheduleName;
     private LocalDate exactDate;
     private LocalDate roughStartDate;
     private LocalDate roughEndDate;
@@ -31,4 +32,5 @@ public class ExamScheduleDO extends TenantBaseDO {
     private String recordStatus;
     private String remark;
     private LocalDateTime publishedAt;
+    private Integer calendarVersion;
 }

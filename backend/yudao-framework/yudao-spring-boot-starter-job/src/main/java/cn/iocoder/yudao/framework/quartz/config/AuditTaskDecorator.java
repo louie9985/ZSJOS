@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditContextHolder;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditRunner;
+import cn.iocoder.yudao.framework.audit.SelfAuditingRunnable;
 import org.springframework.core.task.TaskDecorator;
 import java.util.List;
 
@@ -11,6 +12,9 @@ final class AuditTaskDecorator implements TaskDecorator {
     private final List<ExecutionAuditHook> hooks;
     AuditTaskDecorator(List<ExecutionAuditHook> hooks) { this.hooks = hooks; }
     @Override public Runnable decorate(Runnable task) {
+        if (task instanceof SelfAuditingRunnable) {
+            return task;
+        }
         ExecutionAuditContext parent = ExecutionAuditContextHolder.capture();
         return () -> {
             ExecutionAuditContext c = parent == null ? new ExecutionAuditContext("ASYNC", task.getClass().getName(), null, null, null, null, null, null)

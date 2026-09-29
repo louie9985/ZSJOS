@@ -112,8 +112,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [qualificationConfirmOpen, setQualificationConfirmOpen] = useState(false)
   const [qualificationCandidatesLoading, setQualificationCandidatesLoading] = useState(false)
   const { submitting: dispositionSaving, run: runDisposition, resetIntent: resetDispositionIntent } = useSubmissionGuard()
-  const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
-  const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
+  const closeInvalid = () => { setInvalidOpen(false) }
   const closeValid = () => { setValidOpen(false) }
   const projectedActions = lead.availableActions || []
   const actions = readOnly ? new Map<string, NonNullable<ManagedLead['availableActions']>[number]>()
@@ -154,19 +153,14 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     if (!invalidRemarkTemplates.length && !invalidRemarkTemplateLoading) void loadInvalidRemarkTemplates()
   }
   const judgeInvalid = async () => {
-    setInvalidConfirmOpen(false)
     const reasonCode = invalidReason
-    if (!reasonCode || !invalidDescription.trim()) return
+    if (!reasonCode || !invalidDescription.trim()) { message.warning('请选择无效原因并填写备注'); return }
     await runQualification(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
       if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
       await api.judgeLeadInvalid(lead.id, { reasonCode, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
       complete(); message.success('已判定为无效客资'); setInvalidOpen(false); setInvalidReason(undefined); setInvalidDescription(''); setInvalidEvidence([]); onChanged()
     }).catch(error => message.error(error instanceof Error ? error.message : '无效判定失败'))
-  }
-  const prepareJudgeInvalid = () => {
-    if (!invalidReason || !invalidDescription.trim()) { message.warning('请选择无效原因并填写备注'); return }
-    setInvalidConfirmOpen(true)
   }
 
   useEffect(() => {
@@ -329,7 +323,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     {contextHeader}
     <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => { setInternalActiveTab(key); onTabChange?.(key) }} items={tabItems}/>
     {!readOnly && <>
-      <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>
+      <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={() => void judgeInvalid()}>确认判无效</Button></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {invalidReasonError && <Alert type="error" showIcon message={invalidReasonError} action={<Button size="small" onClick={() => void loadInvalidReasons()}>重试</Button>}/>} 
           <Form.Item label="无效原因" required style={{ marginBottom: 0, width: '100%' }}><Select loading={invalidReasonLoading} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} value={invalidReason} onChange={setInvalidReason} placeholder={invalidReasonLoading ? '正在加载无效原因' : invalidReasons.length ? '选择无效原因' : '暂无可用无效原因'} options={invalidReasons.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/></Form.Item>

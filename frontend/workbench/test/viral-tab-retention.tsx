@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { App, Button, Space } from 'antd'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { APP_ROUTES } from '../src/constants'
-import { RETAINED_PAGE_PATHS } from '../src/retainedPagePaths'
+import { getRetainedPageMenus } from '../src/retainedPagePaths'
 import { http, type WorkbenchMenu } from '../src/services/api'
 import { materialApi } from '../src/services/materialApi'
 import TabBar, { type TabItem } from '../src/components/TabBar'
@@ -19,6 +19,7 @@ const menus = ['/home', ...paths, APP_ROUTES.CONTENT_REVIEW, APP_ROUTES.MEDIA_ST
   id: index + 1, path, name: ['首页', '账号拆解', '内容拆解', '内容审核', '媒体学员'][index],
   parentId: 0, hidden: false, noCache: false, alwaysShow: false, children: []
 })) as WorkbenchMenu[]
+const retainedPaths = getRetainedPageMenus(menus, new Set(menus.filter(menu => menu.path !== '/home').map(menu => menu.path))).map(menu => menu.path)
 const fields = (index: number) => [
   { key: index ? 'work_title' : 'account_name', label: '验收标题', type: 'text', section: 'ACCOUNT_DETAIL' },
   { key: 'rows', label: '重复记录', type: 'repeat-group', section: 'DIRECTOR_ANALYSIS', initialCount: 1,
@@ -76,9 +77,9 @@ function Fixture() {
       <Button onClick={() => setIdentity(value => value + 1)}>更换身份</Button>
       <Button onClick={() => setAllowed(value => !value)}>切换授权</Button>
     </Space>
-    <TabBar tabs={tabs} setTabs={setTabs} currentMenu={currentMenu} />
+    <TabBar tabs={tabs} setTabs={setTabs} currentMenu={currentMenu} retainedPaths={retainedPaths} />
     <div style={{ height: 'calc(100vh - 130px)' }}>
-      {allowed && RETAINED_PAGE_PATHS.map(path => (location.pathname === path || tabs.some(tab => tab.key === path)) &&
+      {allowed && retainedPaths.map(path => (location.pathname === path || tabs.some(tab => tab.key === path)) &&
         <RetainedReviewRoute key={`${path}:${identity}`} active={location.pathname === path}>
           {path === paths[0] ? <ViralAccountDecomposePage /> : path === paths[1] ? <ViralContentDecomposePage /> : <input aria-label={path} defaultValue="旧保留页状态" />}
         </RetainedReviewRoute>)}

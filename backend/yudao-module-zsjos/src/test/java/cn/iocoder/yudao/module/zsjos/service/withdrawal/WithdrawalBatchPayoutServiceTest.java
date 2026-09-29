@@ -51,7 +51,7 @@ class WithdrawalBatchPayoutServiceTest {
         jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:payout" + UUID.randomUUID(), "sa", ""));
         // Keep the in-memory database alive across the connections used by the real Spring transaction proxies.
         jdbc.execute("SET DB_CLOSE_DELAY -1");
-        jdbc.execute("CREATE TABLE withdrawal(id BIGINT PRIMARY KEY, tenant_id BIGINT, status VARCHAR(30), paid_at TIMESTAMP, remark VARCHAR(500), operator_id BIGINT)");
+        jdbc.execute("CREATE TABLE withdrawal(id BIGINT PRIMARY KEY, tenant_id BIGINT, status VARCHAR(30), paid_at TIMESTAMP, remark VARCHAR(500), operator_id BIGINT, version INT NOT NULL DEFAULT 0)");
         jdbc.execute("CREATE TABLE cashback(id BIGINT PRIMARY KEY, tenant_id BIGINT, status VARCHAR(30))");
         jdbc.execute("CREATE TABLE audit(id BIGINT)");
         jdbc.execute("CREATE TABLE outbox(id BIGINT)");
@@ -62,8 +62,8 @@ class WithdrawalBatchPayoutServiceTest {
         when(mapper.selectByIdForUpdate(anyLong(), anyLong())).thenAnswer(call -> read(call.getArgument(0), call.getArgument(1)));
         when(mapper.updateById(any(WithdrawalDO.class))).thenAnswer(call -> {
             WithdrawalDO row = call.getArgument(0);
-            return jdbc.update("UPDATE withdrawal SET status=?,paid_at=?,remark=?,operator_id=? WHERE id=? AND tenant_id=?",
-                    row.getStatus(), row.getPaidAt(), row.getPayoutRemark(), row.getPaidByUserId(), row.getId(), TenantContextHolder.getRequiredTenantId());
+            return jdbc.update("UPDATE withdrawal SET status=?,paid_at=?,remark=?,operator_id=?,version=? WHERE id=? AND tenant_id=?",
+                    row.getStatus(), row.getPaidAt(), row.getPayoutRemark(), row.getPaidByUserId(), row.getVersion(), row.getId(), TenantContextHolder.getRequiredTenantId());
         });
         var items = mock(WithdrawalItemMapper.class);
         when(items.selectByWithdrawalId(anyLong())).thenAnswer(call -> List.of(new WithdrawalItemDO().setCashbackId(call.getArgument(0))));
@@ -196,7 +196,7 @@ class WithdrawalBatchPayoutServiceTest {
     private WithdrawalDO read(Long id, Long tenantId) {
         var rows = jdbc.query("SELECT * FROM withdrawal WHERE id=? AND tenant_id=? FOR UPDATE", (rs, i) ->
                 new WithdrawalDO().setId(rs.getLong("id")).setStatus(rs.getString("status"))
-                        .setWithdrawalNo("TEST-" + id).setApplicationAmount(BigDecimal.TEN), id, tenantId);
+                        .setVersion(rs.getInt("version")).setWithdrawalNo("TEST-" + id).setApplicationAmount(BigDecimal.TEN), id, tenantId);
         return rows.isEmpty() ? null : rows.getFirst();
     }
     private int count(String table, String condition) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE " + condition, Integer.class); }

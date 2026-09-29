@@ -8,7 +8,7 @@ import static cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilte
 final class AdvancedFilterFieldCatalog {
     private AdvancedFilterFieldCatalog() {}
 
-    static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales", "cashback", "withdrawal");
+    static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "media_student", "subordinate_sales", "cashback", "withdrawal");
 
     static Map<String, Field> fields() {
         Map<String, Field> result = new LinkedHashMap<>();
@@ -20,6 +20,7 @@ final class AdvancedFilterFieldCatalog {
         DuplicateReviewFilterFields.register(result);
         RegistrationFilterFields.register(result);
         StudentFilterFields.register(result);
+        MediaStudentFilterFields.register(result);
         SubordinateSalesFilterFields.register(result);
         CashbackFilterFields.register(result);
         WithdrawalFilterFields.register(result);

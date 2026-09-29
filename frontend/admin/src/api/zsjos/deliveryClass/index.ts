@@ -99,27 +99,27 @@ export const getDeliveryClassOptions = (categoryId?: number, includePending = tr
   })
 export const getHomeroomCandidates = () =>
   request.get<HomeroomCandidate[]>({ url: '/zsjos/delivery-class/homeroom-candidates' })
-export const getExamOptions = (categoryId: number, productId?: number, selectedAttrsJson?: string, selectedSkuIds?: number[]) =>
+export const getExamOptions = (categoryId?: number, productId?: number, selectedAttrsJson?: string, selectedSkuIds?: number[]) =>
   request.get<ExamOption[]>({ url: '/zsjos/delivery-class/exam-options', params: { categoryId, productId, selectedAttrsJson, selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })
 export const getProductOptions = () =>
   request.get<ProductOption[]>({ url: '/zsjos/delivery-class/product-options' })
 export const createDeliveryClass = (data: {
-  className?: string
-  productId: number
+  className: string
+  productId?: number
   selectedAttrs?: Record<string, string>
   selectedSkuIds?: number[]
-  categoryId: number
+  categoryId?: number
   examScheduleId: number
   homeroomUserId: number
 }) => request.post<number>({ url: '/zsjos/delivery-class/create', data })
 export const updateDeliveryClass = (
   id: number,
   data: {
-    className?: string
-    productId: number
+    className: string
+    productId?: number
     selectedAttrs?: Record<string, string>
     selectedSkuIds?: number[]
-    categoryId: number
+    categoryId?: number
     examScheduleId: number
     homeroomUserId: number
     version: number

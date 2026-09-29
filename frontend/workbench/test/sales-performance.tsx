@@ -8,6 +8,8 @@ import SalesPerformancePage from '../src/pages/SalesPerformancePage'
 import SalesPerformanceTargetPage from '../src/pages/SalesPerformanceTargetPage'
 // Opt-in transport fixture matching the server's numeric LocalDateTime JSON shape.
 import { http } from '../src/services/api'
+import { installPerformanceReview } from './sales-performance-review'
+if(new URLSearchParams(location.search).has('review')) installPerformanceReview()
 if (new URLSearchParams(location.search).has('timestamps')) {
  const start = Date.parse('2026-08-31T16:00:00Z'), end = Date.parse('2026-09-22T16:00:00Z')
  const metric = {key:'month',label:'本月',start,end,amount:1000,orders:1,converted:1,denominator:2,rate:0.5,average:1000}
@@ -24,5 +26,5 @@ if (new URLSearchParams(location.search).has('timestamps')) {
   return {data:{code:0,data},status:200,statusText:'OK',headers:{},config}
  }
 }
-const permissions=['zsjos:sales-performance:query','zsjos:sales-performance:self','zsjos:sales-performance:department','zsjos:sales-performance:center','zsjos:sales-performance:detail','zsjos:sales-performance-target:query','zsjos:sales-performance-target:update','zsjos:sales-performance-target:configure']
+const permissions=['zsjos:sales-performance:query','zsjos:sales-performance:self','zsjos:sales-performance:department','zsjos:sales-performance:center','zsjos:sales-performance:detail','zsjos:sales-performance-target:query','zsjos:sales-performance-target:update','zsjos:sales-performance-target:configure','zsjos:lead:query'].filter(p=>!new URLSearchParams(location.search).has('noDetail')||!['zsjos:sales-performance:detail','zsjos:lead:query'].includes(p))
 createRoot(document.getElementById('root')!).render(<BrowserRouter><ThemeProvider><App>{location.search.includes('target')?<SalesPerformanceTargetPage permissions={permissions}/>:<SalesPerformancePage permissions={permissions}/>}</App></ThemeProvider></BrowserRouter>)

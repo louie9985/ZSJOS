@@ -22,6 +22,44 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 @ExtendWith(MockitoExtension.class)
 class NotifyBusinessEventApiImplTest {
 
+    @Test void durablePublishReportsConfiguredRulesWithoutSynchronousDelivery() {
+        var inApp = NotifyRuleDO.builder().id(1L).channelCode("in_app").build();
+        var wecom = NotifyRuleDO.builder().id(2L).channelCode("wecom").build();
+        var sms = NotifyRuleDO.builder().id(3L).channelCode("sms").build();
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of(inApp, wecom, sms));
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").sourceEventKey("durable")
+                .recipientMode("FIXED").fixedRecipients(java.util.List.of(cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO.admin(7L))).build();
+        assertEquals(2, api.publishDurable(event));
+        var captured = org.mockito.ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(outboxService).enqueue(captured.capture(), org.mockito.ArgumentMatchers.eq(java.util.List.of(inApp, wecom)));
+        assertEquals(event.getFixedRecipients(), captured.getValue().getFixedRecipients());
+        org.mockito.Mockito.verifyNoInteractions(eventProcessor, applicationEventPublisher);
+    }
+
+    @Test void durablePublishWithoutRulesReturnsZero() {
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of());
+        assertEquals(0, api.publishDurable(NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").build()));
+        org.mockito.Mockito.verifyNoInteractions(outboxService, eventProcessor, applicationEventPublisher);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void fixedRecipientsSurviveNormalizationAndRuleCopy(boolean confirmed) {
+        var rule = NotifyRuleDO.builder().id(21L).sceneCode("test.scene").channelCode("wecom").build();
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(java.util.List.of(rule));
+        var recipients = java.util.List.of(
+                cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO.admin(7L),
+                cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO.partner(7L));
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").sourceEventKey("fixed")
+                .recipientMode("FIXED").fixedRecipients(recipients).build();
+        if (confirmed) api.publishConfirmed(event); else api.publish(event);
+        var captured = org.mockito.ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(outboxService).enqueue(captured.capture(), org.mockito.ArgumentMatchers.eq(java.util.List.of(rule)));
+        assertEquals("FIXED", captured.getValue().getRecipientMode());
+        assertEquals(recipients, captured.getValue().getFixedRecipients());
+        if (confirmed) assertEquals(21L, captured.getValue().getTargetRuleId());
+    }
+
     @InjectMocks
     private NotifyBusinessEventApiImpl api;
     @Mock

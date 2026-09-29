@@ -5139,6 +5139,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_refund` (
 CREATE TABLE IF NOT EXISTS `zsjos_person` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'Person 编号',
   `person_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Person 业务编号',
+  `in_service_period` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否在服务期（学员列表人工归类）',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名',
   `mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '手机号（脱敏展示）',
   `wechat_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '微信号（脱敏展示）',
@@ -5308,20 +5309,22 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_category` (
 
 -- zsjos_exam_schedule
 CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
+  `calendar_version` int NOT NULL DEFAULT 1 COMMENT '通知内容版本',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '考期安排编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
+  `schedule_name` varchar(100) DEFAULT NULL COMMENT '手工填写的考期名称',
   `schedule_type` varchar(16) NOT NULL COMMENT '时间类型：EXACT/ROUGH',
   `exact_date` date DEFAULT NULL COMMENT '精确考试日期',
   `rough_start_date` date DEFAULT NULL COMMENT '粗略开始日期',
   `rough_end_date` date DEFAULT NULL COMMENT '粗略结束日期',
-  `category_id` bigint NOT NULL COMMENT '产品分类编号',
+  `category_id` bigint DEFAULT NULL COMMENT '产品分类编号',
   `product_id` bigint DEFAULT NULL COMMENT '考期产品编号，空表示分类范围',
   `product_name_snapshot` varchar(255) DEFAULT NULL COMMENT '产品名称快照',
   `selected_attrs_json` json DEFAULT NULL COMMENT '已选规格条件',
   `selected_specs_json` json DEFAULT NULL COMMENT '已选规格字段和值标签快照',
   `frozen_skus_json` json DEFAULT NULL COMMENT '发布时适用SKU快照',
-  `category_name_snapshot` varchar(100) NOT NULL COMMENT '分类名称快照',
-  `category_path_snapshot` json NOT NULL COMMENT '分类路径快照',
+  `category_name_snapshot` varchar(100) DEFAULT NULL COMMENT '分类名称快照',
+  `category_path_snapshot` json DEFAULT NULL COMMENT '分类路径快照',
   `record_status` varchar(16) NOT NULL DEFAULT 'DRAFT' COMMENT '记录状态',
   `remark` varchar(1000) DEFAULT NULL COMMENT '备注',
   `published_at` datetime DEFAULT NULL COMMENT '发布时间',
@@ -5786,6 +5789,10 @@ CREATE TABLE `zsjos_cashback` (
   `rule_snapshot_json` varchar(2000) NOT NULL, `base_amount` decimal(12,2) DEFAULT NULL, `rate_snapshot` decimal(8,4) DEFAULT NULL, `amount` decimal(12,2) NOT NULL,
   `observation_days_snapshot` int NOT NULL, `generated_at` datetime NOT NULL, `available_at` datetime NOT NULL, `settled_at` datetime DEFAULT NULL,
   `cancelled_at` datetime DEFAULT NULL, `cancel_reason` varchar(500) DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+  `blocked_from_status` varchar(32) DEFAULT NULL,
+  `block_reason` varchar(500) DEFAULT NULL,
+  `blocked_by_user_id` bigint DEFAULT NULL,
+  `blocked_at` datetime DEFAULT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_cashback_no` (`tenant_id`,`cashback_no`), UNIQUE KEY `uk_tenant_business_key` (`tenant_id`,`business_key`),
@@ -7562,6 +7569,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_personal_calendar_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='个人日程';
 
 CREATE TABLE IF NOT EXISTS `zsjos_course_calendar_event` (
+  `calendar_version` int NOT NULL DEFAULT 1 COMMENT '通知内容版本',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '课程安排编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
   `course_name` varchar(200) NOT NULL COMMENT '课程名称',
@@ -7826,3 +7834,136 @@ CREATE TABLE IF NOT EXISTS zsjos_data_repair_marker (
  applied_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  PRIMARY KEY(id), UNIQUE KEY uk_repair_marker(repair_key,table_name,column_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 一次性数据修正执行标记';
+
+-- ZSJOS calendar notification baseline objects.
+SET NAMES utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_batch` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `calendar_type` varchar(16) NOT NULL,
+  `calendar_id` bigint NOT NULL,
+  `calendar_version` int NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `scope` varchar(16) NOT NULL,
+  `title_snapshot` text NOT NULL,
+  `time_snapshot` varchar(256) DEFAULT NULL,
+  `remark_snapshot` varchar(2000) DEFAULT NULL,
+  `source_event_key` varchar(128) NOT NULL,
+  `resend` bit(1) NOT NULL DEFAULT b'0',
+  `status` varchar(16) NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `snapshot_id` bigint DEFAULT NULL,
+  `operator_user_id` bigint DEFAULT NULL,
+  `idempotency_key` varchar(128) DEFAULT NULL,
+  `request_hash` char(64) DEFAULT NULL,
+  `requested_count` int NOT NULL DEFAULT 0,
+  `accepted_count` int NOT NULL DEFAULT 0,
+  `skipped_count` int NOT NULL DEFAULT 0,
+  UNIQUE KEY `uk_calendar_request` (`tenant_id`,`idempotency_key`),
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_calendar_notify_event` (`tenant_id`,`source_event_key`),
+  KEY `idx_calendar_notify_business` (`tenant_id`,`calendar_type`,`calendar_id`,`calendar_version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ZSJOS日历通知批次';
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_recipient` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0, `batch_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL, `user_type` int NOT NULL DEFAULT 2,
+  `nickname_snapshot` varchar(128) DEFAULT NULL, `status` varchar(16) NOT NULL DEFAULT 'PENDING',
+  `skip_reason` varchar(128) DEFAULT NULL, `message_id` bigint DEFAULT NULL, `completed_time` datetime DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `accepted` bit(1) DEFAULT NULL,
+  `dedup_key` char(64) DEFAULT NULL,
+  UNIQUE KEY `uk_calendar_recipient_dedup` (`tenant_id`,`dedup_key`),
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_calendar_notify_recipient` (`tenant_id`,`batch_id`,`user_id`,`user_type`),
+  KEY `idx_calendar_notify_recipient_user` (`tenant_id`,`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ZSJOS日历通知接收人';
+
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_snapshot` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `calendar_type` varchar(16) NOT NULL,
+  `calendar_id` bigint NOT NULL,
+  `calendar_version` int NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `record_status` varchar(16) NOT NULL,
+  `title_snapshot` text NOT NULL,
+  `time_snapshot` varchar(256) DEFAULT NULL,
+  `remark_snapshot` varchar(2000) DEFAULT NULL,
+  `details_json` longtext NOT NULL,
+  `content_hash` char(64) NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_calendar_snapshot_version` (`tenant_id`,`calendar_type`,`calendar_id`,`calendar_version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日历不可变通知快照';
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_state` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `calendar_type` varchar(16) NOT NULL,
+  `calendar_id` bigint NOT NULL,
+  `calendar_version` int NOT NULL,
+  `current_snapshot_id` bigint DEFAULT NULL,
+  `record_status` varchar(16) NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_calendar_notify_state` (`tenant_id`,`calendar_type`,`calendar_id`),
+  KEY `idx_calendar_state_snapshot` (`tenant_id`,`current_snapshot_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日历通知当前状态';
+
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_preview` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `token_hash` char(64) NOT NULL,
+  `operator_user_id` bigint NOT NULL,
+  `request_hash` char(64) NOT NULL,
+  `content_hash` char(64) NOT NULL,
+  `roster_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_calendar_preview_token` (`tenant_id`,`token_hash`),
+  KEY `idx_calendar_preview_expiry` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日历通知预览凭证';
+
+CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_intent` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `operation_key` varchar(128) NOT NULL,
+  `request_hash` char(64) NOT NULL,
+  `acceptance_key` varchar(128) NOT NULL,
+  `operator_user_id` bigint NOT NULL,
+  `calendar_type` varchar(16) NOT NULL,
+  `calendar_id` bigint NOT NULL,
+  `snapshot_id` bigint NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `scope` varchar(16) NOT NULL,
+  `recipients_json` longtext NOT NULL,
+  `resend` bit(1) NOT NULL DEFAULT b'0',
+  `status` varchar(16) NOT NULL DEFAULT 'PENDING',
+  `batch_id` bigint DEFAULT NULL,
+  `attempt_count` int NOT NULL DEFAULT 0,
+  `next_attempt_at` datetime NOT NULL,
+  `last_error_code` varchar(64) DEFAULT NULL,
+  `completed_time` datetime DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_calendar_intent_operation` (`tenant_id`,`operation_key`),
+  UNIQUE KEY `uk_calendar_intent_acceptance` (`tenant_id`,`acceptance_key`),
+  KEY `idx_calendar_intent_due` (`tenant_id`,`status`,`next_attempt_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日历维护通知意图';

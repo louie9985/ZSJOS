@@ -8,6 +8,7 @@
 /* Container width also covers narrow detail panes on desktop. */
 @container (max-width: 768px) {
   .fu-panel .fu-panel-layout { grid-template-columns: 1fr; }
+  .fu-panel .fu-panel-layout > * { grid-column: 1 / -1; }
   .fu-panel .fu-panel-aside { position: static; }
 }
 
@@ -96,15 +97,18 @@
 
 .fu-panel-layout {
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--crm-sp-5);
   align-items: start;
 }
+
+.fu-panel-layout > * { grid-column: span 6; }
 
 @media(max-width:768px) {
   .fu-panel-layout {
     grid-template-columns: 1fr;
   }
+  .fu-panel-layout > * { grid-column: 1 / -1; }
 }
 
 /* ---- Left: timeline column ---- */

@@ -178,6 +178,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     private static QueryWrapperX<PersonDO> studentQuery(MyStudentPageReqVO reqVO,
                                                          java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = new QueryWrapperX<>();
+        query.eqIfPresent("in_service_period", reqVO.getInServicePeriod());
         if (matchedIds != null) {
             if (matchedIds.isEmpty()) query.eq("id", -1L);
             else query.in("id", matchedIds);

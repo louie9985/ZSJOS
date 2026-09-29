@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """Exercise production tab retention and editors against synthetic transport."""
 from pathlib import Path
+import os
 from tempfile import gettempdir
 from playwright.sync_api import sync_playwright, expect
 
-URL = 'http://127.0.0.1:5174/test/viral-tab-retention.html'
+URL = os.environ.get('WORKBENCH_TEST_URL', 'http://127.0.0.1:5174') + '/test/viral-tab-retention.html'
 with sync_playwright() as p:
     browser = p.chromium.launch(channel='chrome', headless=True)
     page = browser.new_page(viewport={'width': 1440, 'height': 900})

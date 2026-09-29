@@ -104,3 +104,150 @@ html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-card,.ant-colla
 html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.ant-drawer-content,.ant-dropdown-menu,.ant-popover-inner,.ant-select-dropdown,.ant-picker-dropdown,.ant-notification-notice) {
   box-shadow: var(--crm-glass-edge), var(--crm-shadow-float);
 }
+
+/* ==================== 移动端：表单控件字号 ====================
+   iOS Safari 在聚焦元素 computed font-size < 16px 且页面允许缩放时，
+   会把整个视觉视口放大。本工作台的输入控件字号来自
+   ThemeProvider 注入的 token.fontSize（12/13/14，见 constants.FONT_SCALE_SIZE），
+   三档全部小于 16px；又因 .crm-shell 是 position:fixed + overflow:hidden
+   （layout.css），放大后页面不会自适应，用户只能手动缩回才能看到其他字段 ——
+   这正是「输入一半得缩小页面」的成因。
+
+   修字号而不是禁缩放：从根因消除，且不剥夺视力不佳用户主动放大的能力。
+   只作用于移动端，桌面端字号与信息密度保持不变。
+
+   必须逐个控件写而不是改 --ant-font-size：后者是 antd 的全站基准，
+   表格、按钮、标签都引用它，改它会连带放大整个界面。
+
+   选择器用 html 前缀：antd 6 以 hashPriority: 'low' 生成样式，
+   选择器被 :where() 包裹（特异性 0），故普通类选择器即可胜出，无需 !important。 */
+@media (max-width: 768px) {
+  /* 可聚焦的真实输入元素 —— 只有它们会触发自动放大 */
+  html input.ant-input,
+  html textarea.ant-input,
+  html .ant-input-affix-wrapper input.ant-input,
+  html .ant-input-affix-wrapper textarea.ant-input,
+  html .ant-input-number-input,
+  html .ant-picker-input > input,
+  html .ant-select-input,
+  html .ant-cascader-input,
+  html .ant-cascader-picker input {
+    font-size: var(--crm-font-mobile-input);
+  }
+
+  /* 富文本正文。wangEditor 的可编辑区 [data-slate-editor] 自身不声明
+     字号（见其 dist/css/style.css），会继承所在弹窗的 antd token 13px；
+     contenteditable 同样会触发 iOS 自动放大，故一并抬到 16px。 */
+  html .w-e-text-container [data-slate-editor],
+  html .w-e-text-container .w-e-scroll {
+    font-size: var(--crm-font-mobile-input);
+  }
+
+  /* 呈现层同步字号，否则聚焦时字会突然变大、值会跳一下。
+     这些是 div，不触发放大，但不同步会看出突变。 */
+  html .ant-input-affix-wrapper,
+  html .ant-input-number,
+  html .ant-picker,
+  html .ant-select,
+  html .ant-select-selection-item,
+  html .ant-select-selection-placeholder,
+  html .ant-select-placeholder,
+  html .ant-cascader-picker,
+  html .ant-input-textarea-show-count > .ant-input,
+  html .ant-input-data-count {
+    font-size: var(--crm-font-mobile-input);
+  }
+}
+
+/* ==================== 移动端：弹窗高度与键盘 ====================
+   antd 已自行限制 Modal 的横向宽度（modal/style/index.js 在 ≤screenSMMax 时
+   强制 max-width: calc(100vw - 16px)），所以 100+ 处调用点传入的固定
+   width（最大 1680px）不会横向溢出。
+
+   真正缺的是高度：antd 的 .ant-modal 起始位置是固定的 top: 100px，
+   且默认不给 .ant-modal-body 设 max-height / 滚动，长表单弹窗的底部按钮
+   会滚出可视区，软键盘弹起后更够不到。
+
+   这里把内容区改成纵向 flex、body 内部滚动、头尾固定，
+   等价于把 AccountProfilePanel 里已验证的那种写法提升为全局规则，
+   一次覆盖全部弹窗，而不用改 100 多处调用点。 */
+@media (max-width: 768px) {
+  html .ant-modal {
+    top: 8px;
+    max-height: calc(100vh - 16px);
+    padding-bottom: 0;
+  }
+
+  html .ant-modal .ant-modal-content {
+    display: flex;
+    max-height: calc(100vh - 16px);
+    flex-direction: column;
+  }
+
+  html .ant-modal .ant-modal-header,
+  html .ant-modal .ant-modal-footer,
+  html .ant-modal .ant-modal-confirm-btns {
+    flex-shrink: 0;
+  }
+
+  html .ant-modal .ant-modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* dvh 跟随地址栏收缩，避免 iOS 上 100vh 超出可视区把底部按钮推到屏幕外。
+   与 layout.css 的做法一致：vh 兜底在前，不支持 dvh 时忽略本块。 */
+@supports (height: 100dvh) {
+  @media (max-width: 768px) {
+    html .ant-modal {
+      max-height: calc(100dvh - 16px);
+    }
+
+    html .ant-modal .ant-modal-content {
+      max-height: calc(100dvh - 16px);
+    }
+  }
+}
+
+/* ==================== 移动端：抽屉 ====================
+   抽屉宽度普遍是固定 px（如 width={720}）或 min(320px, 100vw)。
+   antd 给 content-wrapper 的 max-width 是 100vw，但抽屉内部区域仍是
+   固定高度链，这里补上纵向弹性和安全区内边距。 */
+@media (max-width: 768px) {
+  html .ant-drawer-content-wrapper {
+    max-width: 100vw;
+  }
+
+  html .ant-drawer .ant-drawer-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  html .ant-drawer .ant-drawer-body {
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ==================== 移动端：日期与时间选择器浮层 ====================
+   RangePicker 的面板是 display:inline-flex + flex-wrap:nowrap
+   （antd date-picker/style/index.js），两个面板并排约 560px，
+   在 375-430px 的手机屏上必然超出视口。
+   这里允许换行，让两个面板改为上下堆叠；位置越界由 antd 的
+   autoAdjustOverflow 负责，宽度越界必须由这里收口。 */
+@media (max-width: 768px) {
+  html .ant-picker-dropdown {
+    max-width: calc(100vw - 16px);
+  }
+
+  html .ant-picker-dropdown .ant-picker-panel-layout,
+  html .ant-picker-dropdown .ant-picker-panels {
+    flex-wrap: wrap;
+  }
+
+  html .ant-picker-dropdown .ant-picker-panel-container {
+    overflow-x: auto;
+  }
+}

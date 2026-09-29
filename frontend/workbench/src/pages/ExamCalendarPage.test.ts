@@ -4,31 +4,19 @@ import { describe, expect, it } from 'vitest'
 import { scheduleInput, scheduleStatusLabel } from './ExamCalendarPage'
 
 describe('ExamCalendarPage contracts', () => {
-  it('submits only selected exam conditions without leaking the navigation category', () => {
-    expect(scheduleInput({ scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), categoryId: 2,
-      productId: 8, selectedAttrs: { level: '2', place: '' } })).toMatchObject({
-      productId: 8, categoryId: undefined, selectedAttrs: { level: '2' }
-    })
-  })
-  it('derives the product id from the registered cascader field', () => {
-    expect(scheduleInput({ scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'),
-      productSelection: [2, 8], selectedAttrs: { level: '2', place: '' } })).toMatchObject({
-      productId: 8, categoryId: undefined, selectedAttrs: { level: '2' }
-    })
-  })
   it('serializes exact schedules without rough dates', () => {
     expect(scheduleInput({
-      scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), categoryId: 2, remark: ' 上午场 '
-    })).toEqual({ scheduleType: 'EXACT', exactDate: '2026-10-10', categoryId: 2, remark: '上午场' })
+      scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), scheduleName: '任意名称', remark: ' 上午场 '
+    })).toEqual({ scheduleType: 'EXACT', exactDate: '2026-10-10', scheduleName: '任意名称', remark: '上午场' })
   })
 
   it('serializes rough schedules as an inclusive date range', () => {
     expect(scheduleInput({
       scheduleType: 'ROUGH', roughRange: [dayjs('2026-10-01'), dayjs('2026-10-15')],
-      categoryId: 3
+      scheduleName: '自由考期'
     })).toEqual({
       scheduleType: 'ROUGH', roughStartDate: '2026-10-01', roughEndDate: '2026-10-15',
-      categoryId: 3, remark: undefined
+      scheduleName: '自由考期', remark: undefined
     })
   })
 
@@ -44,12 +32,8 @@ describe('ExamCalendarPage contracts', () => {
     expect(source).not.toContain("if (canManage && info.source === 'date') openCreate(date)")
   })
 
-  it('renders a complete product cascader', () => {
-    const source = readFileSync(new URL('./ExamCalendarPage.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('name="productSelection" label="产品"')
-    expect(source).toContain('<Cascader')
-    expect(source).not.toContain('name="productId" label="产品"')
-    expect(source).toContain('保存并发布')
-    expect(source).toContain('api.examCalendar.publish(savedId)')
+  it('keeps the manual name and never derives it from catalog fields', () => {
+    const values = { scheduleType: 'EXACT' as const, exactDate: dayjs('2026-10-10'), scheduleName: '  秋季专场  ', productId: 8, categoryId: 2 }
+    expect(scheduleInput(values)).toEqual({ scheduleType: 'EXACT', exactDate: '2026-10-10', scheduleName: '秋季专场', remark: undefined })
   })
 })

@@ -15,6 +15,17 @@ import java.util.List;
 @Mapper
 public interface NotifyBusinessOutboxMapper extends BaseMapperX<NotifyBusinessOutboxDO> {
     @TenantIgnore
+    @Select("""
+            SELECT * FROM system_notify_business_outbox
+            WHERE tenant_id=#{tenantId} AND scene_code=#{scene} AND source_event_key=#{eventKey}
+              AND deleted=0 AND id > #{afterId}
+            ORDER BY id LIMIT #{limit}
+            """)
+    List<NotifyBusinessOutboxDO> selectEventEvidence(@Param("tenantId") Long tenantId,
+            @Param("scene") String scene, @Param("eventKey") String eventKey,
+            @Param("afterId") long afterId, @Param("limit") int limit);
+
+    @TenantIgnore
     @Update("""
             UPDATE system_notify_business_outbox SET payload=#{payload}, lease_until=#{leaseUntil}, update_time=#{now}
             WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' AND status='processing'

@@ -6,4 +6,5 @@ import java.util.List;
 public class CourseCalendarRespVO {
     private Long id; private String courseName; private String courseFormValue; private String courseFormLabelSnapshot;
     private LocalDateTime startTime; private LocalDateTime endTime; private String remark; private List<Long> attachmentIds;
+    private Integer calendarVersion;
 }

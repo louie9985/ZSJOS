@@ -26,6 +26,10 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
 
     @Override public String getBizType() { return "student"; }
     @Override public boolean hasPermission(Long bizId, String action, Long userId) {
+        if ("update-service-period".equals(action)) {
+            // Full read and account collaboration do not grant this student-level write.
+            return relationMapper.isMediaStudentResponsible(bizId, userId);
+        }
         if ("repurchase".equals(action)) {
             return !relationMapper.selectOwnedRepurchaseEligibleByPerson(userId, bizId).isEmpty();
         }

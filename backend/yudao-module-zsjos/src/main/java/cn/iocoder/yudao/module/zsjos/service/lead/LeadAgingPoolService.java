@@ -25,6 +25,7 @@ public interface LeadAgingPoolService {
     int clearInvalidCollaborators(LocalDateTime now);
     int emitAdvanceReminders(LocalDateTime now);
     boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
+    boolean canRequestTransfer(LeadAgingPoolCycleDO cycle, Long userId);
     void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     LeadAgingPoolCycleDO getActiveCycle(Long leadId);
     boolean hasActiveManualPublicSea(Long leadId);

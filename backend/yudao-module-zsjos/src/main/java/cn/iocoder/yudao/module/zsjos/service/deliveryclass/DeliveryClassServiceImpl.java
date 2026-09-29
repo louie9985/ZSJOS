@@ -169,29 +169,12 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     public List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson,
                                                            String selectedSkuIdsJson) {
-        Map<String, String> selectedAttrs = selectedAttrsJson == null || selectedAttrsJson.isBlank()
-                ? Map.of() : JsonUtils.parseObject(selectedAttrsJson, Map.class);
-        ExamProductScopeRespVO requested = productId == null ? null : productSkuService.resolveExamScope(productId, selectedAttrs);
-        if (requested != null && selectedSkuIdsJson != null && !selectedSkuIdsJson.isBlank()) {
-            Set<Long> selectedSkuIds = new HashSet<>(JsonUtils.parseArray(selectedSkuIdsJson, Long.class));
-            Set<Long> validSkuIds = requested.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet());
-            if (selectedSkuIds.isEmpty() || !validSkuIds.containsAll(selectedSkuIds)) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
-            requested = new ExamProductScopeRespVO(requested.productId(), requested.productRef(), requested.productName(), requested.categoryId(),
-                    requested.categoryPath(), requested.attrs(), requested.selectedSpecs(),
-                    requested.skus().stream().filter(sku -> selectedSkuIds.contains(sku.id())).toList());
-        }
-        if (requested != null && !Objects.equals(categoryId, requested.categoryId())) {
-            throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
-        }
-        ExamProductScopeRespVO requestedScope = requested;
         return scheduleMapper.selectList(new LambdaQueryWrapperX<ExamScheduleDO>()
-                .eq(ExamScheduleDO::getCategoryId, categoryId)
                 .eq(ExamScheduleDO::getRecordStatus, "PUBLISHED")
                 .orderByDesc(ExamScheduleDO::getPublishedAt).orderByDesc(ExamScheduleDO::getId))
-                .stream().filter(this::isUnended).filter(row -> scheduleCovers(row, requestedScope))
+                .stream().filter(this::isUnended)
                 .map(row -> new DeliveryClassExamOptionRespVO(row.getId(), row.getScheduleType(),
-                        "EXACT".equals(row.getScheduleType()) ? String.valueOf(row.getExactDate())
-                                : row.getRoughStartDate() + "~" + row.getRoughEndDate(), row.getProductId(),
+                        cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleService.displayName(row) + " · " + scheduleDate(row), row.getProductId(),
                         row.getCategoryId(), parseSkus(row.getFrozenSkusJson()))).toList();
     }
 
@@ -202,21 +185,15 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(DeliveryClassSaveReqVO req, Long userId) {
-        ScopeSnapshot snapshot = validate(req);
+        String snapshot = validate(req);
         AdminUserRespDTO homeroom = requireHomeroom(req.getHomeroomUserId());
         requireSameDepartment(userId, homeroom);
         DeptRespDTO dept = homeroom.getDeptId() == null ? null : deptApi.getDept(homeroom.getDeptId());
         for (int retry = 0; retry < 20; retry++) {
             String classNo = numberService.next();
             DeliveryClassDO row = new DeliveryClassDO().setClassNo(classNo)
-                    .setClassName(blank(req.getClassName()) ? snapshot.categoryName() + snapshot.scheduleSnapshot()
-                            + classNo.substring(classNo.length() - 4) + "班" : req.getClassName().trim())
-                    .setSystemClass(false).setProductId(snapshot.scope().productId()).setProductNameSnapshot(snapshot.scope().productName())
-                    .setSelectedAttrsJson(JsonUtils.toJsonString(req.getSelectedAttrs() == null ? Map.of() : req.getSelectedAttrs()))
-                    .setSelectedSpecsJson(JsonUtils.toJsonString(snapshot.scope().selectedSpecs()))
-                    .setSelectedSkusJson(JsonUtils.toJsonString(snapshot.scope().skus())).setCategoryId(snapshot.scope().categoryId())
-                    .setCategoryNameSnapshot(snapshot.categoryName()).setCategoryPathSnapshot(snapshot.categoryPath())
-                    .setExamScheduleId(req.getExamScheduleId()).setExamScheduleSnapshot(snapshot.scheduleSnapshot())
+                    .setClassName(req.getClassName().trim()).setSystemClass(false)
+                    .setExamScheduleId(req.getExamScheduleId()).setExamScheduleSnapshot(snapshot)
                     .setHomeroomUserId(homeroom.getId()).setHomeroomUserNameSnapshot(homeroom.getNickname())
                     .setDeptId(homeroom.getDeptId()).setDeptNameSnapshot(dept == null ? null : dept.getName())
                     .setStatus("SERVING").setVersion(0);
@@ -237,20 +214,13 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             throw exception(DELIVERY_CLASS_STATE_INVALID);
         }
         if (!Objects.equals(req.getVersion(), current.getVersion())) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
-        ScopeSnapshot snapshot = validate(req);
-        if (!Objects.equals(snapshot.scope().categoryId(), current.getCategoryId())
-                && mapper.countAllRelations(current.getTenantId(), id) > 0) throw exception(DELIVERY_CLASS_CATEGORY_LOCKED);
+        String snapshot = validate(req);
         AdminUserRespDTO homeroom = requireHomeroom(req.getHomeroomUserId());
         requireSameDepartment(userId, homeroom);
         if (!Objects.equals(homeroom.getDeptId(), current.getDeptId())) throw exception(DELIVERY_CLASS_USER_INVALID);
         Long oldOwner = current.getHomeroomUserId();
-        current.setClassName(blank(req.getClassName()) ? current.getClassName() : req.getClassName().trim())
-                .setProductId(snapshot.scope().productId()).setProductNameSnapshot(snapshot.scope().productName())
-                .setSelectedAttrsJson(JsonUtils.toJsonString(req.getSelectedAttrs() == null ? Map.of() : req.getSelectedAttrs()))
-                .setSelectedSpecsJson(JsonUtils.toJsonString(snapshot.scope().selectedSpecs()))
-                .setSelectedSkusJson(JsonUtils.toJsonString(snapshot.scope().skus())).setCategoryId(snapshot.scope().categoryId())
-                .setCategoryNameSnapshot(snapshot.categoryName()).setCategoryPathSnapshot(snapshot.categoryPath()).setExamScheduleId(req.getExamScheduleId())
-                .setExamScheduleSnapshot(snapshot.scheduleSnapshot()).setHomeroomUserId(homeroom.getId())
+        current.setClassName(req.getClassName().trim()).setExamScheduleId(req.getExamScheduleId())
+                .setExamScheduleSnapshot(snapshot).setHomeroomUserId(homeroom.getId())
                 .setHomeroomUserNameSnapshot(homeroom.getNickname()).setVersion(current.getVersion() + 1);
         if (mapper.updateById(current) != 1) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
         if (!Objects.equals(oldOwner, homeroom.getId())) {
@@ -369,14 +339,6 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
                 : !schedule.getRoughEndDate().isBefore(today);
     }
 
-    private boolean scheduleCovers(ExamScheduleDO schedule, ExamProductScopeRespVO requested) {
-        if (requested == null) return true;
-        if (schedule.getProductId() == null) return Objects.equals(schedule.getCategoryId(), requested.categoryId());
-        if (!Objects.equals(schedule.getProductId(), requested.productId())) return false;
-        Set<Long> frozen = parseSkus(schedule.getFrozenSkusJson()).stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet());
-        return frozen.containsAll(requested.skus().stream().map(ExamProductScopeRespVO.Sku::id).toList());
-    }
-
     private List<ExamProductScopeRespVO.Sku> parseSkus(String json) {
         return json == null ? List.of() : JsonUtils.parseArray(json, ExamProductScopeRespVO.Sku.class);
     }
@@ -387,36 +349,23 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         return row;
     }
 
-    private ScopeSnapshot validate(DeliveryClassSaveReqVO req) {
-        ExamProductScopeRespVO resolved = productSkuService.resolveExamScope(req.getProductId(), req.getSelectedAttrs());
-        if (!Objects.equals(req.getCategoryId(), resolved.categoryId())) {
-            throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
-        }
-        Set<Long> selectedIds = req.getSelectedSkuIds();
-        Set<Long> validIds = resolved.skus().stream().map(ExamProductScopeRespVO.Sku::id).collect(java.util.stream.Collectors.toSet());
-        if (selectedIds == null || selectedIds.isEmpty() || !validIds.containsAll(selectedIds)) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
-        ExamProductScopeRespVO scope = new ExamProductScopeRespVO(resolved.productId(), resolved.productRef(), resolved.productName(),
-                resolved.categoryId(), resolved.categoryPath(), resolved.attrs(), resolved.selectedSpecs(),
-                resolved.skus().stream().filter(sku -> selectedIds.contains(sku.id())).toList());
-        ZsjosProductCategoryDO category = categoryMapper.selectById(scope.categoryId());
-        if (category == null || !Objects.equals(category.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
-            throw exception(DELIVERY_CLASS_CATEGORY_INVALID);
-        }
+    private String validate(DeliveryClassSaveReqVO req) {
         ExamScheduleDO schedule = scheduleMapper.selectById(req.getExamScheduleId());
-        if (schedule == null || !"PUBLISHED".equals(schedule.getRecordStatus()) || !isUnended(schedule)
-                || !Objects.equals(schedule.getCategoryId(), scope.categoryId()) || !scheduleCovers(schedule, scope)) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
-        List<String> path = new ArrayList<>();
-        ZsjosProductCategoryDO cursor = category;
-        Set<Long> visited = new HashSet<>();
-        while (cursor != null && visited.add(cursor.getId())) {
-            path.add(cursor.getName());
-            if (cursor.getParentId() == null || cursor.getParentId() == 0) break;
-            cursor = categoryMapper.selectById(cursor.getParentId());
+        if (schedule == null || !"PUBLISHED".equals(schedule.getRecordStatus()) || !isUnended(schedule)) {
+            throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
         }
-        Collections.reverse(path);
-        String date = "EXACT".equals(schedule.getScheduleType()) ? String.valueOf(schedule.getExactDate())
+        return scheduleSnapshot(schedule);
+    }
+
+    private String scheduleSnapshot(ExamScheduleDO schedule) {
+        // Legacy product/spec titles may exceed the existing class snapshot column; retain its date-only contract.
+        return schedule.getScheduleName() == null ? scheduleDate(schedule)
+                : schedule.getScheduleName() + " · " + scheduleDate(schedule);
+    }
+
+    private String scheduleDate(ExamScheduleDO schedule) {
+        return "EXACT".equals(schedule.getScheduleType()) ? String.valueOf(schedule.getExactDate())
                 : schedule.getRoughStartDate() + "~" + schedule.getRoughEndDate();
-        return new ScopeSnapshot(scope, category.getName(), JsonUtils.toJsonString(path), date);
     }
 
     private DeliveryClassRespVO toVO(DeliveryClassDO row) {
@@ -448,5 +397,4 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private boolean blank(String value) { return value == null || value.isBlank(); }
-    private record ScopeSnapshot(ExamProductScopeRespVO scope, String categoryName, String categoryPath, String scheduleSnapshot) {}
 }

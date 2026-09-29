@@ -42,6 +42,7 @@ public class ExamScheduleService {
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private PermissionApi permissionApi;
     @Resource private ConfigApi configApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationSnapshotService notificationSnapshots;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.product.ProductCategoryLocks categoryLocks;
 
@@ -88,10 +89,11 @@ public class ExamScheduleService {
         validateSchedule(req);
         ExamScheduleDO schedule = BeanUtils.toBean(req, ExamScheduleDO.class)
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT))
-                .setRecordStatus("DRAFT");
-        applyScope(schedule, req, false);
+                .setRecordStatus("DRAFT").setCalendarVersion(1);
+        applyFreeName(schedule, req);
         normalizeDates(schedule);
         mapper.insert(schedule);
+        notificationSnapshots.captureExam(schedule, "CREATED");
         return schedule.getId();
     }
 
@@ -108,35 +110,27 @@ public class ExamScheduleService {
         ExamScheduleDO update = BeanUtils.toBean(req, ExamScheduleDO.class)
                 .setId(id)
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT));
-        var scope = applyScope(update, req, false);
-        if (current.getProductId() != null && Objects.equals(current.getProductId(), req.getProductId())) {
-            var requested = req.getSelectedAttrs() == null ? Map.<String, String>of() : req.getSelectedAttrs();
-            var cleared = req.getClearedInvalidAttrs() == null ? Set.<String>of() : req.getClearedInvalidAttrs();
-            for (var old : parseAttrs(current.getSelectedAttrsJson()).entrySet()) {
-                boolean valid = scope.attrs().stream().anyMatch(a -> a.attrKey().equals(old.getKey())
-                        && a.values().stream().anyMatch(v -> Objects.equals(v.value(), old.getValue())));
-                if (!valid && !requested.containsKey(old.getKey()) && !cleared.contains(old.getKey())) {
-                    throw exception(EXAM_SCHEDULE_SCOPE_CLEAR_REQUIRED);
-                }
-            }
-        }
-        if (Objects.equals(current.getProductId(), update.getProductId())
-                && (current.getProductId() != null || Objects.equals(current.getCategoryId(), update.getCategoryId()))
-                && parseAttrs(current.getSelectedAttrsJson()).equals(parseAttrs(update.getSelectedAttrsJson()))) {
-            update.setCategoryNameSnapshot(current.getCategoryNameSnapshot()).setCategoryPathSnapshot(current.getCategoryPathSnapshot())
-                    .setProductNameSnapshot(current.getProductNameSnapshot()).setSelectedSpecsJson(current.getSelectedSpecsJson());
-        }
+        applyFreeName(update, req);
         normalizeDates(update);
-        // Explicit null assignments are needed when switching exact/rough or product/category scopes.
+        int version = current.getCalendarVersion() == null ? 1 : current.getCalendarVersion();
+        update.setCalendarVersion(sameNotificationContent(current, update) ? version : version + 1);
+        notificationSnapshots.captureExam(current, "MANUAL");
+        // Clear obsolete catalog links explicitly; MyBatis skips null entity fields.
         mapper.update(update, new LambdaUpdateWrapper<ExamScheduleDO>().eq(ExamScheduleDO::getId, id)
                 .set(ExamScheduleDO::getExactDate, update.getExactDate())
                 .set(ExamScheduleDO::getRoughStartDate, update.getRoughStartDate())
                 .set(ExamScheduleDO::getRoughEndDate, update.getRoughEndDate())
-                .set(ExamScheduleDO::getProductId, update.getProductId())
+                .set(ExamScheduleDO::getCategoryId, null)
+                .set(ExamScheduleDO::getCategoryNameSnapshot, null)
+                .set(ExamScheduleDO::getCategoryPathSnapshot, null)
+                .set(ExamScheduleDO::getFrozenSkusJson, null)
+                .set(ExamScheduleDO::getProductId, null)
                 .set(ExamScheduleDO::getProductNameSnapshot, update.getProductNameSnapshot())
                 .set(ExamScheduleDO::getSelectedAttrsJson, update.getSelectedAttrsJson())
                 .set(ExamScheduleDO::getSelectedSpecsJson, update.getSelectedSpecsJson())
                 .set(ExamScheduleDO::getRemark, update.getRemark()));
+        update.setRecordStatus(current.getRecordStatus());
+        notificationSnapshots.captureExam(update, "UPDATED");
     }
 
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -147,11 +141,10 @@ public class ExamScheduleService {
         if (!"DRAFT".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
         if ("EXACT".equals(current.getScheduleType()) && current.getExactDate() != null
                 && current.getExactDate().isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
-        ExamScheduleSaveReqVO request = BeanUtils.toBean(current, ExamScheduleSaveReqVO.class);
-        if (current.getProductId() != null) request.setCategoryId(null);
-        request.setSelectedAttrs(parseAttrs(current.getSelectedAttrsJson()));
-        applyScope(current, request, true);
-        mapper.updateById(current.setRecordStatus("PUBLISHED").setPublishedAt(LocalDateTime.now(BUSINESS_ZONE)));
+        notificationSnapshots.captureExam(current, "MANUAL");
+        mapper.updateById(current.setRecordStatus("PUBLISHED").setPublishedAt(LocalDateTime.now(BUSINESS_ZONE))
+                .setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1));
+        notificationSnapshots.captureExam(current, "PUBLISHED");
     }
 
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -160,7 +153,44 @@ public class ExamScheduleService {
         requireManage(userId);
         ExamScheduleDO current = requireExists(id);
         if (!"PUBLISHED".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
-        mapper.updateById(new ExamScheduleDO().setId(id).setRecordStatus("REVOKED"));
+        notificationSnapshots.captureExam(current, "MANUAL");
+        mapper.updateById(new ExamScheduleDO().setId(id).setRecordStatus("REVOKED")
+                .setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1));
+        current.setRecordStatus("REVOKED").setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1);
+        notificationSnapshots.captureExam(current, "REVOKED");
+    }
+
+    public ExamScheduleDO previewTransition(Long id, String event, Long userId) {
+        requireManage(userId);
+        var stored = mapper.selectById(id);
+        if (stored == null) throw exception(EXAM_SCHEDULE_NOT_EXISTS);
+        var row = BeanUtils.toBean(stored, ExamScheduleDO.class);
+        if ("PUBLISHED".equals(event)) {
+            if (!"DRAFT".equals(row.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
+            if ("EXACT".equals(row.getScheduleType()) && row.getExactDate() != null && row.getExactDate().isBefore(today()))
+                throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
+            row.setRecordStatus("PUBLISHED");
+        } else if ("REVOKED".equals(event)) {
+            if (!"PUBLISHED".equals(row.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
+            row.setRecordStatus("REVOKED");
+        } else throw exception(CALENDAR_NOTIFY_REQUEST_INVALID);
+        return row.setCalendarVersion((stored.getCalendarVersion() == null ? 1 : stored.getCalendarVersion()) + 1);
+    }
+
+    private boolean sameNotificationContent(ExamScheduleDO before, ExamScheduleDO after) {
+        return Objects.equals(before.getScheduleName(), after.getScheduleName())
+                && Objects.equals(before.getScheduleType(), after.getScheduleType())
+                && Objects.equals(before.getExactDate(), after.getExactDate())
+                && Objects.equals(before.getRoughStartDate(), after.getRoughStartDate())
+                && Objects.equals(before.getRoughEndDate(), after.getRoughEndDate())
+                && Objects.equals(before.getProductId(), after.getProductId())
+                && (before.getProductId() != null || Objects.equals(before.getCategoryId(), after.getCategoryId()))
+                && Objects.equals(before.getProductNameSnapshot(), after.getProductNameSnapshot())
+                && Objects.equals(before.getCategoryNameSnapshot(), after.getCategoryNameSnapshot())
+                && Objects.equals(before.getCategoryPathSnapshot(), after.getCategoryPathSnapshot())
+                && parseAttrs(before.getSelectedAttrsJson()).equals(parseAttrs(after.getSelectedAttrsJson()))
+                && Objects.equals(before.getSelectedSpecsJson(), after.getSelectedSpecsJson())
+                && Objects.equals(before.getRemark(), after.getRemark());
     }
 
     String displayStatus(ExamScheduleDO schedule, LocalDate currentDate, int upcomingDays) {
@@ -193,6 +223,7 @@ public class ExamScheduleService {
         response.setProductNameSnapshot(schedule.getProductNameSnapshot()); response.setRecordStatus(schedule.getRecordStatus());
         response.setRemark(schedule.getRemark()); response.setPublishedAt(schedule.getPublishedAt());
         response.setCreateTime(schedule.getCreateTime()); response.setUpdateTime(schedule.getUpdateTime());
+        response.setCalendarVersion(schedule.getCalendarVersion() == null ? 1 : schedule.getCalendarVersion());
         response.setCategoryPathSnapshot(schedule.getCategoryPathSnapshot() == null ? List.of()
                 : JsonUtils.parseArray(schedule.getCategoryPathSnapshot(), ZsjosProductCategoryPathNodeVO.class));
         response.setDisplayStatus(displayStatus(schedule, today(), configuredUpcomingDays()));
@@ -201,48 +232,29 @@ public class ExamScheduleService {
                 : JsonUtils.parseArray(schedule.getSelectedSpecsJson(), ProductSpecVO.class));
         response.setFrozenSkus(schedule.getFrozenSkusJson() == null ? List.of()
                 : JsonUtils.parseArray(schedule.getFrozenSkusJson(), ExamProductScopeRespVO.Sku.class));
-        String name = schedule.getProductId() == null ? schedule.getCategoryNameSnapshot() : schedule.getProductNameSnapshot();
-        response.setScheduleName(name + response.getSelectedSpecs().stream().map(s -> "，" + s.displayText())
-                .collect(java.util.stream.Collectors.joining()));
+        response.setScheduleName(displayName(schedule));
         return response;
     }
 
-    private ExamProductScopeRespVO applyScope(ExamScheduleDO target, ExamScheduleSaveReqVO req, boolean publishing) {
-        if (req.getProductId() == null) {
-            if (req.getCategoryId() == null || req.getSelectedAttrs() != null && !req.getSelectedAttrs().isEmpty()) {
-                throw exception(EXAM_SCHEDULE_SCOPE_INVALID);
-            }
-            CategorySnapshot category = snapshotCategory(req.getCategoryId());
-            target.setCategoryId(req.getCategoryId()).setCategoryNameSnapshot(category.name())
-                    .setCategoryPathSnapshot(JsonUtils.toJsonString(category.path()));
-            return null;
-        }
-        if (req.getCategoryId() != null) throw exception(EXAM_SCHEDULE_SCOPE_INVALID);
-        ExamProductScopeRespVO scope = productSkuService.resolveExamScope(req.getProductId(), req.getSelectedAttrs());
-        target.setProductId(scope.productId()).setProductNameSnapshot(scope.productName())
-                .setCategoryId(scope.categoryId()).setCategoryNameSnapshot(scope.categoryPath().getLast().name())
-                .setCategoryPathSnapshot(JsonUtils.toJsonString(scope.categoryPath()))
-                .setSelectedAttrsJson(JsonUtils.toJsonString(req.getSelectedAttrs() == null ? Map.of() : new TreeMap<>(req.getSelectedAttrs())))
-                .setSelectedSpecsJson(JsonUtils.toJsonString(scope.selectedSpecs()));
-        if (publishing) target.setFrozenSkusJson(JsonUtils.toJsonString(scope.skus()));
-        return scope;
+    private void applyFreeName(ExamScheduleDO target, ExamScheduleSaveReqVO req) {
+        target.setScheduleName(req.getScheduleName().trim()).setProductId(null).setCategoryId(null)
+                .setProductNameSnapshot(null).setCategoryNameSnapshot(null).setCategoryPathSnapshot(null)
+                .setSelectedAttrsJson(null).setSelectedSpecsJson(null).setFrozenSkusJson(null);
+    }
+
+    public static String displayName(ExamScheduleDO schedule) {
+        if (schedule.getScheduleName() != null) return schedule.getScheduleName();
+        // Legacy records retain their original stored labels without consulting today's catalog.
+        String name = schedule.getProductId() == null ? schedule.getCategoryNameSnapshot() : schedule.getProductNameSnapshot();
+        var specs = schedule.getSelectedSpecsJson() == null ? List.<ProductSpecVO>of()
+                : JsonUtils.parseArray(schedule.getSelectedSpecsJson(), ProductSpecVO.class);
+        return (name == null ? "未命名考期" : name) + specs.stream().map(spec -> "，" + spec.displayText())
+                .collect(java.util.stream.Collectors.joining());
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, String> parseAttrs(String json) {
         return json == null ? Map.of() : JsonUtils.parseObject(json, Map.class);
-    }
-
-    private CategorySnapshot snapshotCategory(Long categoryId) {
-        var allById = categoryLocks.paths(List.of(categoryId));
-        ZsjosProductCategoryDO category = allById.get(categoryId);
-        if (category == null || !CommonStatusEnum.ENABLE.getStatus().equals(category.getStatus())) {
-            throw exception(EXAM_SCHEDULE_CATEGORY_INVALID);
-        }
-        if (allById.values().stream().anyMatch(row -> !CommonStatusEnum.ENABLE.getStatus().equals(row.getStatus()))) {
-            throw exception(EXAM_SCHEDULE_CATEGORY_INVALID);
-        }
-        return new CategorySnapshot(category.getName(), buildPath(category, allById));
     }
 
     private List<ZsjosProductCategoryPathNodeVO> buildPath(ZsjosProductCategoryDO category,

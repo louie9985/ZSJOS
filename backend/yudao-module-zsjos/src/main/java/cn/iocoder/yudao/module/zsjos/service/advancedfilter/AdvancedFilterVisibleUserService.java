@@ -30,6 +30,7 @@ public class AdvancedFilterVisibleUserService {
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private ServiceRelationMapper serviceRelationMapper;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private AdvancedFilterService advancedFilterService;
     @Resource private cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
 
     public Resolution resolve(String scene, Long userId) {
@@ -45,6 +46,10 @@ public class AdvancedFilterVisibleUserService {
             return Resolution.supported(options(users));
         }
         return switch (scene) {
+            case "media_student" -> {
+                var ids = advancedFilterService.mediaStudentOperatorIds(userId);
+                yield Resolution.supported(ids.isEmpty() ? List.of() : options(adminUserApi.getUserList(ids)));
+            }
             case "lead", "order", "lead_appeal", "duplicate_review", "registration" ->
                     Resolution.supported(leadUsers(userId));
             case "subordinate_sales" -> Resolution.supported(

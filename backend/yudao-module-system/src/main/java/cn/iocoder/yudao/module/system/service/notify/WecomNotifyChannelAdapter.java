@@ -59,7 +59,12 @@ public class WecomNotifyChannelAdapter implements NotifyChannelAdapter {
             }
             toUser = resolveToUser(context);
             if (StrUtil.isBlank(toUser)) {
-                return NotifySendResult.success("WECOM_RECIPIENT_SKIPPED");
+                String reason = wecomUserProviders.stream()
+                        .filter(provider -> Objects.equals(provider.getUserType(), context.getUserType()))
+                        .map(provider -> provider.getUnavailableReason(context.getUserId()))
+                        .filter(StrUtil::isNotBlank).findFirst().orElse("WECOM_RECIPIENT_UNAVAILABLE");
+                return NotifySendResult.builder().success(true).skipped(true)
+                        .externalId("WECOM_RECIPIENT_SKIPPED").errorCode(reason).build();
             }
             client = resolveClient(context.getUserType());
             if (client == null || StrUtil.hasBlank(client.getClientId(), client.getClientSecret(), client.getAgentId())

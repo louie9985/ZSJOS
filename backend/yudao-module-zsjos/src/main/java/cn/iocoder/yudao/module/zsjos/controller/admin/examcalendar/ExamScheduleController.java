@@ -23,6 +23,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Validated
 public class ExamScheduleController {
     @Resource private ExamScheduleService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarMaintenanceNotificationService notification;
 
     @GetMapping("/page")
     @Operation(summary = "查询精确考期")
@@ -70,16 +71,20 @@ public class ExamScheduleController {
     @PostMapping("/publish/{id}")
     @Operation(summary = "发布考期")
     @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")
-    public CommonResult<Boolean> publish(@PathVariable Long id) {
-        service.publish(id, getLoginUserId());
+    public CommonResult<Boolean> publish(@PathVariable Long id,
+            @Valid @RequestBody(required = false) cn.iocoder.yudao.module.zsjos.controller.admin.calendar.vo.CalendarMaintenanceNotifyReqVO req) {
+        if (req == null) service.publish(id, getLoginUserId());
+        else notification.execute("EXAM", "PUBLISHED", id, null, req);
         return success(true);
     }
 
     @PostMapping("/revoke/{id}")
     @Operation(summary = "撤销考期")
     @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")
-    public CommonResult<Boolean> revoke(@PathVariable Long id) {
-        service.revoke(id, getLoginUserId());
+    public CommonResult<Boolean> revoke(@PathVariable Long id,
+            @Valid @RequestBody(required = false) cn.iocoder.yudao.module.zsjos.controller.admin.calendar.vo.CalendarMaintenanceNotifyReqVO req) {
+        if (req == null) service.revoke(id, getLoginUserId());
+        else notification.execute("EXAM", "REVOKED", id, null, req);
         return success(true);
     }
 }

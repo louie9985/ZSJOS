@@ -7,6 +7,9 @@ public interface NotifyBusinessEventApi {
 
     void publish(NotifyBusinessEvent event);
 
+    /** Persists only in-app/WeCom rules in the caller transaction. Zero means no configured durable delivery. */
+    int publishDurable(NotifyBusinessEvent event);
+
     /**
      * Confirms persistence or sending for the selected deliveries. WeCom confirms durable outbox
      * acceptance (WECOM_QUEUED), not provider delivery; inspect delivery status for the final result.

@@ -201,14 +201,16 @@ public class LeadObjectPermissionService {
     }
 
     private boolean canOperateAsSales(LeadDO lead, Long userId) {
+        if (userId == null) return false;
+        // Entering the collaboration pool does not suspend the formal owner's follow-up rights.
+        if (Objects.equals(userId, lead.getOwnerUserId())) return true;
         LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
         if (cycle != null) {
             return Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
-                    && (Objects.equals(userId, lead.getOwnerUserId())
-                    || Objects.equals(userId, cycle.getCollaboratorUserId()));
+                    && Objects.equals(userId, cycle.getCollaboratorUserId());
         }
         var manual = publicSeaRecordMapper.selectByLeadId(lead.getId());
-        return Objects.equals(userId, lead.getOwnerUserId()) || manual != null
+        return manual != null
                 && Objects.equals(userId, manual.getCollaboratorUserId());
     }
 

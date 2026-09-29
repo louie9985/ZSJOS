@@ -15,7 +15,7 @@ Lead / Person 跟进 -> PurchaseIntent 草稿
 
 ## 2. 数据模型
 
-`zsjos_purchase_intent` 是一次首购或复购链路的稳定锚点，保存业务编号、购买类型、收款路径、Lead/Person/Opportunity、发起人、责任人、当前订单、表单草稿 JSON、后端解析后的 SKU/金额快照、总额、币种、版本和幂等键。草稿最低要求是可确定 Person、至少一个有效 SKU、明细金额合法且合计大于零。
+`zsjos_purchase_intent` 是一次首购或复购链路的稳定锚点，保存业务编号、购买类型、收款路径、Lead/Person/Opportunity、发起人、责任人、当前订单、表单草稿 JSON、后端解析后的 SKU/金额快照、总额、币种、版本和幂等键。草稿最低要求是可确定 Person、至少一个有效 SKU、每条明细金额非负且最多两位小数、与请求总额精确一致：线下 `offline_paid` 合计允许 `0.00`，线上 `online_link` 合计必须大于零。线上零金额保存草稿或生成/复用支付链接返回 `1900017030`，提示改用线下已支付；不得通过舍入接受非法精度。零金额仍须付款时间、支付方式、1–6 份缴费凭证，正式提交仍绑定购买草稿并进入教务、财务双审批，不自动生效，不创建渠道支付流水或线上支付分配。
 
 `zsjos_payment_order` 作为 PaymentIntent，状态固定为 `created/waiting/paid/expired/closed`。一个 PurchaseIntent 可有历史支付单，但最多一条活动或已支付记录；旧单失效或关闭后可以在同一 PurchaseIntent 上重新生成新的 PaymentIntent，旧单不复活。`zsjos_payment_gateway_event` 保存脱敏下单、查询、回调和关单事实；`zsjos_payment_transaction` 只保存验签并核对成功的到账事实。
 

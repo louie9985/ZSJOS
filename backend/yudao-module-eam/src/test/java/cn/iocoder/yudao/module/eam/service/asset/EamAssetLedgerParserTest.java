@@ -76,6 +76,16 @@ class EamAssetLedgerParserTest {
     }
 
     @Test
+    void parse_shouldKeepAllAssetStatuses() throws Exception {
+        for (String status : new String[]{"闲置", "在用", "借出", "维修中", "待报废", "已报废", "已丢失", "已冻结", "已退供应商"}) {
+            EamAssetLedgerParser.LedgerRow row = parser.parse(workbook(Map.of(
+                    "分类编码", "IT", "资产名称", "资产", "资产状态", status))).get(0);
+            assertTrue(row.errors().isEmpty(), status);
+            assertTrue(row.status() >= 0 && row.status() <= 8, status);
+        }
+    }
+
+    @Test
     void parseDate_shouldSupportDayMonthAndYearPrecision() {
         assertEquals(LocalDate.of(2026, 6, 23), EamAssetLedgerParser.parseDate("2026/6/23"));
         assertEquals(LocalDate.of(2026, 6, 1), EamAssetLedgerParser.parseDate("2026.6"));

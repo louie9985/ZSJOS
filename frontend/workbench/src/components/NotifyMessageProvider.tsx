@@ -3,7 +3,7 @@ import { createContext, type PropsWithChildren, useCallback, useContext, useEffe
 import { useNavigate } from 'react-router-dom'
 import { api, type NotifyMessage } from '../services/api'
 import { executeNotifyMessageAction } from '../services/notifyMessageAction'
-import { useRealtimeEvent } from './RealtimeProvider'
+import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 
 type NotifyMessageContextValue = {
   unreadCount: number
@@ -17,6 +17,7 @@ const NotifyMessageContext = createContext<NotifyMessageContextValue | null>(nul
 export function NotifyMessageProvider({ children }: PropsWithChildren) {
   const { message, notification } = App.useApp()
   const navigate = useNavigate()
+  const { status } = useRealtime()
   const displayedIds = useRef(new Set<number>())
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -36,6 +37,14 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
   }, [])
 
   useEffect(() => { void refreshUnreadCount() }, [refreshUnreadCount])
+  // WebSocket 断开时不会有 invalidation 送达，轮询是唯一的兜底，否则未读数会长期停在旧值。
+  // 间隔与 MenuTaskBadgeProvider 保持一致：连接正常时放宽，重连中收紧。
+  useEffect(() => {
+    const ms = status === 'open' ? 60_000 : 15_000
+    const timer = window.setInterval(() => void refreshUnreadCount(), ms)
+    return () => window.clearInterval(timer)
+  }, [refreshUnreadCount, status])
+
   useEffect(() => {
     let active = true
     void api.leadRuntimeSetting().then(setting => {

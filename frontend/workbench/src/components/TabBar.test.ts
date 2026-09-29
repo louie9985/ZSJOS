@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkbenchMenu } from '../services/api'
 import { appendMenuTab, MAX_TABS, type TabItem } from './TabBar'
-import { RETAINED_PAGE_PATHS } from '../retainedPagePaths'
 
 const menu = (path: string, name = path): WorkbenchMenu => ({
   id: Number(path.replace(/\D/g, '')) || 1,
@@ -16,11 +15,21 @@ const menu = (path: string, name = path): WorkbenchMenu => ({
 
 describe('Workbench tabs', () => {
   it('never evicts a retained editor when opening more than the tab limit', () => {
+    const retainedPaths = ['/configured/editor-a', '/configured/editor-b']
     let tabs = appendMenuTab([], menu('/home'))
-    for (const path of RETAINED_PAGE_PATHS) tabs = appendMenuTab(tabs, menu(path))
-    for (let index = 0; index < MAX_TABS * 2; index++) tabs = appendMenuTab(tabs, menu(`/other/${index}`))
+    for (const path of retainedPaths) tabs = appendMenuTab(tabs, menu(path), undefined, retainedPaths)
+    for (let index = 0; index < MAX_TABS * 2; index++) tabs = appendMenuTab(tabs, menu(`/other/${index}`), undefined, retainedPaths)
     expect(tabs).toHaveLength(MAX_TABS)
-    for (const path of RETAINED_PAGE_PATHS) expect(tabs.some(tab => tab.key === path)).toBe(true)
+    for (const path of retainedPaths) expect(tabs.some(tab => tab.key === path)).toBe(true)
+  })
+  it('uses the latest cache policy when choosing an eviction candidate', () => {
+    let tabs: TabItem[] = []
+    const paths = Array.from({ length: MAX_TABS + 1 }, (_, index) => `/page/${index}`)
+    for (const path of paths) tabs = appendMenuTab(tabs, menu(path), undefined, paths)
+    expect(tabs).toHaveLength(MAX_TABS + 1)
+    tabs = appendMenuTab(tabs, menu('/next'), undefined, paths.filter(path => path !== '/page/1'))
+    expect(tabs.some(tab => tab.key === '/page/1')).toBe(false)
+    expect(tabs.some(tab => tab.key === '/page/2')).toBe(true)
   })
   it('reuses the menu identity while remembering the latest account address', () => {
     const first = appendMenuTab([], menu('/zsjos/media-students', '媒体学员'), '/zsjos/media-students?personId=1&accountId=2')

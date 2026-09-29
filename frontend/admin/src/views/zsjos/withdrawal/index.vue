@@ -140,7 +140,7 @@
       <el-descriptions-item v-if="detail.status === 'paid' && canViewFinance" label="打款时间">{{
         formatDate(detail.paidAt) || '-'
       }}</el-descriptions-item>
-      <el-descriptions-item v-if="detail.status === 'paid' && canViewFinance" label="备注">{{
+      <el-descriptions-item v-if="detail.status === 'paid' && canViewFinance" label="打款备注">{{
         detail.payoutRemark || '-'
       }}</el-descriptions-item>
     </el-descriptions>

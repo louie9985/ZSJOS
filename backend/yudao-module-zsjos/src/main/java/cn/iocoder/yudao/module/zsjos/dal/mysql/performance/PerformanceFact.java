@@ -3,8 +3,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 @Data public class PerformanceFact {
- private Boolean currentQualification; private Boolean currentAssignment;
+ private Long ownerUserId; private Boolean currentQualification; private Boolean currentAssignment;
+ private String generationSource;
  private String channelCode;
+ private String sourceType; private Long sourceProviderUserId;
  private String outcome; private LocalDateTime endedAt;
  private Long id; private String number; private Long leadId; private Long userId; private String userName;
  private LocalDateTime occurredAt; private LocalDateTime receivedAt; private LocalDateTime dueAt; private LocalDateTime completedAt;

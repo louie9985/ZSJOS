@@ -418,6 +418,35 @@ class LeadFollowUpServiceImplTest {
         verifyNoInteractions(lifecycleTaskService);
     }
 
+    @Test
+    void automaticFollowUpAllowsNoReminderAndPreservesRecordedSnapshots() {
+        LeadDO lead=validLead().setSourceType("sales_self_sourced").setSourceProviderRecorded(true).setDispatchMode("self")
+                .setRemark("已联系，有意向").setLeadCategoryLabelSnapshot("录单分类")
+                .setSalesStage("pending_contact").setSalesStageLabelSnapshot("录单阶段");
+        when(leadMapper.selectByIdForUpdate(1L,9L)).thenReturn(lead);
+        when(dictDataApi.getDictDataList("zsjos_lead_follow_up_method")).thenReturn(List.of(dict("other","其他方式")));
+        when(dictDataApi.getDictDataList("zsjos_lead_follow_up_result")).thenReturn(List.of(dict("interested","有意向")));
+        when(attachmentService.validateReferences(anyList(),eq(20L))).thenReturn(Map.of());
+        doAnswer(call->{call.<LeadFollowUpRecordDO>getArgument(0).setId(40L);return 1;}).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        var result=withTenant(()->service.createSelfSourcedAutomatic(1L,20L,null));
+        assertEquals("other",result.getMethod());assertEquals("录单分类",result.getCategoryAfterLabel());
+        assertEquals("录单阶段",result.getSalesStageAfterLabelSnapshot());assertTrue(result.getFirstInAssignment());
+        assertNotNull(lead.getCurrentAssignmentFirstFollowUpAt());assertEquals(1,lead.getFollowUpCount());
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L),eq(20L),eq("lead"),eq(40L),isNull(),any());
+        verify(dictDataApi,never()).getDictDataList("zsjos_lead_category");
+    }
+
+    @Test
+    void automaticFollowUpRejectsOtherEntrypointsAndReusedCycles() {
+        for (int scenario=0;scenario<5;scenario++) {
+            LeadDO lead=validLead().setSourceType("sales_self_sourced").setSourceProviderRecorded(true).setDispatchMode("self").setRemark("备注");
+            switch(scenario) {case 0 -> lead.setSourceType("education_self_sourced");case 1 -> lead.setSourceProviderUserId(3L);case 2 -> lead.setOwnerUserId(99L);case 3 -> lead.setSourceProviderRecorded(false);default -> lead.setCurrentAssignmentFirstFollowUpAt(LocalDateTime.now());}
+            when(leadMapper.selectByIdForUpdate(1L,9L)).thenReturn(lead);
+            assertThrows(ServiceException.class,()->withTenant(()->service.createSelfSourcedAutomatic(1L,20L,null)));
+        }
+        verify(recordMapper,never()).insert(any(LeadFollowUpRecordDO.class));
+    }
+
     private void stubSuccessfulCreate(LeadDO lead) {
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(recordMapper.selectByIdempotencyKey("request-1")).thenReturn(null);

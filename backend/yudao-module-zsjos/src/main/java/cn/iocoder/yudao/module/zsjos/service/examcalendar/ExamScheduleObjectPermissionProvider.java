@@ -15,6 +15,7 @@ public class ExamScheduleObjectPermissionProvider implements ZsjosObjectPermissi
 
     @Resource private ExamScheduleMapper mapper;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationAccess notificationAccess;
 
     @Override
     public String getBizType() {
@@ -23,9 +24,16 @@ public class ExamScheduleObjectPermissionProvider implements ZsjosObjectPermissi
 
     @Override
     public boolean hasPermission(Long id, String action, Long userId) {
-        return mapper.selectById(id) != null
-                && permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE)
-                && ("update".equals(action) || "publish".equals(action) || "revoke".equals(action));
+        if (id == null || id <= 0 || userId == null) return false;
+        var row = mapper.selectById(id);
+        if (row == null || Boolean.TRUE.equals(row.getDeleted()) || !java.util.Objects.equals(row.getTenantId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) return false;
+        if ("notify".equals(action)) {
+            try { return notificationAccess.checkForUser("EXAM", false, userId); }
+            catch (cn.iocoder.yudao.framework.common.exception.ServiceException denied) { return false; }
+        }
+        return permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE)
+                && ("update".equals(action) || "publish".equals(action) || "revoke".equals(action) || "maintain".equals(action));
     }
 
     @Override

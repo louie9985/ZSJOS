@@ -1,66 +1,36 @@
-import { Alert, App, Avatar, Badge, Button, Empty, Popover, Skeleton, Tooltip } from 'antd'
+import { Alert, App, Badge, Button, Empty, Popover, Skeleton, Tooltip } from 'antd'
 import { BellOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
-import { useCallback, useRef, useState, type UIEvent } from 'react'
+import { useState, type UIEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
-import { api, type NotifyMessage } from '../services/api'
-import { buildNotifyMessageCursorParams } from '../services/notifyMessage'
+import type { NotifyMessage } from '../services/api'
+import { notifyMessageSenderName } from '../services/notifyMessage'
 import { executeNotifyMessageAction } from '../services/notifyMessageAction'
+import { notifyMessageCategoryLabelOf, useNotifyMessageCategories } from '../services/notifyMessageCategory'
 import { formatTimestamp } from '../services/time'
+import { useNotifyMessageFeed } from '../services/useNotifyMessageFeed'
+import MessageCategoryIcon from './MessageCategoryIcon'
 import { useNotifyMessages } from './NotifyMessageProvider'
 
 export default function MessageCenter() {
   const { message } = App.useApp()
   const navigate = useNavigate()
-  const requestSequence = useRef(0)
   const { unreadCount, loading: countLoading, error: countError, refreshUnreadCount } = useNotifyMessages()
+  const { categories } = useNotifyMessageCategories()
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<NotifyMessage[]>([])
-  const [cursor, setCursor] = useState<string>()
-  const [hasMore, setHasMore] = useState(true)
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
+  // 弹窗打开才拉取未读列表；enabled 由关闭转为打开时 hook 会自行加载，
+  // 这里不再显式 reload，避免同一次打开发出两个请求。
+  const feed = useNotifyMessageFeed({ view: 'unread', enabled: open })
   const title = countError ? `消息中心：${countError}` : '消息中心'
-
-  const loadUnreadMessages = useCallback(async (append = false) => {
-    const requestId = ++requestSequence.current
-    if (append) setLoadingMore(true)
-    else {
-      setLoading(true)
-      setMessages([])
-      setCursor(undefined)
-      setHasMore(true)
-    }
-    try {
-      const data = await api.myNotifyMessageCursor(buildNotifyMessageCursorParams('unread', append ? cursor : undefined))
-      if (requestId !== requestSequence.current) return
-      setMessages(current => append
-        ? [...current, ...data.list.filter(item => !current.some(existing => existing.id === item.id))]
-        : data.list)
-      setCursor(data.nextCursor)
-      setHasMore(data.hasMore)
-      setError('')
-    } catch (loadError) {
-      if (requestId !== requestSequence.current) return
-      setError(loadError instanceof Error ? loadError.message : '未读消息加载失败')
-    } finally {
-      if (requestId === requestSequence.current) {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    }
-  }, [cursor])
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen)
-    if (nextOpen) void loadUnreadMessages(false)
   }
 
   const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
     const target = event.currentTarget
     const nearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 80
-    if (nearBottom && hasMore && !loading && !loadingMore) void loadUnreadMessages(true)
+    if (nearBottom && feed.hasMore && !feed.loading && !feed.loadingMore) void feed.loadMore()
   }
 
   const openMessage = (item: NotifyMessage) => {
@@ -81,41 +51,41 @@ export default function MessageCenter() {
 
   const content = <div className="message-center-popup">
     <div className="message-center-popup-list" aria-live="polite" onScroll={handleListScroll}>
-      {loading && messages.length === 0
+      {feed.loading && feed.messages.length === 0
         ? <div className="message-center-popup-skeleton"><Skeleton active avatar paragraph={{ rows: 3 }}/></div>
-        : error && messages.length === 0
+        : feed.error && feed.messages.length === 0
           ? <div className="message-center-popup-state"><Alert
               type="error"
               showIcon
               message="未读消息加载失败"
-              description={error}
-              action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadUnreadMessages(false)}>重试</Button>}
+              description={feed.error}
+              action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void feed.reload()}>重试</Button>}
             /></div>
-          : messages.length === 0
+          : feed.messages.length === 0
             ? <div className="message-center-popup-state"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无未读消息"/></div>
             : <>
-              {messages.map(item => {
-                const sender = item.templateNickname?.trim() || '系统消息'
+              {feed.messages.map(item => {
+                const sender = notifyMessageSenderName(item)
                 return <button
                   key={item.id}
                   type="button"
                   className="message-center-popup-item"
                   onClick={() => openMessage(item)}
                 >
-                  <Avatar size={36} icon={<BellOutlined/>}/>
+                  <span className="message-center-popup-icon"><MessageCategoryIcon category={item.category} size={18}/></span>
                   <span className="message-center-popup-copy">
                     <strong>{item.templateTitle || sender}</strong>
                     <span>{item.templateSummary || '暂无摘要'}</span>
-                    <time>{formatTimestamp(item.createTime)}</time>
+                    <time>{notifyMessageCategoryLabelOf(categories, item.category)} · {formatTimestamp(item.createTime)}</time>
                   </span>
                 </button>
               })}
               <div className="message-center-popup-load-more">
-                {error
-                  ? <Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadUnreadMessages(true)}>加载失败，重试</Button>
-                  : loadingMore
+                {feed.error
+                  ? <Button size="small" icon={<ReloadOutlined/>} onClick={() => void feed.loadMore()}>加载失败，重试</Button>
+                  : feed.loadingMore
                     ? '加载中...'
-                    : hasMore ? '继续下滑加载' : '已加载全部未读消息'}
+                    : feed.hasMore ? '继续下滑加载' : '已加载全部未读消息'}
               </div>
             </>}
     </div>

@@ -78,6 +78,7 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
         when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 20L,
@@ -99,6 +100,7 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
         when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey("transfer-completed")).thenReturn(replay);
 
         Long result = service.create(3L, 20L,
@@ -152,6 +154,36 @@ class LeadTransferRequestServiceImplTest {
     }
 
     @Test
+    void createAllowsEligibleSalesToRequestTransferFromWaitingCycle() {
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("waiting_assignment");
+        cycle.setOriginalOwnerUserId(10L);
+        LeadDO lead = new LeadDO(); lead.setId(2L); lead.setLeadNo("KZ202608160000000002"); lead.setOwnerUserId(10L);
+        when(cycleMapper.selectById(3L)).thenReturn(cycle);
+        when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
+        when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
+        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(requestMapper.selectByIdempotencyKey("waiting-transfer")).thenReturn(null);
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(100L);
+        AdminUserRespDTO requester = new AdminUserRespDTO(); requester.setId(20L); requester.setDeptId(100L);
+        when(adminUserApi.getUser(10L)).thenReturn(owner);
+        when(adminUserApi.getUser(20L)).thenReturn(requester);
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(100L); dept.setLeaderUserId(30L);
+        when(deptApi.getDept(100L)).thenReturn(dept);
+        doAnswer(invocation -> { ((LeadTransferRequestDO) invocation.getArgument(0)).setId(9L); return 1; })
+                .when(requestMapper).insert(any(LeadTransferRequestDO.class));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-waiting-transfer");
+
+        Long result = service.create(3L, 20L,
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        .setIdempotencyKey("waiting-transfer").setReason("持续跟进"));
+
+        assertEquals(9L, result);
+        verify(processInstanceApi).createProcessInstance(eq(20L), any());
+    }
+
+    @Test
     void createRejectsIdempotencyReplayFromAnotherCycleAfterAuthorization() {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
@@ -162,6 +194,7 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
         when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey("transfer-replay")).thenReturn(replay);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
@@ -237,6 +270,7 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
         when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey(idempotencyKey)).thenReturn(null);
         AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(100L);
         AdminUserRespDTO requester = new AdminUserRespDTO(); requester.setId(20L); requester.setDeptId(100L);

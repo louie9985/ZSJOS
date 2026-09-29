@@ -17,6 +17,25 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/cashback")
 public class CashbackController {
     @Resource private CashbackService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.cashback.CashbackControlService control;
+
+    @PutMapping("/{id}/block")
+    @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query') && @ss.hasPermission('zsjos:cashback:block')")
+    public CommonResult<Boolean> block(@PathVariable Long id, @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackControlReqVO request) {
+        control.block(id, request); return success(true);
+    }
+    @PutMapping("/{id}/unblock")
+    @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query') && @ss.hasPermission('zsjos:cashback:unblock')")
+    public CommonResult<Boolean> unblock(@PathVariable Long id, @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackControlReqVO request) {
+        control.unblock(id, request); return success(true);
+    }
+    @GetMapping("/{id}/control-history")
+    @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query')")
+    public CommonResult<PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackControlLogRespVO>> controlHistory(
+            @PathVariable Long id, @Valid cn.iocoder.yudao.framework.common.pojo.PageParam page) {
+        return success(control.history(id, page));
+    }
+
     @Resource private cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService traceService;
 
     @PostMapping("/search-page")

@@ -3,7 +3,8 @@ import type { MaterialVersion } from './materialApi'
 import type { Timestamp } from './time'
 export type MaterialApproval = {
   typeCode?: string
-  task: { id: string; status?: number; reason?: string; createTime?: Timestamp; endTime?: Timestamp }
+  /** processInstanceId 由后端透传，供流程面板查询审批轨迹；缺省时面板整体不渲染。 */
+  task: { id: string; status?: number; reason?: string; createTime?: Timestamp; endTime?: Timestamp; processInstanceId?: string }
   versionId: number
   materialNo: string
   title: string

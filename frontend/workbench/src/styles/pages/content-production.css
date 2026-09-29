@@ -123,11 +123,16 @@
 
 .content-production-current,
 .content-production-history,
+.content-production-published,
 .content-production-editor {
   margin-top: var(--crm-gap);
   padding: var(--crm-card-pad);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-md);
+}
+
+.content-production-published > h5 {
+  margin: 0 0 var(--crm-sp-3);
 }
 
 .content-production-current {

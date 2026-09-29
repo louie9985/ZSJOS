@@ -59,8 +59,7 @@ public class ClassTransferServiceImpl implements ClassTransferService {
         DeliveryClassDO target = classMapper.selectByIdForUpdate(req.getTargetClassId(), relation.getTenantId());
         if (source == null || Boolean.TRUE.equals(source.getSystemClass()) || target == null
                 || Boolean.TRUE.equals(target.getSystemClass()) || !"SERVING".equals(target.getStatus())
-                || Objects.equals(source.getId(), target.getId())
-                || !Objects.equals(source.getCategoryId(), target.getCategoryId())) throw exception(CLASS_TRANSFER_INVALID);
+                || Objects.equals(source.getId(), target.getId())) throw exception(CLASS_TRANSFER_INVALID);
         deliveryClassService.validateHomeroom(target.getHomeroomUserId());
         if (mapper.selectPendingByRelation(relationId) != null) throw exception(CLASS_TRANSFER_ACTIVE);
         AdminUserRespDTO applicant = adminUserApi.getUser(userId);
@@ -136,7 +135,6 @@ public class ClassTransferServiceImpl implements ClassTransferService {
                     || !Objects.equals(relation.getVersion(), request.getServiceRelationVersion())
                     || source == null || Boolean.TRUE.equals(source.getSystemClass())
                     || target == null || !"SERVING".equals(target.getStatus()) || Boolean.TRUE.equals(target.getSystemClass())
-                    || !Objects.equals(source.getCategoryId(), target.getCategoryId())
                     || !Objects.equals(target.getHomeroomUserId(), request.getTargetHomeroomUserId())
                     || !targetOwnerEligible;
             if (stale) {

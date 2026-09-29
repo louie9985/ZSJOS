@@ -30,6 +30,23 @@ class AdvancedFilterTemplateServiceImplTest {
     @InjectMocks private AdvancedFilterTemplateServiceImpl service;
     @Mock private AdvancedFilterTemplateMapper mapper;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    @Test void mediaTemplateRequiresMediaQueryPermissionAndKeepsPersonalOwnership() {
+        var request = request(false); request.setScene("media_student"); request.setPageKey("media_students");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.createPersonal(request, 11L));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.visibleList("media_student", "media_students", 11L));
+        when(permissionApi.hasAnyPermissions(11L, "zsjos:media-student:query-my")).thenReturn(true);
+        when(advancedFilterService.supportsScene("media_student")).thenReturn(true);
+        service.createPersonal(request, 11L);
+        verify(mapper).insert(any(AdvancedFilterTemplateDO.class));
+        var other = template("personal", 22L); other.setScene("media_student");
+        when(mapper.selectById(9L)).thenReturn(other);
+        assertThrows(ServiceException.class, () -> service.deletePersonal(9L, 11L));
+    }
+
 
     @Test
     void createPersonalStoresStructuredFilterAndClearsOtherDefault() {

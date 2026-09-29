@@ -13,8 +13,12 @@ public final class PerformanceCalendar {
   for(var receipt:received){
    var rounds=tasks.stream().filter(t->"lead_qualification".equals(t.getGroupKey())&&Objects.equals(t.getLeadId(),receipt.getLeadId())&&Objects.equals(t.getUserId(),receipt.getUserId())&&Objects.equals(t.getAssignmentId(),receipt.getAssignmentId())).toList();
    var task=rounds.stream().max(Comparator.comparing(PerformanceFact::getId)).orElse(null);
-   var originalDeadline=rounds.stream().map(PerformanceFact::getDueAt).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
+   var originalDeadline=rounds.stream().filter(t->!cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.SOURCE.equals(t.getGenerationSource())).map(PerformanceFact::getDueAt).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
    if(task==null||task.getOutcome()==null){unknown++;continue;}
+   if(cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.SOURCE.equals(task.getGenerationSource())) {
+    if("valid".equals(task.getOutcome()))valid++;else if("invalid".equals(task.getOutcome()))invalid++;else ended++;
+    continue;
+   }
    boolean judged=Set.of("valid","invalid").contains(task.getOutcome());
    boolean completedCycle=judged||"ended".equals(task.getOutcome())||Boolean.FALSE.equals(task.getCurrentAssignment());
    // A cancelled responsibility is not a successful qualification. Keep its past deadline in the timeliness denominator.

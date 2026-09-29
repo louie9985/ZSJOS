@@ -82,6 +82,8 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 57 | 内容审核 | `/zsjos/material-library/content-review` | `ContentReviewBatchPage` | Workbench 原生页 |
 | 58 | 内容生产 | `/zsjos/material-library/content-production` | `ContentProductionPage` | Workbench 原生页 |
 
+通知公告的只读查看页仅在存在附件时展示附件标题与列表；无附件时不展示附件区域或“无附件”占位。此规则适用于 React 员工工作台与 Vue 管理端。
+
 兼职管理页面节点本身不携带权限标识。其子权限 `zsjos:partner:query`、
 `zsjos:partner:manage`、`zsjos:partner:manage-all` 分别提供现有扩展只读范围、严格本人只读范围和
 全租户管理范围；两端仅对 `manage-all` 展示修改操作。
@@ -104,6 +106,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。
 - 强制表单管理页是 Vue Admin 配置面，使用服务端权限 `zsjos:forced-form:*`，不作为 Workbench 可导航页面注册。员工端通过全局 `ForcedFormProvider` 在登录、刷新、路由切换、401 恢复和 WebSocket 重连后查询 `/zsjos/forced-form/pending`，有待办时显示不可关闭填写面并阻断普通业务接口。
 - `/zsjos/my-students` 仅属于 `study_planner`；`content_director` 和 `new_media_operator` 共用 `/zsjos/media-students` 与 `zsjos:media-student:query-my`，后端分别按服务关系、账号责任关系和本人任务限制学员范围。
+- V283 定义 `/zsjos/media-lead-analysis` 和 `/zsjos/media-lead-target` 两个 Workbench 菜单及独立的新媒体按钮权限；角色授权仅由 System 角色管理配置。Vue Admin 会过滤这两个仅由 React Workbench 渲染的组件键，保留其他已授权的 Vue 页面。大盘本人、部门、中心范围同时受后端业务权限和 System 数据范围约束；目标与组织配置不复用销售业绩权限或销售组织映射。部署与真实账号验收状态见 [新媒体客资分析契约](../api/media-lead-analysis.md)。
 - `/zsjos/accounts`、`/zsjos/content`、`/zsjos/positioning` 的页面菜单由 V113 退役。稳定的查询和操作权限字符串保留，并调整到学员菜单下；账号、内容和定位只能从具体学员的相应标签进入。
 The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.
 

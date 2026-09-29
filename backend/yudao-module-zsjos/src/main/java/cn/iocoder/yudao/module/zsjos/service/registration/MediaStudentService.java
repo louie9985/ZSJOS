@@ -39,6 +39,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_
 
 @Service
 public class MediaStudentService {
+    @Resource private MediaStudentServicePeriodService servicePeriodService;
     public PageResult<MediaStudentListRespVO> getPage(
             Long userId, MyStudentPageReqVO request) {
         var page = myStudentService.getMediaPage(userId, request);
@@ -79,6 +80,7 @@ public class MediaStudentService {
         boolean readAll = permissionApi.hasTenantReadAllAccess(userId);
         MediaStudentDetailRespVO result = new MediaStudentDetailRespVO();
         result.setStudent(myStudentService.getMediaStudent(userId, personId));
+        result.setCanUpdateServicePeriod(servicePeriodService.canUpdate(userId, personId));
         // Student visibility does not authorize all accounts under that person.
         List<MediaAccountDO> accounts = accountMapper.selectByStudent(personId).stream()
                 .filter(account -> accountPermissionProvider.hasPermission(account.getId(), "read", userId)).toList();

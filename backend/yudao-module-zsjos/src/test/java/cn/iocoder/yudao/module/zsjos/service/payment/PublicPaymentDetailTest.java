@@ -51,9 +51,10 @@ class PublicPaymentDetailTest {
         ReflectionTestUtils.setField(service, "productSkuMapper", skus);
     }
 
-    @Test
-    void newPaymentFreezesAuthoritativeNamesAndSpecsButKeepsNegotiatedPrices() {
-        var request = prepareDraft();
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"3980.00,680.00", "0.00,0.01"})
+    void newPaymentFreezesAuthoritativeNamesAndSpecsButKeepsNegotiatedPrices(String firstAmount, String secondAmount) {
+        var request = prepareDraft(firstAmount, secondAmount);
         when(subjects.resolve(any())).thenReturn(new PaymentSubjectDO());
         when(products.validateLeadProduct("COURSE-1", false, "sku_random1", false)).thenReturn(product("课程一", "高级班"));
         when(products.validateLeadProduct("COURSE-2", false, "sku_random2", false)).thenReturn(product("课程二", "基础班"));
@@ -73,9 +74,9 @@ class PublicPaymentDetailTest {
         assertEquals("课程一", snapshots.getFirst().productName());
         assertEquals("高级班", snapshots.getFirst().skuName());
         assertEquals("线上授课", snapshots.getFirst().specs().getFirst().label());
-        assertEquals(new BigDecimal("3980.00"), snapshots.getFirst().actualAmount());
-        assertEquals(new BigDecimal("680.00"), snapshots.getLast().actualAmount());
-        assertEquals(new BigDecimal("4660.00"), payment.getExpectedAmount());
+        assertEquals(new BigDecimal(firstAmount), snapshots.getFirst().actualAmount());
+        assertEquals(new BigDecimal(secondAmount), snapshots.getLast().actualAmount());
+        assertEquals(new BigDecimal(firstAmount).add(new BigDecimal(secondAmount)), payment.getExpectedAmount());
         // Existing command readers must still deserialize the original reference/amount fields.
         var compatible = JsonUtils.parseArray(payment.getProductItemsSnapshot(), PurchaseIntentSaveDraftReqVO.Item.class);
         assertEquals("COURSE-1", compatible.getFirst().getSpuRef());
@@ -224,13 +225,18 @@ class PublicPaymentDetailTest {
     }
 
     private PurchaseIntentSaveDraftReqVO prepareDraft() {
+        return prepareDraft("3980.00", "680.00");
+    }
+
+    private PurchaseIntentSaveDraftReqVO prepareDraft(String firstAmount, String secondAmount) {
         var request = new PurchaseIntentSaveDraftReqVO();
         request.setCollectionMode("online_link");
-        request.setItems(List.of(item("COURSE-1", "sku_random1", "3980.00"), item("COURSE-2", "sku_random2", "680.00")));
+        request.setItems(List.of(item("COURSE-1", "sku_random1", firstAmount), item("COURSE-2", "sku_random2", secondAmount)));
+        request.setTotalAmount(new BigDecimal(firstAmount).add(new BigDecimal(secondAmount)));
         var saved = new PurchaseIntentRespVO();
         saved.setId(1L);
         doReturn(saved).when(service).saveDraft(request, 7L);
-        var intent = new PurchaseIntentDO().setId(1L).setTotalAmount(new BigDecimal("4660.00"))
+        var intent = new PurchaseIntentDO().setId(1L).setTotalAmount(request.getTotalAmount())
                 .setItemSnapshotJson(JsonUtils.toJsonString(request.getItems()));
         when(intents.selectByIdForUpdate(1L)).thenReturn(intent);
         return request;

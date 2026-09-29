@@ -1,20 +1,21 @@
 # AI Handoff Guide
 
-This file is the stable repository-wide guide for AI workstream handoffs. Parallel workstreams keep their active, append-only logs in uniquely owned files under `handoff/`; this root file is not updated for each AI turn and does not maintain a dynamic index.
+This file is the stable repository-wide guide for AI workstream handoffs. Workstreams keep their active, append-only logs under `handoff/` according to `AGENTS.md` sections 7 and 8; this root file is not updated for each AI turn and does not maintain a dynamic index.
 
 ## Workstream layout
 
-- Use one file per workstream: `handoff/<workstream-id>.md`.
-- Use the same workstream ID in the AI branch name: `codex/<workstream-id>`.
-- Assign one branch, one worktree, and one handoff-file owner to each active workstream.
+- Use the current branch and worktree by default; parallel execution does not require a new branch or worktree. Resolve the environment using `ZSJOS_AGENT_ENV`, then `/etc/zsjos/agent-environment`, then `local`; accepted values are `local`, `test`, and `production`. Reject any other explicit value.
+- Shared-main work uses `handoff/main.md` for `local`, `handoff/test_main.md` for `test`, or `handoff/pro_main.md` for `production`. Independently owned concurrent workstreams in the same worktree use separate `handoff/<environment>-<workstream-id>.md` files instead of competing for the default log.
+- Give each file one active workstream owner. Within a coordinated workstream, record task-level file ownership in the existing registration and let its designated owner append the consolidated log. Independent reads and checks can run in parallel; disjoint file edits can run in parallel once shared contracts and prerequisites are settled. Serialize only writes to the same file or commands with conflicting resources. Release ownership on delivery or explicit handoff.
+- When the user explicitly requests branch/worktree isolation, use one branch, one worktree, and one uniquely owned `handoff/<workstream-id>.md` file per isolated workstream. Use `codex/<workstream-id>` for the AI branch unless the user specifies otherwise; Git operations retain their explicit-authorization requirements.
 - Discover workstreams by listing the `handoff/` directory rather than editing a shared index.
 - Preserve completed workstream files as delivery history; update their status instead of deleting them.
 
 ## Required workstream metadata
 
-Each workstream file records its ID, status, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan before implementation begins.
+Each workstream registration records its ID, status, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan before implementation begins. Use `None` for target branch and integration order when no branch integration is planned. Reuse an active registration; update only changed scope, ownership, dependencies, verification, or execution context.
 
-Allowed status values are `planned`, `active`, `blocked`, `ready-to-merge`, and `merged`.
+Allowed status values are `planned`, `active`, `blocked`, `completed`, `ready-to-merge`, and `merged`. Use `completed` for delivered work with no pending branch integration; reserve `ready-to-merge` and `merged` for isolated branch integration.
 
 ## Per-turn entry template
 

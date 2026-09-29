@@ -1234,7 +1234,7 @@ export function StudentPlannerOperations({ student, service, context, permission
   const [examDateSaving, setExamDateSaving] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferSaving, setTransferSaving] = useState(false);
-  const [transferTargets, setTransferTargets] = useState<DeliveryClass[]>([]);
+  const [transferTargets, setTransferTargets] = useState<DeliveryClassOption[]>([]);
   const [transferTargetId, setTransferTargetId] = useState<number>();
   const [transferReason, setTransferReason] = useState("");
   const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
@@ -1335,9 +1335,7 @@ export function StudentPlannerOperations({ student, service, context, permission
   const openTransfer = async () => {
     setTransferOpen(true); setTransferReason(""); setTransferTargetId(undefined);
     try {
-      const manage = hasPermission(permissions, "zsjos:delivery-class:query-managed");
-      const page = await api.deliveryClasses.page({ pageNo: 1, pageSize: 100, status: "SERVING" }, manage);
-      setTransferTargets(page.list.filter(row => !row.systemClass));
+      setTransferTargets(await api.deliveryClasses.options(undefined, false));
     } catch (error) { message.error(errorMessage(error)); setTransferTargets([]); }
   };
   const submitTransfer = async () => {

@@ -5,6 +5,12 @@
         <el-button link type="primary" @click="load">重试</el-button>
       </el-alert>
       <article v-else-if="notice">
+        <el-tabs v-model="activeTab">
+          <el-tab-pane name="content" label="公告正文" />
+          <el-tab-pane name="reading" label="阅读情况" />
+        </el-tabs>
+        <NoticeReadStatistics v-if="activeTab === 'reading' && notice.id != null" :key="notice.id" :id="notice.id" />
+        <div v-else>
         <h2>{{ notice.title }}</h2>
         <el-descriptions :column="1" border>
           <el-descriptions-item label="公告类型"><dict-tag :type="DICT_TYPE.SYSTEM_NOTICE_TYPE" :value="notice.type" /></el-descriptions-item>
@@ -17,11 +23,13 @@
           <el-descriptions-item label="高亮截止时间">{{ notice.highlightUntil ? formatDate(notice.highlightUntil) : '-' }}</el-descriptions-item>
         </el-descriptions>
         <div v-dompurify-html="notice.content || ''" class="notice-detail-content"></div>
-        <h3>附件</h3>
-        <el-empty v-if="!notice.attachments?.length" description="无附件" :image-size="48" />
-        <div v-for="file in notice.attachments" :key="file.infraFileId">
-          <a v-if="safeUrl(file.downloadUrl)" :href="safeUrl(file.downloadUrl)" target="_blank" rel="noopener noreferrer">{{ file.fileName }}</a>
-          <span v-else>{{ file.fileName }}（文件不可用）</span>
+        <template v-if="notice.attachments?.length">
+          <h3>附件</h3>
+          <div v-for="file in notice.attachments" :key="file.infraFileId">
+            <a v-if="safeUrl(file.downloadUrl)" :href="safeUrl(file.downloadUrl)" target="_blank" rel="noopener noreferrer">{{ file.fileName }}</a>
+            <span v-else>{{ file.fileName }}（文件不可用）</span>
+          </div>
+        </template>
         </div>
       </article>
     </div>
@@ -30,10 +38,12 @@
 
 <script setup lang="ts">
 import * as NoticeApi from '@/api/system/notice'
+import NoticeReadStatistics from './NoticeReadStatistics.vue'
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
 
 const visible = ref(false)
+const activeTab = ref('content')
 const loading = ref(false)
 const error = ref('')
 const notice = ref<NoticeApi.NoticeVO>()
@@ -55,7 +65,7 @@ const load = async () => {
     if (current === generation) error.value = cause instanceof Error ? cause.message : '公告详情加载失败'
   } finally { if (current === generation) loading.value = false }
 }
-const open = (id: number) => { noticeId.value = id; visible.value = true; void load() }
+const open = (id: number) => { activeTab.value = 'content'; noticeId.value = id; visible.value = true; void load() }
 watch(visible, value => { if (!value) { generation++; notice.value = undefined } })
 defineExpose({ open })
 </script>

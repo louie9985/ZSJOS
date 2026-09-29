@@ -33,7 +33,7 @@ const legacyResultLabels: Record<string, string> = {
 const duplicateFlagLabels: Record<string, string> = {
   none: '未发现重复', strong_duplicate: '强重复', suspected_duplicate: '疑似重复'
 }
-const resultLabel = (value?: string) => value ? (labels[value as ResultType] ?? legacyResultLabels[value] ?? value) : value
+const resultLabel = (value?: string) => value ? (labels[value as ResultType] ?? legacyResultLabels[value] ?? '未知结论') : '—'
 
 type DuplicateReviewSnapshot = {
   submission: Record<string, unknown>

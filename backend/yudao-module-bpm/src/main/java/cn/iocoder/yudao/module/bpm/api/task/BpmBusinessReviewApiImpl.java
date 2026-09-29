@@ -55,7 +55,7 @@ public class BpmBusinessReviewApiImpl implements BpmBusinessReviewApi {
             Long actor = BpmTaskActorSnapshot.userId(task.getTaskLocalVariables());
             result.setReviewerUserId(actor != null ? actor : numericId(task.getAssignee()));
             result.setReviewerName(BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
-            result.setReason(task.getDescription());
+            result.setReason(FlowableUtils.getTaskReason(task));
             result.setReviewedAt(task.getEndTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
         }
         if (history.getEndTime() != null) return result.setProblem("流程已结束，请刷新；业务未同步时联系管理员核对");

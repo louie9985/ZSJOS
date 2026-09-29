@@ -46,7 +46,7 @@ Workbench扫描src/pages全部非测试TSX；Admin扫描views/zsjos所有index.v
 | MaterialFields, MaterialLibraryPage | [MaterialLibraryPage.tsx](../../frontend/workbench/src/pages/MaterialLibraryPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索并选择生产内容草稿；搜索标题、摘要或内容；搜索账号画像 |
 | MediaCalendarPage | [MediaCalendarPage.tsx](../../frontend/workbench/src/pages/MediaCalendarPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索账号编号或昵称；当下状态 |
 | MediaFeaturePage, AccountsPage, ContentPage, ProductionTicketDetail, ProductionTicketAssignmentHost, PositioningPage | [MediaFeaturePage.tsx](../../frontend/workbench/src/pages/MediaFeaturePage.tsx) | 复用业务页面壳；须随调用方确认 | — | — | 搜索编号、名称或关键词 |
-| MediaStudentsPage | [MediaStudentsPage.tsx](../../frontend/workbench/src/pages/MediaStudentsPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索姓名或手机号；搜索学员 |
+| MediaStudentsPage | [MediaStudentsPage.tsx](../../frontend/workbench/src/pages/MediaStudentsPage.tsx) | AdvancedFilterToolbar | media_student | media_students | 搜索姓名或手机号；服务期；责任运营/账号平台/账号状态 |
 | MessageInboxPage | [MessageInboxPage.tsx](../../frontend/workbench/src/pages/MessageInboxPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索消息标题、摘要或正文 |
 | MySalesOrderPage | [MySalesOrderPage.tsx](../../frontend/workbench/src/pages/MySalesOrderPage.tsx) | 统一目录入口 | order | sales_order_management | 搜索订单号 / 学员姓名 / 手机号 |
 | NoticeManagementPage | [NoticeManagementPage.tsx](../../frontend/workbench/src/pages/NoticeManagementPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索公告标题；全部发布状态 |

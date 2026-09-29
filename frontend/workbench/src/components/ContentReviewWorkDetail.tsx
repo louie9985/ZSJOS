@@ -1,4 +1,5 @@
 import { Image, Tag, Typography } from 'antd'
+import { CommentOutlined } from '@ant-design/icons'
 import { useRef } from 'react'
 import ResourceLink from './ResourceLink'
 import AttachmentCard from './AttachmentCard'
@@ -27,6 +28,20 @@ export default function ContentReviewWorkDetail({ item, batchId }: { item: Conte
   const deliverableUrl = text(snapshot, 'deliverableUrl')
   const plannedAt = typeof snapshot.plannedPublishAt === 'number' || typeof snapshot.plannedPublishAt === 'string' ? snapshot.plannedPublishAt : undefined
   return <>
+    <section className="content-review-opinions" aria-label="作品审核意见">
+      <div className="content-review-opinions-heading"><CommentOutlined /><Typography.Text strong>作品审核意见</Typography.Text></div>
+      {[
+        { label: '编导意见', comment: item.directorComment, decision: item.directorDecision },
+        { label: '终审意见', comment: item.finalComment, decision: item.finalDecision },
+      ].map(({ label, comment, decision }) => <div className="content-review-opinion" key={label}>
+        <div className="content-review-opinion-heading"><Typography.Text strong>{label}</Typography.Text>
+          {decision === 'APPROVED' ? <Tag color="success">通过</Tag> : decision === 'RETURNED' ? <Tag color="error">退回</Tag> : null}
+        </div>
+        <Typography.Paragraph className="content-review-opinion-text">
+          {comment?.trim() ? comment : <Typography.Text type="secondary">{decision ? '未填写意见' : '尚未审核'}</Typography.Text>}
+        </Typography.Paragraph>
+      </div>)}
+    </section>
     <div className="content-review-item-body">
       <div className="content-review-item-cover">
         {cover?.previewUrl ? <Image src={cover.previewUrl} alt={`作品封面图：${cover.originalName}`} /> : <Typography.Text type="secondary">暂无封面图</Typography.Text>}

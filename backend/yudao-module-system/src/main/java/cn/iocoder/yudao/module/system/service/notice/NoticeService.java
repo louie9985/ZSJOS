@@ -31,4 +31,6 @@ public interface NoticeService {
     NoticeMyRespVO getMyNotice(Long id, Long userId);
     NoticeUnreadSummaryRespVO getUnreadSummary(Long userId);
     void markRead(Long id, Long userId);
+    NoticeReadSummaryRespVO getReadSummary(Long id);
+    PageResult<NoticeReadPersonRespVO> getReadPage(NoticeReadPageReqVO reqVO);
 }

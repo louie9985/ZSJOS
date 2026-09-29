@@ -43,6 +43,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
+    @Resource private LeadSelfSourcedAutomationService selfSourcedAutomation;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper eventMapper;
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
     @Resource private PersonMapper personMapper;
@@ -230,8 +232,13 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             return LeadCreateRespVO.reviewPending(review.getId());
         }
 
-        return createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
+        boolean automatic = selfSourced && identity.identity() == LeadSubmissionIdentityService.Identity.SALES && reqVO.getNewMediaProviderUserId() == null;
+        if (automatic) selfSourcedAutomation.validate(reqVO, actorUserId);
+        LeadCreateRespVO created = createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
                 requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
+        if (!automatic) return created;
+        selfSourcedAutomation.complete(created.getLeadId(), actorUserId, reqVO.getSelfSourcedNextFollowUpAt());
+        return response(leadMapper.selectById(created.getLeadId()), "created");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -642,10 +649,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName());
     }
 
-    private static LeadCreateRespVO response(LeadDO lead, String outcome) {
+    private LeadCreateRespVO response(LeadDO lead, String outcome) {
         LeadCreateRespVO response = new LeadCreateRespVO(
                 lead.getId(), outcome, lead.getAssignmentStatus(), lead.getPendingAssigneeUserId());
         response.setLeadNo(lead.getLeadNo());
+        response.setQualificationStatus(LeadStateProjection.qualification(lead));
+        response.setAutomaticQualificationApplied(false);
+        if ("created".equals(outcome) && SOURCE_SALES_SELF.equals(lead.getSourceType()) && lead.getSourceProviderUserId() == null) {
+            var event = eventMapper.selectByIdempotencyKey(LeadAutomaticGeneration.qualificationEventKey(lead.getId()));
+            response.setAutomaticQualificationApplied(event != null && LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs()));
+        }
         return response;
     }
 

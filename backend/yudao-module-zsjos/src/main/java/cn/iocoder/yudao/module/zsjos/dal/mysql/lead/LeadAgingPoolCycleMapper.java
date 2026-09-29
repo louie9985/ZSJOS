@@ -49,7 +49,8 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
             query.exists("SELECT 1 FROM zsjos_lead l WHERE l.id = zsjos_lead_aging_pool_cycle.lead_id " +
                     "AND l.tenant_id = zsjos_lead_aging_pool_cycle.tenant_id AND l.deleted = b'0' " +
-                    "AND (l.submitted_name LIKE CONCAT('%',{0},'%') " +
+                    "AND (l.lead_no LIKE CONCAT('%',{0},'%') " +
+                    "OR l.submitted_name LIKE CONCAT('%',{0},'%') " +
                     "OR l.submitted_mobile LIKE CONCAT('%',{0},'%') " +
                     "OR l.submitted_wechat_id LIKE CONCAT('%',{0},'%'))", reqVO.getKeyword().trim());
         }

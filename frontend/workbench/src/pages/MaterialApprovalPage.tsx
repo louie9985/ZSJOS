@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
 import { MaterialFields } from './MaterialLibraryPage'
 import ResourceLink, { ResourceLinkPresentation } from '../components/ResourceLink'
+import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import { materialApprovalApi, type MaterialApproval } from '../services/materialApprovalApi'
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '加载失败，请重试'
@@ -87,10 +88,10 @@ export default function MaterialApprovalPage({ permissions }: { permissions: str
       <BusinessTable<MaterialApproval> tableKey="material-approval-page-1" columnMode="native" rowKey={r => r.task.id} dataSource={rows} loading={loading} scroll={{x:640}}
         locale={{emptyText:<Empty description={done ? '暂无已审批素材' : '暂无待审批素材'}/>}}
         pagination={{current:page,total,pageSize:APPROVAL_PAGE_SIZE,showSizeChanger:false,onChange:setPage}}
-        columns={[{title:'审批类型',render:(_,r) => <Tag color={r.typeCode === 'viral_content' ? 'blue' : 'gold'}>{types.find(type => type.code === r.typeCode)?.name || r.typeCode}</Tag>},{title:'素材编号',dataIndex:'materialNo'},{title:'拆解标题',dataIndex:'title'},
+        columns={[{title:'审批类型',render:(_,r) => <Tag color={r.typeCode === 'viral_content' ? 'blue' : 'gold'}>{types.find(type => type.code === r.typeCode)?.name || (r.typeCode ? '类型名称未配置' : '—')}</Tag>},{title:'素材编号',dataIndex:'materialNo'},{title:'拆解标题',dataIndex:'title'},
           {title:done ? '处理时间' : '到达时间',render:(_,r) => <DateTimeText value={done ? r.task.endTime : r.task.createTime}/>},
           { key: 'action',title:'操作',render:(_,r) => <Button type="link" onClick={() => {const next=new URLSearchParams(params); next.set('taskId',r.task.id);next.set('versionId',String(r.versionId));if (r.typeCode) next.set('typeCode',r.typeCode);setParams(next)}}>{done ? '查看记录' : '审批'}</Button>}]}/>}
-    <Modal className="material-approval-detail-modal" open={Boolean(taskId)} title={detail ? <Space><span>{detail.title}</span><Tag>{types.find(type => type.code === (detail.typeCode || typeCode))?.name || detail.typeCode || typeCode}</Tag></Space> : '素材审批详情'} width="min(1280px, calc(100vw - 32px))" footer={null} onCancel={() => !saving && close()}>
+    <Modal className="material-approval-detail-modal" open={Boolean(taskId)} title={detail ? <Space><span>{detail.title}</span><Tag>{types.find(type => type.code === (detail.typeCode || typeCode))?.name || '类型名称未配置'}</Tag></Space> : '素材审批详情'} width="min(1280px, calc(100vw - 32px))" footer={null} onCancel={() => !saving && close()}>
       {detailLoading ? <Skeleton active paragraph={{rows: 12}}/> : detailError ? <Alert type="error" showIcon title={detailError} action={<Button onClick={() => void loadDetail()}>重试</Button>}/> : detail?.snapshot && <ResourceLinkPresentation.Provider value={true}><div className="material-approval-detail">
         <aside className="material-approval-visual">
           <Typography.Title level={5}>{(detail.typeCode || typeCode) === 'viral_content' ? '封面图' : '账号主截图'}</Typography.Title>
@@ -100,6 +101,28 @@ export default function MaterialApprovalPage({ permissions }: { permissions: str
         <main className="material-approval-content"><div className="material-approval-meta"><Typography.Text>{detail.materialNo}</Typography.Text><Typography.Text type="secondary">提交版本 V{detail.snapshot.versionNo}</Typography.Text>{done && <span className="material-approval-record"><strong>本次处理记录</strong><span>{detail.task.reason || '未记录审批意见'}</span><DateTimeText value={detail.task.endTime}/></span>}</div>
         {detail.snapshot.summary && <Typography.Paragraph>{detail.snapshot.summary}</Typography.Paragraph>}
         <MaterialFields version={detail.snapshot}/>
+        {/* 只读流程轨迹：审批人做决定前需要看到走到第几节点、上一轮是谁驳回的。
+            取数走 BPM 的审批详情接口，因此需要 bpm:process-instance:query；审核页自身只要求
+            zsjos:material-approval:*，缺 BPM 查询权限时不发这个必然被拒的请求。
+            后端仍是唯一强制点，这里隐藏不等于授权。
+
+            decisionOnly + allowDecision=false 关掉全部流程类动作与通过/驳回：本页的通过/驳回走
+            zsjos/material-approval/{approve,reject}，由业务接口写审批轮次。
+
+            canUpdate=false 不是权限判断。面板在 allowDecision=false 时会给未完成动作硬编码内容批审
+            专用文案（先逐条保存审核结论…），传 true 会把那段误导文案显示给素材审批人；false 走空提示
+            分支，渲染出无文本的动作容器，是这里唯一干净的选择。
+
+            users 只服务于上面已关闭的动作，传空数组可省掉一次人员候选请求。 */}
+        {permissions.includes('bpm:process-instance:query') && detail.task.processInstanceId && <BpmProcessPanel
+          compact
+          decisionOnly
+          allowDecision={false}
+          canUpdate={false}
+          users={[]}
+          processInstanceId={detail.task.processInstanceId}
+          taskId={detail.task.id}
+        />}
         {!done && <Space wrap className="material-approval-actions">
           {permissions.includes('zsjos:material-approval:approve') && <Button type="primary" onClick={() => {form.resetFields();setAction('approve')}}>通过</Button>}
           {permissions.includes('zsjos:material-approval:reject') && <Button danger onClick={() => {form.resetFields();setAction('reject')}}>驳回</Button>}

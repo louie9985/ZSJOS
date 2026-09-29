@@ -16,5 +16,6 @@ public class MyStudentPageReqVO extends PageParam {
     @Size(max = 100) private String keyword;
     @Pattern(regexp = "active|paused|completed", message = "学员服务状态不正确") private String serviceStatus;
     private Long classId;
+    private Boolean inServicePeriod;
     @Valid private AdvancedFilterGroupReqVO advancedFilter;
 }

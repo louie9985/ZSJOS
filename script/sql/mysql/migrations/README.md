@@ -1539,3 +1539,22 @@ Fresh installation uses the existing baseline then migration chain; no duplicate
 Rollback retains metadata/version history and disables the page via System management.
 Verification: `python script/sql/mysql/tools/test_lead_calendar.py`; API and UI contract:
 [`docs/api/lead-follow-up-calendar.md`](../../../../docs/api/lead-follow-up-calendar.md).
+
+### V279 collision resolution and local chain renumbering
+
+Remote V279 is `V279__attribution_org_provenance_and_identity_split.sql` and remains authoritative.
+The unpublished local chain was renumbered in order to V280 media-student service period, V281 cashback
+withdrawal control, V282 calendar notifications, V283 new-media lead analysis and V284 notice reading
+statistics. Filenames, procedure names, prerequisites, ledger values, checksums, creator/updater markers,
+tests and active documentation use the new numbers. Historical handoff entries are not rewritten.
+Existing databases with any old-numbered development copy require separate schema/ledger/checksum review;
+never reconcile those markers automatically. See `docs/operations/database-migrations.md`.
+
+### V282 calendar notification button metadata completion
+
+Active-development correction of `V282__calendar_notifications.sql`, after V281 and the existing V187/V191 calendar pages. Defines four missing System buttons: exam 73613/73614 and course 73633/73634, named 发送通知 / 全员通知. Menu inserts and both version writes share one failure-controlled transaction; earlier DDL remains implicitly committed. Checks parent/permission/ID identity, preserves existing administrator labels, order, disabled state and ledger checksums, and never changes roles or tenant packages. Full initialization remains bootstrap plus the existing migration chain; do not duplicate these rows in baseline seeds or edit V187/V191.
+
+Run `python -B script/sql/mysql/tools/test_calendar_notifications.py` and `python -B script/sql/mysql/tools/test_calendar_notification_permissions.py --fresh` on controlled MySQL 8. Fixtures cover initial/repeated/partial execution, conflict and prerequisite rejection, injected ledger failure, recovery, Chinese HEX and unchanged grants. With explicit local-target authorization, `--apply-dev` uses the exact V282 metadata block in its own rollback-controlled transaction, backing up correction SQL and state hashes. It inserts only the four absent metadata rows in `ruoyi-vue-pro`; unrelated menus, schema, data, version ledgers, roles and packages remain unchanged. No service restart is included. Disable metadata through System management for rollback; deployed checksum-enforced installations need a separately reviewed rollout, never silent checksum reconciliation.
+
+### V283 new-media lead analysis
+`V283__media_lead_analysis.sql` defines independent new-media target, organization and target-revision tables plus Workbench page/button metadata. It requires V282 and one active `/zsjos` root. MySQL DDL commits implicitly: prerequisites precede DDL, schema postconditions follow DDL, and menu changes plus both version ledgers share the subsequent rollback-controlled transaction. Repeat execution repairs partial table/menu application and preserves administrator-edited menu metadata. It never assigns roles or seeds business targets. No development/shared database synchronization is included in this code delivery. See [the API and rollout contract](../../../../docs/api/media-lead-analysis.md).

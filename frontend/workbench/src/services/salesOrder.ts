@@ -1,4 +1,20 @@
-import type { DictData, SalesOrder, SalesOrderListItem } from './api'
+import type { CollectionMode, DictData, SalesOrder, SalesOrderListItem } from './api'
+
+export function validateSalesOrderAmounts(
+  items: Array<{ courseKey?: string; actualAmount?: number }> | undefined,
+  collectionMode: CollectionMode,
+) {
+  if (!items?.length || items.some(item => !item?.courseKey || item.courseKey.split('::').length !== 2
+      || item.courseKey.split('::').some(ref => !ref.trim()) || item.actualAmount == null
+      || typeof item.actualAmount !== 'number' || !Number.isFinite(item.actualAmount)
+      || item.actualAmount < 0 || !/^\d+(\.\d{1,2})?$/.test(String(item.actualAmount)))) {
+    return '请选择每个课程并填写非负、最多两位小数的有效金额'
+  }
+  if (collectionMode === 'online_link' && items.every(item => item.actualAmount === 0)) {
+    return '线上支付金额必须大于 0，零金额订单请选择线下已支付。'
+  }
+  return undefined
+}
 
 export type DictionaryLoadState = 'loading' | 'ready' | 'error'
 

@@ -20,7 +20,7 @@ final class CashbackFilterFields {
         add(result, date(Sensitivity.STANDARD, "cashback.cancelledAt", TIME, "取消时间", bind("cashback", "c.cancelled_at", null)));
         add(result, text(Sensitivity.FREE_TEXT, "cashback.cancelReason", EXTRA, "取消原因", bind("cashback", "c.cancel_reason", null)));
         add(result, select(Sensitivity.STANDARD, "cashback.type", STATUS, "返现类型", options(TYPE_VALID, "有效返现", TYPE_DEAL, "成交返现"), bind("cashback", "c.type", null)));
-        add(result, select(Sensitivity.STANDARD, "cashback.status", STATUS, "返现状态", options(STATUS_PENDING, "待结算", STATUS_AVAILABLE, "可提现", STATUS_WITHDRAWING, "提现中", STATUS_WITHDRAWN, "已提现", STATUS_CANCELLED, "已取消"), bind("cashback", "c.status", null)));
+        add(result, select(Sensitivity.STANDARD, "cashback.status", STATUS, "返现状态", options(STATUS_PENDING, "待结算", STATUS_AVAILABLE, "可提现", STATUS_WITHDRAWING, "提现中", STATUS_WITHDRAWN, "已提现", STATUS_CANCELLED, "已取消", STATUS_BLOCKED, "不可提现"), bind("cashback", "c.status", null)));
         add(result, text(Sensitivity.STANDARD, "cashback.leadNo", IDENTITY, "客资编号", bind("cashback", "fl.lead_no", "SELECT 1 FROM zsjos_lead fl WHERE fl.id=c.lead_id AND fl.tenant_id=c.tenant_id AND fl.deleted=b'0'")));
         add(result, text(Sensitivity.STANDARD, "cashback.orderNo", IDENTITY, "订单号", bind("cashback", "fo.order_no", "SELECT 1 FROM zsjos_order fo WHERE fo.id=c.order_id AND fo.tenant_id=c.tenant_id AND fo.deleted=b'0'")));
         add(result, text(Sensitivity.PERSONAL, "cashback.partnerName", PEOPLE, "合作方名称", bind("cashback", "fp.name", "SELECT 1 FROM zsjos_partner fp WHERE fp.id=c.partner_id AND fp.tenant_id=c.tenant_id AND fp.deleted=b'0'")));

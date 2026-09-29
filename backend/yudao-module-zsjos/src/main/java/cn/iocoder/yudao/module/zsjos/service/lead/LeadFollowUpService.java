@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.followup.LeadFollo
 
 public interface LeadFollowUpService {
     LeadFollowUpRespVO create(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO);
+    LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, java.time.LocalDateTime nextFollowUpAt);
     PageResult<LeadFollowUpRespVO> getPage(Long leadId, int pageNo, int pageSize);
 
     PageResult<LeadFollowUpRespVO> getPage(Long leadId, int pageNo, int pageSize, Long viewerId);

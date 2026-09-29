@@ -99,7 +99,7 @@ public interface ZsjosErrorCodeConstants {
 
     ErrorCode PURCHASE_INTENT_NOT_EXISTS = new ErrorCode(1_900_017_001, "购买草稿不存在");
     ErrorCode PURCHASE_INTENT_VERSION_CONFLICT = new ErrorCode(1_900_017_002, "购买草稿已被其他人修改，请刷新后重试");
-    ErrorCode PURCHASE_INTENT_DRAFT_INVALID = new ErrorCode(1_900_017_003, "购买草稿至少需要购买主体、一个有效课程和大于零的金额");
+    ErrorCode PURCHASE_INTENT_DRAFT_INVALID = new ErrorCode(1_900_017_003, "购买草稿需要购买主体、有效课程及非负且最多两位小数的金额，明细合计须与总金额一致");
     ErrorCode PURCHASE_INTENT_PERMISSION_DENIED = new ErrorCode(1_900_017_004, "无权操作该购买草稿");
     ErrorCode PURCHASE_INTENT_PAYMENT_CONFLICT = new ErrorCode(1_900_017_005, "当前购买草稿已有未结束的支付链接");
     ErrorCode PURCHASE_INTENT_PAYMENT_REQUIRED = new ErrorCode(1_900_017_006, "线上支付尚未确认到账");
@@ -126,6 +126,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PAYMENT_TRANSACTION_LOCKED = new ErrorCode(1_900_017_027, "线上已支付订单不能直接修改课程、规格或金额");
     ErrorCode PAYMENT_AMOUNT_MISMATCH = new ErrorCode(1_900_017_028, "到账金额与订单金额不一致，请核实收款记录");
     ErrorCode PURCHASE_INTENT_ITEMS_MISMATCH = new ErrorCode(1_900_017_029, "订单课程或金额与购买草稿不一致，请重新保存草稿");
+    ErrorCode PURCHASE_INTENT_ONLINE_AMOUNT_INVALID = new ErrorCode(1_900_017_030, "线上支付金额必须大于 0，零金额订单请选择线下已支付");
 
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
@@ -178,6 +179,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode USER_RELATION_MODE_INVALID = new ErrorCode(1_900_002_009, "不支持的用户关系操作模式");
     ErrorCode USER_RELATION_SCENE_ELIGIBILITY_INVALID = new ErrorCode(1_900_002_010, "用户关系场景目标资格配置无效");
 
+    ErrorCode LEAD_SELF_SOURCED_REMARK_REQUIRED = new ErrorCode(1_900_003_180, "销售自拓自动判有效需填写录单备注，说明已联系及意向情况");
     ErrorCode LEAD_CONTACT_REQUIRED = new ErrorCode(1_900_003_001, "手机号和微信号至少填写一个");
     ErrorCode LEAD_CONTACT_CONFLICT = new ErrorCode(1_900_003_002, "手机号和微信号分别属于不同客户，请核对后重试");
     ErrorCode LEAD_REGION_INVALID = new ErrorCode(1_900_003_003, "客户省市地区无效或层级不匹配");
@@ -369,6 +371,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode EXPORT_TASK_NOT_EXISTS = new ErrorCode(1_900_007_007, "导出任务不存在或不属于当前账号");
     ErrorCode EXPORT_STATE_INVALID = new ErrorCode(1_900_007_008, "当前导出任务状态不允许该操作");
     ErrorCode EXPORT_FILTER_INVALID = new ErrorCode(1_900_007_009, "导出筛选条件格式无效");
+    ErrorCode CASHBACK_NOT_EXISTS = new ErrorCode(1_900_008_006, "返现记录不存在");
+    ErrorCode CASHBACK_CONTROL_STALE = new ErrorCode(1_900_008_007, "返现状态已变化，请刷新后重试");
+    ErrorCode CASHBACK_CONTROL_REASON_INVALID = new ErrorCode(1_900_008_008, "请填写1至500字的操作原因");
+    ErrorCode CASHBACK_CONTROL_DENIED = new ErrorCode(1_900_008_009, "无权操作该返现记录");
     ErrorCode CASHBACK_PRODUCT_UNSPECIFIED = new ErrorCode(1_900_008_001, "意向产品尚未明确具体课程，无法判定返现规则");
     ErrorCode CASHBACK_RULE_NOT_CONFIGURED = new ErrorCode(1_900_008_002, "主意向课程未配置有效返现规则");
     ErrorCode CASHBACK_STATE_INVALID = new ErrorCode(1_900_008_003, "当前返现状态不允许该操作");
@@ -557,6 +563,24 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode COURSE_CALENDAR_TIME_INVALID = new ErrorCode(1_900_020_002, "课程结束时间不得早于开始时间");
     ErrorCode COURSE_CALENDAR_FORM_INVALID = new ErrorCode(1_900_020_003, "课程形式无效或已停用");
     ErrorCode COURSE_CALENDAR_ATTACHMENT_INVALID = new ErrorCode(1_900_020_004, "课程附件不存在或无效");
+
+    ErrorCode CALENDAR_NOTIFY_TYPE_INVALID = new ErrorCode(1_900_092_001, "日历通知类型无效");
+    ErrorCode CALENDAR_NOTIFY_PERMISSION_DENIED = new ErrorCode(1_900_092_002, "没有该日历的发送通知权限");
+    ErrorCode CALENDAR_NOTIFY_ALL_PERMISSION_DENIED = new ErrorCode(1_900_092_003, "没有该日历的全员通知权限");
+    ErrorCode CALENDAR_NOTIFY_BATCH_NOT_EXISTS = new ErrorCode(1_900_092_004, "通知批次不存在");
+    ErrorCode CALENDAR_NOTIFY_SNAPSHOT_CONFLICT = new ErrorCode(1_900_092_005, "日历通知快照版本冲突，请刷新后重试");
+    ErrorCode CALENDAR_NOTIFY_NOT_EXISTS = new ErrorCode(1_900_092_006, "日历安排不存在");
+    ErrorCode CALENDAR_NOTIFY_STATE_INVALID = new ErrorCode(1_900_092_007, "当前日历状态不允许发送通知");
+    ErrorCode CALENDAR_NOTIFY_VERSION_CONFLICT = new ErrorCode(1_900_092_008, "日历版本已变化，请重新预览");
+    ErrorCode CALENDAR_NOTIFY_PREVIEW_INVALID = new ErrorCode(1_900_092_009, "通知预览已失效，请重新预览确认");
+    ErrorCode CALENDAR_NOTIFY_ROSTER_CHANGED = new ErrorCode(1_900_092_010, "接收名单已变化，请重新预览确认人数");
+    ErrorCode CALENDAR_NOTIFY_RECIPIENT_INVALID = new ErrorCode(1_900_092_011, "所选员工不可用，请移除后重试");
+    ErrorCode CALENDAR_NOTIFY_RECIPIENT_EMPTY = new ErrorCode(1_900_092_012, "请至少选择一名可通知员工");
+    ErrorCode CALENDAR_NOTIFY_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_092_013, "通知请求标识已用于其他内容");
+    ErrorCode CALENDAR_NOTIFY_REQUEST_INVALID = new ErrorCode(1_900_092_014, "通知请求参数无效");
+    ErrorCode CALENDAR_NOTIFY_CONFIG_UNAVAILABLE = new ErrorCode(1_900_092_015, "没有可用的通知规则，请联系管理员配置");
+    ErrorCode CALENDAR_NOTIFY_MANAGE_PERMISSION_DENIED = new ErrorCode(1_900_092_016, "没有该日历的维护权限");
+    ErrorCode CALENDAR_NOTIFY_OPERATION_NOT_EXISTS = new ErrorCode(1_900_092_017, "日历维护操作不存在或不可访问");
 
     ErrorCode FEEDBACK_TYPE_INVALID = new ErrorCode(1_900_016_001, "反馈类型无效");
     ErrorCode FEEDBACK_NOT_OPEN = new ErrorCode(1_900_016_002, "该类反馈暂未开放，请联系管理员配置分派负责人");

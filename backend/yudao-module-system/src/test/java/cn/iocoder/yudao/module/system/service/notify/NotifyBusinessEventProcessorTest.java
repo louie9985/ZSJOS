@@ -23,6 +23,51 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MockitoExtension.class)
 class NotifyBusinessEventProcessorTest {
 
+    @Test void fixedInAppPreparationHonorsTemplateStatusAndChangedRuleChannel() {
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L)
+                .recipientMode("FIXED").fixedRecipients(List.of(NotifyRecipientDTO.admin(7L))).build();
+        var rule = NotifyRuleDO.builder().id(20L).templateId(30L).channelCode("in_app")
+                .recipientRoles(List.of()).specifiedUserIds(List.of(999L)).build();
+        var template = NotifyTemplateDO.builder().id(30L).sceneCode("test.scene").channelCode("in_app").status(0).build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
+        org.junit.jupiter.api.Assertions.assertNull(processor.prepareFixedInApp(event).failure());
+        template.setStatus(1);
+        org.junit.jupiter.api.Assertions.assertEquals("NOTIFY_TEMPLATE_INVALID", processor.prepareFixedInApp(event).failure().getErrorCode());
+        rule.setChannelCode("wecom");
+        org.junit.jupiter.api.Assertions.assertEquals("NOTIFY_RULE_MISSING", processor.prepareFixedInApp(event).failure().getErrorCode());
+        verify(provider, org.mockito.Mockito.never()).resolveRecipients(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoInteractions(messageCreator);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"in_app", "wecom"})
+    void fixedRecipientsExcludeRuleAndProviderRecipients(String channel) {
+        var chosen = List.of(NotifyRecipientDTO.admin(7L), NotifyRecipientDTO.partner(7L));
+        var event = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("test.scene").targetRuleId(20L)
+                .recipientMode("FIXED").fixedRecipients(chosen).build();
+        var rule = NotifyRuleDO.builder().id(20L).templateId(30L).channelCode(channel)
+                .recipientRoles(List.of("operator")).specifiedUserIds(List.of(999L)).build();
+        var template = NotifyTemplateDO.builder().id(30L).sceneCode("test.scene").channelCode(channel).status(0).build();
+        when(sceneRegistry.getProvider("test.scene")).thenReturn(provider);
+        when(notifyRuleService.getEnabledRules("test.scene")).thenReturn(List.of(rule));
+        when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
+        if ("wecom".equals(channel)) {
+            var result = processor.prepareWecom(event);
+            org.junit.jupiter.api.Assertions.assertNull(result.failure());
+            org.junit.jupiter.api.Assertions.assertEquals(chosen, result.recipients().stream()
+                    .map(r -> new NotifyRecipientDTO(r.getUserType(), r.getUserId())).toList());
+        } else {
+            assertTrue(processor.processConfirmed(event).isSuccess());
+            for (var recipient : chosen) verify(messageCreator).create(event, provider, rule, template, recipient);
+            verify(messageCreator, org.mockito.Mockito.times(2)).create(org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        }
+        verify(provider, org.mockito.Mockito.never()).resolveRecipients(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
     @InjectMocks
     private NotifyBusinessEventProcessor processor;
     @Mock

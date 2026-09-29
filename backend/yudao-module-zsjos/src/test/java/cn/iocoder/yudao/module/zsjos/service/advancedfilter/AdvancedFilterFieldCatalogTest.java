@@ -121,7 +121,7 @@ class AdvancedFilterFieldCatalogTest {
         Map<String, Integer> expected = Map.of("lead", 80, "order", 72, "lead_appeal", 80,
                 "duplicate_review", 18, "registration", 79, "student", 77,
                 "subordinate_sales", 26, "cashback", 20, "withdrawal", 25);
-        assertEquals(195, AdvancedFilterFieldCatalog.fields().size());
+        assertEquals(198, AdvancedFilterFieldCatalog.fields().size());
         expected.forEach((scene, count) -> {
             var fields = service.catalog(scene).fields();
             assertEquals(count, fields.size(), scene);

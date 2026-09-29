@@ -74,7 +74,7 @@ describe('business inbox advanced-filter guard', () => {
   it('keeps template selection and saving inside the filter drawer draft flow', () => {
     const source = read('components/AdvancedFilter.tsx')
     const toolbarStart = source.indexOf('<div className="advanced-filter-toolbar">')
-    const appliedTagsStart = source.indexOf('{active.length > 0')
+    const appliedTagsStart = source.indexOf('<ResizableDrawer', toolbarStart)
     const toolbarSource = source.slice(toolbarStart, appliedTagsStart)
 
     expect(source).toContain('advanced-filter-template-panel')

@@ -125,6 +125,18 @@ public class NoticeController {
         return success(noticeService.getUnreadSummary(getLoginUserId()));
     }
 
+    @GetMapping("/read-summary")
+    @PreAuthorize("@ss.hasPermission('system:notice:query')")
+    public CommonResult<NoticeReadSummaryRespVO> getReadSummary(@RequestParam("id") Long id) {
+        return success(noticeService.getReadSummary(id));
+    }
+
+    @GetMapping("/read-page")
+    @PreAuthorize("@ss.hasPermission('system:notice:query')")
+    public CommonResult<PageResult<NoticeReadPersonRespVO>> getReadPage(@Valid NoticeReadPageReqVO reqVO) {
+        return success(noticeService.getReadPage(reqVO));
+    }
+
     @PutMapping("/mark-read")
     @PreAuthorize("@ss.hasPermission('system:notice:read')")
     public CommonResult<Boolean> markRead(@RequestParam("id") Long id) {

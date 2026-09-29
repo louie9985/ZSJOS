@@ -7,5 +7,6 @@ public interface CashbackConstants {
     String STATUS_AVAILABLE = "available";
     String STATUS_WITHDRAWING = "withdrawing";
     String STATUS_WITHDRAWN = "withdrawn";
+    String STATUS_BLOCKED = "blocked";
     String STATUS_CANCELLED = "cancelled";
 }

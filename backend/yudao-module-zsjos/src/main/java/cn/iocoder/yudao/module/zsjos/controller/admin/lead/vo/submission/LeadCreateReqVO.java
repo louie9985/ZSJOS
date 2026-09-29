@@ -27,6 +27,7 @@ public class LeadCreateReqVO {
     // Server-resolved snapshot. All public submission entries discard client values.
     private String specifiedOwnerIdentity;
     private Long newMediaProviderUserId;
+    private java.time.LocalDateTime selfSourcedNextFollowUpAt;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 
     public List<LeadProductReqVO> getEffectiveProducts() {

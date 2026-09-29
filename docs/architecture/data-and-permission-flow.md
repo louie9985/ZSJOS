@@ -429,6 +429,7 @@ WebSocket events are refresh hints, while the persisted message page remains aut
 - Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
 - React Workbench employee reading uses only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu into 我的公告 and 公告管理 views. The read permission controls employee reading, query controls management list/details, and create/update/publish/offline/delete independently control management operations. Accounts with both permissions default to 我的公告; announcementId deep links always target employee reading. React management is explicitly approved alongside Vue management (2026-09-21). Both use existing System page/get and lifecycle APIs; management preview never calls mark-read or expands employee recipient visibility. Vue management details support every lifecycle state. React lazily loads @wangeditor-next/editor 5.7.0, consumes the System notice type dictionary and recipient-options, and uploads through the existing System attachment and Infra content endpoints. Published content remains immutable. The announcement center uses `/system/notice/my-cursor` with `publish_time DESC, id DESC` for additive scroll loading; `/system/notice/my-page` remains compatible for legacy callers. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
 - `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
+- V284 freezes publication-time statistical rosters and name/department snapshots for new ALL and TARGET notices, atomically with publication and an explicit completion flag. ALL visibility remains dynamic; later readers are counted separately. Both management clients use `system:notice:query` for reading summary and person paging. Historical ALL notices without rosters expose actual readers only; historical TARGET profiles use explicitly labeled current data. Employee acknowledgements follow visible body rendering and retain retryable failures. See [notice reading statistics](../api/notice-read-statistics.md).
 - Notices may target `ALL` enabled ADMIN users with `system:notice:read`, or `TARGET` departments and/or users. The administration tree keeps department and user selections independent, shows enabled users without read permission as disabled, and keeps users without a current department in a separate group. Department selections include the complete department subtree at publish time; mixed department/user selections are unioned and de-duplicated. TARGET selections are expanded into immutable `system_notice_recipient` user snapshots at publish time, and every list/detail/read operation enforces that snapshot. Existing notices without targeting columns remain ALL for compatibility.
 - Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.
 
@@ -718,8 +719,12 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
   or exit a cycle. `manage-all` is the tenant-wide operational fallback.
 - B must be an enabled eligible sales user in A's current department and must differ from A. The entry-time
   department snapshot is retained for audit only.
-- A and configured collaborator B may both add follow-ups and submit or revise the deal. Commands lock
+- Formal owner A may continue adding follow-ups while a cycle is waiting for assignment; configured
+  collaborator B may add follow-ups after assignment. An active cycle blocks first-purchase deal
+  entry and revision for both users until formal transfer or manager exit ends the cycle. Commands lock
   the active cycle, so the first conflicting mutation to commit wins.
+- A waiting cycle has no collaborator B. A same-department eligible salesperson may request formal
+  transfer to self through the configured BPM approval; the formal owner cannot request transfer to self.
 - Full contact data follows the same server-side pool visibility. Frontends consume
   `availableActions` and do not infer mutation rights from owner or department labels.
 - The published `agingPool` inbox audience owns the configurable status grouping for the dedicated
@@ -801,10 +806,16 @@ The claim-pool page uses `zsjos:lead:claim-pool:query`, independently of the
 claim; claim execution still requires sales qualification, daily-limit and atomic object checks.
 
 Supervisor Lead commands use five independent `zsjos:subordinate-sales:lead-*` button permissions and
-the same live department-leader scope. Submitted or suspended Leads release to the claim pool; valid
+the same live department-leader scope. A suspended Lead remains a Lead-module exception state; its
+operator is the original owner's department-leader chain or a caller with
+`zsjos:lead:qualification:manage-all`, not the Student Delivery Center merely because that is the
+owner's department. Submitted or suspended Leads release to the claim pool; valid
 pre-deal Leads release to the canonical public sea while preserving formal ownership and optionally
 assigning an eligible collaborator. The backend rejects won, closed, wrong-pool, stale-owner, and
-out-of-scope operations independently of frontend visibility.
+out-of-scope operations independently of frontend visibility. Restore is projected only when the
+current original owner remains an eligible sales user; otherwise the available actions are limited to
+the applicable transfer, recycle, or claim-pool release actions. Button permissions remain administrator
+configuration and are never inferred from role or department names.
 
 The Workbench owns one shared sales-dispatch status lifecycle for the header control and global route-shell warning. The warning is mounted outside individual pages, so it remains visible while navigating between routes. Only the backend-projected eligible sales identity is warned; an eligible user sees status-load failure first, then page/realtime offline, then a paused preference. Managers and other non-sales users do not receive a recoverable intake warning merely because they hold management permissions. The header uses red tags for paused and offline states.
 

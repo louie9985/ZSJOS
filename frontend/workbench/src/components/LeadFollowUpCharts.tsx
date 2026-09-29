@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Empty, Typography } from 'antd'
+import { Alert, Button, Empty, Typography } from 'antd'
 import { api, type LeadFollowUp } from '../services/api'
 
 const PAGE_SIZE = 100
@@ -9,18 +9,30 @@ const PAGE_SIZE = 100
 function useAllFollowUps(leadId: number) {
   const [records, setRecords] = useState<LeadFollowUp[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>()
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    api.leadFollowUpPage(leadId, { pageNo: 1, pageSize: PAGE_SIZE })
-      .then(page => { if (!cancelled) setRecords(page.list) })
-      .catch(() => { if (!cancelled) setRecords([]) })
+    setError(undefined)
+    const load = async () => {
+      const all: LeadFollowUp[] = []
+      for (let pageNo = 1; !cancelled; pageNo++) {
+        const page = await api.leadFollowUpPage(leadId, { pageNo, pageSize: PAGE_SIZE })
+        all.push(...page.list)
+        if (!page.list.length || all.length >= page.total) return all
+      }
+      return all
+    }
+    load()
+      .then(all => { if (!cancelled) setRecords(all) })
+      .catch(reason => { if (!cancelled) { setRecords([]); setError(reason instanceof Error ? reason.message : '跟进图表加载失败') } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [leadId])
+  }, [leadId, attempt])
 
-  return { records, loading }
+  return { records, loading, error, retry: () => setAttempt(value => value + 1) }
 }
 
 /* ========== 沉默天数 ========== */
@@ -171,13 +183,16 @@ function MethodDonut({ records }: { records: LeadFollowUp[] }) {
 /* ========== 主导出 ========== */
 
 export default function LeadFollowUpCharts({ leadId }: { leadId: number }) {
-  const { records, loading } = useAllFollowUps(leadId)
+  const { records: history, loading, error, retry } = useAllFollowUps(leadId)
+  const records = history.filter(record => record.generationSource !== 'sales_self_sourced_auto')
 
   if (loading) return <div className="lead-charts-loading"><Typography.Text type="secondary">图表加载中...</Typography.Text></div>
-  if (!records.length) return <div className="lead-charts-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无跟进数据" /></div>
+  if (error) return <Alert type="error" showIcon message={error} action={<Button onClick={retry}>重试</Button>} />
+  if (!records.length) return <div className="lead-charts-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无人工跟进数据；销售自拓录单自动生成记录不计入" /></div>
 
   return (
     <div className="lead-follow-up-charts">
+      <Typography.Text type="secondary">仅统计人工跟进，销售自拓录单自动生成记录不计入。</Typography.Text>
       {/* 跟进活跃度（左）+ 跟进方式环形图（右）*/}
       <section className="lead-card lead-chart-card">
         <div className="lead-chart-split">

@@ -128,6 +128,21 @@ describe('BPM 通用审批组件', () => {
     expect(panel).not.toContain('complete-director')
   })
 
+  it('素材审批与素材库只展示爆款流程轨迹，结论仍走素材审批接口', () => {
+    const approvalPage = readFileSync('src/pages/MaterialApprovalPage.tsx', 'utf8')
+    const libraryPage = readFileSync('src/pages/MaterialLibraryPage.tsx', 'utf8')
+    for (const page of [approvalPage, libraryPage]) {
+      expect(page).toContain('BpmProcessPanel')
+      expect(page).toContain('allowDecision={false}')
+      // 流程类动作（转办/委派/加签/抄送）一律关闭，审批结论由业务接口写审批轮次。
+      expect(page).toContain('decisionOnly')
+      // 面板缺 BPM 查询权限时会 403，因此页面侧先按权限门控。
+      expect(page).toContain("'bpm:process-instance:query'")
+    }
+    // canUpdate 必须为 false：面板在 allowDecision=false 时会给未完成动作硬编码内容批审文案。
+    expect(approvalPage).toMatch(/canUpdate=\{false\}/)
+  })
+
   it('完成审核按钮只在流程面板内，不再留在页面顶部按钮区', () => {
     const reviewPage = readFileSync('src/pages/ContentReviewBatchPage.tsx', 'utf8')
     // 推进流程的动作通过 businessAdvance 交给流程面板承载。

@@ -29,6 +29,27 @@ class NoticeMapperTest extends BaseDbUnitTest {
 
     @Resource private NoticeMapper noticeMapper;
     @Resource private NoticeReadMapper readMapper;
+    @Resource private NoticeRecipientMapper recipients;
+    @Resource private NoticeReadStatisticsMapper statistics;
+
+    @Test void readingStatisticsWorkWithTenantInterceptorAndRejectOtherTenantRows() {
+        TenantContextHolder.setTenantId(1L);
+        NoticeDO notice = publishedNotice("统计隔离"); noticeMapper.insert(notice);
+        var recipient = new cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeRecipientDO();
+        recipient.setNoticeId(notice.getId()); recipient.setUserId(7L); recipient.setProfileSnapshotComplete(true);
+        recipient.setUserNameSnapshot("发布姓名"); recipient.setDeptIdSnapshot(10L); recipient.setDeptNameSnapshot("发布部门");
+        recipients.insert(recipient);
+        var q = new cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeReadPageReqVO(); q.setId(notice.getId());
+        assertEquals(1L, statistics.count(1L, q));
+        assertEquals("发布姓名", statistics.page(1L, q, 0).getFirst().getUserName());
+        assertEquals("发布部门", statistics.departments(1L, q).getFirst().getName());
+        q.setScope("EXTRA"); assertEquals(0L, statistics.count(1L, q));
+        TenantContextHolder.setTenantId(2L); q.setScope("EXPECTED");
+        assertNull(noticeMapper.selectById(notice.getId()));
+        assertEquals(0L, statistics.count(2L, q));
+        assertTrue(statistics.page(2L, q, 0).isEmpty());
+        assertTrue(statistics.departments(2L, q).isEmpty());
+    }
 
     @AfterEach
     void clearTenantContext() {

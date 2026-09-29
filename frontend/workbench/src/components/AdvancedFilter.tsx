@@ -1,7 +1,7 @@
 import { DeleteOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
-import { Alert, Badge, Button, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tag, message } from 'antd'
+import { Alert, Badge, Button, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tag, message, type InputRef } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode, type Ref } from 'react'
 import { api, type AdvancedFilterCondition, type AdvancedFilterField, type AdvancedFilterGroup, type AdvancedFilterScene, type AdvancedFilterTemplate } from '../services/api'
 import ResizableDrawer from './ResizableDrawer'
 import { ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
@@ -134,22 +134,28 @@ export function removeFilterAtPath(group: AdvancedFilterGroup, path: number[]): 
   return { ...group, groups: group.groups.map((child, index) => index === groupIndex ? removeFilterAtPath(child, rest) : child) }
 }
 
-export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyword, onKeyword, onChange }: {
+export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyword, onKeyword, onChange, leading, collapsed = false, disabled = false, inputRef }: {
   scene: AdvancedFilterScene
   pageKey?: string
   placeholder: string
   value?: AdvancedFilterGroup
   keyword: string
   onKeyword: (value: string) => void
-  onChange: (value?: AdvancedFilterGroup) => void
+  onChange: (value?: AdvancedFilterGroup) => void | boolean | Promise<void | boolean>
+  leading?: ReactNode
+  collapsed?: boolean
+  disabled?: boolean
+  inputRef?: Ref<InputRef>
 }) {
   const [open, setOpen] = useState(false)
+  const [applying, setApplying] = useState(false)
   const [fields, setFields] = useState<AdvancedFilterField[]>([])
   const [relativeDateOptions, setRelativeDateOptions] = useState<Array<{ value: string; label: string }>>([])
   const [draft, setDraft] = useState<AdvancedFilterGroup>(() => cloneFilterGroup(value))
   const [searchText, setSearchText] = useState(keyword)
   const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [templates, setTemplates] = useState<AdvancedFilterTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number>()
   const [templateState, setTemplateState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [saveOpen, setSaveOpen] = useState(false)
   const [templateName, setTemplateName] = useState('')
@@ -192,16 +198,21 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
     }
   }, [pageKey, scene])
   useEffect(() => { void loadTemplates() }, [loadTemplates])
-  const show = () => { setDraft(cloneFilterGroup(value)); setOpen(true) }
+  const show = () => { setSelectedTemplateId(undefined); setDraft(cloneFilterGroup(value)); setOpen(true) }
   const cancel = () => { setDraft(cloneFilterGroup(value)); setOpen(false) }
-  const apply = () => {
+  const apply = async () => {
     const effective = effectiveGroup(draft)
-    onChange(filterCount(effective) ? effective : undefined)
-    setOpen(false)
+    setApplying(true)
+    try {
+      if (await onChange(filterCount(effective) ? effective : undefined) !== false) setOpen(false)
+    } finally { setApplying(false) }
   }
-  const clearApplied = () => { setDraft(blank()); onChange(undefined) }
+  const clearApplied = async () => {
+    if (await onChange(undefined) !== false) setDraft(blank())
+  }
   const applyTemplate = (id?: number) => {
     const template = templates.find(item => item.id === id)
+    setSelectedTemplateId(id)
     if (!template) return
     setDraft(cloneFilterGroup(template.filter))
   }
@@ -272,12 +283,12 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
   }
   const submitKeyword = () => onKeyword(searchText.trim())
   return <>
-    <div className="advanced-filter-toolbar"><Input allowClear value={searchText} placeholder={placeholder} suffix={<SearchOutlined role="button" aria-label="搜索" tabIndex={0} onClick={submitKeyword} onKeyDown={event => event.key === 'Enter' && submitKeyword()}/>} onChange={event => { setSearchText(event.target.value); if (!event.target.value) onKeyword('') }} onPressEnter={submitKeyword}/><Badge count={filterCount(value)}><Button icon={<FilterOutlined/>} onClick={show}>筛选</Button></Badge></div>
-    {active.length > 0 && <div className="advanced-filter-tags">{active.map(({ condition, path }, index) => { const field = fields.find(item => item.fieldKey === condition.fieldKey); const label = condition.fieldKey === 'duration.diff' ? summarize(condition) : `${field?.label || '筛选字段'} ${operatorLabels[condition.operator]} ${summarize(condition)}`; return <Tag closable key={`${condition.fieldKey}-${index}`} onClose={event => { event.preventDefault(); const next = removeFilterAtPath(cloneFilterGroup(value), path); onChange(filterCount(next) ? next : undefined) }}>{label}</Tag> })}<Button size="small" type="link" onClick={clearApplied}>清空全部</Button></div>}
-    <ResizableDrawer className="advanced-filter-drawer" open={open} placement="right" width="min(560px, 100vw)" defaultSize={560} minSize={420} storageKey={ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY} title="高级筛选" onClose={cancel} footer={<div className="advanced-filter-footer"><Button onClick={() => setDraft(blank())}>重置</Button><Space><Button onClick={cancel}>取消</Button><Button type="primary" onClick={apply}>应用筛选</Button></Space></div>}>
+    <div className="advanced-filter-toolbar">{leading}{!collapsed && <Input ref={inputRef} disabled={disabled} allowClear value={searchText} placeholder={placeholder} suffix={<SearchOutlined role="button" aria-label="搜索" tabIndex={0} onClick={submitKeyword} onKeyDown={event => event.key === 'Enter' && submitKeyword()}/>} onChange={event => { setSearchText(event.target.value); if (!event.target.value) onKeyword('') }} onPressEnter={submitKeyword}/>}<Badge count={filterCount(value)}><Button aria-label="高级筛选" title="高级筛选" disabled={disabled} size={collapsed ? 'small' : 'middle'} type={filterCount(value) ? 'primary' : collapsed ? 'text' : 'default'} icon={<FilterOutlined/>} onClick={show}>{!collapsed && '筛选'}</Button></Badge></div>
+    {!collapsed && active.length > 0 && <div className="advanced-filter-tags">{active.map(({ condition, path }, index) => { const field = fields.find(item => item.fieldKey === condition.fieldKey); const label = condition.fieldKey === 'duration.diff' ? summarize(condition) : `${field?.label || '筛选字段'} ${operatorLabels[condition.operator]} ${summarize(condition)}`; return <Tag closable key={`${condition.fieldKey}-${index}`} onClose={event => { event.preventDefault(); const next = removeFilterAtPath(cloneFilterGroup(value), path); onChange(filterCount(next) ? next : undefined) }}>{label}</Tag> })}<Button size="small" type="link" onClick={clearApplied}>清空全部</Button></div>}
+    <ResizableDrawer className="advanced-filter-drawer" open={open} placement="right" width="min(560px, 100vw)" defaultSize={560} minSize={420} storageKey={ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY} title="高级筛选" onClose={cancel} footer={<div className="advanced-filter-footer"><Button onClick={() => setDraft(blank())}>重置</Button><Space><Button onClick={cancel}>取消</Button><Button aria-label="应用筛选" type="primary" loading={applying} disabled={disabled || catalogState !== 'ready'} onClick={() => void apply()}>应用筛选</Button></Space></div>}>
       {pageKey && <div className="advanced-filter-template-panel">
         <div className="advanced-filter-template-actions">
-          <Select allowClear className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} onChange={applyTemplate}/>
+          <Select allowClear value={selectedTemplateId} className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} onChange={applyTemplate}/>
           <Button icon={<SaveOutlined/>} disabled={!filterCount(draft)} onClick={openSave}>保存模板</Button>
         </div>
         {templateState === 'error' && <Alert type="warning" showIcon message="筛选模板加载失败" action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadTemplates()}>重试</Button>}/>}

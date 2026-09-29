@@ -17,6 +17,10 @@ public class CashbackDO extends TenantBaseDO {
     private String businessKey;
     private String type;
     private String status;
+    private String blockedFromStatus;
+    private String blockReason;
+    private Long blockedByUserId;
+    private LocalDateTime blockedAt;
     private Long beneficiaryUserId;
     private Long partnerId;
     private Long leadId;

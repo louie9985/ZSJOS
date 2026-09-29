@@ -22,6 +22,11 @@ public class WecomOutboxDeliveryService {
     @Resource private WecomNotifyChannelAdapter adapter;
 
     public NotifySendResult deliver(NotifyBusinessOutboxDO row, NotifyBusinessEvent event) {
+        if ("FIXED".equals(event.getRecipientMode())) {
+            var decoded = NotifyOutboxEventCodec.decode(row);
+            if (!decoded.wecom() || !decoded.event().equals(event))
+                throw new IllegalArgumentException("Fixed WeCom event mismatch");
+        }
         AtomicReference<NotifySendResult> result = new AtomicReference<>();
         TenantUtils.execute(row.getTenantId(), () -> result.set(deliverInTenant(row, event)));
         return result.get();
@@ -50,6 +55,8 @@ public class WecomOutboxDeliveryService {
                 recipient.setContext(context);
                 state.getRecipients().add(recipient);
             }
+            // Validate freshly prepared contexts as well as recovered checkpoints before any external send.
+            NotifyOutboxEventCodec.validateWecomCheckpoints(state, event);
             checkpoint(row, state);
         }
         for (var recipient : state.getRecipients()) {
@@ -67,6 +74,7 @@ public class WecomOutboxDeliveryService {
                 if (skipReason != null) {
                     recipient.setStatus("skipped"); recipient.setRetryable(false);
                     recipient.setErrorCode(skipReason);
+                    recipient.setCompletedTime(LocalDateTime.now());
                     checkpoint(row, state);
                     continue;
                 }
@@ -88,8 +96,11 @@ public class WecomOutboxDeliveryService {
             recipient.setErrorCode(result.getErrorCode());
             recipient.setProviderMessageId(result.getExternalId());
             recipient.setStatus(result.isSuccess()
-                    ? "WECOM_RECIPIENT_SKIPPED".equals(result.getExternalId()) ? "skipped" : "succeeded"
+                    ? result.isSkipped() || "WECOM_RECIPIENT_SKIPPED".equals(result.getExternalId()) ? "skipped" : "succeeded"
                     : "WECOM_DELIVERY_UNCERTAIN".equals(result.getErrorCode()) ? "uncertain" : "failed");
+            // Record only known terminal outcomes; uncertainty is not a delivery completion timestamp.
+            recipient.setCompletedTime("uncertain".equals(recipient.getStatus()) || recipient.isRetryable()
+                    ? null : LocalDateTime.now());
             checkpoint(row, state);
         }
         boolean retryable = state.getRecipients().stream().anyMatch(WecomOutboxPayload.Recipient::isRetryable);

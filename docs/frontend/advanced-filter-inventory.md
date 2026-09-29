@@ -43,7 +43,7 @@
 | 主管确认旧页 | React 旧路径重定向至审批页 | 源码保留 `order / sales_order_supervisor_confirm` | 主管确认任务 + Order | 兼容源码，不作为新增正式页面；以服务端菜单为准 |
 | 报名履约公共池 | `registration / registration_pool` | 同目录 | 履约单 + 订单 + 清单/流转 | A/C；班级、负责人分派、清单时间未完整覆盖 |
 | 学员管理（规划师） | `student / student_my` | 同目录 | Person + 可见服务关系 | A/B/C；班级、服务状态有普通筛选，接收/联系/协作者字段缺 |
-| 我的学员（编导/运营） | `MediaStudentsPage` 仅关键词列表请求 | Workbench 专属组件 | Person + 服务 + 账号责任 | 未接统一目录；不能把规划师 student 目录直接视为已兼容 |
+| 我的学员（编导/运营） | `media_student / media_students` | Workbench 专属组件 | Person + 同一可见账号条件树 | 已接责任运营、账号平台、账号状态；与关键词/服务期相交，详见 [接口说明](../api/media-student-filter.md) |
 | 返现管理/我的返现 | `lead / cashback` | 仅普通类型、状态控件 | Cashback | D：错用 lead；cashback 目录无字段；实际列表不执行 advancedFilter |
 | 提现管理/我的提现 | `withdrawal / withdrawal` | 仅普通状态控件及授权范围 | Withdrawal | D：目录权限没有该场景；目录无字段；实际列表不执行 advancedFilter |
 | Partner H5 客资列表 | 独立筛选，不使用 ADMIN 目录 | N | PARTNER 自有客资 | 已有 8 个业务维度：阶段、分配、渠道、分类、主产品、申诉、订单审核、提交日期区间；另有关键词/页签 |

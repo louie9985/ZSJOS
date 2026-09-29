@@ -55,6 +55,15 @@ class WecomNotifyChannelAdapterTest {
         doReturn("{\"errcode\":0,\"msgid\":\"message-1\"}").when(adapter).postMessage(anyString(), anyString());
         assertEquals("message-1", adapter.send(context).getExternalId());
     }
+    @Test void unavailableRecipientReturnsExplicitSkipWithoutNetworkOrCredentials() {
+        when(recipient.getWecomUserId(7L)).thenReturn(null);
+        when(recipient.getUnavailableReason(7L)).thenReturn("WECOM_BINDING_MISSING");
+        var result = adapter.send(context);
+        assertTrue(result.isSuccess()); assertTrue(result.isSkipped()); assertFalse(result.isRetryable());
+        assertEquals("WECOM_BINDING_MISSING", result.getErrorCode());
+        verifyNoInteractions(socialClientMapper, stringRedisTemplate);
+        verify(adapter, never()).postMessage(anyString(), anyString());
+    }
     @Test void invalidUserIsFailureEvenWhenErrcodeIsZero() {
         doReturn("{\"errcode\":0,\"invaliduser\":\"synthetic-recipient\",\"msgid\":\"message-1\"}")
                 .when(adapter).postMessage(anyString(), anyString());

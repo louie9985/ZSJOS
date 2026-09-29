@@ -2,6 +2,21 @@ import { api, http, unwrap, type AnnouncementAttachment, type PageResult } from 
 import type { TimestampValue } from './time'
 
 const ROOT = '/system/notice'
+export type NoticeReadScope = 'EXPECTED' | 'READ' | 'UNREAD' | 'EXTRA' | 'ACTUAL'
+export type NoticeReadSummary = {
+  published: boolean; rosterComplete: boolean; expectedCount?: number | null; readCount?: number | null
+  unreadCount?: number | null; readRate?: number | null; extraReadCount?: number | null; actualReadCount?: number | null
+  departments: { id: number; name?: string }[]; extraDepartments: { id: number; name?: string }[]
+}
+export type NoticeReadPerson = {
+  userId: number; userName?: string; deptId?: number; deptName?: string; profileSource: 'SNAPSHOT' | 'CURRENT'
+  accountStatus?: number; accountDeleted: boolean; readTime?: TimestampValue
+}
+export type NoticeReadQuery = { id: number; scope: NoticeReadScope; pageNo: number; pageSize: number; name?: string; deptId?: number }
+export const noticeReadStatistics = {
+  summary: async (id: number) => unwrap<NoticeReadSummary>(await http.get(ROOT + '/read-summary', { params: { id } })),
+  page: async (params: NoticeReadQuery) => unwrap<PageResult<NoticeReadPerson>>(await http.get(ROOT + '/read-page', { params }))
+}
 export const NOTICE_TYPE_DICT = 'system_notice_type'
 export const NOTICE_STATUSES = { DRAFT: '草稿', PUBLISHED: '已发布', OFFLINE: '已下线' } as const
 export type NoticeStatus = keyof typeof NOTICE_STATUSES

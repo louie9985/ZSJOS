@@ -95,10 +95,15 @@ public class BpmTaskEventListener extends AbstractFlowableEngineEventListener {
     @Override
     @SuppressWarnings("PatternVariableCanBeUsed")
     protected void timerFired(FlowableEngineEntityEvent event) {
+        Job entity = (Job) event.getEntity();
+        // Timer acquisition runs without an HTTP tenant; restore the persisted job tenant before any reads.
+        FlowableUtils.execute(entity.getTenantId(), () -> processTimer(event, entity));
+    }
+
+    private void processTimer(FlowableEngineEntityEvent event, Job entity) {
         // 1.1 只处理 BoundaryEvent 边界计时时间
         String processDefinitionId = event.getProcessDefinitionId();
         BpmnModel bpmnModel = modelService.getBpmnModelByDefinitionId(processDefinitionId);
-        Job entity = (Job) event.getEntity();
         // 特殊 from https://t.zsxq.com/h6oWr ：当 elementId 为空时，尝试从 JobHandlerConfiguration 中解析 JSON 获取
         String elementId = entity.getElementId();
         if (elementId == null && entity.getJobHandlerConfiguration() != null) {
@@ -116,7 +121,7 @@ public class BpmTaskEventListener extends AbstractFlowableEngineEventListener {
             log.error("[timerFired][解析 entity({}) elementId 为空，跳过处理]", entity);
             return;
         }
-        FlowElement element = BpmnModelUtils.getFlowElementById(bpmnModel, entity.getElementId());
+        FlowElement element = BpmnModelUtils.getFlowElementById(bpmnModel, elementId);
         if (!(element instanceof BoundaryEvent)) {
             return;
         }

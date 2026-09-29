@@ -49,7 +49,7 @@ V183 是未发布的开发基线修正，已同时同步 `00-bootstrap-schema.sq
 
 顺序为 V182 → V183 → V184。V183 仅创建空业务表和 10 个 System 菜单/按钮定义，不创建学员数据、字典选项或实际角色授权。SQL 使用 `SET NAMES utf8mb4`；执行后运行 `verify-student-information-collection.sql` 并核对中文字节及结构。重复执行保留已配置数据。回退可禁用功能权限，但必须保留历史表、配置和加密密钥。
 
-部署 H5 时须支持 history 路由 `/student-info-form` 和 `/public-api`、`/app-api` 代理。后端配置 `zsjos.student-info.public-base-url` 或 `ZSJOS_PUBLIC_H5_BASE_URL` 为真实 H5 根地址，无 localhost 默认值。发布字段配置、配置销售与协作角色权限后才可生成实际链接。
+部署 H5 时须支持 history 路由 `/student-info-form` 和 `/public-api`、`/app-api` 代理。后端优先使用专用配置 `zsjos.student-info.public-base-url`；未配置时复用定位确认页的 `zsjos.positioning.public-base-url`，再回退到 `ZSJOS_PUBLIC_H5_BASE_URL`。三者都必须是真实 H5 根地址。发布字段配置、配置销售与协作角色权限后才可生成实际链接。
 
 ## 验证边界
 

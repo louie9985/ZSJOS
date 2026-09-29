@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api, type Announcement } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import { useAnnouncements } from '../components/AnnouncementProvider'
-import AnnouncementAttachmentIcon from '../components/AnnouncementAttachmentIcon'
+import NoticeAttachments from '../components/NoticeAttachments'
 import SafeRichText from '../components/SafeRichText'
 import { useInboxTableLayout } from '../services/inboxLayout'
 
@@ -16,7 +16,7 @@ import { noticePermission, noticeView } from '../services/noticeManagement'
 
 const CURSOR_LIMIT = 20
 
-function AnnouncementDetail({ item }: { item?: Announcement }) {
+export function AnnouncementDetail({ item }: { item?: Announcement }) {
   if (!item) return <Empty description="请选择公告"/>
   return <article className="announcement-detail">
     <header>
@@ -27,25 +27,52 @@ function AnnouncementDetail({ item }: { item?: Announcement }) {
     <SafeRichText html={item.content || ''}/>
     {item.attachments.length > 0 && <section className="announcement-files">
       <Typography.Title level={5}>附件</Typography.Title>
-      {item.attachments.map(file => file.downloadUrl
-        ? <a key={file.infraFileId} href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="announcement-file">
-          <AnnouncementAttachmentIcon name={file.fileName} mimeType={file.mimeType}/><span>{file.fileName}</span><small>{formatFileSize(file.fileSize)}</small>
-        </a>
-        : <div key={file.infraFileId} className="announcement-file unavailable">
-          <AnnouncementAttachmentIcon name={file.fileName} mimeType={file.mimeType}/><span>{file.fileName}</span><small>文件不可用</small>
-        </div>)}
+      <NoticeAttachments key={item.id} files={item.attachments} reload={async () => (await api.announcement(item.id)).attachments} />
     </section>}
   </article>
 }
-
-const formatFileSize = (size: number) => size >= 1024 * 1024
-  ? `${(size / 1024 / 1024).toFixed(1)} MB`
-  : `${Math.max(1, Math.round(size / 1024))} KB`
 
 function announcementText(content?: string) {
   if (!content) return '-'
   if (typeof DOMParser === 'undefined') return content
   return new DOMParser().parseFromString(content, 'text/html').body.textContent?.trim() || '-'
+}
+
+export function DisplayedAnnouncement({ item, onRead }: { item: Announcement; onRead: (id: number) => void }) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const root = useRef<HTMLDivElement>(null)
+  const onReadRef = useRef(onRead)
+  onReadRef.current = onRead
+  useEffect(() => {
+    if (item.read) return
+    let cancelled = false
+    let started = false
+    let painted = false
+    const acknowledge = async () => {
+      if (!painted || started || cancelled || document.visibilityState !== 'visible' || !root.current?.getClientRects().length) return
+      started = true; setBusy(true); setError('')
+      try {
+        await api.markAnnouncementRead(item.id)
+        if (!cancelled) onReadRef.current(item.id)
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? '已读记录失败：' + cause.message : '已读记录失败，请重试')
+      } finally { if (!cancelled) setBusy(false) }
+    }
+    // Two frames allow the committed detail to be painted; hidden/preloaded details do not acknowledge.
+    let secondFrame = 0
+    const frame = requestAnimationFrame(() => { secondFrame = requestAnimationFrame(() => { painted = true; void acknowledge() }) })
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void acknowledge() })
+    if (root.current) observer.observe(root.current)
+    const visible = () => { if (document.visibilityState === 'visible') void acknowledge() }
+    document.addEventListener('visibilitychange', visible)
+    return () => { cancelled = true; cancelAnimationFrame(frame); cancelAnimationFrame(secondFrame); observer.disconnect(); document.removeEventListener('visibilitychange', visible) }
+  }, [item.id, item.read, attempt])
+  return <div ref={root}>
+    {error && <Alert type="warning" showIcon title={error} action={<Button loading={busy} onClick={() => setAttempt(value => value + 1)}>重试记录</Button>} />}
+    <AnnouncementDetail item={item} />
+  </div>
 }
 
 export default function AnnouncementCenterPage({ permissions }: { permissions: string[] }) {
@@ -84,23 +111,29 @@ function MyAnnouncements() {
   const { useTableLayout } = useInboxTableLayout()
   const requestedAnnouncementId = searchParams.get('announcementId')
   const paramsRef = useRef(searchParams)
+  const detailGeneration = useRef(0)
   paramsRef.current = searchParams
 
   const openDetail = useCallback(async (id: number, mobile = useTableLayout || !screens.md) => {
+    const request = ++detailGeneration.current
     setDetailLoading(true)
     setSelected(undefined)
     try {
       const detail = await api.announcement(id)
-      if (!detail.read) await api.markAnnouncementRead(id)
-      setSelected({ ...detail, read: true })
-      setItems(current => current.map(item => item.id === id ? { ...item, read: true } : item))
-      await refreshSummary()
+      if (request !== detailGeneration.current) return
+      setSelected(detail)
       if (paramsRef.current.get('announcementId') !== String(id)) setSearchParams({ announcementId: String(id) }, { replace: true })
       if (mobile) setDrawerOpen(true)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '公告详情加载失败')
-    } finally { setDetailLoading(false) }
-  }, [refreshSummary, screens.md, setSearchParams, useTableLayout])
+      if (request === detailGeneration.current) setError(loadError instanceof Error ? loadError.message : '公告详情加载失败')
+    } finally { if (request === detailGeneration.current) setDetailLoading(false) }
+  }, [screens.md, setSearchParams, useTableLayout])
+  const onRead = useCallback((id: number) => {
+    setSelected(current => current?.id === id ? { ...current, read: true } : current)
+    setItems(current => current.map(item => item.id === id ? { ...item, read: true } : item))
+    void refreshSummary()
+  }, [refreshSummary])
+  useEffect(() => () => { detailGeneration.current++ }, [])
 
   const load = useCallback(async (append = false) => {
     if (append) setLoadingMore(true)
@@ -115,8 +148,8 @@ function MyAnnouncements() {
       setError('')
       if (!append) {
         const requestedId = Number(requestedAnnouncementId)
-        const targetId = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : data.list[0]?.id
-        if (targetId) await openDetail(targetId, !!requestedAnnouncementId && !screens.md)
+        const targetId = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : screens.md && !useTableLayout ? data.list[0]?.id : undefined
+        if (targetId) await openDetail(targetId, !!requestedAnnouncementId && (useTableLayout || !screens.md))
         else setSelected(undefined)
       }
     } catch (loadError) {
@@ -176,10 +209,10 @@ function MyAnnouncements() {
           </div>
         </>}
       </aside>
-      <main className="announcement-detail-pane">{detailLoading ? <Skeleton active/> : <AnnouncementDetail item={selected}/>}</main>
+      <main className="announcement-detail-pane">{detailLoading ? <Skeleton active/> : selected && screens.md && !drawerOpen ? <DisplayedAnnouncement key={selected.id} item={selected} onRead={onRead} /> : <AnnouncementDetail item={selected}/>}</main>
     </div>}
     <ResizableDetailDrawer desktopResizable={useTableLayout} className="announcement-mobile-drawer" title="公告详情" placement={useTableLayout ? 'right' : 'bottom'} height={useTableLayout ? undefined : '82vh'} open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-      {detailLoading ? <Skeleton active/> : <AnnouncementDetail item={selected}/>}
+      {detailLoading ? <Skeleton active/> : selected && drawerOpen ? <DisplayedAnnouncement key={selected.id} item={selected} onRead={onRead} /> : <AnnouncementDetail item={selected}/>}
     </ResizableDetailDrawer>
   </section>
 }

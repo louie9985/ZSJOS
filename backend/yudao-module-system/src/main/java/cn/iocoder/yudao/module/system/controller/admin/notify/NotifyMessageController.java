@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.system.api.notify.NotifyMessageCategory;
+import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageCategoryRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyCursorReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessagePageReqVO;
@@ -56,12 +58,20 @@ public class NotifyMessageController {
 
     // ========== 查看自己的站内信 ==========
 
+    @GetMapping("/my-categories")
+    @Operation(summary = "获得我的站内信分类目录")
+    public CommonResult<List<NotifyMessageCategoryRespVO>> getMyNotifyMessageCategories() {
+        return success(NotifyMessageCategory.labels().entrySet().stream()
+                .map(entry -> new NotifyMessageCategoryRespVO(entry.getKey(), entry.getValue()))
+                .toList());
+    }
+
     @GetMapping("/my-get")
     @Operation(summary = "获得我的单条站内信")
     public CommonResult<NotifyMessageRespVO> getMyNotifyMessage(@RequestParam("id") Long id) {
         NotifyMessageDO message = notifyMessageService.getMyNotifyMessage(id, getLoginUserId(),
                 UserTypeEnum.ADMIN.getValue());
-        return success(BeanUtils.toBean(message, NotifyMessageRespVO.class));
+        return success(toRespVO(message));
     }
 
     @GetMapping("/my-page")
@@ -69,7 +79,7 @@ public class NotifyMessageController {
     public CommonResult<PageResult<NotifyMessageRespVO>> getMyMyNotifyMessagePage(@Valid NotifyMessageMyPageReqVO pageVO) {
         PageResult<NotifyMessageDO> pageResult = notifyMessageService.getMyMyNotifyMessagePage(pageVO,
                 getLoginUserId(), UserTypeEnum.ADMIN.getValue());
-        return success(BeanUtils.toBean(pageResult, NotifyMessageRespVO.class));
+        return success(new PageResult<>(toRespVOList(pageResult.getList()), pageResult.getTotal()));
     }
 
     @GetMapping("/my-cursor")
@@ -78,8 +88,36 @@ public class NotifyMessageController {
             @Valid NotifyMessageMyCursorReqVO reqVO) {
         CursorPageResult<NotifyMessageDO> result = notifyMessageService.getMyNotifyMessageCursor(reqVO,
                 getLoginUserId(), UserTypeEnum.ADMIN.getValue());
-        return success(new CursorPageResult<>(BeanUtils.toBean(result.getList(), NotifyMessageRespVO.class),
+        return success(new CursorPageResult<>(toRespVOList(result.getList()),
                 result.getNextCursor(), result.isHasMore()));
+    }
+
+    /**
+     * 消息分类由 {@link NotifyMessageCategory} 统一推导，不是持久化字段，因此不能依赖同名字段拷贝，
+     * 必须在转换时显式赋值。
+     */
+    private static NotifyMessageRespVO toRespVO(NotifyMessageDO source) {
+        NotifyMessageRespVO target = BeanUtils.toBean(source, NotifyMessageRespVO.class);
+        if (target != null && source != null) {
+            target.setCategory(NotifyMessageCategory.resolve(source.getBizType(), source.getSceneCode(),
+                    source.getSourceEventKey()));
+        }
+        return target;
+    }
+
+    private static List<NotifyMessageRespVO> toRespVOList(List<NotifyMessageDO> source) {
+        return source == null ? null : source.stream().map(NotifyMessageController::toRespVO).toList();
+    }
+
+    /**
+     * 分类由 {@link NotifyMessageCategory} 统一推导，不是持久化字段，因此不能依赖同名字段拷贝。
+     */
+    private static NotifyMessageRespVO withCategory(NotifyMessageRespVO target, NotifyMessageDO source) {
+        if (target == null || source == null) {
+            return target;
+        }
+        return target.setCategory(NotifyMessageCategory.resolve(source.getBizType(), source.getSceneCode(),
+                source.getSourceEventKey()));
     }
 
     @PutMapping("/update-read")

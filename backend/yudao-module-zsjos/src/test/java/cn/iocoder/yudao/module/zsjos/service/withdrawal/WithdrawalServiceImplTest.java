@@ -215,6 +215,16 @@ class WithdrawalServiceImplTest {
                         || field.getName().equals("proofFileId") || field.getName().equals("bankTransactionNo")));
     }
 
+    @Test void blockedCashbackCannotBeAppliedEvenWithKnownId() {
+        when(partnerMapper.selectEnabledByUserId(7L)).thenReturn(new PartnerDO().setId(8L).setStatus("enabled"));
+        CashbackDO row = cashback(1L,"20").setStatus("blocked");
+        when(cashbackMapper.selectAvailableByBeneficiary(7L)).thenReturn(List.of());
+        when(cashbackMapper.selectByIdForUpdate(1L,9L)).thenReturn(row);
+        WithdrawalApplyReqVO request = new WithdrawalApplyReqVO().setCashbackIds(List.of(1L)).setAccountName("验收").setCardNumber("6222000000001234").setBankName("测试银行");
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.apply(7L,request));
+        verifyNoInteractions(withdrawalMapper,itemMapper,processApi);
+    }
+
     private WithdrawalDO invocationWithdrawal(org.mockito.invocation.InvocationOnMock inv){return inv.getArgument(0);}
     private CashbackDO cashback(long id,String amount){return new CashbackDO().setId(id).setPartnerId(8L).setBeneficiaryUserId(7L).setStatus("available").setAmount(new BigDecimal(amount)).setVersion(0);}
     private WithdrawalDO withdrawal(long id,String status){return new WithdrawalDO().setId(id).setWithdrawalNo("TX-TEST-" + id).setApplicantUserId(7L).setStatus(status).setApplicationAmount(new BigDecimal("20.00")).setProcessInstanceId("p1").setVersion(0);}

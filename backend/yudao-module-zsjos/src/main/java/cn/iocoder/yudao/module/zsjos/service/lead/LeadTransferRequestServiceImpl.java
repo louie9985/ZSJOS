@@ -66,7 +66,9 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (!agingPoolService.canRead(cycle, requesterUserId)) throw exception(LEAD_PERMISSION_DENIED);
-        if (!Objects.equals(cycle.getCollaboratorUserId(), requesterUserId)) {
+        // Action authorization must precede idempotent replay so a visible but ineligible
+        // salesperson cannot replay another user's transfer request.
+        if (!agingPoolService.canRequestTransfer(cycle, requesterUserId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         LeadTransferRequestDO replay = requestMapper.selectByIdempotencyKey(request.getIdempotencyKey());

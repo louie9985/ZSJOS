@@ -1,5 +1,6 @@
 import axios, { type AxiosProgressEvent, type AxiosRequestConfig } from "axios";
 import type { AxiosHeaderValue } from "axios";
+import { invalidateMenuTasks } from "./menuTaskRefresh";
 import {
   APP_CONFIG,
   AUTH_CLIENT_IDS,
@@ -577,6 +578,10 @@ export type AssignmentLog = {
 export type PageResult<T> = { list: T[]; total: number };
 export type CourseCalendarEvent = { id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
 export type CourseCalendarInput = { courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] };
+export type CalendarNotifyInput = { calendarId: number; calendarType: 'EXAM' | 'COURSE'; scope: 'ALL' | 'SPECIFIED'; userIds?: number[]; resend?: boolean; calendarVersion?: number; eventType?: string; idempotencyKey?: string; previewToken?: string; title?: string; time?: string; remark?: string };
+export type CalendarNotifyResult = { batchId: number; acceptedCount: number; skippedCount: number; status: string; resend: boolean; sourceEventKey: string };
+export type CalendarNotifyPreview = { calendarVersion: number; title: string; time?: string; remark?: string; recipientCount: number; notifiedCount: number; newRecipientCount: number; previewToken: string; contentHash: string };
+export type CalendarNotifyUser = { id: number; nickname: string; deptId?: number | null };
 export type ExamScheduleType = 'EXACT' | 'ROUGH';
 export type ExamScheduleRecordStatus = 'DRAFT' | 'PUBLISHED' | 'REVOKED';
 export type ExamScheduleDisplayStatus = ExamScheduleRecordStatus | 'UPCOMING' | 'IN_PROGRESS' | 'ENDED';
@@ -597,8 +602,8 @@ export type ExamSchedule = {
   exactDate?: string;
   roughStartDate?: string;
   roughEndDate?: string;
-  categoryId: number;
-  categoryNameSnapshot: string;
+  categoryId?: number;
+  categoryNameSnapshot?: string;
   categoryPathSnapshot: Array<{ id: number; name: string }>;
   recordStatus: ExamScheduleRecordStatus;
   displayStatus: ExamScheduleDisplayStatus;
@@ -608,6 +613,7 @@ export type ExamSchedule = {
   updateTime?: Timestamp;
 };
 export type ExamScheduleInput = {
+  scheduleName: string;
   clearedInvalidAttrs?: string[];
   scheduleType: ExamScheduleType;
   exactDate?: string;
@@ -743,6 +749,7 @@ export type StudentTaskStage = {
   detail: string;
 };
 export type MyStudent = {
+  inServicePeriod?: boolean;
   personId: number;
   personNo?: string;
   leadId?: number;
@@ -792,6 +799,7 @@ export type MediaStudentAccountSummary = {
 };
 export type MediaStudentListItem = MyStudent & { accounts: MediaStudentAccountSummary[] };
 export type MediaStudentDetail = {
+  canUpdateServicePeriod?: boolean;
   student: MyStudent;
   accounts: Array<{
     id: number;
@@ -852,6 +860,7 @@ export type MediaStudentDetail = {
     title?: string;
     status: string;
     currentVersionNo?: number;
+    publishedUrl?: string;
     publishedAt?: Timestamp;
     version: number;
     lastActivityAt?: Timestamp;
@@ -1158,6 +1167,7 @@ export type AdvancedFilterScene =
   | "duplicate_review"
   | "registration"
   | "student"
+  | "media_student"
   | "subordinate_sales"
   | "cashback"
   | "withdrawal";
@@ -1271,6 +1281,7 @@ export type LeadAttachment = {
   fileSize: number;
 };
 export type LeadCreateRequest = {
+  selfSourcedNextFollowUpAt?: Timestamp;
   name: string;
   mobile?: string;
   wechatId?: string;
@@ -1293,6 +1304,8 @@ export type LeadCreateRequest = {
   idempotencyKey: string;
 };
 export type LeadCreateResult = {
+  qualificationStatus?: string;
+  automaticQualificationApplied?: boolean;
   leadId?: number;
   leadNo?: string;
   reviewId?: number;
@@ -1675,6 +1688,7 @@ export type LeadFollowUpImage = {
   url?: string;
 };
 export type LeadFollowUp = {
+  generationSource?: string;
   salesStageBefore?: string;
   salesStageBeforeLabelSnapshot?: string;
   salesStageAfter?: string;
@@ -2861,6 +2875,13 @@ export type NotifyMessage = {
   bizType?: string;
   bizId?: number;
   sourceEventKey?: string;
+  /** 服务端推导的消息分类，客户端不做分类判断。 */
+  category?: string;
+};
+
+export type NotifyMessageCategoryOption = {
+  key: string;
+  label: string;
 };
 
 export type AnnouncementAttachment = {
@@ -3405,9 +3426,9 @@ export const api = {
     candidates: async () => unwrap<HomeroomCandidate[]>(await http.get('/zsjos/delivery-class/homeroom-candidates')),
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
-      exams: async (categoryId: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
-    create: async (data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
-    update: async (id: number, data: { className?: string; productId: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
+      exams: async (categoryId?: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
+    create: async (data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
+    update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
     directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
     requestTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<number>(await http.post(`/zsjos/class-transfer/service/${relationId}`, data)),
@@ -3556,11 +3577,14 @@ export const api = {
   },
   areaTree: async () => unwrap<AreaNode[]>(await http.get("/system/area/tree")),
   courseCalendar: {
+    notifyUsers: async (keyword?: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<CalendarNotifyUser>>(await http.get('/zsjos/calendar-notification/users', { params: { calendarType: 'COURSE', keyword, pageNo, pageSize } })),
     page: async (params: { rangeStart: string; rangeEnd: string }) => unwrap<CourseCalendarEvent[]>(await http.get('/zsjos/course-calendar/page', { params })),
     get: async (id: number) => unwrap<CourseCalendarEvent>(await http.get(`/zsjos/course-calendar/${id}`)),
     create: async (data: CourseCalendarInput) => unwrap<number>(await http.post('/zsjos/course-calendar', data)),
     update: async (id: number, data: CourseCalendarInput) => unwrap<boolean>(await http.put(`/zsjos/course-calendar/${id}`, data)),
     delete: async (id: number) => unwrap<boolean>(await http.delete(`/zsjos/course-calendar/${id}`)),
+    notify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyResult>(await http.post('/zsjos/calendar-notification/send', data)),
+    previewNotify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyPreview>(await http.post('/zsjos/calendar-notification/preview', data)),
   },
   checkLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post("/zsjos/lead/contact-check", data)),
@@ -3600,6 +3624,7 @@ export const api = {
       unwrap<boolean>(await http.delete(`/zsjos/personal-calendar/${id}`)),
   },
   examCalendar: {
+    notifyUsers: async (keyword?: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<CalendarNotifyUser>>(await http.get('/zsjos/calendar-notification/users', { params: { calendarType: 'EXAM', keyword, pageNo, pageSize } })),
     productOptions: async () => unwrap<ExamProductOption[]>(await http.get('/zsjos/exam-calendar/product-options')),
     exactPage: async (params: {
       pageNo: number;
@@ -3631,6 +3656,8 @@ export const api = {
     revoke: async (id: number) => unwrap<boolean>(
       await http.post(`/zsjos/exam-calendar/revoke/${id}`),
     ),
+    notify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyResult>(await http.post('/zsjos/calendar-notification/send', data)),
+    previewNotify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyPreview>(await http.post('/zsjos/calendar-notification/preview', data)),
   },
   mediaAccount: {
     create: async (data: {
@@ -4397,7 +4424,7 @@ export const api = {
   judgeLeadValid: async (
     id: number,
     data: { leadCategory?: string; remark: string; idempotencyKey: string },
-  ) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-valid`, data)),
+  ) => invalidateMenuTasks(unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-valid`, data))),
   judgeLeadInvalid: async (
     id: number,
     data: {
@@ -4407,7 +4434,7 @@ export const api = {
       idempotencyKey: string;
     },
   ) =>
-    unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-invalid`, data)),
+    invalidateMenuTasks(unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-invalid`, data))),
   uploadLeadQualificationImage: async (file: File) => {
     const data = new FormData();
     data.append("file", file);
@@ -4542,9 +4569,9 @@ export const api = {
       await http.get(`/zsjos/lead/${leadId}/follow-ups/page`, { params }),
     ),
   createLeadFollowUp: async (leadId: number, data: LeadFollowUpCreateRequest) =>
-    unwrap<LeadFollowUp>(
+    invalidateMenuTasks(unwrap<LeadFollowUp>(
       await http.post(`/zsjos/lead/${leadId}/follow-ups`, data),
-    ),
+    )),
   uploadLeadFollowUpImage: async (leadId: number, file: File) => {
     const data = new FormData();
     data.append("file", file);
@@ -5636,6 +5663,10 @@ export const api = {
     unwrap<NotifyMessage>(
       await http.get("/system/notify-message/my-get", { params: { id } }),
     ),
+  myNotifyMessageCategories: async () =>
+    unwrap<NotifyMessageCategoryOption[]>(
+      await http.get("/system/notify-message/my-categories"),
+    ),
   markNotifyMessagesRead: async (ids: number[]) => {
     const params = new URLSearchParams();
     ids.forEach((id) => params.append("ids", String(id)));
@@ -5850,14 +5881,17 @@ export const api = {
       pageNo: number;
       pageSize: number;
       keyword?: string;
-    }) =>
-      unwrap<PageResult<MediaStudentListItem>>(
-        await http.get("/zsjos/media-students/page", { params }),
-      ),
+      inServicePeriod?: boolean;
+      advancedFilter?: AdvancedFilterGroup;
+    }) => params.advancedFilter
+      ? unwrap<PageResult<MediaStudentListItem>>(await http.post("/zsjos/media-students/search-page", params))
+      : unwrap<PageResult<MediaStudentListItem>>(await http.get("/zsjos/media-students/page", { params })),
     get: async (personId: number) =>
       unwrap<MediaStudentDetail>(
         await http.get(`/zsjos/media-students/${personId}`),
       ),
+    updateServicePeriod: async (personId: number, inServicePeriod: boolean) =>
+      unwrap<boolean>(await http.put(`/zsjos/media-students/${personId}/service-period`, { inServicePeriod })),
     target: async (bizType: string, bizId: number) =>
       unwrap<{ personId: number; targetTab: string; recordId: number; serviceRelationId?: number }>(
         await http.get("/zsjos/media-students/target", {

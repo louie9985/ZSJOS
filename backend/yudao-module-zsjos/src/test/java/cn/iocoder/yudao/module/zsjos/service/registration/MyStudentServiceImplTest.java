@@ -52,6 +52,22 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class MyStudentServiceImplTest {
     @Test
+    void accountFilterIdsReachPersonalAndAllPaginationWithoutChangingTotal() {
+        var req = new MyStudentPageReqVO();
+        var filter = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();
+        req.setAdvancedFilter(filter); req.setKeyword("name"); req.setInServicePeriod(true);
+        when(advancedFilterService.matchMediaStudentPersonIds(filter, 28L)).thenReturn(List.of(1L, 2L));
+        when(personMapper.selectMediaStudentPage(req, 28L, List.of(1L, 2L)))
+                .thenReturn(new PageResult<>(List.of(), 2L));
+        assertEquals(2L, service.getMediaPage(28L, req).getTotal());
+        when(permissionApi.hasTenantReadAllAccess(28L)).thenReturn(true);
+        when(personMapper.selectAllMediaStudentPage(req, List.of(1L, 2L)))
+                .thenReturn(new PageResult<>(List.of(), 2L));
+        assertEquals(2L, service.getMediaPage(28L, req).getTotal());
+        verify(advancedFilterService, never()).matchStudentPersonIds(any(), anyLong());
+    }
+
+    @Test
     void administratorDefaultsToAllMediaWithoutAssignedRelations() {
         MyStudentPageReqVO req = new MyStudentPageReqVO();
         when(permissionApi.hasTenantReadAllAccess(28L)).thenReturn(true);
@@ -180,12 +196,12 @@ class MyStudentServiceImplTest {
     void getDirectorPageDoesNotTreatMissingAdvancedFilterAsNoMatches() {
         MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20);
-        when(personMapper.selectMediaStudentPage(reqVO, 28L)).thenReturn(PageResult.empty());
+        when(personMapper.selectMediaStudentPage(reqVO, 28L, List.of())).thenReturn(PageResult.empty());
 
         PageResult<MyStudentRespVO> result = service.getDirectorPage(28L, reqVO);
 
         assertEquals(0, result.getTotal());
-        verify(personMapper).selectMediaStudentPage(reqVO, 28L);
+        verify(personMapper).selectMediaStudentPage(reqVO, 28L, List.of());
     }
 
     @Test
@@ -258,7 +274,7 @@ class MyStudentServiceImplTest {
         MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20);
         PersonDO person = new PersonDO(); person.setId(42L); person.setName("媒体学员");
-        when(personMapper.selectMediaStudentPage(reqVO, 28L))
+        when(personMapper.selectMediaStudentPage(reqVO, 28L, List.of()))
                 .thenReturn(new PageResult<>(List.of(person), 1L));
         when(mediaAccountMapper.selectParticipantStudentIds(28L, List.of(42L))).thenReturn(List.of(42L));
         when(relationMapper.selectActiveByPersonIds(List.of(42L))).thenReturn(List.of());

@@ -6,7 +6,7 @@ import { api, type AreaNode, type CollectionMode, type DictData, type LeadCatalo
 import { createIdempotencyKey } from '../services/idempotency'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
-import { validateSalesOrderSubmission } from '../services/salesOrder'
+import { validateSalesOrderAmounts, validateSalesOrderSubmission } from '../services/salesOrder'
 import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -182,13 +182,13 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
   const buildDraftRequest = (values: Partial<Values>, idempotencyKey: string): PurchaseIntentDraftRequest | undefined => {
-    const draftItems = (values.items || []).flatMap(item => {
-      if (!item.courseKey || item.actualAmount == null) return []
-      const [spuRef, skuRef] = item.courseKey.split('::')
-      return spuRef && skuRef ? [{ spuRef, skuRef, actualAmount: Number(item.actualAmount) }] : []
+    const amountError = validateSalesOrderAmounts(values.items, collectionMode)
+    if (amountError) { message.warning(amountError); return undefined }
+    const draftItems = values.items!.map(item => {
+      const [spuRef, skuRef] = item.courseKey!.split('::')
+      return { spuRef, skuRef, actualAmount: item.actualAmount! }
     })
-    const draftTotal = draftItems.reduce((sum, item) => sum + item.actualAmount, 0)
-    if (!draftItems.length || draftTotal <= 0) { message.warning('保存草稿前请至少选择一个课程并填写有效金额'); return undefined }
+    const draftTotal = draftItems.reduce((sum, item) => sum + Math.round(item.actualAmount * 100), 0) / 100
     return { ...purchaseSource, id: purchaseIntent?.id, version: purchaseIntent?.version, collectionMode,
       draft: { ...values, customerPaidAt: values.customerPaidAt?.valueOf(), studentMobile: values.mobile, studentWechatId: values.wechatId },
       items: draftItems, totalAmount: Number(draftTotal.toFixed(2)), idempotencyKey }
@@ -223,6 +223,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const prepareSubmit = async () => {
     if (loading || loadError || (orderId && !revisionOrder)) return
+    const amountError = validateSalesOrderAmounts(form.getFieldValue('items'), collectionMode)
+    if (amountError) { message.warning(amountError); return }
     if (!orderId && collectionMode === 'online_link' && purchaseIntent?.paymentStatus !== 'paid') {
       message.warning('线上支付尚未确认到账，不能提交审批'); return
     }

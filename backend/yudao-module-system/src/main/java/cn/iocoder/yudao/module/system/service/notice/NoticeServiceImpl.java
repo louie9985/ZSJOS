@@ -52,6 +52,7 @@ public class NoticeServiceImpl implements NoticeService {
     @Resource private NoticeMapper noticeMapper;
     @Resource private NoticeAttachmentMapper attachmentMapper;
     @Resource private NoticeReadMapper readMapper;
+    @Resource private NoticeReadStatisticsMapper statisticsMapper;
     @Resource private FileApi fileApi;
     @Resource private XssCleaner xssCleaner;
     @Resource private WebSocketSenderApi webSocketSenderApi;
@@ -171,6 +172,7 @@ public class NoticeServiceImpl implements NoticeService {
         NoticeDO update = new NoticeDO();
         update.setId(id);
         update.setPublishStatus(NoticePublishStatusEnum.PUBLISHED.getStatus());
+        update.setRecipientSnapshotComplete(true);
         update.setPublishTime(LocalDateTime.now());
         update.setOfflineTime(null);
         noticeMapper.updateById(update);
@@ -324,6 +326,57 @@ public class NoticeServiceImpl implements NoticeService {
         return notice;
     }
 
+    private boolean hasCompleteRoster(NoticeDO notice) {
+        return Boolean.TRUE.equals(notice.getRecipientSnapshotComplete())
+                || ("TARGET".equals(notice.getAudienceType()) && recipientMapper.selectCountByNoticeId(notice.getId()) > 0);
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public NoticeReadSummaryRespVO getReadSummary(Long id) {
+        NoticeDO notice = requireNotice(id);
+        NoticeReadSummaryRespVO result = new NoticeReadSummaryRespVO();
+        boolean published = !NoticePublishStatusEnum.DRAFT.getStatus().equals(notice.getPublishStatus());
+        result.setPublished(published);
+        result.setRosterComplete(published && hasCompleteRoster(notice));
+        if (!published) return result;
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        NoticeReadPageReqVO req = new NoticeReadPageReqVO();
+        req.setId(id);
+        req.setScope("ACTUAL");
+        result.setActualReadCount(statisticsMapper.count(tenantId, req));
+        if (result.getRosterComplete()) {
+            req.setScope("EXPECTED");
+            long expected = statisticsMapper.count(tenantId, req);
+            result.setExpectedCount(expected);
+            result.setDepartments(statisticsMapper.departments(tenantId, req));
+            req.setScope("READ");
+            long read = statisticsMapper.count(tenantId, req);
+            result.setReadCount(read);
+            result.setUnreadCount(expected - read);
+            result.setReadRate(expected == 0 ? null : (double) read / expected);
+            req.setScope("EXTRA");
+            result.setExtraReadCount(statisticsMapper.count(tenantId, req));
+            result.setExtraDepartments(statisticsMapper.departments(tenantId, req));
+        } else {
+            result.setDepartments(statisticsMapper.departments(tenantId, req));
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public PageResult<NoticeReadPersonRespVO> getReadPage(NoticeReadPageReqVO reqVO) {
+        NoticeDO notice = requireNotice(reqVO.getId());
+        if (NoticePublishStatusEnum.DRAFT.getStatus().equals(notice.getPublishStatus())) return new PageResult<>(List.of(), 0L);
+        // Missing historical ALL rosters must never be reported as a known empty roster.
+        if (!hasCompleteRoster(notice)) reqVO.setScope("ACTUAL");
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        long total = statisticsMapper.count(tenantId, reqVO);
+        return new PageResult<>(total == 0 ? List.of() : statisticsMapper.page(tenantId, reqVO,
+                (long) (reqVO.getPageNo() - 1) * reqVO.getPageSize()), total);
+    }
+
     private NoticeDO requirePublishedNotice(Long id) {
         NoticeDO notice = requireNotice(id);
         if (!NoticePublishStatusEnum.PUBLISHED.getStatus().equals(notice.getPublishStatus())) {
@@ -374,20 +427,31 @@ public class NoticeServiceImpl implements NoticeService {
         if (recipientMapper.selectCountByNoticeId(notice.getId()) > 0) {
             throw exception(NOTICE_RECIPIENT_INVALID);
         }
-        if (!"TARGET".equals(notice.getAudienceType())) return;
         Set<Long> deptIds = new LinkedHashSet<>(parseIds(notice.getTargetDeptIds()));
         if (!deptIds.isEmpty()) deptIds.addAll(deptService.getChildDeptList(deptIds).stream().map(item -> item.getId()).toList());
         Set<Long> userIds = new LinkedHashSet<>(parseIds(notice.getTargetUserIds()));
         if (!deptIds.isEmpty()) userIds.addAll(userService.getUserListByDeptIds(deptIds).stream().map(item -> item.getId()).toList());
         userIds.retainAll(permissionService.getEnabledUserIdsByPermission("system:notice:read"));
-        if (userIds.isEmpty()) throw exception(NOTICE_RECIPIENT_INVALID);
-        List<NoticeRecipientDO> recipients = userIds.stream().map(userId -> {
+        if (!"TARGET".equals(notice.getAudienceType())) {
+            userIds = new LinkedHashSet<>(permissionService.getEnabledUserIdsByPermission("system:notice:read"));
+        }
+        List<AdminUserDO> users = userIds.isEmpty() ? List.of() : userService.getUserList(userIds).stream()
+                .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())).toList();
+        if ("TARGET".equals(notice.getAudienceType()) && users.isEmpty()) throw exception(NOTICE_RECIPIENT_INVALID);
+        Set<Long> profileDeptIds = users.stream().map(AdminUserDO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DeptDO> departments = profileDeptIds.isEmpty() ? Map.of() : deptService.getDeptMap(profileDeptIds);
+        List<NoticeRecipientDO> recipients = users.stream().map(user -> {
             NoticeRecipientDO recipient = new NoticeRecipientDO();
             recipient.setNoticeId(notice.getId());
-            recipient.setUserId(userId);
+            recipient.setUserId(user.getId());
+            recipient.setUserNameSnapshot(user.getNickname());
+            recipient.setDeptIdSnapshot(user.getDeptId());
+            DeptDO dept = user.getDeptId() == null ? null : departments.get(user.getDeptId());
+            recipient.setDeptNameSnapshot(dept == null ? null : dept.getName());
+            recipient.setProfileSnapshotComplete(true);
             return recipient;
         }).toList();
-        recipientMapper.insertBatch(recipients, 500);
+        if (!recipients.isEmpty()) recipientMapper.insertBatch(recipients, 500);
     }
 
     private List<Long> parseIds(String json) {

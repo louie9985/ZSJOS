@@ -204,14 +204,14 @@ export default function EamAssetPage({ permissions, view }: { permissions: strin
       {summary?.offboardingUncleared && <Alert type="warning" showIcon message="离职资产尚未结清"/>}
       {summary?.items.length ? <BusinessTable tableKey="eam-asset-page-1" columnMode="native" rowKey={row => `${row.itemType}-${row.holdingId || row.assetId}`} pagination={false} dataSource={summary.items} scroll={{ x: 720 }} columns={[
         { title: '资产', dataIndex: 'name' }, { title: '资产编号', dataIndex: 'assetCode' }, { title: '数量', render: (_, row) => `${row.quantity} ${row.unit || ''}` },
-        { title: '状态', render: (_, row) => <Tag>{row.itemType.endsWith('HOLDING') ? HOLDING_STATUS[row.status] : assetStatuses.labels[String(row.status)] || '未知状态'}</Tag> },
+        { title: '状态', render: (_, row) => <Tag>{row.itemType.endsWith('HOLDING') ? (HOLDING_STATUS[row.status] || '未知状态') : assetStatuses.labels[String(row.status)] || '未知状态'}</Tag> },
         { key: 'action', title: '操作', render: (_, row) => <Space>{row.holdingId && row.status === 0 && permissions.includes('eam:workbench:asset:sign') && <Button icon={<CheckOutlined/>} onClick={() => sign(row.holdingId!)}>签收</Button>}{row.holdingId && row.status === 1 && row.custodyMode === 2 && permissions.includes('eam:workbench:asset:return') && <Button icon={<RollbackOutlined/>} onClick={() => applyReturn(row.holdingId!)}>退还</Button>}{row.assetId && (row.holdingId ? row.status === 1 : [1, 2].includes(row.status)) && permissions.includes('eam:workbench:asset:repair') && <Button icon={<ToolOutlined/>} onClick={() => repair(row)}>报修</Button>}</Space> }
       ]}/> : <Empty description="暂无个人资产"/>}
       <Card size="small" title="入离职与异动资产任务"><List locale={{ emptyText: '暂无资产任务' }} dataSource={summary?.tasks || []} renderItem={task => <List.Item><List.Item.Meta title={TASK_TYPE[task.type] || '资产任务'} description={task.remark || '系统根据员工生命周期自动创建'}/><Tag>{TASK_STATUS[task.status] || task.status}</Tag></List.Item>}/></Card>
       <Card size="small" title="我的流转"><BusinessTable tableKey="eam-asset-page-2" columnMode="native" mode="compact" rowKey="id" size="small" pagination={false} dataSource={transfers} scroll={{ x: 620 }} columns={[
-        { title: '单据', dataIndex: 'no' }, { title: '类型', render: (_, row) => TRANSFER_TYPE[row.type] || row.type },
+        { title: '单据', dataIndex: 'no' }, { title: '类型', render: (_, row) => TRANSFER_TYPE[row.type] || (row.type == null ? '—' : '未知类型') },
         { title: '资产', render: (_, row) => `${row.assetCodeSnapshot || ''} ${row.assetNameSnapshot || ''}`.trim() || row.assetId },
-        { title: '状态', render: (_, row) => <Tag>{TRANSFER_STATUS[row.status] || row.status}</Tag> },
+        { title: '状态', render: (_, row) => <Tag>{TRANSFER_STATUS[row.status] || (row.status == null ? '—' : '未知状态')}</Tag> },
         { title: '验收', render: (_, row) => row.inspectionResult ? ['-', '完好', '损坏', '缺件/遗失', '不符驳回'][row.inspectionResult] : '-' }
       ]}/></Card>
     </> : demands.length ? <List dataSource={demands} renderItem={demand => <Card size="small" className="eam-demand-card" title={demand.no || '采购申请'} extra={<Tag>{DEMAND_STATUS[demand.status || 0]}</Tag>}><div className="eam-demand-meta">{demand.reason || '未填写事由'}</div><List size="small" dataSource={demand.items} renderItem={item => <List.Item><span>{item.name}</span><span>{item.fulfilledQuantity || 0}/{item.quantity} {item.unit}</span></List.Item>}/></Card>}/> : <Empty description="暂无采购申请"/>}

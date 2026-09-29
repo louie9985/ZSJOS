@@ -128,6 +128,15 @@ public class LeadLifecycleTaskService {
         performanceSnapshotService.qualificationResult(getQualificationTaskId(leadId, roundNo), "valid", completedAt);
     }
 
+    /** A later human decision must not overwrite the completed automatic fact or inherit its exclusion. */
+    public void startManualRoundAfterAutomatic(LeadDO lead, Long userId, LocalDateTime startedAt) {
+        if (lead.getQualificationRoundNo() == null) return;
+        var previous = taskCommandService.getByIdempotencyKey(qualificationTaskKey(lead.getId(), lead.getQualificationRoundNo()));
+        if (previous != null && LeadAutomaticGeneration.isAutomatic(previous.getPayload())) {
+            createQualificationTask(lead, userId, startedAt);
+        }
+    }
+
     public void cancelQualificationTask(Long leadId, Integer roundNo, LocalDateTime cancelledAt, String reason) {
         if (roundNo == null) return;
         var task = taskCommandService.getByIdempotencyKey(qualificationTaskKey(leadId, roundNo));

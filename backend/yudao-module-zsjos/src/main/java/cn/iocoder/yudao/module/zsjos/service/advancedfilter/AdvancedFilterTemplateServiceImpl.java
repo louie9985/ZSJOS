@@ -24,9 +24,17 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
 
     @Resource private AdvancedFilterTemplateMapper mapper;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+
+    private void checkMediaScene(String scene, Long userId) {
+        if ("media_student".equals(scene) && !permissionApi.hasAnyPermissions(userId, "zsjos:media-student:query-my")) {
+            throw new org.springframework.security.access.AccessDeniedException("无权使用媒体学员筛选模板");
+        }
+    }
 
     @Override
     public List<AdvancedFilterTemplateRespVO> visibleList(String scene, String pageKey, Long userId) {
+        checkMediaScene(scene, userId);
         validateScenePage(scene, pageKey);
         List<AdvancedFilterTemplateDO> templates = mapper.selectVisibleList(scene, pageKey, userId);
         Long effectiveId = resolveEffectiveDefaultId(templates);
@@ -55,18 +63,21 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createPersonal(AdvancedFilterTemplateSaveReqVO reqVO, Long userId) {
+        checkMediaScene(reqVO.getScene(), userId);
         return create(reqVO, SCOPE_PERSONAL, userId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updatePersonal(AdvancedFilterTemplateSaveReqVO reqVO, Long userId) {
+        checkMediaScene(reqVO.getScene(), userId);
         update(reqVO, SCOPE_PERSONAL, userId);
     }
 
     @Override
     public void deletePersonal(Long id, Long userId) {
         AdvancedFilterTemplateDO template = require(id, SCOPE_PERSONAL, userId);
+        checkMediaScene(template.getScene(), userId);
         mapper.deleteById(template.getId());
     }
 

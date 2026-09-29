@@ -21,4 +21,5 @@ public class CourseCalendarEventDO extends TenantBaseDO {
     private LocalDateTime endTime;
     private String remark;
     private String attachmentIdsJson;
+    private Integer calendarVersion;
 }

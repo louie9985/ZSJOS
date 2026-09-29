@@ -29,7 +29,9 @@ export function catalogSpecs(values: Record<string, string> = {}, attrs: Product
 }
 
 export function specText(spec: ProductSpec): string {
-  return `${spec.attrName}：${spec.label}${spec.labelMissing ? '（历史标签缺失）' : ''}`
+  // Missing labels are not user-entered text: their fallback contains internal attribute codes.
+  if (spec.labelMissing) return spec.attrName && spec.attrName !== spec.attrKey ? `${spec.attrName}：历史标签缺失` : '历史规格标签缺失'
+  return `${spec.attrName}：${spec.label}`
 }
 
 export function productSpecText(product: ProductDisplay): string {

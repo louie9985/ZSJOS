@@ -28,11 +28,26 @@ public class MediaStudentController {
     @Resource private MyStudentService studentService;
     @Resource private MediaStudentService mediaStudentService;
     @Resource private MediaStudentPartnerContextService partnerContextService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentServicePeriodService servicePeriodService;
+
+    @PutMapping("/{personId}/service-period")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-student:update-service-period')")
+    public CommonResult<Boolean> updateServicePeriod(@PathVariable Long personId,
+            @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServicePeriodUpdateReqVO req) {
+        return success(servicePeriodService.update(SecurityFrameworkUtils.getLoginUserId(), personId, req.getInServicePeriod()));
+    }
 
     @GetMapping("/{personId}/partner-context")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
     public CommonResult<MediaStudentPartnerContextRespVO> partnerContext(@PathVariable Long personId) {
         return success(partnerContextService.getContext(SecurityFrameworkUtils.getLoginUserId(), personId));
+    }
+
+    @PostMapping("/search-page")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
+    public CommonResult<PageResult<MediaStudentListRespVO>> searchPage(@Valid @RequestBody MyStudentPageReqVO req) {
+        return success(mediaStudentService.getPage(SecurityFrameworkUtils.getLoginUserId(), req));
     }
 
     @GetMapping("/page")

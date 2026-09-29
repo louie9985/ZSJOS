@@ -1,4 +1,5 @@
 import ResourceLinkInput from '../components/ResourceLinkInput'
+import ResourceLink from '../components/ResourceLink'
 import {
   CheckOutlined,
   EditOutlined,
@@ -447,6 +448,15 @@ export default function ContentProductionPage({ permissions = [] }: { permission
           {selected.availableActions.map(name => <Button key={name} type={name === 'SUBMIT_ACCEPTANCE' ? 'primary' : undefined} icon={<CheckOutlined />} onClick={() => void action(name)}>{({ COMPLETE_TOPIC: '完成选题', SUBMIT_PRODUCTION: '提交制作', SUBMIT_ACCEPTANCE: '提交审核', START_CONTENT_REVISION: '开始修改', RESUBMIT_PRODUCTION: '重新提交' } as Record<string, string>)[name] || name}</Button>)}
         </Space></div>
         {editing && <VersionEditor content={selected} initial={currentVersion} purposeOptions={purposeOptions} formatOptions={formatOptions} onSaved={() => { setEditing(false); void refreshSelected() }} onCancel={() => setEditing(false)} />}
+        {/* 发布登记在内容审核批次页完成，这里只读展示登记结果，便于运营核对。 */}
+        {(selected.publishedAt || selected.publishedUrl) && <section className="content-production-published">
+          <Typography.Title level={5}>发布结果</Typography.Title>
+          <dl className="content-production-fields">
+            <dt>发布时间</dt><dd>{formatTimestamp(selected.publishedAt) || '—'}</dd>
+            <dt>平台链接</dt><dd>{selected.publishedUrl
+              ? <ResourceLink href={selected.publishedUrl} title="查看已发布作品" variant="resource" /> : '—'}</dd>
+          </dl>
+        </section>}
         <section className="content-production-current"><div className="content-production-section-heading"><Typography.Title level={5}>当前版本</Typography.Title><Typography.Text type="secondary">{currentVersion ? `V${currentVersion.versionNo} · ${versionStatusText[currentVersion.reviewDecision ? (currentVersion.reviewDecision === 'approved' ? 'EFFECTIVE' : 'REJECTED') : 'DRAFT'] || currentVersion.stage}` : '尚未保存版本'}</Typography.Text></div>{currentVersion ? <>
           {/* 字段顺序与内容审核页一致，运营填写时看到的排布就是编导审核时的排布。 */}
           <div className="content-production-version-body">
@@ -459,12 +469,12 @@ export default function ContentProductionPage({ permissions = [] }: { permission
               <dt>选题</dt><dd>{currentVersion.topicSnapshot || '—'}</dd>
               <dt>正文文稿</dt><dd>{currentVersion.scriptText || '暂无脚本或正文'}</dd>
               <dt>作品详情</dt><dd>{currentVersion.detailUrl
-                ? <a href={currentVersion.detailUrl} target="_blank" rel="noreferrer">打开详情</a> : '—'}</dd>
+                ? <ResourceLink href={currentVersion.detailUrl} title="打开详情" /> : '—'}</dd>
               <dt>引流资料链接</dt><dd>{currentVersion.leadResourceUrl
-                ? <a href={currentVersion.leadResourceUrl} target="_blank" rel="noreferrer">打开链接</a> : '—'}</dd>
+                ? <ResourceLink href={currentVersion.leadResourceUrl} title="打开链接" /> : '—'}</dd>
               <dt>评论区钩子</dt><dd>{currentVersion.commentHook || '—'}</dd>
               <dt>参考作品链接</dt><dd>{currentVersion.referenceWorkUrl
-                ? <a href={currentVersion.referenceWorkUrl} target="_blank" rel="noreferrer">打开参考作品</a> : '—'}</dd>
+                ? <ResourceLink href={currentVersion.referenceWorkUrl} title="打开参考作品" /> : '—'}</dd>
             </dl>
           </div>
           <VersionReferenceMaterials version={currentVersion} />

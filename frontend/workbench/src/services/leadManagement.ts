@@ -1,5 +1,17 @@
 import type { Timestamp } from './time'
 
+// Relationship identifiers come from LeadManagementService, never from user role names.
+const relationLabels: Record<string, string> = { submitter: '提交人', owner: '负责人', student_service_owner: '学员服务负责人' }
+
+export function leadRelationTypesLabel(values?: readonly string[]) {
+  return values?.length ? values.map(value => Object.hasOwn(relationLabels, value) ? relationLabels[value] : '未知关系').join(' / ') : '—'
+}
+
+export function leadSnapshotLabel(snapshot?: string, value?: string) {
+  // A current dictionary label cannot establish the historical meaning of a missing snapshot.
+  return snapshot?.trim() || (value ? '历史标签缺失' : '—')
+}
+
 export function mergeUniqueLeads<T extends { id: number }>(current: T[], incoming: T[]): T[] {
   const byId = new Map(current.map(item => [item.id, item]))
   incoming.forEach(item => byId.set(item.id, item))

@@ -24,6 +24,10 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
         return selectCashbackPage(request, beneficiaryUserId, null);
     }
     default PageResult<CashbackDO> selectCashbackPage(CashbackPageReqVO request, Long beneficiaryUserId, List<Long> matchedIds) {
+        return selectCashbackPage(request, beneficiaryUserId, matchedIds, List.of());
+    }
+    default PageResult<CashbackDO> selectCashbackPage(CashbackPageReqVO request, Long beneficiaryUserId,
+                                                    List<Long> matchedIds, java.util.Collection<Long> nameMatchedIds) {
         if (matchedIds != null && matchedIds.isEmpty()) return new PageResult<>(List.of(), 0L);
         var query = new LambdaQueryWrapperX<CashbackDO>()
                 .eqIfPresent(CashbackDO::getBeneficiaryUserId, beneficiaryUserId)
@@ -44,7 +48,8 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
         query.likeIfPresent(CashbackDO::getProductNameSnapshot, request.getProductName());
         if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
             query.and(q -> q.like(CashbackDO::getCashbackNo, request.getKeyword().trim())
-                    .or().apply("EXISTS (SELECT 1 FROM zsjos_lead fl WHERE fl.id=zsjos_cashback.lead_id AND fl.tenant_id=zsjos_cashback.tenant_id AND fl.deleted=0 AND fl.lead_no LIKE {0})", "%" + request.getKeyword().trim() + "%"));
+                    .or().apply("EXISTS (SELECT 1 FROM zsjos_lead fl WHERE fl.id=zsjos_cashback.lead_id AND fl.tenant_id=zsjos_cashback.tenant_id AND fl.deleted=0 AND fl.lead_no LIKE {0})", "%" + request.getKeyword().trim() + "%")
+                    .or(!nameMatchedIds.isEmpty()).in(!nameMatchedIds.isEmpty(), CashbackDO::getId, nameMatchedIds));
         }
         if (request.getOrderNo() != null && !request.getOrderNo().isBlank()) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_order fo WHERE fo.id=zsjos_cashback.order_id AND fo.tenant_id=zsjos_cashback.tenant_id AND fo.deleted=0 AND fo.order_no LIKE {0})", "%" + request.getOrderNo().trim() + "%");

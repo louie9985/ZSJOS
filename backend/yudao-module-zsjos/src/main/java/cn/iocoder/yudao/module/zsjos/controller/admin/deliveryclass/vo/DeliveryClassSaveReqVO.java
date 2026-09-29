@@ -8,11 +8,11 @@ import java.util.Set;
 
 @Data
 public class DeliveryClassSaveReqVO {
-    @Size(max = 100) private String className;
-    @NotNull private Long productId;
+    @jakarta.validation.constraints.NotBlank @Size(max = 100) private String className;
+    private Long productId;
     private Map<String, String> selectedAttrs;
     private Set<Long> selectedSkuIds;
-    @NotNull private Long categoryId;
+    private Long categoryId;
     @NotNull private Long examScheduleId;
     @NotNull private Long homeroomUserId;
     private Integer version;

@@ -53,6 +53,7 @@ class DeliveryClassServiceImplTest {
     @Mock private ExamScheduleMapper scheduleMapper;
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private DeliveryClassNotifyPublisher notifyPublisher;
+    @Mock private DeliveryClassNumberService numberService;
 
     @Test void administratorReadScopesDoNotReuseCommandDepartmentScope() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
@@ -126,17 +127,14 @@ class DeliveryClassServiceImplTest {
         schedule.setScheduleType("EXACT"); schedule.setExactDate(java.time.LocalDate.of(2026, 12, 1));
         when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
         when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
-        when(categoryMapper.selectById(8L)).thenReturn(category);
         when(scheduleMapper.selectById(70L)).thenReturn(schedule);
-        when(productSkuService.resolveExamScope(eq(500L), any())).thenReturn(scope(500L, 8L, 900L));
         when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L).setNickname("新班主任"));
         when(classMapper.updateById(current)).thenReturn(1);
         when(relationMapper.selectClassRelationsForUpdate(100L, 1L)).thenReturn(java.util.List.of(first, second));
         when(relationMapper.transferClass(10L, 100L, 20L, 3)).thenReturn(1);
         when(relationMapper.transferClass(12L, 100L, 20L, 5)).thenReturn(1);
         DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
-        request.setClassName("新班级"); request.setProductId(500L); request.setCategoryId(8L); request.setExamScheduleId(70L);
-        request.setSelectedSkuIds(java.util.Set.of(900L));
+        request.setClassName("新班级"); request.setExamScheduleId(70L);
         request.setHomeroomUserId(20L); request.setVersion(2);
 
         service.update(100L, request, 9L);
@@ -146,50 +144,57 @@ class DeliveryClassServiceImplTest {
         verify(notifyPublisher).publishOwnerChanged(
                 "homeroom-change:100:relation:12:v5", 12L, 100L, 11L, 20L, "班主任变更");
         verify(taskCommandService, times(2)).reassignPending(anyCollection(), anyLong(), eq(20L));
+        verifyNoInteractions(productSkuService, categoryMapper);
+        assertEquals("新班级", current.getClassName());
     }
 
-    @Test
-    void updateUsesResolvedProductCategoryForCategoryLock() {
-        DeliveryClassDO current = deliveryClass(100L, false, 8L, 11L);
-        current.setClassName("原班级"); current.setExamScheduleId(70L); current.setVersion(2);
-        ZsjosProductCategoryDO category = new ZsjosProductCategoryDO().setId(9L).setName("新分类")
-                .setParentId(0L).setStatus(CommonStatusEnum.ENABLE.getStatus());
-        ExamScheduleDO schedule = new ExamScheduleDO().setId(70L).setCategoryId(9L)
-                .setRecordStatus("PUBLISHED").setScheduleType("EXACT")
-                .setExactDate(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).plusDays(1));
-        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
-        when(productSkuService.resolveExamScope(eq(500L), any())).thenReturn(scope(500L, 9L, 900L));
-        when(categoryMapper.selectById(9L)).thenReturn(category);
+
+
+
+
+    @Test void createsNamedClassWithoutProductAndRequiresExplicitNameAndExam() {
+        plannerRole(20L);
+        var schedule = new ExamScheduleDO().setId(70L).setScheduleName("自由考期").setRecordStatus("PUBLISHED")
+                .setScheduleType("EXACT").setExactDate(java.time.LocalDate.now().plusDays(10));
         when(scheduleMapper.selectById(70L)).thenReturn(schedule);
-        when(classMapper.countAllRelations(1L, 100L)).thenReturn(1);
-
-        DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
-        request.setClassName("修改班级"); request.setProductId(500L); request.setCategoryId(9L);
-        request.setExamScheduleId(70L); request.setSelectedSkuIds(java.util.Set.of(900L)); request.setVersion(2);
-
-        var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
-                () -> service.update(100L, request, 9L));
-
-        assertEquals(DELIVERY_CLASS_CATEGORY_LOCKED.getCode(), error.getCode());
-        verify(classMapper, never()).updateById(any(DeliveryClassDO.class));
+        when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
+        when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L));
+        when(numberService.next()).thenReturn("BJ209910100001");
+        var req = new DeliveryClassSaveReqVO(); req.setClassName("  自由班级  "); req.setExamScheduleId(70L); req.setHomeroomUserId(20L);
+        service.create(req, 9L);
+        var saved = org.mockito.ArgumentCaptor.forClass(DeliveryClassDO.class);
+        verify(classMapper).insert(saved.capture());
+        assertEquals("自由班级", saved.getValue().getClassName());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getProductId());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getCategoryId());
+        org.junit.jupiter.api.Assertions.assertTrue(saved.getValue().getExamScheduleSnapshot().startsWith("自由考期"));
+        verifyNoInteractions(productSkuService, categoryMapper);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            req.setClassName("  "); req.setExamScheduleId(null);
+            var fields = factory.getValidator().validate(req).stream().map(v -> v.getPropertyPath().toString()).toList();
+            org.junit.jupiter.api.Assertions.assertTrue(fields.containsAll(java.util.List.of("className", "examScheduleId")));
+        }
     }
 
-    @Test
-    void updateRejectsCategoryDifferentFromResolvedProduct() {
-        DeliveryClassDO current = deliveryClass(100L, false, 8L, 11L);
-        current.setVersion(2);
-        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
-        when(productSkuService.resolveExamScope(eq(500L), any())).thenReturn(scope(500L, 9L, 900L));
-
-        DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
-        request.setProductId(500L); request.setCategoryId(8L); request.setExamScheduleId(70L);
-        request.setSelectedSkuIds(java.util.Set.of(900L)); request.setVersion(2);
-
-        var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
-                () -> service.update(100L, request, 9L));
-
-        assertEquals(DELIVERY_CLASS_CATEGORY_INVALID.getCode(), error.getCode());
-        verifyNoInteractions(scheduleMapper, categoryMapper);
+    @Test void examOptionsIgnoreCatalogAndRejectExpiredDraftOrRevokedRecords() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "exam-options"), ExamScheduleDO.class);
+        var future = new ExamScheduleDO().setId(7L).setScheduleName("任意考期").setScheduleType("EXACT")
+                .setExactDate(java.time.LocalDate.now().plusDays(10)).setRecordStatus("PUBLISHED");
+        var ended = new ExamScheduleDO().setId(8L).setScheduleType("EXACT").setExactDate(java.time.LocalDate.now().minusDays(1));
+        when(scheduleMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(java.util.List.of(future, ended));
+        var options = service.examOptions(null, null, null, null);
+        assertEquals(1, options.size()); assertEquals(7L, options.getFirst().id());
+        org.junit.jupiter.api.Assertions.assertTrue(options.getFirst().displayName().startsWith("任意考期"));
+        verifyNoInteractions(productSkuService, categoryMapper);
+        var req = new DeliveryClassSaveReqVO(); req.setClassName("手工班级"); req.setExamScheduleId(7L);
+        when(scheduleMapper.selectById(7L)).thenReturn(future);
+        for (String state : java.util.List.of("DRAFT", "REVOKED")) {
+            future.setRecordStatus(state);
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.create(req, 9L));
+        }
+        future.setRecordStatus("PUBLISHED").setExactDate(java.time.LocalDate.now().minusDays(1));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.create(req, 9L));
+        verifyNoInteractions(classMapper, adminUserApi);
     }
 
     private static ServiceRelationDO relation(Long id, Long classId, Integer version) {

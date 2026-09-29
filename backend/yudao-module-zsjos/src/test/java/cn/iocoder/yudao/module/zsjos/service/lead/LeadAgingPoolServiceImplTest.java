@@ -113,6 +113,18 @@ class LeadAgingPoolServiceImplTest {
     }
 
     @Test
+    void manualPublicSeaAllowsItsOwnerAndConfiguredCollaboratorToFollowUp() {
+        var manual = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO();
+        manual.setOwnerUserId(10L); manual.setCollaboratorUserId(20L);
+        when(cycleMapper.selectActiveByLeadId(1L)).thenReturn(null);
+        when(publicSeaRecordMapper.selectByLeadId(1L)).thenReturn(manual);
+
+        assertTrue(service.canOperate(1L, 10L, 10L));
+        assertTrue(service.canOperate(1L, 10L, 20L));
+        assertFalse(service.canOperate(1L, 10L, 30L));
+    }
+
+    @Test
     void collaboratorRetainsFollowUpButNotDealActions() {
         LeadAgingPoolCycleDO cycle = cycle(AGING_POOL_ASSIGNED, 20L);
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(10L);
@@ -121,6 +133,7 @@ class LeadAgingPoolServiceImplTest {
         when(cycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
         when(orderMapper.selectActiveByLeadId(1L, cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES)).thenReturn(null);
         when(securityFrameworkService.hasPermission(anyString())).thenReturn(false);
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
         AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(30L);
         AdminUserRespDTO collaboratorUser = new AdminUserRespDTO(); collaboratorUser.setId(20L); collaboratorUser.setDeptId(30L);
         when(adminUserApi.getUser(10L)).thenReturn(owner);

@@ -55,6 +55,34 @@ public class NotifyBusinessEventProcessor {
 
     public record PreparedWecom(List<NotifyDeliveryContext> recipients, NotifySendResult failure) {}
 
+    public record PreparedInApp(NotifySceneProvider provider, NotifyRuleDO rule,
+                                NotifyTemplateDO template, NotifySendResult failure) {}
+
+    /** The fixed outbox worker owns recipient checkpoints; template and scene policy remain here. */
+    public PreparedInApp prepareFixedInApp(NotifyBusinessEvent event) {
+        if (!"FIXED".equals(event.getRecipientMode()) || event.getTargetRuleId() == null)
+            throw new IllegalArgumentException("Fixed in-app delivery requires a persisted rule");
+        event.validatedFixedRecipients();
+        var provider = sceneRegistry.getProvider(event.getSceneCode());
+        if (provider == null) return new PreparedInApp(null, null, null,
+                NotifySendResult.failure("NOTIFY_SCENE_MISSING", "通知场景未注册", false));
+        var rule = notifyRuleService.getEnabledRules(event.getSceneCode()).stream()
+                .filter(value -> event.getTargetRuleId().equals(value.getId())
+                        && (value.getChannelCode() == null || value.getChannelCode().isBlank()
+                        || NotifyChannelType.IN_APP.equals(value.getChannelCode()))).findFirst().orElse(null);
+        if (rule == null) return new PreparedInApp(provider, null, null,
+                NotifySendResult.failure("NOTIFY_RULE_MISSING", "站内信规则不存在、已停用或渠道已变更", false));
+        var applicability = evaluateRule(event, rule);
+        if (applicability != null) return new PreparedInApp(provider, rule, null, applicability);
+        var template = notifyTemplateService.getNotifyTemplate(rule.getTemplateId());
+        if (template == null || !Integer.valueOf(0).equals(template.getStatus())
+                || !event.getSceneCode().equals(template.getSceneCode())
+                || template.getChannelCode() != null && !NotifyChannelType.IN_APP.equals(template.getChannelCode()))
+            return new PreparedInApp(provider, rule, null,
+                    NotifySendResult.failure("NOTIFY_TEMPLATE_INVALID", "站内信模板不可用", false));
+        return new PreparedInApp(provider, rule, template, validateTemplateContract(event, template));
+    }
+
     /** Called inside the event tenant; freeze the same scene/rule contract used for immediate delivery. */
     public PreparedWecom prepareWecom(NotifyBusinessEvent event) {
         NotifySceneProvider provider = sceneRegistry.getProvider(event.getSceneCode());
@@ -76,8 +104,7 @@ public class NotifyBusinessEventProcessor {
         NotifySendResult invalid = validateTemplateContract(event, template);
         if (invalid != null) return new PreparedWecom(List.of(), invalid);
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
-        rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
-        recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
+        addRecipients(event, rule, provider, recipients);
         if (recipients.isEmpty()) return new PreparedWecom(List.of(),
                 NotifySendResult.failure("NOTIFY_RECIPIENT_MISSING", "通知收件人暂不可用", true));
         List<NotifyDeliveryContext> prepared = new java.util.ArrayList<>();
@@ -141,8 +168,7 @@ public class NotifyBusinessEventProcessor {
         NotifySendResult contractFailure = validateTemplateContract(event, template);
         if (contractFailure != null) return contractFailure;
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
-        rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
-        recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
+        addRecipients(event, rule, provider, recipients);
         if (recipients.isEmpty()) {
             return NotifySendResult.failure("NOTIFY_RECIPIENT_MISSING", "通知收件人暂不可用", true);
         }
@@ -199,8 +225,7 @@ public class NotifyBusinessEventProcessor {
                     continue;
                 }
                 Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
-                rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
-                recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
+                addRecipients(event, rule, provider, recipients);
                 NotifyTemplateDO template = notifyTemplateService.getNotifyTemplate(rule.getTemplateId());
                 boolean websocketUsesInAppTemplate = template != null && NotifyChannelType.WEBSOCKET.equals(channelCode)
                         && NotifyChannelType.IN_APP.equals(template.getChannelCode());
@@ -290,5 +315,17 @@ public class NotifyBusinessEventProcessor {
             log.warn("[createMessageBestEffort][scene({}) ruleId({}) userId({}) creation failed]",
                     event.getSceneCode(), rule.getId(), recipient.getUserId(), exception);
         }
+    }
+
+    private void addRecipients(NotifyBusinessEvent event, NotifyRuleDO rule,
+                               NotifySceneProvider provider, Set<NotifyRecipientDTO> recipients) {
+        var fixed = event.validatedFixedRecipients();
+        if ("FIXED".equals(event.getRecipientMode())) {
+            recipients.addAll(fixed);
+            return;
+        }
+        if (rule.getSpecifiedUserIds() != null) rule.getSpecifiedUserIds().stream()
+                .map(NotifyRecipientDTO::admin).forEach(recipients::add);
+        recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
     }
 }

@@ -35,6 +35,8 @@
 }
 
 .media-students-filter-shell { flex: none; margin-bottom: var(--crm-gap); }
+.media-students-service-period-tabs { flex: 1; min-width: 0; }
+.media-students-service-period-tabs > .ant-tabs-nav { margin-bottom: 0; }
 .media-students-filter-shell h4,
 .media-students-detail-hero h4,
 .media-students-card h5 { margin: 0; }
@@ -759,26 +761,35 @@
   gap: var(--crm-sp-4);
   margin-block: var(--crm-sp-4);
 }
-.account-work-card { min-width: 0; }
+/* 边框挂在卡片容器上：链接必须渲染在打开卡片的按钮之外，边框若留在按钮上会把链接甩到框外。 */
+.account-work-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  overflow: hidden;
+}
 .account-work-open {
   width: 100%;
   padding: 0;
   text-align: start;
   color: var(--crm-text);
   font: inherit;
-  border: 1px solid var(--crm-border);
-  border-radius: var(--crm-radius-md);
-  background: var(--crm-bg-container);
-  overflow: hidden;
+  border: none;
+  background: none;
   cursor: pointer;
 }
 .account-work-open:disabled { cursor: default; }
-.account-work-open:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.account-work-open:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
 .account-work-cover { aspect-ratio: 3 / 4; display: grid; place-items: center; background: var(--crm-bg-sunken); color: var(--crm-text-secondary); }
 .account-work-cover img { width: 100%; height: 100%; object-fit: cover; }
 .account-work-cover > span { text-align: center; }
 .account-work-caption { display: flex; flex-direction: column; align-items: flex-start; gap: var(--crm-sp-2); padding: var(--crm-card-pad); }
 .account-work-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+/* 链接在按钮之外、卡片边框之内，左右内边距与 caption 对齐。 */
+.account-work-link { min-width: 0; padding: 0 var(--crm-card-pad) var(--crm-card-pad); }
 .account-published-works { grid-column: 1 / -1; min-width: 0; }
 .account-profile > .media-students-tab-heading { flex-wrap: wrap; flex: none; }
 
@@ -966,3 +977,16 @@
 .media-students-account-card .media-students-item-heading { flex-wrap: wrap; white-space: normal; overflow: visible; }
 .media-students-account-card .media-students-item-heading > span { flex: 0 1 auto; overflow-wrap: anywhere; }
 .media-students-load-more { flex: none; padding: var(--crm-sp-2); text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; }
+
+/* Search and filter share the list's padding; summaries wrap below without shrinking controls. */
+.media-students-toolbar { display: block; min-width: 0; }
+.media-students-toolbar .advanced-filter-toolbar { min-width: 0; width: 100%; }
+.media-students-toolbar .advanced-filter-toolbar > .ant-btn,
+.media-students-toolbar .advanced-filter-toolbar > .ant-badge { flex: none; }
+.media-students-toolbar .advanced-filter-tags { max-height: 112px; overflow-y: auto; }
+.media-students-toolbar .advanced-filter-tags .ant-tag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.media-students-inbox-layout.is-list-collapsed .media-students-toolbar { display: block; }
+.media-students-inbox-layout.is-list-collapsed .advanced-filter-toolbar { justify-content: center; gap: var(--crm-sp-1); }
+@media (max-width: 768px) {
+  .media-students-inbox-layout.is-list-collapsed .advanced-filter-toolbar { justify-content: flex-start; }
+}

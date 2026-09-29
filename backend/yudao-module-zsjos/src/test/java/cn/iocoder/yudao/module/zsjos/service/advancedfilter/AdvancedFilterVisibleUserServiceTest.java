@@ -26,6 +26,16 @@ class AdvancedFilterVisibleUserServiceTest {
     @Mock private LeadObjectPermissionService leadObjectPermissionService;
     @Mock private ServiceRelationMapper serviceRelationMapper;
     @Mock private AdminUserApi adminUserApi;
+    @Mock private AdvancedFilterService advancedFilterService;
+
+    @Test void mediaOptionsUseOnlyReadableAccountOwnersIncludingDisabledHistoricalOwners() {
+        when(advancedFilterService.mediaStudentOperatorIds(7L)).thenReturn(Set.of(8L));
+        when(adminUserApi.getUserList(Set.of(8L))).thenReturn(List.of(user(8L, "历史运营", 1)));
+        var result = service.resolve("media_student", 7L);
+        assertEquals(List.of("8"), result.options().stream().map(option -> option.value()).toList());
+        verifyNoInteractions(leadObjectPermissionService, serviceRelationMapper);
+    }
+
 
     @Test
     void leadSceneUsesLeadHierarchyAndExcludesDisabledUsers() {

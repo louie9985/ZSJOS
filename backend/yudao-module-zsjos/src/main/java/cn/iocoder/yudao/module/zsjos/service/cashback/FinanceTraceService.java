@@ -29,7 +29,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
-/** Management-only projections. Personal/H5 converters intentionally never call this service. */
+/** Finance projections and authorized search matching; H5 keeps its own converters. */
 @Service
 public class FinanceTraceService {
     @Resource private CashbackMapper cashbacks;
@@ -184,6 +184,31 @@ public class FinanceTraceService {
                 default -> false;
             };
         }).collect(Collectors.toSet());
+    }
+
+    public Set<Long> matchCashbackNameIds(String keyword) {
+        if (keyword == null || keyword.isBlank()) return Set.of();
+        String expected = keyword.trim().toLowerCase(Locale.ROOT);
+        var result = new HashSet<>(matchIdentityIds("cashback", "contains", expected));
+        // Search must not disclose a source identity that the detail projection hides.
+        Set<Long> leadIds = canQuerySource("lead_identity") ? visibleSourceIds("lead_identity") : Set.of();
+        Set<Long> orderIds = canQuerySource("order") ? visibleSourceIds("order") : Set.of();
+        Set<Long> matchingLeads = leadIds.isEmpty() ? Set.of() : leads.selectBatchIds(leadIds).stream()
+                .filter(row -> containsName(row.getSubmittedName(), expected)).map(LeadDO::getId).collect(Collectors.toSet());
+        Set<Long> matchingOrders = orderIds.isEmpty() ? Set.of() : orders.selectBatchIds(orderIds).stream()
+                .filter(row -> containsName(row.getStudentName(), expected)).map(SalesOrderDO::getId).collect(Collectors.toSet());
+        if (!matchingLeads.isEmpty() || !matchingOrders.isEmpty()) {
+            for (CashbackDO row : cashbacks.selectList(new LambdaQueryWrapper<CashbackDO>()
+                    .select(CashbackDO::getId, CashbackDO::getLeadId, CashbackDO::getOrderId))) {
+                if ((row.getLeadId() != null && matchingLeads.contains(row.getLeadId()))
+                        || (row.getOrderId() != null && matchingOrders.contains(row.getOrderId()))) result.add(row.getId());
+            }
+        }
+        return result;
+    }
+
+    private static boolean containsName(String name, String expected) {
+        return name != null && name.toLowerCase(Locale.ROOT).contains(expected);
     }
 
     public WithdrawalRespVO enrichWithdrawalIfManagement(WithdrawalRespVO view) {

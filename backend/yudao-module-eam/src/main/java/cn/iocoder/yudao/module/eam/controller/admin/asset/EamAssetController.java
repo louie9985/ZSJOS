@@ -102,6 +102,17 @@ public class EamAssetController {
         return success(true);
     }
 
+    @PutMapping("/change-status")
+    @Operation(summary = "直接调整资产状态", description = "用于历史台账修正或盘点纠正，不启动领用、调拨等审批流程")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:update', 'eam:manage-all')")
+    public CommonResult<Boolean> changeStatus(@RequestParam("id") Long id,
+                                               @RequestParam("status") Integer status,
+                                               @RequestParam(value = "reason", required = false) String reason) {
+        assetService.changeStatus(id, status, reason,
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
     @DeleteMapping("/delete")
     @Operation(summary = "删除资产")
     @Parameter(name = "id", description = "资产编号", required = true, example = "1024")

@@ -13,3 +13,9 @@ The five supported providers are registered by the ZSJOS module. `lead` accepts 
 Workers rebuild a temporary security context for the task creator, recheck that the account is enabled and still has the type-specific export permission, and always restore the worker thread's previous context. Revoked access terminates the task with `PERMISSION_REVOKED` instead of retrying. Domain list services remain authoritative for visibility and tenant filtering.
 
 `GET /admin-api/zsjos/business-audit/page` requires `zsjos:audit:query` and queries the fixed business category/action catalog. `GET /admin-api/zsjos/business-audit/impersonation-page` requires `zsjos:audit:query-impersonation` and queries the separate impersonation request log. Audit details reject sensitive contact/card keys and never persist filters, exported file content, query strings, request bodies, or response content.
+
+Flowable timer jobs restore the persisted job tenant before resolving process instances,
+tasks, models, or timeout actions. Their async execution adapter carries that tenant into
+the execution audit hook and restores the worker thread afterward. A failed notification
+or automatic timeout action is recorded as `FAILURE` while Flowable retains its normal job
+retry behavior; a missing HTTP request tenant is never replaced with a default tenant.

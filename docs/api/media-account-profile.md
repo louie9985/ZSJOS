@@ -106,6 +106,7 @@ V211 已于 2026-09-12 在开发库执行。执行前备份位于 `backups/mysql
 - 沿用现有流程资产及其“学员联系延期”名称，本次未发布或改名共享流程。BPM 变量额外提供交付阶段、原/目标截止时间、说明、发起人及提交时间，需在可用流程环境完成真实审批验收。
 - Workbench 按 `zsjos:student-delivery:query/submit/defer` 控制入口；后端 defer Controller 权限和 `student-delivery-stage/defer` 对象权限累积执行。仅当前责任编导可发起，客户端不能指定其他发起人或审批人。
 - 已发布作品来自既有学员详情完整 contents 列表，按 accountId 和 published 状态筛选，按发布时间倒序，每页 12 项。网格按可用宽度自动排列；封面读取当前内容版本绑定文件的短期 previewUrl，无图片时显示“暂无封面”。详情/封面读取沿用 `zsjos:content:query` 及服务端对象授权，失败显示原因并可重试。未接入点赞等互动数据，不补造统计值；本功能不是外部平台自动抓取。
+- 2026-09-27 补充：`MediaStudentDetailRespVO.ContentVO` 增加 `publishedUrl`，与既有 `publishedAt` 同源，均为发布登记写入的公开作品投影（`ContentDO.publishedUrl/publishedAt`）。卡片在标题与时间下方直接展示该链接，详情弹窗同样展示；两处均复用 `ResourceLink`，无效协议由组件拒绝并按纯文本呈现，不再手写 `<a target="_blank">`。卡片链接渲染在打开卡片的 `<button>` 之外：按钮内嵌链接既是无效结构，也会吞掉卡片交互。该字段随既有 `zsjos:media-student:query-my` 与 contents 对象授权一并返回，不新增接口或权限。
 - Vue 管理端只消费交付周期配置接口，不调用 defer，不改其配置协议。本次无 SQL、新依赖、账号授权或共享服务配置变更。
 
 本次开发库已发布租户 1 配置版本 5，cover.ownerType=OPERATOR；前一版本 JSON 保留，其他字段逐项一致，重复执行无新增版本，主页截图标签 HEX 为 E4B8BBE9A1B5E688AAE59BBE。定向 MySQL 重放、后端 17 项专项测试、Workbench 3 项测试、typecheck 和生产构建通过。完整前置初始化检查因当前仓库重复 V228 编号阻断；浏览器无登录会话，真实上传与桌面/移动页面验收未完成，不能据此宣称完整新库发布验收通过。

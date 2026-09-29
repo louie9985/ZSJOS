@@ -91,6 +91,8 @@ with sync_playwright() as p:
     page.get_by_role('dialog').get_by_role('button', name='查看详情').first.click()
     page.get_by_role('button', name='放弃并切换', exact=True).click()
     expect(pane.get_by_text('历史轮次 · 只读', exact=True)).to_be_visible()
+    expect(pane.get_by_label('作品审核意见')).to_contain_text('历史编导意见：调整开场')
+    expect(pane.get_by_label('作品审核意见')).to_contain_text('历史终审意见：补充来源')
     expect(pane.locator('.content-review-decision')).to_have_count(0)
     expect(pane.get_by_text('历史选题', exact=True)).to_be_visible()
     expect(pane.locator('.content-review-resource-links a')).to_have_count(4)
@@ -123,6 +125,22 @@ with sync_playwright() as p:
             assert assets.nth(1).bounding_box()['y'] > assets.nth(0).bounding_box()['y']
             assets.first.scroll_into_view_if_needed()
             page.screenshot(path=str(OUT / 'mobile-assets.png'))
+    # Completed batches remain readable for viewers with no review actions.
+    page.evaluate('''() => {
+      const b = window.reviewOpinionFixture;
+      b.availableActions = []; b.status = 'COMPLETED'; b.currentStage = 'DONE';
+      b.items[0].directorDecision = 'APPROVED'; b.items[0].directorComment = '编导已保存意见\\n第二行';
+      b.items[0].finalDecision = 'APPROVED'; b.items[0].finalComment = '终审已保存意见';
+    }''')
+    for width in [1440, 390]:
+        page.set_viewport_size({'width': width, 'height': 900})
+        page.get_by_role('button', name='刷新内容审核', exact=True).click()
+        expect(pane.get_by_label('作品审核意见')).to_contain_text('编导已保存意见')
+        expect(pane.get_by_label('作品审核意见')).to_contain_text('终审已保存意见')
+        expect(pane.locator('.content-review-decision')).to_have_count(0)
+        pane.get_by_label('作品审核意见').scroll_into_view_if_needed()
+        assert pane.evaluate('(e) => e.scrollWidth <= e.clientWidth + 1')
+        page.screenshot(path=str(OUT / f'opinions-{width}.png'))
     assert not errors, errors
     browser.close()
 print('PASS: desktop/mobile layout, tags, mapping, protected attachment retry, history error/empty/dirty/read-only/return; synthetic transport.')

@@ -51,6 +51,8 @@ public class NoticeDO extends BaseDO {
     private String targetDeptIds;
     /** 草稿选择的用户编号 JSON。 */
     private String targetUserIds;
+    /** Complete publication roster, including a valid empty roster. */
+    private Boolean recipientSnapshotComplete;
     private String publishStatus;
     private LocalDateTime publishTime;
     private LocalDateTime offlineTime;

@@ -5,7 +5,7 @@ import { createCashbackColumns, money } from './financeTableColumns'
 import type { Cashback } from '../services/managementApi'
 
 const cashbackColumns = createCashbackColumns([{ value: 'valid', label: '有效返现' }, { value: 'deal', label: '成交返现' }], [{ value: 'pending_settlement', label: '待结算' }])
-const row: Cashback = { id: 1, cashbackNo: 'CB-test', type: 'valid', status: 'pending_settlement', beneficiaryUserId: 1, productNameSnapshot: '测试产品', baseAmount: 1000, rateSnapshot: 0.075, amount: 75, generatedAt: Date.UTC(2026, 8, 23, 2), availableAt: Date.UTC(2026, 8, 24, 2) }
+const row: Cashback = { version: 0, id: 1, cashbackNo: 'CB-test', type: 'valid', status: 'pending_settlement', beneficiaryUserId: 1, productNameSnapshot: '测试产品', baseAmount: 1000, rateSnapshot: 0.075, amount: 75, generatedAt: Date.UTC(2026, 8, 23, 2), availableAt: Date.UTC(2026, 8, 24, 2) }
 function renderField(field: string, record = row) {
   const column = cashbackColumns.find(item => item.dataIndex === field)!
   // Reproduce ProTable's formatted-node argument, which cannot be treated as a number/string.
@@ -14,6 +14,11 @@ function renderField(field: string, record = row) {
 }
 
 describe('finance table raw response rendering', () => {
+  it('labels the finance partner identity as 兼职姓名', () => {
+    const column = createCashbackColumns([], [], () => {}).find(item => item.dataIndex === 'partnerName')!
+    expect(column.title).toBe('兼职姓名')
+    expect(column.hideInTable).toBe(false)
+  })
   it('uses raw amounts and rates despite a formatted first argument', () => {
     expect(renderField('baseAmount')).toBe('¥1000.00')
     expect(renderField('amount')).toBe('¥75.00')

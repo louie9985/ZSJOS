@@ -168,6 +168,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     @Test
     void shouldFreezeTargetUsersAndRejectNonRecipients() {
         when(permissionService.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of(USER_ID));
+        when(userService.getUserList(Set.of(USER_ID))).thenReturn(List.of(user(USER_ID, null)));
         NoticeSaveReqVO request = saveRequest("<p>定向正文</p>");
         request.setAudienceType("TARGET");
         request.setTargetUserIds(List.of(USER_ID, USER_ID));
@@ -205,6 +206,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
         when(userService.getUserListByDeptIds(Set.of(10L, 20L)))
                 .thenReturn(List.of(departmentUser, explicitUser));
         when(deptService.getChildDeptList(Set.of(10L))).thenReturn(List.of(child));
+        when(userService.getUserList(Set.of(USER_ID, 30L))).thenReturn(List.of(departmentUser, explicitUser));
 
         NoticeSaveReqVO request = saveRequest("<p>部门公告</p>");
         request.setAudienceType("TARGET");

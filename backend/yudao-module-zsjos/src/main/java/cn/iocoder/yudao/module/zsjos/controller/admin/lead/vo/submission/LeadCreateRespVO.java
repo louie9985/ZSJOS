@@ -9,6 +9,8 @@ public class LeadCreateRespVO {
     private Long reviewId;
     private String outcome;
     private String assignmentStatus;
+    private String qualificationStatus;
+    private Boolean automaticQualificationApplied = false;
     private Long pendingAssigneeUserId;
     private String existingLeadStatus;
     private String existingQualificationStatus;

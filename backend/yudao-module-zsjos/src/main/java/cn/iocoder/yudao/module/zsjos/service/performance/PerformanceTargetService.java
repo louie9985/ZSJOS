@@ -27,14 +27,14 @@ public class PerformanceTargetService {
    BigDecimal f=BigDecimal.ZERO,s=BigDecimal.ZERO;int missing=0;for(var t:months){f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
    return new Target(null,type,id,name(type,id),period,start,f,s,f,s,false,missing==0,missing,null);
   }
-  return resolve(type,id,period,start,rows(period,start),new HashSet<>());
+  return resolve(type,id,period,start,rows(period,start),new HashSet<>(),null);
  }
- private Target resolve(String type,Long id,String period,LocalDate start,List<PerformanceTargetDO> rows,Set<String> path) {
+ private Target resolve(String type,Long id,String period,LocalDate start,List<PerformanceTargetDO> rows,Set<String> path,List<MissingTarget> missingRows) {
   String key=type+id;if(!path.add(key))throw PerformanceAccess.invalid("目标组织关联存在循环");
   var row=rows.stream().filter(x->type.equals(x.getScopeType())&&id.equals(x.getScopeId())).findFirst().orElse(null);
   if(row!=null&&"USER".equals(type)){var q=new Query();q.setScopeType("USER");q.setScopeId(id);if(!access.historicalRowAllowed(q,row.getDeptId()))row=null;}
   BigDecimal f=BigDecimal.ZERO,s=BigDecimal.ZERO;int missing=0;
-  if("USER".equals(type)) {missing=row==null?1:0; f=row==null?null:row.getFloorAmount();s=row==null?null:row.getSprintAmount();}
+  if("USER".equals(type)) {missing=row==null?1:0;if(row==null&&missingRows!=null)missingRows.add(missingRow(type,id,start,"保底、冲刺目标未设置")); f=row==null?null:row.getFloorAmount();s=row==null?null:row.getSprintAmount();}
   else {
    Set<Long> children=new LinkedHashSet<>();String childType="DEPT";
    if("CENTER".equals(type)) {
@@ -46,11 +46,18 @@ public class PerformanceTargetService {
     Set<Long> recorded=new HashSet<>();rows.stream().filter(x->"USER".equals(x.getScopeType())).forEach(x->{recorded.add(x.getScopeId());if(id.equals(x.getDeptId()))children.add(x.getScopeId());});
     access.sales().stream().filter(x->id.equals(x.getDeptId())&&!recorded.contains(x.getId())&&Objects.equals(x.getStatus(),0)).forEach(x->children.add(x.getId()));
    }
-   if(children.isEmpty())missing++;
-   for(Long child:children){var t=resolve(childType,child,period,start,rows,new HashSet<>(path));f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
+   if(children.isEmpty()){missing++;if(missingRows!=null)missingRows.add(missingRow(type,id,start,"无可汇总的下级目标"));}
+   for(Long child:children){var t=resolve(childType,child,period,start,rows,new HashSet<>(path),missingRows);f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
   }
   boolean manual=row!=null&&Boolean.TRUE.equals(row.getManual());
   return new Target(row==null?null:row.getId(),type,id,name(type,id),period,start,f,s,manual?row.getFloorAmount():f,manual?row.getSprintAmount():s,manual,missing==0,missing,row==null?null:row.getVersion());
+ }
+ public List<MissingTarget> missing(String type,Long id,LocalDate start){
+  List<MissingTarget> result=new ArrayList<>();resolve("SELF".equals(type)?"USER":type,id,"month",start,rows("month",start),new HashSet<>(),result);return result;
+ }
+ private MissingTarget missingRow(String type,Long id,LocalDate start,String reason){
+  var user="USER".equals(type)?access.user(id):null;var dept=access.dept("USER".equals(type)?user==null?null:user.getDeptId():id);
+  return new MissingTarget(type,id,name(type,id),dept==null?"组织未记录":dept.getName(),start,reason);
  }
  private static BigDecimal z(BigDecimal x){return x==null?BigDecimal.ZERO:x;}
  private String name(String type,Long id){if("USER".equals(type)){var u=access.user(id);return u==null?"历史人员":u.getNickname();}var d=access.dept(id);return d==null?"历史组织":d.getName();}

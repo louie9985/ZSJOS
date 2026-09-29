@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateSalesOrderDecisionReason, buildDictionaryLabelMap, canReviewSalesOrderTask, mergeSalesOrderListItems, resolveDictionaryLabel, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
+import { validateSalesOrderAmounts, validateSalesOrderDecisionReason, buildDictionaryLabelMap, canReviewSalesOrderTask, mergeSalesOrderListItems, resolveDictionaryLabel, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
 import type { SalesOrder, SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
@@ -90,5 +90,28 @@ describe('decision reason contract', () => {
   it('blocks missing configuration and accepts actual rejection reasons', () => {
     expect(validateSalesOrderDecisionReason('approve', undefined, '')).toBe('审批意见配置未加载，请重试')
     expect(validateSalesOrderDecisionReason('reject', false, ' 补正资料 ')).toBeUndefined()
+  })
+})
+
+
+describe('purchase draft and submission amounts', () => {
+  const items = (...amounts: number[]) => amounts.map((actualAmount, i) => ({ courseKey: `spu::sku-${i}`, actualAmount }))
+  it.each([[0], [0, 0], [0, 12.34]])('accepts offline amounts %j', (...amounts) => {
+    expect(validateSalesOrderAmounts(items(...amounts), 'offline_paid')).toBeUndefined()
+  })
+  it('requires a positive online total but permits free line items', () => {
+    expect(validateSalesOrderAmounts(items(0, 0), 'online_link')).toContain('零金额订单请选择线下已支付')
+    expect(validateSalesOrderAmounts(items(0.01), 'online_link')).toBeUndefined()
+    expect(validateSalesOrderAmounts(items(0, 0.01), 'online_link')).toBeUndefined()
+  })
+  it.each([-1, NaN, Infinity, 0.001, 1.999])('rejects invalid line amount %s', amount => {
+    expect(validateSalesOrderAmounts(items(amount, 100), 'offline_paid')).toBeTruthy()
+  })
+  it('does not omit incomplete rows or coerce empty values to zero', () => {
+    expect(validateSalesOrderAmounts(undefined, 'offline_paid')).toBeTruthy()
+    expect(validateSalesOrderAmounts([], 'offline_paid')).toBeTruthy()
+    expect(validateSalesOrderAmounts([...items(0), { courseKey: 'spu::sku' }], 'offline_paid')).toBeTruthy()
+    expect(validateSalesOrderAmounts([{ actualAmount: 0 }], 'offline_paid')).toBeTruthy()
+    expect(validateSalesOrderAmounts([{ courseKey: 'spu::', actualAmount: 0 }], 'offline_paid')).toBeTruthy()
   })
 })

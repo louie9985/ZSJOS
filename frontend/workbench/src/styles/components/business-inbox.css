@@ -135,6 +135,16 @@
   content: '';
 }
 
+/* 未读态是所有收件箱共用的语义，此前各页各写一份（公告用标题加粗、今日任务用自绘类），
+   消息中心那份还因为类名不匹配完全失效。统一在共享层定义。 */
+.business-inbox-item.unread {
+  background: color-mix(in srgb, var(--crm-bg-container) 92%, var(--crm-color-primary) 8%);
+}
+
+.business-inbox-item.unread .business-inbox-item-title strong {
+  font-weight: var(--crm-weight-semibold);
+}
+
 .business-inbox-item-main {
   display: flex;
   min-width: 0;
@@ -288,6 +298,20 @@
 .business-inbox-table-page > .business-inbox-table {
   min-width: 0;
   flex: 1;
+}
+
+/* 表格模式的未读/选中行状态，与列表模式的 .business-inbox-item 语义一致。
+   行类名由页面通过 rowClassName 提供，这里只定义视觉。 */
+.business-inbox-table .ant-table-tbody > tr.unread > td {
+  background: color-mix(in srgb, var(--crm-bg-container) 92%, var(--crm-color-primary) 8%);
+}
+
+.business-inbox-table .ant-table-tbody > tr.active > td {
+  background: var(--crm-color-primary-bg);
+}
+
+.business-inbox-table .ant-table-tbody > tr.active.unread > td {
+  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-color-primary) 22%);
 }
 
 

@@ -26,11 +26,12 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  ReloadOutlined,
   RobotOutlined,
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, readSharedTenantId, SERVER_CONNECTION_ERROR_MESSAGE, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, readSharedTenantId, SERVER_CONNECTION_ERROR_MESSAGE, type PermissionInfo, type WorkbenchMenu } from './services/api'
 import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
@@ -67,9 +68,9 @@ import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
-import RetainedReviewRoute from './layouts/RetainedReviewRoutes'
-import { RETAINED_PAGE_PATHS } from './retainedPagePaths'
-import { WorkbenchPageNavigation } from './components/WorkbenchPageNavigation'
+import RetainedPageHost from './layouts/RetainedPageHost'
+import { getRetainedPageMenus } from './retainedPagePaths'
+import { WorkbenchPageNavigation, useWorkbenchPageNavigation } from './components/WorkbenchPageNavigation'
 import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbedPage'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
@@ -127,8 +128,27 @@ function MobileEntryReloadGuard({ platform }: { platform: AuthPlatform }) {
   return null
 }
 
-function Shell({ info, authPlatform, onLogout, onUserChange }: { info: PermissionInfo; authPlatform: AuthPlatform; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }) {
+type ShellProps = { info: PermissionInfo; authPlatform: AuthPlatform; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }
+
+function Shell(props: ShellProps) {
+  const { tabs: tabsEnabled } = useTheme()
+  const authorizedMenus = useMemo(() => buildMenuTree(props.info.menus || []), [props.info.menus])
+  const retainedMenus = useMemo(() => getRetainedPageMenus(authorizedMenus, props.authPlatform === 'MOBILE'
+    ? MOBILE_RENDERABLE_APP_ROUTES : RENDERABLE_APP_ROUTES), [authorizedMenus, props.authPlatform])
+  const retainedPaths = useMemo(() => retainedMenus.map(menu => menu.path), [retainedMenus])
+  return <WorkbenchPageNavigation
+    canOpen={path => Boolean(findMenuByPath(authorizedMenus, path))}
+    canRetain={path => tabsEnabled && retainedPaths.includes(path)}
+  >
+    <ShellContent {...props} authorizedMenus={authorizedMenus} retainedMenus={retainedMenus} retainedPaths={retainedPaths}/>
+  </WorkbenchPageNavigation>
+}
+
+function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMenus, retainedMenus, retainedPaths }: ShellProps & {
+  authorizedMenus: WorkbenchMenu[]; retainedMenus: WorkbenchMenu[]; retainedPaths: readonly string[]
+}) {
   const navigate = useNavigate()
+  const pageNavigation = useWorkbenchPageNavigation()
   const location = useLocation()
   const { token } = theme.useToken()
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
@@ -163,10 +183,6 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
 
   // 移动端侧栏由 layout.css 在整个 ≤768px 视口隐藏（抽屉成为唯一导航入口），
   // 无需再用 matchMedia 同步 primarySider 的 collapsed 状态。
-  const authorizedMenus = useMemo(
-    () => buildMenuTree(info.menus || []),
-    [info.menus]
-  )
   const navigationMenus = useMemo(() => {
     const renderableRoutes = authPlatform === 'MOBILE' ? MOBILE_RENDERABLE_APP_ROUTES : RENDERABLE_APP_ROUTES
     if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) {
@@ -249,7 +265,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
       window.open(path, '_blank', 'noopener,noreferrer')
       return
     }
-    navigate(path)
+    void pageNavigation?.open(path)
   }
   const selectPrimary = (key: string) => {
     const item = navigation.find(candidate => candidate.key === key)
@@ -449,6 +465,9 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
         <Space size={8} className="header-actions">
           <span className="header-dispatch-control"><SalesDispatchStatusControl/></span>
           <SettingsDrawer/>
+          <Tooltip title="全局刷新">
+            <Button type="text" aria-label="全局刷新" icon={<ReloadOutlined/>} onClick={() => window.location.reload()}/>
+          </Tooltip>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>
           {(info.permissions || []).includes('zsjos:lead:accept') && (
@@ -474,7 +493,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
       />}
       <SalesDispatchStatusAlert />
       <ProductionTicketAssignmentHost permissions={info.permissions || []} />
-      {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
+      {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs} retainedPaths={retainedPaths}/>}
       <Layout className="content-layout">
         <Content>
           {<AdminEmbedFrame
@@ -484,14 +503,11 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
               title={currentMenu?.name}
               onRouteChange={handleAdminRouteChange}
             />}
-          {RETAINED_PAGE_PATHS.map(path => {
-            const menu = findMenuByPath(authorizedMenus, path)
-            if (!menu || menu.workbenchRenderMode === 'admin_only' || findAdminEmbedPath(authorizedMenus, path) || (location.pathname !== path && (!tabsEnabled || !tabs.some(tab => tab.key === path)))) return null
-            return <RetainedReviewRoute key={`${path}:${readSharedTenantId()}:${info.user.id}:${JSON.stringify(info.permissions)}`} active={location.pathname === path}>
-              <RouteHost tenantReadAll={info.dataAccess?.tenantReadAll === true} menu={menu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
-            </RetainedReviewRoute>
-          })}
-          {!activeAdminEmbedPath && !(currentMenu && currentMenu.workbenchRenderMode !== 'admin_only' && RETAINED_PAGE_PATHS.includes(location.pathname)) && <Routes>
+          <RetainedPageHost menus={retainedMenus} activePath={location.pathname} openPaths={tabs.map(tab => tab.key)} tabsEnabled={tabsEnabled}
+            scopeKey={JSON.stringify([authPlatform, readSharedTenantId(), info.user.id, info.permissions, info.roles, info.dataAccess])}
+            renderPage={menu => <RouteHost tenantReadAll={info.dataAccess?.tenantReadAll === true} menu={menu} permissions={info.permissions || []} roles={info.roles || []} authPlatform={authPlatform} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>}
+          />
+          {!activeAdminEmbedPath && !retainedPaths.includes(location.pathname) && <Routes key={location.pathname}>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
@@ -510,14 +526,12 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   </Layout>
   )
 
-  return <WorkbenchPageNavigation canOpen={path => Boolean(findMenuByPath(authorizedMenus, path))}>
-    <>
+  return <>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
-    </>
-  </WorkbenchPageNavigation>
+  </>
 }
 
 function Root({ authPlatform }: { authPlatform: AuthPlatform }) {

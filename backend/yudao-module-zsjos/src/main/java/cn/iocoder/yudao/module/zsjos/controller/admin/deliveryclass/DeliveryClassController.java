@@ -37,7 +37,7 @@ public class DeliveryClassController {
     public CommonResult<List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO>> productOptions(){ return success(service.productOptions()); }
     @GetMapping("/exam-options")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:create','zsjos:delivery-class:update')")
-    public CommonResult<List<DeliveryClassExamOptionRespVO>> examOptions(@RequestParam Long categoryId,
+    public CommonResult<List<DeliveryClassExamOptionRespVO>> examOptions(@RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long productId, @RequestParam(required = false) String selectedAttrsJson,
             @RequestParam(required = false) String selectedSkuIdsJson){ return success(service.examOptions(categoryId, productId, selectedAttrsJson, selectedSkuIdsJson)); }
     @GetMapping("/{id}") @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:query','zsjos:delivery-class:query-managed','zsjos:delivery-class:query-my')")

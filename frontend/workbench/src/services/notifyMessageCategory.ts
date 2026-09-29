@@ -1,82 +1,40 @@
-import type { NotifyMessage } from './api'
+import { useCallback, useEffect, useState } from 'react'
+import { api, type NotifyMessageCategoryOption } from './api'
 
-export type NotifyMessageCategory = 'all' | 'lead' | 'withdrawal' | 'reward' | 'appeal' | 'system'
+/**
+ * 消息分类目录由服务端 `NotifyMessageCategory` 统一提供，客户端不做任何分类判断。
+ *
+ * 这样 SQL 过滤与展示分类只可能有一处口径：任何「某条消息属于哪个分类」的改动
+ * 只需改服务端，前端自动跟随，不会再出现前后端判定顺序不一致导致同一条消息
+ * 在两个分类下重复出现的问题。
+ */
+export function useNotifyMessageCategories() {
+  const [categories, setCategories] = useState<NotifyMessageCategoryOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-export type NotifyMessageCategorySource = {
-  sceneCode?: string | null
-  sourceEventKey?: string | null
-  bizType?: string | null
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      setCategories(await api.myNotifyMessageCategories())
+      setError('')
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '消息分类加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  return { categories, loading, error, reload: load }
 }
 
-const LEAD_BIZ_TYPES = new Set([
-  'lead',
-  'sales_order',
-  'student',
-  'student_service',
-  'media-account',
-  'content',
-  'positioning-card',
-  'production-ticket'
-])
-
-const WITHDRAWAL_BIZ_TYPES = new Set(['withdrawal'])
-const REWARD_BIZ_TYPES = new Set(['reward', 'cashback', 'commission'])
-
-const includesAny = (value: string, keywords: string[]) => keywords.some(keyword => value.includes(keyword))
-
-const normalize = (value?: string | null) => value?.trim().toLowerCase() || ''
-
-export const NOTIFY_MESSAGE_CATEGORY_ORDER: NotifyMessageCategory[] = [
-  'all',
-  'lead',
-  'withdrawal',
-  'reward',
-  'appeal',
-  'system'
-]
-
-export const notifyMessageCategoryLabel: Record<NotifyMessageCategory, string> = {
-  all: '全部',
-  lead: '客资',
-  withdrawal: '提现',
-  reward: '收益',
-  appeal: '申诉',
-  system: '系统'
-}
-
-export function notifyMessageCategoryOf(message: NotifyMessageCategorySource): Exclude<NotifyMessageCategory, 'all'> {
-  const sceneCode = normalize(message.sceneCode)
-  const sourceEventKey = normalize(message.sourceEventKey)
-  const bizType = normalize(message.bizType)
-
-  if (
-    includesAny(sceneCode, ['appeal', 'complaint'])
-    || includesAny(sourceEventKey, ['appeal', 'complaint'])
-    || bizType === 'appeal'
-    || bizType === 'complaint'
-  ) return 'appeal'
-
-  if (
-    includesAny(sceneCode, ['withdrawal'])
-    || includesAny(sourceEventKey, ['withdrawal'])
-    || WITHDRAWAL_BIZ_TYPES.has(bizType)
-  ) return 'withdrawal'
-
-  if (
-    includesAny(sceneCode, ['reward', 'cashback', 'commission'])
-    || includesAny(sourceEventKey, ['reward', 'cashback', 'commission'])
-    || REWARD_BIZ_TYPES.has(bizType)
-  ) return 'reward'
-
-  if (
-    includesAny(sceneCode, ['lead', 'registration', 'sales_order', 'payment'])
-    || includesAny(sourceEventKey, ['lead', 'registration', 'sales_order', 'payment'])
-    || LEAD_BIZ_TYPES.has(bizType)
-  ) return 'lead'
-
-  return 'system'
-}
-
-export function notifyMessageMatchesCategory(message: NotifyMessageCategorySource, category: NotifyMessageCategory) {
-  return category === 'all' || notifyMessageCategoryOf(message) === category
-}
+/**
+ * 分类编码 → 名称。未在目录中的编码回退为服务端的兜底分类名称，
+ * 使新增分类在后端先上线时不会显示为空白。
+ */
+export const notifyMessageCategoryLabelOf = (
+  categories: NotifyMessageCategoryOption[],
+  key?: string | null
+) => categories.find(item => item.key === key)?.label || '系统'

@@ -77,6 +77,20 @@ public class BusinessTaskCommandService {
         return taskMapper.selectByIdempotencyKey(idempotencyKey);
     }
 
+    /** Annotate only completed tasks inside the caller's atomic business transaction. */
+    @SuppressWarnings("unchecked")
+    public void markCompletedGenerationSource(String key, String source) {
+        BusinessTaskDO task = taskMapper.selectByIdempotencyKey(key);
+        if (task == null || !"completed".equals(task.getStatus())) {
+            throw new IllegalStateException("Automatic completion task missing or pending: " + key);
+        }
+        java.util.Map<String, Object> payload = task.getPayload() == null ? new java.util.LinkedHashMap<>()
+                : new java.util.LinkedHashMap<>(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(task.getPayload(), java.util.Map.class));
+        payload.put("generationSource", source);
+        task.setPayload(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(payload));
+        if (taskMapper.updateById(task) != 1) throw new IllegalStateException("Automatic task metadata update failed");
+    }
+
     public int reassignPending(Collection<String> taskTypes, Long bizId, Long assigneeId) {
         return taskMapper.reassignPending(taskTypes, bizId, assigneeId);
     }

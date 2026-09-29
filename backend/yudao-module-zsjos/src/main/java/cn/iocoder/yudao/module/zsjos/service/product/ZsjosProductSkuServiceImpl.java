@@ -98,6 +98,19 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         return result;
     }
 
+    @Override
+    public ExamProductScopeRespVO previewExamScope(Long productId, Map<String, String> selected) {
+        var product = productMapper.selectById(productId);
+        if (product == null) throw exception(EXAM_SCHEDULE_SCOPE_INVALID);
+        var metadata = productService.getEnabledSimpleList().stream()
+                .filter(item -> Objects.equals(item.productRef(), product.getProductRef())).findFirst()
+                .orElseThrow(() -> exception(EXAM_SCHEDULE_SCOPE_INVALID));
+        var result = examScope(product, metadata.categoryPath(), selected == null ? Map.of() : selected,
+                enabledAttrs(productId), skuMapper.selectEnabledListBySpuIds(List.of(productId)));
+        if (result.skus().isEmpty()) throw exception(EXAM_SCHEDULE_SKU_NO_MATCH);
+        return result;
+    }
+
     private ExamProductScopeRespVO examScope(ZsjosProductDO product, List<ZsjosProductCategoryPathNodeVO> path,
                                        Map<String, String> selected, List<ZsjosProductAttrRespVO> attrs,
                                        List<ZsjosProductSkuDO> candidates) {

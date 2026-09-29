@@ -4,6 +4,8 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { AnnouncementAttachment, DictData } from '../services/api'
 import { noticeManagement, noticePermission, noticeRecipientTree, type ManagedNotice, type NoticeInput, type NoticeRecipients } from '../services/noticeManagement'
 import NoticeManagementDetail from './NoticeManagementDetail'
+import NoticeAttachments from './NoticeAttachments'
+import { ClipboardUploadButtons } from './ClipboardPasteTarget'
 
 const RichTextEditor = lazy(() => import('./NoticeRichTextEditor'))
 type Values = Omit<NoticeInput, 'id' | 'attachments' | 'highlightUntil'> & { highlightUntil?: dayjs.Dayjs | null }
@@ -117,18 +119,20 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
     }
     finally { busyRef.current = false; setBusy(false) }
   }
-  const upload = async (file: File & { uid: string }) => {
+  const upload = async (file: File) => {
+    if (busyRef.current || !canSave) return
+    const uid = crypto.randomUUID()
     const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip']
     if (!extensions.includes(file.name.split('.').pop()?.toLowerCase() || '')) { void message.error('不支持该文件格式'); return }
     if (attachmentCount.current + pendingUploads.current >= 10) { void message.error('公告附件不能超过 10 个'); return }
     pendingUploads.current += 1
-    setUploads(current => [...current, { uid: file.uid, name: file.name, progress: 0 }])
+    setUploads(current => [...current, { uid, name: file.name, progress: 0 }])
     try {
-      const attached = await noticeManagement.upload(file, progress => setUploads(current => current.map(task => task.uid === file.uid ? { ...task, progress } : task)))
+      const attached = await noticeManagement.upload(file, progress => setUploads(current => current.map(task => task.uid === uid ? { ...task, progress } : task)))
       attachmentCount.current += 1
       setAttachments(current => [...current, attached]); setDirty(true)
-      setUploads(current => current.filter(task => task.uid !== file.uid))
-    } catch (cause) { setUploads(current => current.map(task => task.uid === file.uid ? { ...task, error: cause instanceof Error ? cause.message : '上传失败，请重新选择文件' } : task)) }
+      setUploads(current => current.filter(task => task.uid !== uid))
+    } catch (cause) { setUploads(current => current.map(task => task.uid === uid ? { ...task, error: cause instanceof Error ? cause.message : '上传失败，请重新选择文件' } : task)) }
     finally { pendingUploads.current -= 1 }
   }
   return <>
@@ -160,14 +164,16 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
           <Form.Item name="highlightUntil" label="高亮提醒截止时间"><DatePicker showTime style={{ width: '100%' }} placeholder="不设置则不高亮" /></Form.Item>
           <div inert={busy || !canSave ? true : undefined}><Suspense fallback={<Spin />}><Form.Item name="content" label="正文" rules={[{ required: true, message: '请输入公告正文' }]}><RichTextEditor onUploadChange={delta => setContentUploads(current => current + delta)} onError={setError} /></Form.Item></Suspense></div>
           <Form.Item label="附件">
-            <Upload multiple showUploadList={false} disabled={busy || !canSave} beforeUpload={file => { void upload(file); return false }}><Button disabled={busy || !canSave}>上传附件（最多 10 个）</Button></Upload>
+            <ClipboardUploadButtons disabled={busy || !canSave} canPaste={() => attachmentCount.current + pendingUploads.current < 10} onFiles={files => files.forEach(file => { void upload(file) })}>
+              <Upload multiple accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" showUploadList={false} disabled={busy || !canSave} beforeUpload={file => { void upload(file); return false }}><Button disabled={busy || !canSave}>上传附件（最多 10 个）</Button></Upload>
+            </ClipboardUploadButtons>
             <Typography.Text type="secondary">支持图片、Office、PDF 和 ZIP；上传完成后可保存。</Typography.Text>
             {uploads.map(task => <div key={task.uid}>{task.name}{task.error ? <Alert type="error" title={task.error} action={<Button onClick={() => setUploads(current => current.filter(item => item.uid !== task.uid))}>移除失败项</Button>} /> : <Progress percent={task.progress} />}</div>)}
-            {attachments.map(file => <div key={file.infraFileId}><Space wrap><span>{file.fileName}</span><Button type="link" disabled={busy || !canSave} onClick={() => { setAttachments(current => current.filter(item => item.infraFileId !== file.infraFileId)); setDirty(true) }}>移除</Button></Space></div>)}
+            {attachments.map(file => <div key={file.infraFileId}><NoticeAttachments files={[file]} /><Button type="link" disabled={busy || !canSave} aria-label={`移除 ${file.fileName}`} onClick={() => { setAttachments(current => current.filter(item => item.infraFileId !== file.infraFileId)); setDirty(true) }}>移除</Button></div>)}
           </Form.Item>
         </Form>
       </Spin>
     </Modal>
-    <Modal open={!!preview} title="公告预览" width={800} footer={null} onCancel={() => setPreview(undefined)}>{preview && <NoticeManagementDetail notice={preview} />}</Modal>
+    <Modal open={!!preview} title="公告预览" width={800} footer={null} onCancel={() => setPreview(undefined)}>{preview && <NoticeManagementDetail notice={preview} preview />}</Modal>
   </>
 }

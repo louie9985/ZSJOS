@@ -394,3 +394,38 @@ describe('scrollbar styling', () => {
     expect(missing).toEqual([])
   })
 })
+
+describe('mobile input font size', () => {
+  const overrides = readFileSync(join(ROOT, 'antd-overrides.css'), 'utf8')
+
+  it('raises mobile form controls to the autozoom threshold', () => {
+    // iOS Safari 在聚焦控件的 computed font-size < 16px 时放大整个视觉视口。
+    // 本工作台注入的是 12/13/14px（FONT_SCALE_SIZE），三档都会触发放大，
+    // 而 .crm-shell 是 fixed + overflow:hidden，放大后只能手动缩回。
+    // 这里固定「移动端把可聚焦控件抬到阈值」这件事，删掉任一选择器即失败。
+    const mobile = overrides.split('@media (max-width: 768px)')[1] ?? ''
+    for (const selector of [
+      'input.ant-input',
+      'textarea.ant-input',
+      '.ant-input-number-input',
+      '.ant-picker-input > input',
+      '.ant-select-input',
+      '.ant-cascader-input',
+      '[data-slate-editor]'
+    ]) {
+      expect(mobile, selector).toContain(selector)
+    }
+    expect(mobile).toContain('var(--crm-font-mobile-input)')
+  })
+
+  it('keeps the threshold out of reach of the font tier', () => {
+    // 该 token 必须与字号档无关：若跟随 small 档降到 12px，
+    // 就会在最需要它的窄屏上把自动放大重新引回来。
+    const root = tokens.split(':root')[1]?.split('}')[0] ?? ''
+    expect(root).toMatch(/--crm-font-mobile-input:\s*16px/)
+    for (const tier of ["html[data-crm-font='small']", "html[data-crm-font='large']"]) {
+      const body = tokens.split(tier)[1]?.split('}')[0] ?? ''
+      expect(body, tier).not.toContain('--crm-font-mobile-input')
+    }
+  })
+})

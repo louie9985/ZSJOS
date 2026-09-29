@@ -21,6 +21,16 @@ Templates provide four dynamic-field sections: `plan`, `task`, `report`, and `su
 - Domains create, complete, and cancel tasks through `BusinessTaskCommandService`.
 - Clients execute controlled `actionCode` values only; arbitrary backend URLs are never executed.
 
+### Menu reminder eligibility (2026-09-27)
+
+The menu-task-summary endpoint counts reminder-eligible pending tasks, not every unfinished task. Lead first-follow-up tasks count immediately. Lead follow-up-reminder and qualification tasks count only when dueAt is earlier than tomorrow's midnight in Asia/Shanghai; overdue pending tasks remain included. Missing dueAt excludes these two dated reminder types. Completed/cancelled tasks never count. Other task types retain their existing eligibility and routing.
+
+Count tasks, not distinct Leads. All item counts, total, severity, sourceTypes and target are derived from the same filtered set at a single request time. The wire shape is unchanged. Existing current-assignee, tenant and logical-delete query boundaries remain in force. Menu names/visibility still come from the authorized server menu response; this change neither adds menu mappings nor repairs existing mapping discrepancies.
+
+The homepage my-summary and task-page endpoints keep all pending tasks and their existing today/overdue/future/unscheduled buckets. Task creation, deadlines, lifecycle, notifications, performance and unread-Lead markers do not change; no schema/data migration is needed. Admin has no menu-task-summary consumer; its existing task endpoints are unchanged.
+
+Workbench refreshes after successful follow-up/valid/invalid commands, existing realtime signals, focus/visibility restoration and existing 60-second connected / 15-second disconnected polling. Older responses are discarded. Temporary errors retain the last successful count; initial errors invent no count; 401/403 or disabling the provider clear it. Other clients' operations are observed through realtime when available or polling.
+
 ## Work-plan API
 
 | Method and path | Purpose | Permission |

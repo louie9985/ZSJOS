@@ -105,7 +105,8 @@ public class MyStudentServiceImpl implements MyStudentService {
         if (reqVO.getReadScope() != null || reqVO.getTargetUserId() != null) {
             return getExplicitReadPage(userId, reqVO, true);
         }
-        PageResult<PersonDO> people = personMapper.selectMediaStudentPage(reqVO, userId);
+        List<Long> matchedIds = advancedFilterService.matchMediaStudentPersonIds(reqVO.getAdvancedFilter(), userId);
+        PageResult<PersonDO> people = personMapper.selectMediaStudentPage(reqVO, userId, matchedIds);
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         Set<Long> participantPersonIds = new HashSet<>(mediaAccountMapper.selectParticipantStudentIds(userId, personIds));
         Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
@@ -203,7 +204,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     }
 
     private PageResult<MyStudentRespVO> getAllMediaPage(Long actorId, MyStudentPageReqVO req) {
-        List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), actorId);
+        List<Long> matchedIds = advancedFilterService.matchMediaStudentPersonIds(req.getAdvancedFilter(), actorId);
         PageResult<PersonDO> page = personMapper.selectAllMediaStudentPage(req, matchedIds);
         var ids = page.getList().stream().map(PersonDO::getId).toList();
         var groups = relationMapper.selectMediaReadByPersonIds(ids, req.getServiceStatus()).stream()
@@ -215,8 +216,9 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     private PageResult<MyStudentRespVO> getExplicitReadPage(Long actorId, MyStudentPageReqVO req, boolean media) {
         Long subjectId = readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), actorId);
-        List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(),
-                subjectId == null ? actorId : subjectId);
+        List<Long> matchedIds = media
+                ? advancedFilterService.matchMediaStudentPersonIds(req.getAdvancedFilter(), actorId)
+                : advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), subjectId == null ? actorId : subjectId);
         PageResult<PersonDO> page = subjectId == null ? personMapper.selectTenantReadStudentPage(req, matchedIds)
                 : media ? personMapper.selectMediaStudentPage(req, subjectId, matchedIds)
                 : personMapper.selectMyStudentPage(req, subjectId, matchedIds);
@@ -276,6 +278,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         MyStudentRespVO result = new MyStudentRespVO();
         result.setPersonId(personId);
         result.setPersonNo(person.getPersonNo());
+        result.setInServicePeriod(person.getInServicePeriod());
         Long relatedLeadId = relations.stream().map(relation -> orders.get(relation.getOrderId()))
                 .filter(Objects::nonNull).map(SalesOrderDO::getLeadId).filter(Objects::nonNull).findFirst().orElse(null);
         Long ownedLeadId = relations.stream()

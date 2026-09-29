@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar;
 
 import cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamSchedulePageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamScheduleSaveReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.calendar.vo.CalendarMaintenanceNotifyReqVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -16,8 +17,8 @@ class ExamScheduleControllerPermissionTest {
         assertPermission("productOptions", new Class<?>[]{}, "zsjos:exam-calendar:manage");
         assertPermission("create", new Class<?>[]{ExamScheduleSaveReqVO.class}, "zsjos:exam-calendar:manage");
         assertPermission("update", new Class<?>[]{Long.class, ExamScheduleSaveReqVO.class}, "zsjos:exam-calendar:manage");
-        assertPermission("publish", new Class<?>[]{Long.class}, "zsjos:exam-calendar:manage");
-        assertPermission("revoke", new Class<?>[]{Long.class}, "zsjos:exam-calendar:manage");
+        assertPermission("publish", new Class<?>[]{Long.class, CalendarMaintenanceNotifyReqVO.class}, "zsjos:exam-calendar:manage");
+        assertPermission("revoke", new Class<?>[]{Long.class, CalendarMaintenanceNotifyReqVO.class}, "zsjos:exam-calendar:manage");
     }
 
     private static void assertPermission(String method, Class<?>[] parameters, String permission)

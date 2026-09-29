@@ -29,4 +29,5 @@ public class ExamScheduleRespVO {
     private LocalDateTime publishedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private Integer calendarVersion;
 }

@@ -2,6 +2,10 @@ import type { NotifyMessage, NotifyMessagePageParams, NotifyMessageCursorParams 
 
 export type NotifyMessageView = 'all' | 'unread'
 
+/** 列表、弹窗与详情三处共用，避免各写一份字面量。 */
+export const notifyMessageSenderName = (item: { templateNickname?: string | null }) =>
+  item.templateNickname?.trim() || '系统消息'
+
 export const buildNotifyMessagePageParams = (
   view: NotifyMessageView,
   pageNo: number,

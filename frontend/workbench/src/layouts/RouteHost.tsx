@@ -19,6 +19,8 @@ import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
 import MySalesOrderPage from '../pages/MySalesOrderPage'
 import SalesPerformancePage from '../pages/SalesPerformancePage'
 import SalesPerformanceTargetPage from '../pages/SalesPerformanceTargetPage'
+import MediaLeadAnalysisPage from '../pages/MediaLeadAnalysisPage'
+import MediaLeadTargetPage from '../pages/MediaLeadTargetPage'
 import SubordinateSalesPage from '../pages/SubordinateSalesPage'
 import SubordinatePartnerPage from '../pages/SubordinatePartnerPage'
 import ExternalRepurchasePage from '../pages/ExternalRepurchasePage'
@@ -111,6 +113,8 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE) return <SalesPerformancePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE_TARGET) return <SalesPerformanceTargetPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MEDIA_LEAD_ANALYSIS) return <MediaLeadAnalysisPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MEDIA_LEAD_TARGET) return <MediaLeadTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>

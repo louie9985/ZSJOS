@@ -1483,3 +1483,15 @@
 AND 的正向产品/SKU条件必须命中同一条意向记录或订单明细；负向条件沿用 NOT EXISTS（排除有此明细的对象）。关联保留 tenant/deleted 与学员可见服务范围。历史停用/删除产品不在当前启用选项中，旧条件保存的稳定引用仍可查询，不重新解释为新产品；当前选项不等于完整历史商品档案。
 
 审批轮次和动态字段的待确认实现口径：审批同时区分当前轮次（order.current_approval_round_id）与任意历史轮次，同组条件不得跨轮匹配；动态字段由模板显式开启，键包含模板版本及字段键，仅已提交的业务快照参与查询，草稿不参与。此段为待确认方案，尚非已实现功能；BPM任务审核人/结论不得从业务轮次字段臆造。
+
+## 2026-09-28 媒体学员增补
+
+独立场景 `media_student` 新增 3 个静态选择字段，无时间作差，pageKey 为 `media_students`。字段来源位于 `MediaStudentFilterFields`；支持 in/not_in/is_empty/is_not_empty。
+
+| fieldKey | 名称 | 选项来源 |
+|---|---|---|
+| mediaAccount.ownerOperatorUserId | 责任运营 | 可见账号的人员归属，经 System 用户 API 解析 |
+| mediaAccount.platform | 账号平台 | dict:zsjos_account_platform |
+| mediaAccount.currentStatus | 账号状态 | dict:zsjos_media_account_current_status |
+
+完整条件组必须由同一可见账号命中，按学员去重后分页。历史统计表保持其采集时间含义；新场景口径、权限、传输与验证见 [媒体学员筛选](../api/media-student-filter.md)。

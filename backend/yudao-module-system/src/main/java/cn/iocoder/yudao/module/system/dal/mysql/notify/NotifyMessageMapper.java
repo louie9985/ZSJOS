@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.QueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.module.system.api.notify.NotifyMessageCategory;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessagePageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
@@ -18,6 +19,22 @@ import java.util.List;
 
 @Mapper
 public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
+    // Select only proof of persistence, never message text or business variables.
+    @TenantIgnore
+    @org.apache.ibatis.annotations.Select("""
+            <script>
+            SELECT id,user_id,user_type,notify_rule_id,scene_code,source_event_key,create_time
+            FROM system_notify_message
+            WHERE tenant_id=#{tenantId} AND scene_code=#{scene} AND source_event_key=#{eventKey}
+              AND notify_rule_id=#{ruleId} AND deleted=0 AND
+            <foreach collection="recipients" item="recipient" open="(" separator=" OR " close=")">
+              (user_id=#{recipient.userId} AND user_type=#{recipient.userType})
+            </foreach>
+            </script>
+            """)
+    List<NotifyMessageDO> selectDeliveryEvidence(@Param("tenantId") Long tenantId,
+            @Param("scene") String scene, @Param("eventKey") String eventKey, @Param("ruleId") Long ruleId,
+            @Param("recipients") List<cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO> recipients);
 
     @TenantIgnore
     @Delete("DELETE FROM system_notify_message WHERE create_time < #{before}")
@@ -44,7 +61,7 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                         .or().like(NotifyMessageDO::getTemplateSummary, reqVO.getKeyword())
                         .or().like(NotifyMessageDO::getTemplateContent, reqVO.getKeyword())
                         .or().like(NotifyMessageDO::getTemplateNickname, reqVO.getKeyword()))
-                .apply(messageCategoryCondition(reqVO.getCategory()))
+                .apply(NotifyMessageCategory.condition(reqVO.getCategory()))
                 .eq(NotifyMessageDO::getUserId, userId)
                 .eq(NotifyMessageDO::getUserType, userType)
                 .orderByDesc(NotifyMessageDO::getCreateTime)
@@ -69,14 +86,7 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                     .or().like(NotifyMessageDO::getTemplateNickname, keyword));
         }
         if (category != null && !category.isBlank()) {
-            String categoryCondition = switch (category) {
-                case "lead" -> "(biz_type IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket') OR scene_code LIKE '%lead%' OR scene_code LIKE '%registration%' OR scene_code LIKE '%payment%' OR source_event_key LIKE '%lead%' OR source_event_key LIKE '%registration%' OR source_event_key LIKE '%payment%')";
-                case "withdrawal" -> "(biz_type = 'withdrawal' OR scene_code LIKE '%withdrawal%' OR source_event_key LIKE '%withdrawal%')";
-                case "reward" -> "(biz_type IN ('reward','cashback','commission') OR scene_code LIKE '%reward%' OR source_event_key LIKE '%reward%')";
-                case "appeal" -> "(biz_type IN ('appeal','complaint') OR scene_code LIKE '%appeal%' OR scene_code LIKE '%complaint%' OR source_event_key LIKE '%appeal%' OR source_event_key LIKE '%complaint%')";
-                default -> "(biz_type NOT IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket','withdrawal','reward','cashback','commission','appeal','complaint') OR biz_type IS NULL)";
-            };
-            query.apply(categoryCondition);
+            query.apply(NotifyMessageCategory.condition(category));
         }
         if (cursorCreateTime != null && cursorId != null) {
             query.and(wrapper -> wrapper.lt(NotifyMessageDO::getCreateTime, cursorCreateTime)
@@ -94,17 +104,6 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                         .eq(NotifyMessageDO::getUserId, userId)
                         .eq(NotifyMessageDO::getUserType, userType)
                         .eq(NotifyMessageDO::getReadStatus, false));
-    }
-
-    static String messageCategoryCondition(String category) {
-        if (category == null || category.isBlank() || "all".equals(category)) return "1=1";
-        return switch (category) {
-            case "lead" -> "(biz_type IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket') OR scene_code LIKE '%lead%' OR scene_code LIKE '%registration%' OR scene_code LIKE '%payment%' OR source_event_key LIKE '%lead%' OR source_event_key LIKE '%registration%' OR source_event_key LIKE '%payment%')";
-            case "withdrawal" -> "(biz_type = 'withdrawal' OR scene_code LIKE '%withdrawal%' OR source_event_key LIKE '%withdrawal%')";
-            case "reward" -> "(biz_type IN ('reward','cashback','commission') OR scene_code LIKE '%reward%' OR source_event_key LIKE '%reward%')";
-            case "appeal" -> "(biz_type IN ('appeal','complaint') OR scene_code LIKE '%appeal%' OR scene_code LIKE '%complaint%' OR source_event_key LIKE '%appeal%' OR source_event_key LIKE '%complaint%')";
-            default -> "(biz_type NOT IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket','withdrawal','reward','cashback','commission','appeal','complaint') OR biz_type IS NULL)";
-        };
     }
 
     default int updateListRead(Long userId, Integer userType) {

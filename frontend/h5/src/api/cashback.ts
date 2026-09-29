@@ -16,9 +16,11 @@ export interface CashbackSummary {
 
 export interface CashbackItem {
   id: number
+  version: number
+  blockReason?: string
   cashbackNo: string
   type: 'valid' | 'deal'
-  status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'
+  status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled' | 'blocked'
   leadId: number
   leadNo?: string
   orderId?: number

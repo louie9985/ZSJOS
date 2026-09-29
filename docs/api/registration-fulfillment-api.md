@@ -303,3 +303,11 @@ Workbench 学员搜索完成后保留结果内的当前学员，否则选中首�
 ### Media student inbox account summaries
 
 The media-only `/zsjos/media-students/page` response adds a required `accounts` array per student (`id`, `accountNo`, `nickname`, `platformValue`, `platformLabel`). Existing pagination, student fields and read scopes are unchanged. The media service batch-loads accounts for the authorized page and filters them through the account permission provider using batch-loaded service relations. Account read predicates are shared with single-object checks; student visibility does not broaden account access. Ordering remains update time descending then ID descending. `platformLabel` is the persisted dictionary snapshot, never a current-label repair. Detail account projections additionally expose `platformValue` so saved changes can refresh inbox cards without reloading the list. Generic student responses and Vue Admin APIs remain unchanged. No SQL or grants are required.
+
+
+### 自由班级选择（2026-09-28）
+
+报名履约按订单商品选择服务中的班级，继续使用不带分类条件的班级候选接口；不要求班级与商品的
+产品、SKU、分类或考期匹配。新班级可独立命名且不绑定产品，正式班仍须有效班主任；待分班、
+班级状态、租户隔离、保存/完成前的有效性复核保持原契约。WorkBench 与 Admin 调班候选也不按
+产品分类筛选；审批流程与服务归属校验保持不变，详见[班级管理](delivery-class-management.md)。

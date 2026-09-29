@@ -4,6 +4,7 @@ import ContentReviewWorkDetail from '../components/ContentReviewWorkDetail'
 import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
 import { prepareContentReviewWorks } from '../services/contentReviewAttachments'
 import ResourceLinkInput from '../components/ResourceLinkInput'
+import ResourceLink from '../components/ResourceLink'
 import ContentReviewInbox, { type ReviewFilters } from '../components/ContentReviewInbox'
 import { contentReviewCategories, reviewAccounts } from '../services/contentReviewQuery'
 import { useWorkbenchPageGuard, useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
@@ -13,7 +14,6 @@ import {
   ArrowLeftOutlined,
   CloseCircleOutlined,
   LinkOutlined,
-  PlusOutlined,
   ReloadOutlined,
   SendOutlined
 } from '@ant-design/icons'
@@ -22,7 +22,6 @@ import {
   App,
   Button,
   Card,
-  Checkbox,
   DatePicker,
   Empty,
   Form,
@@ -51,13 +50,11 @@ import {
   contentReviewApi,
   materialApi,
   type ContentReviewBatch,
-  type ContentReviewCandidate,
   type ContentReviewItem,
   type ContentReviewAccount,
 } from '../services/materialApi'
 
 const PAGE_SIZE = 20
-const CANDIDATE_PAGE_SIZE = 10
 const statusText: Record<string, string> = {
   DRAFT: '草稿',
   REVISION_DRAFT: '已有修订草稿',
@@ -122,104 +119,6 @@ export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBa
       </dl></details></div>
     </dl>
   })}</div>
-}
-
-function CreateBatchDialog({ open, onClose, onCreated }: {
-  open: boolean
-  onClose: () => void
-  onCreated: (id: number) => void
-}) {
-  const { message } = App.useApp()
-  const [contents, setContents] = useState<ContentReviewCandidate[]>([])
-  const [selected, setSelected] = useState<ContentReviewCandidate[]>([])
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [keywordInput, setKeywordInput] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const selectedAccount = selected[0]?.accountId
-
-  const loadCandidates = useCallback(async (targetPage: number, search: string) => {
-    setLoading(true)
-    setError('')
-    try {
-      const result = await contentReviewApi.candidates({
-        pageNo: targetPage,
-        pageSize: CANDIDATE_PAGE_SIZE,
-        keyword: search || undefined
-      })
-      setContents(result.list)
-      setTotal(result.total)
-      setPage(targetPage)
-    } catch (cause) {
-      setContents([])
-      setTotal(0)
-      setError(errorText(cause))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    setSelected([])
-    setKeywordInput('')
-    setKeyword('')
-    setError('')
-    void loadCandidates(1, '')
-  }, [loadCandidates, open])
-
-  const toggle = (content: ContentReviewCandidate, checked: boolean) => {
-    setError('')
-    if (!checked) {
-      setSelected(current => current.filter(item => item.contentVersionId !== content.contentVersionId))
-      return
-    }
-    if (selected.length >= 20) return setError('一个批次最多选择 20 条内容')
-    setSelected(current => [...current, content])
-  }
-
-  const create = async () => {
-    const contentVersionIds = selected.map(item => item.contentVersionId)
-    if (!contentVersionIds.length) return setError('请选择 1 至 20 条完整内容版本')
-    setLoading(true)
-    setError('')
-    try {
-      const id = await contentReviewApi.create(contentVersionIds)
-      message.success('审核批次已创建')
-      onCreated(id)
-      onClose()
-    } catch (cause) {
-      setError(errorText(cause))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return <Modal title="创建审核批次" open={open} onCancel={onClose} onOk={() => void create()}
-    okText="创建批次" confirmLoading={loading} width="min(820px, calc(100vw - 32px))">
-    {error && <Alert type="error" showIcon message={error} />}
-    <div className="content-review-picker-toolbar">
-      <Input.Search allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
-        onSearch={value => { const search = value.trim(); setKeyword(search); void loadCandidates(1, search) }}
-        placeholder="搜索内容编号或标题" />
-      <Typography.Text type="secondary">已选 {selected.length}/20</Typography.Text>
-    </div>
-    {loading && !contents.length ? <Skeleton active /> : <List className="content-review-picker" dataSource={contents}
-      locale={{ emptyText: '暂无可选内容' }} renderItem={content => {
-        const checked = selected.some(item => item.contentVersionId === content.contentVersionId)
-        const disabled = !checked && selectedAccount != null && selectedAccount !== content.accountId
-        return <List.Item>
-          <Checkbox checked={checked} disabled={disabled} onChange={event => toggle(content, event.target.checked)}>
-            <span className="content-review-picker-copy"><strong>{content.title}</strong>
-              <span>{content.contentNo} · 账号 {content.accountId} · 当前 V{content.currentVersionNo}</span></span>
-          </Checkbox>
-        </List.Item>
-      }} />}
-    {total > CANDIDATE_PAGE_SIZE && <Pagination simple current={page} pageSize={CANDIDATE_PAGE_SIZE}
-      total={total} onChange={value => void loadCandidates(value, keyword)} />}
-  </Modal>
 }
 
 function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
@@ -396,7 +295,6 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
-  const [createOpen, setCreateOpen] = useState(false)
   const [completeStage, setCompleteStage] = useState<'director' | 'final'>()
   const [dirtyItems, setDirtyItems] = useState<Record<number, boolean>>({})
   const updateDirty = useCallback((id: number, dirty: boolean) => setDirtyItems(current =>
@@ -590,7 +488,6 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
 
   const stage = historyOriginId ? undefined : selected?.availableActions.includes('DIRECTOR_DECIDE') ? 'director'
     : selected?.availableActions.includes('FINAL_DECIDE') ? 'final' : undefined
-  const canCreate = hasPermission(permissions, 'zsjos:content-review:create')
   const canSeeAll = hasPermission(permissions, 'zsjos:content-review:query-all')
   const canUpdateTask = !historyOriginId && hasPermission(permissions, 'bpm:task:update')
 
@@ -641,7 +538,6 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
         <Typography.Text type="secondary">查看内容，给出反馈，推进审批</Typography.Text></div>
       <div className="content-review-toolbar">
         <Tooltip title="刷新"><Button aria-label="刷新内容审核" icon={<ReloadOutlined />} onClick={() => confirmChange(() => { if (historyOriginId && selectedId) void loadDetail(selectedId, historyOriginId); else void load(page, selectedId) })} /></Tooltip>
-        {canCreate && <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建批次</Button>}
       </div>
     </header>
     <Tabs className="content-review-status-tabs" activeKey={category} items={contentReviewCategories.map(({ key, label }) => ({ key, label }))}
@@ -708,7 +604,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
                 onSaved={() => { const id = selected.id; void contentReviewApi.get(id).then(value => { if (selectedIdRef.current === id) setSelected(value) }).catch(cause => message.error(errorText(cause))) }} />}
               {!historyOriginId && selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
                 && <Button icon={<ClockCircleOutlined />} onClick={() => setPublishItem(item)}>登记发布</Button>}
-              {item.publishedPlatformUrl && <a href={item.publishedPlatformUrl} target="_blank" rel="noreferrer">查看已发布内容</a>}
+              {item.publishedPlatformUrl && <ResourceLink href={item.publishedPlatformUrl} title="查看已发布内容" />}
             </section>)}</div>
             </div>
             <aside className="content-review-process-column">
@@ -730,7 +626,6 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           </> : <Empty description="从左侧选择一个审核批次" />}
       </main>
     </div>
-    <CreateBatchDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={id => void load(1, id)} />
     {selected?.studentPersonId && <DraftEditDialog batch={selected} open={draftEditOpen} onClose={() => setDraftEditOpen(false)} onSaved={id => void load(page, id)} />}
     <Modal title={completeDecision === 'RETURNED' ? '退回运营修改' : completeStage === 'director' ? '通过本次审批' : '通过终审'} open={Boolean(completeStage)}
       onCancel={() => setCompleteStage(undefined)} onOk={() => void complete()} confirmLoading={completeLoading} okButtonProps={{ disabled: !completeReason.trim() }}>
@@ -745,8 +640,10 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           { type: 'url', message: '请输入有效链接' },
           { pattern: /^https:\/\//i, message: '平台链接必须使用 HTTPS' }
         ]}><ResourceLinkInput /></Form.Item>
-        <Form.Item name="publishedAt" label="发布时间" extra="请填写当前时间之后的时间，过去的时间无法登记发布结果。" rules={[{ required: true, message: '请选择发布时间' }, { validator: (_, value: dayjs.Dayjs | undefined) => !value || value.isAfter(dayjs(), 'minute') ? Promise.resolve() : Promise.reject(new Error('发布时间必须晚于当前时间，请重新选择未来时间')) }]}
-          initialValue={dayjs().add(1, 'minute')}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+        {/* 作品多为发布后再登记，这里是真实发布时间，允许早于当前时间；服务端契约同样只要求必填。 */}
+        <Form.Item name="publishedAt" label="发布时间" extra="填写作品的真实发布时间，可早于当前时间。"
+          rules={[{ required: true, message: '请选择发布时间' }]}
+          initialValue={dayjs()}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
       </Form>
     </Modal>
     <Modal title="审批历史轮次" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={null}>

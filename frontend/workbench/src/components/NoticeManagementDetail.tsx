@@ -1,10 +1,12 @@
-import { Descriptions, Typography } from 'antd'
-import { NOTICE_STATUSES, noticeDownloadUrl, type ManagedNotice } from '../services/noticeManagement'
+import { Descriptions, Tabs, Typography } from 'antd'
+import NoticeReadStatistics from './NoticeReadStatistics'
+import { NOTICE_STATUSES, noticeManagement, type ManagedNotice } from '../services/noticeManagement'
+import NoticeAttachments from './NoticeAttachments'
 import DateTimeText from './DateTimeText'
 import SafeRichText from './SafeRichText'
 
-export default function NoticeManagementDetail({ notice }: { notice: ManagedNotice }) {
-  return <article className="announcement-detail">
+export default function NoticeManagementDetail({ notice, preview = false }: { notice: ManagedNotice; preview?: boolean }) {
+  const content = <article className="announcement-detail">
     <Typography.Title level={3}>{notice.title}</Typography.Title>
     <Descriptions column={1} size="small" items={[
       { key: 'status', label: '发布状态', children: NOTICE_STATUSES[notice.publishStatus] },
@@ -13,9 +15,13 @@ export default function NoticeManagementDetail({ notice }: { notice: ManagedNoti
       { key: 'highlight', label: '高亮截止时间', children: <DateTimeText value={notice.highlightUntil} /> }
     ]} />
     <SafeRichText html={notice.content || ''} />
-    <Typography.Title level={5}>附件</Typography.Title>
-    {!notice.attachments?.length ? <Typography.Text type="secondary">无附件</Typography.Text> : notice.attachments.map(file => <div key={file.infraFileId}>
-      {noticeDownloadUrl(file.downloadUrl) ? <a href={noticeDownloadUrl(file.downloadUrl)} target="_blank" rel="noopener noreferrer">{file.fileName}</a> : <span>{file.fileName}（文件不可用）</span>}
-    </div>)}
+    {!!notice.attachments?.length && <>
+      <Typography.Title level={5}>附件</Typography.Title>
+      <NoticeAttachments files={notice.attachments} reload={preview ? undefined : async () => (await noticeManagement.get(notice.id)).attachments} />
+    </>}
   </article>
+  return preview ? content : <Tabs key={notice.id} destroyOnHidden items={[
+    { key: 'content', label: '公告正文', children: content },
+    { key: 'reading', label: '阅读情况', children: <NoticeReadStatistics key={notice.id} id={notice.id} /> }
+  ]} />
 }

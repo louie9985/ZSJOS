@@ -9,6 +9,7 @@ import java.util.List;
 public class MyStudentRespVO {
     private Long personId;
     private String personNo;
+    private Boolean inServicePeriod;
     private Long leadId;
     private String leadNo;
     private String name;

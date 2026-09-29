@@ -22,9 +22,11 @@ export interface CashbackVO {
   baseAmount?: number; rateSnapshot?: number; observationDaysSnapshot?: number
   settledAt?: string; cancelledAt?: string; cancelReason?: string
   id: number
+  version: number
+  blockReason?: string
   cashbackNo: string
   type: 'valid' | 'deal'
-  status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'
+  status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled' | 'blocked'
   beneficiaryUserId: number
   productNameSnapshot: string
   amount: number
@@ -43,3 +45,7 @@ export const searchMyCashbackPage = (data: CashbackPageQuery) => request.post({ 
 export interface CashbackWithdrawal { id: number; withdrawalNo: string; amount: number; active: boolean; status: string; submittedAt: string }
 export const getDetail = (id: number): Promise<CashbackVO> => request.get({ url: `/zsjos/cashback/${id}` })
 export const getWithdrawals = (id: number, pageNo = 1): Promise<{ list: CashbackWithdrawal[]; total: number }> => request.get({ url: `/zsjos/cashback/${id}/withdrawals`, params: { pageNo, pageSize: 10 } })
+
+export interface CashbackControlLog { id: number; action: 'block' | 'unblock'; reason: string; operatorName: string; occurredAt: string }
+export const controlCashback = (id: number, action: 'block' | 'unblock', data: { version: number; reason: string }) => request.put({ url: `/zsjos/cashback/${id}/${action}`, data })
+export const getControlHistory = (id: number, pageNo = 1, pageSize = 10): Promise<{ list: CashbackControlLog[]; total: number }> => request.get({ url: `/zsjos/cashback/${id}/control-history`, params: { pageNo, pageSize } })

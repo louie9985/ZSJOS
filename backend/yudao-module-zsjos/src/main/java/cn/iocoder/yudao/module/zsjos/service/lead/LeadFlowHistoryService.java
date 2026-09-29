@@ -279,6 +279,7 @@ public class LeadFlowHistoryService {
             Map.entry("won", "已成交"), Map.entry("closed", "已关闭")
     ).get(status); }
     private static String eventSource(BusinessEventDO event, LeadAssignmentHistoryDO assignment, boolean system) {
+        if (LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs())) return "销售自拓录单自动生成";
         return assignment == null ? (system ? "系统任务" : "员工工作台") : assignmentSource(assignment);
     }
     private static String eventReason(BusinessEventDO event, LeadAssignmentHistoryDO assignment) {

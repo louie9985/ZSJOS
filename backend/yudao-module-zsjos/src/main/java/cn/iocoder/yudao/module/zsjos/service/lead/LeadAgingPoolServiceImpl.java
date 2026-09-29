@@ -48,7 +48,6 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
     @Resource private SalesOrderMapper orderMapper;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
     @Resource private LeadFollowUpRuleService ruleService;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private AdminUserApi adminUserApi;
@@ -365,10 +364,25 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     }
 
     @Override public boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
+        if (operatorUserId == null) return false;
         if (Objects.equals(formalOwnerUserId, operatorUserId)) return true;
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);
-        return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
-                && Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus());
+        if (cycle != null) {
+            return Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
+                    && Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus());
+        }
+        var manual = publicSeaRecordMapper.selectByLeadId(leadId);
+        return manual != null && Objects.equals(manual.getOwnerUserId(), formalOwnerUserId)
+                && Objects.equals(manual.getCollaboratorUserId(), operatorUserId);
+    }
+    @Override public boolean canRequestTransfer(LeadAgingPoolCycleDO cycle, Long userId) {
+        if (cycle == null || userId == null || Objects.equals(userId, cycle.getOriginalOwnerUserId())) return false;
+        if (AGING_POOL_WAITING_ASSIGNMENT.equals(cycle.getStatus())) {
+            // Waiting cycles have no B yet; eligibility must come from the configured same-team candidates.
+            return eligibleSales(cycle).stream().anyMatch(user -> Objects.equals(user.getId(), userId));
+        }
+        return Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
+                && Objects.equals(cycle.getCollaboratorUserId(), userId);
     }
     @Override public void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
         if (Objects.equals(formalOwnerUserId, operatorUserId)) {
@@ -478,21 +492,11 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (order != null) { result.setActiveSalesOrderId(order.getId()); result.setActiveSalesOrderStatus(order.getStatus()); }
         List<String> actions = new ArrayList<>();
         if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
-        if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
+        if (canOperate(lead.getId(), lead.getOwnerUserId(), userId)
+                && securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")) {
             actions.add(ACTION_ADD_FOLLOW_UP);
-            if (Objects.equals(cycle.getOriginalOwnerUserId(), userId)
-                    && order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())
-                    && salesOrderPermissionService.canRevise(order, userId)) {
-                actions.add(ACTION_REVISE_DEAL);
-            } else if (Objects.equals(cycle.getOriginalOwnerUserId(), userId)
-                    && order == null && Objects.equals(lead.getOwnerUserId(), userId)) {
-                actions.add(ACTION_ENTER_DEAL);
-            }
         }
-        boolean canRequestTransfer = AGING_POOL_WAITING_ASSIGNMENT.equals(cycle.getStatus())
-                ? !Objects.equals(userId, cycle.getOriginalOwnerUserId()) && canRead(cycle, userId)
-                : Objects.equals(userId, cycle.getCollaboratorUserId());
-        if (canRequestTransfer
+        if (canRequestTransfer(cycle, userId)
                 && canRead(cycle.getLeadId(), userId) && !hasActiveApproval(cycle.getLeadId())
                 && securityFrameworkService.hasPermission("zsjos:lead-aging-pool:transfer-request")) {
             actions.add("REQUEST_TRANSFER");

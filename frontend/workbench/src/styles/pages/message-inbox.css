@@ -22,20 +22,6 @@
   margin: 0!important;
 }
 
-.message-inbox-error {
-  flex: none;
-  margin-bottom: var(--crm-sp-4);
-}
-
-.message-inbox-category-bar {
-  flex: none;
-  margin-bottom: var(--crm-sp-4);
-}
-
-.message-inbox-category-bar .ant-segmented {
-  width: 100%;
-}
-
 .message-inbox-layout {
   display: grid;
   min-height: 0;
@@ -162,45 +148,6 @@
   white-space: nowrap;
 }
 
-.message-inbox-pagination {
-  display: flex;
-  min-height: 42px;
-  flex: none;
-  align-items: flex-end;
-  justify-content: center;
-  padding-top: var(--crm-sp-3);
-}
-
-.message-inbox-table-shell {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--crm-sp-3);
-}
-
-.message-inbox-table-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--crm-gap-sm);
-}
-
-.message-inbox-table-shell .ant-table-wrapper {
-  min-width: 0;
-}
-
-.message-inbox-table .ant-table-tbody > tr.unread > td {
-  background: color-mix(in srgb, var(--crm-bg-container) 92%, var(--crm-color-primary) 8%);
-}
-
-.message-inbox-table .ant-table-tbody > tr.active > td {
-  background: var(--crm-color-primary-bg);
-}
-
-.message-inbox-table .ant-table-tbody > tr.active.unread > td {
-  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-color-primary) 22%);
-}
-
 .message-inbox-detail-pane {
   min-width: 0;
   min-height: 0;
@@ -217,8 +164,32 @@
   place-content: center;
 }
 
-.message-inbox-detail {
-  max-width: var(--crm-read-max);
+/* 视图标题与分类、操作同处一行；标题不参与收缩，避免被压成竖排。 */
+.message-inbox-view-title {
+  flex: none;
+  margin: 0 !important;
+}
+
+.message-inbox-search {
+  width: 100%;
+  min-width: 0;
+}
+
+.message-inbox-scope-row .message-inbox-search {
+  width: 280px;
+}
+
+/* 搜索与卡片共享滚动容器的可用宽度和间距，滚动条出现时仍保持左右对齐。 */
+.message-inbox-list-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  background: var(--crm-bg-layout);
+}
+
+.message-inbox-scope-actions {
+  margin-inline-start: auto;
 }
 
 .message-detail-hero {
@@ -238,7 +209,10 @@
   overflow-wrap: anywhere;
 }
 
-.message-detail-section {
+/* 该区块有两种用法：消息详情把它叠加在 .business-inbox-card 上（由卡片提供内边距），
+   申诉页则单独使用、依赖文档流式留白。因此只在未叠加卡片时施加纵向留白，
+   否则二者会互相覆盖。 */
+.message-detail-section:not(.business-inbox-card) {
   padding: var(--crm-sp-6) 0;
 }
 
@@ -284,10 +258,6 @@
     min-height: 0;
   }
 
-  .message-inbox-category-bar {
-    margin-bottom: var(--crm-sp-3);
-  }
-
   .message-inbox-list-pane {
     height: 100%;
   }
@@ -302,12 +272,6 @@
 
   .message-inbox-detail-pane {
     display: none;
-  }
-
-  .message-inbox-pagination {
-    align-items: center;
-    overflow-x: auto;
-    justify-content: flex-start;
   }
 
   .message-inbox-mobile-drawer .ant-drawer-body {
@@ -498,18 +462,6 @@
 
 /* Message center uses the shared business inbox geometry; duplicate review keeps
    the legacy message-inbox selectors above until its own migration. */
-.message-center-scope-bar {
-  justify-content: space-between;
-}
-
-.message-center-heading {
-  min-width: 0;
-}
-
-.message-center-heading h4 {
-  margin: 0 !important;
-}
-
 .message-center-item {
   overflow: hidden;
   flex: none;
@@ -535,10 +487,137 @@
   -webkit-line-clamp: 2;
 }
 
+/* 分类图标：列表项、弹窗、表格分类列、详情头部共用。图标本身是单色 currentColor，
+   这里只负责尺寸与主色，不引入新配色。 */
+.message-center-item-icon,
+.message-center-popup-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.message-category-icon {
+  flex: none;
+  color: var(--crm-color-primary);
+}
+
 .message-inbox-detail {
   width: 100%;
   max-width: none;
   min-width: 0;
+}
+
+/* 列表独立；正文与状态都在同一个带底色的详情面板内。 */
+.message-detail-pane-content,
+.message-detail-pane-content > .message-detail-layout {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.message-detail-pane-content > .message-detail-layout {
+  align-items: stretch;
+}
+
+.message-detail-pane-content .message-detail-main,
+.message-detail-pane-content .message-detail-side {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 抽屉 portal 不在页面 DOM 内，用独立命名容器控制其正文与状态栏。 */
+.message-detail-drawer-content {
+  container: message-detail / inline-size;
+  min-width: 0;
+  width: 100%;
+}
+
+.message-detail-layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--crm-gap);
+}
+
+.message-detail-layout > .message-detail-main,
+.message-detail-layout > .ant-empty {
+  grid-column: span 9;
+}
+
+.message-detail-layout > .message-detail-side {
+  grid-column: span 3;
+}
+
+.message-detail-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.message-detail-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-3);
+}
+
+.message-detail-head h4 {
+  margin: 0 !important;
+  overflow-wrap: anywhere;
+}
+
+.message-detail-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+  padding: var(--crm-pane-pad);
+  border-inline-start: 1px solid var(--crm-border);
+  overflow-wrap: anywhere;
+}
+
+.message-status-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.message-status-fields {
+  display: grid;
+  gap: var(--crm-sp-4);
+  margin: 0;
+}
+
+.message-status-fields dt {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.message-status-fields dd {
+  margin: var(--crm-sp-1) 0 0;
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+  overflow-wrap: anywhere;
+}
+
+.message-status-actions {
+  padding-top: var(--crm-sp-4);
+  border-top: 1px solid var(--crm-border);
+}
+
+.message-status-actions .ant-btn {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--crm-control-h);
+  white-space: normal;
 }
 
 .message-inbox-detail .message-detail-heading {
@@ -551,17 +630,49 @@
   word-break: break-word;
 }
 
-.message-detail-meta-card {
-  min-width: 0;
+@container message-detail (width < 700px) {
+  .message-detail-layout > .message-detail-main,
+  .message-detail-layout > .ant-empty,
+  .message-detail-layout > .message-detail-side {
+    grid-column: 1 / -1;
+  }
+
+  .message-detail-layout > .message-detail-main,
+  .message-detail-layout > .ant-empty {
+    grid-row: 2;
+  }
+
+  .message-detail-layout > .message-detail-side {
+    grid-row: 1;
+    padding: 0 0 var(--crm-sp-4);
+    border-inline-start: 0;
+    border-bottom: 1px solid var(--crm-border);
+  }
+
+  .message-status-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
-  .message-center-scope-bar {
-    align-items: stretch;
+  /* 共享层在移动端把筛选行设为不换行横向滚动；本页有搜索、分类、状态、操作四组控件，
+     横滑入口难以发现，改为换行两行。复合选择器用于覆盖共享层的 nowrap。 */
+  .message-inbox-view-page .business-inbox-scope-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 
-  .message-center-scope-bar > .ant-btn {
+  .message-inbox-view-page .ant-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .message-inbox-search {
     width: 100%;
+  }
+
+  .message-inbox-scope-actions {
+    margin-inline-start: 0;
   }
 }
 

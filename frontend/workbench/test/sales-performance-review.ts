@@ -1,0 +1,29 @@
+// UTF-8. Synthetic records for interactive browser acceptance; never installed in the app entry.
+import { http } from '../src/services/api'
+export function installPerformanceReview() {
+  const params = new URLSearchParams(location.search)
+  const mode = params.get('state') ?? 'success'
+  const start = '2026-09-01T00:00:00', end = '2026-09-28T12:00:00'
+  const metric = (key: string, label = key, i = 0) => ({ key, label, start, end, amount: 120000 + i * 3000, orders: 42, averageAmount: 120000 + i * 3000, averageOrders: 40, average: 3000 + i * 75, converted: 24, denominator: 60, rate: .4 })
+  const target = { scopeType: 'USER', scopeId: 1, name: '演示销售甲', periodType: 'month', periodStart: '2026-09-01', floorAmount: 150000, sprintAmount: 200000, automaticFloor: 150000, automaticSprint: 200000, manual: false, complete: false, missing: 1 }
+  const groups = [{ key: 'inbound|线上引流', label: '线上引流', amount: 80000, count: 40, share: 2 / 3 }, { key: 'self|非引流', label: '非引流', amount: 40000, count: 20, share: 1 / 3 }]
+  const categories = groups.map((x, i) => ({ ...x, key: `category-${i}`, label: ['课程咨询', '考试咨询'][i] }))
+  const nodes = [{ key: 'ORG:10', title: '演示销售中心', scopeType: 'CENTER', scopeId: 10, selectable: true }, { key: 'USER:1', parentKey: 'ORG:10', title: '演示销售甲', scopeType: 'USER', scopeId: 1, selectable: true }]
+  const failedPaths=new Set<string>()
+  http.defaults.adapter = async config => {
+    const path = config.url ?? '', q = config.params ?? {}
+    let data: unknown = []
+    if (path.endsWith('/tree')) data = mode === 'unauthorized' ? [] : nodes
+    else if (mode === 'loading') return new Promise(()=>{})
+    else if(mode === 'retry'&&!failedPaths.has(path)){failedPaths.add(path);throw new Error('演示请求失败，请重试')}
+    else if (mode === 'error') throw new Error('演示请求失败，请重试')
+    else if (path.endsWith('/overview')) data = { asOf: end, attributionAvailableSince: start, targets: ['lastWeek', 'week', 'month', 'quarter', 'year'].map((key, i) => ({ key, label: ['上周', '本周', '本月', '本季度', '本年'][i], actual: metric(key), target })), performance: ['today', 'week', 'month', 'quarter', 'year', 'last7', 'last30', 'last60', 'last90'].map((k, i) => metric(k, ['今日', '本周', '本月', '本季度', '本年', '近7日', '近30日', '近60日', '近90日'][i])), conversion: ['month', 'lastMonth', 'last7', 'last30', 'last60', 'last90'].map((k, i) => metric(k, ['本月', '上月', '近7日', '近30日', '近60日', '近90日'][i])), pending: { accept: 1, qualification: 1, todayFollowUp: 1, overdueFollowUp: 1, missingTarget: 1 }, missingAttributionOrders: 0, missingAttributionAmount: 0, canDetail: true }
+    else if (path.endsWith('/history')) data = mode === 'empty' ? [] : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, amount: i < 9 ? 85000 + i * 12000 : null, previousAmount: i < 9 ? i === 0 ? 0 : 70000 + i * 9000 : null, start, end, previousStart: '2025-09-01T00:00:00', previousEnd: '2025-09-28T12:00:00', future: i >= 9 }))
+    else if (path.endsWith('/analysis')) data = { asOf: end, start: start.slice(0, 10), end: end.slice(0, 10), averages: ['all', 'inbound', 'self'].map((k, i) => mode === 'empty' ? { ...metric(k, ['整体', '线上引流', '非引流'][i]), average: null, averageAmount: 0, averageOrders: 0 } : metric(k, ['整体', '线上引流', '非引流'][i], i)), trend: mode === 'empty' ? [] : Array.from({ length: 14 }, (_, i) => ({ ...metric(`2026-09-${String(i + 1).padStart(2, '0')}`, `2026-09-${String(i + 1).padStart(2, '0')}`, i), amount: 8000 + i * 1300 })), sources: mode === 'empty' ? [] : groups, products: mode === 'empty' ? [] : categories, contributors: [], contributionMetrics: [], target: null, averageTrends: mode === 'empty' ? {} : Object.fromEntries(['all', 'inbound', 'self'].map((k, j) => [k, Array.from({ length: 14 }, (_, i) => ({ ...metric(`2026-09-${String(i + 1).padStart(2, '0')}`, `2026-09-${String(i + 1).padStart(2, '0')}`, i + j * 5), average: i === 4 ? null : 2800 + i * 90 + j * 180, averageAmount:i===4?0:(2800+i*90+j*180)*40,averageOrders:i===4?0:40 }))])) }
+    else if (path.endsWith('/leads')) data = { asOf: end, start: '2026-09-01', end: '2026-09-28', workload: { assigned: 60, missed: 2, received: 58, valid: 40, followUps: 70 }, categories: mode === 'empty' ? [] : categories, stages: mode === 'empty' ? [] : categories.map((x, i) => ({ ...x, label: ['需求沟通', '方案确认'][i] })), categoryTrend: mode === 'empty' ? [] : Array.from({ length: 7 }, (_, i) => categories.map((x, j) => ({ bucket: `2026-09-${String(i + 1).padStart(2, '0')}`, category: x.label, count: 4 + i + j }))).flat(), followUp: mode === 'empty' ? [] : ['completed', 'pending', 'overdue', 'cancelled'].map((key, i) => ({ key, label: ['已完成', '未到期未完成', '逾期未完成', '已取消'][i], count: [30, 12, 7, 1][i], amount: 0, share: null })), funnel: ['received', 'valid', 'converted'].map((key, i) => ({ key, label: ['接收客资', '有效客资', '成交客资'][i], count: [60, 40, 1][i], amount: 0, share: null })), calendar: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, '0')}`, received: 10, valid: 4, invalid: 2, pending: 1, overdue: 2, ended: 1, unknown: 0, lateCompleted: 1, onTime: 5, dueCount: 8 })) }
+    else if (path.endsWith('/missing-targets')) data = [{ scopeType: 'USER', scopeId: 1, name: '演示销售甲', department: '演示销售中心', periodStart: '2026-09-01', reason: '保底、冲刺目标未设置' }]
+    else if (path.endsWith('/details')) data = { list: [{ id: 100, leadId: 200, number: 'KZ-DEMO-001', kind: ['accept', 'qualification', 'todayFollowUp', 'overdueFollowUp', 'tasks'].includes(q.metric) ? 'task' : 'lead', label: '后续跟进', occurredAt: start, receivedAt: start, dueAt: '2026-09-28T09:00:00', ownerName: '演示归属人', assigneeName: '演示执行人', category: '课程咨询', stage: '方案确认', overdueMinutes: 180, state: '待处理' }], total: 1 }
+    else if (path.endsWith('/list')) data = [target]
+    return { data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config }
+  }
+}

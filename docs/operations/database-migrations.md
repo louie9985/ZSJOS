@@ -1,5 +1,78 @@
 # Database migration operations
 
+## 2026-09-29 V279 collision resolution
+
+The remote, already-deployed `V279__attribution_org_provenance_and_identity_split.sql` remains the
+authoritative V279. The unpublished local migration chain moved forward without changing its order:
+
+- media student service period: V279 -> V280
+- cashback withdrawal control: V280 -> V281
+- calendar notifications: V281 -> V282
+- new-media lead analysis: V282 -> V283
+- notice reading statistics: V283 -> V284
+
+Every renamed source now records its new version and filename checksum and requires the immediately
+preceding version. V280 explicitly requires the remote V279 in both version ledgers. Historical handoff
+entries retain their original numbers as audit evidence. A development database that previously ran an
+old-numbered copy must be inspected for actual schema, data, both ledgers and stored checksum before any
+recovery. Do not silently rename version rows, rewrite checksums, or rerun a differently numbered script
+against shared or deployed data; that requires a separately reviewed, scoped database correction.
+
+## V282 calendar notification partial-run recovery
+
+The active-development V282 correction replaces unsupported MySQL `ADD COLUMN IF NOT EXISTS`
+with database-scoped `information_schema` guards. Run after V281 exists in both version
+ledgers and both calendar source tables exist. It adds only the two `calendar_version`
+columns and six notification tables (batch, recipient, immutable snapshot, current state, preview credential and maintenance intent); existing data, permissions, version values and recorded
+checksums are preserved. The matching fresh baseline defines the columns directly in
+`CREATE TABLE` in both `schema/core.sql` and `00-bootstrap-schema.sql`.
+
+The maintenance-intent extension adds `zsjos_calendar_notify_intent`, with immutable operation/request
+identity, original actor, snapshot reference and fixed roster, and mutable acceptance/retry outcome.
+Its tenant-scoped operation and acceptance keys are unique. The due index bounds recovery by tenant,
+status, next-attempt time and ID. V282 checks all columns and indexes before writing either ledger;
+an existing table with an invalid key fails explicitly rather than being treated as successfully upgraded.
+The controlled verifier covers intent-only partial application, an intentionally invalid unique key,
+additive recovery, repeated execution, rollback, tenant uniqueness and Chinese snapshot HEX. No intent
+or employee data is seeded. Reverting code leaves this additive table intact. Replay the active-development
+source only after a scoped backup; deployed copies/checksum differences still require separate review.
+
+If the earlier script failed but a GUI client continued and recorded V282, inspect the
+actual schema and both ledgers and retain a schema/ledger backup. Explicitly replay this
+corrected file through an utf8mb4 client; a version-aware runner may skip recorded V282.
+All required changes, postcondition checks and version registration run inside one procedure;
+errors propagate, and the two final ledger writes share a transaction. DDL itself commits
+implicitly: recovery is additive replay, not transaction rollback. Do not delete notification
+history or version records to force a replay. Applied copies in deployed environments or
+file-checksum differences require a separately reviewed rollout; do not reconcile checksums
+as part of this development repair. Revert application code for rollback and retain schema/data.
+
+Run `python script/sql/mysql/tools/test_calendar_notifications.py` for isolated initial,
+repeat, partial-run, failed-prerequisite, failed-DDL and failed-ledger checks on the existing
+local MySQL container. The test retains uniquely named verification databases and does not
+delete data. Compare the affected columns/indexes with the development database and inspect
+Chinese column comments with `HEX()` through an utf8mb4 client. Baseline changes also require
+the complete fresh-install chain verification.
+
+The snapshot/state extension remains part of the active-development source V282. It creates
+empty `zsjos_calendar_notify_snapshot` and `zsjos_calendar_notify_state` tables, with tenant-scoped
+unique version and business-identity keys. It does not fabricate historical snapshots or backfill
+old notifications. Calendar maintenance captures the current baseline lazily, then stores each new
+content/lifecycle version in the same business transaction. Deletion retains notification state and
+the cancellation snapshot. A version cannot be reused for different snapshot content. Existing
+development databases with a V282 marker must replay the source explicitly after scoped backup;
+their marker/checksum is preserved. This does not authorize rewriting deployed migration copies.
+
+The acceptance extension adds nullable request identity/hash, snapshot/operator references and count
+columns to batches, and nullable accepted/dedup fields to recipients. Separate tenant-scoped unique
+keys protect request replay and ordinary recipient deduplication; explicit reminders leave the latter
+key null. Legacy recipient acceptance is read compatibly from existing status when the new flag is
+null; no historical batch linkage or employee identity is invented. The recipient user-type default
+changes to ADMIN (2), without rewriting historical values. Batch titles widen from varchar to text to
+retain specification labels. Preview credentials persist only a token digest, bound request/content/
+roster hashes, operator and expiry. Run V282 explicitly after backup on the controlled development
+database; applied deployed copies remain a separate rollout. Retain widened schema on rollback.
+
 ## Core schema synchronization and numbering
 
 `check` compares `schema/core.sql` and `00-bootstrap-schema.sql` byte for byte,

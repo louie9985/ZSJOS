@@ -34,6 +34,23 @@ public class AdvancedFilterService {
             "this_week", "本周", "this_month", "本月", "this_quarter", "本季度", "this_year", "本年");
 
     @Resource private AdvancedFilterMapper mapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountObjectPermissionProvider accountPermissions;
+
+    public List<Long> matchMediaStudentPersonIds(AdvancedFilterGroupReqVO group, Long userId) {
+        AdvancedFilterQuery query = buildIfPresent(group, "media_student", Map.of());
+        if (query == null) return null;
+        return accountPermissions.filterReadable(mapper.selectMediaStudentAccounts(query), userId).stream()
+                .map(cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO::getStudentPersonId)
+                .distinct().toList();
+    }
+
+    public java.util.Set<Long> mediaStudentOperatorIds(Long userId) {
+        var query = new AdvancedFilterQuery("1=1", Map.of("tenantId", TenantContextHolder.getRequiredTenantId()));
+        return accountPermissions.filterReadable(mapper.selectMediaStudentAccounts(query), userId).stream()
+                .map(cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO::getOwnerOperatorUserId)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+    }
+
     @Resource private LeadFilterOrganizationService leadFilterOrganizations;
     @Resource private cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService financeTrace;
 

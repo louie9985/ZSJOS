@@ -29,4 +29,15 @@ public class AdminNotifyRecipientWecomUserProvider implements NotifyRecipientWec
         }
         return StrUtil.trimToNull(user.getWecomUserId());
     }
+
+    @Override
+    public String getUnavailableReason(Long userId) {
+        AdminUserDO user = userMapper.selectById(userId);
+        if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+            return "EMPLOYEE_UNAVAILABLE";
+        if (!Boolean.TRUE.equals(user.getWecomEnabled())) return "WECOM_PERSONAL_PUSH_DISABLED";
+        if (StrUtil.isBlank(user.getWecomUserId())) return "WECOM_BINDING_MISSING";
+        // Eligibility may change between address lookup and reason lookup; never silently send a skipped attempt.
+        return "WECOM_RECIPIENT_UNAVAILABLE";
+    }
 }

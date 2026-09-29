@@ -36,6 +36,7 @@ public class AdvancedFilterController {
             + "'zsjos:lead:appeal:review-chairman'))"
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
             + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
+            + " || (#scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))"
             + " || (#scene == 'cashback' && @ss.hasAnyPermissions('zsjos:cashback:my-query','zsjos:cashback:finance-query'))"

@@ -126,6 +126,9 @@
           >
             编辑
           </el-button>
+          <el-button v-hasPermi="['eam:asset:update']" link type="warning" @click="openStatusDialog(row)">
+            调状态
+          </el-button>
           <el-button v-hasPermi="['eam:asset:qrcode']" link type="primary" @click="openQrCode(row)">
             二维码
           </el-button>
@@ -152,6 +155,22 @@
   <AssetImportForm ref="importRef" @success="handleImportSuccess" />
   <AssetDetail ref="detailRef" />
   <QrCodeDialog ref="qrCodeRef" />
+  <el-dialog v-model="statusDialogVisible" title="直接调整资产状态" width="440px">
+    <el-form label-width="90px">
+      <el-form-item label="资产状态">
+        <el-select v-model="statusForm.status" class="w-full">
+          <el-option v-for="dict in getIntDictOptions('eam_asset_status')" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="调整原因">
+        <el-input v-model="statusForm.reason" type="textarea" :rows="3" maxlength="200" show-word-limit />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="statusDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="statusLoading" @click="submitStatusChange">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -293,6 +312,28 @@ const handleImportSuccess = async () => {
 const qrCodeRef = ref()
 const openQrCode = (row: AssetApi.AssetVO) => {
   qrCodeRef.value.open(row)
+}
+
+const statusDialogVisible = ref(false)
+const statusLoading = ref(false)
+const statusForm = reactive<{ id?: number; status?: number; reason: string }>({ reason: '' })
+const openStatusDialog = (row: AssetApi.AssetVO) => {
+  statusForm.id = row.id
+  statusForm.status = row.status
+  statusForm.reason = ''
+  statusDialogVisible.value = true
+}
+const submitStatusChange = async () => {
+  if (!statusForm.id || statusForm.status === undefined) return
+  statusLoading.value = true
+  try {
+    await AssetApi.changeAssetStatus(statusForm.id, statusForm.status, statusForm.reason)
+    message.success('资产状态已调整')
+    statusDialogVisible.value = false
+    await getList()
+  } finally {
+    statusLoading.value = false
+  }
 }
 
 const handleDelete = async (id: number) => {

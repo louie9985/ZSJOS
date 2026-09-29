@@ -148,6 +148,17 @@
         "withdrawal.paidAt",
         "withdrawal.rejectionReason"
       ]
+    },
+    "media_student": {
+      "list": [
+        "mediaAccount.platform"
+      ],
+      "detail": [
+        "mediaAccount.ownerOperatorUserId",
+        "mediaAccount.currentStatus"
+      ],
+      "export": [],
+      "exportNotApplicable": "媒体学员未提供导出。"
     }
   },
   "pages": [
@@ -273,6 +284,13 @@
       "consumers": {
         "workbench": "ManagementPages.tsx",
         "admin": "withdrawal/index.vue"
+      }
+    },
+    {
+      "scene": "media_student",
+      "pageKey": "media_students",
+      "consumers": {
+        "workbench": "MediaStudentsPage.tsx"
       }
     }
   ],

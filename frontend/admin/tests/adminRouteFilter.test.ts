@@ -84,3 +84,12 @@ test('sales follow-up calendar remains Workbench-only', () => {
     { path: 'personal', component: 'zsjos/personalCalendar/index' }
   ] }])[0].children?.map(route => route.path), ['personal'])
 })
+
+test('new-media analysis and target pages remain Workbench-only', () => {
+  const routes = filterAdminRoutes([{ path: '/zsjos', children: [
+    { path: 'media-lead-analysis', component: 'zsjos/mediaLeadAnalysis/index' },
+    { path: 'media-lead-target', component: 'zsjos/mediaLeadTarget/index' },
+    { path: 'roles', component: 'system/role/index' }
+  ] }])
+  assert.deepEqual(routes[0].children?.map(route => route.path), ['roles'])
+})

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.framework.audit;
 
 import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.zsjos.service.audit.AuditActionCatalog;
 import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,15 @@ public class ZsjosExecutionAuditHook implements ExecutionAuditHook {
     }
 
     private void record(ExecutionAuditContext c, String status, long duration, String error) {
+        if (c.tenantId() != null && !c.tenantId().isBlank()) {
+            // Completion may run after the business tenant scope has already been restored.
+            TenantUtils.execute(Long.valueOf(c.tenantId()), () -> persist(c, status, duration, error));
+        } else {
+            persist(c, status, duration, error);
+        }
+    }
+
+    private void persist(ExecutionAuditContext c, String status, long duration, String error) {
         String action = switch (c.executionType()) {
             case "ASYNC" -> AuditActionCatalog.EXECUTION_ASYNC;
             case "SYSTEM_REDIS_PUBSUB" -> AuditActionCatalog.EXECUTION_REDIS_PUBSUB;

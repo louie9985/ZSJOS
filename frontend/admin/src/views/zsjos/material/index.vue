@@ -208,6 +208,16 @@
           <el-descriptions-item label="生效时间">{{ formatTime(detailVersion.effectiveAt) }}</el-descriptions-item>
           <el-descriptions-item label="流程实例">{{ detailVersion.processInstanceId || '-' }}</el-descriptions-item>
         </el-descriptions>
+        <!-- 审批轨迹：与员工端同源的 BPM 节点数据，这里只读展示，不提供流程动作。
+             取数失败单独降级为可重试的提示，不伪装成"暂无审批记录"。 -->
+        <el-collapse v-if="canQueryFlow && detailVersion?.processInstanceId" class="mb-16px">
+          <el-collapse-item name="flow" title="审批流程">
+            <el-alert v-if="flowError" :title="flowError" type="error" show-icon :closable="false" class="mb-12px" />
+            <el-skeleton v-if="flowLoading" :rows="3" animated />
+            <ProcessInstanceTimeline v-else-if="activityNodes.length" :activity-nodes="activityNodes" />
+            <el-empty v-else-if="!flowError" description="暂无审批记录" :image-size="60" />
+          </el-collapse-item>
+        </el-collapse>
         <div v-if="detailVersion" class="material-detail-layout">
           <el-card class="material-detail-cover-card" shadow="never">
             <el-image v-if="detailCoverUrl" :src="detailCoverUrl" fit="contain" :preview-src-list="[detailCoverUrl]" />
@@ -240,7 +250,10 @@ import * as DictDataApi from '@/api/system/dict/dict.data'
 import * as UserApi from '@/api/system/user'
 import * as DeptApi from '@/api/system/dept'
 import * as MaterialApi from '@/api/zsjos/material'
+import * as ProcessInstanceApi from '@/api/bpm/processInstance'
+import { checkPermi } from '@/utils/permission'
 import MaterialDynamicForm from './components/MaterialDynamicForm.vue'
+import ProcessInstanceTimeline from '@/views/bpm/processInstance/detail/ProcessInstanceTimeline.vue'
 import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
 
 defineOptions({ name: 'ZsjosMaterial' })
@@ -298,6 +311,9 @@ const detail = ref<MaterialApi.Material>()
 const detailVersions = ref<MaterialApi.MaterialVersion[]>([])
 const detailVersionId = ref<number>()
 const detailVersion = ref<MaterialApi.MaterialVersion>()
+const activityNodes = ref<ProcessInstanceApi.ApprovalNodeInfo[]>([])
+const flowLoading = ref(false)
+const flowError = ref('')
 const detailApproval = ref<MaterialApi.MaterialApprovalTask>()
 
 const statusOptions = [
@@ -505,6 +521,7 @@ const loadDetail = async (id: number) => {
     detailVersion.value = material.currentVersion || versions[0]
     detailVersionId.value = detailVersion.value?.id
     detailApproval.value = undefined
+    await loadActivityNodes()
     for (const type of types.value.filter((item) => item.code === 'viral_account' || item.code === 'viral_content')) {
       const page = await MaterialApi.getMaterialApprovalPage(type.code)
       const match = page.list.find((item) => item.materialNo === material.materialNo)
@@ -521,10 +538,32 @@ const changeDetailVersion = async (id: number) => {
   detailLoading.value = true
   try {
     detailVersion.value = await MaterialApi.getMaterialVersion(id)
+    await loadActivityNodes()
   } catch (cause: any) {
     message.error(cause?.msg || cause?.message || '版本加载失败')
   } finally {
     detailLoading.value = false
+  }
+}
+/**
+ * 审批轨迹。节点数据由 BPM 提供，本页只负责展示，不参与流程推进。
+ * 该接口要求 bpm:process-instance:query；无权限时不发这个必然被拒的请求，
+ * 后端仍是唯一强制点，前端隐藏不等于授权。取数失败按错误降级，不伪装成空轨迹。
+ */
+const canQueryFlow = computed(() => checkPermi(['bpm:process-instance:query']))
+const loadActivityNodes = async () => {
+  const processInstanceId = detailVersion.value?.processInstanceId
+  if (!processInstanceId || !canQueryFlow.value) { activityNodes.value = []; flowError.value = ''; return }
+  flowLoading.value = true
+  flowError.value = ''
+  try {
+    const data = await ProcessInstanceApi.getApprovalDetail({ processInstanceId })
+    activityNodes.value = data?.activityNodes || []
+  } catch (cause: any) {
+    activityNodes.value = []
+    flowError.value = cause?.msg || cause?.message || '审批轨迹加载失败'
+  } finally {
+    flowLoading.value = false
   }
 }
 const decideApproval = async (action: 'approve' | 'reject') => {

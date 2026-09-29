@@ -76,6 +76,10 @@ export const updateAsset = async (data: AssetVO) => {
   return await request.put({ url: '/eam/asset/update', data })
 }
 
+export const changeAssetStatus = async (id: number, status: number, reason?: string) => {
+  return await request.put({ url: '/eam/asset/change-status', params: { id, status, reason } })
+}
+
 // 删除资产
 export const deleteAsset = async (id: number) => {
   return await request.delete({ url: '/eam/asset/delete?id=' + id })

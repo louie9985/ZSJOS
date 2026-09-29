@@ -69,6 +69,8 @@ class LeadSubmissionServiceImplTest {
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private LeadMapper leadMapper;
+    @Mock private LeadSelfSourcedAutomationService selfSourcedAutomation;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper eventMapper;
     @Mock private LeadActivationMapper activationMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private LeadAttachmentMapper attachmentMapper;
@@ -448,6 +450,47 @@ class LeadSubmissionServiceImplTest {
         area.setLeafSelectable(false);
         area.setStatus(status == 0 ? CommonStatusEnum.ENABLE.getStatus() : CommonStatusEnum.DISABLE.getStatus());
         return area;
+    }
+
+    @Test
+    void salesDirectCreateRunsAutomationOnceAndReturnsServerState() {
+        LeadCreateReqVO req=validDuplicateRequest();req.setRemark("已联系，有意向");prepareDuplicateValidation(req);
+        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
+        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
+        when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
+        doAnswer(call->{saved.get().setStatus("valid");return null;}).when(selfSourcedAutomation).complete(90L,1L,null);
+        LeadCreateRespVO result=service.createSelfSourced(req,1L);
+        assertEquals("valid",result.getQualificationStatus());assertEquals(1L,saved.get().getSourceUserId());
+        verify(selfSourcedAutomation).validate(req,1L);verify(selfSourcedAutomation).complete(90L,1L,null);
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
+        service.createSelfSourced(req,1L);
+        verify(selfSourcedAutomation,org.mockito.Mockito.times(1)).complete(90L,1L,null);
+    }
+
+    @Test
+    void historicalReplayAndContactActivationNeverRunAutomation() {
+        LeadCreateReqVO req=validDuplicateRequest();
+        LeadDO historical=new LeadDO().setId(30L).setSourceType(SOURCE_SALES_SELF).setStatus("submitted");
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(historical);
+        assertFalse(service.createSelfSourced(req,1L).getAutomaticQualificationApplied());
+        org.mockito.Mockito.reset(leadMapper);
+        when(contactActivationService.activate(any(),any(),any(),eq(1L),eq(SOURCE_SALES_SELF),org.mockito.ArgumentMatchers.isNull())).thenReturn(true);
+        assertEquals("activated",service.createSelfSourced(req,1L).getOutcome());
+        org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
+    }
+
+    @Test
+    void linkedProviderAndDuplicateReviewKeepExistingFlow() {
+        LeadCreateReqVO req=validDuplicateRequest();req.setNewMediaProviderUserId(2L);prepareDuplicateValidation(req);
+        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
+        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
+        when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
+        service.createSelfSourced(req,1L);org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
+        assertEquals(2L,saved.get().getSourceProviderUserId());
     }
 
     private static LeadCreateReqVO baseRequest() {

@@ -1,3 +1,4 @@
+import { CashbackControl, CashbackControlHistory } from './CashbackControl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Descriptions, Drawer, Space, Spin, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
@@ -23,7 +24,7 @@ export function SourceSummary({ source, permissions }: { source?: FinanceSource;
       { key: 'lead', label: '客资编号', children: <Button type="link" onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${source.leadId}`)}>{source.leadNo || '历史未记录'}</Button> },
       { key: 'customer', label: '客户姓名', children: source.customerName || '未提供可见姓名' }
     ]} /> : <Alert type="info" title={`客资：${sourceMessage(source.leadAccess)}`} />}
-    {source.orderAccess === 'available' ? <Descriptions column={2} bordered items={[
+    {source.orderAccess === 'available' ? <Descriptions column={{ xs: 1, sm: 2 }} bordered items={[
       { key: 'order', label: '订单号', children: <Button type="link" onClick={() => navigate(`${orderPath}?orderId=${source.orderId}`)}>{source.orderNo || '历史未记录'}</Button> },
       { key: 'student', label: '学员', children: source.studentName || '-' },
       { key: 'sales', label: '负责销售', children: source.salesName || '-' },
@@ -41,7 +42,7 @@ export function SourceSummary({ source, permissions }: { source?: FinanceSource;
   </Space>
 }
 
-export function CashbackDetail({ id, permissions, onClose }: { id?: number; permissions: string[]; onClose: () => void }) {
+export function CashbackDetail({ id, permissions, onClose, onChanged }: { id?: number; permissions: string[]; onClose: () => void; onChanged?: () => void }) {
   const [detail, setDetail] = useState<Cashback>()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -56,12 +57,14 @@ export function CashbackDetail({ id, permissions, onClose }: { id?: number; perm
     finally { if (current === sequence.current) setLoading(false) }
   }, [id])
   useEffect(() => { void load(); return () => { sequence.current++ } }, [load])
-  return <Drawer title="返现详情" open={!!id} onClose={onClose} size={860}>
+  return <Drawer title="返现详情" open={!!id} onClose={onClose} size={860} footer={detail && <CashbackControl row={detail} permissions={permissions} onSuccess={() => { void load(); onChanged?.() }} />}>
+
     <Spin spinning={loading}>
       {error && <Alert type="error" title={error} action={<Button onClick={() => void load()}>重试</Button>} />}
       {detail && <Space orientation="vertical" style={{ width: '100%' }}>
         {financeOptions.error && <Alert type="error" title={financeOptions.error} action={<Button onClick={() => void financeOptions.reload()}>重试</Button>} />}
-        <Descriptions column={2} bordered items={[
+        {detail.status === 'blocked' && <Alert type="warning" showIcon title="该笔返现已禁止提现" description={detail.blockReason} />}
+        <Descriptions column={{ xs: 1, sm: 2 }} bordered items={[
           { key: 'no', label: '返现编号', children: detail.cashbackNo }, { key: 'beneficiary', label: '返现受益人', children: detail.beneficiaryName || '历史归属信息缺失' },
           { key: 'partner', label: '合作方', children: detail.partnerName || '-' }, { key: 'product', label: '返现产品快照', children: detail.productNameSnapshot || '-' },
           { key: 'type', label: '类型', children: financeOptions.options('type').find(x => x.value === detail.type)?.label || '类型暂不可用' },
@@ -73,6 +76,8 @@ export function CashbackDetail({ id, permissions, onClose }: { id?: number; perm
           { key: 'settled', label: '结算时间', children: formatTimestamp(detail.settledAt) }, { key: 'cancelled', label: '取消时间', children: formatTimestamp(detail.cancelledAt) },
           { key: 'reason', label: '取消原因', children: detail.cancelReason || '-' }
         ]} />
+        <Typography.Title level={5}>操作记录</Typography.Title>
+        <CashbackControlHistory id={detail.id} revision={detail.version} />
         <SourceSummary source={detail.source} permissions={permissions} />
         <Typography.Title level={5}>提现记录</Typography.Title>
         {hasPermission(permissions, 'zsjos:withdrawal:finance-query') || hasPermission(permissions, 'zsjos:withdrawal:admin-query')

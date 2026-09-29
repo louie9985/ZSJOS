@@ -43,6 +43,7 @@ class ClassTransferServiceImplTest {
         relation.setStatus("active"); relation.setVersion(3);
         DeliveryClassDO source = sourceClass();
         DeliveryClassDO target = targetClass();
+        target.setCategoryId(null);
         when(requestMapper.selectByProcessInstanceId("process-1")).thenReturn(request);
         when(requestMapper.selectByIdForUpdate(1L, 1L)).thenReturn(request);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);

@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.system.service.notify;
 
-import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyBusinessOutboxDO;
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -29,6 +27,7 @@ public class NotifyBusinessOutboxService {
     @Resource private NotifyBusinessEventProcessor eventProcessor;
     @Resource private NotifyMessageMapper notifyMessageMapper;
     @Resource private WecomOutboxDeliveryService wecomDeliveryService;
+    @Resource private FixedInAppOutboxDeliveryService fixedInAppDeliveryService;
 
     @Transactional(propagation = Propagation.REQUIRED)
     public void enqueue(NotifyBusinessEvent event, List<NotifyRuleDO> rules) {
@@ -39,12 +38,7 @@ public class NotifyBusinessOutboxService {
             outbox.setSourceEventKey(event.getSourceEventKey()); outbox.setTargetRuleId(rule.getId());
             outbox.setBizType(event.getBizType()); outbox.setBizId(event.getBizId());
             outbox.setOperatorUserId(event.getOperatorUserId()); outbox.setOccurredAt(event.getOccurredAt());
-            outbox.setPayload(JsonUtils.toJsonString(event.getPayload())); outbox.setStatus("pending");
-            if ("wecom".equals(rule.getChannelCode())) {
-                WecomOutboxPayload envelope = new WecomOutboxPayload();
-                envelope.setEventPayload(event.getPayload());
-                outbox.setPayload(JsonUtils.toJsonString(envelope));
-            }
+            outbox.setPayload(NotifyOutboxEventCodec.encode(event, rule.getChannelCode())); outbox.setStatus("pending");
             outbox.setAttemptCount(0); outbox.setNextAttemptAt(now);
             try {
                 outboxMapper.insert(outbox);
@@ -75,25 +69,15 @@ public class NotifyBusinessOutboxService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private void deliver(NotifyBusinessOutboxDO outbox) {
         LocalDateTime now = LocalDateTime.now();
         String claimToken = outbox.getClaimToken();
         try {
-            Map<String, Object> payload = outbox.getPayload() == null ? Map.of()
-                    : JsonUtils.parseObjectQuietly(outbox.getPayload(), Map.class);
-            if (payload == null && outbox.getPayload() != null && !"null".equals(outbox.getPayload().trim())) {
-                throw new IllegalArgumentException("Invalid notification payload");
-            }
-            boolean wecom = payload != null && WecomOutboxPayload.FORMAT.equals(payload.get("deliveryFormat"));
-            Map<String, Object> eventPayload = wecom ? (Map<String, Object>) payload.get("eventPayload") : payload;
-            NotifyBusinessEvent event = NotifyBusinessEvent.builder()
-                    .tenantId(outbox.getTenantId()).sceneCode(outbox.getSceneCode())
-                    .sourceEventKey(outbox.getSourceEventKey()).targetRuleId(outbox.getTargetRuleId())
-                    .bizType(outbox.getBizType()).bizId(outbox.getBizId())
-                    .operatorUserId(outbox.getOperatorUserId()).occurredAt(outbox.getOccurredAt())
-                    .payload(eventPayload).build();
+            var decoded = NotifyOutboxEventCodec.decode(outbox);
+            boolean wecom = decoded.wecom();
+            NotifyBusinessEvent event = decoded.event();
             NotifySendResult result = wecom ? wecomDeliveryService.deliver(outbox, event)
+                    : "FIXED".equals(event.getRecipientMode()) ? fixedInAppDeliveryService.deliver(outbox, event)
                     : eventProcessor.processConfirmed(event);
             now = LocalDateTime.now();
             if (result.isSuccess()) {

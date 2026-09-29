@@ -9,6 +9,7 @@ import java.util.List;
 public interface ZsjosProductSkuService {
     List<ExamProductScopeRespVO> getExamProductOptions();
     ExamProductScopeRespVO resolveExamScope(Long productId, java.util.Map<String, String> selected);
+    ExamProductScopeRespVO previewExamScope(Long productId, java.util.Map<String, String> selected);
     List<ZsjosProductAttrRespVO> getAttrs(Long spuId);
     void saveAttrs(ZsjosProductAttrSaveReqVO reqVO);
     Long createSku(ZsjosProductSkuSaveReqVO reqVO);

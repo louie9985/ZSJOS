@@ -151,6 +151,28 @@ public class EamAssetServiceImpl implements EamAssetService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long assetId, Integer status, String reason, Long operatorUserId) {
+        EamAssetDO before = validateAssetExists(assetId);
+        if (status == null || !java.util.Arrays.asList(EamAssetStatusEnum.ARRAYS).contains(status)
+                || EamAssetStatusEnum.TERMINAL_STATUSES.contains(before.getStatus())) {
+            throw exception(ASSET_STATUS_INVALID, before.getAssetCode());
+        }
+        if (EamAssetStatusEnum.TERMINAL_STATUSES.contains(status)
+                && !EamAssetStatusEnum.IDLE.getStatus().equals(before.getStatus())) {
+            throw exception(ASSET_STATUS_INVALID, before.getAssetCode());
+        }
+        EamAssetDO update = new EamAssetDO().setId(assetId).setStatus(status)
+                .setVersion((before.getVersion() == null ? 0 : before.getVersion()) + 1);
+        if (isReversibleStatus(status)) update.setPreviousStatus(before.getStatus());
+        if (operatorUserId != null) update.setUpdater(String.valueOf(operatorUserId));
+        assetMapper.updateById(update);
+        EamAssetDO after = assetMapper.selectById(assetId);
+        changeLogService.record(before, after, EamChangeTypeEnum.EDIT.getType(), null,
+                "管理员直接调整资产状态" + (StrUtil.isBlank(reason) ? "" : "：" + reason), operatorUserId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void clearUsageAndSetIdle(Long assetId, Integer expectedVersion, Long operatorUserId) {
         EamAssetDO before = validateAssetExists(assetId);
         validateStatusTransition(before, Set.of(EamAssetStatusEnum.IDLE.getStatus(),

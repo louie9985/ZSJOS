@@ -85,6 +85,8 @@ class LeadManagementServiceImplTest {
     private DeptApi deptApi;
     @Mock
     private LeadObjectPermissionService leadObjectPermissionService;
+    @Mock
+    private LeadAssignmentService leadAssignmentService;
     @Spy
     @InjectMocks
     private LeadIdentityMaskingService leadIdentityMaskingService;
@@ -592,6 +594,19 @@ class LeadManagementServiceImplTest {
         assertProjection(actionLead("invalid", "owned", true), null, "invalid", null, "active");
         LeadDO suspended = actionLead("suspended", "owned", true);
         assertProjection(suspended, null, "pending", "following", "suspended");
+    }
+
+    @Test
+    void suspendedRestoreActionRequiresEligibleSalesOwner() {
+        LeadDO lead = actionLead("suspended", "owned", true);
+        when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-restore")).thenReturn(true);
+
+        when(leadAssignmentService.isEligibleSalesUser(20L)).thenReturn(false);
+        assertActions(lead, null);
+
+        when(leadAssignmentService.isEligibleSalesUser(20L)).thenReturn(true);
+        assertActions(lead, null, "SUPERVISOR_RESTORE");
     }
 
     @Test

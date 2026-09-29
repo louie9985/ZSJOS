@@ -97,6 +97,12 @@ class StudentInfoFormServiceTest {
         ReflectionTestUtils.setField(service,"publicBaseUrl","");
         assertEquals(1_900_090_010,assertThrows(ServiceException.class, () -> service.getLink(5L)).getCode());
     }
+
+    @Test void positioningPublicUrlCanBeUsedForCollectionLink() {
+        when(forms.byLead(5L)).thenReturn(form("DRAFT"));
+        ReflectionTestUtils.setField(service,"publicBaseUrl","https://h5.example.test");
+        assertEquals("https://h5.example.test/student-info-form#token=" + token, service.getLink(5L).getUrl());
+    }
     @Test void nonWonLeadCannotGenerateAndStaleRotationCannotInvalidateLink() {
         when(leads.selectByIdForUpdate(5L,7L)).thenReturn(new LeadDO().setId(5L).setStatus("valid"));
         assertThrows(ServiceException.class, () -> service.generate(5L));

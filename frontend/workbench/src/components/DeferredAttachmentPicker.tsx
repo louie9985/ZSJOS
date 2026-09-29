@@ -15,7 +15,7 @@ export default function DeferredAttachmentPicker<T>({ value, onChange, accept, m
   const addFiles = (files: File[]) => {
     const next = [...value]
     for (const file of files) {
-      if (next.length >= maxCount) break
+      if (next.length >= maxCount) { message.warning(`最多选择 ${maxCount} 个文件`); break }
       if (imageOnly && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         message.error('仅支持 JPG、PNG、WebP 图片')
         continue
@@ -24,13 +24,10 @@ export default function DeferredAttachmentPicker<T>({ value, onChange, accept, m
     }
     if (next.length !== value.length) onChange(next)
   }
-  const beforeUpload: UploadProps['beforeUpload'] = file => {
-    if (value.length >= maxCount) { message.warning(`最多选择 ${maxCount} 个文件`); return Upload.LIST_IGNORE }
-    if (imageOnly && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      message.error('仅支持 JPG、PNG、WebP 图片'); return Upload.LIST_IGNORE
-    }
-    onChange([...value, createDeferredUploadItem<T>(file)])
-    return false
+  const beforeUpload: UploadProps['beforeUpload'] = (file, batch) => {
+    // Upload invokes this for each file with the same state snapshot; append the batch only once.
+    if (file === batch[0]) addFiles(batch)
+    return Upload.LIST_IGNORE
   }
   const { targetRef, targetProps, pasteButtonProps } = useClipboardPasteTarget({
     disabled,

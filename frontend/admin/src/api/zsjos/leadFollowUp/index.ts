@@ -11,6 +11,8 @@ export interface LeadFollowUpImageVO {
 }
 
 export interface LeadFollowUpVO {
+  generationSource?: string
+  recordScope?: string
   salesStageBefore?: string
   salesStageBeforeLabelSnapshot?: string
   salesStageAfter?: string

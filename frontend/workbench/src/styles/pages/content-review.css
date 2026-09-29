@@ -636,3 +636,40 @@
   padding-bottom: var(--crm-sp-2);
   border-bottom: 1px solid var(--crm-border);
 }
+.content-review-opinions {
+  border: 1px solid var(--crm-color-primary-border);
+  border-left: 4px solid var(--crm-color-primary);
+  border-radius: var(--crm-radius-md);
+  overflow: hidden;
+  margin-bottom: var(--crm-sp-4);
+}
+
+.content-review-opinions-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.content-review-opinion {
+  padding: var(--crm-sp-4);
+  background: var(--crm-bg-container);
+  border-top: 1px solid var(--crm-border);
+}
+
+.content-review-opinion-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-2);
+}
+
+.content-review-opinion-text.ant-typography {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}

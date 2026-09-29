@@ -1,6 +1,9 @@
 package cn.iocoder.yudao.module.system.service.notify;
 
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
+import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyRuleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyBusinessOutboxDO;
 import cn.iocoder.yudao.module.system.dal.mysql.notify.NotifyBusinessOutboxMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notify.NotifyMessageMapper;
@@ -26,6 +29,64 @@ class NotifyBusinessOutboxServiceTest {
     @Mock private NotifyBusinessEventProcessor eventProcessor;
     @Mock private NotifyMessageMapper notifyMessageMapper;
     @Mock private WecomOutboxDeliveryService wecomDeliveryService;
+    @Mock private FixedInAppOutboxDeliveryService fixedInAppDeliveryService;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"in_app", "wecom"})
+    void fixedEmployeesSurviveEnqueueClaimAndDelivery(String channel) {
+        var original = NotifyBusinessEvent.builder().tenantId(10L).sceneCode("zsjos.calendar.exam")
+                .sourceEventKey("calendar:exam:1").bizType("calendar").bizId(31L).operatorUserId(45L)
+                .occurredAt(LocalDateTime.of(2026, 9, 28, 9, 0)).recipientMode("FIXED")
+                .fixedRecipients(List.of(NotifyRecipientDTO.admin(7L), NotifyRecipientDTO.admin(8L)))
+                .payload(java.util.Map.of("calendar.title", "考试安排")).build();
+        service.enqueue(original, List.of(NotifyRuleDO.builder().id(20L).channelCode(channel).build()));
+        var saved = ArgumentCaptor.forClass(NotifyBusinessOutboxDO.class);
+        verify(outboxMapper).insert(saved.capture());
+        var persisted = saved.getValue();
+        persisted.setId(1L);
+        // Restore from a JSON copy so this exercises persisted metadata rather than the original event object.
+        var restored = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(persisted), NotifyBusinessOutboxDO.class);
+        when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(restored));
+        when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> {
+            restored.setClaimToken(call.getArgument(1)); return restored;
+        });
+        if ("wecom".equals(channel)) {
+            when(wecomDeliveryService.deliver(eq(restored), any())).thenReturn(NotifySendResult.success("queued"));
+        } else {
+            when(fixedInAppDeliveryService.deliver(eq(restored), any())).thenReturn(NotifySendResult.success(null));
+        }
+        service.deliverDue();
+        var delivered = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        if ("wecom".equals(channel)) {
+            verify(wecomDeliveryService).deliver(eq(restored), delivered.capture());
+            verifyNoInteractions(eventProcessor);
+        } else {
+            verify(fixedInAppDeliveryService).deliver(eq(restored), delivered.capture());
+            verifyNoInteractions(eventProcessor);
+            verifyNoInteractions(wecomDeliveryService);
+        }
+        assertEquals(original.toBuilder().targetRuleId(20L).build(), delivered.getValue());
+        assertEquals("succeeded", restored.getStatus());
+    }
+
+    @Test void corruptFixedEnvelopeFailsWithoutCallingEitherDeliveryChannel() {
+        var row = row(1L, "event:corrupt");
+        row.setSceneCode("zsjos.calendar.exam");
+        row.setPayload("{\"deliveryFormat\":\"notify-fixed-event-v1\",\"fixedRecipients\":[]}");
+        when(outboxMapper.selectDue(any(), eq(100))).thenReturn(List.of(row));
+        when(outboxMapper.claim(eq(1L), any(), any(), anyString())).thenReturn(1);
+        when(outboxMapper.selectClaimed(eq(1L), anyString())).thenAnswer(call -> {
+            row.setClaimToken(call.getArgument(1)); return row;
+        });
+        service.deliverDue();
+        verifyNoInteractions(eventProcessor, wecomDeliveryService, fixedInAppDeliveryService);
+        assertEquals("failed", row.getStatus());
+        assertEquals("NOTIFY_INTERNAL_ERROR", row.getLastError());
+        assertEquals(1, row.getAttemptCount());
+        verify(outboxMapper).updateDeliveryState(eq(row), anyString(), any());
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})

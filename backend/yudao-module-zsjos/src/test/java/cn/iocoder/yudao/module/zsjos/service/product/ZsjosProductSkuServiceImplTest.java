@@ -60,6 +60,25 @@ class ZsjosProductSkuServiceImplTest {
 
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Test void examPreviewUsesEnabledCatalogWithoutPublicationLocks() {
+        var product = new ZsjosProductDO(); product.setId(1L); product.setProductRef("spu-1");
+        product.setName("产品"); product.setCategoryId(100L); product.setStatus(0);
+        when(productMapper.selectById(1L)).thenReturn(product);
+        when(productService.getEnabledSimpleList()).thenReturn(List.of(
+                new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductSimpleRespVO(
+                        "spu-1", "产品", 100L, "分类", List.of(), null, null, null, null)));
+        when(attrMapper.selectListBySpuId(1L)).thenReturn(List.of());
+        var sku = new ZsjosProductSkuDO(); sku.setId(2L); sku.setSkuRef("sku-2"); sku.setSkuName("规格"); sku.setAttrValuesJson("{}");
+        when(skuMapper.selectEnabledListBySpuIds(List.of(1L))).thenReturn(List.of(sku));
+        var preview = service.previewExamScope(1L, Map.of());
+        assertEquals("sku-2", preview.skus().getFirst().skuRef());
+        verify(productMapper).selectById(1L); verifyNoMoreInteractions(productMapper);
+        verifyNoInteractions(categoryLocks);
+        when(skuMapper.selectEnabledListBySpuIds(List.of(1L))).thenReturn(List.of());
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.EXAM_SCHEDULE_SKU_NO_MATCH.getCode(),
+                assertThrows(ServiceException.class, () -> service.previewExamScope(1L, Map.of())).getCode());
+    }
+
     @Test
     void validatesUnknownSpuAndSkuWithoutCreatingCatalogRows() {
         LeadProductSnapshot snapshot = service.validateLeadProduct(null, true, null, true);

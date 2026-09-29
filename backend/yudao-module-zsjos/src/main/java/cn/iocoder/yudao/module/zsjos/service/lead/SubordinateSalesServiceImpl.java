@@ -303,6 +303,8 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
                                               List<BusinessTaskDO> tasks, List<SalesOrderDO> orders,
                                               List<DictDataRespDTO> categories, boolean eligible,
                                               LocalDateTime start, LocalDateTime end, LocalDateTime now) {
+        tasks = tasks.stream().filter(task -> !(Set.of(TASK_TYPE_FIRST_FOLLOW_UP, TASK_TYPE_QUALIFICATION).contains(task.getTaskType())
+                && LeadAutomaticGeneration.isAutomatic(task.getPayload()))).toList();
         SalesDispatchStatusRespVO dispatch = dispatchStatusService.getStatus(user.getId());
         SubordinateSalesRespVO row = new SubordinateSalesRespVO();
         row.setUserId(user.getId()); row.setName(user.getNickname()); row.setAvatar(user.getAvatar());

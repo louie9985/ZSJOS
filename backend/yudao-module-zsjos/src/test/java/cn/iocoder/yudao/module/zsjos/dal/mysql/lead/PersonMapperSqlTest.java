@@ -25,6 +25,28 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 class PersonMapperSqlTest {
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void servicePeriodFiltersAllMediaReadPathsBeforePagination() {
+        for (Boolean flag : new Boolean[]{true, false, null}) {
+            PersonMapper mapper = mock(PersonMapper.class, Answers.CALLS_REAL_METHODS);
+            doAnswer(invocation -> {
+                var wrapper = (com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) invocation.getArgument(1);
+                String sql = wrapper.getSqlSegment();
+                assertEquals(flag != null, sql.contains("in_service_period"));
+                if (flag != null) assertTrue(wrapper.getParamNameValuePairs().containsValue(flag));
+                assertTrue(sql.contains("tenant_id=zsjos_person.tenant_id"));
+                assertTrue(sql.contains("deleted=b'0'"));
+                assertTrue(sql.contains("name LIKE"));
+                return invocation.getArgument(0);
+            }).when(mapper).selectPage(any(IPage.class), any(Wrapper.class));
+            var request = new MyStudentPageReqVO();
+            request.setInServicePeriod(flag); request.setKeyword("测试");
+            mapper.selectMediaStudentPage(request, 10L);
+            mapper.selectAllMediaStudentPage(request, null);
+            mapper.selectTenantReadStudentPage(request, null);
+        }
+    }
 
     @Test
     void duplicateCandidateSqlRemainsCaseSensitiveAndTenantParserCompatible() throws Exception {

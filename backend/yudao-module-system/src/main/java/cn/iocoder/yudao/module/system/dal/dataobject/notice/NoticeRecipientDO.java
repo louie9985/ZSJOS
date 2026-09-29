@@ -15,4 +15,8 @@ public class NoticeRecipientDO extends TenantBaseDO {
     @TableId private Long id;
     private Long noticeId;
     private Long userId;
+    private String userNameSnapshot;
+    private Long deptIdSnapshot;
+    private String deptNameSnapshot;
+    private Boolean profileSnapshotComplete;
 }

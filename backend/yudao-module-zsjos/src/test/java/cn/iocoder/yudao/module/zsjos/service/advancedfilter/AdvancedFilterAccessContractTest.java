@@ -68,12 +68,32 @@ class AdvancedFilterAccessContractTest {
         verify(service).catalog("withdrawal", List.of());
     }
 
+    @Test void mediaCatalogRequiresItsOwnQueryPermission() {
+        var target = new AdvancedFilterController();
+        var service = mock(AdvancedFilterService.class);
+        var users = mock(AdvancedFilterVisibleUserService.class);
+        var products = mock(AdvancedFilterProductOptions.class);
+        ReflectionTestUtils.setField(target, "service", service);
+        ReflectionTestUtils.setField(target, "visibleUserService", users);
+        ReflectionTestUtils.setField(target, "productOptions", products);
+        var controller = (AdvancedFilterController) secured(target);
+        permissions.granted = "zsjos:student:query-my";
+        assertThrows(AccessDeniedException.class, () -> controller.catalog("media_student"));
+        permissions.granted = "zsjos:media-student:query-my";
+        when(users.resolve(eq("media_student"), nullable(Long.class)))
+                .thenReturn(new AdvancedFilterVisibleUserService.Resolution(true, List.of()));
+        var catalog = new AdvancedFilterCatalogRespVO(List.of(), List.of());
+        when(service.catalog("media_student", List.of())).thenReturn(catalog);
+        when(products.resolve(catalog)).thenReturn(catalog);
+        assertSame(catalog, controller.catalog("media_student").getData());
+    }
+
     @Test void everySearchEntryRejectsUnauthorizedUseBeforeExecutingBusinessCode() throws Exception {
         int checked = 0;
         for (String name : List.of("lead.LeadManagementController", "lead.LeadDispatchController",
                 "lead.LeadAgingPoolController", "lead.LeadQualificationController", "lead.LeadAppealController",
                 "lead.LeadDuplicateReviewController", "lead.SubordinateSalesController", "order.SalesOrderController",
-                "registration.RegistrationController", "registration.MyStudentController",
+                "registration.RegistrationController", "registration.MyStudentController", "registration.MediaStudentController",
                 "cashback.CashbackController", "withdrawal.WithdrawalController")) {
             Class<?> type = Class.forName("cn.iocoder.yudao.module.zsjos.controller.admin." + name);
             Object proxy = secured(type.getDeclaredConstructor().newInstance());

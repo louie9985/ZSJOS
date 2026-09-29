@@ -203,8 +203,9 @@ class SalesOrderServiceImplTest {
         assertNull(row.getFinanceStatus());
     }
 
-    @Test
-    void createZeroAmountOrderStartsDualApprovalAndDefaultsBuyer() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"1,0.00", "2,0.00", "2,0.01"})
+    void createZeroAmountOrderStartsDualApprovalAndDefaultsBuyer(int courseCount, String totalAmount) {
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
@@ -216,14 +217,60 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
 
-        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        var req = request(BigDecimal.ZERO, "13800138000", null);
+        if (courseCount == 2) {
+            var second = new SalesOrderSubmitReqVO.Item();
+            second.setSpuRef("spu-1"); second.setSkuRef("sku-2"); second.setActualAmount(new BigDecimal(totalAmount));
+            req.setItems(List.of(req.getItems().getFirst(), second));
+            when(skuService.validateLeadProduct("spu-1", false, "sku-2", false)).thenReturn(product());
+        }
+        var draftService = new cn.iocoder.yudao.module.zsjos.service.payment.PurchaseIntentService();
+        ReflectionTestUtils.setField(draftService, "purchaseIntentMapper", purchaseIntentMapper);
+        ReflectionTestUtils.setField(draftService, "paymentIntentMapper", paymentIntentMapper);
+        var draft = new cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PurchaseIntentSaveDraftReqVO();
+        draft.setPersonId(10L); draft.setLeadId(1L); draft.setPurchaseType("first_purchase");
+        draft.setSourceKey("lead:1"); draft.setCollectionMode("offline_paid"); draft.setIdempotencyKey("purchase:key-1");
+        draft.setTotalAmount(new BigDecimal(totalAmount)); draft.setDraft(Map.of("items", req.getItems()));
+        draft.setItems(req.getItems().stream().map(item -> {
+            var entry = new cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PurchaseIntentSaveDraftReqVO.Item();
+            entry.setSpuRef(item.getSpuRef()); entry.setSkuRef(item.getSkuRef()); entry.setActualAmount(item.getActualAmount());
+            return entry;
+        }).toList());
+        doAnswer(call -> { ((PurchaseIntentDO) call.getArgument(0)).setId(800L); return 1; })
+                .when(purchaseIntentMapper).insert(any(PurchaseIntentDO.class));
+        var saved = draftService.saveDraft(draft, 20L);
+        var draftCaptor = ArgumentCaptor.forClass(PurchaseIntentDO.class);
+        verify(purchaseIntentMapper).insert(draftCaptor.capture());
+        var persisted = draftCaptor.getValue();
+        when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(persisted);
+        when(purchaseIntentMapper.selectActive(1L, 10L, "first_purchase", "lead:1", 20L)).thenReturn(persisted);
+        assertEquals(new BigDecimal(totalAmount), draftService.current(draft, 20L).getTotalAmount());
+        assertEquals(saved.getDraft(), draftService.current(draft, 20L).getDraft());
+        assertEquals(saved.getId(), draftService.saveDraft(draft, 20L).getId());
+        req.setPurchaseIntentId(saved.getId());
+        var vouchers = req.getPaymentVouchers();
+        req.setPaymentVouchers(List.of());
+        ServiceException missingVoucher = assertThrows(ServiceException.class, () -> service.createAndSubmit(1L, 20L, req));
+        assertEquals(SALES_ORDER_VOUCHER_REQUIRED.getCode(), missingVoucher.getCode());
+        verifyNoInteractions(processInstanceApi);
+        req.setPaymentVouchers(vouchers);
+        Long id = service.createAndSubmit(1L, 20L, req);
+        assertEquals(100L, persisted.getCurrentOrderId());
+        assertEquals("submitted", persisted.getStatus());
+        verify(paymentIntentMapper, never()).insert(any(PaymentIntentDO.class));
+        verifyNoInteractions(paymentTransactionMapper, orderPaymentAllocationMapper);
+
 
         assertEquals(100L, id);
         ArgumentCaptor<SalesOrderDO> orderCaptor = ArgumentCaptor.forClass(SalesOrderDO.class);
         verify(orderMapper).insert(orderCaptor.capture());
         assertEquals("测试学员", orderCaptor.getValue().getBuyerName());
         assertEquals("天津市", orderCaptor.getValue().getProvinceName());
-        assertEquals(new BigDecimal("0.00"), orderCaptor.getValue().getTotalAmount());
+        assertEquals(new BigDecimal(totalAmount), orderCaptor.getValue().getTotalAmount());
+        assertEquals(800L, orderCaptor.getValue().getPurchaseIntentId());
+        when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(orderCaptor.getValue());
+        assertEquals(id, service.createAndSubmit(1L, 20L, req));
+        verify(orderMapper, times(1)).insert(any(SalesOrderDO.class));
         ArgumentCaptor<SalesOrderApprovalRoundDO> roundCaptor = ArgumentCaptor.forClass(SalesOrderApprovalRoundDO.class);
         verify(roundMapper).insert(roundCaptor.capture());
         assertEquals("process-1", roundCaptor.getValue().getProcessInstanceId());
@@ -234,10 +281,10 @@ class SalesOrderServiceImplTest {
         assertEquals("company_qr", frozen.getSelections().get("paymentMethod").value());
         assertFalse(roundCaptor.getValue().getOrderSnapshot().contains("submissionIdempotencyKey"));
 
-        verify(processInstanceApi).createProcessInstance(eq(20L), argThat(req ->
-                req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
-                        && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
-                        && "KZ202608160000000001".equals(req.getVariables().get("leadNo"))));
+        verify(processInstanceApi).createProcessInstance(eq(20L), argThat(processReq ->
+                processReq.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
+                        && processReq.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
+                        && "KZ202608160000000001".equals(processReq.getVariables().get("leadNo"))));
     }
 
     @Test
@@ -808,14 +855,15 @@ class SalesOrderServiceImplTest {
         verify(processTaskApi).rejectTask(eq(20L), argThat(decision -> "finance-task".equals(decision.getTaskId())));
     }
 
-    @Test
-    void reviseCreatesIndependentSuccessorAndPreservesRejectedOrder() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"500.00", "0.00"})
+    void reviseCreatesIndependentSuccessorAndPreservesRejectedOrder(String amount) {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
         order.setPersonId(10L); order.setPurchaseIntentId(800L);
         PurchaseIntentDO intent = purchaseIntent("offline_paid");
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
-        when(purchaseIntentMapper.reviseOfflineSnapshot(eq(intent), anyString(), eq(new BigDecimal("500.00")))).thenReturn(1);
+        when(purchaseIntentMapper.reviseOfflineSnapshot(eq(intent), anyString(), eq(new BigDecimal(amount)))).thenReturn(1);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setId(200L); previous.setRoundNo(1);
@@ -832,7 +880,7 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
                 .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
 
-        Long successorId = service.reviseAndResubmit(100L, 20L, request(new BigDecimal("500"), "13800138000", null));
+        Long successorId = service.reviseAndResubmit(100L, 20L, request(new BigDecimal(amount), "13800138000", null));
 
         assertEquals(101L, successorId);
         assertEquals(STATUS_SUPERSEDED, order.getStatus());

@@ -1,0 +1,82 @@
+# -*- coding: utf-8 -*-
+"""Real Chrome, isolated responses; no production task mutations."""
+from pathlib import Path
+import os
+import tempfile
+from playwright.sync_api import sync_playwright, expect
+
+out = Path(tempfile.gettempdir()) / 'lead-menu-reminder-browser'
+out.mkdir(exist_ok=True)
+base = os.environ.get('WORKBENCH_TEST_URL', 'http://localhost:5175')
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome', headless=True)
+    for width in [1440, 390]:
+        page = browser.new_page(viewport={'width': width, 'height': 900})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(base + '/test/menu-task-reminder.html')
+        count = page.get_by_test_id('count')
+        expect(count).to_have_text('2')
+        def update(values, trigger='focus'):
+            page.evaluate('([values, trigger]) => { Object.assign(window.reminderFixture.state, values); if (trigger === "event") window.reminderFixture.event(); else window.dispatchEvent(new Event("focus")); }', [values, trigger])
+        for command in ['follow', 'valid', 'invalid']:
+            update({'count': 2})
+            expect(count).to_have_text('2')
+            page.evaluate('(type) => window.reminderFixture.command(type)', command)
+            expect(count).to_have_text('1')
+        page.evaluate('window.reminderFixture.state.commandFailure = true')
+        before = page.evaluate('window.reminderFixture.state.calls')
+        page.evaluate('window.reminderFixture.command("valid").catch(() => {})')
+        assert page.evaluate('window.reminderFixture.state.calls') == before
+        expect(count).to_have_text('1')
+        update({'failure': 500})
+        expect(page.get_by_test_id('error')).not_to_be_empty()
+        expect(count).to_have_text('1')
+        update({'failure': 403})
+        expect(count).to_have_text('none')
+        update({'failure': 0, 'count': 1})
+        expect(count).to_have_text('1')
+        update({'failure': 401})
+        expect(count).to_have_text('none')
+        update({'failure': 0, 'count': 0}, 'event')
+        expect(count).to_have_text('0')
+        expect(page.locator('.ant-badge-count')).to_have_count(0)
+        update({'count': 101})
+        expect(count).to_have_text('101')
+        expect(page.get_by_test_id('secondary-menu').locator('.ant-badge-count')).to_have_attribute('title', '101')
+        assert '99+' in page.get_by_test_id('secondary-menu').inner_text()
+        page.screenshot(path=str(out / f'badge-{width}.png'), full_page=True)
+        update({'count': 2, 'delay': 400})
+        page.wait_for_timeout(50)
+        update({'count': 0, 'delay': 0})
+        expect(count).to_have_text('0')
+        page.wait_for_timeout(450)
+        expect(count).to_have_text('0')
+        update({'count': 9, 'delay': 250})
+        page.wait_for_timeout(40)
+        page.get_by_role('button', name='切换权限').click()
+        expect(count).to_have_text('none')
+        page.wait_for_timeout(300)
+        expect(count).to_have_text('none')
+        page.evaluate('Object.assign(window.reminderFixture.state, {count: 3, delay: 0})')
+        page.get_by_role('button', name='切换权限').click()
+        expect(count).to_have_text('3')
+        page.clock.install()
+        page.get_by_role('button', name='切换权限').click()
+        page.get_by_role('button', name='切换权限').click()
+        expect(count).to_have_text('3')
+        page.evaluate('window.reminderFixture.state.count = 4')
+        page.clock.run_for(60001)
+        expect(count).to_have_text('4')
+        page.evaluate('window.reminderFixture.disconnect()')
+        page.clock.run_for(1001)
+        page.evaluate('window.reminderFixture.state.count = 5')
+        page.clock.run_for(15001)
+        expect(count).to_have_text('5')
+        page.evaluate('Object.assign(window.reminderFixture.state, {count: 6}); document.dispatchEvent(new Event("visibilitychange"))')
+        expect(count).to_have_text('6')
+        assert not errors, errors
+        print(f'PASS {width}: commands, websocket, focus, visibility, 60s/15s poll, errors, races, zero/99+; synthetic transport')
+        page.close()
+    browser.close()
+print('Screenshots:', out)

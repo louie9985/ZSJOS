@@ -18,20 +18,21 @@
 - `GET /zsjos/delivery-class/homeroom-candidates`：返回主管部门范围内启用且同时持有
 `zsjos:delivery-class:query-my`、`zsjos:student:query-my` 的用户。
 - `GET /zsjos/delivery-class/product-options`：返回教务端同源的启用产品、规格和 SKU。
-- `GET /zsjos/delivery-class/category-options`、`GET /zsjos/delivery-class/exam-options?categoryId=&productId=&selectedSkuIdsJson=`：
-  返回启用产品分类和同产品范围、已发布且未结束的考期；精确考期按 `exactDate`，粗略考期按
-  `roughEndDate`，结束日期次日起不可选。`selectedSkuIdsJson` 传班级实际选择的 SKU ID 数组时，
-  仅返回覆盖全部所选 SKU 的考期；未传时保留按产品/规格范围查询的兼容语义。
+- `GET /zsjos/delivery-class/exam-options`：直接返回当前租户所有已发布、未结束考期，展示名称与日期。
+  不需要分类、产品、规格或 SKU 参数；旧筛选参数不再限制结果。精确考期按 `exactDate`、粗略考期按
+  `roughEndDate`，结束日期次日起不可选。创建与编辑均重新校验目标考期。
 - `POST /zsjos/delivery-class/create`、`PUT /zsjos/delivery-class/{id}`、
   `POST /zsjos/delivery-class/{id}/complete`：创建、编辑和手动结课。
 
-班级响应同时返回考期 `scheduleType` 与 `exactDate` 展示字段。`ROUGH` 班级由前端持续显示“未设置精确考期”警示；精确考期仍只能通过已有班级编辑权限选择考期管理中匹配的已发布精确考期。
+班级响应同时返回考期 `scheduleType` 与 `exactDate` 展示字段。`ROUGH` 班级由前端持续显示“未设置精确考期”警示；精确考期仍需通过已有班级编辑权限选择考期管理中已发布且未结束的精确考期。
 
 正式班编号为 `BJyyyyMMddHHmmss####`，由服务生成并依赖租户级唯一约束及冲突重试。
-班级保存产品、规格条件、所选 SKU、产品分类完整路径、考期、班主任和创建时部门名称快照。
-SKU 可以只选择产品下的部分有效 SKU，但至少选择一个；创建班级时直接在产品下多选 SKU，规格条件不再作为前置筛选；班内已有任何服务关系后
-产品范围永久锁定；名称、同产品范围未结束考期和同班级部门内的合格班主任仍可修改。结课只
-关闭新学员入口，不修改已有服务关系、接收状态或服务阶段。
+班级名称 `className` 必须手工填写（非空白，最多 100 字），不再自动生成。创建只需名称、具体
+`examScheduleId` 和 `homeroomUserId`；不关联产品、SKU 或分类，旧客户端提交的目录字段忽略。
+考期必须来自已发布且未结束的考期记录，支持精确或粗略考期；新命名考期保存名称和日期组合的班级考期快照。
+旧考期尚无独立名称时沿用日期快照，候选仍展示原历史名称，避免长规格名称超过旧字段长度。
+历史班级原产品/规格快照保留仅供历史读取，不再作为编辑、报名分班和调班的匹配或锁定条件。
+结课只关闭新学员入口，不修改已有服务关系、接收状态或服务阶段。
 
 班主任必须属于当前交付主管的直接部门、账号启用并拥有启用的 `study_planner` 角色。该角色
 资格是写命令的实时前置条件，而不只是候选列表过滤条件。班级创建/编辑、主管直调、
@@ -55,6 +56,9 @@ BPM 调班通过、报名分班保存和报名完成都会重新确认账号启�
 
 - `POST /zsjos/class-transfer/service/{serviceRelationId}`：当前服务 owner 发起正式班之间调班。
 - `GET /zsjos/class-transfer/my-page`、`GET /zsjos/class-transfer/{id}`：查看本人申请及 BPM 引用。
+
+调班申请和审批通过不要求源班与目标班产品分类一致；双端目标选项使用不带分类的正式班候选接口。
+权限、部门范围、服务版本、源班归属、目标状态和班主任资格仍按原契约校验。
 
 流程定义 key 为 `zsjos_class_transfer`，business key 为 `class-transfer:{requestId}`，审批节点
 key 为 `originalSupervisorReview`。审核人取申请人当前部门 `leaderUserId`，必须启用、不能是

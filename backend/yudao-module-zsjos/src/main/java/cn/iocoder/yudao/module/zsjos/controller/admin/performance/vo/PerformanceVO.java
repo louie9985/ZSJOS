@@ -27,7 +27,7 @@ public final class PerformanceVO {
  public record Revision(Long id,String reason,String before,String after,String operatorName,LocalDateTime at) {}
  public record Node(String key,String parentKey,String title,String scopeType,Long scopeId,boolean selectable) {}
  public record Metric(String key,String label,LocalDateTime start,LocalDateTime end,BigDecimal amount,long orders,
-   long converted,long denominator,BigDecimal rate,BigDecimal average) {}
+   long converted,long denominator,BigDecimal rate,BigDecimal average,BigDecimal averageAmount,long averageOrders) {}
  public record Group(String key,String label,BigDecimal amount,long count,BigDecimal share) {}
  public record Target(Long id,String scopeType,Long scopeId,String name,String periodType,LocalDate periodStart,
    BigDecimal automaticFloor,BigDecimal automaticSprint,BigDecimal floorAmount,BigDecimal sprintAmount,
@@ -41,9 +41,16 @@ public final class PerformanceVO {
  public record CalendarDay(LocalDate date,long received,long valid,long invalid,long pending,long overdue,long ended,
    long lateCompleted,long onTime,long dueCount,long unknown) {}
  public record LeadReport(LocalDateTime asOf,LocalDate start,LocalDate end,Map<String,Long> workload,List<Group> categories,List<Group> stages,
-   List<CalendarDay> calendar,List<Group> funnel,List<Group> followUp,List<Group> categoryTrend) {}
- public record Detail(Long id,String number,String kind,String label,LocalDateTime occurredAt,BigDecimal amount,String state) {}
- public record HistoryMonth(int month,BigDecimal amount,BigDecimal previousAmount) {}
+   List<CalendarDay> calendar,List<Group> funnel,List<Group> followUp,List<CategoryPoint> categoryTrend) {}
+ public record CategoryPoint(String bucket,String category,long count) {}
+ public record MissingTarget(String scopeType,Long scopeId,String name,String department,LocalDate periodStart,String reason) {}
+ public record Detail(Long id,String number,String kind,String label,LocalDateTime occurredAt,BigDecimal amount,String state,
+   Long leadId,String ownerName,String assigneeName,LocalDateTime receivedAt,LocalDateTime dueAt,String category,String stage,Long overdueMinutes) {
+  public Detail(Long id,String number,String kind,String label,LocalDateTime occurredAt,BigDecimal amount,String state) {
+   this(id,number,kind,label,occurredAt,amount,state,null,null,null,null,null,null,null,null);
+  }
+ }
+ public record HistoryMonth(int month,BigDecimal amount,BigDecimal previousAmount,LocalDateTime start,LocalDateTime end,LocalDateTime previousStart,LocalDateTime previousEnd,boolean future) {}
  @Data public static class TargetEdit {
   private Long id;
   @NotNull @Pattern(regexp="USER|DEPT|CENTER") private String scopeType;

@@ -1,6 +1,22 @@
 import request from '@/config/axios'
 import type { AxiosProgressEvent } from 'axios'
 
+export type NoticeReadScope = 'EXPECTED' | 'READ' | 'UNREAD' | 'EXTRA' | 'ACTUAL'
+export interface NoticeReadSummary {
+  published: boolean; rosterComplete: boolean; expectedCount?: number | null; readCount?: number | null
+  unreadCount?: number | null; readRate?: number | null; extraReadCount?: number | null; actualReadCount?: number | null
+  departments: Array<{ id: number; name?: string }>; extraDepartments: Array<{ id: number; name?: string }>
+}
+export interface NoticeReadPerson {
+  userId: number; userName?: string; deptId?: number; deptName?: string; profileSource: 'SNAPSHOT' | 'CURRENT'
+  accountStatus?: number; accountDeleted: boolean; readTime?: number
+}
+export const getNoticeReadSummary = (id: number) => request.get<NoticeReadSummary>({
+  url: '/system/notice/read-summary', params: { id }, preserveBusinessError: true
+})
+export const getNoticeReadPage = (params: { id: number; scope: NoticeReadScope; pageNo: number; pageSize: number; name?: string; deptId?: number }) =>
+  request.get<{ list: NoticeReadPerson[]; total: number }>({ url: '/system/notice/read-page', params, preserveBusinessError: true })
+
 export interface NoticeVO {
   id: number | undefined
   title: string

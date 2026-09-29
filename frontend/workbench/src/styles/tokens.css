@@ -143,6 +143,12 @@
   --crm-icon-lg: 18px;
   --crm-icon-xl: 30px;
 
+  /* 移动端输入控件字号。**刻意不随字号档缩放**。
+     iOS Safari 对 computed font-size < 16px 的可聚焦控件会在聚焦时放大整个
+     视觉视口；若这里跟随 small 档掉到 12px，自动放大就会在最需要它的窄屏上
+     复发。16px 是该行为的阈值，不是设计偏好，故三档统一。 */
+  --crm-font-mobile-input: 16px;
+
   /* 字重：按语义命名而非数值，避免业务在 500/600 之间随手选 */
   --crm-weight-normal: 400;
   --crm-weight-medium: 500;    /* 强调、次级标题 */

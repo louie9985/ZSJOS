@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } fr
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { WorkbenchMenu } from '../services/api'
 import { type TabStyle } from '../constants'
-import { RETAINED_PAGE_PATHS } from '../retainedPagePaths'
 import { useWorkbenchPageNavigation } from './WorkbenchPageNavigation'
 
 export interface TabItem {
@@ -15,7 +14,7 @@ export interface TabItem {
 
 export const MAX_TABS = 15
 
-export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu, href?: string): TabItem[] {
+export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu, href?: string, retainedPaths: readonly string[] = []): TabItem[] {
   if (!currentMenu) return tabs
   const existing = tabs.find(tab => tab.key === currentMenu.path)
   if (existing) return !href || existing.href === href ? tabs : tabs.map(tab => tab === existing ? { ...tab, href } : tab)
@@ -25,7 +24,7 @@ export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu, href
   ]
   if (next.length > MAX_TABS) {
     const index = next.findIndex(tab => tab.closable && tab.key !== currentMenu.path
-      && !RETAINED_PAGE_PATHS.includes(tab.key))
+      && !retainedPaths.includes(tab.key))
     if (index >= 0) next.splice(index, 1)
   }
   return next
@@ -40,8 +39,9 @@ const TabBar: React.FC<{
   initialPath?: string
   tabStyle?: TabStyle
   tabs: TabItem[]
+  retainedPaths?: readonly string[]
   setTabs: Dispatch<SetStateAction<TabItem[]>>
-}> = ({ currentMenu, initialPath, tabStyle = 'card', tabs, setTabs }) => {
+}> = ({ currentMenu, initialPath, tabStyle = 'card', tabs, setTabs, retainedPaths }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const navigation = useWorkbenchPageNavigation()
@@ -49,8 +49,8 @@ const TabBar: React.FC<{
 
   // 当前页面进入 tabs
   useEffect(() => {
-    setTabs(prev => appendMenuTab(prev, currentMenu, `${location.pathname}${location.search}${location.hash}`))
-  }, [currentMenu, setTabs, location.pathname, location.search, location.hash])
+    setTabs(prev => appendMenuTab(prev, currentMenu, `${location.pathname}${location.search}${location.hash}`, retainedPaths))
+  }, [currentMenu, setTabs, location.pathname, location.search, location.hash, retainedPaths])
 
   // 第一个 tab 设为不可关闭
   useEffect(() => {

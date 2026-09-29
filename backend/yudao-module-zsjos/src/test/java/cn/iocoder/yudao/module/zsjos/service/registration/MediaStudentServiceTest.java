@@ -76,6 +76,7 @@ class MediaStudentServiceTest {
         verifyNoInteractions(talkRecordMapper, myStudentService);
     }
     @InjectMocks private MediaStudentService service;
+    @Mock private MediaStudentServicePeriodService servicePeriodService;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryStageMapper deliveryStages;
     @Mock private StudentServiceObjectPermissionProvider servicePermissions;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;

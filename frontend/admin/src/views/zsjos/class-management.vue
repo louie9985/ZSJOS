@@ -39,11 +39,7 @@
         prop="className"
         min-width="180"
       />
-      <el-table-column
-        label="产品分类"
-        prop="categoryNameSnapshot"
-        min-width="150"
-      /><el-table-column label="考期" prop="examScheduleSnapshot" min-width="160" />
+      <el-table-column label="考期" prop="examScheduleSnapshot" min-width="160" />
       <el-table-column
         label="班主任"
         prop="homeroomUserNameSnapshot"
@@ -157,7 +153,7 @@
     </el-table>
   </ContentWrap>
 
-  <Dialog v-model="editorOpen" :title="editing ? '编辑班级' : '创建班级'" width="560px">
+  <Dialog v-model="editorOpen" :title="editing ? '编辑班级' : '创建班级'" width="min(560px, calc(100vw - 32px))">
     <el-form
       ref="editorRef"
       :model="editor"
@@ -166,10 +162,8 @@
       v-loading="referenceLoading"
     >
       <el-form-item label="班级名称" prop="className"
-        ><el-input v-model="editor.className" maxlength="100" placeholder="留空时由系统生成"
+        ><el-input v-model="editor.className" maxlength="100" placeholder="请填写班级名称"
       /></el-form-item>
-      <el-form-item label="产品" prop="productId"><el-select v-model="editor.productId" filterable @change="productChanged"><el-option v-for="item in products" :key="item.productId" :label="item.productName" :value="item.productId" /></el-select></el-form-item>
-      <el-form-item label="SKU" prop="selectedSkuIds"><el-select v-model="editor.selectedSkuIds" multiple collapse-tags filterable :disabled="!selectedProduct" @change="skuChanged"><el-option v-for="item in selectedProduct?.skus || []" :key="item.id" :label="item.skuName" :value="item.id" /></el-select></el-form-item>
       <el-form-item label="考期" prop="examScheduleId"
         ><el-alert v-if="examError" :title="examError" type="error" show-icon :closable="false"><template #default><el-button link type="primary" @click="reloadExams()">重试</el-button></template></el-alert><el-select v-model="editor.examScheduleId" :loading="examLoading" :disabled="examLoading || Boolean(examError)"
           ><el-option
@@ -272,19 +266,13 @@ const exams = ref<Api.ExamOption[]>([])
 const examLoading = ref(false)
 const examError = ref('')
 const candidates = ref<Api.HomeroomCandidate[]>([])
-const products = ref<Api.ProductOption[]>([])
-const selectedProduct = computed(() => products.value.find(item => item.productId === editor.productId))
-const normalizeAttrs = (attrs?: Record<string, string>) => Object.fromEntries(Object.entries(attrs || {}).filter(([, value]) => value != null && value !== ''))
 const editor = reactive({
   className: '',
-  categoryId: undefined as number | undefined,
   examScheduleId: undefined as number | undefined,
   homeroomUserId: undefined as number | undefined
-  , productId: undefined as number | undefined, selectedSkuIds: [] as number[], selectedAttrs: {} as Record<string, string>
 })
 const rules: FormRules = {
-  productId: [{ required: true, message: '请选择产品' }],
-  selectedSkuIds: [{ type: 'array', required: true, min: 1, message: '请至少选择一个 SKU' }],
+  className: [{ required: true, whitespace: true, message: '请填写班级名称' }],
   examScheduleId: [{ required: true, message: '请选择考期' }],
   homeroomUserId: [{ required: true, message: '请选择班主任' }]
 }
@@ -363,19 +351,12 @@ const openEditor = async (row?: Api.DeliveryClass) => {
   examError.value = ''
   Object.assign(editor, {
     className: row?.className || '',
-    categoryId: row?.categoryId,
     examScheduleId: row?.examScheduleId,
     homeroomUserId: row?.homeroomUserId
-    , productId: row?.productId, selectedSkuIds: row?.selectedSkus?.map(sku => sku.id) || [], selectedAttrs: { ...(row?.selectedAttrs || {}) }
   })
   try {
-    const [productRows, candidateRows] = await Promise.all([
-      Api.getProductOptions(),
-      Api.getHomeroomCandidates()
-    ])
-    products.value = productRows; candidates.value = candidateRows
-    editor.selectedAttrs = normalizeAttrs(row?.selectedAttrs)
-    if (row?.categoryId) await reloadExams(row.categoryId, row.productId, editor.selectedAttrs)
+    const [candidateRows] = await Promise.all([Api.getHomeroomCandidates(), reloadExams()])
+    candidates.value = candidateRows
   } catch (cause: any) {
     ElMessage.error(cause?.msg || cause?.message || '基础选项加载失败')
     editorOpen.value = false
@@ -383,35 +364,18 @@ const openEditor = async (row?: Api.DeliveryClass) => {
     referenceLoading.value = false
   }
 }
-const reloadExams = async (categoryId = selectedProduct.value?.categoryId, productId = selectedProduct.value?.productId, attrs = {}, skuIds = editor.selectedSkuIds) => {
-  if (!categoryId) { exams.value = []; return }
+const reloadExams = async () => {
   examLoading.value = true; examError.value = ''
-  try { exams.value = await Api.getExamOptions(categoryId, productId, JSON.stringify(normalizeAttrs(attrs)), skuIds) }
+  try { exams.value = await Api.getExamOptions() }
   catch (cause: any) { exams.value = []; examError.value = cause?.msg || cause?.message || '考期加载失败' }
   finally { examLoading.value = false }
-}
-const productChanged = (productId: number) => {
-  const product = products.value.find(item => item.productId === productId)
-  editor.categoryId = product?.categoryId
-  editor.selectedSkuIds = []
-  editor.selectedAttrs = {}
-  editor.examScheduleId = undefined
-  exams.value = []
-}
-const skuChanged = () => {
-  editor.examScheduleId = undefined
-  if (!selectedProduct.value || !editor.selectedSkuIds.length) { exams.value = []; return }
-  void reloadExams(selectedProduct.value.categoryId, selectedProduct.value.productId, {}, editor.selectedSkuIds)
 }
 const save = async () => {
   if (!(await editorRef.value?.validate())) return
   saving.value = true
   try {
     const value = {
-      className: editor.className || undefined,
-      productId: editor.productId!, selectedSkuIds: editor.selectedSkuIds,
-      selectedAttrs: {},
-      categoryId: editor.categoryId!,
+      className: editor.className.trim(),
       examScheduleId: editor.examScheduleId!,
       homeroomUserId: editor.homeroomUserId!
     }
@@ -437,12 +401,12 @@ const finish = async (row: Api.DeliveryClass) => {
     ElMessage.error(cause?.msg || cause?.message || '结课失败')
   }
 }
-const loadTransferOptions = async (row: Api.DeliveryClassStudent) => {
+const loadTransferOptions = async (_row: Api.DeliveryClassStudent) => {
   transferLoading.value = true
   transferError.value = ''
   transferOptions.value = []
   try {
-    transferOptions.value = await Api.getDeliveryClassOptions(row.categoryId!, false)
+    transferOptions.value = await Api.getDeliveryClassOptions(undefined, false)
   } catch (cause: any) {
     transferError.value = cause?.msg || cause?.message || '目标班级加载失败'
   } finally {
@@ -450,10 +414,6 @@ const loadTransferOptions = async (row: Api.DeliveryClassStudent) => {
   }
 }
 const openTransfer = async (row: Api.DeliveryClassStudent) => {
-  if (!row.categoryId) {
-    ElMessage.error('该课程服务缺少产品分类，无法调班')
-    return
-  }
   transferStudent.value = row
   transferForm.targetClassId = undefined
   transferForm.reason = ''

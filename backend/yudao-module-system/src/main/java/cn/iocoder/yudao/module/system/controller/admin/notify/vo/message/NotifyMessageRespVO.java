@@ -64,6 +64,9 @@ public class NotifyMessageRespVO {
     @Schema(description = "是否已读", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     private Boolean readStatus;
 
+    @Schema(description = "消息分类：lead、withdrawal、appeal、system")
+    private String category;
+
     @Schema(description = "阅读时间")
     private LocalDateTime readTime;
 

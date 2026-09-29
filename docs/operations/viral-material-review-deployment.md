@@ -18,6 +18,7 @@
 
 1. 确认 V194 已在目标环境执行，`zsjos_material_type` 已存在租户级 `viral_account`、`viral_content` 两行，且素材审批分类 `zsjos_material` 由 `MaterialTenantInitializer` 在应用启动后已为该租户创建、启用。缺少任一前置的环境不得继续发布。
 2. 确认目标环境存在启用中的审核角色（租户 1 为董事长角色，`id=3031`），且该角色下有成员；该角色成员即审核节点的或签候选人。角色策略按 `system_user_role` 解析候选人，用户被停用或已逻辑删除时会从候选中剔除，因此角色里残留的停用账号不构成死待办。总监岗位补齐前不改绑，补齐后在第 4 步的模型里将审核节点角色从董事长改为总监并重新发布，不动流程结构与流程标识。
+   审核人**还须持有 `bpm:process-instance:query`**，审批详情页才能显示审核流（节点次序、处理人、审批意见）；展示流程评论另需 `bpm:task:query`。这两个权限不在 `zsjos:material-approval:*` 范围内，由管理员在 System 角色菜单里单独授予 —— 迁移与种子脚本不得代为写入授权。缺失时页面不渲染流程面板，通过/驳回不受影响。租户 1 的审核人（程伟，经董事长/超管角色）与编导（经普通员工角色）已继承该权限，但这是既有授权、不是契约，新环境须逐项确认。
 3. 在 Admin 的“流程模型 → 导入模型”分别导入 `script/bpm/zsjos_viral_account_review/1.1.0/process-model.json` 和 `script/bpm/zsjos_viral_content_review/1.1.0/process-model.json`。导入会在当前租户创建并绑定内嵌 BPM 表单；选择已启用的 `zsjos_material` 分类，两个模型设为不可见并指定流程管理员。1.1.0 的审批节点 id 与线上定义一致（`Activity_0d6b214f…` / `Activity_fb10be5a…`），1.0.0 用的是占位的 `viralReview`，两者不可混用。
 4. 两个模型使用相同的三节点结构：发起人（编导） → 爆款审核（userTask） → 结束。审核节点参数：节点名称填“爆款审核”，不写“董事长/总监”以免误导；审批人来源选“角色”，绑定第 2 步的角色；多人审批方式选“或签（一人通过或拒绝）”；审批意见必填打开；关闭“发起人自选审批人”。提交时 `startUserSelectAssignees` 保持为空，候选人由引擎按角色解析。资产内 `candidateParam` 固定为占位符 `"0"`，导入后必须在设计器里替换为本租户的角色编号。
 5. 模型使用“流程表单”，导入时自动创建并关联内嵌表单。在 BPM 表单设计器可调整布局；保留 `materialNo`、`materialVersionNo`、`materialTitle`、`materialSummary`、`materialContent` 字段名及只读权限。字段由已保存素材版本填充，动态字段和附件的完整查看仍使用素材详情。不可把审批表单编辑作为素材版本修改入口。

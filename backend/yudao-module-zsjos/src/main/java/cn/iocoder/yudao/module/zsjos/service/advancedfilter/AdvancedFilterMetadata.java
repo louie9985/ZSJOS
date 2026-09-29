@@ -21,6 +21,7 @@ final class AdvancedFilterMetadata {
             "duplicate_review", List.of("lead_duplicate_review"),
             "registration", List.of("registration_pool"),
             "student", List.of("student_my"),
+            "media_student", List.of("media_students"),
             "subordinate_sales", List.of("subordinate_sales"),
             "cashback", List.of("cashback"),
             "withdrawal", List.of("withdrawal"));

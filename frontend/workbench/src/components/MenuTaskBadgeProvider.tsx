@@ -1,5 +1,6 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, type MenuTaskSummary } from '../services/api'
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, AuthenticationError, api, type MenuTaskSummary } from '../services/api'
+import { MENU_TASK_INVALIDATED_EVENT } from '../services/menuTaskRefresh'
 import { buildMenuTaskBadgeMap, type MenuTaskBadgeResolver } from '../services/menuTaskBadge'
 import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 
@@ -11,20 +12,48 @@ export default function MenuTaskBadgeProvider({ children, enabled = true }: Prop
   const [summary, setSummary] = useState<MenuTaskSummary>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const generation = useRef(0)
   const refresh = useCallback(async () => {
     if (!enabled) return
+    const request = ++generation.current
     setLoading(true)
-    try { setSummary(await api.menuTaskSummary()); setError('') } catch (e) { setError(e instanceof Error ? e.message : '菜单待办加载失败') } finally { setLoading(false) }
+    try {
+      const result = await api.menuTaskSummary()
+      if (request !== generation.current) return
+      setSummary(result)
+      setError('')
+    } catch (e) {
+      if (request !== generation.current) return
+      if (e instanceof AuthenticationError || (e instanceof ApiError && (e.code === 401 || e.code === 403))) setSummary(undefined)
+      setError(e instanceof Error ? e.message : '菜单待办加载失败')
+    } finally {
+      if (request === generation.current) setLoading(false)
+    }
   }, [enabled])
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    if (enabled) void refresh()
+    else { setSummary(undefined); setLoading(false); setError('') }
+    return () => { generation.current++ }
+  }, [enabled, refresh])
   useRealtimeEvent('zsjos-workbench-task-invalidated', () => { void refresh() })
   useRealtimeEvent('notify-message-new', () => { void refresh() })
   useRealtimeEvent('zsjos_lead_assignment', () => { void refresh() })
   useEffect(() => {
+    if (!enabled) return
     const ms = status === 'open' ? 60_000 : 15_000
     const timer = window.setInterval(() => void refresh(), ms)
-    return () => window.clearInterval(timer)
-  }, [refresh, status])
+    const onRefresh = () => { void refresh() }
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    window.addEventListener('focus', onRefresh)
+    window.addEventListener(MENU_TASK_INVALIDATED_EVENT, onRefresh)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onRefresh)
+      window.removeEventListener(MENU_TASK_INVALIDATED_EVENT, onRefresh)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [enabled, refresh, status])
   const map = useMemo(() => buildMenuTaskBadgeMap(summary), [summary])
   const value = useMemo(() => ({ summary, loading, error, refresh, resolve: (path: string) => map.get(path) }), [error, loading, map, refresh, summary])
   return <Context.Provider value={value}>{children}</Context.Provider>

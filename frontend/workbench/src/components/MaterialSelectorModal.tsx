@@ -30,7 +30,7 @@ const statusTag = (status: string) => {
     REJECTED: { color: 'error', text: '已驳回' },
     DISABLED: { color: 'default', text: '已停用' },
   }
-  const item = map[status] || { color: 'default', text: status }
+  const item = map[status] || { color: 'default', text: status ? '未知状态' : '—' }
   return <Tag color={item.color}>{item.text}</Tag>
 }
 

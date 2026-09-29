@@ -91,6 +91,58 @@ class WecomOutboxDeliveryServiceTest {
         assertTrue(state.getRecipients().stream().allMatch(item -> "skipped".equals(item.getStatus())));
     }
 
+    @Test void fixedCheckpointCannotAddSwapDuplicateOrOmitRecipients() {
+        event = event.toBuilder().sourceEventKey("fixed").recipientMode("FIXED")
+                .fixedRecipients(List.of(NotifyRecipientDTO.admin(10L), NotifyRecipientDTO.partner(10L))).build();
+        row.setSceneCode("scene"); row.setSourceEventKey("fixed");
+        for (int invalid = 0; invalid < 5; invalid++) {
+            var state = JsonUtils.parseObject(NotifyOutboxEventCodec.encode(event, "wecom"), WecomOutboxPayload.class);
+            var first = new WecomOutboxPayload.Recipient();
+            first.setContext(context(2).toBuilder().sceneCode("scene").sourceEventKey("fixed").build());
+            var second = new WecomOutboxPayload.Recipient();
+            second.setContext(context(3).toBuilder().sceneCode("scene").sourceEventKey("fixed").build());
+            if (invalid == 0) second.setContext(second.getContext().toBuilder().userId(99L).build());
+            if (invalid == 1) second.setContext(second.getContext().toBuilder().tenantId(99L).build());
+            if (invalid == 2) second.setContext(first.getContext());
+            if (invalid == 3) second.setContext(second.getContext().toBuilder().sourceEventKey("other-event").build());
+            state.setRecipients(invalid == 4 ? List.of(first) : List.of(first, second));
+            row.setPayload(JsonUtils.toJsonString(state));
+            assertThrows(IllegalArgumentException.class, () -> service.deliver(row, event));
+        }
+        verifyNoInteractions(adapter, processor, outboxMapper);
+    }
+
+    @Test void freshFixedPreparationCannotExpandRosterAndSuccessfulRecoveryDoesNotResend() {
+        event = event.toBuilder().sourceEventKey("fixed").recipientMode("FIXED")
+                .fixedRecipients(List.of(NotifyRecipientDTO.admin(10L))).build();
+        row.setSceneCode("scene"); row.setSourceEventKey("fixed");
+        row.setPayload(NotifyOutboxEventCodec.encode(event, "wecom"));
+        var allowed = context(2).toBuilder().sceneCode("scene").sourceEventKey("fixed").build();
+        when(processor.prepareWecom(event)).thenReturn(new NotifyBusinessEventProcessor.PreparedWecom(List.of(allowed,
+                allowed.toBuilder().userId(99L).build()), null));
+        assertThrows(IllegalArgumentException.class, () -> service.deliver(row, event));
+        verifyNoInteractions(adapter, outboxMapper);
+        when(processor.prepareWecom(event)).thenReturn(new NotifyBusinessEventProcessor.PreparedWecom(List.of(allowed), null));
+        when(adapter.send(any())).thenReturn(NotifySendResult.success("received"));
+        assertTrue(service.deliver(row, event).isSuccess());
+        assertTrue(service.deliver(row, event).isSuccess());
+        verify(adapter, times(1)).send(any());
+    }
+
+    @Test void explicitSkipReasonAndCompletionSurviveCheckpointRoundtrip() {
+        prepareTwo();
+        when(adapter.send(any())).thenReturn(NotifySendResult.skipped("WECOM_PERSONAL_PUSH_DISABLED"),
+                NotifySendResult.success("synthetic-message"));
+        assertTrue(service.deliver(row, event).isSuccess());
+        var state = JsonUtils.parseObject(row.getPayload(), WecomOutboxPayload.class);
+        assertEquals("skipped", state.getRecipients().getFirst().getStatus());
+        assertEquals("WECOM_PERSONAL_PUSH_DISABLED", state.getRecipients().getFirst().getErrorCode());
+        assertNotNull(state.getRecipients().getFirst().getCompletedTime());
+        assertNotNull(state.getRecipients().getLast().getCompletedTime());
+        assertTrue(service.deliver(row, event).isSuccess());
+        verify(adapter, times(2)).send(any());
+    }
+
     @Test void obsoleteAssignmentIsSkippedBeforePreparingOrSending() {
         prepareTwo();
         when(processor.deliverySkipReason(event)).thenReturn("LEAD_ASSIGNMENT_OBSOLETE");

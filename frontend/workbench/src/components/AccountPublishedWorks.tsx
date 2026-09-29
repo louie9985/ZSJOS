@@ -1,6 +1,7 @@
 import { Alert, Button, Empty, Image, Modal, Pagination, Skeleton, Space, Tag, Typography } from 'antd'
 import { FileImageOutlined } from '@ant-design/icons'
 import { useEffect, useState } from 'react'
+import ResourceLink from './ResourceLink'
 import { api, type MediaContent, type MediaStudentDetail } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import { publishedWorkCover, publishedWorksForAccount, safeWorkUrl } from './publishedWorksModel'
@@ -61,14 +62,19 @@ export default function AccountPublishedWorks({ accountId, contents, canQuery }:
     {error && <Alert type="warning" showIcon title={error} action={<Button size="small" onClick={() => setReload(value => value + 1)}>重试封面</Button>} />}
     {!works.length ? <Empty description="该账号暂无已发布作品" /> : <>
       <div className="account-published-grid" aria-busy={loading}>
-        {visible.map(work => <article className="account-work-card" key={work.id}>
-          <button className="account-work-open" disabled={!canQuery} onClick={() => setSelected(work.id)} aria-label={`查看作品：${work.title || work.contentNo}`}>
-            <div className="account-work-cover">
-              {covers[work.id] ? <img src={covers[work.id]} alt={work.title || '作品封面'} loading="lazy" /> : <span><FileImageOutlined /><br />{loading ? '封面加载中' : '暂无封面'}</span>}
-            </div>
-            <div className="account-work-caption"><span className="account-work-title">{work.title || '未填写标题'}</span><Typography.Text type="secondary">{formatTimestamp(work.publishedAt)}</Typography.Text><Tag>已发布</Tag></div>
-          </button>
-        </article>)}
+        {visible.map(work => {
+          const workUrl = safeWorkUrl(work.publishedUrl)
+          return <article className="account-work-card" key={work.id}>
+            <button className="account-work-open" disabled={!canQuery} onClick={() => setSelected(work.id)} aria-label={`查看作品：${work.title || work.contentNo}`}>
+              <div className="account-work-cover">
+                {covers[work.id] ? <img src={covers[work.id]} alt={work.title || '作品封面'} loading="lazy" /> : <span><FileImageOutlined /><br />{loading ? '封面加载中' : '暂无封面'}</span>}
+              </div>
+              <div className="account-work-caption"><span className="account-work-title">{work.title || '未填写标题'}</span><Typography.Text type="secondary">{formatTimestamp(work.publishedAt)}</Typography.Text><Tag>已发布</Tag></div>
+            </button>
+            {/* 链接放在按钮之外：<button> 内嵌 <a> 是无效结构，且会吞掉卡片的打开交互。 */}
+            {workUrl && <div className="account-work-link"><ResourceLink href={workUrl} title="查看原作品" /></div>}
+          </article>
+        })}
       </div>
       <Pagination align="end" current={currentPage} total={works.length} pageSize={PAGE_SIZE} showSizeChanger={false} onChange={setPage} hideOnSinglePage />
     </>}
@@ -79,7 +85,7 @@ export default function AccountPublishedWorks({ accountId, contents, canQuery }:
         <Typography.Text>{detail.contentNo}</Typography.Text>
         <Typography.Text type="secondary">发布时间：{formatTimestamp(detail.publishedAt)}</Typography.Text>
         {detail.topic && <Typography.Paragraph>{detail.topic}</Typography.Paragraph>}
-        {safeWorkUrl(detail.publishedUrl) && <Button href={safeWorkUrl(detail.publishedUrl)} target="_blank" rel="noopener noreferrer">查看原作品</Button>}
+        {safeWorkUrl(detail.publishedUrl) && <div><ResourceLink href={safeWorkUrl(detail.publishedUrl)!} title="查看原作品" variant="resource" /></div>}
       </Space>}
     </Modal>
   </section>

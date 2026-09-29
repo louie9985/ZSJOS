@@ -91,6 +91,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource
     private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
+    @Resource private LeadAssignmentService leadAssignmentService;
     @Resource private LeadIdentityMaskingService leadIdentityMaskingService;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
@@ -730,6 +731,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));
         }
         if (SupervisorLeadActionPolicy.isAllowed(RESTORE, lead)
+                && leadAssignmentService.isEligibleSalesUser(scopedOwner)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RESTORE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RESTORE, true));
         }

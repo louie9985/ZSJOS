@@ -106,11 +106,20 @@ public class EamAssetLedgerParser {
 
     private static int parseStatus(String value, List<String> warnings) {
         if (StrUtil.isBlank(value)) return EamAssetStatusEnum.IDLE.getStatus();
+        try {
+            int numeric = Integer.parseInt(value);
+            if (java.util.Arrays.asList(EamAssetStatusEnum.ARRAYS).contains(numeric)) return numeric;
+        } catch (NumberFormatException ignored) { }
         return switch (value) {
             case "在用", "正常使用中" -> EamAssetStatusEnum.IN_USE.getStatus();
             case "闲置", "闲置备用", "闲置在库" -> EamAssetStatusEnum.IDLE.getStatus();
+            case "借出" -> EamAssetStatusEnum.LENT.getStatus();
             case "维修中" -> EamAssetStatusEnum.REPAIRING.getStatus();
             case "待报废" -> EamAssetStatusEnum.PENDING_SCRAP.getStatus();
+            case "已报废" -> EamAssetStatusEnum.SCRAPPED.getStatus();
+            case "已丢失", "丢失" -> EamAssetStatusEnum.LOST.getStatus();
+            case "已冻结", "冻结" -> EamAssetStatusEnum.FROZEN.getStatus();
+            case "已退供应商", "退供应商" -> EamAssetStatusEnum.RETURNED_TO_SUPPLIER.getStatus();
             default -> { warnings.add("资产状态无法识别，已按闲置导入"); yield EamAssetStatusEnum.IDLE.getStatus(); }
         };
     }

@@ -5,6 +5,9 @@ import java.util.Set;
 
 /** Stable business audit catalog. New explicit audit actions must be registered here first. */
 public final class AuditActionCatalog {
+    public static final String CATEGORY_CASHBACK = "cashback";
+    public static final String CASHBACK_BLOCK = "cashback.block";
+    public static final String CASHBACK_UNBLOCK = "cashback.unblock";
     public static final String CATEGORY_EXPORT = "export";
     public static final String CATEGORY_IMPERSONATION = "impersonation";
     public static final String CATEGORY_WITHDRAWAL = "withdrawal";
@@ -28,6 +31,7 @@ public final class AuditActionCatalog {
     public static final String WITHDRAWAL_PAYOUT = "withdrawal.payout";
 
     public static final Map<String, Set<String>> ACTIONS = Map.of(
+            CATEGORY_CASHBACK, Set.of(CASHBACK_BLOCK, CASHBACK_UNBLOCK),
             CATEGORY_EXPORT, Set.of(EXPORT_CREATE, EXPORT_GENERATE, EXPORT_DOWNLOAD, EXPORT_CANCEL),
             CATEGORY_IMPERSONATION, Set.of(IMPERSONATION_START, IMPERSONATION_END, IMPERSONATION_READ),
             CATEGORY_EXECUTION, Set.of(EXECUTION_QUARTZ, EXECUTION_BPM, EXECUTION_ASYNC,

@@ -17,6 +17,13 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 
 @Mapper
 public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
+    default boolean isMediaStudentResponsible(Long personId, Long userId) {
+        if (personId == null || userId == null) return false;
+        return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))) > 0;
+    }
     String MEDIA_RELATION_PREDICATE = "(content_director_user_id IS NOT NULL OR career_planner_user_id IS NOT NULL OR operator_user_id IS NOT NULL "
                         + "OR EXISTS (SELECT 1 FROM zsjos_media_account ma WHERE ma.create_service_relation_id=zsjos_service_relation.id AND ma.student_person_id=zsjos_service_relation.person_id AND ma.tenant_id=zsjos_service_relation.tenant_id AND ma.deleted=b'0') "
                         + "OR EXISTS (SELECT 1 FROM zsjos_positioning_card pc WHERE pc.service_relation_id=zsjos_service_relation.id AND pc.student_person_id=zsjos_service_relation.person_id AND pc.tenant_id=zsjos_service_relation.tenant_id AND pc.deleted=b'0') "

@@ -11,6 +11,7 @@ import java.time.LocalDate;
 @Data
 public class MediaStudentDetailRespVO {
     private MyStudentRespVO student;
+    private boolean canUpdateServicePeriod;
     private List<AccountVO> accounts;
     private List<PositioningVO> positioningCards;
     private List<PositioningVO> positioningDrafts;
@@ -79,6 +80,8 @@ public class MediaStudentDetailRespVO {
         private String status;
         private Integer currentVersionNo;
         private LocalDateTime publishedAt;
+        /** 发布登记写入的平台作品链接；与 publishedAt 同源，均为公开作品投影。 */
+        private String publishedUrl;
         private Integer version;
         private LocalDateTime lastActivityAt;
         private List<String> availableActions;

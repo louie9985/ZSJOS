@@ -2,6 +2,9 @@ package cn.iocoder.yudao.module.bpm.framework.flowable.config;
 
 import cn.hutool.core.collection.ListUtil;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmActivityBehaviorFactory;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmAuditedAsyncRunnable;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import org.flowable.job.service.impl.asyncexecutor.AbstractAsyncExecutor;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateStrategy;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.event.BpmProcessInstanceEventPublisher;
@@ -62,7 +65,8 @@ public class BpmFlowableConfiguration {
     public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> bpmProcessEngineConfigurationConfigurer(
             ObjectProvider<FlowableEventListener> listeners,
             ObjectProvider<FlowableFunctionDelegate> customFlowableFunctionDelegates,
-            BpmActivityBehaviorFactory bpmActivityBehaviorFactory) {
+            BpmActivityBehaviorFactory bpmActivityBehaviorFactory,
+            ObjectProvider<ExecutionAuditHook> executionAuditHooks) {
         return configuration -> {
             // 注册监听器，例如说 BpmActivityEventListener
             configuration.setEventListeners(ListUtil.toList(listeners.iterator()));
@@ -70,6 +74,10 @@ public class BpmFlowableConfiguration {
             configuration.setActivityBehaviorFactory(bpmActivityBehaviorFactory);
             // 设置自定义的函数
             configuration.setCustomFlowableFunctionDelegates(ListUtil.toList(customFlowableFunctionDelegates.stream().iterator()));
+            configuration.setAsyncExecutorExecuteAsyncRunnableFactory((job, jobConfiguration) ->
+                    new BpmAuditedAsyncRunnable(job, jobConfiguration,
+                            (AbstractAsyncExecutor) configuration.getAsyncExecutor(),
+                            executionAuditHooks.orderedStream().toList()));
         };
     }
 

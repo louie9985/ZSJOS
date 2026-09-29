@@ -11,6 +11,10 @@ import java.util.Map;
 
 @Mapper
 public interface AdvancedFilterMapper {
+    @SelectProvider(type = SqlProvider.class, method = "mediaStudentAccountsSql")
+    List<cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO> selectMediaStudentAccounts(
+            @Param("query") AdvancedFilterQuery query);
+
     @SelectProvider(type = SqlProvider.class, method = "cashbackSql")
     List<Long> selectCashbackIds(@Param("query") AdvancedFilterQuery query);
 
@@ -47,6 +51,15 @@ public interface AdvancedFilterMapper {
     List<Long> selectDuplicateReviewIdsByKeyword(@Param("tenantId") Long tenantId, @Param("keyword") String keyword);
 
     final class SqlProvider {
+        public static String mediaStudentAccountsSql(Map<String, Object> ignored) {
+            // Only fields required by the existing object permission provider and scoped user options.
+            return "SELECT ma.id, ma.tenant_id, ma.student_person_id, ma.owner_operator_user_id, "
+                    + "ma.director_user_id, ma.create_service_relation_id, ma.run_status "
+                    + "FROM zsjos_media_account ma WHERE ma.deleted=0 "
+                    + "AND ma.tenant_id=#{query.parameters.tenantId} AND ma.student_person_id IS NOT NULL "
+                    + "AND (${query.whereSql})";
+        }
+
         public static String cashbackSql(Map<String, Object> ignored) {
             return "SELECT c.id FROM zsjos_cashback c WHERE c.deleted=b'0' AND c.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
         }

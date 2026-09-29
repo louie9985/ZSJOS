@@ -20,8 +20,8 @@ const ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
 }
 
 export function subordinateAssignmentStatusLabel(status?: string) {
-  if (!status) return '未知分配状态（空）'
-  return ASSIGNMENT_STATUS_LABELS[status] || `未知分配状态（${status}）`
+  if (!status) return '—'
+  return ASSIGNMENT_STATUS_LABELS[status] || '未知状态'
 }
 
 export function isSupervisorLeadActionAllowed(

@@ -155,6 +155,7 @@ const statusLabel: Record<string, string> = {
   available: '可提现',
   withdrawing: '提现中',
   withdrawn: '已提现',
+  blocked: '不可提现',
   cancelled: '已取消'
 }
 
@@ -163,6 +164,7 @@ const statusColor: Record<string, string> = {
   available: 'var(--h5-success)',
   withdrawing: 'var(--h5-info)',
   withdrawn: 'var(--h5-text-secondary)',
+  blocked: 'var(--h5-warning)',
   cancelled: 'var(--h5-danger)'
 }
 </script>
@@ -265,6 +267,7 @@ const statusColor: Record<string, string> = {
                 <span>结算时间</span>
                 <strong>{{ formatDate(item.settledAt) }}</strong>
               </div>
+              <div v-if="item.status === 'blocked'" class="earnings-card__meta-item earnings-card__meta-item--cancel"><span>不可提现原因</span><strong>{{ item.blockReason }}</strong></div>
               <div v-if="item.cancelReason" class="earnings-card__meta-item earnings-card__meta-item--cancel">
                 <span>取消原因</span>
                 <strong>{{ item.cancelReason }}</strong>
@@ -353,6 +356,7 @@ const statusColor: Record<string, string> = {
             <div class="earnings-detail__row"><span>收益时间</span><strong>{{ formatDateTime(selectedCashback.generatedAt) }}</strong></div>
             <div v-if="selectedCashback.availableAt" class="earnings-detail__row"><span>可提现时间</span><strong>{{ formatDateTime(selectedCashback.availableAt) }}</strong></div>
             <div v-if="selectedCashback.settledAt" class="earnings-detail__row"><span>结算时间</span><strong>{{ formatDateTime(selectedCashback.settledAt) }}</strong></div>
+            <div v-if="selectedCashback.status === 'blocked'" class="earnings-detail__row"><span>不可提现原因</span><strong>{{ selectedCashback.blockReason }}</strong></div>
             <div v-if="selectedCashback.cancelReason" class="earnings-detail__row"><span>取消原因</span><strong>{{ selectedCashback.cancelReason }}</strong></div>
           </section>
         </div>

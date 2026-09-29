@@ -66,7 +66,27 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(rollbackFor = Exception.class)
     public LeadFollowUpRespVO create(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO) {
-        LocalDateTime occurredAt = LocalDateTime.now();
+        return createInternal(leadId, operatorUserId, reqVO, false);
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, rollbackFor = Exception.class)
+    public LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, LocalDateTime nextFollowUpAt) {
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null || !SOURCE_SALES_SELF.equals(lead.getSourceType()) || lead.getSourceProviderUserId() != null
+                || !Boolean.TRUE.equals(lead.getSourceProviderRecorded()) || !DISPATCH_SELF.equals(lead.getDispatchMode())
+                || !Objects.equals(operatorUserId, lead.getOwnerUserId()) || !STATUS_SUBMITTED.equals(lead.getStatus())
+                || lead.getCurrentAssignmentFirstFollowUpAt() != null) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
+        LeadFollowUpCreateReqVO command = new LeadFollowUpCreateReqVO();
+        command.setMethod(LeadAutomaticGeneration.METHOD); command.setResult(LeadAutomaticGeneration.RESULT);
+        command.setLeadCategory(lead.getLeadCategory()); command.setRemark(lead.getRemark().trim());
+        command.setNextFollowUpAt(nextFollowUpAt); command.setIdempotencyKey(LeadAutomaticGeneration.followUpKey(leadId));
+        return createInternal(leadId, operatorUserId, command, true);
+    }
+
+    private LeadFollowUpRespVO createInternal(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO, boolean automatic) {
+        LocalDateTime occurredAt = automatic ? LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai")) : LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         collaborationService.requireCanOperateForUpdate(lead, operatorUserId);
@@ -89,13 +109,17 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                     adminUserApi.getUserMap(List.of(existingOpportunity.getOperatorUserId())), null);
         }
         boolean won = STATUS_WON.equals(lead.getStatus());
-        if (reqVO.getNextFollowUpAt() == null ? !won : !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
+        if (reqVO.getNextFollowUpAt() == null ? !won && !automatic : !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
 
         DictDataRespDTO method = requireEnabledDict(DICT_FOLLOW_UP_METHOD, reqVO.getMethod());
         DictDataRespDTO result = requireEnabledDict(DICT_FOLLOW_UP_RESULT, reqVO.getResult());
-        DictDataRespDTO beforeCategory = findDict(DICT_CATEGORY, lead.getLeadCategory());
+        // Revalidate the actual snapshots: configuration may change after submission validation.
+        if (automatic && (method.getLabel() == null || method.getLabel().isBlank()
+                || result.getLabel() == null || result.getLabel().isBlank())) throw exception(LEAD_FOLLOW_UP_DICT_INVALID);
+        DictDataRespDTO beforeCategory = automatic ? new DictDataRespDTO() : findDict(DICT_CATEGORY, lead.getLeadCategory());
+        if (automatic) { beforeCategory.setValue(lead.getLeadCategory()); beforeCategory.setLabel(lead.getLeadCategoryLabelSnapshot()); }
         String categoryAfter = reqVO.getLeadCategory() == null || reqVO.getLeadCategory().isBlank()
                 ? null : reqVO.getLeadCategory().trim();
         DictDataRespDTO afterCategory = Objects.equals(lead.getLeadCategory(), categoryAfter)
@@ -121,11 +145,15 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setMethodLabelSnapshot(method.getLabel());
         record.setResultValue(result.getValue());
         record.setResultLabelSnapshot(result.getLabel());
-        var stage = LeadSalesStageSnapshot.resolve(lead, reqVO.getSalesStage(), dictDataApi);
         record.setSalesStageBefore(lead.getSalesStage());
         record.setSalesStageBeforeLabelSnapshot(lead.getSalesStageLabelSnapshot());
-        record.setSalesStageAfter(stage.value());
-        record.setSalesStageAfterLabelSnapshot(stage.label());
+        if (automatic) {
+            record.setSalesStageAfter(lead.getSalesStage());
+            record.setSalesStageAfterLabelSnapshot(lead.getSalesStageLabelSnapshot());
+        } else {
+            var stage = LeadSalesStageSnapshot.resolve(lead, reqVO.getSalesStage(), dictDataApi);
+            record.setSalesStageAfter(stage.value()); record.setSalesStageAfterLabelSnapshot(stage.label());
+        }
         record.setCategoryBefore(lead.getLeadCategory());
         record.setCategoryBeforeLabelSnapshot(labelOf(beforeCategory, lead.getLeadCategory()));
         record.setCategoryAfter(categoryAfter);
@@ -234,6 +262,13 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 leadImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
         opportunityRecords.forEach(record -> merged.add(convertOpportunity(record,
                 opportunityImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
+        Set<Long> automaticRecords = eventMapper.selectByLeadId(leadId).stream()
+                .filter(event -> EVENT_LEAD_FOLLOW_UP_RECORDED.equals(event.getEventType()))
+                .filter(event -> LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs()))
+                .map(event -> JsonUtils.parseObject(event.getRelatedObjectRefs(), Map.class).get("followUpRecordId"))
+                .filter(Number.class::isInstance).map(value -> ((Number) value).longValue()).collect(Collectors.toSet());
+        merged.stream().filter(item -> FOLLOW_UP_RECORD_SCOPE_LEAD.equals(item.getRecordScope()) && automaticRecords.contains(item.getId()))
+                .forEach(item -> item.setGenerationSource(LeadAutomaticGeneration.SOURCE));
         merged.sort(Comparator.comparing(LeadFollowUpRespVO::getOccurredAt).reversed()
                 .thenComparing(LeadFollowUpRespVO::getId, Comparator.reverseOrder()));
         int from = Math.min((pageNo - 1) * pageSize, merged.size());
