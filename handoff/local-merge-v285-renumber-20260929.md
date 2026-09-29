@@ -25,3 +25,9 @@
 
 - User explicitly authorized committing the current local code and pushing it to remote `origin/main`. Target is branch `main` at `https://gitee.com/louie9985/ZSJOS.git`; expected impact is one normal commit containing the accumulated business source, tests, SQL, documentation and handoff records from the registered local workstreams, followed by a non-force push.
 - Scope excludes obvious local runtime artifacts and diagnostics (`.failing_blocks`, `.playwright-mcp`, `.probe_*`, `.tmp_drift`, `.verify_*`, `content-review-tab.png`, `frontend/workbench/tmp`, local Maven wrapper/runtime files and tracked Python bytecode). Those files remain local and are not deleted. No database, service, branch, worktree, rebase, force-push or stash operation is authorized or performed.
+
+## Publication delivery — 2026-09-30 Beijing time
+
+- Committed the accumulated authorized source, tests, SQL, documentation and handoff records as `aded970b57` (`feat: 完善业务查询与多日考期支持`): 174 files, 5,193 insertions and 451 deletions. Pre-commit checks found no whitespace errors, unmerged paths, conflict markers, staged binary/runtime artifacts or high-risk secret patterns.
+- Pushed the commit by normal non-force update from remote `3f37414544` to `aded970b57` on `origin/main`. The first configured localhost proxy was unavailable, so the operation used a command-scoped direct HTTPS connection without modifying global Git configuration.
+- The explicitly excluded local diagnostics, temporary output and tracked Python bytecode remain outside the commit and were not deleted. Existing stashes remain untouched. No database migration, external service or permission change was performed.
