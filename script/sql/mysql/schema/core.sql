@@ -4694,6 +4694,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单状态',
   `submitter_user_id` bigint DEFAULT NULL COMMENT '本次订单提交人',
   `formal_sales_user_id` bigint DEFAULT NULL COMMENT '正式销售归属',
+  `imported_actor_snapshot` json DEFAULT NULL COMMENT '导入订单人员展示证据及来源',
   `formal_owner_identity` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '成交归属业务身份快照',
   `submitter_center_type` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交中心类型',
   `buyer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '购买方快照',

@@ -20,6 +20,19 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
     @Select("SELECT * FROM zsjos_cashback WHERE order_id=#{orderId} AND tenant_id=#{tenantId} AND deleted=0 ORDER BY id FOR UPDATE")
     List<CashbackDO> selectByOrderIdForUpdate(@Param("orderId") Long orderId, @Param("tenantId") Long tenantId);
     default CashbackDO selectByBusinessKey(String key) { return selectOne(CashbackDO::getBusinessKey, key); }
+
+    /**
+     * 按客资 + 类型查有效返现。business_key 里的数字可能是旧库客资 id（迁移遗留），
+     * 与 zsjos_cashback.lead_id（新库客资 id）不同，故不能用 business_key 去重。
+     * 同一客资下取最早一条，避免历史重复数据导致随机选中。
+     */
+    default CashbackDO selectValidByLeadId(Long leadId) {
+        return selectOne(new LambdaQueryWrapperX<CashbackDO>()
+                .eq(CashbackDO::getLeadId, leadId)
+                .eq(CashbackDO::getType, "valid")
+                .orderByAsc(CashbackDO::getId)
+                .last("LIMIT 1"));
+    }
     default PageResult<CashbackDO> selectCashbackPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         return selectCashbackPage(request, beneficiaryUserId, null);
     }

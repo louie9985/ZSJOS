@@ -73,7 +73,10 @@ public class CashbackServiceImpl implements CashbackService {
     @Transactional(rollbackFor = Exception.class)
     public Long ensureValidCashback(Long leadId) {
         String businessKey = "valid:" + leadId;
-        CashbackDO existing = mapper.selectByBusinessKey(businessKey);
+        // 按 lead_id + type 查重，而不是 business_key。旧库迁移过来的行
+        // business_key 里存的是旧库客资 id（如 'valid:3124'），与 lead_id
+        // （新库 id，3113）不同，用 business_key 查会漏掉它们并重复发一份。
+        CashbackDO existing = mapper.selectValidByLeadId(leadId);
         if (existing != null) return reuseOrRestore(existing);
         EligibleLead eligible = eligibleLead(leadId);
         if (eligible == null) return null;

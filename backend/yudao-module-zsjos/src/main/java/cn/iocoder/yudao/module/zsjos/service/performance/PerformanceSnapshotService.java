@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceAttributionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.enums.LeadConstants;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -40,9 +41,15 @@ public class PerformanceSnapshotService {
   row.setOrgSource("frozen");
   var user=userId==null?null:access.user(userId);
   if(user!=null){row.setUserName(user.getNickname());row.setDeptId(user.getDeptId());var dept=access.dept(user.getDeptId());if(dept!=null)row.setDeptName(dept.getName());var m=access.mapping(user.getDeptId());if(m!=null){row.setCenterId(m.getCenterId());var c=access.dept(m.getCenterId());if(c!=null)row.setCenterName(c.getName());}}
-  if(lead!=null){row.setLeadId(lead.getId());row.setAssignmentId(lead.getCurrentAssignmentHistoryId());row.setReceivedAt(lead.getOwnershipStartedAt());row.setChannelCode(lead.getSourceChannelId());row.setChannelLabel(lead.getSourceChannelLabelSnapshot());row.setSourceGroup(switch(lead.getSourceType()==null?"":lead.getSourceType()){case "internal_new_media","partner"->"inbound";case "sales_self_sourced"->"self";default->"unknown";});}
+  if(lead!=null){row.setLeadId(lead.getId());row.setAssignmentId(lead.getCurrentAssignmentHistoryId());row.setReceivedAt(lead.getOwnershipStartedAt());row.setChannelCode(lead.getSourceChannelId());row.setChannelLabel(lead.getSourceChannelLabelSnapshot());row.setSourceGroup(sourceGroup(lead.getSourceType()));}
   else row.setSourceGroup("unknown");
   return row;
+ }
+ // 客资来源 -> 业绩来源分组。销售自拓与教务自拓同为内部人员手动录单自拓，都归 self；
+ // 用 isSelfSourced 而不是枚举字面量，避免再加一类自拓时又漏分支（曾漏过 education_self_sourced）。
+ static String sourceGroup(String sourceType) {
+  if(LeadConstants.isSelfSourced(sourceType))return "self";
+  return switch(sourceType==null?"":sourceType){case LeadConstants.SOURCE_INTERNAL_NEW_MEDIA,LeadConstants.SOURCE_PARTNER->"inbound";default->"unknown";};
  }
  private void insert(PerformanceAttributionDO row) {
   if(mapper.selectCount(new LambdaQueryWrapperX<PerformanceAttributionDO>().eq(PerformanceAttributionDO::getFactType,row.getFactType()).eq(PerformanceAttributionDO::getFactId,row.getFactId()))==0)mapper.insert(row);

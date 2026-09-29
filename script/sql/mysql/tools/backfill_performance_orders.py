@@ -17,21 +17,32 @@ TABLE = 'zsjos_performance_attribution'
 MARKER = 'current-org-backfill-20260923'
 OUT = Path('D:/ZSJ-OS-backups/sales-performance-order-backfill-20260923')
 FIELDS = ['fact_type', 'fact_id', 'user_id', 'user_name', 'dept_id', 'dept_name',
-          'center_id', 'center_name', 'lead_id', 'source_group', 'creator', 'updater', 'tenant_id']
+          'center_id', 'center_name', 'lead_id', 'source_group',
+          'channel_code', 'channel_label', 'creator', 'updater', 'tenant_id']
 
 
 def candidates():
     # Disabled accounts retain affiliation; soft-deleted/missing organizations do not.
+    # source_group 必须按 lead.source_type 现算，不能硬编码 unknown——客资是入站还是自拓
+    # 只有 lead 知道。2026-09-23 那批 ORDER 因为写死 unknown，且没带渠道字段，
+    # 导致 276 行渠道为空、583 行分组与同客资的兄弟行自相矛盾（2026-09-29 已修脚本与数据）。
+    # 口径与 PerformanceSnapshotService.sourceGroup() 保持一致：教务自拓与销售自拓同归 self。
     sql = """SELECT JSON_OBJECT('fact_type','ORDER','fact_id',o.id,
       'user_id',u.id,'user_name',u.nickname,'dept_id',d.id,'dept_name',d.name,
       'center_id',c.id,'center_name',c.name,'lead_id',o.lead_id,
-      'source_group',IF(o.order_type='repurchase','repurchase','unknown'),
+      'source_group',CASE
+         WHEN o.order_type='repurchase' THEN 'repurchase'
+         WHEN l.source_type IN ('partner','internal_new_media') THEN 'inbound'
+         WHEN l.source_type IN ('sales_self_sourced','education_self_sourced') THEN 'self'
+         ELSE 'unknown' END,
+      'channel_code',l.source_channel_id,'channel_label',l.source_channel_label_snapshot,
       'creator','current-org-backfill-20260923','updater','current-org-backfill-20260923',
       'tenant_id',1) FROM zsjos_order o
       JOIN system_users u ON u.id=o.formal_sales_user_id AND u.tenant_id=o.tenant_id AND u.deleted=0
       JOIN system_dept d ON d.id=u.dept_id AND d.tenant_id=o.tenant_id AND d.deleted=0
       JOIN zsjos_performance_org m ON m.dept_id=d.id AND m.tenant_id=o.tenant_id AND m.deleted=0
       JOIN system_dept c ON c.id=m.center_id AND c.tenant_id=o.tenant_id AND c.deleted=0
+      LEFT JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=0
       WHERE o.tenant_id=1 AND o.deleted=0 AND o.status='effective'
       AND NOT EXISTS(SELECT 1 FROM zsjos_performance_attribution a
         WHERE a.tenant_id=1 AND a.fact_type='ORDER' AND a.fact_id=o.id AND a.deleted=0)

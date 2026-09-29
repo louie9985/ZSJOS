@@ -1518,7 +1518,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private SalesOrderRespVO convert(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task, Long userId) {
-        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderSnapshot history = SalesOrderSnapshot.read(round == null ? null : round.getOrderSnapshot(), currentOrder);
         SalesOrderDO order = history.project(currentOrder);
         SalesOrderRespVO result = new SalesOrderRespVO();
         projectPaymentState(currentOrder, result);
@@ -1713,7 +1713,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @SuppressWarnings("unchecked")
     private SalesOrderListItemRespVO convertListItem(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round,
                                                      BpmTaskRespDTO task, List<SalesOrderItemDO> items) {
-        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderSnapshot history = SalesOrderSnapshot.read(round == null ? null : round.getOrderSnapshot(), currentOrder);
         SalesOrderDO order = history.project(currentOrder);
         SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
         SalesOrderRespVO historicalFields = new SalesOrderRespVO();
@@ -1813,7 +1813,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private FinanceOrderExportRowRespVO convertFinanceExportRow(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round,
             List<SalesOrderItemDO> items, Map<String, List<BpmProcessNodeStatusRespDTO>> statuses,
             Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
-        SalesOrderSnapshot history = readSnapshot(round);
+        SalesOrderSnapshot history = SalesOrderSnapshot.read(round == null ? null : round.getOrderSnapshot(), currentOrder);
         SalesOrderDO order = history.project(currentOrder);
         FinanceOrderExportRowRespVO row = new FinanceOrderExportRowRespVO();
         row.setFormalOwnerIdentityLabel(ownerIdentityLabel(order.getFormalOwnerIdentity()));
@@ -1936,5 +1936,4 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}
 }
-
 

@@ -100,6 +100,10 @@ Applied V085 environments use forward migration V087 to repair safely resolvable
 
 `SalesOrderRespVO` 新增 `submitterUserName`、`formalSalesUserName`、`historyMissingFields`；列表亦返回缺失信息。缺失原因 `history_not_recorded` 与 `invalid_snapshot` 分开。第一版已有标签/客资快照继续读取，旧订单主表的独立交易字段保留；不读取当前资料伪造历史，不批量回填旧记录。无关联客资的复购不标记客资缺失。
 
+历史导入订单的定向恢复例外（2026-09-29）：订单主表的可空 `imported_actor_snapshot` 保存经过核对的旧系统人员展示证据，独立于 BPM 审批轮次。已有轮次姓名优先；缺失姓名时才读取匹配租户、订单号和订单人员引用的导入证据，详情、列表及财务导出使用相同规则。不生成审批轮次，不修改人员归属、权限、状态、金额或旧轮次快照；无可靠来源的字段继续显示“历史未记录”。证据中的旧员工 ID 使用 `LEGACY_EMPLOYEE` 类型，仅用于展示溯源，不作为 ADMIN 身份或权限依据。
+
+恢复工具默认仅接受旧订单已有的姓名快照（`legacy_order_snapshot`）。使用旧备份员工档案姓名必须另行明确确认，并以 `legacy_backup_profile` 记录姓名来源及备份时点；这类姓名不是提交时姓名快照，不可在后续处理中改称提交时姓名。所有导入证据保留源文件 SHA-256、旧订单/员工引用和备份时点，不动态关联当前用户名称。操作范围、校验及恢复步骤见[历史订单人员恢复](../operations/order-actor-history-recovery.md)。
+
 补正未改变的字典选择和产品保留旧快照。历史字典名称缺失时，两端清空该选择并要求重新选择，提交 `refreshedDictionaryFields`（仅允许 studentNature/servicePeriod/studentSource/feeMode/paymentMethod），服务端再次校验当前字典并生成本次选择快照。未显式重选的缺失历史返回 `SALES_ORDER_DICTIONARY_RESELECTION_REQUIRED`；当前字典名称不可用返回 `SALES_ORDER_DICTIONARY_LABEL_UNAVAILABLE`。前端提交名称不作为权威来源。后继订单记录本次提交人，旧订单不变。
 
 BPM 在通过/驳回动作内写入任务局部变量 `bpm_action_actor_events` 与终态动作的 `bpm_action_actor_snapshot`，记录主体、ID、动作时姓名、动作与时间。委派回应仅追加动作事件，不覆盖最终审核人；自动执行标识 SYSTEM，不借用受理人身份。公共任务/节点 DTO 追加 `actionUserId`、`actionUserNameSnapshot`；旧 reviewer 字段保留兼容，订单使用新增历史字段。主管确认申请/指派姓名分别写入 V272 的可空列，实际审核姓名从 BPM 历史读取，取消不伪造审核人。

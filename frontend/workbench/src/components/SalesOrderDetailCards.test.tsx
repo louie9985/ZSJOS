@@ -38,6 +38,15 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('renders restored actor names supplied by the shared historical projection', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
+      currentApprovalRoundId: undefined,
+      submitterUserName: '旧备份录单姓名',
+      formalSalesUserName: '原成交姓名'
+    })} />)
+    expect(html).toContain('旧备份录单姓名')
+    expect(html).toContain('原成交姓名')
+  })
   it('retains course names and specs after removal from the active catalog', () => {
     const html = renderToStaticMarkup(<SalesOrderCoursePicker catalog={{ categoryTree: [], spus: [], skus: [] }} value="old::old-sku"
       historicalItems={[{ id: 1, productRef: 'old', skuRef: 'old-sku', productName: '历史课程名称', skuName: '历史班次', actualAmount: 100 } as SalesOrder['items'][number]]} />)

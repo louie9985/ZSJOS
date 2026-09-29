@@ -203,6 +203,35 @@ class SalesOrderServiceImplTest {
         assertNull(row.getFinanceStatus());
     }
 
+    @Test
+    void recoveredActorEvidenceIsSharedByDetailListAndFinanceExportWithoutCreatingRounds() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setTenantId(1L); order.setOrderNo("OD-RECOVERED");
+        order.setStatus(STATUS_EFFECTIVE); order.setSubmitterUserId(20L); order.setFormalSalesUserId(30L);
+        order.setImportedActorSnapshot(JsonUtils.toJsonString(new SalesOrderSnapshot.ImportedActors(
+                1, 1L, "OD-RECOVERED", "parttimecrm", "a".repeat(64), 91L, "2026-09-20T22:21:03+08:00",
+                new SalesOrderSnapshot.ImportedActor(20L, 120L, "旧录单姓名", "legacy_backup_profile"),
+                new SalesOrderSnapshot.ImportedActor(30L, 130L, "旧成交姓名", "legacy_order_snapshot"))));
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(null);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        var detail = service.get(100L, 20L);
+        assertEquals("旧录单姓名", detail.getSubmitterUserName());
+        assertEquals("旧成交姓名", detail.getFormalSalesUserName());
+        assertFalse(detail.getHistoryMissingFields().containsKey("formalSalesUserName"));
+        var list = (cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderListItemRespVO)
+                ReflectionTestUtils.invokeMethod(service, "convertListItem", order, null, null, List.of());
+        assertEquals("旧录单姓名", list.getSubmitterUserName());
+        assertFalse(list.getHistoryMissingFields().containsKey("formalSalesUserName"));
+        FinanceOrderExportRowRespVO export = ReflectionTestUtils.invokeMethod(service, "convertFinanceExportRow",
+                order, null, List.<SalesOrderItemDO>of(), Map.<String, List<BpmProcessNodeStatusRespDTO>>of(),
+                new java.util.HashMap<Long, AdminUserRespDTO>());
+        assertEquals("旧录单姓名", export.getSubmitterName());
+        assertEquals("旧成交姓名", export.getFormalSalesName());
+        assertNull(detail.getCurrentApprovalRoundId());
+        verify(roundMapper, never()).insert(any(SalesOrderApprovalRoundDO.class));
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"1,0.00", "2,0.00", "2,0.01"})
     void createZeroAmountOrderStartsDualApprovalAndDefaultsBuyer(int courseCount, String totalAmount) {

@@ -47,10 +47,23 @@ class CashbackServiceImplTest {
     }
 
     @Test void repeatedGenerationDoesNotRestoreBlockedCashback() {
-        when(mapper.selectByBusinessKey("valid:1")).thenReturn(new CashbackDO().setId(99L).setStatus("blocked"));
+        when(mapper.selectValidByLeadId(1L)).thenReturn(new CashbackDO().setId(99L).setStatus("blocked"));
         assertEquals(99L, service.ensureValidCashback(1L));
         verifyNoInteractions(leadMapper, partnerMapper, intendedMapper);
         verify(mapper, never()).restoreValid(anyLong(), anyInt(), any(), any());
+    }
+
+    /**
+     * 回归：旧库迁移行的 business_key 存旧库客资 id（'valid:3124'），
+     * 新库 lead_id 是 3113。按 business_key 查重会漏掉它并重复发一份。
+     */
+    @Test void dedupesByLeadIdNotBusinessKeyWhenMigratedRowHasLegacyKey() {
+        when(mapper.selectValidByLeadId(3113L))
+                .thenReturn(new CashbackDO().setId(2111L).setBusinessKey("legacy-reward-2376")
+                        .setLeadId(3113L).setType("valid").setStatus("withdrawn"));
+        assertEquals(2111L, service.ensureValidCashback(3113L));
+        verify(mapper, never()).selectByBusinessKey(anyString());
+        verify(mapper, never()).insert(any(CashbackDO.class));
     }
 
     @Test void sourceCancellationAlsoCancelsBlockedDealCashback() {
@@ -78,7 +91,7 @@ class CashbackServiceImplTest {
         assertEquals(9L, service.ensureValidCashback(1L));
         verify(mapper).insert(argThat((CashbackDO row) -> new BigDecimal("12.35").equals(row.getAmount())
                 && row.getBeneficiaryUserId() == null && Long.valueOf(8L).equals(row.getPartnerId())));
-        when(mapper.selectByBusinessKey("valid:1")).thenReturn(new CashbackDO().setId(9L).setStatus("pending_settlement"));
+        when(mapper.selectValidByLeadId(1L)).thenReturn(new CashbackDO().setId(9L).setStatus("pending_settlement"));
         assertEquals(9L, service.ensureValidCashback(1L));
     }
 

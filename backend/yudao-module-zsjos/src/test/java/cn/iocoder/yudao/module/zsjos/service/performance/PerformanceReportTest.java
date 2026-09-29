@@ -37,7 +37,7 @@ class PerformanceReportTest {
   assertEquals(3,analysis.averages().size());var nonInbound=analysis.averages().get(2);
   assertEquals(new BigDecimal("300"),nonInbound.averageAmount());assertEquals(1,nonInbound.averageOrders());assertEquals(new BigDecimal("300.000000"),nonInbound.average());
   assertEquals(new BigDecimal("300.01"),analysis.sources().stream().filter(g->g.key().equals("self|非引流")).findFirst().orElseThrow().amount());
-  assertTrue(analysis.sources().stream().anyMatch(g->g.label().equals("历史来源缺失")));
+  assertTrue(analysis.sources().stream().anyMatch(g->g.label().equals("其他")));
   query.setMetric("orders");query.setDimension("source");query.setGroupKey("self|非引流");var details=service.details(query);
   assertEquals(2L,details.getTotal());assertTrue(details.getList().stream().allMatch(x->x.label().equals("非引流")));
  }

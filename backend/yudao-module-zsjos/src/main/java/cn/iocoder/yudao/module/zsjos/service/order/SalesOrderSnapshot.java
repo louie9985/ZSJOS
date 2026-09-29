@@ -26,6 +26,49 @@ public class SalesOrderSnapshot {
     public record Actor(String subjectType, Long id, String name, String identity) {}
     public record Selection(String type, String value, String label) {}
 
+    public record ImportedActor(Long orderUserId, Long sourceEmployeeId, String name, String nameSource) {}
+    public record ImportedActors(Integer version, Long tenantId, String orderNo, String sourceSystem,
+                                 String sourceSha256, Long sourceOrderId, String sourceCapturedAt,
+                                 ImportedActor submitter, ImportedActor formalSales) {}
+
+    /** Restored evidence may fill missing names, but cannot replace recorded round history. */
+    public static SalesOrderSnapshot read(String raw, SalesOrderDO current) {
+        SalesOrderSnapshot result = read(raw);
+        if (current == null || current.getImportedActorSnapshot() == null
+                || Integer.valueOf(-1).equals(result.getSnapshotVersion())) return result;
+        try {
+            ImportedActors imported = JsonUtils.getObjectMapper().readValue(
+                    current.getImportedActorSnapshot(), ImportedActors.class);
+            if (imported == null || !Integer.valueOf(1).equals(imported.version())
+                    || current.getTenantId() == null || !current.getTenantId().equals(imported.tenantId())
+                    || current.getOrderNo() == null || !current.getOrderNo().equals(imported.orderNo())
+                    || !"parttimecrm".equals(imported.sourceSystem())
+                    || imported.sourceSha256() == null || !imported.sourceSha256().matches("[a-f0-9]{64}")
+                    || imported.sourceOrderId() == null || imported.sourceCapturedAt() == null) return result;
+            result.submitter = restoreActor(result.submitter, imported.submitter(), current.getSubmitterUserId());
+            result.formalSales = restoreActor(result.formalSales, imported.formalSales(), current.getFormalSalesUserId());
+        } catch (RuntimeException ex) {
+            // Imported evidence can contain personal data; never log it or parser messages.
+            log.warn("Imported order actor evidence could not be parsed");
+        }
+        return result;
+    }
+
+    private static Actor restoreActor(Actor recorded, ImportedActor imported, Long currentUserId) {
+        if (recorded != null && recorded.name() != null && !recorded.name().isBlank()) return recorded;
+        if (recorded != null && (!"ADMIN".equals(recorded.subjectType())
+                || !Objects.equals(recorded.id(), currentUserId))) return recorded;
+        if (imported == null || imported.sourceEmployeeId() == null
+                || !Objects.equals(imported.orderUserId(), currentUserId)
+                || imported.name() == null || imported.name().isBlank()
+                || imported.nameSource() == null
+                || !Set.of("legacy_order_snapshot", "legacy_backup_profile").contains(imported.nameSource())) return recorded;
+        // Legacy employee IDs are explicitly typed and must never be consumed as ADMIN IDs.
+        return recorded == null
+                ? new Actor("LEGACY_EMPLOYEE", imported.sourceEmployeeId(), imported.name(), null)
+                : new Actor(recorded.subjectType(), recorded.id(), imported.name(), recorded.identity());
+    }
+
     @Data
     public static class Facts {
         private String buyerName;
