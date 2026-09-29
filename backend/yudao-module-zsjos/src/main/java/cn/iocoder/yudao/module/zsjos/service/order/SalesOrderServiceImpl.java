@@ -92,6 +92,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class SalesOrderServiceImpl implements SalesOrderService {
     private static final Set<String> VOUCHER_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
     private static final long MAX_VOUCHER_SIZE = 10L * 1024 * 1024;
+    private static final String LEGACY_VOUCHER_ORIGIN = "https://crm.zhongshijian.top";
 
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderItemMapper itemMapper;
@@ -1911,17 +1912,36 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private List<SalesOrderRespVO.AttachmentVO> convertVouchers(String json) {
-        List<VoucherRef> refs = json == null ? List.of() : JsonUtils.parseArray(json, VoucherRef.class);
+        if (StrUtil.isBlank(json)) return List.of();
+        List<Object> entries = JsonUtils.parseArray(json, Object.class);
+        if (entries == null || entries.isEmpty()) return List.of();
+        // 历史导入凭证可能仅保存 URL；读取兼容不回写订单或审批快照。
+        List<VoucherRef> refs = entries.stream().map(entry -> {
+            if (entry instanceof String url) {
+                return new VoucherRef(null, url, null, null, null, null);
+            }
+            if (entry instanceof Map<?, ?>) {
+                return JsonUtils.convertObject(entry, VoucherRef.class);
+            }
+            throw new IllegalArgumentException("Invalid sales order voucher reference type");
+        }).toList();
+        List<Long> fileIds = refs.stream().map(VoucherRef::infraFileId).filter(Objects::nonNull).distinct().toList();
         Map<Long, String> resolved;
         try {
-            resolved = refs.isEmpty() ? Map.of() : fileApi.presignGetUrls(refs.stream().map(VoucherRef::infraFileId).toList(), 600);
+            resolved = fileIds.isEmpty() ? Map.of() : fileApi.presignGetUrls(fileIds, 600);
         } catch (RuntimeException ex) {
             resolved = Map.of();
         }
         Map<Long, String> urls = resolved == null ? Map.of() : resolved;
         return refs.stream().map(ref -> { SalesOrderRespVO.AttachmentVO vo = new SalesOrderRespVO.AttachmentVO();
-            vo.setInfraFileId(ref.infraFileId()); vo.setFileUrl(urls.get(ref.infraFileId()));
+            vo.setInfraFileId(ref.infraFileId());
+            // 有文件 ID 的凭证仍须签名；签名不可用时不得回退到存储原始地址。
+            vo.setFileUrl(ref.infraFileId() == null ? legacyVoucherUrl(ref.fileUrl()) : urls.get(ref.infraFileId()));
             vo.setOriginalName(ref.originalName()); vo.setContentType(ref.contentType()); vo.setFileSize(ref.fileSize()); return vo; }).toList();
+    }
+
+    private String legacyVoucherUrl(String url) {
+        return url != null && url.startsWith("/media") ? LEGACY_VOUCHER_ORIGIN + url : url;
     }
 
     private Long parseOrderId(String businessKey) {

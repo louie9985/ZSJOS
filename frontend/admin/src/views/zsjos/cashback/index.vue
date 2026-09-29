@@ -14,13 +14,13 @@
             :value="item.value" /></el-select
       ></el-form-item>
       <el-form-item
-        ><el-button :loading="loading" @click="load"
+        ><el-button :loading="loading" @click="keywordFilter?.submitSearch()"
           ><Icon icon="ep:search" class="mr-5px" />查询</el-button
         ></el-form-item
       >
     </el-form>
     <el-alert v-if="optionsError" :title="optionsError" type="error" :closable="false"><el-button link @click="reloadOptions">重试</el-button></el-alert>
-    <ZsjosAdvancedFilter scene="cashback" page-key="cashback" placeholder="返现编号 / 客资编号 / 姓名" @search="value => { query.keyword = value; query.pageNo = 1; load() }" @change="value => { query.advancedFilter = value; query.pageNo = 1; load() }" />
+    <ZsjosAdvancedFilter ref="keywordFilter" scene="cashback" page-key="cashback" placeholder="返现编号 / 客资编号 / 姓名" @search="value => { query.keyword = value; query.pageNo = 1; load() }" @change="value => { query.advancedFilter = value; query.pageNo = 1; load() }" />
     <el-alert v-if="error" :title="error" type="error" show-icon
       ><template #default><el-button link @click="load">重试</el-button></template></el-alert
     >
@@ -79,6 +79,7 @@ const finance = computed(() => cashbackDataScope(userStore.getPermissions) === '
 const cashbackId = computed(() => Number(route.query.cashbackId) || undefined)
 const openDetail = (id?: number) => router.replace({ query: { ...route.query, cashbackId: id ? String(id) : undefined } })
 const money = (value?: number) => value == null ? '-' : `¥${Number(value).toFixed(2)}`
+const keywordFilter = ref<InstanceType<typeof ZsjosAdvancedFilter>>()
 const loading = ref(false)
 const error = ref('')
 const list = ref<CashbackApi.CashbackVO[]>([])
@@ -94,7 +95,12 @@ const query = reactive({
 const { statuses, types, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFinanceFilterOptions('cashback')
 const statusName = (value: string) => statuses.value.find((item) => item.value === value)?.label || '状态暂不可用'
 let loadSequence = 0
+let pendingSearch: string | undefined
 const load = async () => {
+  const params = { ...query }
+  const key = JSON.stringify([cashbackDataScope(userStore.getPermissions), params])
+  if (pendingSearch === key) return
+  pendingSearch = key
   const sequence = ++loadSequence
   list.value = []
   // Keep the pager range while loading; clearing it resets an in-flight page to 1.
@@ -104,16 +110,17 @@ const load = async () => {
     const scope = cashbackDataScope(userStore.getPermissions)
     if (scope === 'unauthorized') throw new Error('暂无返现查询权限')
     const data = await (scope === 'all'
-      ? (query.advancedFilter ? CashbackApi.searchFinanceCashbackPage(query) : CashbackApi.getFinanceCashbackPage(query))
-      : (query.advancedFilter ? CashbackApi.searchMyCashbackPage(query) : CashbackApi.getMyCashbackPage(query)))
+      ? (query.advancedFilter ? CashbackApi.searchFinanceCashbackPage(params) : CashbackApi.getFinanceCashbackPage(params))
+      : (query.advancedFilter ? CashbackApi.searchMyCashbackPage(params) : CashbackApi.getMyCashbackPage(params)))
     if (sequence !== loadSequence) return
     list.value = data.list
     total.value = data.total
   } catch (e: any) {
     if (sequence === loadSequence) error.value = e?.msg || e?.message || '返现记录加载失败'
   } finally {
-    if (sequence === loadSequence) loading.value = false
+    if (sequence === loadSequence) { pendingSearch = undefined; loading.value = false }
   }
 }
 onMounted(load)
+onBeforeUnmount(() => { ++loadSequence })
 </script>

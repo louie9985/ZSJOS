@@ -32,11 +32,11 @@ public class ExamScheduleController {
         return success(service.exactPage(req, getLoginUserId()));
     }
 
-    @GetMapping("/rough")
-    @Operation(summary = "查询粗略考期")
+    @GetMapping("/multi-day")
+    @Operation(summary = "查询多日考期")
     @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:query')")
-    public CommonResult<PageResult<ExamScheduleRespVO>> rough(@Valid ExamSchedulePageReqVO req) {
-        return success(service.roughPage(req, getLoginUserId()));
+    public CommonResult<PageResult<ExamScheduleRespVO>> multiDay(@Valid ExamSchedulePageReqVO req) {
+        return success(service.multiDayPage(req, getLoginUserId()));
     }
 
     @GetMapping("/category-options")

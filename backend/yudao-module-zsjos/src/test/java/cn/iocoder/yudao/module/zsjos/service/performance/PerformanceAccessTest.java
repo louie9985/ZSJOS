@@ -65,4 +65,21 @@ import static org.junit.jupiter.api.Assertions.*;
  @Test void missingScopeCannotReadUnattributedPersonalHistory(){assertFalse(access.historicalRowAllowed(q("USER",2),null));}
  @Test void tenantWideReaderCannotInventTeamAttribution(){assertFalse(access.historicalRowAllowed(q("DEPT",10),null));assertFalse(access.historicalRowAllowed(q("CENTER",9),null));}
  @Test void tenantWidePersonalQueryStillNeedsFeaturePermission(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
+
+ @Test void sqlHistoricalScopeMatchesPerRowAuthorization() {
+  for (boolean tenantAll : List.of(false,true)) for (boolean dataAll : List.of(false,true))
+   for (boolean ownPermission : List.of(false,true)) for (boolean present : List.of(false,true)) {
+    lenient().when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(tenantAll);
+    var data=new DeptDataPermissionRespDTO(); data.setAll(dataAll); data.setDeptIds(Set.of(10L));
+    lenient().when(permissionApi.getDeptDataPermission(1L)).thenReturn(present?data:null);
+    lenient().when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(ownPermission);
+    for(String type:List.of("SELF","USER","DEPT","CENTER")) for(long id:List.of(1L,2L)) {
+     var query=q(type,id);var projected=access.historicalScope(query);
+     for(Long dept:Arrays.asList(null,10L,20L)) {
+      boolean sqlAllowed=projected.allDepartments()?(dept!=null||projected.missingDepartment()):dept!=null && projected.departments().contains(dept);
+      assertEquals(access.historicalRowAllowed(query,dept),sqlAllowed,type+" historical projection");
+     }
+    }
+   }
+ }
 }

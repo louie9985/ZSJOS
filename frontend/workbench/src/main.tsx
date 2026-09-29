@@ -311,7 +311,8 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
     'crm-shell',
     hasBackground && 'custom-background',
     `layout-${layoutMode}`,
-    !headerFixed && 'header-scroll'
+    !headerFixed && 'header-scroll',
+    tabsEnabled && 'tabs-enabled'
   ].filter(Boolean).join(' ')
 
   const watermarkText = info.user?.nickname || info.user?.username || ''

@@ -92,16 +92,12 @@ class CashbackNameSearchTest {
         assertTrue(trace.matchIdentityIds("cashback","contains","历史归属信息缺失").isEmpty());
     }
 
-    @Test void keywordMatchesIntersectWithAdvancedAndPersonalScopeBeforePaging() {
-        var service = new CashbackServiceImpl(); var mapper = mock(CashbackMapper.class);
-        var trace = mock(FinanceTraceService.class); var filters = mock(AdvancedFilterService.class);
-        ReflectionTestUtils.setField(service,"mapper",mapper); ReflectionTestUtils.setField(service,"financeTraceService",trace);
-        ReflectionTestUtils.setField(service,"advancedFilterService",filters);
+    @Test void keywordAndAdvancedFiltersReachTheScopedSearchTogether() {
+        var service = new CashbackServiceImpl(); var search = mock(CashbackSearchService.class);
+        ReflectionTestUtils.setField(service,"searchService",search);
         var req = new CashbackPageReqVO(); req.setKeyword("  姓名  "); req.setAdvancedFilter(new AdvancedFilterGroupReqVO());
-        when(trace.matchCashbackNameIds("姓名")).thenReturn(Set.of(1L,2L));
-        when(filters.matchFinanceIds("cashback",req.getAdvancedFilter())).thenReturn(List.of(2L));
-        when(mapper.selectCashbackPage(req,7L,List.of(2L),Set.of(1L,2L))).thenReturn(new PageResult<>(List.of(),0L));
+        when(search.search(req,7L)).thenReturn(new PageResult<>(List.of(),0L));
         assertEquals(0L,service.getPage(req,7L).getTotal());
-        verify(mapper).selectCashbackPage(req,7L,List.of(2L),Set.of(1L,2L));
+        verify(search).search(req,7L);
     }
 }

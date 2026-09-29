@@ -16,6 +16,9 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderService;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalService;
+import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalReviewService;
+import cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -41,6 +44,9 @@ class ExportTaskWiringTest {
             context.getBeanFactory().registerSingleton("permissionService", mock(SalesOrderObjectPermissionService.class));
             context.registerBean(CashbackService.class, () -> mock(CashbackService.class));
             context.registerBean(WithdrawalService.class, () -> mock(WithdrawalService.class));
+            context.registerBean(PermissionApi.class, () -> mock(PermissionApi.class));
+            context.getBeanFactory().registerSingleton("traceService", mock(FinanceTraceService.class));
+            context.getBeanFactory().registerSingleton("reviewService", mock(WithdrawalReviewService.class));
             context.register(LeadExportTypeProvider.class, SalesOrderExportTypeProvider.class,
                     FinanceOrderExportTypeProvider.class, CashbackExportTypeProvider.class, WithdrawalExportTypeProvider.class,
                     ExportTaskServiceImpl.class, ExportTaskController.class);

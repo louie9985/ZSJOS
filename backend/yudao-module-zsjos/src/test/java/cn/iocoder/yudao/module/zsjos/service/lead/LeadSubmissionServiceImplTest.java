@@ -463,7 +463,7 @@ class LeadSubmissionServiceImplTest {
         doAnswer(call->{saved.get().setStatus("valid");return null;}).when(selfSourcedAutomation).complete(90L,1L,null);
         LeadCreateRespVO result=service.createSelfSourced(req,1L);
         assertEquals("valid",result.getQualificationStatus());assertEquals(1L,saved.get().getSourceUserId());
-        verify(selfSourcedAutomation).validate(req,1L);verify(selfSourcedAutomation).complete(90L,1L,null);
+        verify(selfSourcedAutomation).validate(req,1L,SOURCE_SALES_SELF);verify(selfSourcedAutomation).complete(90L,1L,null);
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
         service.createSelfSourced(req,1L);
         verify(selfSourcedAutomation,org.mockito.Mockito.times(1)).complete(90L,1L,null);

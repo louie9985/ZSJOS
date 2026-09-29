@@ -44,6 +44,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants
 class NotifyStartupContextTest {
     private static final Class<?>[] SERVICES = {
             NotifySceneRegistry.class, SalesOrderNotifySceneProvider.class, CashbackServiceImpl.class,
+            cn.iocoder.yudao.module.zsjos.service.cashback.CashbackSearchService.class,
             AdvancedFilterService.class, FinanceTraceService.class, LeadObjectPermissionService.class,
             SalesOrderObjectPermissionService.class, LeadAgingPoolServiceImpl.class,
             NotifyRuleApiImpl.class, NotifyRuleServiceImpl.class, NotifyTemplateServiceImpl.class

@@ -23,9 +23,9 @@ describe('delivery class review fixes', () => {
     expect(source).toContain('manage && !row.systemClass')
   })
 
-  it('warns on rough schedules without exposing student rows', () => {
-    expect(source).toContain('row.scheduleType === \'ROUGH\'')
-    expect(source).toContain('未设置精确考期')
+  it('accepts definite multi-day schedules without an uncertain-date warning', () => {
+    expect(source).not.toContain('ROUGH')
+    expect(source).not.toContain('未设置精确考期')
     expect(source).not.toContain('loadStudents')
   })
 

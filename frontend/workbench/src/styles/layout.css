@@ -134,6 +134,14 @@
   overflow: hidden;
 }
 
+/* 页签栏是右侧 Layout 的固定兄弟节点，内容区必须只占剩余高度。
+   否则首页等固定视口页面会把底部操作挤到视口之外。 */
+.crm-shell.tabs-enabled:not(.header-scroll) .content-layout {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .content-layout>.ant-layout-content {
   overflow: auto;
   background: var(--crm-bg-layout);
@@ -501,5 +509,9 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   }
   .content-layout {
     height: calc(100dvh - var(--crm-header-h));
+  }
+
+  .crm-shell.tabs-enabled:not(.header-scroll) .content-layout {
+    height: auto;
   }
 }

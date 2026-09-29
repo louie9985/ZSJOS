@@ -12,6 +12,9 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.*;
 import static cn.iocoder.yudao.module.zsjos.service.material.MaterialApprovalErrors.*;
@@ -37,7 +40,29 @@ public class MaterialApprovalService {
         query.setProcessDefinitionKey(MaterialApprovalContract.processKey(type));
         query.setPageNo(req.getPageNo()); query.setPageSize(req.getPageSize());
         PageResult<BpmTaskRespDTO> tasks = req.isDone() ? taskApi.getDoneTaskPage(userId, query) : taskApi.getTodoTaskPage(userId, query);
-        return new PageResult<>(tasks.getList().stream().map(t -> project(t, false)).toList(), tasks.getTotal());
+        if (tasks.getList().isEmpty()) return new PageResult<>(List.of(), tasks.getTotal());
+        var versionIds = tasks.getList().stream().map(MaterialApprovalService::versionId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var versions = versionIds.isEmpty() ? Map.<Long, MaterialVersionDO>of() : versionMapper.selectByIds(versionIds).stream()
+                .collect(Collectors.toMap(MaterialVersionDO::getId, Function.identity()));
+        var materialIds = versions.values().stream().map(MaterialVersionDO::getMaterialId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var materials = materialIds.isEmpty() ? Map.<Long, MaterialDO>of() : materialMapper.selectByIds(materialIds).stream()
+                .collect(Collectors.toMap(MaterialDO::getId, Function.identity()));
+        var typeIds = materials.values().stream().map(MaterialDO::getMaterialTypeId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var types = typeIds.isEmpty() ? Map.<Long, MaterialTypeDO>of() : typeMapper.selectByIds(typeIds).stream()
+                .collect(Collectors.toMap(MaterialTypeDO::getId, Function.identity()));
+        var processIds = tasks.getList().stream().map(BpmTaskRespDTO::getProcessInstanceId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var rounds = processIds.isEmpty() ? Map.<String, MaterialApprovalRoundDO>of() : roundMapper.selectList(
+                new LambdaQueryWrapperX<MaterialApprovalRoundDO>().in(MaterialApprovalRoundDO::getProcessInstanceId, processIds)).stream()
+                .collect(Collectors.toMap(MaterialApprovalRoundDO::getProcessInstanceId, Function.identity()));
+        // BPM still owns the authorized page; batch enrichment must validate every recorded business round.
+        return new PageResult<>(tasks.getList().stream().map(task -> {
+            var id = versionId(task);
+            var version = id == null ? null : versions.get(id);
+            var material = version == null || version.getMaterialId() == null ? null : materials.get(version.getMaterialId());
+            var owningType = material == null || material.getMaterialTypeId() == null ? null : types.get(material.getMaterialTypeId());
+            return project(task, false, version, material, owningType,
+                    task.getProcessInstanceId() == null ? null : rounds.get(task.getProcessInstanceId()));
+        }).toList(), tasks.getTotal());
     }
 
     @ZsjosPermission(bizType = "material-approval", bizId = "#versionId", action = "read")
@@ -77,6 +102,12 @@ public class MaterialApprovalService {
         MaterialDO material = version == null ? null : materialMapper.selectById(version.getMaterialId());
         MaterialTypeDO type = material == null ? null : typeMapper.selectById(material.getMaterialTypeId());
         MaterialApprovalRoundDO round = roundMapper.selectByProcessInstanceId(task.getProcessInstanceId());
+        return project(task, detail, version, material, type, round);
+    }
+
+    private MaterialApprovalRespVO project(BpmTaskRespDTO task, boolean detail, MaterialVersionDO version,
+            MaterialDO material, MaterialTypeDO type, MaterialApprovalRoundDO round) {
+        Long id = versionId(task);
         if (type == null || !MaterialApprovalContract.isViral(type.getCode())
                 || !Objects.equals(MaterialApprovalContract.processKey(type), task.getProcessDefinitionKey())
                 || round == null || !Objects.equals(round.getProcessDefinitionKey(), task.getProcessDefinitionKey())

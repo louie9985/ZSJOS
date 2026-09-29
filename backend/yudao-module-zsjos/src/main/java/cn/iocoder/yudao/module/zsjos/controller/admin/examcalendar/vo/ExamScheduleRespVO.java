@@ -12,8 +12,8 @@ public class ExamScheduleRespVO {
     private Long id;
     private String scheduleType;
     private LocalDate exactDate;
-    private LocalDate roughStartDate;
-    private LocalDate roughEndDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Long categoryId;
     private Long productId;
     private String productNameSnapshot;

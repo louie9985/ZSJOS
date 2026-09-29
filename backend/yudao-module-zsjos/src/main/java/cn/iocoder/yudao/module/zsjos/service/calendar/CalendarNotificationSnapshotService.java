@@ -49,11 +49,11 @@ public class CalendarNotificationSnapshotService {
     public static CalendarNotifySnapshotDO projectExam(ExamScheduleDO row, String eventType) {
         var details = new TreeMap<String, Object>();
         details.put("scheduleType", row.getScheduleType());
-        details.put("exactDate", row.getExactDate()); details.put("roughStartDate", row.getRoughStartDate());
-        details.put("roughEndDate", row.getRoughEndDate()); details.put("categoryPathSnapshot", row.getCategoryPathSnapshot());
+        details.put("exactDate", row.getExactDate()); details.put("startDate", row.getStartDate());
+        details.put("endDate", row.getEndDate()); details.put("categoryPathSnapshot", row.getCategoryPathSnapshot());
         details.put("selectedSpecsJson", row.getSelectedSpecsJson()); details.put("frozenSkusJson", row.getFrozenSkusJson());
         String title = cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleService.displayName(row);
-        String time = row.getExactDate() != null ? row.getExactDate().toString() : row.getRoughStartDate() + " - " + row.getRoughEndDate();
+        String time = row.getExactDate() != null ? row.getExactDate().toString() : row.getStartDate() + " - " + row.getEndDate();
         return fingerprint(new CalendarNotifySnapshotDO().setCalendarType("EXAM").setCalendarId(row.getId())
                 .setCalendarVersion(version(row.getCalendarVersion())).setEventType(eventType).setRecordStatus(row.getRecordStatus())
                 .setTitleSnapshot(title).setTimeSnapshot(time).setRemarkSnapshot(row.getRemark()).setDetailsJson(JsonUtils.toJsonString(details)));

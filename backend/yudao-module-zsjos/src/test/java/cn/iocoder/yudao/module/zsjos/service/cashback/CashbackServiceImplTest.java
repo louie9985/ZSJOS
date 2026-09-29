@@ -33,12 +33,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CashbackServiceImplTest {
     private final CashbackServiceImpl service = new CashbackServiceImpl();
+    @Mock CashbackSearchService searchService;
     @Mock CashbackMapper mapper; @Mock LeadMapper leadMapper; @Mock LeadIntendedProductMapper intendedMapper;
     @Mock PartnerMapper partnerMapper; @Mock ZsjosProductMapper productMapper;
     @Mock PartnerAccountMapper partnerAccountMapper;
     @Mock ZsjosProductCategoryMapper categoryMapper; @Mock SalesOrderMapper orderMapper; @Mock ConfigApi configApi;
 
     @BeforeEach void setup() {
+        ReflectionTestUtils.setField(service, "searchService", searchService);
         ReflectionTestUtils.setField(service, "mapper", mapper); ReflectionTestUtils.setField(service, "leadMapper", leadMapper);
         ReflectionTestUtils.setField(service, "intendedProductMapper", intendedMapper); ReflectionTestUtils.setField(service, "partnerMapper", partnerMapper);
         ReflectionTestUtils.setField(service, "partnerAccountMapper", partnerAccountMapper);
@@ -141,7 +143,7 @@ class CashbackServiceImplTest {
 
     @Test void pageProjectsLeadNumber() {
         CashbackDO cashback = new CashbackDO().setId(10L).setLeadId(1L);
-        when(mapper.selectCashbackPage(any(CashbackPageReqVO.class), isNull(Long.class)))
+        when(searchService.search(any(CashbackPageReqVO.class), isNull(Long.class)))
                 .thenReturn(new PageResult<>(List.of(cashback), 1L));
         when(leadMapper.selectBatchIds(Set.of(1L))).thenReturn(List.of(
                 new LeadDO().setId(1L).setLeadNo("KZ202608160000000001")));

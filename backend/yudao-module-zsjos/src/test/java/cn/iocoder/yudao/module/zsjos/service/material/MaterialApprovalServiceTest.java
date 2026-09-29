@@ -82,4 +82,30 @@ class MaterialApprovalServiceTest {
         when(roundMapper.selectByProcessInstanceId("process")).thenReturn(new MaterialApprovalRoundDO().setMaterialVersionId(77L));
         assertThrows(ServiceException.class,()->service.get(3L,"task",false,9L));verifyNoInteractions(materialService);
     }
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void pageBatchesOnlyAuthorizedBpmRowsAndPreservesDuplicates(boolean done) {
+        var type=new MaterialTypeDO().setId(2L).setCode("viral_content");
+        var version=new MaterialVersionDO().setId(3L).setMaterialId(1L).setProcessInstanceId("process").setStatus("IN_APPROVAL").setTitle("submitted");
+        var material=new MaterialDO().setId(1L).setMaterialTypeId(2L).setMaterialNo("MAT-test");
+        var task=new BpmTaskRespDTO().setId("task").setBusinessKey("material-version:3").setProcessInstanceId("process").setProcessDefinitionKey("zsjos_viral_content_review");
+        var round=new MaterialApprovalRoundDO().setProcessInstanceId("process").setMaterialVersionId(3L).setBusinessKey(task.getBusinessKey()).setProcessDefinitionKey(task.getProcessDefinitionKey());
+        when(typeMapper.selectByCode("viral_content")).thenReturn(type);
+        var tasks=new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(task,task),17L);
+        if(done)when(taskApi.getDoneTaskPage(eq(9L),any())).thenReturn(tasks);else when(taskApi.getTodoTaskPage(eq(9L),any())).thenReturn(tasks);
+        when(versionMapper.selectByIds(java.util.Set.of(3L))).thenReturn(java.util.List.of(version));
+        when(materialMapper.selectByIds(java.util.Set.of(1L))).thenReturn(java.util.List.of(material));
+        when(typeMapper.selectByIds(java.util.Set.of(2L))).thenReturn(java.util.List.of(type));
+        when(roundMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(java.util.List.of(round));
+        var req=new MaterialApprovalPageReqVO();req.setTypeCode("viral_content");req.setDone(done);req.setPageNo(2);req.setPageSize(20);
+        var result=service.page(req,9L);assertEquals(17L,result.getTotal());assertEquals(2,result.getList().size());assertSame(task,result.getList().getFirst().getTask());assertTrue(result.getList().getFirst().isSnapshotAvailable());
+        verify(versionMapper,times(1)).selectByIds(anyCollection());verify(materialMapper,times(1)).selectByIds(anyCollection());verify(typeMapper,times(1)).selectByIds(anyCollection());
+        verify(versionMapper,never()).selectById(any());verify(materialMapper,never()).selectById(any());verifyNoInteractions(materialService);
+        round.setMaterialVersionId(999L);assertThrows(ServiceException.class,()->service.page(req,9L));
+    }
+    @Test void emptyBpmPageSkipsBusinessProjection(){
+        when(typeMapper.selectByCode("viral_content")).thenReturn(new MaterialTypeDO().setCode("viral_content"));
+        when(taskApi.getTodoTaskPage(eq(9L),any())).thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(),0L));
+        var req=new MaterialApprovalPageReqVO();req.setTypeCode("viral_content");assertTrue(service.page(req,9L).getList().isEmpty());verifyNoInteractions(versionMapper,materialMapper,roundMapper);
+    }
 }

@@ -48,6 +48,26 @@ class EamAssetServiceImplTest {
     private DictDataApi dictDataApi;
 
     @Test
+    void changeStatusShouldPreserveUsageAndRecordStatusCorrection() {
+        EamAssetDO before = asset(10L, IN_USE.getStatus(), 3);
+        EamAssetDO after = asset(10L, REPAIRING.getStatus(), 4);
+        when(assetMapper.selectById(10L)).thenReturn(before, after);
+
+        service.changeStatus(10L, REPAIRING.getStatus(), "盘点纠正", 99L);
+
+        verify(assetMapper).updateById(argThat((EamAssetDO update) ->
+                Long.valueOf(30L).equals(update.getUseEmployeeId())
+                        && Long.valueOf(40L).equals(update.getUseDeptId())
+                        && "员工甲".equals(update.getUseEmployeeNameSnapshot())
+                        && REPAIRING.getStatus().equals(update.getStatus())
+                        && IN_USE.getStatus().equals(update.getPreviousStatus())
+                        && Integer.valueOf(4).equals(update.getVersion())
+                        && "99".equals(update.getUpdater())));
+        verify(changeLogService).record(before, after, EDIT.getType(), null,
+                "管理员直接调整资产状态：盘点纠正", 99L);
+    }
+
+    @Test
     void publicUpdateShouldUseAtomicVersionAndExplicitOperator() {
         EamAssetDO before = asset(10L, IN_USE.getStatus(), 3);
         EamAssetDO after = asset(10L, IN_USE.getStatus(), 4).setName("新名称");

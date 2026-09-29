@@ -19,7 +19,7 @@ with sync_playwright() as p:
                 route.fulfill(status=204, headers={'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*'})
                 return
             if request.url.split('?')[0].endswith('/exam-options'):
-                data = [{'id': 7, 'scheduleType': 'EXACT', 'displayName': '自由考试 · 2099-10-10'}]
+                data = [{'id': 7, 'scheduleType': 'MULTI_DAY', 'displayName': '自由考试 · 2099-10-10~2099-10-12'}]
             elif request.url.split('?')[0].endswith('/homeroom-candidates'):
                 data = [{'id': 8, 'name': '测试班主任'}]
             elif request.url.endswith('/create'):
@@ -37,7 +37,7 @@ with sync_playwright() as p:
         expect(dialog.get_by_text('产品', exact=True)).to_have_count(0)
         dialog.get_by_label('班级名称').fill('管理端自由班级')
         dialog.locator('.el-form-item').filter(has_text='考期').locator('.el-select').click()
-        page.get_by_role('option', name='自由考试 · 2099-10-10').click()
+        page.get_by_role('option', name='自由考试 · 2099-10-10~2099-10-12').click()
         dialog.locator('.el-form-item').filter(has_text='班主任').locator('.el-select').click()
         page.get_by_role('option', name='测试班主任').click()
         dialog.get_by_label('班级名称').click()

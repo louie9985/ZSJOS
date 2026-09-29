@@ -1,6 +1,6 @@
 # UTF-8. Isolated real-browser checks; synthetic responses, no live financial writes.
 from pathlib import Path
-import tempfile,json
+import tempfile,json,re
 from playwright.sync_api import sync_playwright,expect
 out=Path(tempfile.gettempdir())/'cashback-search-browser';out.mkdir(exist_ok=True)
 with sync_playwright() as p:
@@ -12,7 +12,7 @@ with sync_playwright() as p:
   expect(page.get_by_text('CB-TEST-001',exact=True).first).to_be_visible()
   expect(page.get_by_role('columnheader',name='兼职姓名',exact=True)).to_be_visible()
   search=page.get_by_placeholder('返现编号 / 客资编号 / 姓名',exact=True)
-  search.fill('  搜索兼职  ');search.press('Enter')
+  search.fill('  搜索兼职  ');page.get_by_role('button',name=re.compile(r'查\s*询')).click()
   page.wait_for_function("cashbackFixture.calls.some(x => x.body.keyword === '搜索兼职')")
   expect(page.get_by_text('CB-TEST-002',exact=True).first).to_be_visible()
   expect(page.get_by_text('CB-TEST-001',exact=True)).to_have_count(0)
@@ -27,12 +27,34 @@ with sync_playwright() as p:
   expect(page.get_by_text('CB-TEST-001',exact=True).first).to_be_visible()
   search.fill('CB-TEST-021');search.press('Enter')
   expect(page.get_by_text('CB-TEST-021',exact=True).first).to_be_visible()
+  # An identical pending request is not reissued; a later completed submission can refresh.
+  page.evaluate("cashbackFixture.delay=500; cashbackFixture.calls=[]")
+  search.press('Enter');search.press('Enter')
+  page.wait_for_timeout(700)
+  calls=page.evaluate("cashbackFixture.calls.filter(x=>x.body.keyword==='CB-TEST-021').length")
+  assert calls==1,(frontend,calls)
+  # A newer response must win even if the old request finishes later.
+  page.evaluate("cashbackFixture.delay=700")
+  search.fill('搜索兼职');search.press('Enter')
+  page.wait_for_function("cashbackFixture.calls.at(-1).body.keyword==='搜索兼职'")
+  page.evaluate("cashbackFixture.delay=0")
+  search.fill('CB-TEST-021');search.press('Enter')
+  expect(page.get_by_text('CB-TEST-021',exact=True).first).to_be_visible()
+  page.wait_for_timeout(850)
+  expect(page.get_by_text('CB-TEST-021',exact=True).first).to_be_visible()
+  expect(page.get_by_text('CB-TEST-002',exact=True)).to_have_count(0)
+  page.evaluate("cashbackFixture.fail=true")
+  search.press('Enter')
+  expect(page.get_by_text('搜索暂时失败，请重试',exact=False).first).to_be_visible()
+  page.evaluate("cashbackFixture.fail=false")
+  page.get_by_role('button',name=re.compile(r'重\s*试')).first.click()
+  expect(page.get_by_text('CB-TEST-021',exact=True).first).to_be_visible()
   page.screenshot(path=str(out/(frontend+'-desktop.png')),full_page=True)
   page.set_viewport_size({'width':390,'height':844})
   expect(search).to_be_visible()
   page.screenshot(path=str(out/(frontend+'-mobile.png')),full_page=True)
   assert not errors,errors
-  print(frontend,'PASS: column, trimmed keyword, pagination, empty, reset, number search, desktop/mobile')
+  print(frontend,'PASS: column, trimmed keyword, pagination, empty, reset, number search, query-button draft, duplicate suppression, stale response, retry, desktop/mobile')
   page.close()
  browser.close()
 print('Screenshots:',out)

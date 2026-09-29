@@ -11,6 +11,17 @@ public final class MediaLeadVO {
     public record Query(@Pattern(regexp = "SELF|USER|DEPT|CENTER") String scopeType,
                         Long scopeId, @NotNull LocalDate start, @NotNull LocalDate end) {}
 
+    @lombok.Data
+    public static class DetailPageQuery extends cn.iocoder.yudao.framework.common.pojo.PageParam {
+        @NotNull @Pattern(regexp = "SELF|USER|DEPT|CENTER") private String scopeType = "SELF";
+        private Long scopeId;
+        @NotNull @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+        private LocalDate start;
+        @NotNull @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+        private LocalDate end;
+        public Query scopeQuery() { return new Query(scopeType, scopeId, start, end); }
+    }
+
     public record ScopeNode(String key, String parentKey, String title, String scopeType, Long scopeId) {}
 
     public record Target(Long id, String scopeType, Long scopeId, String name, LocalDate periodStart,

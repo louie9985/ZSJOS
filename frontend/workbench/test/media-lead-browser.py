@@ -34,6 +34,16 @@ with sync_playwright() as playwright:
     expect(page.locator('div[role=img][aria-label*=有效客资]')).to_have_count(4)
     for period in ['昨日', '今日', '上周', '本周', '上上月', '上月', '本月', '本年', '全部']:
         expect(page.get_by_role('cell', name=period, exact=True)).to_be_visible()
+    for heading in ['昨日', '今日', '本周', '上周', '本月', '上月']:
+        expect(page.get_by_role('columnheader', name=heading, exact=True)).to_be_visible()
+    member = page.get_by_role('row').filter(has=page.get_by_role('cell', name='测试运营', exact=True)).first
+    week_tags = member.locator('td').nth(4).locator('.media-lead-metric-tags .ant-tag')
+    expect(week_tags).to_have_text(['提交 5', '有效 4', '成交 2'])
+    colors = week_tags.evaluate_all('tags => tags.map(tag => getComputedStyle(tag).backgroundColor)')
+    assert len(set(colors)) == 3, colors
+    main_text = page.locator('.performance-main').inner_text()
+    assert '/' not in main_text, [line for line in main_text.splitlines() if '/' in line]
+    page.locator('.ant-card').filter(has=page.get_by_text('团队成员进度表', exact=True)).first.screenshot(path=str(OUT / 'dashboard-members-desktop.png'))
     expect(page.get_by_role('img', name='提交客资 20')).to_be_visible()
     expect(page.get_by_role('img', name='判有效客资 13')).to_be_visible()
     expect(page.get_by_role('img', name='成交客资 6')).to_be_visible()
@@ -67,6 +77,7 @@ with sync_playwright() as playwright:
     expect(page.get_by_role('dialog').get_by_text('KZ202609280001')).to_be_visible()
     expect(page.get_by_role('dialog').get_by_text('2026-09-28 10:20:00')).to_be_visible()
     expect(page.get_by_role('dialog').get_by_text('2026-09-28 12:00:00')).to_be_visible()
+    assert '/' not in page.get_by_role('dialog').inner_text()
     missing_order = page.get_by_role('dialog').locator('tbody tr').filter(has_text='KZ202609280002')
     expect(missing_order.locator('td').last).to_have_text('—')
     page.wait_for_timeout(400)  # Capture the fully opened modal, not its entrance transition.
@@ -90,7 +101,14 @@ with sync_playwright() as playwright:
     expect(page.locator('.performance-mobile-tree button')).to_contain_text('新媒体一部')
     page.wait_for_timeout(400)  # Wait for the drawer exit transition before capturing layout.
     expect(page.locator('div[role=img][aria-label*=有效客资]')).to_have_count(4)
+    expect(page.locator('.media-lead-metric-tags').first.locator('.ant-tag')).to_have_text(['提交 2', '成交 1'])
+    assert '/' not in page.locator('.performance-main').inner_text()
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+    mobile_member_card = page.locator('.ant-card').filter(has=page.get_by_text('团队成员进度表', exact=True)).first
+    mobile_member_scroller = mobile_member_card.locator('.ant-table-body')
+    mobile_member_scroller.evaluate('(element) => { element.scrollLeft = 650 }')
+    assert mobile_member_scroller.evaluate('(element) => element.scrollLeft') > 0
+    mobile_member_card.screenshot(path=str(OUT / 'dashboard-members-mobile-scrolled.png'))
     page.screenshot(path=str(OUT / 'dashboard-mobile.png'), full_page=True)
     page.goto('http://127.0.0.1:5191/test/media-lead.html?target=1')
     expect(page.get_by_text('客资引流人数指标设置', exact=True)).to_be_visible()

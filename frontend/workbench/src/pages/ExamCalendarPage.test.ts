@@ -4,18 +4,18 @@ import { describe, expect, it } from 'vitest'
 import { scheduleInput, scheduleStatusLabel } from './ExamCalendarPage'
 
 describe('ExamCalendarPage contracts', () => {
-  it('serializes exact schedules without rough dates', () => {
+  it('serializes exact schedules without multiDay dates', () => {
     expect(scheduleInput({
       scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), scheduleName: '任意名称', remark: ' 上午场 '
     })).toEqual({ scheduleType: 'EXACT', exactDate: '2026-10-10', scheduleName: '任意名称', remark: '上午场' })
   })
 
-  it('serializes rough schedules as an inclusive date range', () => {
+  it('serializes multiDay schedules as an inclusive date range', () => {
     expect(scheduleInput({
-      scheduleType: 'ROUGH', roughRange: [dayjs('2026-10-01'), dayjs('2026-10-15')],
+      scheduleType: 'MULTI_DAY', multiDayRange: [dayjs('2026-10-01'), dayjs('2026-10-15')],
       scheduleName: '自由考期'
     })).toEqual({
-      scheduleType: 'ROUGH', roughStartDate: '2026-10-01', roughEndDate: '2026-10-15',
+      scheduleType: 'MULTI_DAY', startDate: '2026-10-01', endDate: '2026-10-15',
       scheduleName: '自由考期', remark: undefined
     })
   })
@@ -28,7 +28,7 @@ describe('ExamCalendarPage contracts', () => {
 
   it('opens day details on date selection instead of creating a schedule', () => {
     const source = readFileSync(new URL('./ExamCalendarPage.tsx', import.meta.url), 'utf8')
-    expect(source).toContain("if (info.source === 'date') setDayDetail(date)")
+    expect(source).toContain('onDay={setDayDetail}')
     expect(source).not.toContain("if (canManage && info.source === 'date') openCreate(date)")
   })
 

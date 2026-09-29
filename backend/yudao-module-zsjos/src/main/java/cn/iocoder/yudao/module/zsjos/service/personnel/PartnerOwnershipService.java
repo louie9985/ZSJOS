@@ -104,6 +104,18 @@ public class PartnerOwnershipService {
         if (!canRead(employeeUserId, partnerId)) throw exception(PARTNER_OWNERSHIP_PERMISSION_DENIED);
     }
 
+    public Set<Long> filterReadablePartnerIds(Long employeeUserId, java.util.Collection<Long> partnerIds) {
+        if (employeeUserId == null || partnerIds.isEmpty() || !canQuery(employeeUserId)) return Set.of();
+        if (canManageAll(employeeUserId)) return partnerMapper.selectBatchIds(partnerIds).stream()
+                .map(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        var employees = getReadableEmployeeUserIds(employeeUserId);
+        if (employees.isEmpty()) return Set.of();
+        return ownershipMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PartnerOwnershipDO>()
+                .in(PartnerOwnershipDO::getPartnerId, partnerIds).in(PartnerOwnershipDO::getEmployeeUserId, employees))
+                .stream().map(PartnerOwnershipDO::getPartnerId).collect(java.util.stream.Collectors.toSet());
+    }
+
     public List<LeadAssignmentUserRespVO> getCandidates() {
         Set<Long> userIds = new HashSet<>();
         userIds.addAll(permissionApi.getEnabledUserIdsByPermission(QUERY_PERMISSION));

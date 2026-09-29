@@ -2,7 +2,7 @@ import { Alert, Button, Card, Drawer, Empty, Input, Modal, Progress, Space, Spin
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataNode } from 'antd/es/tree'
-import { mediaLeadApi, percent, type CalendarDay, type Detail, type Group, type Overview, type Query, type ScopeNode } from '../services/mediaLeadAnalysis'
+import { mediaLeadApi, percent, type CalendarDay, type Detail, type Group, type Member, type Overview, type Query, type ScopeNode } from '../services/mediaLeadAnalysis'
 import { ApiError, AuthenticationError } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import BusinessTable from '../components/BusinessTable'
@@ -11,6 +11,20 @@ import './performance/performance.css'
 const date = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 const monthRange = (month: string): [string, string] => [month + '-01', month + '-' + new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()]
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) { return <Card size="small"><Typography.Text type="secondary">{label}</Typography.Text><Typography.Title level={3} style={{ margin: '8px 0 0' }}>{value}</Typography.Title>{hint && <Typography.Text type="secondary">{hint}</Typography.Text>}</Card> }
+function MemberMetricTags({ submitted, valid, converted }: { submitted: number; valid?: number; converted: number }) {
+  return <Space size={4} wrap className="media-lead-metric-tags">
+    <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {submitted}</Tag>
+    {valid !== undefined && <Tag color="success" style={{ marginInlineEnd: 0 }}>有效 {valid}</Tag>}
+    <Tag color="warning" style={{ marginInlineEnd: 0 }}>成交 {converted}</Tag>
+  </Space>
+}
+const pageSizes = [20, 50, 100]
+const slashFreePagination = {
+  pageSize: 20,
+  pageSizeOptions: pageSizes,
+  showSizeChanger: { options: pageSizes.map(value => ({ value, label: value + ' 条每页' })) },
+  showTotal: (total: number, [start, end]: [number, number]) => '第 ' + start + '–' + end + ' 条，共 ' + total + ' 条'
+}
 const colors = ['#1677ff', '#13c2c2', '#faad14', '#722ed1', '#eb2f96', '#52c41a', '#fa541c', '#2f54eb']
 function periodRange(key: string, today: string): [string, string] | undefined {
   const current = new Date(today + 'T00:00:00+08:00')
@@ -80,8 +94,8 @@ function detailRequestMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : '客资明细加载失败，请稍后重试。'
 }
 
-function DetailModal({ open, title, loading, error, rows, onClose }: { open: boolean; title: string; loading: boolean; error: string; rows: Detail[]; onClose: () => void }) {
-  return <Modal title={title} open={open} width={1080} footer={null} onCancel={onClose}>{loading ? <Spin /> : error ? <Alert type="error" showIcon title={error} /> : rows.length === 0 ? <Empty description="暂无客资明细" /> : <BusinessTable tableKey="media-lead-details" mode="compact" columnMode="native" rowKey="leadNo" scroll={{ x: 950 }} pagination={{ pageSize: 20 }} dataSource={rows} columns={[{ title: '客资编号', dataIndex: 'leadNo' }, { title: '提交时间', dataIndex: 'submittedAt', render: (v: Detail['submittedAt']) => formatTimestamp(v, '—', 'second') }, { title: '冻结引流贡献人', dataIndex: 'contributorName' }, { title: '判定', dataIndex: 'statusLabel' }, { title: '来源渠道', dataIndex: 'channelLabel' }, { title: '客资分类', dataIndex: 'categoryLabel' }, { title: '成交', render: (_: unknown, row: Detail) => row.converted ? <Tag color="success">已成交</Tag> : <Tag>未成交</Tag> }, { title: '首购生效时间', dataIndex: 'orderEffectiveAt', render: (v: Detail['orderEffectiveAt']) => formatTimestamp(v, '—', 'second') }]} />}</Modal>
+function DetailModal({ open, title, loading, error, rows, page, pageSize, total, onChange, onRetry, onClose }: { open: boolean; title: string; loading: boolean; error: string; rows: Detail[]; page: number; pageSize: number; total: number; onChange: (page: number, size: number) => void; onRetry: () => void; onClose: () => void }) {
+  return <Modal title={title} open={open} width={1080} footer={null} onCancel={onClose}>{loading ? <Spin /> : error ? <Alert type="error" showIcon title={error} action={<Button onClick={onRetry}>重试</Button>} /> : rows.length === 0 && total === 0 ? <Empty description="暂无客资明细" /> : <BusinessTable tableKey="media-lead-details" mode="compact" columnMode="native" rowKey="leadNo" scroll={{ x: 950 }} pagination={{ ...slashFreePagination, current: page, pageSize, total, onChange }} dataSource={rows} columns={[{ title: '客资编号', dataIndex: 'leadNo' }, { title: '提交时间', dataIndex: 'submittedAt', render: (v: Detail['submittedAt']) => formatTimestamp(v, '—', 'second') }, { title: '冻结引流贡献人', dataIndex: 'contributorName' }, { title: '判定', dataIndex: 'statusLabel' }, { title: '来源渠道', dataIndex: 'channelLabel' }, { title: '客资分类', dataIndex: 'categoryLabel' }, { title: '成交', render: (_: unknown, row: Detail) => row.converted ? <Tag color="success">已成交</Tag> : <Tag>未成交</Tag> }, { title: '首购生效时间', dataIndex: 'orderEffectiveAt', render: (v: Detail['orderEffectiveAt']) => formatTimestamp(v, '—', 'second') }]} />}</Modal>
 }
 
 export default function MediaLeadAnalysisPage({ permissions }: { permissions: string[] }) {
@@ -90,7 +104,25 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
   const requestId = useRef(0)
   const [keyword, setKeyword] = useState(''), [collapsed, setCollapsed] = useState(false), [drawerOpen, setDrawerOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false), [detailTitle, setDetailTitle] = useState(''), [detailRows, setDetailRows] = useState<Detail[]>([]), [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
+  const [detailQuery, setDetailQuery] = useState<Query>()
+  const [detailPage, setDetailPage] = useState(1), [detailPageSize, setDetailPageSize] = useState(20), [detailTotal, setDetailTotal] = useState(0)
+  const detailRequest = useRef<AbortController | undefined>(undefined)
+  useEffect(() => () => detailRequest.current?.abort(), [])
+  const closeDetails = () => { detailRequest.current?.abort(); setDetailOpen(false) }
+  const loadDetails = async (query: Query, page: number, size: number) => {
+    detailRequest.current?.abort()
+    const controller = new AbortController()
+    detailRequest.current = controller
+    setDetailPage(page); setDetailPageSize(size); setDetailRows([]); setDetailLoading(true); setDetailError('')
+    try {
+      const result = await mediaLeadApi.detailPage({ ...query, pageNo: page, pageSize: size }, controller.signal)
+      if (!controller.signal.aborted) { setDetailRows(result.list); setDetailTotal(result.total) }
+    } catch (cause) {
+      if (!controller.signal.aborted) setDetailError(detailRequestMessage(cause))
+    } finally { if (!controller.signal.aborted) setDetailLoading(false) }
+  }
   const load = async (selected?: ScopeNode, selectedMonth = month) => {
+    closeDetails()
     const request = ++requestId.current
     setLoading(true); setError('')
     try {
@@ -128,10 +160,9 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
   if (!permissions.includes('zsjos:media-lead-analysis:query')) return <Alert type="warning" showIcon title="暂无新媒体客资分析权限" />
   const openDetails = async (title: string, range: [string, string]) => {
     if (!scope || !permissions.includes('zsjos:media-lead-analysis:detail')) return
-    setDetailOpen(true); setDetailTitle(title); setDetailLoading(true); setDetailError('')
-    try { setDetailRows(await mediaLeadApi.details({ scopeType: scope.scopeType, scopeId: scope.scopeId, start: range[0], end: range[1] })) }
-    catch (cause) { setDetailRows([]); setDetailError(detailRequestMessage(cause)) }
-    finally { setDetailLoading(false) }
+    const query: Query = { scopeType: scope.scopeType, scopeId: scope.scopeId, start: range[0], end: range[1] }
+    setDetailOpen(true); setDetailTitle(title); setDetailQuery(query); setDetailTotal(0)
+    await loadDetails(query, 1, detailPageSize)
   }
   const scopeTree = <><Input.Search aria-label="搜索组织或人员" placeholder="搜索组织或人员" value={keyword} onChange={event => setKeyword(event.target.value)} allowClear />
     {treeData.length ? <Tree key={keyword} blockNode defaultExpandAll treeData={treeData} selectedKeys={scope ? [scope.key] : []} onSelect={keys => {
@@ -140,19 +171,35 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
     }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={keyword ? '未找到匹配的组织或人员' : '暂无可选范围'} />}</>
   return <div className={`performance-shell ${collapsed ? 'is-collapsed' : ''}`}>
     <aside className="performance-tree"><Button type="text" aria-label={collapsed ? '展开组织树' : '收起组织树'} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(value => !value)} />{!collapsed && scopeTree}</aside>
-    <main className="performance-main"><div className="performance-mobile-tree"><Button icon={<MenuUnfoldOutlined />} onClick={() => setDrawerOpen(true)}>{scope?.title ?? '选择组织 / 人员'}</Button></div>
+    <main className="performance-main"><div className="performance-mobile-tree"><Button icon={<MenuUnfoldOutlined />} onClick={() => setDrawerOpen(true)}>{scope?.title ?? '选择组织或人员'}</Button></div>
     <Drawer title="统计范围" placement="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>{scopeTree}</Drawer>
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div><Button onClick={() => void load(scope)}>刷新</Button></div>
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
         <Card title="团队大盘"><Space wrap style={{ width: '100%' }}><Stat label="本月有效客资目标" value={data.target.targetCount ?? '未设置'} /><Stat label="本月有效客资" value={data.target.actualCount} hint={`完成率 ${percent(data.target.targetCount ? data.target.actualCount / data.target.targetCount : null)}`} /></Space><Progress style={{ width: '100%' }} percent={Math.min(100, data.target.targetCount ? data.target.actualCount / data.target.targetCount * 100 : 0)} format={() => percent(data.target.targetCount ? data.target.actualCount / data.target.targetCount : null)} status={data.target.targetCount == null ? 'exception' : undefined} /><BusinessTable tableKey="media-lead-periods" mode="compact" columnMode="native" rowKey="key" size="small" scroll={{ x: 750 }} pagination={false} dataSource={data.periods} columns={[{ title: '期间', dataIndex: 'label' }, { title: '客资总数', dataIndex: 'total' }, { title: '有效客资', dataIndex: 'valid' }, { title: '无效客资', dataIndex: 'invalid' }, { title: '客资有效率', dataIndex: 'validRate', render: (v: number) => percent(v) }, { title: '成交客资', dataIndex: 'converted' }, { title: '成交率', dataIndex: 'convertedRate', render: (v: number) => percent(v) }]} /></Card>
-        <Card title="团队成员进度表"><BusinessTable tableKey="media-lead-members" mode="compact" columnMode="native" rowKey="userId" size="small" scroll={{ x: 1200 }} pagination={{ pageSize: 20 }} dataSource={data.members} columns={[{ title: '成员', dataIndex: 'name', fixed: 'left' }, { title: '本月目标', dataIndex: 'targetCount', render: (v: number | null) => v ?? '未设置' }, { title: '昨日提交/成交', render: (_: unknown, x) => `${x.yesterday} / ${x.yesterdayConverted}` }, { title: '今日提交/成交', render: (_: unknown, x) => `${x.today} / ${x.todayConverted}` }, { title: '本周提交/有效/成交', render: (_: unknown, x) => `${x.week} / ${x.weekValid} / ${x.weekConverted}` }, { title: '上周提交/有效/成交', render: (_: unknown, x) => `${x.lastWeek} / ${x.lastWeekValid} / ${x.lastWeekConverted}` }, { title: '本月提交/有效/成交', render: (_: unknown, x) => `${x.month} / ${x.monthValid} / ${x.monthConverted}` }, { title: '上月提交/有效/成交', render: (_: unknown, x) => `${x.lastMonth} / ${x.lastMonthValid} / ${x.lastMonthConverted}` }, { title: '月度完成率', dataIndex: 'monthProgress', render: (v: number | null) => <Progress percent={v == null ? 0 : Math.min(100, v * 100)} format={() => percent(v)} /> }]} /></Card>
+        <Card title="团队成员进度表">
+          <BusinessTable<Member>
+            tableKey="media-lead-members" mode="compact" columnMode="native" rowKey="userId" size="small"
+            scroll={{ x: 1650 }} pagination={slashFreePagination} dataSource={data.members}
+            columns={[
+              { title: '成员', dataIndex: 'name', fixed: 'left' },
+              { title: '本月目标', dataIndex: 'targetCount', render: (v: number | null) => v ?? '未设置' },
+              { title: '昨日', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.yesterday} converted={x.yesterdayConverted} /> },
+              { title: '今日', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.today} converted={x.todayConverted} /> },
+              { title: '本周', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.week} valid={x.weekValid} converted={x.weekConverted} /> },
+              { title: '上周', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.lastWeek} valid={x.lastWeekValid} converted={x.lastWeekConverted} /> },
+              { title: '本月', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.month} valid={x.monthValid} converted={x.monthConverted} /> },
+              { title: '上月', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.lastMonth} valid={x.lastMonthValid} converted={x.lastMonthConverted} /> },
+              { title: '月度完成率', dataIndex: 'monthProgress', render: (v: number | null) => <Progress percent={v == null ? 0 : Math.min(100, v * 100)} format={() => percent(v)} /> }
+            ]}
+          />
+        </Card>
         <Card title="提交日期与判定" extra={<Input type="month" aria-label="客资统计月份" value={month} max={date().slice(0, 7)} style={{ width: 150 }} onChange={event => { const next = event.target.value; if (next) { setMonth(next); void load(scope, next) } }} />}><MonthlyCohort data={data} month={month} canDetail={permissions.includes('zsjos:media-lead-analysis:detail')} onDay={day => void openDetails(day + ' 提交客资明细', [day, day])} /></Card>
         <Card title="引流数据分析"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}><Pie title="本月有效客资来源渠道" rows={data.currentMonthChannels} /><Pie title="上月有效客资来源渠道" rows={data.lastMonthChannels} /><Pie title="本月有效客资分类" rows={data.currentMonthCategories} /><Pie title="上月有效客资分类" rows={data.lastMonthCategories} /></div></Card>
       </>}
       {permissions.includes('zsjos:media-lead-analysis:detail') && <Space wrap><Typography.Text type="secondary">按提交期间查看客资明细：</Typography.Text>{data?.periods.filter(x => periodRange(x.key, data.asOf)).map(x => <Button key={x.key} aria-label={'查看' + x.label + '客资明细'} size="small" onClick={() => { const range = periodRange(x.key, data.asOf); if (range) void openDetails(x.label + '提交客资明细', range) }}>{x.label}</Button>)}</Space>}
-      <DetailModal open={detailOpen} title={detailTitle} loading={detailLoading} error={detailError} rows={detailRows} onClose={() => setDetailOpen(false)} />
+      <DetailModal open={detailOpen} title={detailTitle} loading={detailLoading} error={detailError} rows={detailRows} page={detailPage} pageSize={detailPageSize} total={detailTotal} onChange={(page, size) => { if (detailQuery) void loadDetails(detailQuery, size === detailPageSize ? page : 1, size) }} onRetry={() => { if (detailQuery) void loadDetails(detailQuery, detailPage, detailPageSize) }} onClose={closeDetails} />
     </Space>
     </main>
   </div>

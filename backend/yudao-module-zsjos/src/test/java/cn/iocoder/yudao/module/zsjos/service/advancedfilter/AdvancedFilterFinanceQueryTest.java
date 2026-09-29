@@ -15,18 +15,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AdvancedFilterFinanceQueryTest {
-    @Test void cashbackMatchesAreIntersectedWithPersonalScopeBeforePaging() {
+    @Test void cashbackFiltersAndPersonalScopeUseTheSearchService() {
         var service = new CashbackServiceImpl();
-        var mapper = mock(CashbackMapper.class);
-        var filters = mock(AdvancedFilterService.class);
-        ReflectionTestUtils.setField(service, "mapper", mapper);
-        ReflectionTestUtils.setField(service, "advancedFilterService", filters);
+        var search = mock(cn.iocoder.yudao.module.zsjos.service.cashback.CashbackSearchService.class);
+        ReflectionTestUtils.setField(service, "searchService", search);
         var request = new CashbackPageReqVO(); request.setAdvancedFilter(new AdvancedFilterGroupReqVO());
-        when(filters.matchFinanceIds("cashback", request.getAdvancedFilter())).thenReturn(List.of(2L));
-        when(mapper.selectCashbackPage(request, 7L, List.of(2L))).thenReturn(new PageResult<>(List.of(), 0L));
+        when(search.search(request, 7L)).thenReturn(new PageResult<>(List.of(), 0L));
         assertEquals(0L, service.getPage(request, 7L).getTotal());
-        verify(mapper).selectCashbackPage(request, 7L, List.of(2L));
-        verify(mapper, never()).selectCashbackPage(request, 7L);
+        verify(search).search(request, 7L);
     }
     @Test void withdrawalManagementPersonalAndExportAllConsumeTheSameFilters() {
         var service = new WithdrawalServiceImpl();

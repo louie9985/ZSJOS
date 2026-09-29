@@ -232,8 +232,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             return LeadCreateRespVO.reviewPending(review.getId());
         }
 
-        boolean automatic = selfSourced && identity.identity() == LeadSubmissionIdentityService.Identity.SALES && reqVO.getNewMediaProviderUserId() == null;
-        if (automatic) selfSourcedAutomation.validate(reqVO, actorUserId);
+        boolean automatic = selfSourced && isSelfSourced(sourceType(identity)) && reqVO.getNewMediaProviderUserId() == null;
+        if (automatic) selfSourcedAutomation.validate(reqVO, actorUserId, sourceType(identity));
         LeadCreateRespVO created = createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
                 requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
         if (!automatic) return created;
@@ -655,8 +655,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         response.setLeadNo(lead.getLeadNo());
         response.setQualificationStatus(LeadStateProjection.qualification(lead));
         response.setAutomaticQualificationApplied(false);
-        if ("created".equals(outcome) && SOURCE_SALES_SELF.equals(lead.getSourceType()) && lead.getSourceProviderUserId() == null) {
-            var event = eventMapper.selectByIdempotencyKey(LeadAutomaticGeneration.qualificationEventKey(lead.getId()));
+        if ("created".equals(outcome) && isSelfSourced(lead.getSourceType()) && lead.getSourceProviderUserId() == null) {
+            var event = eventMapper.selectByIdempotencyKey(LeadAutomaticGeneration.qualificationEventKey(lead.getId(), lead.getSourceType()));
             response.setAutomaticQualificationApplied(event != null && LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs()));
         }
         return response;

@@ -30,6 +30,7 @@ class MediaLeadAnalysisServiceTest {
     @Mock private MediaLeadOrgMapper orgs;
     @Mock private MediaLeadRevisionMapper revisions;
     @Mock private MediaLeadFactMapper facts;
+    @Mock private MediaLeadQueryMapper queries;
     private static final LocalDate MONTH = LocalDate.of(2026, 9, 1);
 
     private AdminUserRespDTO user(long id) {
@@ -138,6 +139,29 @@ class MediaLeadAnalysisServiceTest {
         }
     }
 
+    @Test void membersExcludeDisabledHistoricalContributors() {
+        var today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
+        var active = new MediaLeadFact();
+        active.setId(101L); active.setUserId(1L); active.setUserName("启用成员");
+        active.setSubmittedAt(today.minusDays(1).atTime(10, 0)); active.setStatus("valid");
+        var disabled = new MediaLeadFact();
+        disabled.setId(102L); disabled.setUserId(2L); disabled.setUserName("停用成员");
+        disabled.setSubmittedAt(today.minusDays(1).atTime(11, 0)); disabled.setStatus("valid");
+        when(facts.leads(1L, "DEPT", 10L, List.of())).thenReturn(List.of(active, disabled));
+        when(facts.firstOrders(1L, "DEPT", 10L, List.of())).thenReturn(List.of());
+        when(access.mediaUsers()).thenReturn(List.of(user(1)));
+        when(access.organizations()).thenReturn(List.of(org(10, 20, "DEPT")));
+        when(targets.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of());
+        TenantContextHolder.setTenantId(1L);
+        try {
+            var result = service.overview(new MediaLeadVO.Query("DEPT", 10L, today, today));
+            assertEquals(List.of(1L), result.members().stream().map(MediaLeadVO.Member::userId).toList());
+            assertEquals(2, result.periods().stream().filter(x -> "yesterday".equals(x.key())).findFirst().orElseThrow().total());
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
     @Test void teamUsesSubmissionBatchWhileMemberConversionUsesEffectiveDate() {
         var now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
         var today = now.toLocalDate();
@@ -216,5 +240,44 @@ class MediaLeadAnalysisServiceTest {
     @Test void pagePermissionRequiredBeforeReadingTargetRows() {
         assertThrows(RuntimeException.class, () -> service.listTargets(MONTH));
         verifyNoInteractions(targets);
+    }
+
+    @Test void detailPageBoundsAndEmptyPagesAvoidHistoryMaterialization() {
+        TenantContextHolder.setTenantId(991L);
+        try {
+            var request=new MediaLeadVO.DetailPageQuery();request.setScopeType("USER");request.setScopeId(1L);
+            request.setStart(LocalDate.now());request.setEnd(LocalDate.now());request.setPageNo(3);request.setPageSize(20);
+            when(access.has(MediaLeadAccess.DETAIL)).thenReturn(true);
+            when(queries.countDetails(eq(991L),eq("USER"),eq(1L),anyList(),any(),any(),any())).thenReturn(25L);
+            var result=service.detailPage(request);assertEquals(25L,result.getTotal());assertTrue(result.getList().isEmpty());
+            verify(queries,never()).pageDetails(any(),any(),any(),anyList(),any(),any(),any(),anyLong(),anyInt());
+            verifyNoInteractions(facts);
+            request.setPageSize(101);assertThrows(RuntimeException.class,()->service.detailPage(request));
+            request.setPageSize(-1);assertThrows(RuntimeException.class,()->service.detailPage(request));
+            request.setPageSize(20);request.setEnd(request.getStart().plusDays(367));assertThrows(RuntimeException.class,()->service.detailPage(request));
+        } finally {TenantContextHolder.clear();}
+    }
+    @Test void detailPageDeniedBeforeQuery() {
+        var request=new MediaLeadVO.DetailPageQuery();request.setScopeType("USER");request.setScopeId(1L);
+        assertThrows(RuntimeException.class,()->service.detailPage(request));verifyNoInteractions(queries,facts);
+    }
+
+    @Test void indexedCalendarMatchesPreviousDailyScanIncludingEmptyAndHistoricalDays() {
+        var start=LocalDate.of(2026,1,1);var end=start.plusDays(90);
+        var rows=new java.util.ArrayList<MediaLeadFact>();
+        for(int i=0;i<20000;i++) {
+            var row=new MediaLeadFact();row.setSubmittedAt(start.plusDays(i%120-10).atTime(i%24,0));
+            row.setStatus(List.of("valid","converted","won","invalid","pending").get(i%5));rows.add(row);
+        }
+        var expected=start.datesUntil(end.plusDays(1)).map(day->{
+            var own=rows.stream().filter(x->x.getSubmittedAt().toLocalDate().equals(day)).toList();
+            long valid=own.stream().filter(x->List.of("valid","converted","won").contains(x.getStatus())).count();
+            long invalid=own.stream().filter(x->"invalid".equals(x.getStatus())).count();
+            return new MediaLeadVO.CalendarDay(day,own.size(),valid,invalid,own.size()-valid-invalid);
+        }).toList();
+        List<MediaLeadVO.CalendarDay> actual=org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,"calendar",rows,start,end);
+        assertEquals(expected,actual);
+        List<MediaLeadVO.CalendarDay> empty=org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,"calendar",rows,end,start);
+        assertTrue(empty.isEmpty());
     }
 }

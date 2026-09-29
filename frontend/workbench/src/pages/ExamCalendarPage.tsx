@@ -1,11 +1,13 @@
 import CalendarNotificationPanel from '../components/CalendarNotificationPanel'
+import ExamCalendarMonth from './ExamCalendarMonth'
+import { calendarWindow, coversExamDay, multiDaySchedulesForStatus } from './examCalendarLayout'
 import {
   CalendarOutlined, EditOutlined, EyeOutlined, LeftOutlined, PlusOutlined,
   ReloadOutlined, RightOutlined, SendOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
-  Alert, Button, Calendar, DatePicker, Drawer, Empty, Form, Input, List, Modal,
-  Popconfirm, Radio, Select, Space, Spin, Tag, Typography, message
+  Alert, Button, DatePicker, Drawer, Empty, Form, Input, List, Modal,
+  Popconfirm, Radio, Select, Space, Spin, Switch, Tag, Typography, message
 } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -17,7 +19,7 @@ import {
 type EditorValues = {
   scheduleType: ExamScheduleType
   exactDate?: Dayjs
-  roughRange?: [Dayjs, Dayjs]
+  multiDayRange?: [Dayjs, Dayjs]
   scheduleName: string
   remark?: string
 }
@@ -44,8 +46,8 @@ export const scheduleInput = (values: EditorValues): ExamScheduleInput => {
       remark: values.remark?.trim() || undefined
     }
   : {
-      scheduleType: 'ROUGH', roughStartDate: values.roughRange?.[0].format('YYYY-MM-DD'),
-      roughEndDate: values.roughRange?.[1].format('YYYY-MM-DD'),
+      scheduleType: 'MULTI_DAY', startDate: values.multiDayRange?.[0].format('YYYY-MM-DD'),
+      endDate: values.multiDayRange?.[1].format('YYYY-MM-DD'),
       scheduleName: values.scheduleName.trim(),
       remark: values.remark?.trim() || undefined
     }
@@ -59,12 +61,11 @@ function ScheduleStatus({ value }: { value: string }) {
 function ScheduleDetail({ schedule }: { schedule: ExamSchedule }) {
   const period = schedule.scheduleType === 'EXACT'
     ? schedule.exactDate
-    : `${schedule.roughStartDate} 至 ${schedule.roughEndDate}`
+    : `${schedule.startDate} 至 ${schedule.endDate}`
   return <div className="exam-calendar-detail">
     <div className="wide"><span>考期名称</span><strong>{schedule.scheduleName || '未命名考期'}</strong></div>
-    <div><span>时间类型</span><strong>{schedule.scheduleType === 'EXACT' ? '精确时间' : '粗略时间'}</strong></div>
-    <div><span>考试时间</span><strong>{period}</strong></div>
-    <div><span>当前状态</span><ScheduleStatus value={schedule.displayStatus} /></div>
+    <div className="wide"><span>时间</span><strong>{period}</strong></div>
+    {schedule.scheduleType === 'MULTI_DAY' && <div className="wide"><Alert type="info" showIcon message="开始日至结束日均属于本次考试安排（含首尾日期）。" /></div>}
     <div className="wide"><span>备注</span><strong>{schedule.remark || '无'}</strong></div>
   </div>
 }
@@ -78,16 +79,22 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const [dayDetail, setDayDetail] = useState<Dayjs>()
   const [displayStatus, setDisplayStatus] = useState<string>()
   const [loading, setLoading] = useState(false), [error, setError] = useState('')
-  const [roughOpen, setRoughOpen] = useState(false), [roughLoading, setRoughLoading] = useState(false)
-  const [roughRows, setRoughRows] = useState<ExamSchedule[]>([]), [roughTotal, setRoughTotal] = useState(0)
-  const [roughError, setRoughError] = useState('')
+  const [multiDayOpen, setMultiDayOpen] = useState(false), [multiDayLoading, setMultiDayLoading] = useState(false)
+  const [multiDayRows, setMultiDayRows] = useState<ExamSchedule[]>([]), [multiDayTotal, setMultiDayTotal] = useState(0)
+  const [multiDayError, setMultiDayError] = useState('')
+  const [showMultiDay, setShowMultiDay] = useState(true)
+  const [calendarMultiDayRows, setCalendarMultiDayRows] = useState<ExamSchedule[]>([])
+  const [calendarMultiDayLoading, setCalendarMultiDayLoading] = useState(false)
+  const [calendarMultiDayError, setCalendarMultiDayError] = useState('')
   const [editorOpen, setEditorOpen] = useState(false), [editing, setEditing] = useState<ExamSchedule>()
   const [detail, setDetail] = useState<ExamSchedule>(), [saving, setSaving] = useState(false)
   const [savingAction, setSavingAction] = useState<'DRAFT' | 'PUBLISH'>('DRAFT')
   const [form] = Form.useForm<EditorValues>()
-  const requests = useRef({ exact: 0, rough: 0 })
+  const requests = useRef({ exact: 0, multiDay: 0, calendarMultiDay: 0 })
   const scheduleType = Form.useWatch('scheduleType', form)
-  const range = useMemo(() => ({ start: anchor.startOf('month'), end: anchor.endOf('month') }), [anchor])
+  const range = useMemo(() => calendarWindow(anchor), [anchor])
+  const visibleMultiDay = useMemo(() => showMultiDay ? multiDaySchedulesForStatus(calendarMultiDayRows, displayStatus) : [],
+    [calendarMultiDayRows, displayStatus, showMultiDay])
 
   const load = useCallback(async () => {
     const request = ++requests.current.exact
@@ -112,37 +119,66 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     } finally { if (request === requests.current.exact) setLoading(false) }
   }, [displayStatus, range.end, range.start])
 
-  const loadRough = useCallback(async () => {
-    const request = ++requests.current.rough
-    setRoughLoading(true); setRoughError(''); setRoughRows([]); setRoughTotal(0)
+  const loadMultiDay = useCallback(async () => {
+    const request = ++requests.current.multiDay
+    setMultiDayLoading(true); setMultiDayError(''); setMultiDayRows([]); setMultiDayTotal(0)
     try {
       const params = { pageNo: 1, pageSize: 100 }
-      const first = await api.examCalendar.roughPage(params)
-      if (request !== requests.current.rough) return
+      const first = await api.examCalendar.multiDayPage(params)
+      if (request !== requests.current.multiDay) return
       const pages = Math.ceil(first.total / params.pageSize)
       const rest = pages > 1 ? await Promise.all(Array.from({ length: pages - 1 }, (_, index) =>
-        api.examCalendar.roughPage({ ...params, pageNo: index + 2 }))) : []
-      if (request === requests.current.rough) { setRoughRows([first, ...rest].flatMap(result => result.list)); setRoughTotal(first.total) }
+        api.examCalendar.multiDayPage({ ...params, pageNo: index + 2 }))) : []
+      if (request === requests.current.multiDay) { setMultiDayRows([first, ...rest].flatMap(result => result.list)); setMultiDayTotal(first.total) }
     } catch (cause) {
-      if (request !== requests.current.rough) return
-      setRoughError(cause instanceof ApiError && cause.code === 403 ? '无权查看粗略考试时间'
-        : cause instanceof Error ? cause.message : '粗略考期加载失败')
-      setRoughRows([]); setRoughTotal(0)
-    } finally { if (request === requests.current.rough) setRoughLoading(false) }
+      if (request !== requests.current.multiDay) return
+      setMultiDayError(cause instanceof ApiError && cause.code === 403 ? '无权查看多日考试安排'
+        : cause instanceof Error ? cause.message : '多日考期加载失败')
+      setMultiDayRows([]); setMultiDayTotal(0)
+    } finally { if (request === requests.current.multiDay) setMultiDayLoading(false) }
   }, [])
 
-  const latestReload = useRef({ load, loadRough, roughOpen })
-  latestReload.current = { load, loadRough, roughOpen }
+  const loadCalendarMultiDay = useCallback(async () => {
+    const request = ++requests.current.calendarMultiDay
+    setCalendarMultiDayLoading(true); setCalendarMultiDayError(''); setCalendarMultiDayRows([])
+    try {
+      const params = { pageNo: 1, pageSize: 100,
+        rangeStart: range.start.format('YYYY-MM-DD'), rangeEnd: range.end.format('YYYY-MM-DD') }
+      const first = await api.examCalendar.multiDayPage(params)
+      if (request !== requests.current.calendarMultiDay) return
+      const pages = Math.ceil(first.total / params.pageSize)
+      const rest = pages > 1 ? await Promise.all(Array.from({ length: pages - 1 }, (_, index) =>
+        api.examCalendar.multiDayPage({ ...params, pageNo: index + 2 }))) : []
+      if (request === requests.current.calendarMultiDay) setCalendarMultiDayRows([first, ...rest].flatMap(result => result.list))
+    } catch (cause) {
+      if (request !== requests.current.calendarMultiDay) return
+      setCalendarMultiDayRows([])
+      setCalendarMultiDayError(cause instanceof ApiError && cause.code === 403 ? '无权查看多日考期'
+        : cause instanceof Error ? cause.message : '多日考期加载失败')
+    } finally { if (request === requests.current.calendarMultiDay) setCalendarMultiDayLoading(false) }
+  }, [range.end, range.start])
+
+  const latestReload = useRef({ load, loadMultiDay, multiDayOpen, loadCalendarMultiDay, showMultiDay })
+  latestReload.current = { load, loadMultiDay, multiDayOpen, loadCalendarMultiDay, showMultiDay }
+  const reloadVisible = () => {
+    const current = latestReload.current
+    return Promise.all([current.load(), current.multiDayOpen ? current.loadMultiDay() : Promise.resolve(),
+      current.showMultiDay ? current.loadCalendarMultiDay() : Promise.resolve()])
+  }
 
   useEffect(() => { void load(); return () => { ++requests.current.exact } }, [load])
-  useEffect(() => { if (roughOpen) void loadRough(); return () => { ++requests.current.rough } }, [loadRough, roughOpen])
+  useEffect(() => { if (multiDayOpen) void loadMultiDay(); return () => { ++requests.current.multiDay } }, [loadMultiDay, multiDayOpen])
+  useEffect(() => {
+    if (showMultiDay) void loadCalendarMultiDay()
+    return () => { ++requests.current.calendarMultiDay }
+  }, [loadCalendarMultiDay, showMultiDay])
 
   const openCreate = (date = anchor, type: ExamScheduleType = 'EXACT') => {
     setEditing(undefined)
     form.resetFields()
     form.setFieldsValue({
       scheduleType: type, exactDate: type === 'EXACT' ? date : undefined,
-      roughRange: type === 'ROUGH' ? [date.startOf('month'), date.endOf('month')] : undefined,
+      multiDayRange: undefined,
       scheduleName: '', remark: ''
     })
     setEditorOpen(true)
@@ -154,8 +190,8 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     form.setFieldsValue({
       scheduleType: schedule.scheduleType,
       exactDate: schedule.exactDate ? dayjs(schedule.exactDate) : undefined,
-      roughRange: schedule.roughStartDate && schedule.roughEndDate
-        ? [dayjs(schedule.roughStartDate), dayjs(schedule.roughEndDate)] : undefined,
+      multiDayRange: schedule.startDate && schedule.endDate
+        ? [dayjs(schedule.startDate), dayjs(schedule.endDate)] : undefined,
       scheduleName: schedule.scheduleName || '', remark: schedule.remark
     })
     setEditorOpen(true)
@@ -174,8 +210,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
         message.success('考期已保存并发布')
       } else message.success(editing ? '考期已更新' : '考期草稿已创建')
       setEditorOpen(false)
-      const current = latestReload.current
-      await Promise.all([current.load(), current.roughOpen ? current.loadRough() : Promise.resolve()])
+      await reloadVisible()
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message : '考期保存失败')
     } finally { setSaving(false); setSavingAction('DRAFT') }
@@ -187,8 +222,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       else await api.examCalendar.revoke(schedule.id)
       message.success(action === 'publish' ? '考期已发布' : '考期已撤销')
       setDetail(undefined)
-      const current = latestReload.current
-      await Promise.all([current.load(), current.roughOpen ? current.loadRough() : Promise.resolve()])
+      await reloadVisible()
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message
         : action === 'publish' ? '考期发布失败' : '考期撤销失败')
@@ -212,39 +246,69 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     <div className="page-heading">
       <div><Typography.Title level={4}><CalendarOutlined /> 考期日历</Typography.Title><Typography.Text type="secondary">{anchor.format('YYYY年M月')}</Typography.Text></div>
       <Space wrap>
-        <Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void load()} />
-        <Button icon={<EyeOutlined />} onClick={() => setRoughOpen(true)}>粗略考试时间</Button>
+        <Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void reloadVisible()} />
+        <Button icon={<EyeOutlined />} onClick={() => setMultiDayOpen(true)}>多日考试安排</Button>
         {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>新增考期</Button>}
       </Space>
     </div>
     <div className="exam-calendar-toolbar">
-      <Space.Compact><Button icon={<LeftOutlined />} aria-label="上一月" onClick={() => setAnchor(value => value.subtract(1, 'month'))} /><Button onClick={() => setAnchor(dayjs())}>今天</Button><Button icon={<RightOutlined />} aria-label="下一月" onClick={() => setAnchor(value => value.add(1, 'month'))} /></Space.Compact>
       <Space wrap>
+        <Space.Compact><Button icon={<LeftOutlined />} aria-label="上一月" onClick={() => setAnchor(value => value.subtract(1, 'month'))} /><Button onClick={() => setAnchor(dayjs())}>今天</Button><Button icon={<RightOutlined />} aria-label="下一月" onClick={() => setAnchor(value => value.add(1, 'month'))} /></Space.Compact>
+        <DatePicker picker="month" aria-label="选择考期月份" allowClear={false} value={anchor} onChange={value => { if (value) setAnchor(value) }} />
+      </Space>
+      <Space wrap>
+        <Space><Switch aria-label="显示多日考期" checked={showMultiDay} onChange={setShowMultiDay} /><span>显示多日考期</span></Space>
         <Select allowClear placeholder="状态" value={displayStatus} onChange={setDisplayStatus} options={Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label }))} className="exam-calendar-filter" />
       </Space>
     </div>
+    <div className="exam-calendar-legend"><Tag>多日考试</Tag>连续日期条表示多日考试安排，包含开始日和结束日。</div>
+    {showMultiDay && calendarMultiDayError && <Alert type="error" showIcon message={calendarMultiDayError}
+      action={<Button onClick={() => void loadCalendarMultiDay()}>重试多日考期</Button>} />}
     {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} />
-      : <Spin spinning={loading}><Calendar value={anchor} onPanelChange={setAnchor} onSelect={(date, info) => { if (info.source === 'date') setDayDetail(date) }} cellRender={(date, info) => {
-        if (info.type !== 'date') return info.originNode
-        const dayRows = schedules.filter(item => item.exactDate && dayjs(item.exactDate).isSame(date, 'day'))
-        return <div className="exam-calendar-events">{dayRows.slice(0, 3).map(item => <button type="button" key={item.id} className={`exam-calendar-event tone-${item.displayStatus.toLowerCase()}`} onClick={event => { event.stopPropagation(); setDetail(item) }}><span>{item.scheduleName || '未命名考期'}</span><ScheduleStatus value={item.displayStatus} /></button>)}{dayRows.length > 3 && <Button type="link" size="small" className="exam-calendar-overflow" onClick={event => { event.stopPropagation(); setDayDetail(date) }}>另有 {dayRows.length - 3} 条</Button>}</div>
-      }} /></Spin>}
+      : <Spin spinning={loading || (showMultiDay && calendarMultiDayLoading)}>
+        <ExamCalendarMonth anchor={anchor} exactRows={schedules} multiDayRows={visibleMultiDay}
+          onDay={setDayDetail} onDetail={setDetail} renderStatus={status => <ScheduleStatus value={status} />} />
+        {!loading && (!showMultiDay || (!calendarMultiDayLoading && !calendarMultiDayError))
+          && !schedules.length && !visibleMultiDay.length && <Empty description="当前日历范围暂无符合条件的考期" />}
+      </Spin>}
 
-    <Drawer title="粗略考试时间" width={520} open={roughOpen} onClose={() => setRoughOpen(false)} extra={canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(anchor, 'ROUGH')}>新增粗略考期</Button>}>
-      {roughError && <Alert type="error" showIcon message={roughError} action={<Button onClick={() => void loadRough()}>重试</Button>} />}
-      <Spin spinning={roughLoading}>{!roughError && (roughRows.length ? <List dataSource={roughRows} footer={roughTotal > roughRows.length ? `当前展示前 ${roughRows.length} 条，共 ${roughTotal} 条` : undefined} renderItem={item => <List.Item actions={[<Button type="link" key="detail" onClick={() => setDetail(item)}>详情</Button>, ...(canManage && item.recordStatus === 'DRAFT' ? [<Button type="link" key="edit" onClick={() => openEdit(item)}>编辑</Button>] : [])]}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong><ScheduleStatus value={item.recordStatus} /></Space>} description={<><div>{item.roughStartDate} 至 {item.roughEndDate}</div><div>{item.remark || '无备注'}</div></>} /></List.Item>} /> : <Empty description="暂无粗略考试时间" />)}</Spin>
+    <Drawer title="多日考试安排" width={520} open={multiDayOpen} onClose={() => setMultiDayOpen(false)} extra={canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(anchor, 'MULTI_DAY')}>新增多日考期</Button>}>
+      {multiDayError && <Alert type="error" showIcon message={multiDayError} action={<Button onClick={() => void loadMultiDay()}>重试</Button>} />}
+      <Spin spinning={multiDayLoading}>{!multiDayError && (multiDayRows.length ? <List dataSource={multiDayRows} footer={multiDayTotal > multiDayRows.length ? `当前展示前 ${multiDayRows.length} 条，共 ${multiDayTotal} 条` : undefined} renderItem={item => <List.Item actions={[<Button type="link" key="detail" onClick={() => setDetail(item)}>详情</Button>, ...(canManage && item.recordStatus === 'DRAFT' ? [<Button type="link" key="edit" onClick={() => openEdit(item)}>编辑</Button>] : [])]}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong><ScheduleStatus value={item.displayStatus} /></Space>} description={<><div>{item.startDate} 至 {item.endDate}</div><div>{item.remark || '无备注'}</div></>} /></List.Item>} /> : <Empty description="暂无多日考试安排" />)}</Spin>
     </Drawer>
 
-    <Modal title="考期详情" open={Boolean(detail)} onCancel={() => setDetail(undefined)} footer={detail ? actions(detail) : null} destroyOnHidden>{detail && <ScheduleDetail schedule={detail} />}</Modal>
+    <Modal title={<Space wrap><span>考期详情</span>{detail && <ScheduleStatus value={detail.displayStatus} />}</Space>} open={Boolean(detail)} onCancel={() => setDetail(undefined)} footer={detail ? actions(detail) : null} destroyOnHidden>{detail && <ScheduleDetail schedule={detail} />}</Modal>
     <Modal title={`${dayDetail?.format('YYYY年M月D日')} 考期安排`} open={Boolean(dayDetail)} onCancel={() => setDayDetail(undefined)} footer={null} width="min(720px, calc(100vw - 32px))" destroyOnHidden>
-      {dayDetail && (() => { const rows = schedules.filter(row => row.exactDate === dayDetail.format('YYYY-MM-DD')); return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}><List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><ScheduleStatus value={row.displayStatus} /></Space>} description={<>{row.remark && <div>{row.remark}</div>}</>} /></List.Item>} /> : <Empty description="当天暂无考期安排" /> })()}
+      {dayDetail && <div className="exam-day-detail">
+        <Typography.Title level={5}>当天单日考试</Typography.Title>
+        {(() => {
+          const rows = schedules.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
+          return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}>
+            <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><ScheduleStatus value={row.displayStatus} /></Space>}
+              description={row.remark} />
+          </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无单日考试" />
+        })()}
+        {showMultiDay && <>
+          <Typography.Title level={5}>当天多日考试</Typography.Title>
+          <Typography.Paragraph type="secondary">以下考试安排包含当天。</Typography.Paragraph>
+          {calendarMultiDayError ? <Alert type="error" showIcon message={calendarMultiDayError}
+            action={<Button onClick={() => void loadCalendarMultiDay()}>重试多日考期</Button>} />
+            : <Spin spinning={calendarMultiDayLoading}>{!calendarMultiDayLoading && (() => {
+              const rows = visibleMultiDay.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
+              return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}>
+                <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><Tag>多日</Tag><ScheduleStatus value={row.displayStatus} /></Space>}
+                  description={<>{row.startDate} 至 {row.endDate}{row.remark && <div>{row.remark}</div>}</>} />
+              </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无多日考期" />
+            })()}</Spin>}
+        </>}
+      </div>}
     </Modal>
     <Modal title={editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={() => setEditorOpen(false)} footer={<Space><Button onClick={() => setEditorOpen(false)} disabled={saving}>取消</Button><Button loading={saving && savingAction === 'DRAFT'} disabled={saving} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving && savingAction === 'PUBLISH'} disabled={saving} onClick={() => void save(true)}>保存并发布</Button></Space>} destroyOnHidden>
       <Form form={form} layout="vertical" initialValues={{ scheduleType: 'EXACT' }}>
         <Form.Item name="scheduleName" label="考期名称" rules={[{ required: true, whitespace: true, message: '请填写考期名称' }, { max: 100 }]}><Input maxLength={100} placeholder="请填写考期名称" /></Form.Item>
-        <Form.Item name="scheduleType" label="时间类型" rules={[{ required: true }]}><Radio.Group optionType="button" buttonStyle="solid" options={[{ value: 'EXACT', label: '精确时间' }, { value: 'ROUGH', label: '粗略时间' }]} /></Form.Item>
-        {scheduleType === 'ROUGH' ? <Form.Item name="roughRange" label="考试时间段" rules={[{ required: true, message: '请选择考试时间段' }]}><DatePicker.RangePicker style={{ width: '100%' }} /></Form.Item>
-          : <Form.Item name="exactDate" label="考试日期" rules={[{ required: true, message: '请选择考试日期' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>}
+        <Form.Item name="scheduleType" label="时间类型" rules={[{ required: true }]}><Radio.Group optionType="button" buttonStyle="solid" options={[{ value: 'EXACT', label: '单日' }, { value: 'MULTI_DAY', label: '多日' }]} /></Form.Item>
+        {scheduleType === 'MULTI_DAY' ? <Form.Item name="multiDayRange" label="考试时间段" rules={[{ required: true, message: '请选择考试时间段' }]}><DatePicker.RangePicker style={{ width: '100%' }} /></Form.Item>
+          : <Form.Item name="exactDate" label="日期" rules={[{ required: true, message: '请选择日期' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>}
         <Form.Item name="remark" label="备注" rules={[{ max: 1000 }]}><Input.TextArea rows={4} showCount maxLength={1000} /></Form.Item>
       </Form>
     </Modal>

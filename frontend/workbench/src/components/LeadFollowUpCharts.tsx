@@ -184,15 +184,15 @@ function MethodDonut({ records }: { records: LeadFollowUp[] }) {
 
 export default function LeadFollowUpCharts({ leadId }: { leadId: number }) {
   const { records: history, loading, error, retry } = useAllFollowUps(leadId)
-  const records = history.filter(record => record.generationSource !== 'sales_self_sourced_auto')
+  const records = history.filter(record => !['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || ''))
 
   if (loading) return <div className="lead-charts-loading"><Typography.Text type="secondary">图表加载中...</Typography.Text></div>
   if (error) return <Alert type="error" showIcon message={error} action={<Button onClick={retry}>重试</Button>} />
-  if (!records.length) return <div className="lead-charts-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无人工跟进数据；销售自拓录单自动生成记录不计入" /></div>
+  if (!records.length) return <div className="lead-charts-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无人工跟进数据；销售/教务自拓录单自动生成记录不计入" /></div>
 
   return (
     <div className="lead-follow-up-charts">
-      <Typography.Text type="secondary">仅统计人工跟进，销售自拓录单自动生成记录不计入。</Typography.Text>
+      <Typography.Text type="secondary">仅统计人工跟进，销售/教务自拓录单自动生成记录不计入。</Typography.Text>
       {/* 跟进活跃度（左）+ 跟进方式环形图（右）*/}
       <section className="lead-card lead-chart-card">
         <div className="lead-chart-split">

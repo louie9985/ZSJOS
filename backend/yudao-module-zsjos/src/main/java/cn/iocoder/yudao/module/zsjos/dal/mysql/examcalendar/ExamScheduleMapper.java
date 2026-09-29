@@ -23,12 +23,12 @@ public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
                 .orderByAsc(ExamScheduleDO::getId));
     }
 
-    default PageResult<ExamScheduleDO> selectRoughPage(ExamSchedulePageReqVO req, boolean includeUnpublished) {
+    default PageResult<ExamScheduleDO> selectMultiDayPage(ExamSchedulePageReqVO req, boolean includeUnpublished) {
         var query = base(req, includeUnpublished)
-                .eq(ExamScheduleDO::getScheduleType, "ROUGH")
-                .leIfPresent(ExamScheduleDO::getRoughStartDate, req.getRangeEnd())
-                .geIfPresent(ExamScheduleDO::getRoughEndDate, req.getRangeStart())
-                .orderByAsc(ExamScheduleDO::getRoughStartDate)
+                .eq(ExamScheduleDO::getScheduleType, "MULTI_DAY")
+                .leIfPresent(ExamScheduleDO::getStartDate, req.getRangeEnd())
+                .geIfPresent(ExamScheduleDO::getEndDate, req.getRangeStart())
+                .orderByAsc(ExamScheduleDO::getStartDate)
                 .orderByAsc(ExamScheduleDO::getId);
         return selectPage(req, query);
     }

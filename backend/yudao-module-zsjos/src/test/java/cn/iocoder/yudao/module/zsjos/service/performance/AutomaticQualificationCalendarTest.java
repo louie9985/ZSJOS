@@ -5,9 +5,11 @@ import java.time.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class AutomaticQualificationCalendarTest {
- @Test void automaticValidityCountsButTimingDoesNotAndLaterManualRoundCountsNormally(){
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ void automaticValidityCountsButTimingDoesNotAndLaterManualRoundCountsNormally(String generationSource){
   var now=LocalDateTime.of(2026,9,29,12,0);var received=new PerformanceFact();received.setLeadId(1L);received.setUserId(2L);received.setAssignmentId(3L);received.setReceivedAt(now.minusDays(1));
-  var automatic=round(1L,now.minusDays(1),now.minusDays(1));automatic.setGenerationSource("sales_self_sourced_auto");
+  var automatic=round(1L,now.minusDays(1),now.minusDays(1));automatic.setGenerationSource(generationSource);
   var day=PerformanceCalendar.summarize(now.toLocalDate().minusDays(1),List.of(received),List.of(automatic),now);
   assertEquals(1,day.received());assertEquals(1,day.valid());assertEquals(0,day.unknown());assertEquals(0,day.dueCount());assertEquals(0,day.onTime());assertEquals(0,day.lateCompleted());
   var manual=round(2L,now.plusHours(1),now);var changed=PerformanceCalendar.summarize(now.toLocalDate().minusDays(1),List.of(received),List.of(automatic,manual),now);

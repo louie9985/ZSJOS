@@ -18,6 +18,8 @@ import static org.mockito.ArgumentMatchers.*;
 @ExtendWith(MockitoExtension.class)
 class PerformanceReportTest {
  @InjectMocks PerformanceStatisticsService service;
+ // Preserve the existing detail fixtures as the oracle; SQL equivalence is tested in PerformanceDetailMySqlTest.
+ @InjectMocks PerformanceDetailReference reference;
  @Mock PerformanceAccess access;
  @Mock PerformanceFactMapper facts;
  @Mock PerformanceTargetService targets;
@@ -38,7 +40,7 @@ class PerformanceReportTest {
   assertEquals(new BigDecimal("300"),nonInbound.averageAmount());assertEquals(1,nonInbound.averageOrders());assertEquals(new BigDecimal("300.000000"),nonInbound.average());
   assertEquals(new BigDecimal("300.01"),analysis.sources().stream().filter(g->g.key().equals("self|非引流")).findFirst().orElseThrow().amount());
   assertTrue(analysis.sources().stream().anyMatch(g->g.label().equals("其他")));
-  query.setMetric("orders");query.setDimension("source");query.setGroupKey("self|非引流");var details=service.details(query);
+  query.setMetric("orders");query.setDimension("source");query.setGroupKey("self|非引流");var details=reference.details(query);
   assertEquals(2L,details.getTotal());assertTrue(details.getList().stream().allMatch(x->x.label().equals("非引流")));
  }
  PerformanceFact task(long id,String status,LocalDateTime due){
@@ -48,7 +50,7 @@ class PerformanceReportTest {
   var now=LocalDateTime.now(PerformancePeriods.ZONE);var due=now.toLocalDate().atStartOfDay();var task=task(1,"pending",due);var outside=task(2,"pending",due);outside.setDeptId(99L);
   when(facts.tasks(991L,"USER",1L)).thenReturn(List.of(task,outside));when(access.historicalRowAllowed(query,99L)).thenReturn(false);
   var owner=new AdminUserRespDTO();owner.setNickname("归属人");var assignee=new AdminUserRespDTO();assignee.setNickname("执行人");when(access.user(2L)).thenReturn(owner);when(access.user(1L)).thenReturn(assignee);
-  query.setMetric("todayFollowUp");var today=service.details(query);query.setMetric("overdueFollowUp");var overdue=service.details(query);
+  query.setMetric("todayFollowUp");var today=reference.details(query);query.setMetric("overdueFollowUp");var overdue=reference.details(query);
   assertEquals(1L,today.getTotal());assertEquals(1L,overdue.getTotal());var row=today.getList().getFirst();
   assertEquals("归属人",row.ownerName());assertEquals("执行人",row.assigneeName());assertEquals(due,row.dueAt());assertEquals("分类快照",row.category());assertEquals("阶段快照",row.stage());assertEquals(200L,row.leadId());assertNotNull(row.overdueMinutes());
  }
@@ -63,17 +65,19 @@ class PerformanceReportTest {
   when(facts.tasks(991L,"USER",1L)).thenReturn(List.of(task(1,"pending",today.atTime(23,59,59))));
   var report=service.leads(query);
   assertEquals(1,report.followUp().stream().filter(g->g.key().equals("pending")).findFirst().orElseThrow().count());
-  assertEquals(1L,service.details(query).getTotal());
+  assertEquals(1L,reference.details(query).getTotal());
  }
- @Test void automaticTasksAreExcludedFromSummaryAndDetailsInEveryScope(){
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ void automaticTasksAreExcludedFromSummaryAndDetailsInEveryScope(String generationSource){
   var day=LocalDate.now(PerformancePeriods.ZONE).minusDays(1);query.setStart(day);query.setEnd(day.plusDays(1));query.setMetric("tasks");
-  var first=task(1,"completed",day.atTime(12,0));first.setGroupKey("lead_first_follow_up");first.setGenerationSource("sales_self_sourced_auto");
-  var qualification=task(2,"completed",day.atTime(12,0));qualification.setGroupKey("lead_qualification");qualification.setGenerationSource("sales_self_sourced_auto");
+  var first=task(1,"completed",day.atTime(12,0));first.setGroupKey("lead_first_follow_up");first.setGenerationSource(generationSource);
+  var qualification=task(2,"completed",day.atTime(12,0));qualification.setGroupKey("lead_qualification");qualification.setGenerationSource(generationSource);
   var reminder=task(3,"pending",day.atTime(12,0));var manual=task(4,"completed",day.atTime(12,0));manual.setGroupKey("lead_first_follow_up");
   for(String scope:List.of("SELF","USER","DEPT","CENTER")){
    query.setScopeType(scope);when(facts.tasks(991L,scope,1L)).thenReturn(List.of(first,qualification,reminder,manual));
    assertEquals(2,service.leads(query).followUp().stream().mapToLong(Group::count).sum(),scope);
-   assertEquals(2L,service.details(query).getTotal(),scope);
+   assertEquals(2L,reference.details(query).getTotal(),scope);
   }
  }
  @Test void futureHistoryHasNoInventedZeroOrComparison(){
@@ -81,7 +85,7 @@ class PerformanceReportTest {
   assertEquals(12,history.size());assertTrue(history.stream().allMatch(x->x.future()&&x.amount()==null&&x.previousAmount()==null));
  }
  @Test void deniedDetailsAndMissingTargetsReadNoFacts(){
-  when(access.has("zsjos:sales-performance:detail")).thenReturn(false);assertThrows(RuntimeException.class,()->service.details(query));
+  when(access.has("zsjos:sales-performance:detail")).thenReturn(false);assertThrows(RuntimeException.class,()->reference.details(query));
   assertThrows(RuntimeException.class,()->service.missingTargets(query));verifyNoInteractions(facts,targets);
  }
 
@@ -93,7 +97,7 @@ class PerformanceReportTest {
   when(facts.orders(991L,"USER",1L)).thenReturn(List.of(excluded,included));
   when(facts.receipts(991L,"USER",1L)).thenReturn(List.of(unconverted));
   query.setStart(received.toLocalDate());query.setEnd(received.toLocalDate().plusDays(1));query.setMetric("conversion");
-  var details=service.details(query);assertEquals(1L,details.getTotal());assertEquals(2L,details.getList().getFirst().id());
-  query.setMetric("orders");assertEquals(2L,service.details(query).getTotal());
+  var details=reference.details(query);assertEquals(1L,details.getTotal());assertEquals(2L,details.getList().getFirst().id());
+  query.setMetric("orders");assertEquals(2L,reference.details(query).getTotal());
  }
 }

@@ -46,6 +46,18 @@ public class PerformanceAccess {
  public boolean commandDepartmentAllowed(Long deptId) {
   var scope=permissionApi.getDeptDataPermission(getLoginUserId());return deptId!=null&&scope!=null&&(Boolean.TRUE.equals(scope.getAll())||scope.getDeptIds()!=null&&scope.getDeptIds().contains(deptId));
  }
+ public record HistoricalScope(boolean allDepartments, boolean missingDepartment, Set<Long> departments) {}
+ /** Resolve once per request; preserve the personal missing-history exception before SQL pagination. */
+ public HistoricalScope historicalScope(Query q) {
+  if("SELF".equals(q.getScopeType()) || "USER".equals(q.getScopeType())
+    && Objects.equals(q.getScopeId(),getLoginUserId()) && has("zsjos:sales-performance:self"))
+   return new HistoricalScope(true,true,Set.of());
+  boolean all=permissionApi.hasTenantReadAllAccess(getLoginUserId());
+  var scope=all?null:permissionApi.getDeptDataPermission(getLoginUserId());
+  all=all || scope!=null && Boolean.TRUE.equals(scope.getAll());
+  return new HistoricalScope(all,all && "USER".equals(q.getScopeType()),
+    all || scope==null || scope.getDeptIds()==null?Set.of():new HashSet<>(scope.getDeptIds()));
+ }
  public void targetWriteObject(String type,Long id){targetObject(type,id);Long deptId=id;if("USER".equals(type)){var u=user(id);if(u==null)throw denied();if(!CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))throw invalid("该人员已停用，请刷新后重新设置目标");deptId=u.getDeptId();var scope=permissionApi.getDeptDataPermission(getLoginUserId());if(id.equals(getLoginUserId())&&scope!=null&&Boolean.TRUE.equals(scope.getSelf()))return;}if(!commandDepartmentAllowed(deptId))throw denied();}
  public List<PerformanceOrgDO> orgs() {return orgMapper.selectList();}
  public AdminUserRespDTO user(Long id) {return userApi.getUser(id);}

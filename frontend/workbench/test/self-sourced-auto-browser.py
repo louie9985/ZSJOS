@@ -1,16 +1,21 @@
 # UTF-8. Real Chrome against synthetic transport fixtures; no shared database writes.
+import sys
 from pathlib import Path
 from tempfile import gettempdir
 from playwright.sync_api import sync_playwright, expect
 
-OUT = Path(gettempdir()) / 'zsjos-self-sourced-browser'
+EDUCATION = '--education' in sys.argv
+OUT = Path(gettempdir()) / ('zsjos-education-self-sourced-browser' if EDUCATION else 'zsjos-self-sourced-browser')
 OUT.mkdir(exist_ok=True)
 HINT = '提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。'
 REQUIRED = '请填写已联系客户及意向情况，作为首跟内容和判有效依据'
 errors = []
 
+def entry_query(query):
+    return query + ('&' if query else '?') + 'education' if EDUCATION and 'education' not in query else query
+
 def wb_open(page, query=''):
-    page.goto('http://127.0.0.1:5193/test/self-sourced-auto.html' + query)
+    page.goto('http://127.0.0.1:5193/test/self-sourced-auto.html' + entry_query(query))
     expect(page.locator('#name')).to_be_visible()
 
 def wb_base(page, remark='  已联系，有意向  '):
@@ -36,7 +41,7 @@ def wb_submit(page):
     page.get_by_role('button',name='确认执行',exact=True).click()
 
 def admin_open(page, query=''):
-    page.goto('http://127.0.0.1:5194/test/self-sourced-auto.html'+query)
+    page.goto('http://127.0.0.1:5194/test/self-sourced-auto.html'+entry_query(query))
     page.get_by_text('打开录单',exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible()
 
@@ -165,12 +170,12 @@ with sync_playwright() as p:
     assert len(reqs)==2 and reqs[0]['idempotencyKey']==reqs[1]['idempotencyKey']
     assert isinstance(reqs[1]['selfSourcedNextFollowUpAt'],int)
 
-    wb_open(page,'?education');expect(page.get_by_text(HINT,exact=True)).not_to_be_visible()
-    admin_open(page,'?education');expect(page.get_by_text(HINT,exact=True)).not_to_be_visible()
+    wb_open(page,'?education');expect(page.get_by_text(HINT,exact=True)).to_be_visible()
+    admin_open(page,'?education');expect(page.get_by_text(HINT,exact=True)).to_be_visible()
     for width in [1440,390]:
         page.set_viewport_size({'width':width,'height':844})
-        page.goto('http://127.0.0.1:5193/test/self-sourced-auto.html?history')
-        expect(page.get_by_text('销售自拓录单自动生成',exact=True)).to_be_visible()
+        page.goto('http://127.0.0.1:5193/test/self-sourced-auto.html'+entry_query('?history'))
+        expect(page.get_by_text('教务自拓录单自动生成' if EDUCATION else '销售自拓录单自动生成',exact=True)).to_be_visible()
         expect(page.locator('.chart-total-number')).to_have_text('1')
         expect(page.get_by_text('联系方式：录单时其他方式',exact=True)).to_be_visible()
         expect(page.get_by_text('录单人：测试销售',exact=True)).to_be_visible()
@@ -178,4 +183,4 @@ with sync_playwright() as p:
         page.screenshot(path=str(OUT/f'history-{width}.png'),full_page=True)
     assert not errors, errors
     browser.close()
-print('PASS: both frontend forms at 1440/390, required remark, optional time, provider switch, review/activation/education, history and manual charts')
+print(('EDUCATION ' if EDUCATION else 'SALES ')+'PASS: both frontend forms at 1440/390, required remark, optional time, provider switch, review/activation/education, history and manual charts')

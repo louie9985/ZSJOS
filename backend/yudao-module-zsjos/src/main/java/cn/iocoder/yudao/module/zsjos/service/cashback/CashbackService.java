@@ -16,6 +16,7 @@ public interface CashbackService {
     BigDecimal getPartnerOrderCashbackTotal(Long orderId, Long partnerId);
     int settleMatured();
     void assertOrderRejectable(Long orderId);
+    PageResult<CashbackRespVO> getFinancePage(CashbackPageReqVO request);
     PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId);
     PageResult<CashbackRespVO> getPartnerPage(CashbackPageReqVO request, Long partnerId);
     CashbackSummaryRespVO getMySummary(Long userId);

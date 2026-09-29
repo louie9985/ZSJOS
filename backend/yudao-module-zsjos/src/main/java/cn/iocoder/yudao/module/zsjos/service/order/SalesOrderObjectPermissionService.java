@@ -166,4 +166,49 @@ public class SalesOrderObjectPermissionService {
         return rootDeptId != null && deptApi.getChildDeptList(rootDeptId).stream()
                 .anyMatch(item -> Objects.equals(item.getId(), userDeptId));
     }
+
+    public Set<Long> filterReadable(java.util.Collection<SalesOrderDO> orders, Long userId) {
+        if (orders.isEmpty()) return Set.of();
+        if (isApprovalPoolMember(userId)) return orders.stream().map(SalesOrderDO::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        var leadIds = orders.stream().map(SalesOrderDO::getLeadId).filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        var leads = leadIds.isEmpty() ? new java.util.HashMap<Long, LeadDO>() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(java.util.stream.Collectors.toMap(LeadDO::getId, java.util.function.Function.identity()));
+        var aging = new java.util.HashSet<>(agingPoolService.filterReadableLeadIds(leadIds, userId));
+        var team = new java.util.HashSet<>(teamUserIds(userId));
+        var rounds = orders.stream().map(SalesOrderDO::getCurrentApprovalRoundId).filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> supervised = rounds.isEmpty() ? Set.of() : supervisorConfirmationMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderSupervisorConfirmationDO>()
+                        .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderSupervisorConfirmationDO::getApprovalRoundId, rounds)
+                        .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderSupervisorConfirmationDO::getSupervisorUserId, userId))
+                .stream().map(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderSupervisorConfirmationDO::getApprovalRoundId)
+                .collect(java.util.stream.Collectors.toSet());
+        return orders.stream().filter(order -> Objects.equals(order.getSubmitterUserId(), userId)
+                || Objects.equals(order.getFormalSalesUserId(), userId)
+                || leads.containsKey(order.getLeadId()) && Objects.equals(leads.get(order.getLeadId()).getOwnerUserId(), userId)
+                || aging.contains(order.getLeadId()) || order.getCurrentApprovalRoundId() != null && supervised.contains(order.getCurrentApprovalRoundId())
+                || team.contains(order.getSubmitterUserId())).map(SalesOrderDO::getId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /** Same page/object OR branches as finance source projection; no command authorization is granted. */
+    public Set<Long> filterFinanceReadable(java.util.Collection<SalesOrderDO> orders, Long userId) {
+        if (orders.isEmpty() || userId == null) return Set.of();
+        boolean management = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query-management");
+        boolean own = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query-own");
+        boolean general = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query", PERMISSION_QUERY_TEAM);
+        SalesOrderManagementScope scope = management ? resolveManagementScope(userId) : SalesOrderManagementScope.empty();
+        if (management && scope.isAll() || general && permissionApi.hasTenantReadAllAccess(userId)) {
+            return orders.stream().map(SalesOrderDO::getId).collect(java.util.stream.Collectors.toSet());
+        }
+        Set<Long> result = new LinkedHashSet<>();
+        for (var order : orders) {
+            if (management && !scope.isEmpty() && scope.getSubmitterUserIds().contains(order.getSubmitterUserId())
+                    || own && Objects.equals(order.getSubmitterUserId(), userId)) result.add(order.getId());
+        }
+        if (general) result.addAll(filterReadable(orders.stream().filter(order -> !result.contains(order.getId())).toList(), userId));
+        return result;
+    }
 }

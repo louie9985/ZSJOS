@@ -163,6 +163,10 @@ public class EamAssetServiceImpl implements EamAssetService {
         }
         EamAssetDO update = new EamAssetDO().setId(assetId).setStatus(status)
                 .setVersion((before.getVersion() == null ? 0 : before.getVersion()) + 1);
+        // 归属字段允许显式清空（ALWAYS）；仅纠正状态时必须保留原归属及姓名快照。
+        update.setUseEmployeeId(before.getUseEmployeeId());
+        update.setUseDeptId(before.getUseDeptId());
+        update.setUseEmployeeNameSnapshot(before.getUseEmployeeNameSnapshot());
         if (isReversibleStatus(status)) update.setPreviousStatus(before.getStatus());
         if (operatorUserId != null) update.setUpdater(String.valueOf(operatorUserId));
         assetMapper.updateById(update);

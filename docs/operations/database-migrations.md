@@ -18,6 +18,21 @@ old-numbered copy must be inspected for actual schema, data, both ledgers and st
 recovery. Do not silently rename version rows, rewrite checksums, or rerun a differently numbered script
 against shared or deployed data; that requires a separately reviewed, scoped database correction.
 
+## 2026-09-29 V285 collision resolution
+
+The remote, deployed `V285__order_imported_actor_snapshot.sql` remains the authoritative V285. It adds
+the nullable order-owned `imported_actor_snapshot` evidence column after Core V284 and records V285 in
+both version ledgers. The unpublished local definite multi-day exam migration moved from V285 to
+`V286__multi_day_exam_schedule.sql`; its filename, procedure, prerequisite checks, ledger records,
+checksum marker, verifier and active documentation now use V286. V286 requires the authoritative Core
+V285 record in both ledgers.
+
+Historical handoff entries retain the old local V285 number as audit evidence. A development database
+that already ran that old-numbered multi-day script must be inspected for its actual exam schema/data and
+both ledger/checksum rows before recovery. Do not silently relabel V285 to V286, replace the deployed
+order-snapshot V285 marker, or rerun the renamed script against shared data; any correction requires a
+separately reviewed and authorized database plan.
+
 ## V282 calendar notification partial-run recovery
 
 The active-development V282 correction replaces unsupported MySQL `ADD COLUMN IF NOT EXISTS`

@@ -350,10 +350,12 @@
 | 大屏设计器 | ![大屏列表](/.image/大屏设计器-列表.jpg)   | ![大屏预览](/.image/大屏设计器-预览.jpg)   | ![大屏编辑](/.image/大屏设计器-编辑.jpg)         |
 
 
-## 中世健销售自拓录单（2026-09-29）
+## 中世健销售/教务自拓录单（2026-09-29）
 
-src/views/zsjos/components/LeadCreateDialog.vue 与 React 工作台共享原销售自拓接口。未关联新媒体提供方时，提示提交后自动首跟及判有效，录单备注条件必填、未来下次跟进时间选填；切换提供方清空不适用时间。只有服务端返回 created、automaticQualificationApplied=true、qualificationStatus=valid 才展示自动成功，疑似重复及已有客资激活保留对应结果，失败重试沿用同一幂等键。教务自拓不进入自动路径。
+src/views/zsjos/components/LeadCreateDialog.vue 与 React 工作台共享原销售/教务自拓接口。未关联新媒体提供方时，提示提交后自动首跟及判有效，录单备注条件必填、未来下次跟进时间选填；切换提供方清空不适用时间。只有服务端返回 created、automaticQualificationApplied=true、qualificationStatus=valid 才展示自动成功，疑似重复及已有客资激活保留对应结果，失败重试沿用同一幂等键。教务自拓沿用其原有创建权限，不要求销售创建权限。
 
 客资跟进历史读取 generationSource 展示自动生成标记与分类快照；既有菜单、功能和对象权限仍由服务端控制。后端、Vue 管理端与 React 工作台应同步发布，上线前检查启用的 other、interested 字典项和跟进规则，不由前端补建或降级。
 
 完整契约：[客资提交与分配](../../docs/api/zsjos-lead-submission-dispatch.md)。静态检查仍使用 pnpm ts:check；隔离浏览器入口为 test/self-sourced-auto.html，与工作台联合验收脚本为 ../workbench/test/self-sourced-auto-browser.py。开发夹具使用合成 API 数据，不执行真实客资写入。
+
+本轮教务同步：教务使用原 zsjos:lead:education-self-sourced:create，仍累计校验跟进、判定功能权限及本人对象权限；没有权限整笔拒绝，不自动授权。两类自动来源分别保存，历史无标记记录不补处理。

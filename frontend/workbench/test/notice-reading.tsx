@@ -12,10 +12,11 @@ import { api, http, ApiError } from '../src/services/api'
 import { noticeReadStatistics, type ManagedNotice } from '../src/services/noticeManagement'
 import '../src/styles/index.css'
 const params = new URLSearchParams(location.search)
-const fixture = { fail: false, denied: false, readFail: false, reads: 0, queries: [] as unknown[], painted: false }
+const fixture = { fail: false, denied: false, readFail: false, reads: 0, summaries: 0, queries: [] as unknown[], painted: false }
 Object.assign(window, { noticeFixture: fixture })
 const notice: ManagedNotice = { id: 1, title: '公告阅读验收', type: 2, content: '<p>真实正文展示测试</p>', audienceType: 'ALL', targetDeptIds: [], targetUserIds: [], attachments: [], publishStatus: params.has('draft') ? 'DRAFT' : 'PUBLISHED' }
 noticeReadStatistics.summary = async () => {
+  fixture.summaries++
   if (fixture.denied) throw new ApiError(403, '无权查看阅读情况')
   if (fixture.fail) throw new Error('统计加载失败')
   return { published: notice.publishStatus !== 'DRAFT', rosterComplete: !params.has('legacy'), expectedCount: 100, readCount: 80, unreadCount: 20, readRate: 0.8, extraReadCount: 5, actualReadCount: 85, departments: [{ id: 10, name: '发布部门' }], extraDepartments: [{ id: 20, name: '当前部门' }] }

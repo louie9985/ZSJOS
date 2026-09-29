@@ -54,6 +54,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
  * Remote system/catalog APIs are mocked; MySQL bit literal syntax alone is adapted for H2. */
 class LeadSelfSourcedTransactionTest {
     private final Map<Class<?>,Object> beans=new HashMap<>();
+    private boolean education;
     private JdbcTemplate jdbc;
     private DataSourceTransactionManager transactions;
     private LeadSubmissionService submission;
@@ -106,7 +107,7 @@ class LeadSelfSourcedTransactionTest {
         var submissionTarget=new LeadSubmissionServiceImpl();submission=proxy(submissionTarget);
         for(Object target:List.of(taskTarget,lifecycle,dispatch,followTarget,qualification,autoTarget,submissionTarget))wire(target);
         login();
-        when(get(PermissionApi.class).hasAnyPermissions(eq(1L),any(String.class))).thenReturn(true);
+        when(get(PermissionApi.class).hasAnyPermissions(eq(1L),any(String.class))).thenAnswer(call -> !education || !"zsjos:lead:self-sourced:create".equals(call.getArgument(1)));
         when(get(DictDataApi.class).getDictDataList(anyString())).thenAnswer(call->{String type=call.getArgument(0);return List.of(dict(type.equals(DICT_FOLLOW_UP_METHOD)?"other":type.equals(DICT_FOLLOW_UP_RESULT)?"interested":type.equals(LeadSalesStageSnapshot.DICT_TYPE)?"pending_contact":type.equals(DICT_SOURCE_CHANNEL)?"channel":"a", "配置标签"));});
         when(get(LeadCategorySnapshotService.class).requireEnabled(anyString())).thenReturn(new LeadCategorySnapshotService.Selection("a","录单分类"));
         var rule=new LeadFollowUpRuleDO();rule.setId(1L);rule.setVersion(1);rule.setFirstFollowUpTimeoutMinutes(60);rule.setQualificationTimeoutMinutes(180);
@@ -127,42 +128,63 @@ class LeadSelfSourcedTransactionTest {
     private void wire(Object target){for(var field:target.getClass().getDeclaredFields())if(field.isAnnotationPresent(Resource.class))ReflectionTestUtils.setField(target,field.getName(),get(field.getType()));}
     @SuppressWarnings("unchecked") private <T>T proxy(T target){var factory=new AspectJProxyFactory(target);factory.setProxyTargetClass(true);factory.addAspect(permissionAspect);factory.addAdvice(new TransactionInterceptor(transactions,new AnnotationTransactionAttributeSource()));return (T)factory.getProxy();}
     private LeadCreateReqVO request(){var r=new LeadCreateReqVO();r.setName("事务测试客户");r.setMobile("13800138000");r.setProvinceCode("OTHER");r.setCityCode("OTHER");r.setSourceChannel("channel");r.setLeadCategory("a");r.setRemark("  已联系，有意向  ");r.setIdempotencyKey("auto-transaction");var p=new LeadProductReqVO();p.setSpuUnknown(true);p.setSkuUnknown(true);p.setPrimary(true);r.setProducts(List.of(p));return r;}
+    private LeadCreateRespVO create(LeadCreateReqVO request, Long userId) { return education ? submission.createEducationSelfSourced(request,userId) : submission.createSelfSourced(request,userId); }
+    private String generationSource() { return education ? LeadAutomaticGeneration.EDUCATION_SOURCE : LeadAutomaticGeneration.SOURCE; }
     private int count(String table){return jdbc.queryForObject("SELECT COUNT(*) FROM "+table,Integer.class);}
     @AfterEach void close(){SecurityContextHolder.clearContext();TenantContextHolder.clear();if(jdbc!=null)jdbc.execute("SHUTDOWN");}
 
-    @Test void oneSubmissionCommitsCompleteChainAndReplayDoesNotDuplicate() {
-        var req=request();var result=submission.createSelfSourced(req,1L);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void oneSubmissionCommitsCompleteChainAndReplayDoesNotDuplicate(boolean education) {
+        this.education=education;
+        var req=request();var result=create(req,1L);
         assertEquals("valid",result.getQualificationStatus());assertTrue(result.getAutomaticQualificationApplied());
         assertEquals(1,count("zsjos_lead"));assertEquals(1,count("zsjos_person"));assertEquals(1,count("zsjos_lead_follow_up_record"));assertEquals(1,count("zsjos_opportunity"));
         assertEquals(2,jdbc.queryForObject("SELECT COUNT(*) FROM zsjos_business_task WHERE status='completed'",Integer.class));
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM zsjos_business_task WHERE status='pending'",Integer.class));
         var lead=get(LeadMapper.class).selectById(result.getLeadId());assertEquals(1L,lead.getSourceUserId());assertEquals(1L,lead.getOwnerUserId());assertEquals("已联系，有意向",lead.getRemark());assertEquals("录单分类",lead.getLeadCategoryLabelSnapshot());assertNotNull(lead.getQualifiedAt());assertNotNull(lead.getLastFollowUpRecordId());
-        var history=followUp.getPage(lead.getId(),1,100);assertEquals(1L,history.getTotal());assertEquals(LeadAutomaticGeneration.SOURCE,history.getList().getFirst().getGenerationSource());assertFalse(history.getList().getFirst().getOccurredAt().isBefore(lead.getSubmittedAt()));
-        assertEquals(3,sent.get());submission.createSelfSourced(req,1L);assertEquals(3,sent.get());assertEquals(1,count("zsjos_opportunity"));
+        assertEquals(education ? SOURCE_EDUCATION_SELF : SOURCE_SALES_SELF,lead.getSourceType());assertEquals(education ? OWNER_EDUCATION : OWNER_SALES,lead.getOwnerIdentity());
+        var history=followUp.getPage(lead.getId(),1,100);assertEquals(1L,history.getTotal());assertEquals(generationSource(),history.getList().getFirst().getGenerationSource());assertFalse(history.getList().getFirst().getOccurredAt().isBefore(lead.getSubmittedAt()));
+        assertEquals(3,sent.get());create(req,1L);assertEquals(3,sent.get());assertEquals(1,count("zsjos_opportunity"));
     }
-    @Test void optionalFutureReminderRemainsOrdinaryWork() {
-        var req=request();req.setSelfSourcedNextFollowUpAt(LocalDateTime.now().plusDays(1));submission.createSelfSourced(req,1L);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void optionalFutureReminderRemainsOrdinaryWork(boolean education) {
+        this.education=education;
+        var req=request();req.setSelfSourcedNextFollowUpAt(LocalDateTime.now().plusDays(1));create(req,1L);
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM zsjos_business_task WHERE status='pending' AND task_type='lead_follow_up_reminder'",Integer.class));
         String payload=jdbc.queryForObject("SELECT payload FROM zsjos_business_task WHERE task_type='lead_follow_up_reminder'",String.class);assertFalse(LeadAutomaticGeneration.isAutomatic(payload));
     }
-    @Test void qualificationPermissionFailureRollsBackLeadFirstFollowTasksAndNotifications() {
-        denied.set("qualify");assertThrows(IllegalArgumentException.class,()->submission.createSelfSourced(request(),1L));
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void qualificationPermissionFailureRollsBackLeadFirstFollowTasksAndNotifications(boolean education) {
+        this.education=education;
+        denied.set("qualify");assertThrows(IllegalArgumentException.class,()->create(request(),1L));
         for(String table:List.of("zsjos_person","zsjos_lead","zsjos_lead_follow_up_record","zsjos_opportunity","zsjos_business_task","zsjos_business_event"))assertEquals(0,count(table),table);
         assertEquals(0,sent.get());
     }
-    @Test void disabledRuleProducesNoPartialDataAndInternalEntryRequiresTransaction() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void disabledRuleProducesNoPartialDataAndInternalEntryRequiresTransaction(boolean education) {
+        this.education=education;
         when(get(LeadFollowUpRuleService.class).requireEnabledRule()).thenThrow(new IllegalStateException("rule disabled"));
-        assertThrows(RuntimeException.class,()->submission.createSelfSourced(request(),1L));assertEquals(0,count("zsjos_lead"));assertEquals(0,sent.get());
+        assertThrows(RuntimeException.class,()->create(request(),1L));assertEquals(0,count("zsjos_lead"));assertEquals(0,sent.get());
         get(LeadMapper.class).insert(new LeadDO().setId(1L).setOwnerUserId(1L));
         assertThrows(org.springframework.transaction.IllegalTransactionStateException.class,()->automation.complete(1L,1L,null));
     }
-    @Test void linkedProviderAndEducationCreateDoNotAutomaticallyQualify() {
-        var req=request();req.setNewMediaProviderUserId(2L);var result=submission.createSelfSourced(req,1L);assertFalse(result.getAutomaticQualificationApplied());assertEquals("pending",result.getQualificationStatus());assertEquals(0,count("zsjos_lead_follow_up_record"));assertEquals(0,count("zsjos_opportunity"));
-        var education=request();education.setIdempotencyKey("education-test");var result2=submission.createEducationSelfSourced(education,1L);assertFalse(result2.getAutomaticQualificationApplied());assertEquals(0,count("zsjos_opportunity"));
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void linkedProviderCreatesDoNotAutomaticallyQualify(boolean education) {
+        this.education=education;
+        var req=request();req.setNewMediaProviderUserId(2L);var result=create(req,1L);assertFalse(result.getAutomaticQualificationApplied());assertEquals("pending",result.getQualificationStatus());assertEquals(0,count("zsjos_lead_follow_up_record"));assertEquals(0,count("zsjos_opportunity"));
+        var linkedEducation=request();linkedEducation.setIdempotencyKey("education-test");linkedEducation.setNewMediaProviderUserId(2L);var result2=submission.createEducationSelfSourced(linkedEducation,1L);assertFalse(result2.getAutomaticQualificationApplied());assertEquals(0,count("zsjos_opportunity"));
     }
 
-    @Test void laterHumanInvalidationKeepsAutomaticFactAndStartsUnmarkedRound() {
-        var result=submission.createSelfSourced(request(),1L);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void laterHumanInvalidationKeepsAutomaticFactAndStartsUnmarkedRound(boolean education) {
+        this.education=education;
+        var result=create(request(),1L);
         var command=new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadJudgeInvalidReqVO();
         command.setIdempotencyKey("manual-invalid");command.setReasonCode("a");command.setDescription("后续人工核实无意向");
         get(LeadQualificationService.class).judgeInvalid(result.getLeadId(),1L,command);
@@ -177,34 +199,43 @@ class LeadSelfSourcedTransactionTest {
         assertEquals(3,count("zsjos_business_task"));
     }
 
-    @Test void dictionaryRenameDoesNotRewriteAutomaticHistory() {
-        var result=submission.createSelfSourced(request(),1L);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void dictionaryRenameDoesNotRewriteAutomaticHistory(boolean education) {
+        this.education=education;
+        var result=create(request(),1L);
         when(get(DictDataApi.class).getDictDataList(anyString())).thenReturn(List.of(dict("other","后来改名")));
         var record=followUp.getPage(result.getLeadId(),1,100).getList().getFirst();
         assertEquals("配置标签",record.getMethodLabel());assertEquals("配置标签",record.getResultLabel());
         assertEquals("录单分类",record.getCategoryAfterLabel());
     }
 
-    @Test void provenanceFailureRollsBackCompleteChainAndCommitNotifications() {
-        jdbc.execute("ALTER TABLE zsjos_business_task ADD CONSTRAINT reject_auto_payload CHECK (payload NOT LIKE '%sales_self_sourced_auto%')");
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->submission.createSelfSourced(request(),1L));
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void provenanceFailureRollsBackCompleteChainAndCommitNotifications(boolean education) {
+        this.education=education;
+        jdbc.execute("ALTER TABLE zsjos_business_task ADD CONSTRAINT reject_auto_payload CHECK (payload NOT LIKE '%self_sourced_auto%')");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->create(request(),1L));
         for(String table:List.of("zsjos_person","zsjos_lead","zsjos_lead_follow_up_record","zsjos_opportunity","zsjos_business_task","zsjos_business_event"))assertEquals(0,count(table),table);
         assertEquals(0,sent.get());
     }
 
-    @Test void concurrentSameRequestProducesOneChainAndRetryReturnsIt() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void concurrentSameRequestProducesOneChainAndRetryReturnsIt(boolean education) throws Exception {
+        this.education=education;
         var barrier=new java.util.concurrent.CyclicBarrier(2);
         try(var workers=java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var work=(java.util.concurrent.Callable<Boolean>)()->{
                 login();
-                try {barrier.await();submission.createSelfSourced(request(),1L);return true;}
+                try {barrier.await();create(request(),1L);return true;}
                 catch(org.springframework.dao.DuplicateKeyException conflict){return false;}
                 finally {SecurityContextHolder.clearContext();TenantContextHolder.clear();}
             };
             var a=workers.submit(work);var b=workers.submit(work);
             assertTrue(a.get(20,java.util.concurrent.TimeUnit.SECONDS)|b.get(20,java.util.concurrent.TimeUnit.SECONDS));
         }
-        var result=submission.createSelfSourced(request(),1L);
+        var result=create(request(),1L);
         assertTrue(result.getAutomaticQualificationApplied());
         for(String table:List.of("zsjos_person","zsjos_lead","zsjos_lead_follow_up_record","zsjos_opportunity"))assertEquals(1,count(table),table);
         assertEquals(2,count("zsjos_business_task"));assertEquals(3,sent.get());

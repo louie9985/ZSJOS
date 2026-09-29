@@ -6,6 +6,8 @@
 页面位于“日历 → 考期日历”，地址为 `/calendar/exam-calendar`；服务端菜单父节点为
 `73600`，相对子路径为 `exam-calendar`。业务 API 仍使用 `/zsjos/exam-calendar` 前缀。
 
+工作台新增/编辑表单的时间类型显示“单日 / 多日”，单日日期字段显示“日期”。考期详情隐藏时间类型，日期或日期范围统一以“时间”展示，当前状态标签置于“考期详情”标题旁，不再单列状态字段。
+
 ## 权限
 
 角色授权树在“日历 → 考期日历”下提供两个同级按钮：“查看考期”（73612）和
@@ -20,15 +22,15 @@
 
 ## 查询
 
-- `GET /zsjos/exam-calendar/page`：精确考期分页。参数为 `pageNo`、`pageSize`、可选
+- `GET /zsjos/exam-calendar/page`：单日考期分页。参数为 `pageNo`、`pageSize`、可选
   `rangeStart`、`rangeEnd`、`categoryId`、`displayStatus`。
-- `GET /zsjos/exam-calendar/rough`：粗略考期分页。支持日期窗口相交和分类筛选。
+- `GET /zsjos/exam-calendar/multi-day`：多日考期分页。支持日期窗口相交和分类筛选。
 - `GET /zsjos/exam-calendar/category-options`：仅返回当前租户已启用的 ZSJOS 产品分类和分类路径。
 - `GET /zsjos/exam-calendar/product-options`：要求 manage（Controller 与 Service）；返回产品 ID、名称、分类路径、规格及可用 SKU，不返回价格，也不要求产品管理权限。
 
-精确记录的 `displayStatus` 在查询时派生：草稿/撤销优先；已发布记录在考试前 N 天进入
-`UPCOMING`，考试当天为 `IN_PROGRESS`，次日起为 `ENDED`。N 使用全系统 Infra 参数
-`zsjos.exam-calendar.upcoming-days`，缺失、负数或非法值按 3 天处理。粗略记录不派生进行状态。
+Workbench 月历查询当前月完整可见的 42 个自然日（含相邻月补位日期）。多日考期按开始日到结束日的连续确定考试安排显示实线日期条，含首尾日期，跨周／跨月续接。日期详情分别列出当天单日考试与多日考试；可关闭“显示多日考期”，右上角抽屉提供全部多日考试安排。重叠日期条最多显示两行，其余通过当天“多日 +N”查看全部。
+
+已发布考期的状态由后端按北京时间自然日派生：开始前 N 天为 `UPCOMING`，从开始日到结束日（含首尾）为 `IN_PROGRESS`，结束次日起为 `ENDED`；单日考期开始和结束均为 `exactDate`。草稿和撤销状态优先。N 来自 Infra 参数 `zsjos.exam-calendar.upcoming-days`，缺失、负数或非法值按 3 天处理。前端只筛选服务端返回状态。
 
 ## 管理动作
 
@@ -37,11 +39,10 @@
 - `POST /zsjos/exam-calendar/publish/{id}`：发布草稿。
 - `POST /zsjos/exam-calendar/revoke/{id}`：撤销已发布记录；不可重新发布。
 
-已结束的精确考期不可编辑；编辑不能把精确日期改到当前业务日期之前，过去日期的精确草稿也
-不能发布。历史修订需要后续单独定义审计规则。
+已结束的单日／多日草稿不可编辑或发布；编辑后的结束日期不能早于当前业务日期。尚未结束的多日安排可以发布，状态按当前日期派生。
 
-请求的 `scheduleType` 为 `EXACT` 或 `ROUGH`。精确记录只接受 `exactDate`；粗略记录只接受
-`roughStartDate` 和 `roughEndDate`，且结束日期不得早于开始日期。
+请求的 `scheduleType` 为 `EXACT` 或 `MULTI_DAY`。单日记录只接受 `exactDate`；多日记录只接受
+`startDate` 和 `endDate`，且结束日期不得早于开始日期。
 
 ## 自由名称与历史兼容
 
@@ -102,3 +103,9 @@ V282 活跃开发基线补齐 System 按钮元数据，挂在已有「考期日�
 ### 工作台通知员工树
 
 考期、课程共用通知面板的指定员工改为部门／员工树多选。部门层级来自 /system/dept/simple-list，员工来自有对应发送权限的日历候选分页接口；完整加载所有候选页后才开放勾选，避免只选到第一页。支持搜索部门或员工、跨部门多选、勾选部门及下属部门、移除和清空已选人员；未分配或部门不可用的员工保留为根层员工，不推断部门。搜索和折叠不清除已选人员，提交仅包含员工 ID，修改选人须重新预览。加载失败或候选分页发生变化时阻止预览并提供重试，发送仍由后端复核有效性及租户。全员权限与人数确认不变。Admin 兼容新增 deptId 字段，保留原有交互，本次只调整截图所示 Workbench 选择器。
+
+## 多日考试替换与数据同步（V286）
+
+V286 在云端 Core V285 后执行，将原预计区间业务整体替换为确定的 `MULTI_DAY`：旧考期类型与日期列原地转换，保留所有租户、逻辑历史、ID、名称、首尾日期及班级关系。起止日相同的历史记录保留为单日长度的区间，不丢弃、不创造新日期。EXAM 通知快照同步替换类型和日期键，并按服务端规范重算内容指纹；快照 ID、版本、状态、标题和已渲染通知文字保留。既有预览凭证需重新预览。应用不再提供旧类型、旧日期字段或旧查询接口的兼容分支。
+
+迁移源：`script/sql/mysql/migrations/V286__multi_day_exam_schedule.sql`；前后端须在迁移后共同发布。执行前备份考期、快照及两张版本表。迁移可重复、可从部分 DDL 恢复；DDL 非事务回滚，降级需匹配旧代码并审查恢复备份。验证入口：`python -B script/sql/mysql/tools/test_multi_day_exam.py --apply-dev --fresh`，只在已授权的本地开发数据库使用 `--apply-dev`。该命令保留验证数据库，不删除历史或权限配置。

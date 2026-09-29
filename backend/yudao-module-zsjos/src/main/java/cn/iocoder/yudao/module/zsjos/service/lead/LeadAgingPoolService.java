@@ -37,4 +37,5 @@ public interface LeadAgingPoolService {
                                    LocalDateTime now, String reason);
     boolean canRead(Long leadId, Long userId);
     boolean canRead(LeadAgingPoolCycleDO cycle, Long userId);
+    java.util.Set<Long> filterReadableLeadIds(java.util.Collection<Long> leadIds, Long userId);
 }

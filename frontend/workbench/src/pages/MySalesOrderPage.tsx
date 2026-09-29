@@ -97,10 +97,13 @@ export default function MySalesOrderPage() {
     void Promise.all([loadPage(undefined, true, version), loadCounts()])
   }, [loadCounts, loadPage])
 
-  useEffect(() => { reload() }, [reload])
+  useEffect(() => { void loadCounts() }, [loadCounts])
   useEffect(() => {
-    if (useTableLayout) void loadPage(undefined, true, listVersion.current)
-  }, [loadPage, useTableLayout])
+    const version = ++listVersion.current
+    setCursor(undefined); setHasMore(true)
+    void loadPage(undefined, true, version)
+    return () => { listVersion.current++ }
+  }, [loadPage])
 
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current

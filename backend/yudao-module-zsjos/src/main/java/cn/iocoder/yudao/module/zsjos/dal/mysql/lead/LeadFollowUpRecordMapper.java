@@ -15,7 +15,7 @@ public interface LeadFollowUpRecordMapper extends BaseMapperX<LeadFollowUpRecord
         if (userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadFollowUpRecordDO>()
                 .select(LeadFollowUpRecordDO::getOperatorUserId)
-                .apply("NOT EXISTS (SELECT 1 FROM zsjos_business_event auto_event WHERE auto_event.tenant_id=zsjos_lead_follow_up_record.tenant_id AND auto_event.deleted=0 AND auto_event.aggregate_type='lead' AND auto_event.aggregate_id=zsjos_lead_follow_up_record.lead_id AND auto_event.event_type='lead_follow_up_recorded' AND JSON_EXTRACT(auto_event.related_object_refs,'$.followUpRecordId')=zsjos_lead_follow_up_record.id AND JSON_UNQUOTE(JSON_EXTRACT(auto_event.related_object_refs,'$.generationSource'))='sales_self_sourced_auto')")
+                .apply("NOT EXISTS (SELECT 1 FROM zsjos_business_event auto_event WHERE auto_event.tenant_id=zsjos_lead_follow_up_record.tenant_id AND auto_event.deleted=0 AND auto_event.aggregate_type='lead' AND auto_event.aggregate_id=zsjos_lead_follow_up_record.lead_id AND auto_event.event_type='lead_follow_up_recorded' AND JSON_EXTRACT(auto_event.related_object_refs,'$.followUpRecordId')=zsjos_lead_follow_up_record.id AND JSON_UNQUOTE(JSON_EXTRACT(auto_event.related_object_refs,'$.generationSource')) IN ('sales_self_sourced_auto','education_self_sourced_auto'))")
                 .in(LeadFollowUpRecordDO::getOperatorUserId, userIds)
                 .ge(LeadFollowUpRecordDO::getOccurredAt, start).lt(LeadFollowUpRecordDO::getOccurredAt, end));
     }

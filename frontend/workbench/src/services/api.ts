@@ -582,7 +582,7 @@ export type CalendarNotifyInput = { calendarId: number; calendarType: 'EXAM' | '
 export type CalendarNotifyResult = { batchId: number; acceptedCount: number; skippedCount: number; status: string; resend: boolean; sourceEventKey: string };
 export type CalendarNotifyPreview = { calendarVersion: number; title: string; time?: string; remark?: string; recipientCount: number; notifiedCount: number; newRecipientCount: number; previewToken: string; contentHash: string };
 export type CalendarNotifyUser = { id: number; nickname: string; deptId?: number | null };
-export type ExamScheduleType = 'EXACT' | 'ROUGH';
+export type ExamScheduleType = 'EXACT' | 'MULTI_DAY';
 export type ExamScheduleRecordStatus = 'DRAFT' | 'PUBLISHED' | 'REVOKED';
 export type ExamScheduleDisplayStatus = ExamScheduleRecordStatus | 'UPCOMING' | 'IN_PROGRESS' | 'ENDED';
 export type ExamCategoryOption = {
@@ -600,8 +600,8 @@ export type ExamSchedule = {
   id: number;
   scheduleType: ExamScheduleType;
   exactDate?: string;
-  roughStartDate?: string;
-  roughEndDate?: string;
+  startDate?: string;
+  endDate?: string;
   categoryId?: number;
   categoryNameSnapshot?: string;
   categoryPathSnapshot: Array<{ id: number; name: string }>;
@@ -617,8 +617,8 @@ export type ExamScheduleInput = {
   clearedInvalidAttrs?: string[];
   scheduleType: ExamScheduleType;
   exactDate?: string;
-  roughStartDate?: string;
-  roughEndDate?: string;
+  startDate?: string;
+  endDate?: string;
   categoryId?: number;
   productId?: number;
   selectedAttrs?: Record<string, string>;
@@ -3634,13 +3634,13 @@ export const api = {
       categoryId?: number;
       displayStatus?: string;
     }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/page', { params })),
-    roughPage: async (params: {
+    multiDayPage: async (params: {
       pageNo: number;
       pageSize: number;
       rangeStart?: string;
       rangeEnd?: string;
       categoryId?: number;
-    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/rough', { params })),
+    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/multi-day', { params })),
     categoryOptions: async () => unwrap<ExamCategoryOption[]>(
       await http.get('/zsjos/exam-calendar/category-options'),
     ),

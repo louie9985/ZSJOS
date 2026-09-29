@@ -287,7 +287,7 @@
             >
               <div class="follow-up-heading"
                 ><strong>{{ record.operatorName || `用户 #${record.operatorUserId}` }}</strong
-                ><el-tag v-if="record.generationSource === 'sales_self_sourced_auto'" type="info" size="small">销售自拓录单自动生成</el-tag
+                ><el-tag v-if="['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || '')" type="info" size="small">{{ record.generationSource === 'education_self_sourced_auto' ? '教务自拓录单自动生成' : '销售自拓录单自动生成' }}</el-tag
                 ><el-tag v-if="record.firstInAssignment" type="success" size="small"
                   >本轮首次跟进</el-tag
                 ></div
@@ -299,7 +299,7 @@
                 }}</el-tag></div
               >
               <div>销售阶段：<template v-if="record.salesStageBefore !== record.salesStageAfter">{{ record.salesStageBeforeLabelSnapshot || '未记录' }} → </template>{{ record.salesStageAfterLabelSnapshot || '未记录' }}</div>
-              <div v-if="record.generationSource === 'sales_self_sourced_auto'">分类：{{ snapshotLabel(record.categoryAfterLabel, record.categoryAfter) }}</div>
+              <div v-if="['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || '')">分类：{{ snapshotLabel(record.categoryAfterLabel, record.categoryAfter) }}</div>
               <div v-if="record.categoryBefore !== record.categoryAfter"
                 >分类：{{ snapshotLabel(record.categoryBeforeLabel, record.categoryBefore) }} →
                 {{ snapshotLabel(record.categoryAfterLabel, record.categoryAfter) }}</div

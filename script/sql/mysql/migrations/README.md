@@ -1558,3 +1558,14 @@ Run `python -B script/sql/mysql/tools/test_calendar_notifications.py` and `pytho
 
 ### V283 new-media lead analysis
 `V283__media_lead_analysis.sql` defines independent new-media target, organization and target-revision tables plus Workbench page/button metadata. It requires V282 and one active `/zsjos` root. MySQL DDL commits implicitly: prerequisites precede DDL, schema postconditions follow DDL, and menu changes plus both version ledgers share the subsequent rollback-controlled transaction. Repeat execution repairs partial table/menu application and preserves administrator-edited menu metadata. It never assigns roles or seeds business targets. No development/shared database synchronization is included in this code delivery. See [the API and rollout contract](../../../../docs/api/media-lead-analysis.md).
+
+### V285/V286 collision resolution
+
+Remote `V285__order_imported_actor_snapshot.sql` is the authoritative, deployed V285 after Core V284.
+The unpublished local definite multi-day exam migration was renumbered to
+`V286__multi_day_exam_schedule.sql` and now requires Core V285 in both ledgers. Its procedure name,
+version writes, filename checksum marker, verifier and active documentation all use V286; its exam
+business conversion is otherwise unchanged. Historical handoff entries keep the earlier local V285
+wording. If any development database ran that old-numbered copy, inspect schema, data and both ledger
+checksums and use a separately authorized correction; never silently rewrite V285/V286 markers or
+replace the deployed order-snapshot V285.

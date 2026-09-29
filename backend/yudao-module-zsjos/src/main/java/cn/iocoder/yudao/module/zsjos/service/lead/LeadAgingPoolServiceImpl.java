@@ -474,6 +474,36 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 || Objects.equals(userId, cycle.getCollaboratorUserId());
     }
 
+    @Override public Set<Long> filterReadableLeadIds(java.util.Collection<Long> leadIds, Long userId) {
+        if (leadIds.isEmpty()) return Set.of();
+        var cycles = cycleMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LeadAgingPoolCycleDO>()
+                .in(LeadAgingPoolCycleDO::getLeadId, leadIds)
+                .in(LeadAgingPoolCycleDO::getStatus, List.of(AGING_POOL_WAITING_ASSIGNMENT, AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING))
+                .orderByDesc(LeadAgingPoolCycleDO::getId));
+        if (cycles.isEmpty()) return Set.of();
+        boolean all = hasManageAll();
+        var user = all ? null : adminUserApi.getUser(userId);
+        boolean eligible = !all && user != null && isEligibleSales(userId);
+        boolean manage = !all && securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE);
+        var ownerIds = cycles.stream().map(LeadAgingPoolCycleDO::getOriginalOwnerUserId)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        var owners = all || ownerIds.isEmpty() ? new java.util.HashMap<Long, AdminUserRespDTO>() : adminUserApi.getUserMap(ownerIds);
+        Set<Long> managedDepts = manage ? deptApi.getDeptListByLeaderUserId(userId).stream()
+                .map(DeptRespDTO::getId).collect(java.util.stream.Collectors.toSet()) : Set.of();
+        Set<Long> seen = new HashSet<>(), result = new HashSet<>();
+        for (var cycle : cycles) {
+            // The single-object path selects the newest active cycle if historical duplicates exist.
+            if (!seen.add(cycle.getLeadId())) continue;
+            var owner = cycle.getOriginalOwnerUserId() == null ? null : owners.get(cycle.getOriginalOwnerUserId());
+            Long dept = owner == null ? null : owner.getDeptId();
+            if (all || eligible && Objects.equals(user.getDeptId(), dept)
+                    || dept != null && managedDepts.contains(dept)
+                    || Objects.equals(userId, cycle.getOriginalOwnerUserId())
+                    || Objects.equals(userId, cycle.getCollaboratorUserId())) result.add(cycle.getLeadId());
+        }
+        return result;
+    }
+
     private LeadAgingPoolRespVO convert(LeadAgingPoolCycleDO cycle, Long userId) {
         LeadDO lead = leadMapper.selectById(cycle.getLeadId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);

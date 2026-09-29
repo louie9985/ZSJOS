@@ -42,7 +42,7 @@ public class CashbackController {
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query')")
     public CommonResult<PageResult<CashbackRespVO>> searchPage(@Valid @RequestBody CashbackPageReqVO request) {
-        return success(traceService.enrichCashbackPage(service.getPage(request, null)));
+        return success(service.getFinancePage(request));
     }
 
     @PostMapping("/my-search-page")
@@ -63,7 +63,7 @@ public class CashbackController {
     @GetMapping("/page")
     @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query')")
     public CommonResult<PageResult<CashbackRespVO>> financePage(@Valid CashbackPageReqVO request) {
-        return success(traceService.enrichCashbackPage(service.getPage(request, null)));
+        return success(service.getFinancePage(request));
     }
     @GetMapping("/{id}")
     @PreAuthorize("@ss.hasPermission('zsjos:cashback:finance-query')")

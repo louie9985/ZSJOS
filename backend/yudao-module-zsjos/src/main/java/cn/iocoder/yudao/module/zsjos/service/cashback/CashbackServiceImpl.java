@@ -59,6 +59,7 @@ public class CashbackServiceImpl implements CashbackService {
     static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService advancedFilterService;
     @Resource private CashbackMapper mapper;
+    @Resource private CashbackSearchService searchService;
     @Resource private FinanceTraceService financeTraceService;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
@@ -150,13 +151,7 @@ public class CashbackServiceImpl implements CashbackService {
 
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
-        PageResult<CashbackRespVO> result = BeanUtils.toBean(
-                (request.getKeyword() != null && !request.getKeyword().isBlank()
-                ? mapper.selectCashbackPage(request, beneficiaryUserId,
-                    request.getAdvancedFilter() == null ? null : advancedFilterService.matchFinanceIds("cashback", request.getAdvancedFilter()),
-                    financeTraceService.matchCashbackNameIds(request.getKeyword().trim()))
-                : request.getAdvancedFilter() == null ? mapper.selectCashbackPage(request, beneficiaryUserId)
-                : mapper.selectCashbackPage(request, beneficiaryUserId, advancedFilterService.matchFinanceIds("cashback", request.getAdvancedFilter()))), CashbackRespVO.class);
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(searchService.search(request, beneficiaryUserId), CashbackRespVO.class);
         Set<Long> leadIds = new HashSet<>();
         result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
         Map<Long, String> leadNumbers = new HashMap<>();
@@ -166,6 +161,14 @@ public class CashbackServiceImpl implements CashbackService {
             }
         }
         result.getList().forEach(item -> item.setLeadNo(leadNumbers.get(item.getLeadId())));
+        return result;
+    }
+
+    @Override
+    public PageResult<CashbackRespVO> getFinancePage(CashbackPageReqVO request) {
+        var page = searchService.search(request, null);
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(page, CashbackRespVO.class);
+        financeTraceService.enrichCashbacks(result.getList(), page.getList());
         return result;
     }
 

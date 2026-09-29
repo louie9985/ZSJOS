@@ -29,7 +29,7 @@ function deferred<T>() {
 }
 
 describe('exam calendar latest request wins', () => {
-  it.each(['load', 'loadRough'])('%s ignores stale successes and failures', async name => {
+  it.each(['load', 'loadMultiDay', 'loadCalendarMultiDay'])('%s ignores stale successes and failures', async name => {
     for (const fails of [false, true]) {
       const old = deferred<unknown>(), latest = deferred<unknown>()
       let calls = 0
@@ -37,13 +37,13 @@ describe('exam calendar latest request wins', () => {
       const state: Record<string, unknown> = {}
       const setter = (key: string) => (value: unknown) => { state[key] = value }
       const bindings = {
-        api: { examCalendar: { exactPage: fetch, roughPage: fetch, productOptions: fetch } },
-        requests: { current: { exact: 0, rough: 0, products: 0 } },
+        api: { examCalendar: { exactPage: fetch, multiDayPage: fetch, productOptions: fetch } },
+        requests: { current: { exact: 0, multiDay: 0, calendarMultiDay: 0, products: 0 } },
         range: { start: dayjs('2026-10-01'), end: dayjs('2026-10-31') }, categoryId: undefined, displayStatus: undefined,
-        setSchedules: setter('rows'), setRoughRows: setter('rows'), setProducts: setter('rows'),
-        setLoading: setter('loading'), setRoughLoading: setter('loading'), setProductLoading: setter('loading'),
-        setError: setter('error'), setRoughError: setter('error'), setProductError: setter('error'),
-        setRoughTotal: setter('total'), setDetail: setter('detail'), setDayDetail: setter('day'), ApiError: class extends Error {}
+        setCalendarMultiDayRows: setter('rows'), setCalendarMultiDayLoading: setter('loading'), setCalendarMultiDayError: setter('error'), setSchedules: setter('rows'), setMultiDayRows: setter('rows'), setProducts: setter('rows'),
+        setLoading: setter('loading'), setMultiDayLoading: setter('loading'), setProductLoading: setter('loading'),
+        setError: setter('error'), setMultiDayError: setter('error'), setProductError: setter('error'),
+        setMultiDayTotal: setter('total'), setDetail: setter('detail'), setDayDetail: setter('day'), ApiError: class extends Error {}
       }
       const run = loader(name, bindings)
       const first = run(), second = run()
@@ -59,7 +59,7 @@ describe('exam calendar latest request wins', () => {
 
   it('refreshes current views after save and transition', () => {
     expect(source).toContain('scheduleInput(values)')
-    expect(source.match(/const current = latestReload.current/g)).toHaveLength(2)
-    expect(source).not.toContain('Promise.all([load(), roughOpen')
+    expect(source.match(/await reloadVisible\(\)/g)).toHaveLength(2)
+    expect(source).not.toContain('Promise.all([load(), multiDayOpen')
   })
 })

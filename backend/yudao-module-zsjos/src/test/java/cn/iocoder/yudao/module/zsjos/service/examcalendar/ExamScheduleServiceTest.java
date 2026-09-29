@@ -100,14 +100,14 @@ class ExamScheduleServiceTest {
     void rejectsInvalidDateShapes() {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
         ExamScheduleSaveReqVO exact = exactReq();
-        exact.setRoughStartDate(exact.getExactDate());
+        exact.setStartDate(exact.getExactDate());
         assertEquals(1_900_018_003, assertThrows(ServiceException.class,
                 () -> service.create(exact, 20L)).getCode());
 
-        ExamScheduleSaveReqVO rough = roughReq();
-        rough.setRoughEndDate(rough.getRoughStartDate().minusDays(1));
+        ExamScheduleSaveReqVO multiDay = multiDayReq();
+        multiDay.setEndDate(multiDay.getStartDate().minusDays(1));
         assertEquals(1_900_018_003, assertThrows(ServiceException.class,
-                () -> service.create(rough, 20L)).getCode());
+                () -> service.create(multiDay, 20L)).getCode());
 
 
     }
@@ -218,6 +218,45 @@ class ExamScheduleServiceTest {
         }
     }
 
+    @Test void multiDayStatusIncludesStartMiddleAndEnd() {
+        var row = new ExamScheduleDO().setScheduleType("MULTI_DAY").setStartDate(LocalDate.of(2026,10,10))
+                .setEndDate(LocalDate.of(2026,10,20)).setRecordStatus("PUBLISHED");
+        assertEquals("PUBLISHED", service.displayStatus(row, LocalDate.of(2026,10,6), 3));
+        assertEquals("UPCOMING", service.displayStatus(row, LocalDate.of(2026,10,7), 3));
+        for (int day : new int[]{10, 15, 20}) assertEquals("IN_PROGRESS", service.displayStatus(row, LocalDate.of(2026,10,day), 3));
+        assertEquals("ENDED", service.displayStatus(row, LocalDate.of(2026,10,21), 3));
+        row.setRecordStatus("DRAFT");
+        assertEquals("DRAFT", service.displayStatus(row, LocalDate.of(2026,10,21), 3));
+        row.setRecordStatus("REVOKED");
+        assertEquals("REVOKED", service.displayStatus(row, LocalDate.of(2026,10,15), 3));
+    }
+
+    @Test void multiDayRejectsRetiredTypeAndEndedMaintenanceButAllowsOngoingPublish() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var req = multiDayReq(); req.setScheduleType("ROUGH");
+        assertEquals(1_900_018_002, assertThrows(ServiceException.class, () -> service.create(req,20L)).getCode());
+        var today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var row = new ExamScheduleDO().setId(9L).setScheduleType("MULTI_DAY").setStartDate(today.minusDays(3))
+                .setEndDate(today.minusDays(1)).setRecordStatus("DRAFT").setCalendarVersion(1);
+        when(mapper.selectForUpdate(9L)).thenReturn(row);
+        when(mapper.selectById(9L)).thenReturn(row);
+        assertThrows(ServiceException.class, () -> service.publish(9L,20L));
+        assertThrows(ServiceException.class, () -> service.previewTransition(9L,"PUBLISHED",20L));
+        assertThrows(ServiceException.class, () -> service.update(9L,multiDayReq(),20L));
+        row.setEndDate(today.plusDays(2));
+        service.publish(9L,20L);
+        assertEquals("PUBLISHED",row.getRecordStatus());
+    }
+
+    @Test void multiDaySnapshotUsesDefiniteDatesAndStableCanonicalHash() {
+        var row = new ExamScheduleDO().setId(1L).setScheduleType("MULTI_DAY").setStartDate(LocalDate.of(2026,10,1))
+                .setEndDate(LocalDate.of(2026,10,8)).setRecordStatus("PUBLISHED").setCalendarVersion(1).setScheduleName("多日考试");
+        var snapshot = cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationSnapshotService.projectExam(row,"PUBLISHED");
+        assertTrue(snapshot.getDetailsJson().contains("startDate"));
+        assertFalse(snapshot.getDetailsJson().contains("rough"));
+        assertEquals("2026-10-01 - 2026-10-08",snapshot.getTimeSnapshot());
+    }
+
     private static ExamScheduleSaveReqVO exactReq() {
         ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
         req.setScheduleType("EXACT"); req.setExactDate(LocalDate.of(2026, 10, 10));
@@ -225,10 +264,10 @@ class ExamScheduleServiceTest {
         return req;
     }
 
-    private static ExamScheduleSaveReqVO roughReq() {
+    private static ExamScheduleSaveReqVO multiDayReq() {
         ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
-        req.setScheduleType("ROUGH"); req.setRoughStartDate(LocalDate.of(2026, 10, 1));
-        req.setRoughEndDate(LocalDate.of(2026, 10, 15)); req.setScheduleName("自由考期");
+        req.setScheduleType("MULTI_DAY"); req.setStartDate(LocalDate.of(2026, 10, 1));
+        req.setEndDate(LocalDate.of(2026, 10, 15)); req.setScheduleName("自由考期");
         return req;
     }
 

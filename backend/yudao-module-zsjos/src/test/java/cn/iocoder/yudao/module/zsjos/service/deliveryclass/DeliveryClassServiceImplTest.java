@@ -197,6 +197,20 @@ class DeliveryClassServiceImplTest {
         verifyNoInteractions(classMapper, adminUserApi);
     }
 
+    @Test void multiDayOptionsIncludeEndDayAndExcludeEndedRanges() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "multi-day-options"), ExamScheduleDO.class);
+        var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var ongoing = new ExamScheduleDO().setId(7L).setScheduleName("多日考试").setScheduleType("MULTI_DAY")
+                .setStartDate(today.minusDays(2)).setEndDate(today).setRecordStatus("PUBLISHED");
+        var ended = new ExamScheduleDO().setId(8L).setScheduleType("MULTI_DAY")
+                .setStartDate(today.minusDays(4)).setEndDate(today.minusDays(1)).setRecordStatus("PUBLISHED");
+        when(scheduleMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(java.util.List.of(ongoing, ended));
+        var options = service.examOptions(null,null,null,null);
+        assertEquals(1,options.size());
+        assertEquals("MULTI_DAY",options.getFirst().scheduleType());
+        assertEquals("多日考试 · " + today.minusDays(2) + "~" + today,options.getFirst().displayName());
+    }
+
     private static ServiceRelationDO relation(Long id, Long classId, Integer version) {
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(id); relation.setTenantId(1L); relation.setClassId(classId); relation.setOrderItemId(300L);

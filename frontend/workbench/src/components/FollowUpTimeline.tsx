@@ -33,8 +33,8 @@ function TimelineNode({ record }: { record: LeadFollowUp }) {
             {record.ownerIdentitySnapshot && <Tag>负责人身份：{record.ownerIdentityLabel}</Tag>}
             <Tag>联系方式：{snapshotDisplayLabel(record.methodLabel, record.method)}</Tag>
             <Tag color="blue">跟进结果：{snapshotDisplayLabel(record.resultLabel, record.result)}</Tag>
-            {record.generationSource === 'sales_self_sourced_auto' && <Tag color="purple">销售自拓录单自动生成</Tag>}
-            {record.operatorName && <Tag>{record.generationSource === 'sales_self_sourced_auto' ? '录单人' : '操作人'}：{record.operatorName}</Tag>}
+            {['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || '') && <Tag color="purple">{record.generationSource === 'education_self_sourced_auto' ? '教务自拓录单自动生成' : '销售自拓录单自动生成'}</Tag>}
+            {record.operatorName && <Tag>{['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || '') ? '录单人' : '操作人'}：{record.operatorName}</Tag>}
             {record.firstInAssignment && <Tag color="green">本轮首次</Tag>}
           </div>
 
@@ -50,7 +50,7 @@ function TimelineNode({ record }: { record: LeadFollowUp }) {
           <span className="fu-node-meta">销售阶段：{record.salesStageBefore !== record.salesStageAfter
             ? `${record.salesStageBeforeLabelSnapshot || '未记录'} → ${record.salesStageAfterLabelSnapshot || '未记录'}`
             : record.salesStageAfterLabelSnapshot || '未记录'}</span>
-          {record.generationSource === 'sales_self_sourced_auto' && <span className="fu-node-meta">分类：{categoryAfter}</span>}
+          {['sales_self_sourced_auto', 'education_self_sourced_auto'].includes(record.generationSource || '') && <span className="fu-node-meta">分类：{categoryAfter}</span>}
           {record.categoryBefore !== record.categoryAfter && (
             <span className="fu-node-meta">分类：{categoryBefore} → {categoryAfter}</span>
           )}

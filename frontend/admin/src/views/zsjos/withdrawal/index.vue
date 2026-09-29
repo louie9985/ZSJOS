@@ -324,11 +324,12 @@ const canExport = computed(
   () =>
     (userStore.getPermissions.has('*:*:*') ||
       userStore.getPermissions.has('zsjos:export:withdrawal')) &&
+    (userStore.getPermissions.has('*:*:*') || userStore.getPermissions.has('zsjos:export:query')) &&
     withdrawalDataScope(userStore.getPermissions) === 'all'
 )
 const exportCurrent = async () => {
   try {
-    await ElMessageBox.confirm('将导出符合当前筛选条件的全部记录。', '导出提现记录', {
+    await ElMessageBox.confirm('将导出符合当前筛选条件的全部提现记录，包含完整银行卡号、开户信息及审核和打款信息。', '导出提现记录', {
       confirmButtonText: '加入导出队列',
       cancelButtonText: '取消',
       type: 'warning'
@@ -347,6 +348,8 @@ const exportCurrent = async () => {
     })
       .then(() => router.push('/zsjos/export-task'))
       .catch(() => undefined)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出任务创建失败，请重试')
   } finally {
     exporting.value = false
   }

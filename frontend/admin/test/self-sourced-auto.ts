@@ -12,7 +12,7 @@ service.defaults.adapter=async config=>{
  const path=config.url||'';let data:unknown=[]
  if(config.method==='post'){
   const payload=JSON.parse(String(config.data));fixture.requests.push(payload);if(fixture.fail)throw new Error('模拟提交失败')
-  data={outcome:fixture.outcome,leadNo:'LD-UI-TEST',qualificationStatus:payload.newMediaProviderUserId?'pending':'valid',automaticQualificationApplied:!payload.newMediaProviderUserId&&!query.has('education')}
+  data={outcome:fixture.outcome,leadNo:'LD-UI-TEST',qualificationStatus:payload.newMediaProviderUserId?'pending':'valid',automaticQualificationApplied:!payload.newMediaProviderUserId}
  }else if(path.includes('/area/'))data=[{id:990000000,name:'其他省份',selectionCode:'OTHER',children:[{id:990000001,name:'其他城市',selectionCode:'OTHER'}]}]
  else if(path.endsWith('/dict-data/simple-list'))data=[{dictType:'zsjos_lead_category',value:'a',label:'测试分类',status:0},{dictType:'zsjos_lead_source_channel',value:'channel',label:'测试渠道',status:0}]
  else if(path.endsWith('/catalog'))data={spus:[{spuRef:'p1',spuName:'测试课程',attrs:[]}],skus:[{spuRef:'p1',skuRef:'s1',skuName:'测试方案',attrValues:{}}]}

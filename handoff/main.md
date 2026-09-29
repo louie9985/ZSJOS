@@ -29313,3 +29313,75 @@ uoyi-vue-pro.system_menu: insert only four absent rows with fixed IDs/names/perm
 - Diagnosis: local read-only inspection found 230 active `waiting_assignment` cycles without a collaborator, 57 active cycles whose formal owner is disabled or missing, four recent follow-up denials matching the waiting-public-sea authorization mismatch, and no current manual public-sea rows. The 57 invalid-owner records and two valid Leads missing Opportunity rows are data-repair work, not silently changed by this delivery.
 - Dependencies/integration impact: no new dependency, database write, account/role/menu permission change, service restart/deployment, branch/worktree operation, staging, commit or push. Both Admin and Workbench continue to consume server-projected actions; live authenticated API/browser acceptance remains unverified because the shared backend was not restarted.
 - Remaining: administrators must keep the existing follow-up and transfer button permissions configured. Separately authorized, scoped data repair is still needed for disabled/missing formal owners and the two valid Leads without Opportunity rows; no new 90-day cooldown policy was introduced.
+
+
+## Registration update — sales-self-sourced-auto-20260929 / education extension — 2026-09-29 14:21:03 Beijing time
+- Environment local; branch main; worktree D:/ZSJ-OS; current base HEAD 5fadfb3e9be563ac4cb3e5c142308549944aa465; owner this chat /root. Target branch/integration None. Reuse prior workstream; user now explicitly includes education self-sourced creation, superseding the previous education exclusion.
+- Goal: extend the existing atomic automation to directly created unlinked education self-sourced Leads, retain education ownership/source and its existing create permission, add education_self_sourced_auto provenance, and exclude both exact sources from manual metrics while preserving sales/history behavior.
+- Ownership: LeadAutomaticGeneration, LeadSelfSourcedAutomationService, LeadSubmissionServiceImpl, LeadFollowUpServiceImpl, LeadFlowHistoryService, PerformanceCalendar/StatisticsService and the existing performance/follow-up/event SQL mappers; their focused tests; both Lead submission forms, follow-up history/chart and statistical captions; existing self-sourced browser fixtures/tests; API/state/statistics and directly affected frontend docs; this handoff record. Any new frontend pure provenance helper/tests are included.
+- Non-goals: no historical backfill, schema/data/grant changes, dependencies, shared service restart/deployment, Git branch/worktree/commit/push operations. Preserve unrelated dirty files and cached/generated artifacts.
+- Verification: focused backend transaction/permission/branch/idempotency/statistics tests, both typechecks, both real-component browser flows at desktop/mobile using isolated fixtures, scoped diff/UTF-8 checks; report live target database/API validation separately.
+
+
+## Delivery — sales-self-sourced-auto-20260929 / education extension — 2026-09-29 14:34:16 Beijing time
+- Context: local/main/D:/ZSJ-OS; HEAD 5fadfb3e9be563ac4cb3e5c142308549944aa465; owner this chat /root. Registration above reused; target branch/integration order None. Existing unrelated changes and generated artifacts preserved.
+- User goal/result: 教务自拓同步销售自拓自动流程。未关联提供方且查重通过直接新建时，事务内归属本人、自动首跟、判有效并创建商机；教务来源、操作人及本人归属保留。关联提供方、普通提交、激活、复核放行及历史重放不补跑。
+- Decisions: education_self_sourced_auto identifies education facts independently of sales_self_sourced_auto; education uses its existing education-self-sourced:create permission plus follow-up/qualification permissions, without requiring sales create permission or granting access. Both exact markers are excluded consistently from manual work/efficiency; later manual actions and future reminders count normally. Existing conversion-rate source exclusions remain unchanged.
+- Verification: focused Maven reactor BUILD SUCCESS; 129 tests, zero failures/errors/skips, including 18 parameterized sales/education Spring transaction and MyBatis H2 integration scenarios. Covers atomic rollback, permissions, idempotency/concurrency, optional reminders, snapshot retention and manual requalification; actual mapper queries cover scoped statistics and aggregate/detail reconciliation. Workbench npm run typecheck exit 0. Sales and education browser suites both exit 0 using actual React/Vue form components with isolated transport fixtures at widths 1440/390; required remark, optional/future/past time, provider switch clearing, review/activation, retries, provenance/history and manual charts verified. Education form/history screenshots visually inspected. Strict UTF-8 decoding and scoped git diff --check passed for 31 task files.
+- Static gate limitation: Admin pnpm ts:check fails on 12 existing duplicate identifier errors in frontend/admin/src/api/zsjos/withdrawal/index.ts (lines 15–16, 40–45); that unrelated file was not changed. Full Admin static acceptance is not green.
+- Dependencies/integration: None added. No migration, shared database write, role grant, historical repair, deployment/shared-service restart, staging/commit/push or branch/worktree operation. Only task-owned Vite fixture listeners on 5193/5194 were stopped after verification. API, state-machine, statistics and both directly related frontend documents updated.
+- Remaining/unverified: live authenticated API, target MySQL execution and external notification delivery not verified; isolated fixture/H2 results are not target-environment acceptance. Release must coordinate backend + React + Vue, confirm enabled other/interested dictionary entries, follow-up rules and existing education/follow-up/qualification permissions. Existing Admin type errors require separate resolution.
+- Changed files:
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/event/BusinessEventMapper.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadFollowUpRecordMapper.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/performance/PerformanceFactMapper.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAutomaticGeneration.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFlowHistoryService.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFollowUpServiceImpl.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSelfSourcedAutomationService.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmissionServiceImpl.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceCalendar.java
+  - backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceStatisticsService.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/SubordinateSalesDailyQueryTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSelfSourcedAutomationServiceTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSelfSourcedTransactionTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmissionServiceImplTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/performance/AutomaticQualificationCalendarTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceMapperTest.java
+  - backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceReportTest.java
+  - docs/api/sales-performance.md
+  - docs/api/zsjos-lead-submission-dispatch.md
+  - docs/business/lead-order-state-machine.md
+  - frontend/admin/README.md
+  - frontend/admin/src/views/zsjos/components/LeadCreateDialog.vue
+  - frontend/admin/src/views/zsjos/lead/index.vue
+  - frontend/admin/test/self-sourced-auto.ts
+  - frontend/workbench/docs/follow-up-form.md
+  - frontend/workbench/src/components/FollowUpTimeline.tsx
+  - frontend/workbench/src/components/LeadFollowUpCharts.tsx
+  - frontend/workbench/src/pages/LeadSubmissionPage.tsx
+  - frontend/workbench/test/self-sourced-auto-browser.py
+  - frontend/workbench/test/self-sourced-auto.tsx
+  - handoff/main.md
+
+## Workstream Registration - 2026-09-29 15:00:00 +08:00
+
+- Workstream ID: `main-workbench-tabs-content-height-20260929`
+- Goal: 修复 Workbench 开启页签模式时内容区未扣除页签栏高度，导致首页公告等底部操作按钮落到可视区之外的问题。
+- Non-goals: 不修改业务页面、公告接口、权限、菜单、数据库、依赖、分支、提交、推送或外部服务；保留当前工作树全部既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `5fadfb3e9be563ac4cb3e5c142308549944aa465`，并保留当前工作树全部既有未提交改动。
+- Target branch/integration order: 当前本地 `main`; None。
+- Ownership scope: `frontend/workbench/src/main.tsx`; `frontend/workbench/src/styles/layout.css`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 React/Vite/Ant Design Layout、页签栏与 Workbench CSS 变量；无新增依赖。
+- Verification plan: `cd frontend/workbench && npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`；如可用补充页签模式桌面浏览器检查。
+
+## Delivery — main-workbench-tabs-content-height-20260929 — 2026-09-29 15:08:00 +08:00
+
+- Context: local/main/D:\ZSJ-OS; HEAD `5fadfb3e9be563ac4cb3e5c142308549944aa465`; owner this chat `/root`. Existing unrelated changes and generated artifacts preserved.
+- User goal/result: 页签模式下右侧内容区改为占用顶部栏、页签栏及其他固定兄弟节点之外的剩余高度，首页公告卡片底部“查看所有公告”按钮保持在可视区内；顶部不固定时继续使用整页滚动。
+- Changed files: `frontend/workbench/src/main.tsx`, `frontend/workbench/src/styles/layout.css`, `handoff/main.md`。
+- Verification: `npm run typecheck` passed; `npm run build` passed with the existing Vite large-chunk warning; scoped `git diff --check` passed with existing LF-to-CRLF warnings. Full `npm test` ran 953 tests and reported 24 existing failures in unrelated finance, media/content-review, menu, style-guard, BPM, management API, and today-task assertions; no failure implicated these layout files.
+- Dependencies/integration impact: no new dependency, API, database, permission, service, branch, commit or push operation. A live authenticated browser check was not available; responsive visual acceptance remains to be confirmed in the target Workbench session.

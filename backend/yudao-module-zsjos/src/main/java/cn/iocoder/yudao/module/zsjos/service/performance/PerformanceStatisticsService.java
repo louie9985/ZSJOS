@@ -17,6 +17,7 @@ import static cn.iocoder.yudao.module.zsjos.service.performance.PerformancePerio
 public class PerformanceStatisticsService {
  @Resource private PerformanceAccess access;
  @Resource private PerformanceFactMapper facts;
+ @Resource private PerformanceDetailMapper detailQueries;
  @Resource private PerformanceTargetService targets;
  private Long tenant(){return TenantContextHolder.getRequiredTenantId();}
  private LocalDateTime now(){return LocalDateTime.now(ZONE);}
@@ -54,7 +55,7 @@ public class PerformanceStatisticsService {
   var missing=o.stream().filter(x->x.getDeptId()==null||x.getCenterId()==null).toList();
   return new Overview(n,facts.availableSince(tenant(),q.getScopeType(),q.getScopeId()),progress,performance,conversion,pending,missing.size(),missing.stream().map(PerformanceFact::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add),access.has("zsjos:sales-performance:detail"));
  }
- private boolean manualTask(PerformanceFact x){return !(Set.of("lead_first_follow_up","lead_qualification").contains(x.getGroupKey())&&cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.SOURCE.equals(x.getGenerationSource()));}
+ private boolean manualTask(PerformanceFact x){return !(Set.of("lead_first_follow_up","lead_qualification").contains(x.getGroupKey())&&cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.isAutomaticSource(x.getGenerationSource()));}
  private boolean pending(PerformanceFact x){return "pending".equals(x.getStatus());}
  private boolean follow(PerformanceFact x){return Set.of("lead_first_follow_up","lead_follow_up_reminder").contains(x.getGroupKey());}
  private void cumulative(Query q,List<PerformanceFact> o,List<PerformanceFact> r){if(q.isCumulative()){var first=java.util.stream.Stream.concat(o.stream().map(PerformanceFact::getOccurredAt),r.stream().map(PerformanceFact::getReceivedAt)).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(now());q.setStart(first.toLocalDate());q.setEnd(now().toLocalDate());q.setGrain("month");}}
@@ -142,28 +143,45 @@ public class PerformanceStatisticsService {
  public List<MissingTarget> missingTargets(Query q){access.authorize(q,false);if(!access.has("zsjos:sales-performance-target:query"))throw PerformanceAccess.denied();return targets.missing(q.getScopeType(),q.getScopeId(),now().toLocalDate().withDayOfMonth(1));}
  public PageResult<Detail> details(Query q){
   if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
-  var o=orders(q);var allReceipts=receipts(q);cumulative(q,o,allReceipts);var w=range(q);List<Detail> rows;
-  if(q.getDimension()!=null&&q.getGroupKey()!=null){switch(q.getDimension()){
-   case "source"->o=o.stream().filter(x->(sourceGroup(x)+"|"+sourceName(sourceGroup(x))).equals(q.getGroupKey())).toList();
-   case "contributor"->o=o.stream().filter(x->Objects.toString(x.getUserId(),"").equals(q.getGroupKey())).toList();
-   case "product"->{var amounts=authorizedRows(q,facts.products(tenant(),q.getScopeType(),q.getScopeId())).stream().filter(x->(Objects.toString(x.getGroupKey(),"unknown")+"|"+Objects.toString(x.getLabel(),"历史产品名称缺失")).equals(q.getGroupKey())).collect(Collectors.toMap(PerformanceFact::getLeadId,PerformanceFact::getAmount,BigDecimal::add));o=o.stream().filter(x->amounts.containsKey(x.getId())).peek(x->x.setAmount(amounts.get(x.getId()))).toList();}
-  }}
-  if("orders".equals(q.getMetric()))rows=o.stream().filter(x->w.contains(x.getOccurredAt())).map(x->new Detail(x.getId(),x.getNumber(),"order",sourceName(sourceGroup(x)),x.getOccurredAt(),x.getAmount(),"审批通过")).toList();
-  else if("conversion".equals(q.getMetric())) {
-   rows=PerformanceConversion.population(w,o,allReceipts).entrySet().stream().map(e->{
-    var r=e.getValue();var receipt=r.receipt();var order=r.order();
-    return new Detail(e.getKey(),receipt==null?allReceipts.stream().filter(x->Objects.equals(x.getLeadId(),e.getKey())).map(PerformanceFact::getNumber).filter(Objects::nonNull).findFirst().orElse(null):receipt.getNumber(),"lead",r.previous()?"往期接收有效期内成交":"期间新接有效",receipt==null?order.getReceivedAt():receipt.getReceivedAt(),order==null?null:order.getAmount(),order==null?"未成交":"已成交");
-   }).toList();
+  access.authorize(q,false);
+  var scope=access.historicalScope(q);
+  var n=now();
+  var request=new PerformanceDetailQuery().setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
+    .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());
+  if(q.isCumulative()){
+   var first=detailQueries.firstDate(request);
+   q.setStart((first==null?n:first).toLocalDate());q.setEnd(n.toLocalDate());q.setGrain("month");
   }
-  else if(Set.of("leads","valid").contains(q.getMetric()))rows=allReceipts.stream().filter(x->w.contains(x.getReceivedAt())&&(!"valid".equals(q.getMetric())||Set.of("valid","converted","won").contains(x.getStatus()))&&(!"category".equals(q.getDimension())||Objects.toString(x.getCategory(),"历史分类缺失").equals(q.getGroupKey()))&&(!"stage".equals(q.getDimension())||Objects.toString(x.getStage(),"阶段未记录").equals(q.getGroupKey()))).collect(Collectors.toMap(PerformanceFact::getLeadId,java.util.function.Function.identity(),(a,b)->a,LinkedHashMap::new)).values().stream().map(x->new Detail(x.getLeadId(),x.getNumber(),"lead",Objects.toString(x.getCategory(),"历史分类缺失"),x.getReceivedAt(),null,x.getStatus())).toList();
-  else if(Set.of("assigned","missed","followUps").contains(q.getMetric())){var u=users(q);var fs="followUps".equals(q.getMetric())?facts.followUps(tenant(),q.getScopeType(),q.getScopeId()):facts.assignments(tenant(),q.getScopeType(),q.getScopeId());rows=authorizedRows(q,fs).stream().filter(x->w.contains(x.getOccurredAt())&&("followUps".equals(q.getMetric())||("assigned".equals(q.getMetric())?"dispatch":"timeout").equals(x.getGroupKey()))).map(x->new Detail(x.getId(),x.getNumber(),"lead",x.getLabel(),x.getOccurredAt(),null,x.getGroupKey())).toList();}
-  else {var n=now();Map<Long,String> taskNames=new HashMap<>();var followWindow=dueWindow(q,w);rows=tasks(q).stream().filter(this::manualTask).filter(x->switch(q.getMetric()){
-   case "accept"->pending(x)&&"lead_assignment_accept".equals(x.getGroupKey());
-   case "qualification"->Boolean.TRUE.equals(x.getCurrentQualification())&&(pending(x)||"overdue".equals(x.getOutcome()))&&"lead_qualification".equals(x.getGroupKey())&&x.getDueAt()!=null&&!x.getDueAt().isAfter(n);
-   case "todayFollowUp"->pending(x)&&follow(x)&&x.getDueAt()!=null&&x.getDueAt().toLocalDate().equals(n.toLocalDate());
-   case "overdueFollowUp"->pending(x)&&follow(x)&&x.getDueAt()!=null&&x.getDueAt().isBefore(n);
-   default->follow(x)&&followWindow.contains(x.getDueAt());
-  }).sorted(Comparator.comparing(PerformanceFact::getDueAt,Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(PerformanceFact::getId)).map(x->taskDetail(x,n,taskNames)).toList();}
-  int from=Math.min(rows.size(),(q.getPageNo()-1)*q.getPageSize());return new PageResult<>(rows.subList(from,Math.min(rows.size(),from+q.getPageSize())),(long)rows.size());
+  var w=range(q);
+  request.setMetric(q.getMetric()).setDimension(q.getDimension()).setGroupKey(q.getGroupKey())
+    .setStart(w.start()).setEnd(w.end()).setDueEnd(dueWindow(q,w).end())
+    .setNow(n).setToday(n.toLocalDate().atStartOfDay()).setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay())
+    .setOffset((long)(q.getPageNo()-1)*q.getPageSize()).setSize(q.getPageSize());
+  if("conversion".equals(q.getMetric()))return conversionDetails(request,w);
+  long total=detailQueries.count(request);
+  if(request.getOffset()>=total)return new PageResult<>(List.of(),total);
+  Map<Long,String> names=new HashMap<>();
+  var rows=detailQueries.page(request).stream().map(x->switch(q.getMetric()){
+   case "orders" -> new Detail(x.getId(),x.getNumber(),"order",sourceName(sourceGroup(x)),x.getOccurredAt(),x.getAmount(),"审批通过");
+   case "leads","valid" -> new Detail(x.getId(),x.getNumber(),"lead",x.getLabel(),x.getOccurredAt(),null,x.getStatus());
+   case "assigned","missed","followUps" -> new Detail(x.getId(),x.getNumber(),"lead",x.getLabel(),x.getOccurredAt(),null,x.getGroupKey());
+   default -> taskDetail(x,n,names);
+  }).toList();
+  return new PageResult<>(rows,total);
+ }
+ private PageResult<Detail> conversionDetails(PerformanceDetailQuery request,Window window){
+  var orders=detailQueries.conversionOrders(request);
+  request.setConversionLeadIds(orders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(Collectors.toSet()));
+  var receipts=detailQueries.conversionReceipts(request);
+  var population=PerformanceConversion.population(window,orders,receipts);
+  Map<Long,String> numbers=new HashMap<>();
+  receipts.stream().filter(x->x.getNumber()!=null).forEach(x->numbers.putIfAbsent(x.getLeadId(),x.getNumber()));
+  var page=population.entrySet().stream().skip(request.getOffset()).limit(request.getSize()).map(e->{
+   var receipt=e.getValue().receipt();var order=e.getValue().order();
+   return new Detail(e.getKey(),receipt==null?numbers.get(e.getKey()):receipt.getNumber(),"lead",
+     e.getValue().previous()?"往期接收有效期内成交":"期间新接有效",receipt==null?order.getReceivedAt():receipt.getReceivedAt(),
+     order==null?null:order.getAmount(),order==null?"未成交":"已成交");
+  }).toList();
+  return new PageResult<>(page,(long)population.size());
  }
 }

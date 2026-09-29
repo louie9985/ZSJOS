@@ -241,9 +241,10 @@ public class EamAssetController {
 
         result.forEach(vo -> {
             vo.setCategoryName(categoryNameMap.get(vo.getCategoryId()));
-            HrmEmployeeRespDTO employee = employeeMap.get(vo.getUseEmployeeId());
+            HrmEmployeeRespDTO employee = vo.getUseEmployeeId() == null ? null
+                    : employeeMap.get(vo.getUseEmployeeId());
             vo.setUseEmployeeName(employee != null ? employee.getName() : vo.getUseEmployeeNameSnapshot());
-            DeptRespDTO dept = deptMap.get(vo.getUseDeptId());
+            DeptRespDTO dept = vo.getUseDeptId() == null ? null : deptMap.get(vo.getUseDeptId());
             vo.setUseDeptName(dept != null ? dept.getName() : null);
         });
         return result;

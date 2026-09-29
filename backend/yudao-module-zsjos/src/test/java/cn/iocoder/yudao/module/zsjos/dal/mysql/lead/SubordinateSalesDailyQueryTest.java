@@ -24,8 +24,9 @@ public class SubordinateSalesDailyQueryTest {
         return value == null ? null : value.toString();
     }
     public static String jsonUnquote(String value) { return value; }
-    @Test
-    void actualMapperQueriesEnforceUserTimeTenantDeletionAndEventScope() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ void actualMapperQueriesEnforceUserTimeTenantDeletionAndEventScope(String generationSource) throws Exception {
         var datasource = new UnpooledDataSource("org.h2.Driver", "jdbc:h2:mem:daily" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var config = new MybatisConfiguration();
         config.setMapUnderscoreToCamelCase(true);
@@ -73,13 +74,13 @@ public class SubordinateSalesDailyQueryTest {
             assertEquals(List.of(), opportunity.selectTodayByUserIds(List.of(), start, end));
             assertEquals(List.of(), events.selectTodayByUserIds(List.of(), start, end));
             try (var sql = session.getConnection().prepareStatement("UPDATE zsjos_business_event SET related_object_refs=? WHERE id=1")) {
-                sql.setString(1, "{\"generationSource\":\"sales_self_sourced_auto\"}"); sql.executeUpdate();
+                sql.setString(1, "{\"generationSource\":\""+generationSource+"\"}"); sql.executeUpdate();
             }
             session.clearCache();
             assertEquals(0, events.selectTodayByUserIds(List.of(20L), start, end).size());
             assertEquals(1, follow.selectTodayByUserIds(List.of(20L), start, end).size());
             try (var sql = session.getConnection().prepareStatement("INSERT INTO zsjos_business_event(id,aggregate_id,aggregate_type,event_type,tenant_id,deleted,related_object_refs) VALUES (9,1,'lead','lead_follow_up_recorded',1,false,?)")) {
-                sql.setString(1, "{\"generationSource\":\"sales_self_sourced_auto\",\"followUpRecordId\":1}"); sql.executeUpdate();
+                sql.setString(1, "{\"generationSource\":\""+generationSource+"\",\"followUpRecordId\":1}"); sql.executeUpdate();
             }
             session.clearCache();
             assertEquals(0, follow.selectTodayByUserIds(List.of(20L), start, end).size());

@@ -208,4 +208,49 @@ class ExportTaskServiceImplTest {
         task.setTenantId(1L);
         return task;
     }
+
+    private cn.iocoder.yudao.module.system.api.permission.PermissionApi installWithdrawalProvider() {
+        var withdrawalProvider = new cn.iocoder.yudao.module.zsjos.service.export.provider.WithdrawalExportTypeProvider();
+        var permissions = mock(cn.iocoder.yudao.module.system.api.permission.PermissionApi.class);
+        ReflectionTestUtils.setField(withdrawalProvider, "permissionApi", permissions);
+        ReflectionTestUtils.setField(service, "providers", List.of(withdrawalProvider));
+        return permissions;
+    }
+
+    @Test
+    void withdrawalCreateRequiresManagementAccessEvenWithExportPermission() {
+        installWithdrawalProvider();
+        assertThrows(ServiceException.class, () -> service.create(1L, "withdrawal", "{}"));
+        verifyNoInteractions(mapper, fileApi);
+    }
+
+    @Test
+    void withdrawalManagementAccessRevokedWhileQueuedFailsWithoutFile() {
+        installWithdrawalProvider();
+        when(mapper.transition(anyLong(), anyInt(), anyList(), any())).thenReturn(1);
+        service.processOne(task().setExportType("withdrawal"));
+        ArgumentCaptor<ExportTaskDO> values = ArgumentCaptor.forClass(ExportTaskDO.class);
+        verify(mapper, times(2)).transition(eq(10L), anyInt(), anyList(), values.capture());
+        assertEquals(FAILED, values.getAllValues().get(1).getStatus());
+        assertEquals("PERMISSION_REVOKED", values.getAllValues().get(1).getFailureCode());
+        verifyNoInteractions(fileApi);
+        assertNull(SecurityFrameworkUtils.getLoginUser());
+    }
+
+    @Test
+    void withdrawalDownloadRequiresOwnershipAndCurrentManagementAccess() {
+        var permissions = installWithdrawalProvider();
+        var ready = task().setExportType("withdrawal").setStatus(READY).setResultFileId(20L)
+                .setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(mapper.selectById(10L)).thenReturn(ready);
+        assertThrows(ServiceException.class, () -> service.getDownloadUrl(2L, 10L));
+        assertThrows(ServiceException.class, () -> service.getDownloadUrl(1L, 10L));
+        verifyNoInteractions(fileApi);
+        when(permissions.hasAnyPermissions(1L, "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query")).thenReturn(true);
+        when(fileApi.presignGetUrl(20L, 300)).thenReturn("test-private-download");
+        assertEquals("test-private-download", service.getDownloadUrl(1L, 10L));
+        when(permissions.hasAnyPermissions(1L, "zsjos:withdrawal:finance-query", "zsjos:withdrawal:admin-query")).thenReturn(false);
+        assertThrows(ServiceException.class, () -> service.getDownloadUrl(1L, 10L));
+        verify(fileApi, times(1)).presignGetUrl(20L, 300);
+    }
 }

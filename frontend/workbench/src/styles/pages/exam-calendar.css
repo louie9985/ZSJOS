@@ -18,7 +18,7 @@
 .exam-calendar-filter { min-width: 180px; }
 .exam-calendar-page .ant-spin-nested-loading,
 .exam-calendar-page .ant-spin-container { min-height: 0; height: 100%; }
-.exam-calendar-page .ant-picker-calendar { height: 100%; overflow: auto; }
+.exam-calendar-page > .ant-spin-nested-loading { flex: 1; overflow: auto; }
 
 .exam-calendar-events {
   display: grid;
@@ -77,6 +77,30 @@
 .exam-calendar-detail .wide { grid-column: 1 / -1; }
 .exam-calendar-detail span { color: var(--crm-text-secondary); }
 
+.exam-calendar-legend { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.exam-calendar-legend .ant-tag { border-style: solid; }
+.exam-day-detail { max-height: 65vh; overflow-y: auto; }
+.exam-month { min-width: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); overflow: hidden; }
+.exam-month-weekdays, .exam-month-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.exam-month-weekdays { padding-block: var(--crm-sp-3); color: var(--crm-text-secondary); text-align: center; }
+.exam-month-week { border-top: 1px solid var(--crm-border); }
+.exam-month-day { min-width: 0; border-right: 1px solid var(--crm-border); padding-bottom: var(--crm-sp-2); }
+.exam-month-day:nth-child(7) { border-right: 0; }
+.exam-month-day.is-adjacent { background: var(--crm-bg-layout); }
+.exam-month-date { display: block; width: 100%; height: 36px; padding: 0 var(--crm-sp-3); border: 0; background: transparent; color: var(--crm-text); text-align: right; cursor: pointer; font: inherit; }
+.exam-month-day.is-adjacent .exam-month-date { color: var(--crm-text-secondary); }
+.exam-month-day.is-today .exam-month-date { color: var(--crm-color-primary); font-weight: 700; }
+.exam-month-date:hover { background: var(--crm-color-primary-bg); }
+.exam-month .exam-calendar-events { padding-inline: var(--crm-sp-1); }
+.exam-month .exam-calendar-event { font: inherit; font-size: var(--crm-font-sm); }
+.exam-month .exam-calendar-event > span:first-child { white-space: nowrap; }
+.exam-multiDay-bar { z-index: 1; display: flex; align-items: center; gap: var(--crm-sp-1); min-width: 0; height: 26px; margin-inline: var(--crm-sp-1); padding: 0 var(--crm-sp-2); border: 1px solid var(--crm-color-primary-border); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); color: var(--crm-text); cursor: pointer; font: inherit; font-size: var(--crm-font-sm); text-align: left; }
+.exam-multiDay-bar-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exam-multiDay-bar.status-draft, .exam-multiDay-bar.status-revoked { background: var(--crm-bg-container); border-color: var(--crm-border); color: var(--crm-text-secondary); }
+.exam-multiDay-bar.status-revoked .exam-multiDay-bar-label { text-decoration: line-thmultiDay; }
+.exam-month button:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
+.exam-month .exam-multiDay-overflow, .exam-month .exam-calendar-overflow { width: 100%; height: auto; padding: 0; font-size: var(--crm-font-sm); white-space: normal; }
+
 @media (max-width: 768px) {
   .exam-calendar-page { height: auto; min-height: 100%; }
   .exam-calendar-page .page-heading,
@@ -84,4 +108,12 @@
   .exam-calendar-filter { width: 100%; }
   .exam-calendar-detail { grid-template-columns: 1fr; }
   .exam-calendar-detail .wide { grid-column: auto; }
+  .exam-month .exam-calendar-event { padding: var(--crm-sp-1); }
+  .exam-month .exam-calendar-event .ant-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding-inline: 0; font-size: var(--crm-font-sm); }
+  .exam-multiDay-bar { margin-inline: 2px; padding-inline: var(--crm-sp-1); }
+  .exam-month-date { padding-inline: var(--crm-sp-2); }
 }
+
+.exam-multiDay-bar.status-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
+.exam-multiDay-bar.status-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
+.exam-multiDay-bar.status-ended { border-color: var(--crm-border); background: var(--crm-bg-container); color: var(--crm-text-secondary); }

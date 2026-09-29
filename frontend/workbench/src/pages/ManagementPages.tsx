@@ -2,14 +2,14 @@ import { CashbackControl } from '../components/CashbackControl'
 import { auditSourceLabel, auditCategoryLabel, auditResultLabel, relationActionLabel, notifyChannelLabel, notifyRecipientLabels } from '../services/managementDisplay'
 import { CashbackDetail, WithdrawalSources } from '../components/FinanceTrace'
 import { useFinanceFilterOptions } from '../hooks/useFinanceFilterOptions'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createCashbackColumns, money } from './financeTableColumns'
 import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, DatePicker, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio, Select, Space, Spin, Switch, Tabs, Tag, Typography, message } from 'antd'
 import {
-  CheckOutlined, CloseOutlined, DeleteOutlined, EditOutlined, PlusOutlined,
+  CheckOutlined, CloseOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined,
   ReloadOutlined, SafetyCertificateOutlined, StopOutlined
 } from '@ant-design/icons'
 import { formatTimestamp } from '../services/time'
@@ -17,7 +17,8 @@ import {
   managementApi, type BusinessAudit, type Cashback, type ImpersonationAudit, type NotifyRule,
   type PersonnelState, type RelationScene, type UserRelation, type UserRelationLog, type Withdrawal
 } from '../services/managementApi'
-import type { SimpleUser } from '../services/api'
+import { api, type SimpleUser } from '../services/api'
+import { APP_ROUTES } from '../constants'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT, storeImpersonation } from '../services/impersonation'
 import SubordinatePartnerPage from './SubordinatePartnerPage'
 import { availableAuditTabs, canUpdateMaintenance, hasPermission, withdrawalDetailScope } from '../services/managementAccess'
@@ -102,17 +103,51 @@ export function CashbackPage({ permissions }: { permissions: string[] }) {
   const cashbackId = Number(cashbackSearch.get('cashbackId')) || undefined
   const openCashback = (id?: number) => { const next = new URLSearchParams(cashbackSearch); if (id) next.set('cashbackId', String(id)); else next.delete('cashbackId'); setCashbackSearch(next, { replace: true }) }
   const cashbackRequest = useRef(0)
+  const keywordInput = useRef<import('antd').InputRef>(null)
+  const pendingSearch = useRef<string | undefined>(undefined)
   const finance = hasPermission(permissions, 'zsjos:cashback:finance-query'), authorized = finance || hasPermission(permissions, 'zsjos:cashback:my-query'), [items, setItems] = useState<Cashback[]>([]), [loading, setLoading] = useState(false), [error, setError] = useState(authorized ? '' : '无权查看返现记录'), [page, setPage] = useState(1), [total, setTotal] = useState(0), [type, setType] = useState<string>(), [status, setStatus] = useState<string>(), [keyword, setKeyword] = useState(''), [advancedFilter, setAdvancedFilter] = useState<import('../services/api').AdvancedFilterGroup>()
-  const load = useCallback(async (next = page) => { if (!authorized) return; const sequence = ++cashbackRequest.current; setItems([]); setLoading(true); setError(''); try { const result = await managementApi.cashbacks(!finance, { pageNo: next, pageSize: 10, type, status, keyword: keyword || undefined, advancedFilter }); if (sequence !== cashbackRequest.current) return; setItems(result.list); setTotal(result.total); setPage(next) } catch (e) { if (sequence === cashbackRequest.current) setError(errorText(e, '返现记录加载失败')) } finally { if (sequence === cashbackRequest.current) setLoading(false) } }, [authorized, finance, page, status, type, keyword, advancedFilter])
-  useEffect(() => { void load(1) }, [advancedFilter, keyword]) // eslint-disable-line react-hooks/exhaustive-deps
+  const load = useCallback(async (next = page) => {
+    if (!authorized) return
+    const params = { pageNo: next, pageSize: 10, type, status, keyword: keyword || undefined, advancedFilter }
+    const key = JSON.stringify([finance, params])
+    if (pendingSearch.current === key) return
+    pendingSearch.current = key
+    const sequence = ++cashbackRequest.current
+    setItems([]); setLoading(true); setError('')
+    try {
+      const result = await managementApi.cashbacks(!finance, params)
+      if (sequence !== cashbackRequest.current) return
+      setItems(result.list); setTotal(result.total); setPage(next)
+    } catch (e) {
+      if (sequence === cashbackRequest.current) setError(errorText(e, '返现记录加载失败'))
+    } finally {
+      if (sequence === cashbackRequest.current) { pendingSearch.current = undefined; setLoading(false) }
+    }
+  }, [authorized, finance, page, status, type, keyword, advancedFilter])
+  const submitKeyword = (value: string) => {
+    const next = value.trim()
+    if (next === keyword) void load(1)
+    else setKeyword(next)
+  }
+  useEffect(() => () => { ++cashbackRequest.current; pendingSearch.current = undefined }, [])
+  useEffect(() => { void load(1) }, [advancedFilter, keyword, type, status]) // eslint-disable-line react-hooks/exhaustive-deps
   const financeOptions = useFinanceFilterOptions('cashback', authorized)
+  const tabsDisabled = !authorized || financeOptions.loading || !!financeOptions.error
+  const filterTabs = (key: 'type' | 'status') => [
+    { key: '', label: '全部', disabled: tabsDisabled },
+    ...financeOptions.options(key).map(option => ({ key: String(option.value), label: option.label, disabled: tabsDisabled })),
+  ]
   const columns = createCashbackColumns(financeOptions.options('type'), financeOptions.options('status'), finance ? openCashback : undefined)
   if (finance) columns.push({ title: '操作', key: 'control', fixed: 'right', render: (_, row) => <Space><Button type="link" onClick={() => openCashback(row.id)}>详情</Button><CashbackControl row={row} permissions={permissions} onSuccess={() => void load()} /></Space> })
-  return <section className="workspace-page management-page">{pageTitle(finance ? '返现管理' : '我的返现', finance ? '查看业务范围内返现台账' : '查看个人返现进度')}{financeOptions.error && <LoadError error={financeOptions.error} retry={() => void financeOptions.reload()}/>}<BusinessTable<Cashback> tableKey="management-pages-3" rowKey="id"  dataSource={items} loading={loading} columns={columns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-cashback-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Select allowClear value={type} onChange={setType} placeholder="返现类型" options={financeOptions.options('type')} loading={financeOptions.loading} disabled={financeOptions.loading || !!financeOptions.error}/><Select allowClear value={status} onChange={setStatus} placeholder="返现状态" options={financeOptions.options('status')} loading={financeOptions.loading} disabled={financeOptions.loading || !!financeOptions.error}/><Button type="primary" onClick={() => void load(1)}>查询</Button><AdvancedFilterToolbar scene="cashback" pageKey="cashback" placeholder="返现编号 / 客资编号 / 姓名" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1250 }} locale={{ emptyText: error || '当前筛选下暂无返现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}<CashbackDetail id={finance ? cashbackId : undefined} onChanged={() => void load()} permissions={permissions} onClose={() => openCashback()}/></section>
+  return <section className="workspace-page management-page">{pageTitle(finance ? '返现管理' : '我的返现', finance ? '查看业务范围内返现台账' : '查看个人返现进度')}{financeOptions.error && <LoadError error={financeOptions.error} retry={() => void financeOptions.reload()}/>}<div aria-label="返现类型"><Tabs type="card" activeKey={type ?? ''} items={filterTabs('type')} onChange={key => { setPage(1); setType(key || undefined) }}/></div><div aria-label="返现状态"><Tabs size="small" activeKey={status ?? ''} items={filterTabs('status')} onChange={key => { setPage(1); setStatus(key || undefined) }}/></div><BusinessTable<Cashback> tableKey="management-pages-3" rowKey="id"  dataSource={items} loading={loading} columns={columns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-cashback-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Button type="primary" loading={loading} onClick={() => submitKeyword(keywordInput.current?.input?.value ?? keyword)}>查询</Button><AdvancedFilterToolbar inputRef={keywordInput} scene="cashback" pageKey="cashback" placeholder="返现编号 / 客资编号 / 姓名" keyword={keyword} value={advancedFilter} onKeyword={submitKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1250 }} locale={{ emptyText: error || '当前筛选下暂无返现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}<CashbackDetail id={finance ? cashbackId : undefined} onChanged={() => void load()} permissions={permissions} onClose={() => openCashback()}/></section>
 }
 
 
 export function WithdrawalPage({ permissions, tenantReadAll = false }: { permissions: string[]; tenantReadAll?: boolean }) {
+  const navigate = useNavigate()
+  const [exportModal, exportModalHolder] = Modal.useModal()
+  const exportPending = useRef(false)
+  const [exporting, setExporting] = useState(false)
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
   const [withdrawalSearch] = useSearchParams()
   const withdrawalRequest = useRef(0)
@@ -126,6 +161,25 @@ export function WithdrawalPage({ permissions, tenantReadAll = false }: { permiss
     || (financeOptions.loading ? '状态加载中' : '状态暂不可用')
   const canPayout = !own && hasPermission(permissions, 'zsjos:withdrawal:payout')
   const [keyword, setKeyword] = useState(''), [advancedFilter, setAdvancedFilter] = useState<import('../services/api').AdvancedFilterGroup>()
+  const canExport = !own && hasPermission(permissions, 'zsjos:export:withdrawal') && hasPermission(permissions, 'zsjos:export:query')
+  const exportCurrent = async () => {
+    if (!canExport || exportPending.current) return
+    exportPending.current = true
+    setExporting(true)
+    const filter = { status, keyword: keyword || undefined, advancedFilter }
+    try {
+      const confirmed = await exportModal.confirm({
+        title: '导出提现记录',
+        content: '将导出符合当前筛选条件的全部提现记录，包含完整银行卡号、开户信息及审核和打款信息。',
+        okText: '加入导出队列', cancelText: '取消',
+      })
+      if (!confirmed) return
+      await api.createExportTask('withdrawal', filter)
+      exportModal.success({ title: '已加入导出队列', content: '文件生成后可在导出任务中下载。',
+        okText: '查看导出任务', onOk: () => navigate(APP_ROUTES.EXPORT_TASKS) })
+    } catch (e) { message.error(errorText(e, '导出任务创建失败，请重试')) }
+    finally { exportPending.current = false; setExporting(false) }
+  }
   const load = useCallback(async (next = page) => {
     if (!authorized) return
     const sequence = ++withdrawalRequest.current
@@ -138,7 +192,8 @@ export function WithdrawalPage({ permissions, tenantReadAll = false }: { permiss
     } catch (e) { if (sequence === withdrawalRequest.current) setError(errorText(e, '提现记录加载失败')) }
     finally { if (sequence === withdrawalRequest.current) setLoading(false) }
   }, [authorized, own, page, status, keyword, advancedFilter, readScope])
-  useEffect(() => { void load(1) }, [readScope, advancedFilter, keyword]) // eslint-disable-line react-hooks/exhaustive-deps
+  const managementStatus = own ? undefined : status
+  useEffect(() => { void load(1) }, [readScope, advancedFilter, keyword, managementStatus]) // eslint-disable-line react-hooks/exhaustive-deps
   const openDetail = async (row: Withdrawal) => { try { setDetail(await managementApi.withdrawal(row.id, detailScope)) } catch (e) { message.error(errorText(e, '提现详情加载失败')) } }
   useEffect(() => {
     const id = Number(withdrawalSearch.get('withdrawalId'))
@@ -181,7 +236,12 @@ export function WithdrawalPage({ permissions, tenantReadAll = false }: { permiss
     finally { setSavingAction(false) }
   }
   const withdrawalColumns: ProColumns<Withdrawal>[] = [{ title: '提现单号', dataIndex: 'withdrawalNo', fixed: 'left' }, { title: '申请人', dataIndex: 'applicantName', render: (_, row) => row.applicantName || '-' }, { title: '归属合作方', dataIndex: 'partnerName' }, { title: '来源返现笔数', dataIndex: 'cashbackCount' }, { title: '申请金额', dataIndex: 'applicationAmount', render: (_, row) => money(row.applicationAmount) }, { title: '状态', dataIndex: 'status', render: (_, row) => <Tag>{withdrawalStatusLabel(row.status)}</Tag> }, { title: '账户名', dataIndex: 'accountNameSnapshot' }, { title: '银行卡', dataIndex: 'cardNumber', render: (_, row) => row.cardNumber || row.maskedCardNumber || '-' }, { title: '开户行', dataIndex: 'bankNameSnapshot' }, { title: '提交时间', dataIndex: 'submittedAt', render: (_, row) => formatTimestamp(row.submittedAt) }, { title: '审核时间', dataIndex: 'reviewedAt', render: (_, row) => formatTimestamp(row.reviewedAt) }, { key: 'action', title: '操作', fixed: 'right', render: (_, row) => <Space><Button type="link" onClick={() => void openDetail(row)}>详情</Button>{own && !readOnly && row.status === 'pending_review' && <Popconfirm title="确认撤销该提现申请？" onConfirm={() => void cancel(row.id)}><Button type="link" danger>撤销</Button></Popconfirm>}</Space> }]
-  return <section className="workspace-page management-page">{pageTitle(own ? '我的提现' : '提现管理', own ? '提交并跟踪返现提现申请' : '审核与登记提现打款', own && !readOnly && hasPermission(permissions, 'zsjos:withdrawal:apply') ? <Button type="primary" icon={<PlusOutlined/>} onClick={() => void openApply()}>申请提现</Button> : undefined)}{own && tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setReadScope(value); setDetail(undefined); setApplyOpen(false); setAction(undefined) }}/>}{financeOptions.error && <LoadError error={financeOptions.error} retry={() => void financeOptions.reload()}/>}<BusinessTable<Withdrawal> tableKey="management-pages-4" rowKey="id" rowSelection={canPayout ? { selectedRowKeys: selectedWithdrawals, onChange: keys => setSelectedWithdrawals(keys as number[]), getCheckboxProps: row => ({ disabled: row.status !== 'approved' }) } : undefined} batchActions={canPayout ? <Button type="primary" disabled={loading || !selectedWithdrawals.length} onClick={() => openPayout(selectedWithdrawals, true)}>批量登记打款（{selectedWithdrawals.length}）</Button> : undefined}  dataSource={items} loading={loading} columns={withdrawalColumns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-withdrawal-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Input.Search allowClear value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="提现单号 / 银行流水号" onSearch={() => void load(1)}/><Select allowClear value={status} onChange={setStatus} placeholder="提现状态" options={financeOptions.options('status')} loading={financeOptions.loading} disabled={financeOptions.loading || !!financeOptions.error}/><Button type="primary" onClick={() => void load(1)}>查询</Button><AdvancedFilterToolbar scene="withdrawal" pageKey="withdrawal" placeholder="高级筛选" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1400 }} locale={{ emptyText: error || '当前筛选下暂无提现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}
+  return <section className="workspace-page management-page">{exportModalHolder}{pageTitle(own ? '我的提现' : '提现管理', own ? '提交并跟踪返现提现申请' : '审核与登记提现打款', own && !readOnly && hasPermission(permissions, 'zsjos:withdrawal:apply') ? <Button type="primary" icon={<PlusOutlined/>} onClick={() => void openApply()}>申请提现</Button> : undefined)}{own && tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setReadScope(value); setDetail(undefined); setApplyOpen(false); setAction(undefined) }}/>}{financeOptions.error && <LoadError error={financeOptions.error} retry={() => void financeOptions.reload()}/>}{!own && <Tabs
+      aria-label="提现状态"
+      activeKey={status ?? ''}
+      onChange={key => { setPage(1); setSelectedWithdrawals([]); setStatus(key || undefined) }}
+      items={[{ key: '', label: '全部' }, ...financeOptions.options('status').map(option => ({ key: String(option.value), label: option.label }))].map(item => ({ ...item, disabled: financeOptions.loading || !!financeOptions.error }))}
+    />}<BusinessTable<Withdrawal> tableKey="management-pages-4" rowKey="id" rowSelection={canPayout ? { selectedRowKeys: selectedWithdrawals, onChange: keys => setSelectedWithdrawals(keys as number[]), getCheckboxProps: row => ({ disabled: row.status !== 'approved' }) } : undefined} batchActions={canPayout ? <Button type="primary" disabled={loading || !selectedWithdrawals.length} onClick={() => openPayout(selectedWithdrawals, true)}>批量登记打款（{selectedWithdrawals.length}）</Button> : undefined}  dataSource={items} loading={loading} columns={withdrawalColumns} onReload={() => void load(1)} columnsState={{ persistenceKey: 'zsjos-withdrawal-columns', persistenceType: 'localStorage' }} filters={<>{[<Space key="filters" wrap><Input.Search allowClear value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="提现单号 / 银行流水号" onSearch={() => void load(1)}/>{own && <Select allowClear value={status} onChange={setStatus} placeholder="提现状态" options={financeOptions.options('status')} loading={financeOptions.loading} disabled={financeOptions.loading || !!financeOptions.error}/>}<Button type="primary" onClick={() => void load(1)}>查询</Button>{canExport && <Button icon={<DownloadOutlined/>} loading={exporting} onClick={() => void exportCurrent()}>导出</Button>}<AdvancedFilterToolbar scene="withdrawal" pageKey="withdrawal" placeholder="高级筛选" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></Space>]}</>} pagination={{ current: page, total, pageSize: 10, onChange: next => void load(next) }} scroll={{ x: 1400 }} locale={{ emptyText: error || '当前筛选下暂无提现记录' }}/>{error && <LoadError error={error} retry={() => void load()}/>}
     <Modal width={760} title="申请提现" open={applyOpen} onCancel={() => setApplyOpen(false)} onOk={() => void submitApply()}><BusinessTable tableKey="management-pages-5" columnMode="native" mode="compact" rowKey="id" size="small" dataSource={available} rowSelection={{ selectedRowKeys: selectedCashbacks, onChange: keys => setSelectedCashbacks(keys as number[]) }} pagination={false} columns={[{ title: '返现单号', dataIndex: 'cashbackNo' }, { title: '产品', dataIndex: 'productNameSnapshot' }, { title: '金额', dataIndex: 'amount', render: money }]}/><Form form={applyForm} layout="vertical"><Form.Item name="accountName" label="账户名" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="cardNumber" label="银行卡号" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="bankName" label="开户银行" rules={[{ required: true }]}><Input/></Form.Item><Form.Item name="branchName" label="开户支行"><Input/></Form.Item><Form.Item name="saveCard" label="保存银行卡" valuePropName="checked" initialValue={false}><Switch/></Form.Item></Form></Modal>
     <Modal title="提现详情" width={1000} open={Boolean(detail) && !action} onCancel={() => setDetail(undefined)} footer={detail && !own ? <Space>{detail.availableActions?.includes('approve') && hasPermission(permissions, 'zsjos:withdrawal:review') && <Button type="primary" onClick={() => { actionForm.resetFields(); setAction('approve-review') }}>通过</Button>}{detail.availableActions?.includes('reject') && hasPermission(permissions, 'zsjos:withdrawal:review') && <Button danger onClick={() => { actionForm.resetFields(); setAction('reject-review') }}>驳回</Button>}{hasPermission(permissions, 'zsjos:withdrawal:review') && detail.status === 'approved' && <Button danger onClick={() => { actionForm.resetFields(); setAction('reject') }}>驳回已通过申请</Button>}{hasPermission(permissions, 'zsjos:withdrawal:payout') && detail.status === 'approved' && <Button type="primary" onClick={() => openPayout([detail.id])}>登记打款</Button>}</Space> : undefined}>{detail?.reviewUnavailableReason && detail.status === 'pending_review' && <Alert type="warning" showIcon title={detail.reviewUnavailableReason} />}{detail && tenantReadAll && !detail.cardNumber && <Button onClick={async () => { try { setDetail(await managementApi.withdrawal(detail.id, 'finance')) } catch (e) { message.error(errorText(e, '完整收款信息加载失败')) } }}>查看完整收款信息</Button>}<Descriptions bordered column={1} items={detail ? [{ key: 'applicant', label: '申请人', children: detail.applicantName || '-' }, { key: 'partner', label: '合作方', children: detail.partnerName || '-' }, { key: 'balance', label: '申请时可用余额', children: money(detail.availableBalanceSnapshot) }, { key: 'approved', label: '批准金额', children: money(detail.approvedAmount) }, { key: 'payer', label: '打款登记人', children: detail.paidByName || '-' }, { key: 'no', label: '提现单号', children: detail.withdrawalNo }, { key: 'amount', label: '金额', children: money(detail.applicationAmount) }, { key: 'account', label: '收款账户', children: `${detail.accountNameSnapshot} / ${detail.bankNameSnapshot} / ${detail.cardNumber || detail.maskedCardNumber}` }, { key: 'status', label: '状态', children: withdrawalStatusLabel(detail.status) }, { key: 'reviewer', label: '审核人', children: detail.reviewedByName || '-' }, { key: 'reviewedAt', label: '审核时间', children: formatTimestamp(detail.reviewedAt) }, { key: 'reviewReason', label: '审核意见', children: detail.reviewReason || '-' }, { key: 'reason', label: '驳回原因', children: detail.rejectionReason || '-' }, ...(!own && detail.status === 'paid' ? [{ key: 'paidAt', label: '打款时间', children: formatTimestamp(detail.paidAt) }, { key: 'remark', label: '打款备注', children: detail.payoutRemark || '-' }] : [])] : []}/>{detail && !own && <WithdrawalSources id={detail.id} permissions={permissions}/>}</Modal>
     <Modal title={action === 'approve-review' ? '通过提现审核' : action === 'reject-review' ? '驳回提现申请' : action === 'reject' ? '驳回提现' : action === 'batch-payout' ? '批量登记打款' : '登记打款'} open={Boolean(action)} confirmLoading={savingAction} closable={!savingAction} keyboard={!savingAction} maskClosable={!savingAction} cancelButtonProps={{ disabled: savingAction }} onCancel={() => setAction(undefined)} onOk={() => void submitAction()}>

@@ -5314,10 +5314,10 @@ CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '考期安排编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
   `schedule_name` varchar(100) DEFAULT NULL COMMENT '手工填写的考期名称',
-  `schedule_type` varchar(16) NOT NULL COMMENT '时间类型：EXACT/ROUGH',
+  `schedule_type` varchar(16) NOT NULL COMMENT '时间类型：EXACT/MULTI_DAY',
   `exact_date` date DEFAULT NULL COMMENT '精确考试日期',
-  `rough_start_date` date DEFAULT NULL COMMENT '粗略开始日期',
-  `rough_end_date` date DEFAULT NULL COMMENT '粗略结束日期',
+  `start_date` date DEFAULT NULL COMMENT '考试开始日期',
+  `end_date` date DEFAULT NULL COMMENT '考试结束日期',
   `category_id` bigint DEFAULT NULL COMMENT '产品分类编号',
   `product_id` bigint DEFAULT NULL COMMENT '考期产品编号，空表示分类范围',
   `product_name_snapshot` varchar(255) DEFAULT NULL COMMENT '产品名称快照',
@@ -5336,11 +5336,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
   KEY `idx_exam_schedule_exact` (`tenant_id`,`schedule_type`,`exact_date`,`record_status`,`deleted`),
-  KEY `idx_exam_schedule_rough` (`tenant_id`,`schedule_type`,`rough_start_date`,`rough_end_date`,`record_status`,`deleted`),
+  KEY `idx_exam_schedule_multi_day` (`tenant_id`,`schedule_type`,`start_date`,`end_date`,`record_status`,`deleted`),
   KEY `idx_exam_schedule_category` (`tenant_id`,`category_id`,`deleted`),
-  CONSTRAINT `chk_exam_schedule_type` CHECK (`schedule_type` IN ('EXACT','ROUGH')),
+  CONSTRAINT `chk_exam_schedule_type` CHECK (`schedule_type` IN ('EXACT','MULTI_DAY')),
   CONSTRAINT `chk_exam_schedule_status` CHECK (`record_status` IN ('DRAFT','PUBLISHED','REVOKED')),
-  CONSTRAINT `chk_exam_schedule_dates` CHECK ((`schedule_type`='EXACT' AND `exact_date` IS NOT NULL AND `rough_start_date` IS NULL AND `rough_end_date` IS NULL) OR (`schedule_type`='ROUGH' AND `exact_date` IS NULL AND `rough_start_date` IS NOT NULL AND `rough_end_date` IS NOT NULL AND `rough_end_date` >= `rough_start_date`))
+  CONSTRAINT `chk_exam_schedule_dates` CHECK ((`schedule_type`='EXACT' AND `exact_date` IS NOT NULL AND `start_date` IS NULL AND `end_date` IS NULL) OR (`schedule_type`='MULTI_DAY' AND `exact_date` IS NULL AND `start_date` IS NOT NULL AND `end_date` IS NOT NULL AND `end_date` >= `start_date`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考期安排';
 
 -- zsjos_product_sku

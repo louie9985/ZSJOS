@@ -120,6 +120,7 @@ const durationUnitLabels: Record<string, string> = { minute: '分钟', hour: '�
 let timer: number | undefined
 watch(() => props.keyword, (value) => { searchText.value = value || '' })
 const submitSearch = () => emit('search', searchText.value.trim())
+defineExpose({ submitSearch })
 const deliver = (immediate = false) => { window.clearTimeout(timer); const run = () => { const value = effectiveGroup(draft.value); emit('change', countGroup(value) ? structuredClone(value) : undefined) }; if (immediate) run(); else timer = window.setTimeout(run, 500) }
 const updateDraft = (value: Api.AdvancedFilterGroup, immediate = false) => { draft.value = value; deliver(immediate) }
 const clear = () => updateDraft(blank(), true)

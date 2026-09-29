@@ -36,7 +36,7 @@ public class ExamScheduleService {
     public static final String UPCOMING_DAYS_CONFIG_KEY = "zsjos.exam-calendar.upcoming-days";
     public static final int DEFAULT_UPCOMING_DAYS = 3;
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
-    private static final Set<String> TYPES = Set.of("EXACT", "ROUGH");
+    private static final Set<String> TYPES = Set.of("EXACT", "MULTI_DAY");
 
     @Resource private ExamScheduleMapper mapper;
     @Resource private ZsjosProductCategoryMapper categoryMapper;
@@ -64,9 +64,9 @@ public class ExamScheduleService {
         return new PageResult<>(filtered.subList(from, to), (long) filtered.size());
     }
 
-    public PageResult<ExamScheduleRespVO> roughPage(ExamSchedulePageReqVO req, Long userId) {
+    public PageResult<ExamScheduleRespVO> multiDayPage(ExamSchedulePageReqVO req, Long userId) {
         validateQueryRange(req);
-        PageResult<ExamScheduleDO> page = mapper.selectRoughPage(req, hasManagePermission(userId));
+        PageResult<ExamScheduleDO> page = mapper.selectMultiDayPage(req, hasManagePermission(userId));
         return new PageResult<>(page.getList().stream().map(this::toResponse).toList(), page.getTotal());
     }
 
@@ -103,10 +103,9 @@ public class ExamScheduleService {
         requireManage(userId);
         ExamScheduleDO current = requireExists(id);
         if (!"DRAFT".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
-        if ("EXACT".equals(current.getScheduleType()) && current.getExactDate() != null
-                && current.getExactDate().isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
+        if (endDate(current) != null && endDate(current).isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
         validateSchedule(req);
-        rejectPastExactDate(req);
+        rejectPastEndDate(req);
         ExamScheduleDO update = BeanUtils.toBean(req, ExamScheduleDO.class)
                 .setId(id)
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT));
@@ -118,8 +117,8 @@ public class ExamScheduleService {
         // Clear obsolete catalog links explicitly; MyBatis skips null entity fields.
         mapper.update(update, new LambdaUpdateWrapper<ExamScheduleDO>().eq(ExamScheduleDO::getId, id)
                 .set(ExamScheduleDO::getExactDate, update.getExactDate())
-                .set(ExamScheduleDO::getRoughStartDate, update.getRoughStartDate())
-                .set(ExamScheduleDO::getRoughEndDate, update.getRoughEndDate())
+                .set(ExamScheduleDO::getStartDate, update.getStartDate())
+                .set(ExamScheduleDO::getEndDate, update.getEndDate())
                 .set(ExamScheduleDO::getCategoryId, null)
                 .set(ExamScheduleDO::getCategoryNameSnapshot, null)
                 .set(ExamScheduleDO::getCategoryPathSnapshot, null)
@@ -139,8 +138,7 @@ public class ExamScheduleService {
         requireManage(userId);
         ExamScheduleDO current = requireExists(id);
         if (!"DRAFT".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
-        if ("EXACT".equals(current.getScheduleType()) && current.getExactDate() != null
-                && current.getExactDate().isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
+        if (endDate(current) != null && endDate(current).isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
         notificationSnapshots.captureExam(current, "MANUAL");
         mapper.updateById(current.setRecordStatus("PUBLISHED").setPublishedAt(LocalDateTime.now(BUSINESS_ZONE))
                 .setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1));
@@ -167,7 +165,7 @@ public class ExamScheduleService {
         var row = BeanUtils.toBean(stored, ExamScheduleDO.class);
         if ("PUBLISHED".equals(event)) {
             if (!"DRAFT".equals(row.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
-            if ("EXACT".equals(row.getScheduleType()) && row.getExactDate() != null && row.getExactDate().isBefore(today()))
+            if (endDate(row) != null && endDate(row).isBefore(today()))
                 throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
             row.setRecordStatus("PUBLISHED");
         } else if ("REVOKED".equals(event)) {
@@ -181,8 +179,8 @@ public class ExamScheduleService {
         return Objects.equals(before.getScheduleName(), after.getScheduleName())
                 && Objects.equals(before.getScheduleType(), after.getScheduleType())
                 && Objects.equals(before.getExactDate(), after.getExactDate())
-                && Objects.equals(before.getRoughStartDate(), after.getRoughStartDate())
-                && Objects.equals(before.getRoughEndDate(), after.getRoughEndDate())
+                && Objects.equals(before.getStartDate(), after.getStartDate())
+                && Objects.equals(before.getEndDate(), after.getEndDate())
                 && Objects.equals(before.getProductId(), after.getProductId())
                 && (before.getProductId() != null || Objects.equals(before.getCategoryId(), after.getCategoryId()))
                 && Objects.equals(before.getProductNameSnapshot(), after.getProductNameSnapshot())
@@ -193,14 +191,17 @@ public class ExamScheduleService {
                 && Objects.equals(before.getRemark(), after.getRemark());
     }
 
+    private LocalDate endDate(ExamScheduleDO schedule) {
+        return "EXACT".equals(schedule.getScheduleType()) ? schedule.getExactDate() : schedule.getEndDate();
+    }
+
     String displayStatus(ExamScheduleDO schedule, LocalDate currentDate, int upcomingDays) {
-        if (!"PUBLISHED".equals(schedule.getRecordStatus()) || !"EXACT".equals(schedule.getScheduleType())) {
-            return schedule.getRecordStatus();
-        }
-        LocalDate examDate = schedule.getExactDate();
-        if (currentDate.isAfter(examDate)) return "ENDED";
-        if (currentDate.isEqual(examDate)) return "IN_PROGRESS";
-        if (!currentDate.isBefore(examDate.minusDays(upcomingDays))) return "UPCOMING";
+        if (!"PUBLISHED".equals(schedule.getRecordStatus())) return schedule.getRecordStatus();
+        LocalDate start = "EXACT".equals(schedule.getScheduleType()) ? schedule.getExactDate() : schedule.getStartDate();
+        LocalDate end = endDate(schedule);
+        if (currentDate.isAfter(end)) return "ENDED";
+        if (!currentDate.isBefore(start)) return "IN_PROGRESS";
+        if (!currentDate.isBefore(start.minusDays(upcomingDays))) return "UPCOMING";
         return "PUBLISHED";
     }
 
@@ -217,8 +218,8 @@ public class ExamScheduleService {
         // JSON snapshots have different HTTP shapes; generic bean conversion cannot decode them.
         ExamScheduleRespVO response = new ExamScheduleRespVO();
         response.setId(schedule.getId()); response.setScheduleType(schedule.getScheduleType());
-        response.setExactDate(schedule.getExactDate()); response.setRoughStartDate(schedule.getRoughStartDate());
-        response.setRoughEndDate(schedule.getRoughEndDate()); response.setCategoryId(schedule.getCategoryId());
+        response.setExactDate(schedule.getExactDate()); response.setStartDate(schedule.getStartDate());
+        response.setEndDate(schedule.getEndDate()); response.setCategoryId(schedule.getCategoryId());
         response.setCategoryNameSnapshot(schedule.getCategoryNameSnapshot()); response.setProductId(schedule.getProductId());
         response.setProductNameSnapshot(schedule.getProductNameSnapshot()); response.setRecordStatus(schedule.getRecordStatus());
         response.setRemark(schedule.getRemark()); response.setPublishedAt(schedule.getPublishedAt());
@@ -273,11 +274,11 @@ public class ExamScheduleService {
         String type = req.getScheduleType() == null ? "" : req.getScheduleType().toUpperCase(Locale.ROOT);
         if (!TYPES.contains(type)) throw exception(EXAM_SCHEDULE_TYPE_INVALID);
         if ("EXACT".equals(type)) {
-            if (req.getExactDate() == null || req.getRoughStartDate() != null || req.getRoughEndDate() != null) {
+            if (req.getExactDate() == null || req.getStartDate() != null || req.getEndDate() != null) {
                 throw exception(EXAM_SCHEDULE_TIME_INVALID);
             }
-        } else if (req.getExactDate() != null || req.getRoughStartDate() == null || req.getRoughEndDate() == null
-                || req.getRoughEndDate().isBefore(req.getRoughStartDate())) {
+        } else if (req.getExactDate() != null || req.getStartDate() == null || req.getEndDate() == null
+                || req.getEndDate().isBefore(req.getStartDate())) {
             throw exception(EXAM_SCHEDULE_TIME_INVALID);
         }
     }
@@ -287,15 +288,14 @@ public class ExamScheduleService {
                 && req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(EXAM_SCHEDULE_TIME_INVALID);
     }
 
-    private void rejectPastExactDate(ExamScheduleSaveReqVO req) {
-        if ("EXACT".equalsIgnoreCase(req.getScheduleType()) && req.getExactDate().isBefore(today())) {
-            throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
-        }
+    private void rejectPastEndDate(ExamScheduleSaveReqVO req) {
+        LocalDate end = "EXACT".equalsIgnoreCase(req.getScheduleType()) ? req.getExactDate() : req.getEndDate();
+        if (end.isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
     }
 
     private void normalizeDates(ExamScheduleDO schedule) {
         if ("EXACT".equals(schedule.getScheduleType())) {
-            schedule.setRoughStartDate(null).setRoughEndDate(null);
+            schedule.setStartDate(null).setEndDate(null);
         } else {
             schedule.setExactDate(null);
         }

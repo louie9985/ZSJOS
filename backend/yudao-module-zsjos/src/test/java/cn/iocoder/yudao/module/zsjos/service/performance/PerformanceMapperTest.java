@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class PerformanceMapperTest {
- @Test void automaticProvenanceIsAppliedByActualQueriesInEveryScope() throws Exception {
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ void automaticProvenanceIsAppliedByActualQueriesInEveryScope(String generationSource) throws Exception {
   var dataSource=new org.apache.ibatis.datasource.unpooled.UnpooledDataSource("org.h2.Driver","jdbc:h2:mem:performance"+UUID.randomUUID()+";MODE=MySQL","sa","");
   var config=new Configuration();config.setMapUnderscoreToCamelCase(true);
   config.setEnvironment(new org.apache.ibatis.mapping.Environment("performance-auto",new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(),dataSource));
@@ -23,9 +25,9 @@ class PerformanceMapperTest {
      sql.execute("INSERT INTO "+table+" VALUES(1,9,0,1,1,CURRENT_TIMESTAMP,'意向'),(2,9,0,1,1,CURRENT_TIMESTAMP,'意向')");
     }
     sql.execute("CREATE TABLE zsjos_business_event(tenant_id BIGINT,deleted INT,aggregate_type VARCHAR,aggregate_id BIGINT,event_type VARCHAR,related_object_refs VARCHAR)");
-    sql.execute("INSERT INTO zsjos_business_event VALUES(9,0,'lead',1,'lead_follow_up_recorded','{\"generationSource\":\"sales_self_sourced_auto\",\"followUpRecordId\":1}')");
+    sql.execute("INSERT INTO zsjos_business_event VALUES(9,0,'lead',1,'lead_follow_up_recorded','{\"generationSource\":\""+generationSource+"\",\"followUpRecordId\":1}')");
     sql.execute("CREATE TABLE zsjos_business_task(id BIGINT,tenant_id BIGINT,deleted INT,biz_id BIGINT,assignee_id BIGINT,create_time TIMESTAMP,due_at TIMESTAMP,completed_at TIMESTAMP,cancelled_at TIMESTAMP,idempotency_key VARCHAR,status VARCHAR,task_type VARCHAR,cancel_reason VARCHAR,payload VARCHAR)");
-    sql.execute("INSERT INTO zsjos_business_task VALUES(1,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,'lead-qualification:1:1','completed','lead_qualification',NULL,'{\"generationSource\":\"sales_self_sourced_auto\"}'),(2,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,NULL,'reminder','pending','lead_follow_up_reminder',NULL,'{}')");
+    sql.execute("INSERT INTO zsjos_business_task VALUES(1,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,'lead-qualification:1:1','completed','lead_qualification',NULL,'{\"generationSource\":\""+generationSource+"\"}'),(2,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,NULL,'reminder','pending','lead_follow_up_reminder',NULL,'{}')");
     for(String type:List.of("FOLLOW_UP","OPPORTUNITY_FU","TASK"))for(int id=1;id<=2;id++)sql.execute("INSERT INTO zsjos_performance_attribution VALUES('"+type+"',"+id+",9,0,20,30,NULL,NULL,1)");
    }
    var mapper=session.getMapper(PerformanceFactMapper.class);
@@ -34,7 +36,7 @@ class PerformanceMapperTest {
     var follow=mapper.followUps(9L,scope,id);assertEquals(3,follow.size(),scope);
     assertEquals(1,follow.stream().filter(row->row.getId()==1L).count(),"Opportunity collision remains manual");
     var tasks=mapper.tasks(9L,scope,id);assertEquals(2,tasks.size(),scope);
-    assertEquals(1,tasks.stream().filter(row->"sales_self_sourced_auto".equals(row.getGenerationSource())).count());
+    assertEquals(1,tasks.stream().filter(row->generationSource.equals(row.getGenerationSource())).count());
     assertTrue(mapper.followUps(99L,scope,id).isEmpty());assertTrue(mapper.tasks(99L,scope,id).isEmpty());
    }
   }
@@ -48,6 +50,21 @@ class PerformanceMapperTest {
    assertTrue(sql.contains("l.source_type,l.source_provider_user_id"));
    assertFalse(sql.contains("source_provider_user_id IS NOT NULL"));
    if(method.equals("orders")) assertTrue(sql.contains("LEFT JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=0"));
+  }
+ }
+
+ @Test void pagedStatementsPassProductionTenantSqlParser() {
+  var config=new Configuration();config.addMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailMapper.class);
+  var parser=new com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor(new com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler(){
+   public net.sf.jsqlparser.expression.Expression getTenantId(){return new net.sf.jsqlparser.expression.LongValue(991L);}
+   public boolean ignoreTable(String table){return !table.startsWith("zsjos_");}
+  });
+  for(String scope:List.of("USER","DEPT","CENTER")) for(String metric:List.of("orders","leads","valid","assigned","missed","followUps","tasks","accept","qualification","todayFollowUp","overdueFollowUp")) {
+   var q=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailQuery().setTenant(991L).setType(scope).setId(1L).setMetric(metric).setAllDepartments(false).setDepartments(Set.of(10L)).setSize(20);
+   for(String method:List.of("count","page","firstDate","conversionOrders","conversionReceipts")) {
+    var sql=config.getMappedStatement(cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailMapper.class.getName()+"."+method).getBoundSql(q).getSql();
+    var parsed=parser.parserSingle(sql,null);assertTrue(parsed.contains("tenant_id = 991"));assertFalse(parsed.contains("result.tenant_id"));
+   }
   }
  }
 }

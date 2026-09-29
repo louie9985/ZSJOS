@@ -171,7 +171,7 @@ Workbench和Admin继续请求`GET /zsjos/advanced-filter/catalog?scene=...`并�
 
 返现使用 `cashback` 场景，提现使用 `withdrawal` 场景；两类目录均含本实体字段，目录与模板接口按现有查询权限开放。高级条件由 `search-page` 请求进入服务，再与租户、个人/管理范围和普通条件取交集后分页；空匹配集返回空页。返现订单号关联 `zsjos_order`，提现关键词同时覆盖提现单号和银行流水号。Workbench 与 Admin 的返现、提现入口都提交统一 `advancedFilter`。
 
-F01–F06 已在源码修正：除财务链路外，Admin 成交审批新增 order 场景入口，使用 `/zsjos/sales-order/approval/search-page`。返现/提现普通条件与高级条件采用 AND，组内逻辑遵循 AND/OR；切换条件重回第一页，清除高级条件恢复普通 GET 分页。Admin 提现导出保留当前 keyword/status/advancedFilter，后端导出继续使用脱敏投影。模板 visible-list、personal、scene 参数校验及管理页可选场景同步支持财务场景；原先错误 lead/cashback 模板不自动转换，需在正确 cashback 场景重新建立，避免把客资语义误迁为财务语义。
+F01–F06 已在源码修正：除财务链路外，Admin 成交审批新增 order 场景入口，使用 `/zsjos/sales-order/approval/search-page`。返现/提现普通条件与高级条件采用 AND，组内逻辑遵循 AND/OR；切换条件重回第一页，清除高级条件恢复普通 GET 分页。Admin 提现导出保留当前 keyword/status/advancedFilter，后端导出按 2026-09-29 用户确认的完整信息契约使用管理投影，并累积校验导出与管理查询权限。模板 visible-list、personal、scene 参数校验及管理页可选场景同步支持财务场景；原先错误 lead/cashback 模板不自动转换，需在正确 cashback 场景重新建立，避免把客资语义误迁为财务语义。
 
 F07–F09 是待核验或既有设计说明，本次不扩展人员可见性、不引入 pageKey 字段裁剪、不改变下属销售聚合算法。Partner H5 查询不在本次 ADMIN 两端接入范围。G18–G21 的人员选项缺口仍保留，其余财务新增字段见目录增量。
 

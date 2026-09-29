@@ -61,7 +61,16 @@ public class FinanceTraceService {
 
     public void enrichCashbacks(List<CashbackRespVO> views) {
         if (views.isEmpty()) return;
-        var rows = index(cashbacks.selectBatchIds(views.stream().map(CashbackRespVO::getId).toList()), CashbackDO::getId);
+        enrichCashbacks(views, cashbacks.selectBatchIds(views.stream().map(CashbackRespVO::getId).toList()), false);
+    }
+
+    public void enrichCashbacks(List<CashbackRespVO> views, List<CashbackDO> records) {
+        enrichCashbacks(views, records, true);
+    }
+
+    private void enrichCashbacks(List<CashbackRespVO> views, List<CashbackDO> records, boolean batchPermissions) {
+        if (views.isEmpty()) return;
+        var rows = index(records, CashbackDO::getId);
         var partnerIds = ids(rows.values(), CashbackDO::getPartnerId);
         var partnerMap = partnerIds.isEmpty() ? new HashMap<Long, PartnerDO>() : index(partners.selectBatchIds(partnerIds), PartnerDO::getId);
         var leadIds = ids(rows.values(), CashbackDO::getLeadId);
@@ -77,6 +86,9 @@ public class FinanceTraceService {
         // Page entitlement is required in addition to the owning domain's object permission.
         boolean leadPage = permissions.hasAnyPermissions(operator, "zsjos:lead:query");
         boolean orderPage = permissions.hasAnyPermissions(operator, "zsjos:sales-order:query", "zsjos:sales-order:query-management", "zsjos:sales-order:query-team", "zsjos:sales-order:query-own");
+        Set<Long> readableLeads = batchPermissions && leadPage ? leadAccess.filterReadableDetails(leadMap.values(), operator) : Set.of();
+        Set<Long> unmaskedLeads = batchPermissions && leadPage ? leadAccess.filterUnmaskedIdentity(leadMap.values(), operator) : Set.of();
+        Set<Long> readableOrders = batchPermissions && orderPage ? orderAccess.filterFinanceReadable(orderMap.values(), operator) : Set.of();
         for (CashbackRespVO view : views) {
             CashbackDO row = rows.get(view.getId());
             if (row == null) continue;
@@ -89,12 +101,12 @@ public class FinanceTraceService {
             source.setLeadAccess("denied");
             source.setOrderAccess(row.getOrderId() == null ? "not_applicable" : "denied");
             LeadDO lead = leadMap.get(row.getLeadId());
-            if (leadPage && lead != null && leadAccess.canReadDetail(lead, operator)) {
+            if (leadPage && lead != null && (batchPermissions ? readableLeads.contains(lead.getId()) : leadAccess.canReadDetail(lead, operator))) {
                 source.setLeadAccess("available"); source.setLeadId(lead.getId()); source.setLeadNo(lead.getLeadNo());
-                if (leadAccess.canViewUnmaskedIdentity(operator, lead)) source.setCustomerName(lead.getSubmittedName());
+                if (batchPermissions ? unmaskedLeads.contains(lead.getId()) : leadAccess.canViewUnmaskedIdentity(operator, lead)) source.setCustomerName(lead.getSubmittedName());
             } else if (leadPage && lead == null) source.setLeadAccess("unavailable");
             SalesOrderDO order = orderMap.get(row.getOrderId());
-            if (orderPage && order != null && canReadOrder(order, operator)) {
+            if (orderPage && order != null && (batchPermissions ? readableOrders.contains(order.getId()) : canReadOrder(order, operator))) {
                 source.setOrderAccess("available"); source.setOrderId(order.getId()); source.setOrderNo(order.getOrderNo());
                 source.setStudentName(order.getStudentName()); source.setOrderStatus(order.getStatus()); source.setOrderType(order.getOrderType());
                 source.setOrderStatusLabel(switch (Objects.toString(order.getStatus(), "")) {

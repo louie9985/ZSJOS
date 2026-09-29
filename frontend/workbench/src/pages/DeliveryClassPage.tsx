@@ -1,4 +1,4 @@
-import { EditOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
+import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Spin, Tag, Typography, message } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -92,7 +92,6 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
           <div className="delivery-class-card-meta"><span>{row.systemClass ? '当前状态' : '创建时间'}</span><strong>{row.systemClass ? '待分班' : row.createTime ? formatTimestamp(row.createTime) : '未记录'}</strong></div>
           <div className="delivery-class-card-meta"><span>{row.systemClass ? '学员人数' : '考期'}</span><strong>{row.systemClass ? `${row.studentCount} 名` : row.examScheduleSnapshot || row.exactDate || '未设置'}</strong></div>
           <div className="delivery-class-card-foot"><span>{row.systemClass ? '点击查看待分班学员' : `${row.studentCount} 名学员`}</span><span>{row.classNo}</span></div>
-          {!row.systemClass && row.scheduleType === 'ROUGH' && <Alert type="warning" showIcon icon={<WarningOutlined />} message="未设置精确考期" />}
           {manage && !row.systemClass && <Space onClick={event => event.stopPropagation()}>{has(permissions, 'zsjos:delivery-class:update') && row.status === 'SERVING' && <Button type="text" icon={<EditOutlined />} aria-label="编辑班级" onClick={() => void openEditor(row)} />}{has(permissions, 'zsjos:delivery-class:complete') && row.status === 'SERVING' && <Popconfirm title="确认结课该班级？" onConfirm={() => void complete(row)}><Button type="link" danger>结课</Button></Popconfirm>}</Space>}
         </Card>)}</div>
       </>}

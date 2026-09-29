@@ -111,6 +111,15 @@ public class AdvancedFilterService {
         return query == null ? null : "cashback".equals(scene) ? mapper.selectCashbackIds(query) : mapper.selectWithdrawalIds(query);
     }
 
+    public interface FinanceResolver {
+        Set<Long> identityIds(String operator, Object value);
+        Set<Long> visibleSourceIds(String kind);
+    }
+
+    public AdvancedFilterQuery buildCashbackQuery(AdvancedFilterGroupReqVO group, FinanceResolver resolver) {
+        return buildIfPresent(group, "cashback", Map.of("cashbackResolver", resolver));
+    }
+
     public List<Long> matchLeadIds(AdvancedFilterGroupReqVO group) {
         AdvancedFilterQuery query = buildIfPresent(group, "lead", Map.of());
         return query == null ? null : mapper.selectLeadIds(query);
@@ -214,7 +223,10 @@ public class AdvancedFilterService {
         validateOperands(field, condition);
         if (financeTrace != null && Set.of("cashback.beneficiaryName", "withdrawal.applicantName").contains(field.key())) {
             if (Boolean.TRUE.equals(params.get("validateOnly"))) return new Compiled(null, "1=1", false);
-            var matching = financeTrace.matchIdentityIds(scene, condition.getOperator(), condition.getValue());
+            FinanceResolver resolver = (FinanceResolver) params.get("cashbackResolver");
+            var matching = resolver == null ? financeTrace.matchIdentityIds(scene, condition.getOperator(), condition.getValue())
+                    : resolver.identityIds(condition.getOperator(), condition.getValue());
+            if (resolver != null) return new Compiled(null, jsonIds("c.id", matching, params), false);
             return new Compiled(null, matching.isEmpty() ? "1=0" : ("cashback".equals(scene) ? "c.id" : "w.id") + " IN ("
                     + matching.stream().map(id -> ref(params, id)).collect(java.util.stream.Collectors.joining(",")) + ")", false);
         }
@@ -222,8 +234,11 @@ public class AdvancedFilterService {
         if (financeTrace != null && financeSource != null && !Boolean.TRUE.equals(params.get("validateOnly"))) {
             @SuppressWarnings("unchecked")
             Set<Long> visible = (Set<Long>) params.computeIfAbsent("financeVisible_" + financeSource,
-                    ignored -> financeTrace.visibleSourceIds(financeSource));
-            String guard = visible.isEmpty() ? "1=0" : (financeSource.startsWith("lead") ? "fl.id" : "fo.id") + " IN ("
+                    ignored -> params.get("cashbackResolver") instanceof FinanceResolver resolver
+                            ? resolver.visibleSourceIds(financeSource) : financeTrace.visibleSourceIds(financeSource));
+            String expression = financeSource.startsWith("lead") ? "fl.id" : "fo.id";
+            String guard = params.containsKey("cashbackResolver") ? jsonIds(expression, visible, params)
+                    : visible.isEmpty() ? "1=0" : expression + " IN ("
                     + visible.stream().map(id -> ref(params, id)).collect(java.util.stream.Collectors.joining(",")) + ")";
             binding = new Binding(binding.expression(), binding.relation() + " AND " + guard);
         }
@@ -285,6 +300,11 @@ public class AdvancedFilterService {
         }
         Compiled compiled = new Compiled(binding.relation(), predicate, negateRelation);
         if (financeTrace != null && financeSource != null && negateRelation) {
+            // Cashback sources are a single PK-linked Lead/Order. Preserve the visible-source guard
+            // and SQL NULL behavior without evaluating the same relation twice for negative filters.
+            if ("cashback".equals(scene) && params.containsKey("cashbackResolver")) {
+                return new Compiled(binding.relation(), "NOT COALESCE((" + predicate + "), FALSE)", false);
+            }
             return new Compiled(null, "(EXISTS (" + binding.relation() + ") AND " + compiled.sql() + ")", false);
         }
         return compiled;
@@ -463,6 +483,11 @@ public class AdvancedFilterService {
     private String ref(Map<String, Object> params, Object value) {
         if (value == null) throw exception(ADVANCED_FILTER_INVALID);
         String key = "p" + params.size(); params.put(key, value); return "#{query.parameters." + key + "}";
+    }
+
+    private String jsonIds(String expression, Set<Long> ids, Map<String, Object> params) {
+        return ids.isEmpty() ? "1=0" : cn.iocoder.yudao.module.zsjos.service.cashback.CashbackSearchQuery.jsonIds(
+                expression, ref(params, cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(ids)));
     }
 
     private record Compiled(String relation, String predicate, boolean negateRelation) {

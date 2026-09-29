@@ -12,8 +12,8 @@ public class ExamScheduleSaveReqVO {
     @NotBlank @Size(max = 100) private String scheduleName;
     @NotBlank @Size(max = 16) private String scheduleType;
     private LocalDate exactDate;
-    private LocalDate roughStartDate;
-    private LocalDate roughEndDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Long categoryId;
     private Long productId;
     @Size(max = 100) private java.util.Map<@NotBlank String, @NotBlank String> selectedAttrs;

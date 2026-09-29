@@ -1,4 +1,4 @@
-import { http, unwrap } from './api'
+import { http, unwrap, type PageResult } from './api'
 import type { Timestamp } from './time'
 
 export type ScopeNode = { key: string; parentKey?: string; title: string; scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number }
@@ -22,6 +22,7 @@ export const mediaLeadApi = {
   tree: (signal?: AbortSignal) => get<ScopeNode[]>('/zsjos/media-lead-analysis/tree', undefined, signal),
   overview: (query: Query, signal?: AbortSignal) => get<Overview>('/zsjos/media-lead-analysis/overview', query, signal),
   details: (query: Query, signal?: AbortSignal) => get<Detail[]>('/zsjos/media-lead-analysis/details', query, signal),
+  detailPage: (query: Query & { pageNo: number; pageSize: number }, signal?: AbortSignal) => get<PageResult<Detail>>('/zsjos/media-lead-analysis/detail-page', query, signal),
   targets: (periodStart: string, signal?: AbortSignal) => get<Target[]>('/zsjos/media-lead-target/list', { periodStart }, signal),
   saveTargets: async (items: Array<{ scopeType: string; scopeId: number; periodStart: string; targetCount?: number; version?: number; reason: string; restoreAutomatic: boolean }>) => unwrap<boolean>(await http.put('/zsjos/media-lead-target/batch', items)),
   revisions: (id: number, signal?: AbortSignal) => get<TargetRevision[]>(`/zsjos/media-lead-target/${id}/revisions`, undefined, signal),

@@ -168,9 +168,9 @@ html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.
    且默认不给 .ant-modal-body 设 max-height / 滚动，长表单弹窗的底部按钮
    会滚出可视区，软键盘弹起后更够不到。
 
-   这里把内容区改成纵向 flex、body 内部滚动、头尾固定，
-   等价于把 AccountProfilePanel 里已验证的那种写法提升为全局规则，
-   一次覆盖全部弹窗，而不用改 100 多处调用点。 */
+   Ant Design 6 的内容容器是 .ant-modal-container；高度约束必须作用于
+   body 的实际父级，使其能够在 flex 布局内收缩并滚动，否则 body 上的
+   overscroll-behavior: contain 会阻止手势传给外层，导致长表单无法翻动。 */
 @media (max-width: 768px) {
   html .ant-modal {
     top: 8px;
@@ -178,7 +178,7 @@ html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.
     padding-bottom: 0;
   }
 
-  html .ant-modal .ant-modal-content {
+  html .ant-modal .ant-modal-container {
     display: flex;
     max-height: calc(100vh - 16px);
     flex-direction: column;
@@ -205,7 +205,7 @@ html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.
       max-height: calc(100dvh - 16px);
     }
 
-    html .ant-modal .ant-modal-content {
+    html .ant-modal .ant-modal-container {
       max-height: calc(100dvh - 16px);
     }
   }

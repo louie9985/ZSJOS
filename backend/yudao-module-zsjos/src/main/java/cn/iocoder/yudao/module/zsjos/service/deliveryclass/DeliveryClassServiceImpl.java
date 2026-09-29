@@ -336,7 +336,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     private boolean isUnended(ExamScheduleDO schedule) {
         java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         return "EXACT".equals(schedule.getScheduleType()) ? !schedule.getExactDate().isBefore(today)
-                : !schedule.getRoughEndDate().isBefore(today);
+                : !schedule.getEndDate().isBefore(today);
     }
 
     private List<ExamProductScopeRespVO.Sku> parseSkus(String json) {
@@ -365,7 +365,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     private String scheduleDate(ExamScheduleDO schedule) {
         return "EXACT".equals(schedule.getScheduleType()) ? String.valueOf(schedule.getExactDate())
-                : schedule.getRoughStartDate() + "~" + schedule.getRoughEndDate();
+                : schedule.getStartDate() + "~" + schedule.getEndDate();
     }
 
     private DeliveryClassRespVO toVO(DeliveryClassDO row) {

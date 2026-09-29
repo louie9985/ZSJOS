@@ -63,7 +63,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 当前提交页联系方式查重已收敛为强重复激活：手机号、微信号至少填写一个；同字段或交叉字段命中时，逐条创建 `LeadActivation` 并发送 `zsjos.lead.activated`，同一请求对同一客资按幂等键只处理一次，不改变历史客资状态和归属。手机号与微信号分别命中不同客资时分别激活和通知；无负责人时仍记录激活，页面统一显示“客资已存在，已激活提醒”。最终提交前服务端再次执行该联系方式激活，未命中联系方式时才继续执行既有弱重复复核规则。联系方式查重接口为 `POST /zsjos/lead/contact-check`、`/self-sourced/contact-check` 和 `/education-self-sourced/contact-check`，分别受对应提交权限保护。
 
-自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售或教务自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到关联提醒。V257 对未编辑的 V080 默认模板使用 `lead.submitterIdentityLabel` 区分销售/教务。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
+自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售或教务本人，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售或教务自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到关联提醒。V257 对未编辑的 V080 默认模板使用 `lead.submitterIdentityLabel` 区分销售/教务。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
 
 详情响应投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。来源标签为兼职提交、新媒体提交、销售自拓录、教务自拓录；兼职提交人从 Partner 主体解析姓名，不返回内部 ID。提交人与负责人互看时沿用中文姓名脱敏，其他有权业务关系人看完整姓名。四个历史标签分别要求 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read`，前端不得按 mode 或角色名补齐标签。详情顶层 `nextFollowUpAt` 只来自当前 `zsjos_business_task` 中 `task_type=lead_follow_up_reminder` 且 `status=pending` 的 `dueAt`，仅在 `visibleTabs` 包含 `follow-ups` 时查询；任务已完成或取消时返回空。Workbench 在详情标题栏展示该值，不得通过 Lead 历史时间、跟进记录或 Opportunity 摘要绕过任务状态。
 
@@ -284,20 +284,22 @@ Workbench 保留 WebSocket、15 秒轮询、页面恢复可见及重连刷新。
 Workbench 弹窗和详情表单同步支持可选时间；Vue Admin 保持跟进历史只读并兼容空时间。学员服务联系不在此接口范围内。
 
 
-## 销售自拓自动首跟与判有效（2026-09-29）
+## 销售/教务自拓自动首跟与判有效（2026-09-29）
 
-仅 POST /zsjos/lead/self-sourced/create 在未选择新媒体提供方、查重通过并直接创建新 Lead 时，服务端在原创建事务内完成：创建 → 本人归属 → 首跟 → 判有效 → 创建商机。来源人、负责人和业务操作人仍为登录销售。普通提交、教务自拓、关联提供方、历史幂等重放、已有客资激活及复核放行不补跑该链路。
+POST /zsjos/lead/self-sourced/create 与 POST /zsjos/lead/education-self-sourced/create 在未选择新媒体提供方、查重通过并直接创建新 Lead 时，服务端在原创建事务内完成：创建 → 本人归属 → 首跟 → 判有效 → 创建商机。来源人、负责人和业务操作人仍为登录销售或教务。普通提交、关联提供方、历史幂等重放、已有客资激活及复核放行不补跑该链路。
 
 - 录单备注 trim 后必填，同时保存为首跟内容及有效依据；缺失返回专用错误。方式代码固定为 other、结果代码固定为 interested，属于本次明确批准的固定值例外。标签必须取启用字典项并保存快照，不按标签匹配或回退其他代码。
 - 请求增加可选 selfSourcedNextFollowUpAt，沿用 LocalDateTime 的现有毫秒时间戳传输约定。只有上述直接新建分支消费；有值必须晚于服务器处理时间，并创建普通后续提醒。普通跟进必填时间的原校验不变。
 - 创建响应增加 qualificationStatus 和 automaticQualificationApplied；既有 outcome 语义不变。两端仅在 created + automaticQualificationApplied + qualificationStatus=valid 时展示自动判有效成功；激活、复核分别展示原结果。
 - 自动首跟使用真实服务器处理时间，并保留本次录单分类、阶段快照。自动操作依然验证自拓、跟进、判定功能权限和本人对象权限；缺权限整笔失败，不降级为普通录单。
 - Lead、Person、归属历史、跟进、商机、业务事件和任务同事务提交；自动跟进/判定分别使用独立稳定键，任务和通知沿用各自幂等键。任一环节失败回滚，通知使用既有提交后发布机制。
-- 自动跟进事件和判有效事件 relatedObjectRefs 记录 generationSource=sales_self_sourced_auto、followUpRecordId、assignmentHistoryId、roundNo；两项完成任务 payload 保留原规则快照并追加来源。跟进历史批量关联事件返回 generationSource；不根据备注、方式/结果或未关联提供方反推历史。
+- 自动跟进事件和判有效事件 relatedObjectRefs 记录 generationSource=sales_self_sourced_auto（销售）或 education_self_sourced_auto（教务）、followUpRecordId、assignmentHistoryId、roundNo；两项完成任务 payload 保留原规则快照并追加来源。跟进历史批量关联事件返回 generationSource；不根据备注、方式/结果或未关联提供方反推历史。
 - 后续人工将自动有效客资判无效时，保留初始自动判定任务，按现有启用规则建立独立的人工判定轮次。该轮次不带自动标记，按正常人工统计计入；原自动事件不被改写。
 
 ### 双端交互与发布前置
 
-React 工作台在备注校验前选择提供方；Vue 管理端使用相同条件。未关联提供方提示“提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。”备注条件必填，下次时间选填，提交摘要列明自动链路及提醒安排。选择提供方后清除自动时间、恢复原校验。时间线和流转历史显示“销售自拓录单自动生成”，保留操作人、分类快照及真实时间。
+React 工作台在备注校验前选择提供方；Vue 管理端使用相同条件。未关联提供方提示“提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。”备注条件必填，下次时间选填，提交摘要列明自动链路及提醒安排。选择提供方后清除自动时间、恢复原校验。时间线和流转历史显示“销售自拓录单自动生成”或“教务自拓录单自动生成”，保留操作人、分类快照及真实时间。
 
 本次不新增数据库字段、迁移、字典数据或权限项，不自动授权、不补历史、不部署或重启服务。发布前确认目标环境中 other、interested 及跟进规则均启用，并协调后端与双端表单同步发布。无兼职提供方归属时继续不具备返现资格。
+
+本轮教务同步：教务使用原 zsjos:lead:education-self-sourced:create，仍累计校验跟进、判定功能权限及本人对象权限；没有权限整笔拒绝，不自动授权。两类自动来源分别保存，历史无标记记录不补处理。

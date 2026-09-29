@@ -50,7 +50,7 @@ export default function LeadSubmissionPage({
   const wechatId = Form.useWatch('wechatId', form)
   const providerId = Form.useWatch('newMediaProviderUserId', form)
   const nextFollowUpAt = Form.useWatch('selfSourcedNextFollowUpAt', form)
-  const automatic = selfSourced && !educationSelfSourced && providerId == null
+  const automatic = selfSourced && providerId == null
   useEffect(() => {
     if (!automatic) form.setFieldValue('selfSourcedNextFollowUpAt', undefined)
     form.setFields([{ name: 'remark', errors: [] }])
@@ -306,7 +306,7 @@ export default function LeadSubmissionPage({
         dispatchMode: selfSourced ? 'auto' : values.dispatchMode,
         specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId,
         newMediaProviderUserId: selfSourced ? values.newMediaProviderUserId : undefined,
-        selfSourcedNextFollowUpAt: selfSourced && !educationSelfSourced && values.newMediaProviderUserId == null ? values.selfSourcedNextFollowUpAt?.valueOf() : undefined, idempotencyKey
+        selfSourcedNextFollowUpAt: selfSourced && values.newMediaProviderUserId == null ? values.selfSourcedNextFollowUpAt?.valueOf() : undefined, idempotencyKey
       })
       showResult(result)
       resetAll(); setFiles([]); idempotencyKeyRef.current = undefined

@@ -34,8 +34,13 @@ public class LeadSelfSourcedAutomationService {
     @Resource private BusinessEventMapper eventMapper;
     @Resource private BusinessTaskCommandService taskCommandService;
 
-    public void validate(LeadCreateReqVO request, Long userId) {
-        for (String permission : new String[]{"zsjos:lead:self-sourced:create", "zsjos:lead-follow-up:create", "zsjos:lead:qualify"}) {
+    public void validate(LeadCreateReqVO request, Long userId, String sourceType) {
+        String createPermission = switch (sourceType) {
+            case SOURCE_SALES_SELF -> "zsjos:lead:self-sourced:create";
+            case SOURCE_EDUCATION_SELF -> "zsjos:lead:education-self-sourced:create";
+            default -> throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
+        };
+        for (String permission : new String[]{createPermission, "zsjos:lead-follow-up:create", "zsjos:lead:qualify"}) {
             if (!permissionApi.hasAnyPermissions(userId, permission)) throw exception(LEAD_PERMISSION_DENIED);
         }
         if (request.getRemark() == null || request.getRemark().isBlank()) throw exception(LEAD_SELF_SOURCED_REMARK_REQUIRED);
@@ -63,17 +68,18 @@ public class LeadSelfSourcedAutomationService {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         LeadJudgeValidReqVO command = new LeadJudgeValidReqVO();
         command.setLeadCategory(lead.getLeadCategory()); command.setRemark(lead.getRemark().trim());
-        command.setIdempotencyKey(LeadAutomaticGeneration.qualificationKey(leadId));
+        command.setIdempotencyKey(LeadAutomaticGeneration.qualificationKey(leadId, lead.getSourceType()));
         qualificationService.judgeValid(leadId, userId, command);
         Map<String, Object> provenance = new LinkedHashMap<>();
-        provenance.put(LeadAutomaticGeneration.FIELD, LeadAutomaticGeneration.SOURCE);
+        String generationSource = LeadAutomaticGeneration.sourceForLead(lead.getSourceType());
+        provenance.put(LeadAutomaticGeneration.FIELD, generationSource);
         provenance.put("followUpRecordId", followUp.getId());
         provenance.put("assignmentHistoryId", lead.getCurrentAssignmentHistoryId());
         provenance.put("roundNo", lead.getQualificationRoundNo());
         markEvent(EVENT_LEAD_FOLLOW_UP_RECORDED + ":" + followUp.getId(), provenance);
-        markEvent(LeadAutomaticGeneration.qualificationEventKey(leadId), provenance);
-        taskCommandService.markCompletedGenerationSource("lead-first-follow-up:" + lead.getCurrentAssignmentHistoryId(), LeadAutomaticGeneration.SOURCE);
-        taskCommandService.markCompletedGenerationSource("lead-qualification:" + leadId + ":" + lead.getQualificationRoundNo(), LeadAutomaticGeneration.SOURCE);
+        markEvent(LeadAutomaticGeneration.qualificationEventKey(leadId, lead.getSourceType()), provenance);
+        taskCommandService.markCompletedGenerationSource("lead-first-follow-up:" + lead.getCurrentAssignmentHistoryId(), generationSource);
+        taskCommandService.markCompletedGenerationSource("lead-qualification:" + leadId + ":" + lead.getQualificationRoundNo(), generationSource);
     }
 
     @SuppressWarnings("unchecked")

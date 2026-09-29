@@ -52,6 +52,7 @@ public class LeadObjectPermissionService {
     @Resource private LeadAgingPoolService leadAgingPoolService;
     @Resource private MediaAccountMapper mediaAccountMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadReadBatchMapper readBatchMapper;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -265,5 +266,53 @@ public class LeadObjectPermissionService {
         Set<Long> userIds = new HashSet<>(getManagedUserIds(userId));
         userIds.add(userId);
         return userIds;
+    }
+
+    /** Identity visibility implies detail visibility for an authenticated reader: global or owner department. */
+    public Set<Long> filterUnmaskedIdentity(java.util.Collection<LeadDO> leads, Long userId) {
+        if (leads.isEmpty() || userId == null) return Set.of();
+        boolean all = hasTenantReadAll(userId) || hasQueryAll();
+        Set<Long> managed = all ? Set.of() : getManagedUserIds(userId);
+        return leads.stream().filter(lead -> all || lead.getOwnerUserId() != null && managed.contains(lead.getOwnerUserId()))
+                .map(LeadDO::getId).collect(java.util.stream.Collectors.toSet());
+    }
+
+    public Set<Long> filterReadableDetails(java.util.Collection<LeadDO> leads, Long userId) {
+        if (leads.isEmpty() || userId == null) return Set.of();
+        if (hasTenantReadAll(userId) || hasQueryAll()) return leads.stream().map(LeadDO::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> managed = new HashSet<>(getManagedUserIds(userId));
+        boolean submitted = securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED);
+        boolean qualification = securityFrameworkService.hasPermission("zsjos:lead:qualification:manage");
+        boolean qualificationAll = qualification && hasQualificationManageAll();
+        Set<Long> result = new HashSet<>();
+        for (var lead : leads) {
+            if (Objects.equals(userId, lead.getOwnerUserId()) || managed.contains(lead.getOwnerUserId())
+                    || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                        && (Objects.equals(userId, lead.getProviderOwnerId()) || submitted && managed.contains(lead.getProviderOwnerId()))
+                    || canReadRecycledSourceOwner(lead, userId)
+                    || qualification && (qualificationAll || managed.contains(ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
+                        ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId()))) result.add(lead.getId());
+        }
+        var remaining = leads.stream().filter(lead -> !result.contains(lead.getId())).toList();
+        if (remaining.isEmpty()) return result;
+        var ids = remaining.stream().map(LeadDO::getId).toList();
+        result.addAll(leadAgingPoolService.filterReadableLeadIds(ids, userId));
+        var sea = publicSeaRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO>()
+                .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO::getLeadId, ids));
+        for (var record : sea) {
+            if (Objects.equals(userId, record.getOwnerUserId()) || Objects.equals(userId, record.getCollaboratorUserId())
+                    || managed.contains(record.getOwnerUserId())) result.add(record.getLeadId());
+        }
+        result.addAll(readBatchMapper.selectStudentReadableLeadIds(ids, userId, TenantContextHolder.getRequiredTenantId()));
+        var partnerIds = remaining.stream().map(LeadDO::getPartnerId).filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        var readablePartners = new HashSet<>(partnerOwnershipService.filterReadablePartnerIds(userId, partnerIds));
+        remaining.stream().filter(lead -> readablePartners.contains(lead.getPartnerId())).map(LeadDO::getId).forEach(result::add);
+        var orders = salesOrderMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO>()
+                .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO::getLeadId, ids));
+        var readableOrders = salesOrderObjectPermissionService.filterReadable(orders, userId);
+        orders.stream().filter(order -> readableOrders.contains(order.getId())).map(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO::getLeadId).forEach(result::add);
+        return result;
     }
 }

@@ -74,14 +74,14 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, rollbackFor = Exception.class)
     public LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, LocalDateTime nextFollowUpAt) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-        if (lead == null || !SOURCE_SALES_SELF.equals(lead.getSourceType()) || lead.getSourceProviderUserId() != null
+        if (lead == null || !isSelfSourced(lead.getSourceType()) || lead.getSourceProviderUserId() != null
                 || !Boolean.TRUE.equals(lead.getSourceProviderRecorded()) || !DISPATCH_SELF.equals(lead.getDispatchMode())
                 || !Objects.equals(operatorUserId, lead.getOwnerUserId()) || !STATUS_SUBMITTED.equals(lead.getStatus())
                 || lead.getCurrentAssignmentFirstFollowUpAt() != null) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         LeadFollowUpCreateReqVO command = new LeadFollowUpCreateReqVO();
         command.setMethod(LeadAutomaticGeneration.METHOD); command.setResult(LeadAutomaticGeneration.RESULT);
         command.setLeadCategory(lead.getLeadCategory()); command.setRemark(lead.getRemark().trim());
-        command.setNextFollowUpAt(nextFollowUpAt); command.setIdempotencyKey(LeadAutomaticGeneration.followUpKey(leadId));
+        command.setNextFollowUpAt(nextFollowUpAt); command.setIdempotencyKey(LeadAutomaticGeneration.followUpKey(leadId, lead.getSourceType()));
         return createInternal(leadId, operatorUserId, command, true);
     }
 
@@ -262,13 +262,15 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 leadImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
         opportunityRecords.forEach(record -> merged.add(convertOpportunity(record,
                 opportunityImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls, identityContext)));
-        Set<Long> automaticRecords = eventMapper.selectByLeadId(leadId).stream()
+        Map<Long, String> automaticRecords = eventMapper.selectByLeadId(leadId).stream()
                 .filter(event -> EVENT_LEAD_FOLLOW_UP_RECORDED.equals(event.getEventType()))
                 .filter(event -> LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs()))
-                .map(event -> JsonUtils.parseObject(event.getRelatedObjectRefs(), Map.class).get("followUpRecordId"))
-                .filter(Number.class::isInstance).map(value -> ((Number) value).longValue()).collect(Collectors.toSet());
-        merged.stream().filter(item -> FOLLOW_UP_RECORD_SCOPE_LEAD.equals(item.getRecordScope()) && automaticRecords.contains(item.getId()))
-                .forEach(item -> item.setGenerationSource(LeadAutomaticGeneration.SOURCE));
+                .map(event -> JsonUtils.parseObject(event.getRelatedObjectRefs(), Map.class))
+                .filter(refs -> refs.get("followUpRecordId") instanceof Number)
+                .collect(Collectors.toMap(refs -> ((Number) refs.get("followUpRecordId")).longValue(),
+                        refs -> (String) refs.get(LeadAutomaticGeneration.FIELD), (first, duplicate) -> first));
+        merged.stream().filter(item -> FOLLOW_UP_RECORD_SCOPE_LEAD.equals(item.getRecordScope()) && automaticRecords.containsKey(item.getId()))
+                .forEach(item -> item.setGenerationSource(automaticRecords.get(item.getId())));
         merged.sort(Comparator.comparing(LeadFollowUpRespVO::getOccurredAt).reversed()
                 .thenComparing(LeadFollowUpRespVO::getId, Comparator.reverseOrder()));
         int from = Math.min((pageNo - 1) * pageSize, merged.size());

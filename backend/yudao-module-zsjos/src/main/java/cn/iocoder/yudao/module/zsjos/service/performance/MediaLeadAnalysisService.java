@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.MediaLeadOrgDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.MediaLeadRevisionDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadFact;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadFactMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadQueryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadOrderFact;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadTargetMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.MediaLeadOrgMapper;
@@ -32,6 +33,7 @@ public class MediaLeadAnalysisService {
     private static final Set<String> VALID = Set.of("valid", "converted", "won");
     @Resource private MediaLeadAccess access;
     @Resource private MediaLeadFactMapper facts;
+    @Resource private MediaLeadQueryMapper queries;
     @Resource private MediaLeadTargetMapper targets;
     @Resource private MediaLeadOrgMapper orgs;
     @Resource private MediaLeadRevisionMapper revisions;
@@ -52,9 +54,10 @@ public class MediaLeadAnalysisService {
                 .collect(Collectors.toMap(MediaLeadOrderFact::getLeadId, MediaLeadOrderFact::getEffectiveAt, (a, b) -> a));
         var periods = periodStats(leads, orders, today);
         var monthStart = today.withDayOfMonth(1);
-        var target = resolveTarget(query, monthStart, leads, today);
+        var targetsByKey = targetRows(monthStart);
+        var target = resolveTarget(query, monthStart, leads, today, targetsByKey);
         return new MediaLeadVO.Overview(today, target, periods,
-                members(query, leads, orders, today), calendar(leads, query.start(), query.end().isAfter(today) ? today : query.end()),
+                members(query, leads, orders, today, targetsByKey), calendar(leads, query.start(), query.end().isAfter(today) ? today : query.end()),
                 funnel(leads, orders, query.start(), query.end().isAfter(today) ? today : query.end()),
                 groups(leads, monthStart, today.plusDays(1), MediaLeadFact::getChannelLabel),
                 groups(leads, monthStart.minusMonths(1), monthStart, MediaLeadFact::getChannelLabel),
@@ -88,6 +91,33 @@ public class MediaLeadAnalysisService {
                     Objects.toString(x.getChannelLabel(), "历史未记录"),
                     Objects.toString(x.getCategoryLabel(), "历史未记录"), effectiveAt != null, effectiveAt);
         }).toList();
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public cn.iocoder.yudao.framework.common.pojo.PageResult<MediaLeadVO.Detail> detailPage(MediaLeadVO.DetailPageQuery request) {
+        var query = request.scopeQuery();
+        access.authorize(query, false);
+        if (!access.has(MediaLeadAccess.DETAIL)) throw MediaLeadAccess.denied();
+        if (request.getPageNo() < 1 || request.getPageSize() < 1 || request.getPageSize() > 100)
+            throw PerformanceAccess.invalid("每页条数须为 1 至 100");
+        if (query.start().isAfter(query.end()) || java.time.temporal.ChronoUnit.DAYS.between(query.start(), query.end()) > 366)
+            throw PerformanceAccess.invalid("下钻日期范围不能超过 367 天");
+        var now = LocalDateTime.now(ZONE);
+        var tenant = TenantContextHolder.getRequiredTenantId();
+        var type = normalizedType(query);
+        var id = normalizedId(query);
+        var departments = scopedCenterDepartments(type, id);
+        var start = query.start().atStartOfDay();
+        var end = query.end().plusDays(1).atStartOfDay();
+        long total = queries.countDetails(tenant, type, id, departments, start, end, now);
+        long offset = (long) (request.getPageNo() - 1) * request.getPageSize();
+        var rows = offset >= total ? List.<MediaLeadVO.Detail>of() : queries.pageDetails(tenant, type, id, departments,
+                start, end, now, offset, request.getPageSize()).stream().map(row -> new MediaLeadVO.Detail(
+                row.getLeadNo(), row.getSubmittedAt(), row.getContributorName(), row.getStatus(),
+                VALID.contains(row.getStatus()) ? "有效" : "invalid".equals(row.getStatus()) ? "无效" : "待判或其他",
+                Objects.toString(row.getChannelLabel(), "历史未记录"), Objects.toString(row.getCategoryLabel(), "历史未记录"),
+                row.getOrderEffectiveAt() != null, row.getOrderEffectiveAt())).toList();
+        return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(rows, total);
     }
 
     private List<Long> scopedCenterDepartments(String scopeType, Long scopeId) {
@@ -243,9 +273,8 @@ public class MediaLeadAnalysisService {
                         x.getAfterJson(), x.getReason(), x.getOperatorId(), x.getCreateTime())).toList();
     }
 
-    private MediaLeadVO.Target resolveTarget(MediaLeadVO.Query query, LocalDate month, List<MediaLeadFact> leads, LocalDate today) {
+    private MediaLeadVO.Target resolveTarget(MediaLeadVO.Query query, LocalDate month, List<MediaLeadFact> leads, LocalDate today, Map<String, MediaLeadTargetDO> byKey) {
         String type = normalizedType(query); Long id = normalizedId(query);
-        var byKey = targetRows(month);
         var row = byKey.get(type + ":" + id);
         int actual = (int) leads.stream().filter(x -> VALID.contains(x.getStatus()) && in(x.getSubmittedAt(), month, today.plusDays(1))).count();
         return new MediaLeadVO.Target(row == null ? null : row.getId(), type, id, targetName(type, id), month,
@@ -304,7 +333,7 @@ public class MediaLeadAnalysisService {
                 ratio(valid, selected.size()), ratio(converted, valid)));
     }
 
-    private List<MediaLeadVO.Member> members(MediaLeadVO.Query query, List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, LocalDate today) {
+    private List<MediaLeadVO.Member> members(MediaLeadVO.Query query, List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, LocalDate today, Map<String, MediaLeadTargetDO> targetsByKey) {
         Map<Long, String> names = new LinkedHashMap<>();
         Set<Long> allowedDepts = new HashSet<>();
         if ("CENTER".equals(query.scopeType())) {
@@ -320,12 +349,12 @@ public class MediaLeadAnalysisService {
             case "CENTER" -> allowedDepts.contains(u.getDeptId());
             default -> false;
         }).forEach(x -> names.put(x.getId(), x.getNickname()));
-        leads.forEach(x -> names.putIfAbsent(x.getUserId(), x.getUserName() == null ? "历史人员" : x.getUserName()));
         LocalDate month = today.withDayOfMonth(1), lastMonth = month.minusMonths(1), monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        Map<String, MediaLeadTargetDO> targetsByKey = targetRows(month);
+        Map<Long, List<MediaLeadFact>> byUser = leads.stream().filter(x -> x.getUserId() != null)
+                .collect(Collectors.groupingBy(MediaLeadFact::getUserId));
         List<MediaLeadVO.Member> result = new ArrayList<>();
         names.forEach((userId, name) -> {
-            var own = leads.stream().filter(x -> Objects.equals(userId, x.getUserId())).toList();
+            var own = byUser.getOrDefault(userId, List.of());
             var row = targetsByKey.get("USER:" + userId);
             result.add(new MediaLeadVO.Member(userId, name, row == null ? null : row.getTargetCount(),
                     count(own, today.minusDays(1), today, false), converted(own, orders, today.minusDays(1), today),
@@ -341,7 +370,21 @@ public class MediaLeadAnalysisService {
 
     private long count(List<MediaLeadFact> rows, LocalDate start, LocalDate end, boolean valid) { return rows.stream().filter(x -> in(x.getSubmittedAt(), start, end) && (!valid || VALID.contains(x.getStatus()))).count(); }
     private long converted(List<MediaLeadFact> rows, Map<Long, LocalDateTime> orders, LocalDate start, LocalDate end) { return rows.stream().filter(x -> { var t = orders.get(x.getId()); return t != null && in(t, start, end); }).count(); }
-    private List<MediaLeadVO.CalendarDay> calendar(List<MediaLeadFact> rows, LocalDate start, LocalDate end) { if (start.isAfter(end)) return List.of(); return start.datesUntil(end.plusDays(1)).map(d -> { var day=rows.stream().filter(x -> x.getSubmittedAt()!=null && x.getSubmittedAt().toLocalDate().equals(d)).toList(); long valid=day.stream().filter(x->VALID.contains(x.getStatus())).count(), invalid=day.stream().filter(x->"invalid".equals(x.getStatus())).count(); return new MediaLeadVO.CalendarDay(d,day.size(),valid,invalid,day.size()-valid-invalid); }).toList(); }
+    private List<MediaLeadVO.CalendarDay> calendar(List<MediaLeadFact> rows, LocalDate start, LocalDate end) {
+        if (start.isAfter(end)) return List.of();
+        Map<LocalDate, long[]> days = new HashMap<>();
+        for (var row : rows) {
+            if (!in(row.getSubmittedAt(), start, end.plusDays(1))) continue;
+            var counts = days.computeIfAbsent(row.getSubmittedAt().toLocalDate(), ignored -> new long[3]);
+            counts[0]++;
+            if (VALID.contains(row.getStatus())) counts[1]++;
+            else if ("invalid".equals(row.getStatus())) counts[2]++;
+        }
+        return start.datesUntil(end.plusDays(1)).map(day -> {
+            var counts = days.getOrDefault(day, new long[3]);
+            return new MediaLeadVO.CalendarDay(day, counts[0], counts[1], counts[2], counts[0]-counts[1]-counts[2]);
+        }).toList();
+    }
     private MediaLeadVO.Funnel funnel(List<MediaLeadFact> rows, Map<Long, LocalDateTime> orders, LocalDate start, LocalDate end) {
         if (start.isAfter(end)) return new MediaLeadVO.Funnel(0, 0, 0);
         var selected = rows.stream().filter(x -> in(x.getSubmittedAt(), start, end.plusDays(1))).toList();

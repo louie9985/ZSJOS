@@ -156,7 +156,7 @@ const emptyForm = () => ({
   remark: ''
 })
 const form = reactive(emptyForm())
-const automatic = computed(() => !!props.selfSourced && !props.educationSelfSourced && form.newMediaProviderUserId == null)
+const automatic = computed(() => !!props.selfSourced && form.newMediaProviderUserId == null)
 watch(automatic, enabled => {
   if (!enabled) form.selfSourcedNextFollowUpAt = undefined
   formRef.value?.clearValidate(['remark', 'selfSourcedNextFollowUpAt'])
