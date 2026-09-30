@@ -77,3 +77,8 @@
 ## Publication authorization — 2026-09-30 Beijing time
 - User explicitly authorized committing the current local code and pushing it to remote `origin/main`. Exact scope is the publication-status-only calendar correction and its tests/documentation/handoff above.
 - Target: branch `main` at `https://gitee.com/louie9985/ZSJOS.git`; normal non-force push only. Exclude the tracked Python bytecode cache and all existing untracked diagnostics, browser output, local Maven configuration, screenshots and temporary bundles. No database, service, permission, branch/worktree, stash or cleanup operation is included.
+
+## Publication delivery — 2026-09-30 Beijing time
+- Committed the verified publication-status-only calendar correction as `84a933cc01` (`fix: 统一考期发布状态展示`): 10 files, 98 insertions and 40 deletions. Pre-commit checks found no whitespace errors, unmerged paths, conflict markers or high-risk secret patterns.
+- Pushed by normal non-force update from `447b6e8d75` to `84a933cc01` on `origin/main` using a command-scoped direct HTTPS connection; global Git proxy configuration was not modified.
+- The tracked Python bytecode cache and all existing untracked diagnostics, browser output, local Maven configuration, screenshot and temporary bundles remain local and were not deleted or published. No database, service, permission, branch/worktree or stash operation was performed.
