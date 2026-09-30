@@ -25,3 +25,10 @@
 
 - User explicitly authorized committing the current local code and pushing it to remote `origin/main`. Exact target is `https://gitee.com/louie9985/ZSJOS.git`, branch `main`; expected impact is one normal source commit containing the completed exam reedit, calendar navigation/day/full-name/remark-link work, announcement action placement, Lead submitter-assist deadline change, V287, tests, directly affected documentation and handoff records, followed by a non-force push.
 - Exclude obvious local diagnostics and generated/runtime artifacts: `.failing_blocks`, `.playwright-mcp`, `.probe_*`, `.tmp_drift`, `.verify_*`, `backend/.mvn`, `content-review-tab.png`, `frontend/workbench/tmp` and tracked Python bytecode. Preserve them locally without deletion. No database execution, service/permission operation, branch/worktree change, rebase, force push or stash deletion is included.
+
+## Publication delivery — 2026-09-30 Beijing time
+
+- Committed the authorized local source as `943f26c677` (`feat: 完善考期重编与日历交互`): 68 files, 2,361 insertions and 199 deletions. The commit contains V287, exam revoke/reedit, calendar navigation/day/full-name/remark-link behavior, announcement action placement, Lead submitter-assist deadline behavior, tests, directly affected documents and handoff records.
+- Pre-commit checks passed: no unmerged paths, conflict markers, whitespace errors, staged binary/runtime artifacts or high-risk secret patterns; `zsjos_db.py check` passed manifests, migration order, desired schema, Java mappings, baseline versions and verification consistency.
+- Pushed by normal non-force update from remote `a10411fff4` to `943f26c677` on `origin/main`. Command-scoped direct HTTPS bypassed the unavailable configured localhost proxy without changing global Git configuration.
+- Excluded diagnostics, temporary output, screenshot, local Maven configuration and tracked Python bytecode remain local and were not deleted. No database migration, ledger/checksum, service, permission, branch/worktree, force-push or stash operation was performed.
