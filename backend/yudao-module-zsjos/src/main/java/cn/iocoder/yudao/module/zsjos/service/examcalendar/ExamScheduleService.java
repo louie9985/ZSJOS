@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.Clock;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -36,6 +38,7 @@ public class ExamScheduleService {
     public static final String UPCOMING_DAYS_CONFIG_KEY = "zsjos.exam-calendar.upcoming-days";
     public static final int DEFAULT_UPCOMING_DAYS = 3;
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
+    private Clock clock = Clock.system(BUSINESS_ZONE);
     private static final Set<String> TYPES = Set.of("EXACT", "MULTI_DAY");
 
     @Resource private ExamScheduleMapper mapper;
@@ -54,8 +57,9 @@ public class ExamScheduleService {
     public PageResult<ExamScheduleRespVO> exactPage(ExamSchedulePageReqVO req, Long userId) {
         validateQueryRange(req);
         boolean manager = hasManagePermission(userId);
-        List<ExamScheduleRespVO> filtered = mapper.selectExactList(req, manager).stream()
-                .map(this::toResponse)
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<ExamScheduleRespVO> filtered = mapper.selectExactList(req, manager, now).stream()
+                .map(row -> toResponse(row, userId, manager, now))
                 .filter(row -> req.getDisplayStatus() == null || req.getDisplayStatus().isBlank()
                         || row.getDisplayStatus().equalsIgnoreCase(req.getDisplayStatus()))
                 .toList();
@@ -66,8 +70,10 @@ public class ExamScheduleService {
 
     public PageResult<ExamScheduleRespVO> multiDayPage(ExamSchedulePageReqVO req, Long userId) {
         validateQueryRange(req);
-        PageResult<ExamScheduleDO> page = mapper.selectMultiDayPage(req, hasManagePermission(userId));
-        return new PageResult<>(page.getList().stream().map(this::toResponse).toList(), page.getTotal());
+        boolean manager = hasManagePermission(userId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        PageResult<ExamScheduleDO> page = mapper.selectMultiDayPage(req, manager, now);
+        return new PageResult<>(page.getList().stream().map(row -> toResponse(row, userId, manager, now)).toList(), page.getTotal());
     }
 
     public List<ExamCategoryOptionRespVO> categoryOptions() {
@@ -152,10 +158,42 @@ public class ExamScheduleService {
         ExamScheduleDO current = requireExists(id);
         if (!"PUBLISHED".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
         notificationSnapshots.captureExam(current, "MANUAL");
-        mapper.updateById(new ExamScheduleDO().setId(id).setRecordStatus("REVOKED")
-                .setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1));
-        current.setRecordStatus("REVOKED").setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1);
+        current.setRecordStatus("REVOKED").setRevokedAt(LocalDateTime.now(clock)).setRevokedBy(userId)
+                .setCalendarVersion((current.getCalendarVersion() == null ? 1 : current.getCalendarVersion()) + 1);
+        mapper.updateById(current);
         notificationSnapshots.captureExam(current, "REVOKED");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "reedit")
+    public ExamScheduleReeditRespVO reedit(Long id, String operationKey, Long userId) {
+        requireManage(userId);
+        if (operationKey == null || !operationKey.matches("[A-Za-z0-9_-]{16,64}"))
+            throw exception(EXAM_SCHEDULE_REEDIT_KEY_INVALID);
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        ExamScheduleDO row = mapper.selectReeditRecordForUpdate(id, tenantId);
+        if (row == null || !Objects.equals(tenantId, row.getTenantId())) throw exception(EXAM_SCHEDULE_NOT_EXISTS);
+        if (!Objects.equals(userId, row.getRevokedBy())) throw exception(EXAM_SCHEDULE_PERMISSION_DENIED);
+        if (!"REVOKED".equals(row.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
+        if (row.getReeditClaimedAt() != null) {
+            if (!Objects.equals(operationKey, row.getReeditOperationKey())) throw exception(EXAM_SCHEDULE_REEDIT_CLAIMED);
+            // The original request stays replayable after expiry without creating another claim or notification.
+            return reeditContent(row);
+        }
+        if (Boolean.TRUE.equals(row.getDeleted())) throw exception(EXAM_SCHEDULE_NOT_EXISTS);
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (row.getRevokedAt() == null || !now.isBefore(row.getRevokedAt().plusMinutes(5)))
+            throw exception(EXAM_SCHEDULE_REEDIT_EXPIRED);
+        mapper.update(null, new LambdaUpdateWrapper<ExamScheduleDO>()
+                .eq(ExamScheduleDO::getId, id).eq(ExamScheduleDO::getTenantId, tenantId)
+                .set(ExamScheduleDO::getReeditClaimedAt, now)
+                .set(ExamScheduleDO::getReeditOperationKey, operationKey)
+                .set(ExamScheduleDO::getDeleted, true));
+        return reeditContent(row);
+    }
+
+    private ExamScheduleReeditRespVO reeditContent(ExamScheduleDO row) {
+        return BeanUtils.toBean(row, ExamScheduleReeditRespVO.class).setScheduleName(displayName(row));
     }
 
     public ExamScheduleDO previewTransition(Long id, String event, Long userId) {
@@ -214,9 +252,15 @@ public class ExamScheduleService {
         }
     }
 
-    private ExamScheduleRespVO toResponse(ExamScheduleDO schedule) {
+    private ExamScheduleRespVO toResponse(ExamScheduleDO schedule, Long userId, boolean manager, LocalDateTime now) {
         // JSON snapshots have different HTTP shapes; generic bean conversion cannot decode them.
         ExamScheduleRespVO response = new ExamScheduleRespVO();
+        response.setServerTime(now);
+        if ("REVOKED".equals(schedule.getRecordStatus()) && schedule.getRevokedAt() != null) {
+            response.setReeditDeadline(schedule.getRevokedAt().plusMinutes(5));
+            response.setCanReedit(manager && Objects.equals(userId, schedule.getRevokedBy())
+                    && schedule.getReeditClaimedAt() == null && now.isBefore(response.getReeditDeadline()));
+        }
         response.setId(schedule.getId()); response.setScheduleType(schedule.getScheduleType());
         response.setExactDate(schedule.getExactDate()); response.setStartDate(schedule.getStartDate());
         response.setEndDate(schedule.getEndDate()); response.setCategoryId(schedule.getCategoryId());
@@ -316,7 +360,7 @@ public class ExamScheduleService {
     }
 
     private LocalDate today() {
-        return LocalDate.now(BUSINESS_ZONE);
+        return LocalDate.now(clock);
     }
 
     private record CategorySnapshot(String name, List<ZsjosProductCategoryPathNodeVO> path) {}

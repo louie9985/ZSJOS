@@ -48,7 +48,10 @@ export function AnnouncementPanelView(props: AnnouncementPanelViewProps) {
           {props.hasSummary && props.unreadCount > 0 && <span className="home-announcement-count">未读 {props.unreadCount}</span>}
           {!props.hasSummary && props.summaryLoading && <span>未读数加载中</span>}
         </span>
-        <Button type="text" icon={<ReloadOutlined />} aria-label="刷新公告" loading={props.loading} onClick={props.onRefresh} />
+        <div className="home-announcement-actions">
+          <Button className="home-announcement-all" type="link" size="small" onClick={props.onAll}>查看所有公告 <RightOutlined /></Button>
+          <Button type="text" icon={<ReloadOutlined />} aria-label="刷新公告" loading={props.loading} onClick={props.onRefresh} />
+        </div>
       </>}
     </header>
     {props.enabled && props.summaryError && <Alert type="warning" showIcon title={props.hasSummary ? '未读数更新失败，当前显示上次结果' : '未读数暂不可用'} description={props.summaryError} action={<Button size="small" onClick={props.onRefreshSummary}>重试未读数</Button>} />}
@@ -70,7 +73,6 @@ export function AnnouncementPanelView(props: AnnouncementPanelViewProps) {
           </span>
         </button>) : !props.error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无公告" />}
     </div>
-    {props.enabled && <Button className="home-announcement-all" type="link" onClick={props.onAll}>查看所有公告 <RightOutlined /></Button>}
   </section>
 }
 

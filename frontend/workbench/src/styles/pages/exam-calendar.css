@@ -1,7 +1,8 @@
 .exam-calendar-page {
   display: flex;
   min-height: 0;
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   flex-direction: column;
   gap: var(--crm-gap);
 }
@@ -17,7 +18,7 @@
 .exam-calendar-page .page-heading h4 { margin: 0; }
 .exam-calendar-filter { min-width: 180px; }
 .exam-calendar-page .ant-spin-nested-loading,
-.exam-calendar-page .ant-spin-container { min-height: 0; height: 100%; }
+.exam-calendar-page .ant-spin-container { min-height: 0; height: auto; }
 .exam-calendar-page > .ant-spin-nested-loading { flex: 1; overflow: auto; }
 
 .exam-calendar-events {
@@ -41,24 +42,8 @@
   text-align: left;
 }
 
-.exam-calendar-event > span:first-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.exam-calendar-event .ant-tag { flex: 0 0 auto; margin: 0; }
-.exam-calendar-event { align-items: flex-start; flex-wrap: wrap; }
-.exam-calendar-event > span:first-child { white-space: normal; overflow-wrap: anywhere; }
-.exam-calendar-event .product-specs { max-height: 3em; overflow: hidden; }
-.exam-calendar-detail strong { overflow-wrap: anywhere; }
-.exam-calendar-overflow { padding-inline: var(--crm-sp-2); }
+.exam-calendar-event > span:first-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .exam-calendar-page .ant-modal-body { max-height: min(70vh, 640px); overflow-y: auto; }
-.exam-calendar-event.tone-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
-.exam-calendar-event.tone-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
-.exam-calendar-event.tone-published { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
-
 .exam-calendar-detail {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -77,29 +62,28 @@
 .exam-calendar-detail .wide { grid-column: 1 / -1; }
 .exam-calendar-detail span { color: var(--crm-text-secondary); }
 
-.exam-calendar-legend { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
-.exam-calendar-legend .ant-tag { border-style: solid; }
+.exam-calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crm-sp-2) var(--crm-gap); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.exam-calendar-legend-item { display: inline-flex; align-items: center; gap: var(--crm-sp-1); }
+.exam-calendar-swatch { display: inline-block; width: 24px; height: 14px; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-sm); }
+.exam-calendar-swatch.is-multi-day { width: 36px; border-inline-width: 3px; background: var(--crm-bg-container); }
 .exam-day-detail { max-height: 65vh; overflow-y: auto; }
 .exam-month { min-width: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); overflow: hidden; }
 .exam-month-weekdays, .exam-month-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .exam-month-weekdays { padding-block: var(--crm-sp-3); color: var(--crm-text-secondary); text-align: center; }
 .exam-month-week { border-top: 1px solid var(--crm-border); }
-.exam-month-day { min-width: 0; border-right: 1px solid var(--crm-border); padding-bottom: var(--crm-sp-2); }
+/* Subgrid shares actual wrapped lane heights; fixed pixel offsets would overlap long names. */
+.exam-month-day { display: grid; grid-template-rows: subgrid; min-width: 0; border-right: 1px solid var(--crm-border); }
 .exam-month-day:nth-child(7) { border-right: 0; }
 .exam-month-day.is-adjacent { background: var(--crm-bg-layout); }
 .exam-month-date { display: block; width: 100%; height: 36px; padding: 0 var(--crm-sp-3); border: 0; background: transparent; color: var(--crm-text); text-align: right; cursor: pointer; font: inherit; }
 .exam-month-day.is-adjacent .exam-month-date { color: var(--crm-text-secondary); }
 .exam-month-day.is-today .exam-month-date { color: var(--crm-color-primary); font-weight: 700; }
 .exam-month-date:hover { background: var(--crm-color-primary-bg); }
-.exam-month .exam-calendar-events { padding-inline: var(--crm-sp-1); }
+.exam-month .exam-calendar-events { align-content: start; padding: var(--crm-sp-1) var(--crm-sp-1) var(--crm-sp-2); }
 .exam-month .exam-calendar-event { font: inherit; font-size: var(--crm-font-sm); }
-.exam-month .exam-calendar-event > span:first-child { white-space: nowrap; }
-.exam-multiDay-bar { z-index: 1; display: flex; align-items: center; gap: var(--crm-sp-1); min-width: 0; height: 26px; margin-inline: var(--crm-sp-1); padding: 0 var(--crm-sp-2); border: 1px solid var(--crm-color-primary-border); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); color: var(--crm-text); cursor: pointer; font: inherit; font-size: var(--crm-font-sm); text-align: left; }
-.exam-multiDay-bar-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.exam-multiDay-bar.status-draft, .exam-multiDay-bar.status-revoked { background: var(--crm-bg-container); border-color: var(--crm-border); color: var(--crm-text-secondary); }
-.exam-multiDay-bar.status-revoked .exam-multiDay-bar-label { text-decoration: line-thmultiDay; }
+.exam-multiDay-bar { z-index: 1; display: flex; align-items: center; gap: var(--crm-sp-1); min-width: 0; min-height: 26px; margin-block: var(--crm-sp-1); margin-inline: var(--crm-sp-1); padding: var(--crm-sp-1) var(--crm-sp-2); border: 1px solid var(--crm-color-primary-border); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); color: var(--crm-text); cursor: pointer; font: inherit; font-size: var(--crm-font-sm); text-align: left; }
+.exam-multiDay-bar-label { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .exam-month button:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
-.exam-month .exam-multiDay-overflow, .exam-month .exam-calendar-overflow { width: 100%; height: auto; padding: 0; font-size: var(--crm-font-sm); white-space: normal; }
 
 @media (max-width: 768px) {
   .exam-calendar-page { height: auto; min-height: 100%; }
@@ -109,11 +93,26 @@
   .exam-calendar-detail { grid-template-columns: 1fr; }
   .exam-calendar-detail .wide { grid-column: auto; }
   .exam-month .exam-calendar-event { padding: var(--crm-sp-1); }
-  .exam-month .exam-calendar-event .ant-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding-inline: 0; font-size: var(--crm-font-sm); }
   .exam-multiDay-bar { margin-inline: 2px; padding-inline: var(--crm-sp-1); }
   .exam-month-date { padding-inline: var(--crm-sp-2); }
 }
 
-.exam-multiDay-bar.status-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
-.exam-multiDay-bar.status-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
-.exam-multiDay-bar.status-ended { border-color: var(--crm-border); background: var(--crm-bg-container); color: var(--crm-text-secondary); }
+
+/* Date-sized hit targets retain continuous bars and keyboard day selection. */
+.exam-month-day { cursor: pointer; }
+.exam-multiDay-bar { position: relative; }
+.exam-multiDay-days { position: absolute; inset: 0; display: grid; }
+.exam-multiDay-days > button { min-width: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
+
+.exam-countdown { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Legend swatches and both exam types use the same status appearance. */
+.exam-status-tone { border-color: var(--crm-border); background: var(--crm-bg-container); color: var(--crm-text); }
+.exam-status-tone.tone-ended { background: color-mix(in srgb, var(--crm-text-secondary) 12%, var(--crm-bg-container)); color: var(--crm-text-secondary); }
+.exam-status-tone.tone-revoked { border-color: var(--crm-color-error-border); background: var(--crm-color-error-bg); border-style: dashed; }
+.exam-status-tone.tone-published { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
+.exam-status-tone.tone-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
+.exam-status-tone.tone-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
+.exam-multiDay-bar { border-inline-width: 3px; }
+.exam-calendar-page .calendar-side-navigation-content { overflow: visible; }
+.exam-calendar-page .calendar-side-navigation { flex: 0 0 auto; }

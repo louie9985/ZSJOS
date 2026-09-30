@@ -29385,3 +29385,38 @@ uoyi-vue-pro.system_menu: insert only four absent rows with fixed IDs/names/perm
 - Changed files: `frontend/workbench/src/main.tsx`, `frontend/workbench/src/styles/layout.css`, `handoff/main.md`。
 - Verification: `npm run typecheck` passed; `npm run build` passed with the existing Vite large-chunk warning; scoped `git diff --check` passed with existing LF-to-CRLF warnings. Full `npm test` ran 953 tests and reported 24 existing failures in unrelated finance, media/content-review, menu, style-guard, BPM, management API, and today-task assertions; no failure implicated these layout files.
 - Dependencies/integration impact: no new dependency, API, database, permission, service, branch, commit or push operation. A live authenticated browser check was not available; responsive visual acceptance remains to be confirmed in the target Workbench session.
+
+## Scope update — main-workbench-tabs-content-height-20260929 — 2026-09-30
+- Context: local/main/D:/ZSJ-OS; base a10411fff48cdf7cf68eccae072689460d9b22f6; owner this chat /root; target branch/integration None. Reuses previous registration.
+- User feedback: previous shell-height change did not resolve visibility. Authorized follow-up moves 查看所有公告 to the announcement header.
+- Ownership: frontend/workbench/src/components/HomeAnnouncementPanel.tsx; frontend/workbench/src/styles/pages/today-tasks.css; announcement paragraph in frontend/workbench/docs/ui-guidelines.md; this handoff entry. Preserve pre-existing document changes.
+- Non-goals: no further shell changes, API/permission changes, dependencies, service changes, branch operations or commits.
+- Verification: existing isolated announcement fixture in a real browser at desktop/mobile widths; click, scroll and denied-state checks; typecheck and scoped diff checks.
+
+## Follow-up delivery — main-workbench-tabs-content-height-20260929 — 2026-09-30
+- Result: moved 查看所有公告 from panel footer into header action group before refresh; compact link button, token spacing, whole-group wrapping/right alignment. Existing enabled permission condition and onAll navigation callback retained. Updated the related UI guideline paragraph.
+- Correction to prior delivery: previous shell-height edit did not solve the user's reported case; its claim that the footer stayed visible was not browser-verified. This follow-up verifies header placement instead; no additional shell changes.
+- Evidence: npm run typecheck exit 0; existing local Vite 5174 actual AnnouncementPanelView demo checked in Chromium at 1440/1366/390/320 viewport widths, 430/300/358/288 panel widths, constrained 240px height. Header entry visible and horizontally contained; list scrolling keeps its position stable; click invokes existing onAll callback; denied state hides navigation and refresh. Desktop/mobile panel screenshots visually reviewed. Scoped git diff --check passed.
+- Scope/limits: isolated component fixture uses synthetic data; live authenticated route navigation not exercised. No service lifecycle, dependency, backend, permission, branch, commit or push operation. Prior unrelated changes preserved. Ownership released.
+
+## Workstream Registration - 2026-09-30
+
+- Workstream ID: `main-lead-submitter-assist-today-20260930`
+- Goal: 将销售专员发起的提交人协助任务设置为今日截止，避免进入“无截止”分类并要求当天完成。
+- Non-goals: 不改变协助申请状态机、权限、通知、数据库结构、历史任务截止时间、分支、提交、推送或外部服务。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `a10411fff48cdf7cf68eccae072689460d9b22f6`
+- Target branch/integration order: 当前本地 `main`; None。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterActionService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterActionServiceTest.java`; `docs/api/zsjos-lead-submission-dispatch.md`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 `BusinessTaskCreateCommand` 今日任务分桶按北京时间自然日计算；无新增依赖。
+- Verification plan: 协助服务 focused Maven tests；`git diff --check`；UTF-8 文档检查。
+
+## Delivery — main-lead-submitter-assist-today-20260930 — 2026-09-30
+
+- Result: `lead_submitter_assist` 新建业务待办使用北京时间次日 00:00 作为截止边界，因此请求发生当天归入“今日”而不是“无截止”；回复完成仍按原幂等键关闭任务，历史任务不回溯。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterActionService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterActionServiceTest.java`; `docs/api/zsjos-lead-submission-dispatch.md`。
+- Verification: 定向重跑内部提交人和兼职当前负责人两条测试，2 passed；`git diff --check` passed。完整 `LeadSubmitterActionServiceTest` 共 9 条，其中 2 条既有兼职历史负责人 mock 分支失败，与本次截止时间改动无关。
+- Dependencies/integration impact: 无新增依赖、权限、SQL、分支、提交、推送或外部服务操作；保留当前工作树其他未提交改动。
+- Remaining/unverified: 未执行真实登录工作台和目标数据库验证；部署后新创建的协助任务生效，既有无截止任务按本次约定不自动改写。

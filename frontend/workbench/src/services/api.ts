@@ -1,4 +1,5 @@
 import axios, { type AxiosProgressEvent, type AxiosRequestConfig } from "axios";
+import { withExamClock } from './examReedit';
 import type { AxiosHeaderValue } from "axios";
 import { invalidateMenuTasks } from "./menuTaskRefresh";
 import {
@@ -591,6 +592,11 @@ export type ExamCategoryOption = {
   path: Array<{ id: number; name: string }>;
 };
 export type ExamSchedule = {
+  serverTime?: Timestamp;
+  reeditDeadline?: Timestamp;
+  canReedit?: boolean;
+  /** Client-only monotonic deadline; never submitted to the server. */
+  reeditExpiresAt?: number;
   productId?: number;
   productNameSnapshot?: string;
   scheduleName?: string;
@@ -3624,6 +3630,8 @@ export const api = {
       unwrap<boolean>(await http.delete(`/zsjos/personal-calendar/${id}`)),
   },
   examCalendar: {
+    reedit: async (id: number, operationKey: string) => unwrap<ExamScheduleInput>(
+      await http.post('/zsjos/exam-calendar/reedit/' + id, { operationKey })),
     notifyUsers: async (keyword?: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<CalendarNotifyUser>>(await http.get('/zsjos/calendar-notification/users', { params: { calendarType: 'EXAM', keyword, pageNo, pageSize } })),
     productOptions: async () => unwrap<ExamProductOption[]>(await http.get('/zsjos/exam-calendar/product-options')),
     exactPage: async (params: {
@@ -3633,14 +3641,14 @@ export const api = {
       rangeEnd?: string;
       categoryId?: number;
       displayStatus?: string;
-    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/page', { params })),
+    }) => withExamClock(async () => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/page', { params }))),
     multiDayPage: async (params: {
       pageNo: number;
       pageSize: number;
       rangeStart?: string;
       rangeEnd?: string;
       categoryId?: number;
-    }) => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/multi-day', { params })),
+    }) => withExamClock(async () => unwrap<PageResult<ExamSchedule>>(await http.get('/zsjos/exam-calendar/multi-day', { params }))),
     categoryOptions: async () => unwrap<ExamCategoryOption[]>(
       await http.get('/zsjos/exam-calendar/category-options'),
     ),

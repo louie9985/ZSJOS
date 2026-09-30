@@ -25,6 +25,8 @@ import jakarta.validation.Validation;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
@@ -129,6 +131,7 @@ class LeadSubmitterActionServiceTest {
         verify(businessTaskCommandService).create(task.capture());
         assertEquals(10L, task.getValue().assigneeId());
         assertEquals(TASK_TYPE_SUBMITTER_ASSIST, task.getValue().taskType());
+        assertEquals(LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(1).atStartOfDay(), task.getValue().dueAt());
         verify(notifyPublisher).publish(eq(SUBMITTER_ASSIST_REQUESTED), eq(1L), anyString(), eq(20L), any(), anyMap());
         verify(notifyPublisher, never()).publish(eq(PARTNER_ASSIST_REMINDER), anyLong(), anyString(), anyLong(), any(), anyMap());
     }
@@ -146,6 +149,7 @@ class LeadSubmitterActionServiceTest {
         ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
         verify(businessTaskCommandService).create(task.capture());
         assertEquals(30L, task.getValue().assigneeId());
+        assertEquals(LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(1).atStartOfDay(), task.getValue().dueAt());
         verify(notifyPublisher).publish(eq(PARTNER_ASSIST_REMINDER), eq(1L), anyString(), eq(20L), any(),
                 argThat(payload -> Long.valueOf(30L).equals(payload.get("partnerOwnerUserId"))));
     }

@@ -42,6 +42,19 @@ class ExamScheduleObjectPermissionProviderTest {
         assertFalse(provider.hasPermission(9L, "delete", 20L));
     }
 
+    @Test void reeditAllowsOwnedTombstoneButNeverOtherUsersOrTenants() {
+        var row = schedule().setRevokedBy(20L).setReeditClaimedAt(java.time.LocalDateTime.now()); row.setDeleted(true);
+        when(mapper.selectReeditRecord(9L, 10L)).thenReturn(row);
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        assertTrue(provider.hasPermission(9L, "reedit", 20L));
+        assertFalse(provider.hasPermission(9L, "reedit", 21L));
+        row.setTenantId(11L); assertFalse(provider.hasPermission(9L, "reedit", 20L));
+        row.setTenantId(10L); row.setReeditClaimedAt(null); assertFalse(provider.hasPermission(9L, "reedit", 20L));
+        row.setDeleted(false);
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(false);
+        assertFalse(provider.hasPermission(9L, "reedit", 20L));
+    }
+
     @Test
     void rejectsMissingSchedulesAndUsersWithoutManagePermission() {
         when(mapper.selectById(9L)).thenReturn(schedule());

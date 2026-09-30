@@ -8,14 +8,24 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.examcalendar.ExamScheduleDO;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
+    // Only reedit may read a claimed tombstone; both queries explicitly preserve tenant isolation.
+    @Select("SELECT * FROM zsjos_exam_schedule WHERE id = #{id} AND tenant_id = #{tenantId}")
+    ExamScheduleDO selectReeditRecord(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM zsjos_exam_schedule WHERE id = #{id} AND tenant_id = #{tenantId} FOR UPDATE")
+    ExamScheduleDO selectReeditRecordForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     default ExamScheduleDO selectForUpdate(Long id) {
         return selectOne(new LambdaQueryWrapperX<ExamScheduleDO>().eq(ExamScheduleDO::getId, id).last("FOR UPDATE"));
     }
-    default List<ExamScheduleDO> selectExactList(ExamSchedulePageReqVO req, boolean includeUnpublished) {
-        return selectList(base(req, includeUnpublished)
+    default List<ExamScheduleDO> selectExactList(ExamSchedulePageReqVO req, boolean includeUnpublished, LocalDateTime now) {
+        return selectList(base(req, includeUnpublished, now)
                 .eq(ExamScheduleDO::getScheduleType, "EXACT")
                 .geIfPresent(ExamScheduleDO::getExactDate, req.getRangeStart())
                 .leIfPresent(ExamScheduleDO::getExactDate, req.getRangeEnd())
@@ -23,8 +33,8 @@ public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
                 .orderByAsc(ExamScheduleDO::getId));
     }
 
-    default PageResult<ExamScheduleDO> selectMultiDayPage(ExamSchedulePageReqVO req, boolean includeUnpublished) {
-        var query = base(req, includeUnpublished)
+    default PageResult<ExamScheduleDO> selectMultiDayPage(ExamSchedulePageReqVO req, boolean includeUnpublished, LocalDateTime now) {
+        var query = base(req, includeUnpublished, now)
                 .eq(ExamScheduleDO::getScheduleType, "MULTI_DAY")
                 .leIfPresent(ExamScheduleDO::getStartDate, req.getRangeEnd())
                 .geIfPresent(ExamScheduleDO::getEndDate, req.getRangeStart())
@@ -33,9 +43,14 @@ public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
         return selectPage(req, query);
     }
 
-    private static LambdaQueryWrapperX<ExamScheduleDO> base(ExamSchedulePageReqVO req, boolean includeUnpublished) {
-        return new LambdaQueryWrapperX<ExamScheduleDO>()
+    private static LambdaQueryWrapperX<ExamScheduleDO> base(ExamSchedulePageReqVO req, boolean includeUnpublished, LocalDateTime now) {
+        var query = new LambdaQueryWrapperX<ExamScheduleDO>()
                 .eqIfPresent(ExamScheduleDO::getCategoryId, req.getCategoryId())
                 .eq(!includeUnpublished, ExamScheduleDO::getRecordStatus, "PUBLISHED");
+        query.and(includeUnpublished, q -> q.in(ExamScheduleDO::getRecordStatus, "DRAFT", "PUBLISHED")
+                        .or(revoked -> revoked.eq(ExamScheduleDO::getRecordStatus, "REVOKED")
+                                .gt(ExamScheduleDO::getRevokedAt, now.minusMinutes(5))
+                                .isNull(ExamScheduleDO::getReeditClaimedAt)));
+        return query;
     }
 }

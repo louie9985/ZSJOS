@@ -30,4 +30,7 @@ public class ExamScheduleRespVO {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Integer calendarVersion;
+    private LocalDateTime serverTime;
+    private LocalDateTime reeditDeadline;
+    private boolean canReedit;
 }

@@ -78,6 +78,14 @@ public class ExamScheduleController {
         return success(true);
     }
 
+    @PostMapping("/reedit/{id}")
+    @Operation(summary = "领取撤销考期重新编辑内容")
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")
+    public CommonResult<ExamScheduleReeditRespVO> reedit(@PathVariable Long id,
+            @Valid @RequestBody ExamScheduleReeditReqVO req) {
+        return success(service.reedit(id, req.getOperationKey(), getLoginUserId()));
+    }
+
     @PostMapping("/revoke/{id}")
     @Operation(summary = "撤销考期")
     @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")

@@ -1,6 +1,8 @@
+import { LinkedText } from '../components/ResourceLink'
+import CalendarSideNavigation, { moveCalendarMonth } from '../components/CalendarSideNavigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Calendar, DatePicker, Empty, Modal, Pagination, Select, Space, Spin, Tag, Typography } from 'antd'
-import { LeftOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, type DictData, type ManagedLead } from '../services/api'
 import { leadCalendarApi, type CalendarCard, type CalendarDay, type CalendarDirection, type CalendarSort } from '../services/leadCalendar'
@@ -78,12 +80,11 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
   if (!canView) return <Alert type="warning" showIcon title="无权查看销售客资跟进日历，请联系管理员配置权限" />
   return <section className="workspace-page lead-calendar-page">
     <div className="page-heading"><div><Typography.Title level={4}>销售客资跟进日历</Typography.Title><Typography.Text type="secondary">我的待跟进客资 · 按跟进截止日期展示</Typography.Text></div><Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button></div>
+    <CalendarSideNavigation onNavigate={direction => { setDay(undefined); setAnchor(value => moveCalendarMonth(value, direction)) }}>
     {error ? <Alert type="error" showIcon title={error} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={loading}>
       <Calendar value={anchor} mode="month" onPanelChange={setAnchor}
         headerRender={() => <div className="lead-calendar-month"><Space wrap>
-          <Button aria-label="上个月" icon={<LeftOutlined />} onClick={() => setAnchor(value => value.subtract(1, 'month'))} />
           <DatePicker picker="month" value={anchor} allowClear={false} aria-label="选择月份" onChange={value => value && setAnchor(value)} />
-          <Button aria-label="下个月" icon={<RightOutlined />} onClick={() => setAnchor(value => value.add(1, 'month'))} />
           <Button onClick={() => setAnchor(dayjs())}>今天</Button>
         </Space></div>}
         onSelect={(date, info) => { if (info.source === 'date' && !loading) { setDay(date); setPage(1); setCards([]); setTotal(0) } }}
@@ -94,6 +95,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
         }} />
       {!loading && !days.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前日历范围暂无待跟进客资" />}
     </Spin>}
+    </CalendarSideNavigation>
     <Modal title={`${day?.format('YYYY年M月D日')} · 待跟进客资`} open={Boolean(day)} onCancel={() => setDay(undefined)} footer={null}
       mask={{ closable: false }} width="min(1440px, calc(100vw - 32px))" destroyOnHidden className="lead-calendar-modal">
       <div className="lead-calendar-toolbar"><Typography.Text type="secondary">共 {total} 个客资</Typography.Text><Space wrap>
@@ -114,7 +116,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
               <div className="lead-calendar-last"><strong>上次跟进</strong>{!card.canReadFollowUp ? <p>暂无跟进记录查看权限</p> : lastFollowUp ? <>
                 <div>{formatTimestamp(lastFollowUp.occurredAt)} · {lastFollowUp.operatorName || '未记录跟进人'}</div>
                 <div>{[lastFollowUp.methodLabel, lastFollowUp.resultLabel].filter(Boolean).join(' · ') || '未记录方式或结果'}</div>
-                <p>{lastFollowUp.remark || '未填写备注'}</p>
+                <p><LinkedText text={lastFollowUp.remark || '未填写备注'} mode="remark" /></p>
               </> : <p>暂无跟进记录</p>}</div>
             </div>
             <div className="lead-calendar-actions"><Button type="text" onClick={() => { setDetailId(lead.id); void loadDetail(lead.id) }}>查看详情</Button><Button type="text" disabled={!canFollow} onClick={() => setFollowUp(lead)}>填写跟进记录</Button></div>

@@ -22,11 +22,10 @@ export type MultiDaySegment = {
   continuesAfter: boolean
 }
 
-export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs, maxLanes = 2) {
+export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs) {
   const days = Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day').format('YYYY-MM-DD'))
   const laneEnds: number[] = []
   const segments: MultiDaySegment[] = []
-  const hiddenCounts = days.map(() => 0)
   const candidates = rows.filter(row => row.scheduleType === 'MULTI_DAY' && row.startDate && row.endDate
     && row.startDate <= row.endDate && row.startDate <= days[6] && row.endDate >= days[0])
     .sort((a, b) => a.startDate!.localeCompare(b.startDate!)
@@ -37,13 +36,9 @@ export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs, maxLa
     let lane = laneEnds.findIndex(end => end < startColumn)
     if (lane === -1) lane = laneEnds.length
     laneEnds[lane] = endColumn
-    if (lane < maxLanes) {
-      segments.push({ schedule, startColumn, endColumn, lane,
-        continuesBefore: schedule.startDate! < days[0],
-        continuesAfter: schedule.endDate! > days[6] })
-    } else {
-      covered.forEach(i => { hiddenCounts[i] += 1 })
-    }
+    segments.push({ schedule, startColumn, endColumn, lane,
+      continuesBefore: schedule.startDate! < days[0],
+      continuesAfter: schedule.endDate! > days[6] })
   }
-  return { segments, hiddenCounts, laneCount: Math.min(maxLanes, laneEnds.length) }
+  return { segments, laneCount: laneEnds.length }
 }

@@ -364,11 +364,15 @@ The server-owned Calendar `/calendar` menu contains the relative `exam-calendar`
 is available to configured employee roles, while create, edit, publish and revoke operations require the
 independent `zsjos:exam-calendar:manage` button permission. Runtime authorization never derives management
 access from role or post names. Exact schedules use one natural date and derive published/upcoming/in-progress/
-ended display state in `Asia/Shanghai`; rough schedules use an inclusive date range and remain outside the month
-grid. Both forms select one category or one product with optional single-valued specification conditions.
-Product-domain validation resolves matching enabled SKUs; publication freezes their membership and labels.
-Historical projections use stored labels, not current product configuration. Other business selectors retain
-their existing complete-SKU and explicitly unknown-product branches; partial conditions are exam-only. The
+ended display state in `Asia/Shanghai`; MULTI_DAY schedules use inclusive dates and continuous month-grid bars.
+New schedules use a manually entered name; legacy category/product/specification labels remain stored snapshots.
+Revoked schedules remain visible to managers for five minutes, with a server-derived deadline and countdown.
+Reedit additionally requires the current tenant's original revoker and current manage permission. An atomic
+claim soft-deletes the revoked source and returns its content for a new record; matching operation-key retries
+may retrieve the original result after expiry, but cannot bypass current identity or permission checks.
+Expired/claimed records are excluded before pagination; old rows without a revoked timestamp get no invented
+window. Notifications and class snapshots remain historical; reedit neither delivers messages nor rebinds classes.
+See [the exam API](../api/exam-calendar.md) for deadlines, replay, editor cancellation and deployment order. The
 upcoming window uses the global Infra key `zsjos.exam-calendar.upcoming-days`, defaulting to three on invalid data.
 Role assignment exposes separate query (73612) and manage (73611) leaves under the exam-calendar page (73610).
 The query leaf makes read-only access selectable without selecting the manage leaf through a parent checkbox.

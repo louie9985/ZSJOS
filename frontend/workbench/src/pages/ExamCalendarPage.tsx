@@ -1,9 +1,13 @@
+import { LinkedText, REMARK_LINK_HINT } from '../components/ResourceLink'
+import CalendarSideNavigation, { moveCalendarMonth } from '../components/CalendarSideNavigation'
 import CalendarNotificationPanel from '../components/CalendarNotificationPanel'
 import ExamCalendarMonth from './ExamCalendarMonth'
+import { isExamVisible, reeditCountdown } from '../services/examReedit'
+import { createIdempotencyKey } from '../services/idempotency'
 import { calendarWindow, coversExamDay, multiDaySchedulesForStatus } from './examCalendarLayout'
 import {
-  CalendarOutlined, EditOutlined, EyeOutlined, LeftOutlined, PlusOutlined,
-  ReloadOutlined, RightOutlined, SendOutlined, StopOutlined
+  CalendarOutlined, EditOutlined, EyeOutlined, PlusOutlined,
+  ReloadOutlined, SendOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
   Alert, Button, DatePicker, Drawer, Empty, Form, Input, List, Modal,
@@ -53,21 +57,25 @@ export const scheduleInput = (values: EditorValues): ExamScheduleInput => {
     }
 }
 
-function ScheduleStatus({ value }: { value: string }) {
-  const meta = STATUS_META[value] || { label: value, color: 'default' }
-  return <Tag color={meta.color}>{meta.label}</Tag>
+export function ExamCalendarLegend() {
+  return <div className="exam-calendar-legend" aria-label="考期颜色和类型说明">
+    {['ENDED', 'REVOKED', 'PUBLISHED', 'DRAFT', 'UPCOMING', 'IN_PROGRESS'].map(status =>
+      <span className="exam-calendar-legend-item" key={status}>
+        <span aria-hidden="true" className={'exam-calendar-swatch exam-status-tone tone-' + status.toLowerCase()} />
+        {STATUS_META[status].label}
+      </span>)}
+    <span className="exam-calendar-legend-item"><span aria-hidden="true" className="exam-calendar-swatch is-multi-day" />多日考试</span>
+    <span>连续日期条包含开始日和结束日，颜色表示考试状态。</span>
+  </div>
 }
 
-function ScheduleDetail({ schedule }: { schedule: ExamSchedule }) {
-  const period = schedule.scheduleType === 'EXACT'
-    ? schedule.exactDate
-    : `${schedule.startDate} 至 ${schedule.endDate}`
-  return <div className="exam-calendar-detail">
-    <div className="wide"><span>考期名称</span><strong>{schedule.scheduleName || '未命名考期'}</strong></div>
-    <div className="wide"><span>时间</span><strong>{period}</strong></div>
-    {schedule.scheduleType === 'MULTI_DAY' && <div className="wide"><Alert type="info" showIcon message="开始日至结束日均属于本次考试安排（含首尾日期）。" /></div>}
-    <div className="wide"><span>备注</span><strong>{schedule.remark || '无'}</strong></div>
-  </div>
+function ScheduleStatus({ value, countdown }: { value: string; countdown?: string }) {
+  const meta = STATUS_META[value] || { label: value, color: 'default' }
+  return <Tag color={meta.color} className={countdown ? 'exam-revoked-status' : undefined}
+    title={meta.label + (countdown ? ' · ' + countdown : '')}>
+    <span className="exam-status-label">{meta.label}{countdown && ' · '}</span>
+    {countdown && <span className="exam-countdown">{countdown}</span>}
+  </Tag>
 }
 
 export default function ExamCalendarPage({ permissions }: { permissions: string[] }) {
@@ -87,18 +95,30 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const [calendarMultiDayLoading, setCalendarMultiDayLoading] = useState(false)
   const [calendarMultiDayError, setCalendarMultiDayError] = useState('')
   const [editorOpen, setEditorOpen] = useState(false), [editing, setEditing] = useState<ExamSchedule>()
-  const [detail, setDetail] = useState<ExamSchedule>(), [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [now, setNow] = useState(() => performance.now())
+  const [claimedIds, setClaimedIds] = useState<Set<number>>(() => new Set())
+  const [reediting, setReediting] = useState(false)
+  const [claiming, setClaiming] = useState(false)
+  const [claimError, setClaimError] = useState('')
+  const pendingClaim = useRef<{ id: number; key: string } | undefined>(undefined)
+  const claimLock = useRef(false), saveLock = useRef(false)
+  const savedEditorId = useRef<number | undefined>(undefined)
   const [savingAction, setSavingAction] = useState<'DRAFT' | 'PUBLISH'>('DRAFT')
   const [form] = Form.useForm<EditorValues>()
   const requests = useRef({ exact: 0, multiDay: 0, calendarMultiDay: 0 })
   const scheduleType = Form.useWatch('scheduleType', form)
   const range = useMemo(() => calendarWindow(anchor), [anchor])
-  const visibleMultiDay = useMemo(() => showMultiDay ? multiDaySchedulesForStatus(calendarMultiDayRows, displayStatus) : [],
-    [calendarMultiDayRows, displayStatus, showMultiDay])
+  const isVisible = (row: ExamSchedule) => !claimedIds.has(row.id) && isExamVisible(row, now)
+  const visibleSchedules = schedules.filter(isVisible)
+  const visibleDrawerRows = multiDayRows.filter(isVisible)
+  const visibleMultiDay = showMultiDay ? multiDaySchedulesForStatus(calendarMultiDayRows.filter(isVisible), displayStatus) : []
+  const renderStatus = (row: ExamSchedule) => <ScheduleStatus value={row.displayStatus}
+    countdown={row.recordStatus === 'REVOKED' ? reeditCountdown(row, now) : undefined} />
 
   const load = useCallback(async () => {
     const request = ++requests.current.exact
-    setLoading(true); setError(''); setSchedules([]); setDetail(undefined); setDayDetail(undefined)
+    setLoading(true); setError(''); setSchedules([]); setDayDetail(undefined)
     try {
       const params = {
         pageNo: 1, pageSize: 100,
@@ -174,6 +194,8 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }, [loadCalendarMultiDay, showMultiDay])
 
   const openCreate = (date = anchor, type: ExamScheduleType = 'EXACT') => {
+    savedEditorId.current = undefined
+    setReediting(false)
     setEditing(undefined)
     form.resetFields()
     form.setFieldsValue({
@@ -185,7 +207,9 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }
 
   const openEdit = (schedule: ExamSchedule) => {
-    setDetail(undefined); setEditing(schedule)
+    savedEditorId.current = schedule.id
+    setReediting(false)
+    setEditing(schedule)
     form.resetFields()
     form.setFieldsValue({
       scheduleType: schedule.scheduleType,
@@ -198,13 +222,20 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }
 
   const save = async (publishAfterSave = false) => {
+    if (saveLock.current) return
+    saveLock.current = true
     const values = await form.validateFields().catch(() => undefined)
-    if (!values) return
+    if (!values) { saveLock.current = false; return }
     const input = scheduleInput(values)
     setSaving(true); setSavingAction(publishAfterSave ? 'PUBLISH' : 'DRAFT')
     try {
       const request = input
-      const savedId = editing ? (await api.examCalendar.update(editing.id, request), editing.id) : await api.examCalendar.create(request)
+      const savedId = savedEditorId.current != null
+        ? (await api.examCalendar.update(savedEditorId.current, request), savedEditorId.current)
+        : await api.examCalendar.create(request)
+      // The committed draft must survive a failed subsequent publish request.
+      savedEditorId.current = savedId
+      setReediting(false)
       if (publishAfterSave) {
         await api.examCalendar.publish(savedId)
         message.success('考期已保存并发布')
@@ -213,15 +244,55 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       await reloadVisible()
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message : '考期保存失败')
-    } finally { setSaving(false); setSavingAction('DRAFT') }
+    } finally { saveLock.current = false; setSaving(false); setSavingAction('DRAFT') }
   }
+
+  const closeEditor = () => {
+    if (saveLock.current) return
+    if (reediting) Modal.confirm({ title: '放弃本次编辑？原考期不会恢复显示',
+      content: '尚未保存的内容将被放弃。', okText: '放弃编辑', cancelText: '继续编辑',
+      onOk: () => { setEditorOpen(false); setReediting(false) } })
+    else setEditorOpen(false)
+  }
+
+  const reedit = async (id: number) => {
+    if (claimLock.current) return
+    claimLock.current = true; setClaiming(true); setClaimError('')
+    if (pendingClaim.current?.id !== id) pendingClaim.current = { id, key: createIdempotencyKey() }
+    try {
+      const content = await api.examCalendar.reedit(id, pendingClaim.current.key)
+      setClaimedIds(previous => new Set([...previous, id]))
+      setEditing(undefined); savedEditorId.current = undefined; setReediting(true)
+      form.resetFields()
+      form.setFieldsValue({ scheduleType: content.scheduleType, scheduleName: content.scheduleName,
+        exactDate: content.exactDate ? dayjs(content.exactDate) : undefined,
+        multiDayRange: content.startDate && content.endDate ? [dayjs(content.startDate), dayjs(content.endDate)] : undefined,
+        remark: content.remark })
+      setDayDetail(undefined); setEditorOpen(true); pendingClaim.current = undefined
+    } catch (cause) {
+      const text = cause instanceof Error ? cause.message : '重新编辑失败'
+      if (cause instanceof ApiError && [403, 1900018001, 1900018005, 1900018006, 1900018011, 1900018012, 1900018013].includes(cause.code)) {
+        pendingClaim.current = undefined
+        message.error(text)
+        void reloadVisible()
+      } else setClaimError(text + '。可重试取回内容，不会重复领取。')
+    } finally { claimLock.current = false; setClaiming(false) }
+  }
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(performance.now()), 250)
+    const resume = () => { if (document.visibilityState === 'visible') { setNow(performance.now()); void reloadVisible() } }
+    const leaving = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    document.addEventListener('visibilitychange', resume)
+    if (reediting && editorOpen) window.addEventListener('beforeunload', leaving)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', resume); window.removeEventListener('beforeunload', leaving) }
+  }, [reediting, editorOpen])
 
   const transition = async (schedule: ExamSchedule, action: 'publish' | 'revoke') => {
     try {
       if (action === 'publish') await api.examCalendar.publish(schedule.id)
       else await api.examCalendar.revoke(schedule.id)
       message.success(action === 'publish' ? '考期已发布' : '考期已撤销')
-      setDetail(undefined)
       await reloadVisible()
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message
@@ -230,6 +301,9 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }
 
   const actions = (schedule: ExamSchedule) => <Space wrap>
+    {canManage && schedule.canReedit && schedule.recordStatus === 'REVOKED' && isVisible(schedule) &&
+      <Button icon={<EditOutlined />} loading={claiming && pendingClaim.current?.id === schedule.id}
+        disabled={claiming || Boolean(claimError)} onClick={() => void reedit(schedule.id)}>重新编辑</Button>}
     {canManage && schedule.recordStatus === 'DRAFT' && schedule.displayStatus !== 'ENDED' &&
       <Button icon={<EditOutlined />} onClick={() => openEdit(schedule)}>编辑</Button>}
     {canManage && schedule.recordStatus === 'DRAFT' &&
@@ -237,7 +311,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     {canNotify && schedule.recordStatus === 'PUBLISHED' &&
       <Button onClick={() => setNotifyTarget(schedule)}>发送通知</Button>}
     {canManage && schedule.recordStatus === 'PUBLISHED' &&
-      <Popconfirm title="撤销后不能重新发布，确认撤销？" onConfirm={() => void transition(schedule, 'revoke')}>
+      <Popconfirm title="撤销后五分钟内可重新编辑，超时将从日历移除，确认撤销？" onConfirm={() => void transition(schedule, 'revoke')}>
         <Button danger icon={<StopOutlined />}>撤销</Button>
       </Popconfirm>}
   </Space>
@@ -253,7 +327,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     </div>
     <div className="exam-calendar-toolbar">
       <Space wrap>
-        <Space.Compact><Button icon={<LeftOutlined />} aria-label="上一月" onClick={() => setAnchor(value => value.subtract(1, 'month'))} /><Button onClick={() => setAnchor(dayjs())}>今天</Button><Button icon={<RightOutlined />} aria-label="下一月" onClick={() => setAnchor(value => value.add(1, 'month'))} /></Space.Compact>
+        <Button onClick={() => setAnchor(dayjs())}>今天</Button>
         <DatePicker picker="month" aria-label="选择考期月份" allowClear={false} value={anchor} onChange={value => { if (value) setAnchor(value) }} />
       </Space>
       <Space wrap>
@@ -261,31 +335,34 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
         <Select allowClear placeholder="状态" value={displayStatus} onChange={setDisplayStatus} options={Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label }))} className="exam-calendar-filter" />
       </Space>
     </div>
-    <div className="exam-calendar-legend"><Tag>多日考试</Tag>连续日期条表示多日考试安排，包含开始日和结束日。</div>
+    <ExamCalendarLegend />
+    {claimError && <Alert type="error" showIcon message={claimError}
+      action={<Button loading={claiming} onClick={() => { if (pendingClaim.current) void reedit(pendingClaim.current.id) }}>重试取回</Button>} />}
     {showMultiDay && calendarMultiDayError && <Alert type="error" showIcon message={calendarMultiDayError}
       action={<Button onClick={() => void loadCalendarMultiDay()}>重试多日考期</Button>} />}
+    <CalendarSideNavigation onNavigate={direction => { setDayDetail(undefined); setAnchor(value => moveCalendarMonth(value, direction)) }}>
     {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void load()}>重试</Button>} />
       : <Spin spinning={loading || (showMultiDay && calendarMultiDayLoading)}>
-        <ExamCalendarMonth anchor={anchor} exactRows={schedules} multiDayRows={visibleMultiDay}
-          onDay={setDayDetail} onDetail={setDetail} renderStatus={status => <ScheduleStatus value={status} />} />
+        <ExamCalendarMonth anchor={anchor} exactRows={visibleSchedules} multiDayRows={visibleMultiDay}
+          onDay={setDayDetail} statusLabel={scheduleStatusLabel} />
         {!loading && (!showMultiDay || (!calendarMultiDayLoading && !calendarMultiDayError))
-          && !schedules.length && !visibleMultiDay.length && <Empty description="当前日历范围暂无符合条件的考期" />}
+          && !visibleSchedules.length && !visibleMultiDay.length && <Empty description="当前日历范围暂无符合条件的考期" />}
       </Spin>}
+    </CalendarSideNavigation>
 
     <Drawer title="多日考试安排" width={520} open={multiDayOpen} onClose={() => setMultiDayOpen(false)} extra={canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(anchor, 'MULTI_DAY')}>新增多日考期</Button>}>
       {multiDayError && <Alert type="error" showIcon message={multiDayError} action={<Button onClick={() => void loadMultiDay()}>重试</Button>} />}
-      <Spin spinning={multiDayLoading}>{!multiDayError && (multiDayRows.length ? <List dataSource={multiDayRows} footer={multiDayTotal > multiDayRows.length ? `当前展示前 ${multiDayRows.length} 条，共 ${multiDayTotal} 条` : undefined} renderItem={item => <List.Item actions={[<Button type="link" key="detail" onClick={() => setDetail(item)}>详情</Button>, ...(canManage && item.recordStatus === 'DRAFT' ? [<Button type="link" key="edit" onClick={() => openEdit(item)}>编辑</Button>] : [])]}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong><ScheduleStatus value={item.displayStatus} /></Space>} description={<><div>{item.startDate} 至 {item.endDate}</div><div>{item.remark || '无备注'}</div></>} /></List.Item>} /> : <Empty description="暂无多日考试安排" />)}</Spin>
+      <Spin spinning={multiDayLoading}>{!multiDayError && (visibleDrawerRows.length ? <List dataSource={visibleDrawerRows} footer={multiDayTotal > multiDayRows.length ? `当前展示前 ${visibleDrawerRows.length} 条，共 ${multiDayTotal - (multiDayRows.length - visibleDrawerRows.length)} 条` : undefined} renderItem={item => <List.Item extra={actions(item)}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong>{renderStatus(item)}</Space>} description={<><div>{item.startDate} 至 {item.endDate}</div><div><LinkedText text={item.remark || '无备注'} mode="remark" /></div></>} /></List.Item>} /> : <Empty description="暂无多日考试安排" />)}</Spin>
     </Drawer>
 
-    <Modal title={<Space wrap><span>考期详情</span>{detail && <ScheduleStatus value={detail.displayStatus} />}</Space>} open={Boolean(detail)} onCancel={() => setDetail(undefined)} footer={detail ? actions(detail) : null} destroyOnHidden>{detail && <ScheduleDetail schedule={detail} />}</Modal>
     <Modal title={`${dayDetail?.format('YYYY年M月D日')} 考期安排`} open={Boolean(dayDetail)} onCancel={() => setDayDetail(undefined)} footer={null} width="min(720px, calc(100vw - 32px))" destroyOnHidden>
       {dayDetail && <div className="exam-day-detail">
         <Typography.Title level={5}>当天单日考试</Typography.Title>
         {(() => {
-          const rows = schedules.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
-          return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}>
-            <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><ScheduleStatus value={row.displayStatus} /></Space>}
-              description={row.remark} />
+          const rows = visibleSchedules.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
+          return rows.length ? <List dataSource={rows} renderItem={row => <List.Item extra={actions(row)}>
+            <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong>{renderStatus(row)}</Space>}
+              description={<><div>时间：{row.exactDate}</div><div>备注：<LinkedText text={row.remark || "无"} mode="remark" /></div></>} />
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无单日考试" />
         })()}
         {showMultiDay && <>
@@ -295,21 +372,21 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
             action={<Button onClick={() => void loadCalendarMultiDay()}>重试多日考期</Button>} />
             : <Spin spinning={calendarMultiDayLoading}>{!calendarMultiDayLoading && (() => {
               const rows = visibleMultiDay.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
-              return rows.length ? <List dataSource={rows} renderItem={row => <List.Item actions={[<Button key="detail" type="link" onClick={() => setDetail(row)}>详情</Button>]}>
-                <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><Tag>多日</Tag><ScheduleStatus value={row.displayStatus} /></Space>}
-                  description={<>{row.startDate} 至 {row.endDate}{row.remark && <div>{row.remark}</div>}</>} />
+              return rows.length ? <List dataSource={rows} renderItem={row => <List.Item extra={actions(row)}>
+                <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><Tag>多日</Tag>{renderStatus(row)}</Space>}
+                  description={<><div>时间：{row.startDate} 至 {row.endDate}</div><div>备注：<LinkedText text={row.remark || "无"} mode="remark" /></div></>} />
               </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无多日考期" />
             })()}</Spin>}
         </>}
       </div>}
     </Modal>
-    <Modal title={editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={() => setEditorOpen(false)} footer={<Space><Button onClick={() => setEditorOpen(false)} disabled={saving}>取消</Button><Button loading={saving && savingAction === 'DRAFT'} disabled={saving} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving && savingAction === 'PUBLISH'} disabled={saving} onClick={() => void save(true)}>保存并发布</Button></Space>} destroyOnHidden>
+    <Modal title={reediting ? '重新编辑考期' : editing ? '编辑考期' : '新增考期'} open={editorOpen} confirmLoading={saving} onCancel={closeEditor} maskClosable={false} footer={<Space><Button onClick={closeEditor} disabled={saving}>取消</Button><Button loading={saving && savingAction === 'DRAFT'} disabled={saving} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving && savingAction === 'PUBLISH'} disabled={saving} onClick={() => void save(true)}>保存并发布</Button></Space>} destroyOnHidden>
       <Form form={form} layout="vertical" initialValues={{ scheduleType: 'EXACT' }}>
         <Form.Item name="scheduleName" label="考期名称" rules={[{ required: true, whitespace: true, message: '请填写考期名称' }, { max: 100 }]}><Input maxLength={100} placeholder="请填写考期名称" /></Form.Item>
         <Form.Item name="scheduleType" label="时间类型" rules={[{ required: true }]}><Radio.Group optionType="button" buttonStyle="solid" options={[{ value: 'EXACT', label: '单日' }, { value: 'MULTI_DAY', label: '多日' }]} /></Form.Item>
         {scheduleType === 'MULTI_DAY' ? <Form.Item name="multiDayRange" label="考试时间段" rules={[{ required: true, message: '请选择考试时间段' }]}><DatePicker.RangePicker style={{ width: '100%' }} /></Form.Item>
           : <Form.Item name="exactDate" label="日期" rules={[{ required: true, message: '请选择日期' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>}
-        <Form.Item name="remark" label="备注" rules={[{ max: 1000 }]}><Input.TextArea rows={4} showCount maxLength={1000} /></Form.Item>
+        <Form.Item name="remark" label="备注" className="remark-link-field" extra={REMARK_LINK_HINT} rules={[{ max: 1000 }]}><Input.TextArea rows={4} showCount maxLength={1000} /></Form.Item>
       </Form>
     </Modal>
     {notifyTarget && <CalendarNotificationPanel key={notifyTarget.id} calendarType="EXAM" calendarId={notifyTarget.id} permissions={permissions} onClose={() => setNotifyTarget(undefined)} />}

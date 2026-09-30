@@ -25,6 +25,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CLASS_TRANSFER_ACTIVE = new ErrorCode(1_900_019_014, "该课程服务已有待审批的调班申请");
     ErrorCode CLASS_TRANSFER_SUPERVISOR_INVALID = new ErrorCode(1_900_019_015, "直属主管未配置、已停用或不能处理审批");
     ErrorCode CLASS_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_019_016, "调班审批流程尚未部署或暂不可用");
+    ErrorCode EXAM_SCHEDULE_REEDIT_EXPIRED = new ErrorCode(1_900_018_011, "已超过五分钟，无法重新编辑");
+    ErrorCode EXAM_SCHEDULE_REEDIT_CLAIMED = new ErrorCode(1_900_018_012, "该考期已领取重新编辑，请勿重复操作");
+    ErrorCode EXAM_SCHEDULE_REEDIT_KEY_INVALID = new ErrorCode(1_900_018_013, "重新编辑请求标识无效");
     ErrorCode EXAM_SCHEDULE_NOT_EXISTS = new ErrorCode(1_900_018_001, "考期安排不存在");
     ErrorCode EXAM_SCHEDULE_TYPE_INVALID = new ErrorCode(1_900_018_002, "考期时间类型无效");
     ErrorCode EXAM_SCHEDULE_TIME_INVALID = new ErrorCode(1_900_018_003, "考期日期配置无效");

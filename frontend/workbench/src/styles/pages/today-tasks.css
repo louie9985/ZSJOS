@@ -296,10 +296,12 @@
 @keyframes home-notice-flow { 0% { transform: translateY(0); opacity: 0; } 20%,80% { opacity: .8; } 100% { transform: translateY(300%); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .home-announcement-panel *, .home-announcement-panel *::before,.home-announcement-panel *::after { animation: none !important; transition: none !important; } }
 
-.home-announcement-all {
+.home-announcement-actions {
+  display: flex;
   flex: 0 0 auto;
-  align-self: flex-end;
-  margin-top: var(--crm-sp-2);
+  align-items: center;
+  gap: var(--crm-sp-1);
+  margin-inline-start: auto;
 }
 
 @media (max-width: 900px) {

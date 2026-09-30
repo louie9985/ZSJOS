@@ -1,0 +1,32 @@
+/* Remark links wrap within narrow calendar cards without changing other resource presentations. */
+.remark-link-field:has(.ant-input-textarea-show-count) .ant-form-item-extra { padding-block-start: var(--crm-sp-6); }
+.resource-linked-text-remark { white-space: pre-wrap; overflow-wrap: anywhere; }
+.resource-linked-text-remark a.resource-link-anchor {
+  display: inline;
+  color: var(--crm-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.resource-linked-text-remark a.resource-link-anchor:hover { color: var(--crm-color-primary-hover); text-decoration: underline; }
+.resource-linked-text-remark a.resource-link-anchor:focus-visible { text-decoration: underline; outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.resource-linked-text-remark .resource-link-anchor > .anticon { margin-inline-start: var(--crm-sp-1); }
+
+/* Fixed-time cards scroll their contents instead of cutting off a link or overlapping the next event. */
+.personal-calendar-timeline-card:has(.calendar-remark),
+.course-calendar-timeline-card:has(.calendar-remark) { overflow: auto; }
+.personal-calendar-timeline-card:has(.calendar-remark) > *,
+.course-calendar-timeline-card:has(.calendar-remark) > * { flex-shrink: 0; }
+.personal-calendar-timeline-card small.calendar-remark,
+.course-calendar-timeline-card small.calendar-remark {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+.calendar-remark .resource-linked-text-remark,
+.calendar-remark .resource-linked-text-remark span {
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: clip;
+  color: inherit;
+}

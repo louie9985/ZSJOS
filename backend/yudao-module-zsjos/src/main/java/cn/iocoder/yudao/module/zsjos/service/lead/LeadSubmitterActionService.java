@@ -216,9 +216,11 @@ public class LeadSubmitterActionService {
 
         if (recipient.assigneeUserId() != null) {
             String taskLeadNo = StrUtil.isBlank(lead.getLeadNo()) ? "客资记录不可用" : lead.getLeadNo();
+            // 协助请求是销售当天必须闭环的待办；用北京时间次日零点作为自然日截止边界。
+            LocalDateTime todayDeadline = now.toLocalDate().plusDays(1).atStartOfDay();
             businessTaskCommandService.create(new BusinessTaskCreateCommand(TASK_TYPE_SUBMITTER_ASSIST,
                     BIZ_TYPE_LEAD, leadId, recipient.assigneeUserId(), "提交人协助：" + taskLeadNo,
-                    problem, "OPEN_LEAD_SUBMITTER_ASSIST", null, null, JsonUtils.toJsonString(context),
+                    problem, "OPEN_LEAD_SUBMITTER_ASSIST", todayDeadline, null, JsonUtils.toJsonString(context),
                     "lead-submitter-assist:" + row.getId()));
         }
         notifyPublisher.publish(SUBMITTER_ASSIST_REQUESTED, leadId, "lead-submitter-assist-message:" + row.getId(),

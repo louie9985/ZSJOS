@@ -186,6 +186,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 租户、销售和日期原子保留额度；自动接单开关只影响自动轮询，不影响主动抢单。
 ## 请求提交人协助
 
+销售专员请求提交人（包括前端人员）协助时，系统会为当前协助处理人创建 `lead_submitter_assist` 业务待办。该待办的截止时间固定为北京时间次日 00:00，按今日任务展示，并要求在当天完成；因此不会进入“无截止”分类。协助回复完成后，服务端按幂等键关闭对应待办。历史上已创建的无截止协助待办不回溯修改截止时间。
+
 - 员工端详情动作码：`REQUEST_SUBMITTER_ASSIST`。当用户可读该 Lead 且持有
   `zsjos:lead:request-submitter-assist` 时投影，不受 Lead 状态或分配状态限制。
 - 命令：`POST /admin-api/zsjos/lead/{id}/submitter-assist-request`。

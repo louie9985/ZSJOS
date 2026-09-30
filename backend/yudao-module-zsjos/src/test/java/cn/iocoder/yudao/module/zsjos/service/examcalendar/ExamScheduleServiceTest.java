@@ -118,12 +118,12 @@ class ExamScheduleServiceTest {
         req.setPageNo(1); req.setPageSize(20);
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(21L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        when(mapper.selectExactList(req, false)).thenReturn(List.of());
-        when(mapper.selectExactList(req, true)).thenReturn(List.of());
+        when(mapper.selectExactList(eq(req), eq(false), any())).thenReturn(List.of());
+        when(mapper.selectExactList(eq(req), eq(true), any())).thenReturn(List.of());
         service.exactPage(req, 20L);
         service.exactPage(req, 21L);
-        verify(mapper).selectExactList(req, false);
-        verify(mapper).selectExactList(req, true);
+        verify(mapper).selectExactList(eq(req), eq(false), any());
+        verify(mapper).selectExactList(eq(req), eq(true), any());
     }
 
     @Test

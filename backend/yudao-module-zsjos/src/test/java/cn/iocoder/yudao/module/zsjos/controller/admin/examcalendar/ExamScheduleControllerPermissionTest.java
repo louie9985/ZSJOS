@@ -12,7 +12,8 @@ class ExamScheduleControllerPermissionTest {
     @Test
     void endpointsSplitQueryAndManagePermissions() throws NoSuchMethodException {
         assertPermission("page", new Class<?>[]{ExamSchedulePageReqVO.class}, "zsjos:exam-calendar:query");
-        assertPermission("rough", new Class<?>[]{ExamSchedulePageReqVO.class}, "zsjos:exam-calendar:query");
+        assertPermission("multiDay", new Class<?>[]{ExamSchedulePageReqVO.class}, "zsjos:exam-calendar:query");
+        assertPermission("reedit", new Class<?>[]{Long.class, cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamScheduleReeditReqVO.class}, "zsjos:exam-calendar:manage");
         assertPermission("categoryOptions", new Class<?>[]{}, "zsjos:exam-calendar:query");
         assertPermission("productOptions", new Class<?>[]{}, "zsjos:exam-calendar:manage");
         assertPermission("create", new Class<?>[]{ExamScheduleSaveReqVO.class}, "zsjos:exam-calendar:manage");

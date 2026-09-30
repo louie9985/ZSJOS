@@ -43,19 +43,19 @@ describe('exam calendar range layout', () => {
     expect(rows.map(row => row.id)).toEqual([3, 2, 1])
   })
 
-  it('counts only hidden intersecting records per day and keeps them available for details', () => {
+  it('renders all overlapping records without a lane limit', () => {
     const rows = [multiDay(1, '2026-10-04', '2026-10-10'), multiDay(2, '2026-10-04', '2026-10-10'), multiDay(3, '2026-10-05', '2026-10-06'), multiDay(4, '2026-10-06', '2026-10-08')]
     const result = layoutMultiDayWeek(rows, dayjs('2026-10-04'))
-    expect(result.segments).toHaveLength(2)
-    expect(result.laneCount).toBe(2)
-    expect(result.hiddenCounts).toEqual([0, 1, 2, 1, 1, 0, 0])
+    expect(result.segments).toHaveLength(4)
+    expect(result.laneCount).toBe(4)
+    expect(result).not.toHaveProperty('hiddenCounts')
     expect(rows.filter(row => coversExamDay(row, '2026-10-06'))).toHaveLength(4)
   })
 
   it('ignores missing, reversed and non-intersecting ranges', () => {
     const rows = [multiDay(1, '2026-10-01', '2026-10-03'), multiDay(2, '2026-10-11', '2026-10-12'),
       multiDay(3, '2026-10-07', '2026-10-05'), { ...multiDay(4, '2026-10-04', '2026-10-08'), startDate: undefined }]
-    expect(layoutMultiDayWeek(rows, dayjs('2026-10-04'))).toEqual({ segments: [], hiddenCounts: [0, 0, 0, 0, 0, 0, 0], laneCount: 0 })
+    expect(layoutMultiDayWeek(rows, dayjs('2026-10-04'))).toEqual({ segments: [], laneCount: 0 })
   })
 
   it('uses server-derived multi-day status rather than client dates', () => {

@@ -1,3 +1,4 @@
+import { REMARK_LINK_HINT } from './ResourceLink'
 import { useId, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Spin, type FormInstance } from 'antd'
 import dayjs from 'dayjs'
@@ -43,7 +44,7 @@ export default function FollowUpFormFields({ lead, form, dictionaries, stages, i
         {dictionaries.quickNotes.length > FOLLOW_UP_VISIBLE_OPTIONS && <Button type="link" size="small" disabled={locked} aria-controls={notesId} aria-expanded={notesExpanded} onClick={() => setNotesExpanded(value => !value)}>{notesExpanded ? '收起' : `展开全部（共 ${dictionaries.quickNotes.length} 项）`}</Button>}
         {!dictionaries.loading && !dictionaries.error && !dictionaries.quickNotes.length && <div className="follow-up-hint">暂无快捷备注</div>}
         {noteError && <div role="alert" className="follow-up-note-error">{noteError}</div>}
-        <Form.Item name="remark" label="跟进备注" rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }, { max: FOLLOW_UP_REMARK_LIMIT, message: '跟进备注不能超过 2000 字' }]}><Input.TextArea rows={3} maxLength={FOLLOW_UP_REMARK_LIMIT} showCount disabled={locked} onChange={() => setNoteError('')}/></Form.Item>
+        <Form.Item name="remark" label="跟进备注" className="remark-link-field" extra={REMARK_LINK_HINT} rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }, { max: FOLLOW_UP_REMARK_LIMIT, message: '跟进备注不能超过 2000 字' }]}><Input.TextArea rows={3} maxLength={FOLLOW_UP_REMARK_LIMIT} showCount disabled={locked} onChange={() => setNoteError('')}/></Form.Item>
       </div>
       <div>
         <Form.Item name="nextFollowUpAt" label="下次跟进时间" extra={lead.status === 'won' ? '选填，不填写则不安排下次跟进' : undefined} rules={[{ required: lead.status !== 'won', message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>

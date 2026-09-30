@@ -33,4 +33,8 @@ public class ExamScheduleDO extends TenantBaseDO {
     private String remark;
     private LocalDateTime publishedAt;
     private Integer calendarVersion;
+    private LocalDateTime revokedAt;
+    private Long revokedBy;
+    private LocalDateTime reeditClaimedAt;
+    private String reeditOperationKey;
 }

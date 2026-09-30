@@ -25,6 +25,14 @@ public class ExamScheduleObjectPermissionProvider implements ZsjosObjectPermissi
     @Override
     public boolean hasPermission(Long id, String action, Long userId) {
         if (id == null || id <= 0 || userId == null) return false;
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        if ("reedit".equals(action)) {
+            var claimed = mapper.selectReeditRecord(id, tenantId);
+            return claimed != null && java.util.Objects.equals(tenantId, claimed.getTenantId())
+                    && java.util.Objects.equals(userId, claimed.getRevokedBy())
+                    && (!Boolean.TRUE.equals(claimed.getDeleted()) || claimed.getReeditClaimedAt() != null)
+                    && permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE);
+        }
         var row = mapper.selectById(id);
         if (row == null || Boolean.TRUE.equals(row.getDeleted()) || !java.util.Objects.equals(row.getTenantId(),
                 cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) return false;

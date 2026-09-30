@@ -1,3 +1,4 @@
+import { LinkedText } from './ResourceLink'
 import { Image, Tag, Typography } from 'antd'
 import type { LeadFollowUp } from '../services/api'
 import { formatTimestamp } from '../services/time'
@@ -43,7 +44,7 @@ function TimelineNode({ record }: { record: LeadFollowUp }) {
               className="fu-node-remark"
               ellipsis={{ rows: 3, expandable: 'collapsible' }}
             >
-              {record.remark}
+              <LinkedText text={record.remark} mode="remark" />
             </Typography.Paragraph>
           )}
 

@@ -1,3 +1,4 @@
+import { LinkedText } from './ResourceLink'
 import { Alert, Button, Checkbox, Descriptions, Modal, Radio, TreeSelect, Space, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type CalendarNotifyInput, type CalendarNotifyPreview, type CalendarNotifyResult, type CalendarNotifyUser, type SimpleDept } from '../services/api'
@@ -143,7 +144,7 @@ export default function CalendarNotificationPanel({ calendarType, calendarId, pe
           <Descriptions column={1} size="small" items={[
             { key: 'title', label: '通知内容', children: preview.title },
             { key: 'time', label: '时间', children: preview.time || '—' },
-            { key: 'remark', label: '备注', children: <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{preview.remark || '—'}</span> },
+            { key: 'remark', label: '备注', children: <LinkedText text={preview.remark || '—'} mode="remark" /> },
             { key: 'count', label: '接收人数', children: `${preview.recipientCount} 人，已受理 ${preview.notifiedCount} 人，新增 ${preview.newRecipientCount} 人` },
           ]} />
           <Typography.Text type="secondary">{resend ? '本次会再次提醒所选的已通知人员。' : '默认跳过当前版本已经受理通知的人员。'}</Typography.Text>
