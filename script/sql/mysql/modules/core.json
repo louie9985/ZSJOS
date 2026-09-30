@@ -32,6 +32,7 @@
     "zsjos_gift_purchase",
     "zsjos_partner_leaderboard_config",
     "zsjos_payment_subject",
-    "zsjos_product_payment_subject"
+    "zsjos_product_payment_subject",
+    "zsjos_data_repair_backup"
   ]
 }

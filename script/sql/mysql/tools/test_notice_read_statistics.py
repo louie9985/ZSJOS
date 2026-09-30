@@ -40,6 +40,12 @@ def run():
         db = prefix + '_' + case
         query(None, f'CREATE DATABASE `{db}` CHARACTER SET utf8mb4;')
         setup = ''.join(table(name) for name in ['zsjos_schema_version', 'zsjos_module_schema_version', 'system_notice', 'system_notice_recipient', 'system_notice_read'])
+        # The fresh schema already includes V284; remove its fields only in this
+        # isolated fixture so initial/partial/failure cases still start at V283.
+        setup += "ALTER TABLE system_notice DROP COLUMN recipient_snapshot_complete;"
+        setup += ("ALTER TABLE system_notice_recipient DROP COLUMN user_name_snapshot, "
+                  "DROP COLUMN dept_id_snapshot, DROP COLUMN dept_name_snapshot, "
+                  "DROP COLUMN profile_snapshot_complete;")
         if case != 'prerequisite':
             setup += "INSERT INTO zsjos_schema_version(version,description,checksum) VALUES ('V283','fixture','fixture'); INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version) VALUES ('core','V283','fixture','fixture','fixture');"
         if case == 'partial':

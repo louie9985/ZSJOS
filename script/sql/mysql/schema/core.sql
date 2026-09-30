@@ -2967,6 +2967,7 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `audience_type` varchar(16) DEFAULT 'ALL' COMMENT '接收范围：ALL 全员，TARGET 指定部门/用户',
   `target_dept_ids` json DEFAULT NULL COMMENT '草稿选择的部门编号',
   `target_user_ids` json DEFAULT NULL COMMENT '草稿选择的用户编号',
+  `recipient_snapshot_complete` bit(1) NOT NULL DEFAULT b'0' COMMENT '发布名单快照已完成',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -3006,6 +3007,10 @@ CREATE TABLE IF NOT EXISTS `system_notice_recipient` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '接收人记录ID',
   `notice_id` bigint NOT NULL COMMENT '公告ID',
   `user_id` bigint NOT NULL COMMENT 'ADMIN用户ID',
+  `user_name_snapshot` varchar(64) DEFAULT NULL COMMENT '发布时用户姓名',
+  `dept_id_snapshot` bigint DEFAULT NULL COMMENT '发布时部门编号',
+  `dept_name_snapshot` varchar(64) DEFAULT NULL COMMENT '发布时部门名称',
+  `profile_snapshot_complete` bit(1) NOT NULL DEFAULT b'0' COMMENT '发布时资料快照已完成',
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
@@ -7968,3 +7973,44 @@ CREATE TABLE IF NOT EXISTS `zsjos_calendar_notify_intent` (
   UNIQUE KEY `uk_calendar_intent_acceptance` (`tenant_id`,`acceptance_key`),
   KEY `idx_calendar_intent_due` (`tenant_id`,`status`,`next_attempt_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日历维护通知意图';
+
+-- V283 new-media lead statistics. Empty tables; menu metadata remains in the migration.
+CREATE TABLE IF NOT EXISTS zsjos_media_lead_target (
+  id bigint NOT NULL AUTO_INCREMENT,
+  scope_type varchar(16) NOT NULL,
+  scope_id bigint NOT NULL,
+  dept_id bigint DEFAULT NULL,
+  center_id bigint DEFAULT NULL,
+  period_start date NOT NULL,
+  target_count int NOT NULL,
+  manual bit(1) NOT NULL DEFAULT b'1',
+  reason varchar(500) NOT NULL,
+  version int NOT NULL DEFAULT 0,
+  creator varchar(64) NOT NULL DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '',
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_media_lead_target (tenant_id,scope_type,scope_id,period_start,deleted),
+  KEY idx_media_lead_target_dept (tenant_id,dept_id,period_start,deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS zsjos_media_lead_org (
+    id bigint NOT NULL AUTO_INCREMENT, dept_id bigint NOT NULL, center_id bigint NOT NULL,
+    kind varchar(16) NOT NULL, version int NOT NULL DEFAULT 0,
+    creator varchar(64) NOT NULL DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NOT NULL DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY(id), UNIQUE KEY uk_media_lead_org_dept(tenant_id,dept_id,deleted),
+    KEY idx_media_lead_org_center(tenant_id,center_id,deleted)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS zsjos_media_lead_target_revision (
+    id bigint NOT NULL AUTO_INCREMENT, target_id bigint NOT NULL,
+    before_json longtext NULL, after_json longtext NOT NULL, reason varchar(500) NOT NULL,
+    operator_id bigint NOT NULL, creator varchar(64) NOT NULL DEFAULT '',
+    create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updater varchar(64) NOT NULL DEFAULT '',
+    update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY(id), KEY idx_media_lead_revision_target(tenant_id,target_id,id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

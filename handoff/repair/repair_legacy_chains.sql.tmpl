@@ -1,0 +1,101 @@
+-- ============================================================================
+-- 订单历史档案修复：legacy 迁迁移单的修订链重建
+--
+-- 目的：把 73 条 legacy 迁移单恢复到旧系统 parttimecrm 的真实状态——
+--       补 current_approval_round_id、按旧系统修订链回写 status /
+--       superseded_by_order_id / effective_at。
+--
+-- 依据：旧库 orders_order 的 revision_root_id / resubmitted_from_id /
+--       is_current_revision / review_status / reviewed_at。
+--       计划明细见 /tmp/repair_plan.tsv（148 项 / 73 单）。
+--
+-- 执行方式：本文件是参数化模板，实参由 repair_driver.sh 注入。
+--           @TENANT_ID@ 租户、@STAMP@ 备份表后缀。
+--
+-- 幂等性：每一步都带 WHERE 守卫，只改「还没改过」的行。重复执行是 no-op。
+-- 可回滚：执行前把受影响行整行快照到 zsjos_order_bak_@STAMP@。
+--
+-- 不触碰：Flowable/ACT_* 表、zsjos_order_item、cashback、履约、业绩。
+--         这 73 单的 legacy 轮次没有 BPM 实例，本次修复不创建任何流程。
+-- ============================================================================
+
+SET NAMES utf8mb4;
+SET @TENANT_ID = @TENANT_ID@;
+SET @STAMP = '@STAMP@';
+
+-- ---------------------------------------------------------------------------
+-- 步骤 0：前置校验。任何一条不满足就应当中止，人工介入。
+-- ---------------------------------------------------------------------------
+SELECT '--- precheck ---' AS section;
+
+-- 0a. 幂等基线：修复前应当没有 legacy 单存在已回填的指针
+SELECT 'legacy orders already pointing at a round' AS metric, COUNT(*) AS n
+FROM zsjos_order o
+JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0'
+WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+  AND r.process_definition_key = 'legacy-finance-review'
+  AND o.current_approval_round_id IS NOT NULL;
+
+-- 0b. 每单恰好一条 legacy 轮次（多轮会让指针回填歧义）
+SELECT 'orders with >1 legacy round' AS metric, COUNT(*) AS n FROM (
+  SELECT o.id FROM zsjos_order o
+  JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0'
+  WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+    AND r.process_definition_key = 'legacy-finance-review'
+  GROUP BY o.id HAVING COUNT(*) > 1
+) t;
+
+-- 0c. 目标替补单必须存在且已生效（否则会指空）
+SELECT 'superseded_by targets missing or not effective' AS metric, COUNT(*) AS n
+FROM zsjos_order o
+WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+  AND o.superseded_by_order_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM zsjos_order t
+                  WHERE t.id = o.superseded_by_order_id AND t.tenant_id = @TENANT_ID AND t.deleted = b'0');
+
+-- ---------------------------------------------------------------------------
+-- 步骤 1：整行快照。可重复执行（DROP + CREATE 保证拿到「执行前」状态）。
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS zsjos_order_bak_@STAMP@;
+CREATE TABLE zsjos_order_bak_@STAMP@ AS
+SELECT o.* FROM zsjos_order o
+JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0'
+WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+  AND r.process_definition_key = 'legacy-finance-review';
+
+SELECT 'snapshot rows' AS metric, COUNT(*) AS n FROM zsjos_order_bak_@STAMP@;
+
+-- ---------------------------------------------------------------------------
+-- 步骤 2：回填 current_approval_round_id（73 单）。
+--        只填 NULL，保护任何已存在的正确指针。
+-- ---------------------------------------------------------------------------
+UPDATE zsjos_order o
+JOIN (
+  SELECT r.order_id, MIN(r.id) AS round_id
+  FROM zsjos_order_approval_round r
+  WHERE r.tenant_id = @TENANT_ID AND r.deleted = b'0'
+    AND r.process_definition_key = 'legacy-finance-review'
+  GROUP BY r.order_id
+) m ON m.order_id = o.id
+SET o.current_approval_round_id = m.round_id
+WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+  AND o.current_approval_round_id IS NULL;
+
+SELECT 'pointer backfilled' AS metric, ROW_COUNT() AS n;
+
+-- 步骤 2 的验证：应当等于 73（首次执行）
+SELECT 'legacy orders still without pointer' AS metric, COUNT(*) AS n
+FROM zsjos_order o
+JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0'
+WHERE o.tenant_id = @TENANT_ID AND o.deleted = b'0'
+  AND r.process_definition_key = 'legacy-finance-review'
+  AND o.current_approval_round_id IS NULL;
+
+-- ---------------------------------------------------------------------------
+-- 步骤 3：状态与替补链接。
+--        由 repair_driver.sh 生成的逐条语句注入到 @PLAN_STATEMENTS@。
+--        每条都带 status 守卫，重复执行为 no-op。
+-- ---------------------------------------------------------------------------
+@PLAN_STATEMENTS@
+
+SELECT '--- done ---' AS section;

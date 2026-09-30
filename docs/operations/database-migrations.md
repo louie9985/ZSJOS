@@ -105,6 +105,27 @@ databases continue through their pending migrations. Bootstrap remains a
 fresh-database entry point, not a repair command for an installed database;
 there is no data rollback associated with these source corrections.
 
+The V283 media-lead target, organization and revision tables and the five V284
+notice recipient/profile snapshot columns are also defined in both Core schema
+sources. They match the existing numbered migrations, including indexes, defaults
+and Chinese comments. These source corrections apply to fresh installations and
+the desired-schema comparison only. Existing databases retain their V283/V284
+objects, rows and checksums and continue with pending migrations in order; do not
+replay bootstrap or edit deployed migration files. Fresh execution creates empty
+media-lead tables; V283 still owns their menu metadata. Repeated migration execution
+preserves existing objects and metadata. Application rollback retains these additive
+objects and recorded snapshots; there is no reverse data operation in this correction.
+
+`core.json` permits only the exact optional operational table
+`zsjos_data_repair_backup`, created by
+`repairs/repair_performance_attribution_source_20260929.py`. It stores recovery
+before-values and is neither a runtime business table nor a fresh-install seed.
+The schema verifier does not require or create it, and never deletes its recovery
+records. This exception does not cover similarly named tables or relax verification
+of V283/V284 business objects. Verify the correction with `check`, `test-fresh`,
+`test-upgrade`, the focused V283/V284 MySQL checks, and read-only comparison with
+the target database before continuing migration and `verify`.
+
 Each module starts at V001 and uses consecutive versions. The generator accepts
 both odd and even next versions; no author owns a version parity. Missing,
 duplicate or non-V001 starting versions remain errors. Some migration files rely
