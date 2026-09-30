@@ -108,11 +108,8 @@
 
 /* Legend swatches and both exam types use the same status appearance. */
 .exam-status-tone { border-color: var(--crm-border); background: var(--crm-bg-container); color: var(--crm-text); }
-.exam-status-tone.tone-ended { background: color-mix(in srgb, var(--crm-text-secondary) 12%, var(--crm-bg-container)); color: var(--crm-text-secondary); }
 .exam-status-tone.tone-revoked { border-color: var(--crm-color-error-border); background: var(--crm-color-error-bg); border-style: dashed; }
 .exam-status-tone.tone-published { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
-.exam-status-tone.tone-upcoming { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
-.exam-status-tone.tone-in_progress { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
 .exam-multiDay-bar { border-inline-width: 3px; }
 .exam-calendar-page .calendar-side-navigation-content { overflow: visible; }
 .exam-calendar-page .calendar-side-navigation { flex: 0 0 auto; }

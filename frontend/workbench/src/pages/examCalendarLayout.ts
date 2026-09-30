@@ -6,8 +6,8 @@ export const calendarWindow = (anchor: Dayjs) => {
   return { start, end: start.add(41, 'day') }
 }
 
-export const multiDaySchedulesForStatus = (rows: ExamSchedule[], status?: string) =>
-  rows.filter(row => !status || row.displayStatus === status)
+export const schedulesForRecordStatus = (rows: ExamSchedule[], status?: ExamSchedule['recordStatus']) =>
+  rows.filter(row => !status || row.recordStatus === status)
 
 export const coversExamDay = (row: ExamSchedule, date: string) =>
   row.scheduleType === 'EXACT' ? row.exactDate === date

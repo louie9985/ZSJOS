@@ -4,7 +4,7 @@ import CalendarNotificationPanel from '../components/CalendarNotificationPanel'
 import ExamCalendarMonth from './ExamCalendarMonth'
 import { isExamVisible, reeditCountdown } from '../services/examReedit'
 import { createIdempotencyKey } from '../services/idempotency'
-import { calendarWindow, coversExamDay, multiDaySchedulesForStatus } from './examCalendarLayout'
+import { calendarWindow, coversExamDay, schedulesForRecordStatus } from './examCalendarLayout'
 import {
   CalendarOutlined, EditOutlined, EyeOutlined, PlusOutlined,
   ReloadOutlined, SendOutlined, StopOutlined
@@ -31,10 +31,7 @@ type EditorValues = {
 const STATUS_META: Record<string, { label: string; color: string }> = {
   DRAFT: { label: '草稿', color: 'default' },
   PUBLISHED: { label: '已发布', color: 'blue' },
-  REVOKED: { label: '已撤销', color: 'default' },
-  UPCOMING: { label: '即将开始', color: 'gold' },
-  IN_PROGRESS: { label: '正在进行', color: 'green' },
-  ENDED: { label: '已结束', color: 'default' }
+  REVOKED: { label: '已撤销', color: 'red' }
 }
 
 const hasPermission = (permissions: string[], value: string) =>
@@ -59,13 +56,13 @@ export const scheduleInput = (values: EditorValues): ExamScheduleInput => {
 
 export function ExamCalendarLegend() {
   return <div className="exam-calendar-legend" aria-label="考期颜色和类型说明">
-    {['ENDED', 'REVOKED', 'PUBLISHED', 'DRAFT', 'UPCOMING', 'IN_PROGRESS'].map(status =>
+    {['PUBLISHED', 'REVOKED', 'DRAFT'].map(status =>
       <span className="exam-calendar-legend-item" key={status}>
         <span aria-hidden="true" className={'exam-calendar-swatch exam-status-tone tone-' + status.toLowerCase()} />
         {STATUS_META[status].label}
       </span>)}
     <span className="exam-calendar-legend-item"><span aria-hidden="true" className="exam-calendar-swatch is-multi-day" />多日考试</span>
-    <span>连续日期条包含开始日和结束日，颜色表示考试状态。</span>
+    <span>连续日期条包含开始日和结束日，颜色仅表示发布状态。</span>
   </div>
 }
 
@@ -85,7 +82,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const [anchor, setAnchor] = useState(dayjs())
   const [schedules, setSchedules] = useState<ExamSchedule[]>([])
   const [dayDetail, setDayDetail] = useState<Dayjs>()
-  const [displayStatus, setDisplayStatus] = useState<string>()
+  const [recordStatus, setRecordStatus] = useState<ExamSchedule['recordStatus']>()
   const [loading, setLoading] = useState(false), [error, setError] = useState('')
   const [multiDayOpen, setMultiDayOpen] = useState(false), [multiDayLoading, setMultiDayLoading] = useState(false)
   const [multiDayRows, setMultiDayRows] = useState<ExamSchedule[]>([]), [multiDayTotal, setMultiDayTotal] = useState(0)
@@ -110,10 +107,10 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const scheduleType = Form.useWatch('scheduleType', form)
   const range = useMemo(() => calendarWindow(anchor), [anchor])
   const isVisible = (row: ExamSchedule) => !claimedIds.has(row.id) && isExamVisible(row, now)
-  const visibleSchedules = schedules.filter(isVisible)
+  const visibleSchedules = schedulesForRecordStatus(schedules.filter(isVisible), recordStatus)
   const visibleDrawerRows = multiDayRows.filter(isVisible)
-  const visibleMultiDay = showMultiDay ? multiDaySchedulesForStatus(calendarMultiDayRows.filter(isVisible), displayStatus) : []
-  const renderStatus = (row: ExamSchedule) => <ScheduleStatus value={row.displayStatus}
+  const visibleMultiDay = showMultiDay ? schedulesForRecordStatus(calendarMultiDayRows.filter(isVisible), recordStatus) : []
+  const renderStatus = (row: ExamSchedule) => <ScheduleStatus value={row.recordStatus}
     countdown={row.recordStatus === 'REVOKED' ? reeditCountdown(row, now) : undefined} />
 
   const load = useCallback(async () => {
@@ -122,8 +119,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     try {
       const params = {
         pageNo: 1, pageSize: 100,
-        rangeStart: range.start.format('YYYY-MM-DD'), rangeEnd: range.end.format('YYYY-MM-DD'),
-        displayStatus
+        rangeStart: range.start.format('YYYY-MM-DD'), rangeEnd: range.end.format('YYYY-MM-DD')
       }
       const first = await api.examCalendar.exactPage(params)
       if (request !== requests.current.exact) return
@@ -137,7 +133,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       setError(cause instanceof ApiError && cause.code === 403 ? '无权查看考期日历'
         : cause instanceof Error ? cause.message : '考期日历加载失败')
     } finally { if (request === requests.current.exact) setLoading(false) }
-  }, [displayStatus, range.end, range.start])
+  }, [range.end, range.start])
 
   const loadMultiDay = useCallback(async () => {
     const request = ++requests.current.multiDay
@@ -332,7 +328,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       </Space>
       <Space wrap>
         <Space><Switch aria-label="显示多日考期" checked={showMultiDay} onChange={setShowMultiDay} /><span>显示多日考期</span></Space>
-        <Select allowClear placeholder="状态" value={displayStatus} onChange={setDisplayStatus} options={Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label }))} className="exam-calendar-filter" />
+        <Select allowClear aria-label="发布状态" placeholder="发布状态" value={recordStatus} onChange={value => { setRecordStatus(value); setDayDetail(undefined) }} options={Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label }))} className="exam-calendar-filter" />
       </Space>
     </div>
     <ExamCalendarLegend />

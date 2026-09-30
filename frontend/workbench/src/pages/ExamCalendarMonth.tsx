@@ -30,8 +30,8 @@ export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onD
               aria-current={key === today ? 'date' : undefined} onClick={event => { event.stopPropagation(); onDay(date) }}>{date.date()}</button>
             <div className="exam-calendar-events" style={{ gridRow: laneCount + 2 }}>
               {rows.map(item => <button type="button" key={item.id}
-                className={'exam-calendar-event exam-status-tone tone-' + item.displayStatus.toLowerCase()}
-                aria-label={(item.scheduleName || '未命名考期') + '，' + statusLabel(item.displayStatus) + '，查看' + date.format('M月D日') + '全部考期'}
+                className={'exam-calendar-event exam-status-tone tone-' + item.recordStatus.toLowerCase()}
+                aria-label={(item.scheduleName || '未命名考期') + '，' + statusLabel(item.recordStatus) + '，查看' + date.format('M月D日') + '全部考期'}
                 onClick={event => { event.stopPropagation(); onDay(date) }}>
                 <span>{item.scheduleName || '未命名考期'}</span>
               </button>)}
@@ -41,7 +41,7 @@ export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onD
         })}
         {segments.map(({ schedule, startColumn, endColumn, lane, continuesBefore, continuesAfter }) => {
           return (
-            <div key={schedule.id} className={'exam-multiDay-bar exam-status-tone tone-' + schedule.displayStatus.toLowerCase()}
+            <div key={schedule.id} className={'exam-multiDay-bar exam-status-tone tone-' + schedule.recordStatus.toLowerCase()}
               data-schedule-id={schedule.id}
               style={{ gridColumn: (startColumn + 1) + ' / ' + (endColumn + 2), gridRow: lane + 2 }}>
               {continuesBefore && <span aria-hidden="true">‹</span>}
@@ -52,7 +52,7 @@ export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onD
                   const date = weekStart.add(startColumn + offset, 'day')
                   return <button type="button" key={offset} data-date={date.format('YYYY-MM-DD')}
                     aria-label={`${date.format('YYYY年M月D日')} 全部考期安排（${schedule.scheduleName || '未命名考期'}）`}
-                    aria-description={'多日考试，' + statusLabel(schedule.displayStatus)}
+                    aria-description={'多日考试，' + statusLabel(schedule.recordStatus)}
                     onClick={event => { event.stopPropagation(); onDay(date) }} />
                 })}
               </div>

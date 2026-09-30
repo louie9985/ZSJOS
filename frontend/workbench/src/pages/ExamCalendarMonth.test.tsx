@@ -56,9 +56,20 @@ describe('full-name exam month', () => {
     }
   })
 
-  it('explains every existing lifecycle color and the independent multi-day type', () => {
+  it('explains only publication colors and the independent multi-day type', () => {
     const html = renderToStaticMarkup(<ExamCalendarLegend />)
-    for (const label of ['已结束', '已撤销', '已发布', '草稿', '即将开始', '正在进行', '多日考试']) expect(html).toContain(label)
-    for (const status of ['ended', 'revoked', 'published', 'draft', 'upcoming', 'in_progress']) expect(html).toContain('tone-' + status)
+    for (const label of ['已撤销', '已发布', '草稿', '多日考试']) expect(html).toContain(label)
+    for (const status of ['revoked', 'published', 'draft']) expect(html).toContain('tone-' + status)
   })
+  it.each(['PUBLISHED', 'UPCOMING', 'IN_PROGRESS', 'ENDED'] as const)('uses published color and accessible label for %s in both exam types', displayStatus => {
+    const single = { ...exact(1), recordStatus: 'PUBLISHED' as const, displayStatus }
+    const range = { ...multi(2), recordStatus: 'PUBLISHED' as const, displayStatus }
+    const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
+      exactRows={[single]} multiDayRows={[range]} onDay={() => {}} statusLabel={scheduleStatusLabel} />)
+    expect(html.match(/exam-status-tone tone-published/g)).toHaveLength(3)
+    for (const tone of ['ended', 'upcoming', 'in_progress']) expect(html).not.toContain('tone-' + tone)
+    for (const label of ['即将开始', '正在进行', '已结束']) expect(html).not.toContain(label)
+    expect(html).toContain('已发布')
+  })
+
 })

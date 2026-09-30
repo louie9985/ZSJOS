@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
 import type { ExamSchedule } from '../services/api'
-import { calendarWindow, coversExamDay, layoutMultiDayWeek, multiDaySchedulesForStatus } from './examCalendarLayout'
+import { calendarWindow, coversExamDay, layoutMultiDayWeek, schedulesForRecordStatus } from './examCalendarLayout'
 
 const multiDay = (id: number, start: string, end: string, status: ExamSchedule['recordStatus'] = 'PUBLISHED'): ExamSchedule => ({
   id, scheduleType: 'MULTI_DAY', scheduleName: '多日考试', startDate: start, endDate: end,
@@ -58,14 +58,15 @@ describe('exam calendar range layout', () => {
     expect(layoutMultiDayWeek(rows, dayjs('2026-10-04'))).toEqual({ segments: [], laneCount: 0 })
   })
 
-  it('uses server-derived multi-day status rather than client dates', () => {
+  it('filters publication status independently of time phases for both exam types', () => {
     const rows = [multiDay(1, '2020-01-01', '2030-01-01'), multiDay(2, '2026-10-01', '2026-10-05', 'DRAFT'), multiDay(3, '2026-10-01', '2026-10-05', 'REVOKED')]
-    expect(multiDaySchedulesForStatus(rows)).toHaveLength(3)
-    for (const status of ['PUBLISHED', 'DRAFT', 'REVOKED']) expect(multiDaySchedulesForStatus(rows, status)).toHaveLength(1)
+    expect(schedulesForRecordStatus(rows)).toHaveLength(3)
+    for (const status of ['PUBLISHED', 'DRAFT', 'REVOKED'] as const) expect(schedulesForRecordStatus(rows, status)).toHaveLength(1)
     for (const status of ['UPCOMING', 'IN_PROGRESS', 'ENDED'] as const) {
       const published = { ...rows[0], displayStatus: status }
-      expect(multiDaySchedulesForStatus([published], status)).toEqual([published])
-      expect(multiDaySchedulesForStatus([published], 'PUBLISHED')).toHaveLength(0)
+      const single = { ...published, scheduleType: 'EXACT' as const, exactDate: '2026-10-10' }
+      expect(schedulesForRecordStatus([published, single], 'PUBLISHED')).toEqual([published, single])
+      expect(schedulesForRecordStatus([published, single], 'DRAFT')).toHaveLength(0)
     }
   })
 })

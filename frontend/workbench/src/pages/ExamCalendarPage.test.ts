@@ -21,9 +21,9 @@ describe('ExamCalendarPage contracts', () => {
   })
 
   it('uses the approved lifecycle labels', () => {
-    expect(scheduleStatusLabel('UPCOMING')).toBe('即将开始')
-    expect(scheduleStatusLabel('IN_PROGRESS')).toBe('正在进行')
-    expect(scheduleStatusLabel('ENDED')).toBe('已结束')
+    expect(scheduleStatusLabel('PUBLISHED')).toBe('已发布')
+    expect(scheduleStatusLabel('DRAFT')).toBe('草稿')
+    expect(scheduleStatusLabel('REVOKED')).toBe('已撤销')
   })
 
   it('opens day details on date selection instead of creating a schedule', () => {

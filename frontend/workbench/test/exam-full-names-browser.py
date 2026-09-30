@@ -20,7 +20,7 @@ with sync_playwright() as p:
         expect(page.locator('.exam-month .ant-tag, .exam-month .exam-countdown')).to_have_count(0)
         expect(page.locator('.exam-calendar-overflow, .exam-multiDay-overflow')).to_have_count(0)
         expect(page.locator('.exam-multiDay-days button[data-date="' + date + '"]')).to_have_count(6)
-        for label in ['已结束', '已撤销', '已发布', '草稿', '即将开始', '正在进行', '多日考试']:
+        for label in ['已撤销', '已发布', '草稿', '多日考试']:
             expect(page.locator('.exam-calendar-legend').get_by_text(label, exact=True)).to_be_visible()
         geometry = page.evaluate('''() => {
             const labels = [...document.querySelectorAll('.exam-calendar-event > span, .exam-multiDay-bar-label')];
@@ -45,7 +45,11 @@ with sync_playwright() as p:
         assert geometry == {'clipped': 0, 'overlaps': [], 'mismatch': 0, 'horizontal': False, 'scrollable': True}, geometry
         assert page.evaluate('''() => new Set([...document.querySelectorAll('.exam-calendar-swatch.exam-status-tone')].map(el => {
             const s = getComputedStyle(el); return [s.backgroundColor,s.borderTopColor,s.borderTopStyle].join('|');
-        })).size''') == 6
+        })).size''') == 3
+        expect(page.locator('.exam-month .tone-upcoming, .exam-month .tone-in_progress, .exam-month .tone-ended')).to_have_count(0)
+        expect(page.locator('.exam-calendar-event.tone-published')).to_have_count(7)
+        for label in ['即将开始', '正在进行', '已结束']:
+            expect(page.locator('.exam-calendar-legend').get_by_text(label, exact=True)).to_have_count(0)
         page.screenshot(path=str(out / f'legend-{width}.png'), animations='disabled')
         day.scroll_into_view_if_needed()
         page.screenshot(path=str(out / f'dense-{width}.png'), animations='disabled')
@@ -62,6 +66,23 @@ with sync_playwright() as p:
         expect(dialog.locator('.ant-list-item')).to_have_count(16)
         dialog.get_by_role('button', name='Close').click()
         expect(dialog).to_have_count(0)
+        # Each publication filter includes all matching time phases, for both exam types.
+        for label, exact_count, multi_count in [('已发布', 7, 4), ('草稿', 2, 1), ('已撤销', 1, 1)]:
+            page.get_by_role('combobox', name='发布状态').click()
+            expect(page.locator('.ant-select-item-option')).to_have_count(3)
+            page.locator('.ant-select-item-option').filter(has_text=label).click()
+            expect(page.locator('.exam-calendar-event')).to_have_count(exact_count)
+            expect(page.locator('.exam-multiDay-days button[data-date="' + date + '"]')).to_have_count(multi_count)
+            page.locator('.exam-calendar-event').first.click()
+            expect(dialog.locator('.ant-list-item')).to_have_count(exact_count + multi_count)
+            for time_label in ['即将开始', '正在进行', '已结束']:
+                expect(dialog.get_by_text(time_label, exact=True)).to_have_count(0)
+            expect(dialog.locator('.exam-status-label')).to_have_count(exact_count + multi_count)
+            assert all(label in text for text in dialog.locator('.exam-status-label').all_text_contents())
+            dialog.get_by_role('button', name='Close').click()
+            expect(dialog).to_have_count(0)
+        page.locator('.exam-calendar-filter .ant-select-clear').click()
+        expect(page.locator('.exam-calendar-event')).to_have_count(10)
         page.get_by_role('switch', name='显示多日考期').click()
         expect(page.locator('.exam-multiDay-bar')).to_have_count(0)
         page.get_by_role('switch', name='显示多日考期').click()
@@ -71,6 +92,15 @@ with sync_playwright() as p:
             expect(page.locator('.exam-calendar-event')).to_have_count(count)
             if count == 110:
                 assert 'exact:2' in page.evaluate('window.examFullNamesFixture.calls')
+                page.get_by_role('combobox', name='发布状态').click()
+                page.locator('.ant-select-item-option').filter(has_text='已发布').click()
+                expect(page.locator('.exam-calendar-event')).to_have_count(73)
+                page.locator('.exam-calendar-event').last.click()
+                expect(page.get_by_role('dialog').locator('.ant-list-item')).to_have_count(73)
+                page.get_by_role('dialog').get_by_role('button', name='Close').click()
+                expect(page.get_by_role('dialog')).to_have_count(0)
+                page.locator('.exam-calendar-filter .ant-select-clear').click()
+                expect(page.locator('.exam-calendar-event')).to_have_count(count)
             page.locator('.exam-calendar-event').last.click()
             expect(page.get_by_role('dialog').locator('.ant-list-item')).to_have_count(count)
             expect(page.get_by_role('dialog').locator('.ant-list-item button')).to_have_count(0)
