@@ -18,3 +18,15 @@
 状态按 `sales_manager_reviewing`、`quality_reviewing`、`chairman_reviewing`、`overturned`、`upheld`、`withdrawn` 解释。`upheld` 仅表示当前轮维持无效，第三轮 `upheld` 才是最终无效；没有期限、自动升级或第四轮申诉。
 
 裁决权限按轮次和状态固定映射：第一轮要求销售主管复核权限，第二轮要求质检复核权限，第三轮要求董事长复核权限。请求轮次、持久化轮次、当前状态和权限任一不匹配均拒绝，不能用其他轮次权限代替。
+
+## 流程契约校验与空身份字段
+
+新申诉通过 BPM `BpmDefinitionReadApi` 读取当前发布定义，要求定义启用、Key 匹配，且恰好存在一个
+`appealReview` 节点并使用“发起人自选（业务提交时指定）”审批人策略。校验发生在申诉记录和通知事件
+写入之前；创建流程时固定传入已校验的 `processDefinitionId`，避免模型并发发布后启动到另一版本。
+配置缺失或不兼容返回既有 `LEAD_APPEAL_PROCESS_UNAVAILABLE`，不留下新申诉或通知。
+这项检查防止已知审批人契约漂移，不代表所有事务完成后的流程异常都能回滚提交事务。
+
+详情与列表允许未裁决记录的 `reviewerUserId/reviewerUserName` 为空，也允许 Partner 申诉的员工申请人
+字段为空。历史列表仍经过身份脱敏投影；不以当前审批人快照冒充已经作出裁决的处理人。
+HTTP 路径、请求字段、权限和响应结构不变，Workbench 与 Partner H5 无需新增字段。

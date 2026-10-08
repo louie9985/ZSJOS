@@ -8,7 +8,7 @@
 
 | scene | 静态字段 | 运行时附加时间作差 | 目录能力上限 |
 |---|---|---|---|
-| lead | 79 | 1 | 80 |
+| lead | 80 | 1 | 81 |
 | order | 71 | 1 | 72 |
 | lead_appeal | 79 | 1 | 80 |
 | duplicate_review | 17 | 1 | 18 |
@@ -18,7 +18,7 @@
 | cashback | 15 | 1 | 16 |
 | withdrawal | 17 | 1 | 18 |
 
-去重静态 fieldKey 共 **184** 个。`duration.diff`由catalog在至少两个日期字段时动态添加；不是重复登记的业务字段。
+原 2026-09-23 快照去重静态 fieldKey 共 **184** 个；2026-10-08 新增兼职提交人后，当前注册总数为 **199**，客资场景为 **81**（含时间作差）。其余历史快照行不在本次修正范围，当前数量以 `AdvancedFilterFieldCatalogTest` 为准。`duration.diff`由catalog在至少两个日期字段时动态添加；不是重复登记的业务字段。
 
 ## 2. 操作符定义
 
@@ -55,7 +55,8 @@
 | lead.dealStatus | 状态与进度 | 成交状态 | select | SELECT | 业务/技术固定选项（见源码） | lead | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L25) |
 | lead.qualifiedAt | 时间 | 有效性判定时间 | date | DATE | 无下拉选项 | lead | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L26) |
 | lead.convertedAt | 时间 | 成交时间 | date | DATE | 无下拉选项 | lead | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L27) |
-| lead.sourceUserId | 归属与人员 | 提交人 | select | SELECT | visible-users | lead, order, lead_appeal, registration, student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L28) |
+| lead.sourceUserId | 归属与人员 | 员工提交人 | select | SELECT | visible-users | lead, order, lead_appeal, registration, student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java) |
+| lead.partnerSubmitterId | 归属与人员 | 兼职提交人 | select | SELECT | visible-lead-partners（授权业务实体） | lead | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java) |
 | lead.ownerUserId | 归属与人员 | 负责人 | select | SELECT | visible-users | lead, order, lead_appeal, registration, student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L30) |
 | lead.submittedAt | 时间 | 客资提交时间 | date | DATE | 无下拉选项 | lead, order, lead_appeal, registration, student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L31) |
 | lead.lastFollowUpAt | 时间 | 最近跟进时间 | date | DATE | 无下拉选项 | lead, order, lead_appeal, registration, student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/LeadFilterFields.java#L32) |
@@ -178,6 +179,7 @@
 | LeadManagementPageReqVO | sourceChannel | String |
 | LeadManagementPageReqVO | leadCategory | String |
 | LeadManagementPageReqVO | sourceUserId | Long |
+| LeadManagementPageReqVO | partnerSubmitterId | Long |
 | LeadManagementPageReqVO | providerOwnerType | String |
 | LeadManagementPageReqVO | providerOwnerId | Long |
 | LeadManagementPageReqVO | ownerUserId | Long |
@@ -1302,6 +1304,7 @@
 | lead.qualifiedAt | standard | false | false | false |
 | lead.convertedAt | standard | false | false | false |
 | lead.sourceUserId | personal | true | false | false |
+| lead.partnerSubmitterId | personal | true | false | false |
 | lead.ownerUserId | personal | true | false | false |
 | lead.submittedAt | standard | false | false | false |
 | lead.lastFollowUpAt | standard | false | false | false |

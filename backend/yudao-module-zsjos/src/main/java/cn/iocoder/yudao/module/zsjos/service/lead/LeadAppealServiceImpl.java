@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
+import cn.iocoder.yudao.module.bpm.api.definition.BpmDefinitionReadApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.*;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
@@ -68,6 +69,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private RoleApi roleApi;
     @Resource private PermissionApi permissionApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
+    @Resource private BpmDefinitionReadApi definitionReadApi;
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
@@ -136,6 +138,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         }
         ReviewerResolution resolution = resolveReviewers(roundNo, lead);
         List<Long> reviewers = resolution.reviewerUserIds();
+        String processDefinitionId = requireAppealProcessDefinition();
         String evidence = buildEvidenceJson(reqVO.getAttachments(), partnerId == null ? userId : accountId,
                 partnerId != null);
         LocalDateTime now = LocalDateTime.now();
@@ -161,6 +164,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         try {
             BpmProcessInstanceCreateReqDTO processReq = new BpmProcessInstanceCreateReqDTO();
             processReq.setProcessDefinitionKey(APPEAL_PROCESS_DEFINITION_KEY);
+            processReq.setProcessDefinitionId(processDefinitionId);
             processReq.setBusinessKey(APPEAL_BUSINESS_KEY_PREFIX + appeal.getId());
             Map<String, Object> processVariables = new LinkedHashMap<>();
             processVariables.put("appealId", appeal.getId());
@@ -189,6 +193,23 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         notifyEventPublisher.publish(cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.APPEAL_SUBMITTED,
                 leadId, event.getIdempotencyKey(), userId, now, context);
         return appeal.getId();
+    }
+
+    private String requireAppealProcessDefinition() {
+        var definition = definitionReadApi.getPublishedProcessDefinition(APPEAL_PROCESS_DEFINITION_KEY);
+        // The starter node advances after commit. Reject incompatible reviewer configuration before
+        // saving an appeal/outbox event, and start exactly the definition whose contract was checked.
+        if (definition == null || definition.getId() == null || definition.getId().isBlank()
+                || !APPEAL_PROCESS_DEFINITION_KEY.equals(definition.getKey())
+                || !Boolean.FALSE.equals(definition.getSuspended()) || definition.getUserTasks() == null) {
+            throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
+        }
+        var reviewTasks = definition.getUserTasks().stream()
+                .filter(task -> APPEAL_TASK_DEFINITION_KEY.equals(task.getKey())).toList();
+        if (reviewTasks.size() != 1 || !Boolean.TRUE.equals(reviewTasks.getFirst().getStartUserSelectAssignees())) {
+            throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
+        }
+        return definition.getId();
     }
 
     @Override
@@ -560,16 +581,16 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         result.setLeadName(lead.getSubmittedName());
         result.setRoundNo(source.getRoundNo()); result.setReviewStage(source.getReviewStage()); result.setStatus(source.getStatus());
         result.setApplicantUserId(source.getApplicantUserId());
-        result.setApplicantUserName(userNames == null ? userName(source.getApplicantUserId())
-                : userNames.get(source.getApplicantUserId()));
+        result.setApplicantUserName(source.getApplicantUserId() == null ? null
+                : userNames == null ? userName(source.getApplicantUserId()) : userNames.get(source.getApplicantUserId()));
         result.setReason(source.getReason()); result.setEvidence(toEvidenceVO(source.getEvidenceRefs()));
         result.setInvalidReasonSnapshot(source.getInvalidReasonSnapshot());
         result.setInvalidDescriptionSnapshot(source.getInvalidDescriptionSnapshot());
         result.setInvalidEvidenceSnapshot(toEvidenceVO(source.getInvalidEvidenceRefsSnapshot()));
         result.setProcessInstanceId(source.getProcessInstanceId()); result.setTaskId(taskId);
         result.setReviewerUserId(source.getReviewerUserId());
-        result.setReviewerUserName(userNames == null ? userName(source.getReviewerUserId())
-                : userNames.get(source.getReviewerUserId()));
+        result.setReviewerUserName(source.getReviewerUserId() == null ? null
+                : userNames == null ? userName(source.getReviewerUserId()) : userNames.get(source.getReviewerUserId()));
         result.setDecisionReason(source.getDecisionReason()); result.setDecisionEvidence(toEvidenceVO(source.getDecisionEvidenceRefs()));
         result.setSubmittedAt(source.getSubmittedAt()); result.setDecidedAt(source.getDecidedAt());
         result.setCanSubmitNextRound(APPEAL_STATUS_UPHELD.equals(source.getStatus()) && source.getRoundNo() < 3);

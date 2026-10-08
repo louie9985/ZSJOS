@@ -32,6 +32,7 @@ class BpmDefinitionReadApiImplTest extends BaseMockitoUnitTest {
         model.addProcess(process);
         UserTask director = new UserTask();
         director.setId("director");
+        BpmnModelUtils.addExtensionElement(director, "candidateStrategy", "35");
         process.addFlowElement(director);
         UserTask last = new UserTask();
         last.setId("final");
@@ -39,6 +40,7 @@ class BpmDefinitionReadApiImplTest extends BaseMockitoUnitTest {
         handler.setType(BpmUserTaskRejectHandlerTypeEnum.RETURN_USER_TASK.getType());
         handler.setReturnNodeId("director");
         BpmnModelUtils.addTaskRejectElements(handler, last);
+        BpmnModelUtils.addExtensionElement(last, "candidateStrategy", "60");
         process.addFlowElement(last);
         when(service.getProcessDefinitionBpmnModel("definition-1")).thenReturn(model);
 
@@ -47,5 +49,7 @@ class BpmDefinitionReadApiImplTest extends BaseMockitoUnitTest {
         assertTrue(tasks.getFirst().getRejectEndsProcess());
         assertFalse(tasks.getLast().getRejectEndsProcess());
         assertEquals("SINGLE", tasks.getFirst().getExecutionMode());
+        assertTrue(tasks.getFirst().getStartUserSelectAssignees());
+        assertFalse(tasks.getLast().getStartUserSelectAssignees());
     }
 }

@@ -195,10 +195,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private String cursorContext(LeadManagementPageReqVO reqVO) {
-        return Integer.toHexString(Objects.hash(reqVO.getRelationScope(), reqVO.getAudience(),
+        String context = Integer.toHexString(Objects.hash(reqVO.getRelationScope(), reqVO.getAudience(),
                 reqVO.getInboxGroup(), reqVO.getInboxStage(), reqVO.getSimpleStatus(),
                 reqVO.getKeyword(), reqVO.getStatus(), reqVO.getAssignmentStatus(), reqVO.getSourceChannel(),
                 reqVO.getLeadCategory(), reqVO.getSourceUserId(), reqVO.getOwnerUserId(), reqVO.getAdvancedFilter()));
+        return reqVO.getPartnerSubmitterId() == null ? context
+                : context + ":partner:" + reqVO.getPartnerSubmitterId();
     }
 
     private record LeadCursor(LocalDateTime time, Long id) {}

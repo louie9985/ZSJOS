@@ -26,11 +26,22 @@ final class AdvancedFilterRelations {
         return bind("lead", "l." + column, null, "order", "rl." + column, order, "lead_appeal", "rl." + column, appeal, "registration", "rl." + column, registration, "student", "rl." + column, student);
     }
     static Map<String, Binding> leadSubmitterFilterBind(String order, String appeal, String registration, String student) {
-        String leadExpression = "CASE WHEN l.source_provider_recorded = b'1' AND l.source_type IN ('sales_self_sourced','education_self_sourced') THEN l.source_provider_user_id ELSE l.source_user_id END";
-        String orderExpression = "CASE WHEN rl.source_provider_recorded = b'1' AND rl.source_type IN ('sales_self_sourced','education_self_sourced') THEN rl.source_provider_user_id ELSE rl.source_user_id END";
+        String leadExpression = employeeSubmitterExpression("l");
+        String orderExpression = employeeSubmitterExpression("rl");
         return bind("lead", leadExpression, null, "order", orderExpression, order,
                 "lead_appeal", orderExpression, appeal, "registration", orderExpression, registration,
                 "student", orderExpression, student);
+    }
+    private static String employeeSubmitterExpression(String alias) {
+        // Account IDs overlap. Preserve selected-media semantics for self-sourced Leads,
+        // but never reinterpret a canonical Partner subject as an employee.
+        return "CASE WHEN " + alias + ".provider_owner_type='partner' OR " + alias
+                + ".partner_id IS NOT NULL THEN NULL WHEN " + alias
+                + ".provider_owner_type IS NOT NULL AND " + alias + ".provider_owner_type<>'system_user' THEN NULL WHEN " + alias
+                + ".provider_owner_type IS NULL AND " + alias + ".source_type='partner' THEN NULL WHEN "
+                + alias + ".source_provider_recorded = b'1' AND " + alias
+                + ".source_type IN ('sales_self_sourced','education_self_sourced') THEN "
+                + alias + ".source_provider_user_id ELSE " + alias + ".source_user_id END";
     }
     static Map<String, Binding> orderBind(String column, String lead, String appeal, String registration, String student) {
         return bind("lead", "ro." + column, lead, "order", "o." + column, null, "lead_appeal", "ro." + column, appeal, "registration", "ro." + column, registration, "student", "ro." + column, student);

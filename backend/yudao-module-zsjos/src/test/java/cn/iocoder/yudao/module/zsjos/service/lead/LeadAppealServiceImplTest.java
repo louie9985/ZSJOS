@@ -41,6 +41,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
+import cn.iocoder.yudao.module.bpm.api.definition.BpmDefinitionReadApi;
+import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmProcessDefinitionMetadataRespDTO;
+import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmUserTaskMetadataRespDTO;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_INVALID;
 import static org.junit.jupiter.api.Assertions.*;
@@ -62,6 +66,7 @@ class LeadAppealServiceImplTest {
     @Mock private RoleApi roleApi;
     @Mock private PermissionApi permissionApi;
     @Mock private BpmProcessInstanceApi processInstanceApi;
+    @Mock private BpmDefinitionReadApi definitionReadApi;
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
@@ -73,6 +78,8 @@ class LeadAppealServiceImplTest {
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(definitionReadApi.getPublishedProcessDefinition(LeadConstants.APPEAL_PROCESS_DEFINITION_KEY))
+                .thenAnswer(ignored -> validDefinition());
         lenient().when(advancedFilterService.matchAppealIds(isNull(), isNull())).thenReturn(null);
         lenient().when(identityMaskingService.resolve(anyLong(), any()))
                 .thenReturn(new LeadIdentityMaskingService.LeadIdentityViewContext(40L,
@@ -262,6 +269,7 @@ class LeadAppealServiceImplTest {
         ArgumentCaptor<BpmProcessInstanceCreateReqDTO> processCaptor = ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
         verify(processInstanceApi).createProcessInstance(eq(7L), processCaptor.capture());
         BpmProcessInstanceCreateReqDTO processRequest = processCaptor.getValue();
+        assertEquals("validated-definition-2", processRequest.getProcessDefinitionId());
         assertEquals(List.of(30L), processRequest.getStartUserSelectAssignees().get("appealReview"));
         assertEquals("KZ202608160000000008", processRequest.getVariables().get("leadNo"));
         assertDoesNotThrow(() -> processRequest.getVariables().remove("appealId"));
@@ -441,6 +449,95 @@ class LeadAppealServiceImplTest {
         assertEquals(1_900_003_041, error.getCode());
         verifyNoInteractions(processTaskApi);
         verify(leadMapper, never()).selectByIdForUpdate(anyLong(), anyLong());
+    }
+
+    @Test
+    void partnerSubmissionPinsTheValidatedDefinition() {
+        LeadDO lead = invalidLead(20L);
+        lead.setProviderOwnerType(LeadConstants.PROVIDER_OWNER_PARTNER); lead.setProviderOwnerId(70L);
+        prepareFirstRoundSubmit(lead, "partner-key");
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 100L));
+        when(adminUserApi.getUser(30L)).thenReturn(user(30L, 100L));
+        when(deptApi.getDept(100L)).thenReturn(dept(100L, 0L, 30L));
+        when(permissionApi.hasAnyPermissions(30L, LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER)).thenReturn(true);
+        when(processInstanceApi.createProcessInstance(
+                any(cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO.class), any())).thenReturn("partner-process");
+        assertEquals(55L, service.submitForPartner(8L, 80L, 70L, submitRequest("partner-key")));
+        verify(processInstanceApi).createProcessInstance(
+                any(cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO.class),
+                argThat(req -> "validated-definition-2".equals(req.getProcessDefinitionId())
+                        && List.of(30L).equals(req.getStartUserSelectAssignees().get("appealReview"))));
+    }
+
+    @Test
+    void incompatibleDefinitionFailsBeforeBusinessOrNotificationWrites() {
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 100L));
+        when(adminUserApi.getUser(30L)).thenReturn(user(30L, 100L));
+        when(deptApi.getDept(100L)).thenReturn(dept(100L, 0L, 30L));
+        when(permissionApi.hasAnyPermissions(30L, LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER)).thenReturn(true);
+        var wrongStrategy = validDefinition();
+        wrongStrategy.getUserTasks().getFirst().setStartUserSelectAssignees(false);
+        var missingNode = validDefinition().setUserTasks(List.of());
+        var suspended = validDefinition().setSuspended(true);
+        var wrongKey = validDefinition().setKey("another-process");
+        for (var definition : java.util.Arrays.asList(null, wrongStrategy, missingNode, suspended, wrongKey)) {
+            when(definitionReadApi.getPublishedProcessDefinition(LeadConstants.APPEAL_PROCESS_DEFINITION_KEY))
+                    .thenReturn(definition);
+            ServiceException failure = assertThrows(ServiceException.class,
+                    () -> service.submit(8L, 7L, submitRequest("bad-definition")));
+            assertEquals(1_900_003_043, failure.getCode());
+        }
+        verify(appealMapper, never()).insert(any(LeadAppealDO.class));
+        verifyNoInteractions(processInstanceApi, eventMapper, notifyEventPublisher, attachmentService);
+    }
+
+    @Test
+    void employeeHistoryWithPendingReviewerPreservesIdentityMasking() {
+        LeadDO lead = invalidLead(20L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 7L)).thenReturn(true);
+        LeadAppealDO pending = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[30]");
+        pending.setApplicantUserId(7L);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of(pending));
+        when(adminUserApi.getUserList(anyCollection())).thenReturn(List.of(user(7L, 100L)));
+        var result = service.getLeadAppeals(8L, 7L).getFirst();
+        assertNull(result.getReviewerUserName());
+        assertNull(result.getApplicantUserName()); // masked projection remains authoritative
+        verify(identityMaskingService, times(2)).employeeName(any(), anyMap(), nullable(Long.class), any());
+        verify(adminUserApi, never()).getUser(any());
+    }
+
+    @Test
+    void nullableApplicantAndReviewerWorkWithImmutableNameMap() {
+        LeadDO lead = invalidLead(20L);
+        LeadAppealDO pending = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[30]");
+        var result = (cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealRespVO)
+                ReflectionTestUtils.invokeMethod(service, "convert", pending, lead, "task", Map.of());
+        assertNull(result.getApplicantUserName());
+        assertNull(result.getReviewerUserName());
+        pending.setReviewerUserId(30L);
+        result = ReflectionTestUtils.invokeMethod(service, "convert", pending, lead, "task", Map.of(30L, "复核人"));
+        assertEquals("复核人", result.getReviewerUserName());
+    }
+
+    @Test
+    void partnerHistoryAllowsMissingEmployeeApplicantAndPendingReviewer() {
+        LeadDO lead = invalidLead(20L);
+        lead.setProviderOwnerType(LeadConstants.PROVIDER_OWNER_PARTNER); lead.setProviderOwnerId(70L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of(
+                appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[30]")));
+        var result = service.getPartnerLeadAppeals(8L, 70L).getFirst();
+        assertNull(result.getApplicantUserName()); assertNull(result.getReviewerUserName());
+        verifyNoInteractions(adminUserApi);
+    }
+
+    private BpmProcessDefinitionMetadataRespDTO validDefinition() {
+        return new BpmProcessDefinitionMetadataRespDTO().setId("validated-definition-2")
+                .setKey(LeadConstants.APPEAL_PROCESS_DEFINITION_KEY).setSuspended(false)
+                .setUserTasks(List.of(new BpmUserTaskMetadataRespDTO()
+                        .setKey(LeadConstants.APPEAL_TASK_DEFINITION_KEY).setStartUserSelectAssignees(true)));
     }
 
     private void prepareFirstRoundSubmit(LeadDO lead, String idempotencyKey) {

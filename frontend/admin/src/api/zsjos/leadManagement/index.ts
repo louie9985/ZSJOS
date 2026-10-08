@@ -101,6 +101,7 @@ export interface LeadManagementPageReqVO extends PageParam {
   sourceChannel?: string
   leadCategory?: string
   sourceUserId?: number
+  partnerSubmitterId?: number
   ownerUserId?: number
   submittedAt?: string[]
   advancedFilter?: AdvancedFilterGroup

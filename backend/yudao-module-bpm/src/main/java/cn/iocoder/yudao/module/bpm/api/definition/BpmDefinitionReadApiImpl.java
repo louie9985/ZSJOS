@@ -90,6 +90,10 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
                     BpmUserTaskMetadataRespDTO userTask = new BpmUserTaskMetadataRespDTO();
                     userTask.setKey(task.getId());
                     userTask.setName(task.getName());
+                    userTask.setStartUserSelectAssignees(Objects.equals(
+                            BpmnModelUtils.parseCandidateStrategy(task),
+                            cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmTaskCandidateStrategyEnum
+                                    .START_USER_SELECT.getStrategy()));
                     userTask.setRejectEndsProcess(BpmnModelUtils.parseRejectHandlerType(task)
                             != cn.iocoder.yudao.module.bpm.enums.definition.BpmUserTaskRejectHandlerTypeEnum.RETURN_USER_TASK);
                     userTask.setExecutionMode(task.getLoopCharacteristics() == null ? "SINGLE"

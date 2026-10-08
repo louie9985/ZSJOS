@@ -56,6 +56,12 @@
 
 人员、部门填充统一使用 `FieldVO.withResolvedOptions`，保留全部元数据、declaredOptionSource和sourceType，只更新options、optionsState和已解析后的optionSource。空人员选项仍为empty，不回退成全系统用户。字典加载仍由现有客户端按dict来源执行。
 
+客资场景新增 `lead.partnerSubmitterId`（兼职提交人）：来源 `visible-lead-partners`，
+类型 `business_api`，后端按既有客资管理范围与姓名脱敏规则解析为兼职主体选项。
+空结果已解析为 `empty`，客户端不得另查全量兼职。员工字段 `lead.sourceUserId`
+保留兼容键和值，名称明确为“员工提交人”，查询不再匹配同号兼职身份。
+见[身份区分与双端查询合同](../api/lead-submitter-filter.md)。
+
 ## 示例
 
 ```json

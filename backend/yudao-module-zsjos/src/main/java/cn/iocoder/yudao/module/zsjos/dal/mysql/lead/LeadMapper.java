@@ -238,9 +238,9 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
                 .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
-                .eqIfPresent(LeadDO::getSourceUserId, reqVO.getSourceUserId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);
         } else if (inboxFilter != null) {
@@ -287,11 +287,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
                 .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
-                .eqIfPresent(LeadDO::getSourceUserId, reqVO.getSourceUserId())
                 .eqIfPresent(LeadDO::getProviderOwnerType, reqVO.getProviderOwnerType())
                 .eqIfPresent(LeadDO::getProviderOwnerId, reqVO.getProviderOwnerId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);
         } else if (inboxFilter != null) {
@@ -334,6 +334,29 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                 .in(LeadDO::getRecycleSourceOwnerUserId, visibleOwnerUserIds));
             }
         });
+    }
+
+    default List<LeadDO> selectPartnerSubmitterCandidates(List<Long> sourceUserIds,
+                                                         List<Long> ownerUserIds, boolean queryAll) {
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
+        query.eq(LeadDO::getProviderOwnerType, "partner").isNotNull(LeadDO::getPartnerId);
+        if (!queryAll) applyManagementScope(query, sourceUserIds, ownerUserIds);
+        return selectList(query.select(LeadDO::getId, LeadDO::getPartnerId, LeadDO::getProviderOwnerType,
+                LeadDO::getProviderOwnerId, LeadDO::getOwnerUserId, LeadDO::getAssignmentStatus,
+                LeadDO::getDispatchMode).orderByAsc(LeadDO::getId));
+    }
+
+    private static void applySubmitterFilters(LambdaQueryWrapperX<LeadDO> query, LeadManagementPageReqVO reqVO) {
+        if (reqVO.getSourceUserId() != null) {
+            query.eq(LeadDO::getSourceUserId, reqVO.getSourceUserId()).isNull(LeadDO::getPartnerId)
+                    .and(identity -> identity.eq(LeadDO::getProviderOwnerType, "system_user")
+                            .or(legacy -> legacy.isNull(LeadDO::getProviderOwnerType)
+                                    .ne(LeadDO::getSourceType, "partner")));
+        }
+        if (reqVO.getPartnerSubmitterId() != null) {
+            query.eq(LeadDO::getProviderOwnerType, "partner")
+                    .eq(LeadDO::getPartnerId, reqVO.getPartnerSubmitterId());
+        }
     }
 
     private static void applyManagementOrder(LambdaQueryWrapperX<LeadDO> query,

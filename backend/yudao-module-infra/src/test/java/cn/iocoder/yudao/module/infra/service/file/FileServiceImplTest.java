@@ -32,6 +32,8 @@ import static org.mockito.Mockito.*;
 @Import({FileServiceImpl.class})
 public class FileServiceImplTest extends BaseDbUnitTest {
 
+    private static final boolean DEFAULT_UNIQUE_PATH_ENABLED = FileServiceImpl.PATH_SUFFIX_TIMESTAMP_ENABLE;
+
     @Resource
     private FileServiceImpl fileService;
 
@@ -46,6 +48,48 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         FileServiceImpl.PATH_PREFIX_DATE_ENABLE = true;
         FileServiceImpl.PATH_SUFFIX_TIMESTAMP_ENABLE = true;
         FileServiceImpl.PATH_SUFFIX_AS_DIRECTORY = true;
+    }
+
+    @Test
+    public void testUniqueUploadPathEnabledByDefault() {
+        assertTrue(DEFAULT_UNIQUE_PATH_ENABLED, "Production defaults must prevent same-name overwrite");
+    }
+
+    @Test
+    public void testSameNameUploadsKeepIndependentContent() throws Exception {
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(client.getId()).thenReturn(10L);
+        Map<String, byte[]> objects = new java.util.HashMap<>();
+        when(client.upload(any(byte[].class), anyString(), eq("image/jpeg"))).thenAnswer(invocation -> {
+            String path = invocation.getArgument(1);
+            objects.put(path, invocation.getArgument(0));
+            return "https://files.example/" + path;
+        });
+        byte[] firstContent = new byte[]{1, 2};
+        byte[] secondContent = new byte[]{3, 4, 5};
+
+        FileDO first = fileService.createFileInfo(firstContent, "image.jpg", "zsjos/lead/admin", "image/jpeg");
+        FileDO second = fileService.createFileInfo(secondContent, "image.jpg", "zsjos/lead/admin", "image/jpeg");
+
+        assertNotEquals(first.getId(), second.getId());
+        assertNotEquals(first.getPath(), second.getPath());
+        assertEquals("image.jpg", first.getName());
+        assertEquals("image.jpg", second.getName());
+        assertArrayEquals(firstContent, objects.get(fileMapper.selectById(first.getId()).getPath()));
+        assertArrayEquals(secondContent, objects.get(fileMapper.selectById(second.getId()).getPath()));
+    }
+
+    @Test
+    public void testSameNamePresignedUploadsUseIndependentPaths() {
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(client.getId()).thenReturn(10L);
+        var first = fileService.presignPutUrl("image.jpg", "avatar");
+        var second = fileService.presignPutUrl("image.jpg", "avatar");
+        assertNotEquals(first.getPath(), second.getPath());
+        verify(client).presignPutUrl(first.getPath());
+        verify(client).presignPutUrl(second.getPath());
     }
 
     @Test

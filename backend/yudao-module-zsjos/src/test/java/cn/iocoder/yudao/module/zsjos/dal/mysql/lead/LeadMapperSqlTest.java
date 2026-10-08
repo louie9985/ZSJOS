@@ -30,6 +30,26 @@ import static org.mockito.Mockito.verify;
 class LeadMapperSqlTest {
 
     @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void partnerCandidatesIntersectCanonicalIdentityWithManagementScope() throws Exception {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+        doReturn(List.of()).when(mapper).selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        mapper.selectPartnerSubmitterCandidates(List.of(50L), List.of(60L), false);
+        var capture = org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(mapper).selectList(capture.capture());
+        var query = (LambdaQueryWrapperX<LeadDO>) capture.getValue();
+        String sql = query.getSqlSegment();
+        assertTrue(sql.contains("partner_id IS NOT NULL"), sql);
+        assertTrue(sql.contains("owner_user_id IN"), sql);
+        assertTrue(sql.contains("recycle_source_owner_user_id IN"), sql);
+        assertTrue(query.getParamNameValuePairs().containsValue("partner"));
+        assertTrue(query.getParamNameValuePairs().containsValue("system_user"));
+        assertDoesNotThrow(() -> CCJSqlParserUtil.parse("SELECT id FROM zsjos_lead WHERE "
+                + sql.replaceAll("#\\{[^}]+}", "?")));
+    }
+
+    @Test
     void leadKeywordSearchesBusinessNumberAndContactsWithoutInternalId() throws Exception {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
         Method method = LeadMapper.class.getDeclaredMethod("applyLeadKeyword", LambdaQueryWrapperX.class, String.class);

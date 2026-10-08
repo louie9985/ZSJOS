@@ -35,10 +35,21 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="提交人" prop="sourceUserId">
+      <el-form-item label="员工提交人" prop="sourceUserId">
         <el-select v-model="queryParams.sourceUserId" filterable clearable class="!w-170px">
           <el-option v-for="user in users" :key="user.id" :label="user.nickname" :value="user.id" />
         </el-select>
+      </el-form-item>
+      <el-form-item label="兼职提交人" prop="partnerSubmitterId">
+        <el-select v-model="queryParams.partnerSubmitterId" filterable clearable class="!w-170px"
+          :loading="partnerOptionsLoading" :disabled="!!partnerOptionsError" placeholder="选择兼职">
+          <el-option v-for="partner in partnerOptions" :key="partner.value"
+            :label="partner.label" :value="Number(partner.value)" />
+          <template #empty>暂无可选兼职</template>
+        </el-select>
+        <el-button v-if="partnerOptionsError" link type="danger" @click="loadPartnerOptions">
+          {{ partnerOptionsError }}，重试
+        </el-button>
       </el-form-item>
       <el-form-item label="负责人" prop="ownerUserId">
         <el-select v-model="queryParams.ownerUserId" filterable clearable class="!w-170px">
@@ -334,7 +345,7 @@ import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as LeadFollowUpApi from '@/api/zsjos/leadFollowUp'
 import { DICT_TYPE, getStrDictOptions } from '@/utils/dict'
 import { formatZsjosTimestamp } from '@/utils/zsjosTime'
-import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
+import { getCatalog, type AdvancedFilterGroup, type AdvancedFilterOption } from '@/api/zsjos/advancedFilter'
 import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosLeadManagement' })
@@ -349,6 +360,22 @@ const error = ref('')
 const list = ref<LeadApi.LeadManagementVO[]>([])
 const total = ref(0)
 const users = ref<LeadApi.VisibleUserVO[]>([])
+const partnerOptions = ref<AdvancedFilterOption[]>([])
+const partnerOptionsLoading = ref(false)
+const partnerOptionsError = ref('')
+const loadPartnerOptions = async () => {
+  partnerOptionsLoading.value = true
+  partnerOptionsError.value = ''
+  try {
+    const catalog = await getCatalog('lead')
+    partnerOptions.value = catalog.fields.find(field => field.fieldKey === 'lead.partnerSubmitterId')?.options ?? []
+  } catch (failure) {
+    partnerOptions.value = []
+    partnerOptionsError.value = failure instanceof Error ? failure.message : '兼职选项加载失败'
+  } finally {
+    partnerOptionsLoading.value = false
+  }
+}
 const queryParams = reactive<LeadApi.LeadManagementPageReqVO>({ pageNo: 1, pageSize: 10 })
 const detailVisible = ref(false)
 const detailLoading = ref(false)
@@ -434,7 +461,7 @@ const snapshotLabel = (label?: string, value?: string) =>
   !label || /^[a-z][a-z0-9_.-]*$/i.test(label) || label === value ? '标签未配置' : label
 
 onMounted(async () => {
-  const [userResult] = await Promise.allSettled([LeadApi.getVisibleUsers()])
+  const [userResult] = await Promise.allSettled([LeadApi.getVisibleUsers(), loadPartnerOptions()])
   if (userResult.status === 'fulfilled') users.value = userResult.value
   await getList()
   const requestedLeadId = Number(route.query.leadId)

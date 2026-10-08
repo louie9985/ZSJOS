@@ -22,6 +22,7 @@ public class AdvancedFilterController {
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.LeadFilterOrganizationService organizations;
     @Resource private AdvancedFilterVisibleUserService visibleUserService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterProductOptions productOptions;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.LeadFilterPartnerService partnerOptions;
 
     @GetMapping("/catalog")
     @Operation(summary = "获得高级筛选字段目录")
@@ -47,9 +48,12 @@ public class AdvancedFilterController {
                 : service.catalogWithoutVisibleUsers(scene);
         if ("lead".equals(scene)) {
             var organizationOptions = organizations.options(userScope.options());
+            var visiblePartners = partnerOptions.options(getLoginUserId());
             catalog = new AdvancedFilterCatalogRespVO(catalog.fields().stream().map(field ->
                     "visible-departments".equals(field.optionSource())
-                            ? field.withResolvedOptions(organizationOptions) : field).toList(),
+                            ? field.withResolvedOptions(organizationOptions)
+                            : "visible-lead-partners".equals(field.optionSource())
+                            ? field.withResolvedOptions(visiblePartners) : field).toList(),
                     catalog.relativeDateOptions());
         }
         if (java.util.Set.of("cashback", "withdrawal").contains(scene)) {

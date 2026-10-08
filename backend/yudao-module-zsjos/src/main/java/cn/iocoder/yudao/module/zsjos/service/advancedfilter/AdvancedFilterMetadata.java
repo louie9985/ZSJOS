@@ -61,6 +61,7 @@ final class AdvancedFilterMetadata {
         if (source == null) return options.isEmpty() ? "none" : "business_contract";
         if (source.startsWith("dict:") && source.length() > 5) return "dictionary";
         if (source.startsWith("product-catalog:")) return "business_api";
+        if (source.equals("visible-lead-partners")) return "business_api";
         if (source.equals("visible-users")) return "visible_users";
         if (source.equals("visible-departments")) return "visible_departments";
         throw new IllegalStateException("Unsupported filter option source: " + source);

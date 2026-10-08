@@ -63,6 +63,9 @@ public class LeadManagementPageReqVO extends PageParam {
     private String sourceChannel;
     private String leadCategory;
     private Long sourceUserId;
+    @Schema(description = "兼职提交人主体编号，与员工账号编号属于不同身份空间")
+    @Min(1)
+    private Long partnerSubmitterId;
     @Pattern(regexp = "system_user|partner", message = "客资提供方类型不正确")
     private String providerOwnerType;
     private Long providerOwnerId;

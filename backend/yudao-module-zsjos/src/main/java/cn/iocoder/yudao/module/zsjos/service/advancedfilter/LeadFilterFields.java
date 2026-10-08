@@ -30,8 +30,10 @@ final class LeadFilterFields {
         add(result, select(Sensitivity.STANDARD, "lead.dealStatus", STATUS, "成交状态", options("won", "已成交", "not_won", "未成交"), bind("lead", "CASE WHEN l.status='won' THEN 'won' ELSE 'not_won' END", null)));
         add(result, date(Sensitivity.STANDARD, "lead.qualifiedAt", TIME, "有效性判定时间", bind("lead", "l.qualified_at", null)));
         add(result, date(Sensitivity.STANDARD, "lead.convertedAt", TIME, "成交时间", bind("lead", "op.won_at", "SELECT 1 FROM zsjos_opportunity op WHERE op.lead_id=l.id AND op.type='initial_conversion' AND op.tenant_id=l.tenant_id AND op.deleted=b'0'")));
-        add(result, selectSource(Sensitivity.PERSONAL, "lead.sourceUserId", PEOPLE, "提交人", "visible-users",
+        add(result, selectSource(Sensitivity.PERSONAL, "lead.sourceUserId", PEOPLE, "员工提交人", "visible-users",
                 leadSubmitterFilterBind(leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
+        add(result, selectSource(Sensitivity.PERSONAL, "lead.partnerSubmitterId", PEOPLE, "兼职提交人", "visible-lead-partners",
+                bind("lead", "CASE WHEN l.provider_owner_type='partner' THEN l.partner_id END", null)));
         add(result, selectSource(Sensitivity.PERSONAL, "lead.ownerUserId", PEOPLE, "负责人", "visible-users", leadBind("owner_user_id", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, date(Sensitivity.STANDARD, "lead.submittedAt", TIME, "客资提交时间", leadBind("submitted_at", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
         add(result, date(Sensitivity.STANDARD, "lead.lastFollowUpAt", TIME, "最近跟进时间", leadBind("last_follow_up_at", leadFromOrder, leadFromAppeal, leadFromRegistration, leadFromStudent)));
