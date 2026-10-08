@@ -116,7 +116,7 @@ media-lead tables; V283 still owns their menu metadata. Repeated migration execu
 preserves existing objects and metadata. Application rollback retains these additive
 objects and recorded snapshots; there is no reverse data operation in this correction.
 
-`core.json` permits only the exact optional operational table
+`core.json` permits the exact optional operational table
 `zsjos_data_repair_backup`, created by
 `repairs/repair_performance_attribution_source_20260929.py`. It stores recovery
 before-values and is neither a runtime business table nor a fresh-install seed.
@@ -152,6 +152,48 @@ provider-template verifier checks the V080 default before V257 and the
 submitter-identity wording/parameters after V257; neither contract is skipped.
 A scoped V274–V277 replay must include the V146 calendar-directory prerequisite
 and does not replace complete fresh/upgrade tests.
+
+## Retained order-repair backups (2026-09-30)
+
+The September 30 deployment also encountered twelve recovery tables created by the
+earlier order/approval repairs. Their exact identities were checked against retained
+backup SQL and the target database metadata. `core.json` lists only these additional
+names in `allowedExtraTables`:
+
+- `zsjos_case_bak_approve_20260930031902`
+- `zsjos_item_bak_seedamt_20260930033438`
+- `zsjos_order_approval_round_bak_20260930012653`
+- `zsjos_order_bak_20260930012653`
+- `zsjos_order_bak_432_20260930041710`
+- `zsjos_order_bak_approve_20260930031902`
+- `zsjos_order_bak_apv_20260930040452`
+- `zsjos_order_bak_insert_20260930034736`
+- `zsjos_order_bak_seedamt_20260930033438`
+- `zsjos_order_bak_submit2_20260930015245`
+- `zsjos_order_bak_submit_20260930013844`
+- `zsjos_round_bak_approve_20260930031902`
+
+These are optional recovery evidence, not business schema or fresh-install seeds.
+The verifier neither requires nor creates them, and does not alter or delete their
+contents. This is an exact-name exception, not an exemption for `_bak_` patterns;
+new or similarly named tables still block `plan`, `migrate`, and `verify`. Expected
+business columns, indexes and foreign keys remain checked even when their table is
+also in an extra-table allowlist. Unknown tables are reported once per table rather
+than once per column.
+
+This tooling correction changes no baseline, numbered migration, version ledger or
+checksum. Verify it with the focused regression command:
+
+```bash
+python3 -m unittest discover -s script/sql/mysql/tools -p 'test_schema_drift.py'
+```
+
+Then run `bash ./zsjos-db check` and a read-only `db-plan` against the target.
+`deploy-production.sh db-plan`, `db-migrate` and `deploy` rebuild the migrator image
+from current sources; a stale image still has the old manifest. A blocked `deploy`
+may leave the backend stopped because it stops the service before building. Inspect
+service state, then separately authorize migration/deployment or service recovery
+as required by repository operations rules. Preserve the recovery tables.
 
 ## V270 Media student full reads
 

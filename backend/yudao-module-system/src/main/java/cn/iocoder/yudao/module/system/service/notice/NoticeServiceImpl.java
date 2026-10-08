@@ -490,7 +490,9 @@ public class NoticeServiceImpl implements NoticeService {
         if (items.size() > 10 || items.stream().map(NoticeAttachmentVO::getInfraFileId).distinct().count() != items.size()) {
             throw exception(NOTICE_ATTACHMENT_INVALID);
         }
-        attachmentMapper.deleteByNoticeIds(List.of(noticeId));
+        Map<Long, NoticeAttachmentDO> storedByFileId = attachmentMapper.selectListIncludingDeletedByNoticeId(noticeId)
+                .stream().collect(Collectors.toMap(NoticeAttachmentDO::getInfraFileId, Function.identity()));
+        List<NoticeAttachmentDO> validated = new ArrayList<>();
         for (int i = 0; i < items.size(); i++) {
             FileInfoRespDTO file;
             try {
@@ -498,6 +500,7 @@ public class NoticeServiceImpl implements NoticeService {
             } catch (RuntimeException ex) {
                 throw exception(NOTICE_ATTACHMENT_INVALID);
             }
+            if (file == null) throw exception(NOTICE_ATTACHMENT_INVALID);
             boolean ownedUpload = Objects.equals(String.valueOf(userId), file.getCreator())
                     && StrUtil.startWith(file.getPath(), "system/notice/" + userId + "/");
             if ((!ownedUpload && !existingFileIds.contains(file.getId())) || file.getSize() == null || file.getSize() > MAX_ATTACHMENT_SIZE) {
@@ -510,7 +513,23 @@ public class NoticeServiceImpl implements NoticeService {
             row.setMimeType(file.getType());
             row.setFileSize(file.getSize());
             row.setSort(i);
-            attachmentMapper.insert(row);
+            validated.add(row);
+        }
+        attachmentMapper.deleteByNoticeIdExceptFileIds(noticeId,
+                validated.stream().map(NoticeAttachmentDO::getInfraFileId).toList());
+        for (NoticeAttachmentDO row : validated) {
+            NoticeAttachmentDO stored = storedByFileId.get(row.getInfraFileId());
+            if (stored == null) {
+                attachmentMapper.insert(row);
+            } else {
+                // Reuse the binding: logical deletion does not release uk_notice_file.
+                // Deleted rows do not expand existingFileIds or bypass upload ownership checks.
+                if (Boolean.TRUE.equals(stored.getDeleted()) && attachmentMapper.restoreDeleted(stored) != 1) {
+                    throw exception(NOTICE_ATTACHMENT_INVALID);
+                }
+                row.setId(stored.getId());
+                attachmentMapper.updateById(row);
+            }
         }
     }
 

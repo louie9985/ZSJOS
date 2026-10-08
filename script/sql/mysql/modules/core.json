@@ -33,6 +33,18 @@
     "zsjos_partner_leaderboard_config",
     "zsjos_payment_subject",
     "zsjos_product_payment_subject",
-    "zsjos_data_repair_backup"
+    "zsjos_data_repair_backup",
+    "zsjos_case_bak_approve_20260930031902",
+    "zsjos_item_bak_seedamt_20260930033438",
+    "zsjos_order_approval_round_bak_20260930012653",
+    "zsjos_order_bak_20260930012653",
+    "zsjos_order_bak_432_20260930041710",
+    "zsjos_order_bak_approve_20260930031902",
+    "zsjos_order_bak_apv_20260930040452",
+    "zsjos_order_bak_insert_20260930034736",
+    "zsjos_order_bak_seedamt_20260930033438",
+    "zsjos_order_bak_submit2_20260930015245",
+    "zsjos_order_bak_submit_20260930013844",
+    "zsjos_round_bak_approve_20260930031902"
   ]
 }

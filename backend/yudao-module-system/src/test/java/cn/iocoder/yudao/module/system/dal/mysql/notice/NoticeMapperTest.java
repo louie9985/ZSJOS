@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeAttachmentDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeReadDO;
 import cn.iocoder.yudao.module.system.enums.notice.NoticePublishStatusEnum;
@@ -31,6 +32,39 @@ class NoticeMapperTest extends BaseDbUnitTest {
     @Resource private NoticeReadMapper readMapper;
     @Resource private NoticeRecipientMapper recipients;
     @Resource private NoticeReadStatisticsMapper statistics;
+    @Resource private NoticeAttachmentMapper attachments;
+
+    @Test
+    void shouldScopeDeletedAttachmentLookupAndRestoreToTenantAndNotice() {
+        TenantContextHolder.setTenantId(1L);
+        NoticeDO notice = publishedNotice("附件隔离");
+        noticeMapper.insert(notice);
+        NoticeAttachmentDO attachment = new NoticeAttachmentDO();
+        attachment.setNoticeId(notice.getId());
+        attachment.setInfraFileId(101L);
+        attachment.setFileName("制度.pdf");
+        attachment.setFileSize(1024L);
+        attachment.setSort(0);
+        attachments.insert(attachment);
+        attachments.deleteByNoticeIds(List.of(notice.getId()));
+        NoticeAttachmentDO deleted = attachments.selectListIncludingDeletedByNoticeId(notice.getId()).get(0);
+        assertTrue(deleted.getDeleted());
+
+        TenantContextHolder.setTenantId(2L);
+        assertTrue(attachments.selectListIncludingDeletedByNoticeId(notice.getId()).isEmpty());
+        assertEquals(0, attachments.restoreDeleted(deleted));
+
+        TenantContextHolder.setTenantId(1L);
+        NoticeDO otherNotice = publishedNotice("另一公告");
+        noticeMapper.insert(otherNotice);
+        deleted.setNoticeId(otherNotice.getId());
+        assertEquals(0, attachments.restoreDeleted(deleted));
+        deleted.setNoticeId(notice.getId());
+        assertEquals(1, attachments.restoreDeleted(deleted));
+        assertEquals(0, attachments.restoreDeleted(deleted));
+        assertEquals(attachment.getId(), attachments.selectListByNoticeId(notice.getId()).get(0).getId());
+        assertTrue(attachments.selectListByNoticeId(otherNotice.getId()).isEmpty());
+    }
 
     @Test void readingStatisticsWorkWithTenantInterceptorAndRejectOtherTenantRows() {
         TenantContextHolder.setTenantId(1L);

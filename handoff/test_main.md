@@ -1915,3 +1915,62 @@
 - Verification: MySQL temporary initial/repeat/conflict/rollback-recovery and UTF-8 tests passed; live exact-source guarded insertion committed one row with immediate repeat-no-op and full target-order/all-existing-attribution preservation. Independent readback confirms effective status, 2380.00 amount, expected department/center/current provenance and receipt reference; affected account missing count=0 and amount=0.00; persisted Chinese user/department/center/channel HEX verified. Python syntax/whitespace, unrelated file hashes and original handoff prefix passed.
 - Evidence/recovery: Restricted /opt/zsjos-runtime/backups/order-8854-attribution-20260930/ contains frozen plan, rehearsal, before digests, complete inserted after-image, commit result and independent readback. Any post-commit removal needs separate exact-ID/after-image authorization; none executed.
 - Remaining work: None for scoped repair. Browser/authenticated HTTP not exercised; page refresh result inferred from the verified underlying query. Other accounts/orders remain outside scope.
+
+
+## Workstream Registration — 2026-09-30 12:30:47 +0800 — test-backup-table-drift
+
+- Owner: Codex /root; environment: test (resolved /etc/zsjos/agent-environment); branch: main; worktree: /opt/zsjos; base/HEAD: d43cc180c3a3e92740888b521fc2ea4e006a0560; target branch/integration order: None.
+- Goal: Fix the reported deployment blocker caused by twelve retained operational backup tables, and report each unknown table only once.
+- Non-goals: No database writes/deletions, migration/checksum changes, service operations, release installation, dependency changes, Git branch/commit/push operations, or changes to the existing frontend build-info edit.
+- Ownership: script/sql/mysql/modules/core.json; script/sql/mysql/tools/zsjos_db.py; script/sql/mysql/tools/test_schema_drift.py (new); docs/operations/database-migrations.md; this append-only handoff. Private read-only verification evidence under /tmp.
+- Dependencies/decisions: Exact backup identities from the user log are corroborated by retained backup SQL and database metadata. Extend the existing allowedExtraTables mechanism with only those twelve names; no wildcard exemptions and no bootstrap seeds. Preserve unknown-table and business-column/index/foreign-key guards. Update the prior single-backup documentation to this explicitly bounded scope.
+- Verification plan: Focused regression tests for exact optional backups, absence, lookalikes, real business drift, unique reporting and plan/migrate/verify blocking; static check; read-only comparison and plan against the configured existing MySQL 8 database; confirm backup metadata/counts and version ledgers are unchanged; scoped diff and unrelated-file hash checks. No SQL changes or live migrations are part of this code repair.
+
+
+## Delivery — 2026-09-30 12:36:09 +0800 — test-backup-table-drift
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos; registration above applies; HEAD unchanged d43cc180c3a3e92740888b521fc2ea4e006a0560. Source repair complete; ownership released.
+- User goal/result: Fixed the reported deployment schema-drift blocker. Added only the twelve exact backup identities from the error to the existing optional-table allowlist; verified provenance against retained backup SQL and MySQL metadata. Unknown tables now produce one sorted diagnostic per table rather than one per column. Similar names and business column/index/foreign-key drift remain blocked.
+- Changed files: script/sql/mysql/modules/core.json; script/sql/mysql/tools/zsjos_db.py; new script/sql/mysql/tools/test_schema_drift.py; docs/operations/database-migrations.md; this handoff. No SQL/baseline/numbered migration, database, service, artifact installation, dependency or Git publication changes.
+- Verification: Eight focused regressions PASS (optional backups present/absent, lookalikes, unknown-table deduplication, business guards, plan acceptance, migrate fail-before-write, verify acceptance/rejection). bash ./zsjos-db check PASS; focused diff/UTF-8 checks PASS. Direct executable wrapper lacked execute permission, so invoked its existing Bash interpreter without changing file mode.
+- Live evidence: Used the current Python implementation through a SELECT-only transport to the already-running configured MySQL 8 container, with module selection from /opt/zsjos-runtime/.env.production. Prior manifest reproduces exactly twelve extra tables; corrected manifest has zero raw schema differences. Strict runner-recorded checksum validation PASS. Actual print_plan result: unexpected drift None; Status MIGRATIONS PENDING; only core/V287__exam_revoke_reedit.sql pending. This is source-level read-only planning, not execution of the packaged migrator image.
+- Preservation: Twelve backup tables total 5,235 rows; row counts, complete column metadata digest and both version-ledger digests identical before/after verification. Existing frontend/workbench/tsconfig.tsbuildinfo SHA-256 and prior handoff prefix preserved. No business payloads or secrets printed.
+- Dependencies/integration: None. Migrator wrappers rebuild the image from current sources on the next db-plan/db-migrate/deploy. No fresh/upgrade SQL execution required for this manifest/diagnostic-only change; no SQL or migration ordering changed.
+- Remaining operations: V287 execution, full packaged migration verification, release installation and service health after deployment are not performed. zsjos-backend.service was observed inactive/dead after the failed deploy. Shared database/service/deployment operations require explicit operation/target authorization under AGENTS.md section 4; this code repair does not authorize them.
+
+## Scope Update - 2026-09-30 - test-backup-table-drift
+
+- The target executed Core V287 after the preceding read-only plan. Verification then exposed a source/schema inventory gap: V287's four additive exam columns existed in the database but were absent from both desired schema files. Ownership now includes script/sql/mysql/schema/core.sql and script/sql/mysql/00-bootstrap-schema.sql; the correction remains source-only and preserves the already-applied V287 ledger/data.
+- Verification is extended to byte-identical desired/baseline schema sources, static checks, focused V287 schema tests, and a read-only target db-verify. No new numbered migration or database write is planned.
+
+## Delivery - 2026-09-30 - test-backup-table-drift
+
+- Result: Corrected the post-V287 verification blocker by adding the four V287 exam columns to both byte-identical desired schema sources. The database already contained these columns and both V287 ledger rows; no database correction or replay was performed.
+- Changed files: script/sql/mysql/schema/core.sql; script/sql/mysql/00-bootstrap-schema.sql; this handoff. Existing backup-table allowlist, drift deduplication, unrelated frontend build-info change, and prior documentation remain preserved.
+- Verification: `bash ./zsjos-db check` PASS; desired and bootstrap schemas byte-identical; `git diff --check` PASS; eight focused schema-drift regression tests PASS; rebuilt db-migrator `db-verify` PASS with `PASS: database verification ... schema drift checks completed`.
+- Remaining warnings: 17 data-grade FAIL/MISSING lines remain warn-only base-state snapshots on the in-use database (V054/V071/V125/V157/V188/V192/V193/V196/V208 and named baseline checks). They are separate from structural schema verification and require business review if those historical invariants must be repaired; no such data repair was performed.
+- Operations: V287 was already applied by the user's prior `db-migrate`; no migration was rerun. Backend service remains inactive/dead. Release installation or service start was not performed.
+
+
+## Workstream Registration — 2026-10-08 — test-notice-attachment-save
+
+- Owner: Codex /root; environment: test (resolved /etc/zsjos/agent-environment); branch: main; worktree: /opt/zsjos; base commit: d43cc180c3a3e92740888b521fc2ea4e006a0560; target branch/integration order: None.
+- Goal: Correct draft attachment updates that collide with uk_notice_file after logical deletion, including repeated saves and removal/re-addition of an authorized upload.
+- Non-goals: No service restart/start, compilation, test execution, database writes/schema/migrations, deployment, dependencies, frontend behavior changes, or Git publication. Current user instruction overrides the usual runtime verification requirement.
+- Ownership: backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeServiceImpl.java; backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeAttachmentMapper.java; backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/service/notice/NoticeServiceImplTest.java; backend/yudao-module-system/src/test/resources/sql/create_tables.sql (notice attachment test constraint only); docs/frontend/notice-attachments.md; this append-only handoff.
+- Dependencies/decisions: Existing notice transaction and draft row lock; reuse active attachment bindings, logically remove only omitted bindings, and restore a matching deleted binding after existing file authorization. Deleted bindings are not evidence of current file access. Scope lookup/restore by tenant and notice; preserve Infra objects and existing permission/API contracts.
+- Verification plan: Add regression code and mirror the existing production unique constraint in the H2 fixture, but do not execute tests. Review service/mapper boundaries and both React/Vue callers statically; run scoped diff/UTF-8 and unrelated-change preservation checks only. Runtime behavior and compilation remain explicitly unverified.
+
+## Scope Update — 2026-10-08 — test-notice-attachment-save
+
+- Ownership additionally includes backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeMapperTest.java to add tenant-isolation and notice-boundary regressions for deleted-binding lookup/restore using the existing tenant-interceptor test configuration. Tests remain unexecuted as requested.
+
+## Delivery — 2026-10-08 10:06:46 +0800 — test-notice-attachment-save
+
+- Owner/environment/branch/worktree: Codex /root; test; main; /opt/zsjos; registration and scope update above apply. HEAD unchanged d43cc180c3a3e92740888b521fc2ea4e006a0560. Source edits delivered; ownership released.
+- User goal/result: Implemented source correction for draft-save attachment unique-key collisions. Validate the full attachment request first, logically delete only omitted bindings, update retained bindings, and restore a deleted binding only after existing upload authorization. Restoration checks tenant, notice, file, row identity and deleted state. Notice transaction/row lock, file permissions and Infra ownership remain intact. Missing file responses map to the existing attachment validation error.
+- Changed files: NoticeServiceImpl.java; NoticeAttachmentMapper.java; NoticeServiceImplTest.java; NoticeMapperTest.java; System test resources/sql/create_tables.sql (matching production attachment unique constraint); docs/frontend/notice-attachments.md; this handoff. Exact paths are in registration/scope update.
+- Regression source: Added repeated-save/reorder/publish, partial/all removal and re-addition, copied attachment retention with unauthorized re-add rejection, rollback/duplicate request, and tenant/notice restore-boundary cases. No new test dependencies.
+- Verification evidence: git diff --check passed; affected files decode as UTF-8; SHA-256 checks confirm pre-existing unrelated file changes and the original handoff prefix were preserved. Static inspection confirms both React NoticeEditorDialog and Vue NoticeEditor save before publishing using unchanged APIs; default tenant interception remains active for attachment DO queries and mutations.
+- Explicit verification limit: At the user's request no compilation, test execution, browser/API runtime check, database operation or service/deployment operation was performed. Added tests and runtime behavior remain unverified; static checks are not proof of runtime success. The running test service still uses its existing build.
+- Dependencies/integration: None; no package/API/schema migration changes, commits or pushes. Remaining work: compilation, focused tests including tenant interception, and deployment verification when separately requested; those are excluded from this source-only delivery.

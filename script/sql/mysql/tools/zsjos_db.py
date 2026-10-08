@@ -650,8 +650,9 @@ def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
     for table, column in sorted(actual_columns):
         if table in desired_tables and (table, column) not in desired_columns:
             drift.append(f"unexpected column {table}.{column}")
-        elif table not in desired_tables and table not in allowed_extra:
-            drift.append(f"unexpected table {table}")
+    actual_tables = {table for table, _ in actual_columns}
+    for table in sorted(actual_tables - desired_tables - allowed_extra):
+        drift.append(f"unexpected table {table}")
     for key, signature in sorted(desired_indexes.items()):
         actual = actual_indexes.get(key)
         if actual is None:

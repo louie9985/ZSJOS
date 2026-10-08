@@ -79,6 +79,110 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    void shouldKeepAttachmentBindingsAcrossRepeatedSavesAndPublish() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        when(fileApi.getFileInfo(102L)).thenReturn(file(102L, USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p>正文</p>");
+        request.setAttachments(List.of(attachment(101L)));
+        Long id = noticeService.createNotice(request, USER_ID);
+        NoticeAttachmentDO original = attachmentMapper.selectListByNoticeId(id).get(0);
+        request.setId(id);
+        request.setAttachments(List.of(attachment(102L), attachment(101L)));
+
+        noticeService.updateNotice(request, USER_ID);
+        noticeService.updateNotice(request, USER_ID);
+        noticeService.publishNotice(id);
+
+        List<NoticeAttachmentDO> saved = attachmentMapper.selectListByNoticeId(id);
+        assertEquals(List.of(102L, 101L), saved.stream().map(NoticeAttachmentDO::getInfraFileId).toList());
+        assertEquals(List.of(0, 1), saved.stream().map(NoticeAttachmentDO::getSort).toList());
+        assertEquals(original.getId(), saved.get(1).getId());
+        assertEquals(original.getCreateTime(), saved.get(1).getCreateTime());
+        assertEquals(2, attachmentMapper.selectListIncludingDeletedByNoticeId(id).size());
+        assertEquals(NoticePublishStatusEnum.PUBLISHED.getStatus(), noticeMapper.selectById(id).getPublishStatus());
+    }
+
+    @Test
+    void shouldRestoreRemovedOwnedAttachmentWithoutInsertingAnotherBinding() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        when(fileApi.getFileInfo(102L)).thenReturn(file(102L, USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p>正文</p>");
+        request.setAttachments(List.of(attachment(101L), attachment(102L)));
+        Long id = noticeService.createNotice(request, USER_ID);
+        List<Long> originalIds = attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getId).toList();
+        request.setId(id);
+        request.setAttachments(List.of(attachment(102L)));
+
+        noticeService.updateNotice(request, USER_ID);
+
+        assertEquals(List.of(102L), attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getInfraFileId).toList());
+        assertEquals(originalIds.get(1), attachmentMapper.selectListByNoticeId(id).get(0).getId());
+        assertTrue(attachmentMapper.selectListIncludingDeletedByNoticeId(id).stream()
+                .filter(row -> row.getInfraFileId().equals(101L)).findFirst().orElseThrow().getDeleted());
+        request.setAttachments(List.of());
+        noticeService.updateNotice(request, USER_ID);
+        assertTrue(attachmentMapper.selectListByNoticeId(id).isEmpty());
+
+        request.setAttachments(List.of(attachment(101L), attachment(102L)));
+        noticeService.updateNotice(request, USER_ID);
+        noticeService.updateNotice(request, USER_ID);
+
+        assertEquals(originalIds, attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getId).toList());
+        assertEquals(2, attachmentMapper.selectListIncludingDeletedByNoticeId(id).size());
+    }
+
+    @Test
+    void shouldRetainCopiedAttachmentButRejectReaddingAnotherUsersRemovedUpload() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p>正文</p>");
+        request.setAttachments(List.of(attachment(101L)));
+        Long sourceId = noticeService.createNotice(request, USER_ID);
+        noticeService.publishNotice(sourceId);
+        Long copyId = noticeService.copyNotice(sourceId);
+        request.setId(copyId);
+
+        noticeService.updateNotice(request, 8L);
+        assertEquals(1, attachmentMapper.selectListByNoticeId(copyId).size());
+        request.setAttachments(List.of());
+        noticeService.updateNotice(request, 8L);
+        request.setAttachments(List.of(attachment(101L)));
+
+        assertServiceException(() -> noticeService.updateNotice(request, 8L), NOTICE_ATTACHMENT_INVALID);
+        assertTrue(attachmentMapper.selectListByNoticeId(copyId).isEmpty());
+        assertTrue(attachmentMapper.selectListIncludingDeletedByNoticeId(copyId).get(0).getDeleted());
+        assertEquals(1, attachmentMapper.selectListByNoticeId(sourceId).size());
+    }
+
+    @Test
+    void shouldRollBackDraftChangesWhenAttachmentValidationFails() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        when(fileApi.getFileInfo(102L)).thenReturn(file(102L, USER_ID));
+        when(fileApi.getFileInfo(103L)).thenReturn(file(103L, 8L));
+        NoticeSaveReqVO request = saveRequest("<p>原正文</p>");
+        request.setAttachments(List.of(attachment(101L), attachment(102L)));
+        Long id = noticeService.createNotice(request, USER_ID);
+        List<Long> originalIds = attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getId).toList();
+        request.setId(id);
+        request.setContent("<p>修改正文</p>");
+        request.setAttachments(List.of(attachment(102L), attachment(103L)));
+
+        assertServiceException(() -> noticeService.updateNotice(request, USER_ID), NOTICE_ATTACHMENT_INVALID);
+
+        assertEquals("<p>原正文</p>", noticeMapper.selectById(id).getContent());
+        assertEquals(originalIds, attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getId).toList());
+        assertEquals(2, attachmentMapper.selectListIncludingDeletedByNoticeId(id).size());
+        request.setAttachments(List.of(attachment(101L), attachment(101L)));
+        assertServiceException(() -> noticeService.updateNotice(request, USER_ID), NOTICE_ATTACHMENT_INVALID);
+        assertEquals(originalIds, attachmentMapper.selectListByNoticeId(id).stream()
+                .map(NoticeAttachmentDO::getId).toList());
+    }
+
+    @Test
     void shouldRejectSanitizedEmptyContentWithStableError() {
         when(xssCleaner.clean(anyString())).thenReturn("<script></script>");
         assertServiceException(() -> noticeService.createNotice(saveRequest("<script>bad()</script>"), USER_ID),

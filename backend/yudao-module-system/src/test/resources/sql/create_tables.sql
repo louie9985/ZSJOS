@@ -254,7 +254,8 @@ CREATE TABLE IF NOT EXISTS "system_notice_attachment" (
     "mime_type" varchar(128), "file_size" bigint NOT NULL, "sort" int NOT NULL DEFAULT 0,
     "creator" varchar(64) DEFAULT '', "create_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     "updater" varchar(64) DEFAULT '', "update_time" datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    "deleted" bit NOT NULL DEFAULT 0, "tenant_id" bigint NOT NULL DEFAULT 0, PRIMARY KEY("id")
+    "deleted" bit NOT NULL DEFAULT 0, "tenant_id" bigint NOT NULL DEFAULT 0, PRIMARY KEY("id"),
+    CONSTRAINT "uk_notice_file" UNIQUE ("tenant_id", "notice_id", "infra_file_id")
 );
 
 CREATE TABLE IF NOT EXISTS "system_notice_read" (
