@@ -18,6 +18,7 @@ public class ExamScheduleRespVO {
     private Long productId;
     private String productNameSnapshot;
     private String scheduleName;
+    private String backgroundColor;
     private java.util.Map<String, String> selectedAttrs;
     private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> selectedSpecs;
     private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO.Sku> frozenSkus;
@@ -26,6 +27,7 @@ public class ExamScheduleRespVO {
     private String recordStatus;
     private String displayStatus;
     private String remark;
+    private java.util.List<ExamScheduleAttachmentRespVO> attachments;
     private LocalDateTime publishedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

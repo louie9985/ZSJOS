@@ -19,6 +19,8 @@ public class SalesPerformanceController {
  @GetMapping("/analysis") public CommonResult<Analysis> analysis(@Valid Query q){return success(service.analysis(q));}
  @GetMapping("/history") public CommonResult<List<HistoryMonth>> history(@Valid Query q){return success(service.history(q));}
  @GetMapping("/leads") public CommonResult<LeadReport> leads(@Valid Query q){return success(service.leads(q));}
+ @GetMapping("/lead-workload") public CommonResult<LeadWorkload> leadWorkload(@Valid Query q){return success(service.leadWorkload(q));}
+ @GetMapping("/lead-calendar") public CommonResult<LeadCalendar> leadCalendar(@Valid Query q){return success(service.leadCalendar(q));}
  @GetMapping("/missing-targets") public CommonResult<List<MissingTarget>> missingTargets(@Valid Query q){return success(service.missingTargets(q));}
  @GetMapping("/details") public CommonResult<PageResult<Detail>> details(@Valid Query q){return success(service.details(q));}
 }

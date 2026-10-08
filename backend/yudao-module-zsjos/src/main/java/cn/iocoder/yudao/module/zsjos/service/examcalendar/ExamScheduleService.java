@@ -34,6 +34,14 @@ import static cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleObj
 
 @Service
 public class ExamScheduleService {
+
+    public PageResult<ExamScheduleRespVO> search(ExamCalendarSearchReqVO req, Long userId) {
+        boolean manager = hasManagePermission(userId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        var page = mapper.selectSearch(req, manager, now);
+        return new PageResult<>(page.getList().stream().map(row -> toResponse(row, userId, manager, now)).toList(), page.getTotal());
+    }
+
     public static final String PERMISSION_MANAGE = "zsjos:exam-calendar:manage";
     public static final String UPCOMING_DAYS_CONFIG_KEY = "zsjos.exam-calendar.upcoming-days";
     public static final int DEFAULT_UPCOMING_DAYS = 3;
@@ -42,6 +50,7 @@ public class ExamScheduleService {
     private static final Set<String> TYPES = Set.of("EXACT", "MULTI_DAY");
 
     @Resource private ExamScheduleMapper mapper;
+    @Resource private ExamScheduleAttachmentService attachmentService;
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private PermissionApi permissionApi;
     @Resource private ConfigApi configApi;
@@ -97,6 +106,9 @@ public class ExamScheduleService {
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT))
                 .setRecordStatus("DRAFT").setCalendarVersion(1);
         applyFreeName(schedule, req);
+        schedule.setBackgroundColor(normalizeBackgroundColor(req.getBackgroundColor()));
+        if (req.getAttachmentIds() != null)
+            schedule.setAttachmentIdsJson(attachmentService.validate(req.getAttachmentIds(), null, userId));
         normalizeDates(schedule);
         mapper.insert(schedule);
         notificationSnapshots.captureExam(schedule, "CREATED");
@@ -109,19 +121,22 @@ public class ExamScheduleService {
         requireManage(userId);
         ExamScheduleDO current = requireExists(id);
         if (!"DRAFT".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
-        if (endDate(current) != null && endDate(current).isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
         validateSchedule(req);
-        rejectPastEndDate(req);
         ExamScheduleDO update = BeanUtils.toBean(req, ExamScheduleDO.class)
                 .setId(id)
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT));
         applyFreeName(update, req);
+        update.setBackgroundColor(req.getBackgroundColor() == null ? current.getBackgroundColor()
+                : normalizeBackgroundColor(req.getBackgroundColor()));
+        update.setAttachmentIdsJson(req.getAttachmentIds() == null ? current.getAttachmentIdsJson()
+                : attachmentService.validate(req.getAttachmentIds(), current.getAttachmentIdsJson(), userId));
         normalizeDates(update);
         int version = current.getCalendarVersion() == null ? 1 : current.getCalendarVersion();
         update.setCalendarVersion(sameNotificationContent(current, update) ? version : version + 1);
         notificationSnapshots.captureExam(current, "MANUAL");
         // Clear obsolete catalog links explicitly; MyBatis skips null entity fields.
         mapper.update(update, new LambdaUpdateWrapper<ExamScheduleDO>().eq(ExamScheduleDO::getId, id)
+                .set(ExamScheduleDO::getBackgroundColor, update.getBackgroundColor())
                 .set(ExamScheduleDO::getExactDate, update.getExactDate())
                 .set(ExamScheduleDO::getStartDate, update.getStartDate())
                 .set(ExamScheduleDO::getEndDate, update.getEndDate())
@@ -133,6 +148,7 @@ public class ExamScheduleService {
                 .set(ExamScheduleDO::getProductNameSnapshot, update.getProductNameSnapshot())
                 .set(ExamScheduleDO::getSelectedAttrsJson, update.getSelectedAttrsJson())
                 .set(ExamScheduleDO::getSelectedSpecsJson, update.getSelectedSpecsJson())
+                .set(ExamScheduleDO::getAttachmentIdsJson, update.getAttachmentIdsJson())
                 .set(ExamScheduleDO::getRemark, update.getRemark()));
         update.setRecordStatus(current.getRecordStatus());
         notificationSnapshots.captureExam(update, "UPDATED");
@@ -193,7 +209,9 @@ public class ExamScheduleService {
     }
 
     private ExamScheduleReeditRespVO reeditContent(ExamScheduleDO row) {
-        return BeanUtils.toBean(row, ExamScheduleReeditRespVO.class).setScheduleName(displayName(row));
+        return BeanUtils.toBean(row, ExamScheduleReeditRespVO.class).setScheduleName(displayName(row))
+                .setAttachments(ExamScheduleAttachmentService.ids(row.getAttachmentIdsJson()).isEmpty()
+                        ? List.of() : attachmentService.describe(row.getAttachmentIdsJson()));
     }
 
     public ExamScheduleDO previewTransition(Long id, String event, Long userId) {
@@ -226,6 +244,8 @@ public class ExamScheduleService {
                 && Objects.equals(before.getCategoryPathSnapshot(), after.getCategoryPathSnapshot())
                 && parseAttrs(before.getSelectedAttrsJson()).equals(parseAttrs(after.getSelectedAttrsJson()))
                 && Objects.equals(before.getSelectedSpecsJson(), after.getSelectedSpecsJson())
+                && ExamScheduleAttachmentService.ids(before.getAttachmentIdsJson()).equals(
+                        ExamScheduleAttachmentService.ids(after.getAttachmentIdsJson()))
                 && Objects.equals(before.getRemark(), after.getRemark());
     }
 
@@ -267,6 +287,8 @@ public class ExamScheduleService {
         response.setCategoryNameSnapshot(schedule.getCategoryNameSnapshot()); response.setProductId(schedule.getProductId());
         response.setProductNameSnapshot(schedule.getProductNameSnapshot()); response.setRecordStatus(schedule.getRecordStatus());
         response.setRemark(schedule.getRemark()); response.setPublishedAt(schedule.getPublishedAt());
+        response.setAttachments(ExamScheduleAttachmentService.ids(schedule.getAttachmentIdsJson()).isEmpty()
+                ? List.of() : attachmentService.describe(schedule.getAttachmentIdsJson()));
         response.setCreateTime(schedule.getCreateTime()); response.setUpdateTime(schedule.getUpdateTime());
         response.setCalendarVersion(schedule.getCalendarVersion() == null ? 1 : schedule.getCalendarVersion());
         response.setCategoryPathSnapshot(schedule.getCategoryPathSnapshot() == null ? List.of()
@@ -278,6 +300,7 @@ public class ExamScheduleService {
         response.setFrozenSkus(schedule.getFrozenSkusJson() == null ? List.of()
                 : JsonUtils.parseArray(schedule.getFrozenSkusJson(), ExamProductScopeRespVO.Sku.class));
         response.setScheduleName(displayName(schedule));
+        response.setBackgroundColor(schedule.getBackgroundColor());
         return response;
     }
 
@@ -314,7 +337,12 @@ public class ExamScheduleService {
         return List.copyOf(path);
     }
 
+    private String normalizeBackgroundColor(String color) {
+        return color == null || color.isEmpty() ? null : color.toUpperCase(Locale.ROOT);
+    }
+
     private void validateSchedule(ExamScheduleSaveReqVO req) {
+        cn.iocoder.yudao.framework.common.util.validation.ValidationUtils.validate(req);
         String type = req.getScheduleType() == null ? "" : req.getScheduleType().toUpperCase(Locale.ROOT);
         if (!TYPES.contains(type)) throw exception(EXAM_SCHEDULE_TYPE_INVALID);
         if ("EXACT".equals(type)) {
@@ -325,6 +353,7 @@ public class ExamScheduleService {
                 || req.getEndDate().isBefore(req.getStartDate())) {
             throw exception(EXAM_SCHEDULE_TIME_INVALID);
         }
+        rejectPastEndDate(req);
     }
 
     private void validateQueryRange(ExamSchedulePageReqVO req) {
@@ -334,7 +363,7 @@ public class ExamScheduleService {
 
     private void rejectPastEndDate(ExamScheduleSaveReqVO req) {
         LocalDate end = "EXACT".equalsIgnoreCase(req.getScheduleType()) ? req.getExactDate() : req.getEndDate();
-        if (end.isBefore(today())) throw exception(EXAM_SCHEDULE_ENDED_IMMUTABLE);
+        if (end.isBefore(today())) throw exception(EXAM_SCHEDULE_DATE_IN_PAST);
     }
 
     private void normalizeDates(ExamScheduleDO schedule) {

@@ -16,12 +16,12 @@ public class LeadCreateReqVO {
     @Size(max = 64) private String wechatId;
     @NotBlank @Size(max = 32) private String provinceCode;
     @NotBlank @Size(max = 32) private String cityCode;
-    @Valid @Size(max = 20) private List<LeadProductReqVO> products;
-    @Valid @Size(max = 20) private List<LeadProductReqVO> intendedProducts;
+    @Size(max = 20) private List<@Valid LeadProductReqVO> products;
+    @Size(max = 20) private List<@Valid LeadProductReqVO> intendedProducts;
     @NotBlank @Size(max = 64) private String sourceChannel;
     @NotBlank @Size(max = 64) private String leadCategory;
     @Size(max = 1000) private String remark;
-    @Valid @Size(max = 9) private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
+    @Size(max = 9) private List<@Valid LeadAttachmentReqVO> attachments = new ArrayList<>();
     @NotBlank private String dispatchMode = "auto";
     private Long specifiedSalesUserId;
     // Server-resolved snapshot. All public submission entries discard client values.

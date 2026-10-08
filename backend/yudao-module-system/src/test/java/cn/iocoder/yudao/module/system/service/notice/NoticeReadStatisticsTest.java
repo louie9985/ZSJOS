@@ -38,6 +38,10 @@ class NoticeReadStatisticsTest extends BaseDbUnitTest {
     @MockitoBean private AdminUserService users;
     @MockitoBean private PermissionService permissions;
     @BeforeEach void tenant() {
+        AdminUserDO publisher = new AdminUserDO(); publisher.setId(900L); publisher.setNickname("测试发布人"); publisher.setDeptId(900L);
+        DeptDO origin = new DeptDO(); origin.setId(900L); origin.setName("测试来源部门");
+        when(users.getUser(900L)).thenReturn(publisher);
+        when(departments.getDept(900L)).thenReturn(origin);
         TenantContextHolder.setTenantId(0L);
         jdbc = new org.springframework.jdbc.core.JdbcTemplate(dataSource);
     }
@@ -99,7 +103,7 @@ class NoticeReadStatisticsTest extends BaseDbUnitTest {
         when(users.getUserList(Set.of(7L))).thenReturn(List.of(user));
         when(departments.getDeptMap(Set.of(10L))).thenReturn(Map.of(10L, dept));
         NoticeDO draft = notice("ALL", false, "DRAFT");
-        service.publishNotice(draft.getId());
+        service.publishNotice(draft.getId(), 900L);
         assertTrue(notices.selectById(draft.getId()).getRecipientSnapshotComplete());
         user.setNickname("新姓名"); dept.setName("新部门");
         assertEquals("发布姓名", recipients.selectListByNoticeId(draft.getId()).getFirst().getUserNameSnapshot());
@@ -139,13 +143,13 @@ class NoticeReadStatisticsTest extends BaseDbUnitTest {
     @Test void zeroRecipientPublicationCompletesAndResolutionFailureLeavesDraft() {
         NoticeDO empty = notice("ALL", false, "DRAFT");
         when(permissions.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of());
-        service.publishNotice(empty.getId());
+        service.publishNotice(empty.getId(), 900L);
         var result = service.getReadSummary(empty.getId());
         assertTrue(result.getRosterComplete()); assertEquals(0L, result.getExpectedCount()); assertNull(result.getReadRate());
         NoticeDO failed = notice("ALL", false, "DRAFT");
         when(permissions.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of(7L));
         when(users.getUserList(Set.of(7L))).thenThrow(new IllegalStateException("profile resolution unavailable"));
-        assertThrows(IllegalStateException.class, () -> service.publishNotice(failed.getId()));
+        assertThrows(IllegalStateException.class, () -> service.publishNotice(failed.getId(), 900L));
         assertEquals("DRAFT", notices.selectById(failed.getId()).getPublishStatus());
         assertFalse(notices.selectById(failed.getId()).getRecipientSnapshotComplete());
         assertEquals(0L, recipients.selectCountByNoticeId(failed.getId()));

@@ -10,6 +10,7 @@ import { NOTIFY_MESSAGE_CHANGED_EVENT } from '@/utils/notifyMessage'
 import { ElNotification } from 'element-plus'
 import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as FeedbackApi from '@/api/zsjos/feedback'
+import { feedbackUrgeTaskTarget, isFeedbackUrgeNotification } from '@/utils/feedbackUrgeNotification'
 
 defineOptions({ name: 'Message' })
 
@@ -90,6 +91,15 @@ const showPersistedNotification = async (messageId: number) => {
         notification.close()
         if (!detail.readStatus) await NotifyMessageApi.updateNotifyMessageRead(detail.id)
         emitter.emit(NOTIFY_MESSAGE_CHANGED_EVENT)
+        if (isFeedbackUrgeNotification(detail)) {
+          try {
+            await router.push(await feedbackUrgeTaskTarget(detail))
+          } catch {
+            message.warning('审批任务已结束、已转交或暂时无法访问，已打开消息详情')
+            await router.push({ path: '/user/notify-message', query: { messageId: String(detail.id) } })
+          }
+          return
+        }
         if (detail.actionType === 'business_detail' && detail.bizType === 'withdrawal' && detail.bizId) {
           await router.push({ path: '/zsjos/withdrawal', query: { withdrawalId: detail.bizId } })
           return

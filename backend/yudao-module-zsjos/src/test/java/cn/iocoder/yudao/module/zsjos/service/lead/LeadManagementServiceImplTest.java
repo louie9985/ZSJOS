@@ -69,6 +69,7 @@ class LeadManagementServiceImplTest {
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Mock
     private LeadMapper leadMapper;
+    @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Mock
     private LeadIntendedProductMapper intendedProductMapper;
     @Mock
@@ -104,6 +105,20 @@ class LeadManagementServiceImplTest {
     private PartnerMapper partnerMapper;
     @Mock
     private BusinessTaskMapper businessTaskMapper;
+
+    @Test
+    void educationRestoreProjectionNeedsPermissionAndManagedOwner() {
+        LeadDO lead = actionLead("suspended", "owned", true);
+        lead.setOwnerIdentity("education"); lead.setSourceType("education_self_sourced");
+        assertActions(lead, null);
+        when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
+        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
+        assertActions(lead, null);
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-restore")).thenReturn(true);
+        assertActions(lead, null, "SUPERVISOR_RESTORE");
+        when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of());
+        assertActions(lead, null);
+    }
 
     @Test
     void pageTimestampsUsePendingReminderAndLatestFirstPurchase() {
@@ -597,15 +612,15 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void suspendedRestoreActionRequiresEligibleSalesOwner() {
+    void suspendedRestoreActionRequiresEligibleOwner() {
         LeadDO lead = actionLead("suspended", "owned", true);
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
         when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-restore")).thenReturn(true);
 
-        when(leadAssignmentService.isEligibleSalesUser(20L)).thenReturn(false);
+        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(false);
         assertActions(lead, null);
 
-        when(leadAssignmentService.isEligibleSalesUser(20L)).thenReturn(true);
+        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
         assertActions(lead, null, "SUPERVISOR_RESTORE");
     }
 

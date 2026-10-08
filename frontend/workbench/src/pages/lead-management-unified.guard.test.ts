@@ -62,7 +62,7 @@ describe('unified Lead management route', () => {
     const panel = readFileSync('src/components/LeadFollowUpPanel.tsx', 'utf8')
 
     expect(detail).toContain('setFollowUpRefreshVersion(current => current + 1)')
-    expect(detail).toContain('refreshVersion={followUpRefreshVersion}')
+    expect(detail).toContain('refreshVersion={refreshVersion + followUpRefreshVersion}')
     expect(detail).toContain('onSuccess={handleStandaloneFollowUpSuccess}')
     expectSourceToContainTokens(panel, 'useEffect(() => { void loadRecords() }, [loadRecords, refreshVersion])')
   })

@@ -45,7 +45,8 @@ export default {
   },
   upload: async <T = any>(option: any) => {
     option.headersType = 'multipart/form-data'
-    const res = await request({ method: 'POST', ...option })
+    const timeout = option.timeout === 0 ? 0 : Math.max(option.timeout || 0, 10 * 60 * 1000)
+    const res = await request({ method: 'POST', ...option, timeout })
     return res as unknown as Promise<T>
   }
 }

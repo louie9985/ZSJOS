@@ -1,3 +1,4 @@
+import { noticeAudienceText } from '../services/noticeManagement'
 import { Alert, App, Button, Input, Modal, Select, Space, Spin } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import BusinessTable from '../components/BusinessTable'
@@ -60,12 +61,15 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
   }
   return <>
     <BusinessTable<ManagedNotice> tableKey="announcement-management" rowKey="id" loading={loading} dataSource={rows} error={error} unauthorized={unauthorized || !allowed} onReload={() => void load()}
-      filters={<Space wrap><Input.Search allowClear placeholder="搜索公告标题" onSearch={title => setQuery(current => ({ ...current, pageNo: 1, title: title || undefined }))} />
+      filters={<Space wrap><Input.Search allowClear placeholder="搜索标题、来源部门或发布人" onSearch={title => setQuery(current => ({ ...current, pageNo: 1, title: title || undefined }))} />
         <Select allowClear placeholder="全部发布状态" style={{ width: 160 }} value={query.publishStatus} options={Object.entries(NOTICE_STATUSES).map(([value, label]) => ({ value, label }))} onChange={publishStatus => setQuery(current => ({ ...current, pageNo: 1, publishStatus }))} /></Space>}
       actions={noticePermission(permissions, 'create') && <Button type="primary" onClick={() => setEditor({})}>新建公告</Button>}
       pagination={{ current: query.pageNo, pageSize: query.pageSize, total, showSizeChanger: true, onChange: (pageNo, pageSize) => setQuery(current => ({ ...current, pageNo: current.pageSize === pageSize ? pageNo : 1, pageSize })) }} scroll={{ x: 1100 }}
       columns={[
         { title: '公告标题', dataIndex: 'title', width: 260 },
+        { title: '文章来源', dataIndex: 'sourceDeptName', width: 160, render: value => value || '未记录' },
+        { title: '发布人', dataIndex: 'publisherName', width: 110, render: (value, row) => row.publishStatus === 'DRAFT' ? '待发布' : value || '未记录' },
+        { title: '接收部门/人员', width: 230, ellipsis: true, render: (_, row) => noticeAudienceText(row) },
         { title: '发布状态', dataIndex: 'publishStatus', render: (_, row) => NOTICE_STATUSES[row.publishStatus] },
         { title: '附件数量', key: 'attachments', render: (_, row) => row.attachments?.length || 0 },
         { title: '发布时间', dataIndex: 'publishTime', render: (_, row) => <DateTimeText value={row.publishTime} /> },
@@ -80,7 +84,7 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
         </Space> } }
       ]} />
     <Modal open={detailId != null} title="公告详情" width={800} footer={null} onCancel={() => { detailGeneration.current++; setDetailId(undefined); setDetail(undefined) }}>
-      {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId != null && void view(detailId)}>重试</Button>} /> : detail && <NoticeManagementDetail notice={detail} />}
+      {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId != null && void view(detailId)}>重试</Button>} /> : detail && <NoticeManagementDetail notice={detail} permissions={permissions} />}
     </Modal>
     {editor && <NoticeEditorDialog initial={editor.initial} permissions={permissions} onClose={() => setEditor(undefined)} onChanged={() => void load()} />}
   </>

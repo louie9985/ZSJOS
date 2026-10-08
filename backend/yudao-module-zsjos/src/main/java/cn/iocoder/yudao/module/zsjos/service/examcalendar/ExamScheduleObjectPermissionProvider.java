@@ -40,6 +40,14 @@ public class ExamScheduleObjectPermissionProvider implements ZsjosObjectPermissi
             try { return notificationAccess.checkForUser("EXAM", false, userId); }
             catch (cn.iocoder.yudao.framework.common.exception.ServiceException denied) { return false; }
         }
+        if ("read-attachment".equals(action)) {
+            if (!permissionApi.hasAnyPermissions(userId, "zsjos:exam-calendar:query")) return false;
+            if ("PUBLISHED".equals(row.getRecordStatus())) return true;
+            if (!permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE)) return false;
+            return "DRAFT".equals(row.getRecordStatus()) || ("REVOKED".equals(row.getRecordStatus())
+                    && row.getReeditClaimedAt() == null && row.getRevokedAt() != null
+                    && row.getRevokedAt().plusMinutes(5).isAfter(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))));
+        }
         return permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE)
                 && ("update".equals(action) || "publish".equals(action) || "revoke".equals(action) || "maintain".equals(action));
     }

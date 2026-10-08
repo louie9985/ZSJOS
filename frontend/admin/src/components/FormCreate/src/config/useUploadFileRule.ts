@@ -1,4 +1,5 @@
 import { generateUUID } from '@/utils'
+import { DEFAULT_UPLOAD_FILE_TYPES } from '@/components/UploadFile/src/fileTypes'
 import { localeProps, makeRequiredRule } from '@/components/FormCreate/src/utils'
 
 export const useUploadFileRule = () => {
@@ -14,6 +15,7 @@ export const useUploadFileRule = () => {
         field: generateUUID(),
         title: label,
         info: '',
+        props: { fileType: [...DEFAULT_UPLOAD_FILE_TYPES], fileSize: 100 },
         $required: false
       }
     },
@@ -24,14 +26,8 @@ export const useUploadFileRule = () => {
           type: 'select',
           field: 'fileType',
           title: '文件类型',
-          value: ['doc', 'xls', 'ppt', 'txt', 'pdf'],
-          options: [
-            { label: 'doc', value: 'doc' },
-            { label: 'xls', value: 'xls' },
-            { label: 'ppt', value: 'ppt' },
-            { label: 'txt', value: 'txt' },
-            { label: 'pdf', value: 'pdf' }
-          ],
+          value: [...DEFAULT_UPLOAD_FILE_TYPES],
+          options: DEFAULT_UPLOAD_FILE_TYPES.map((type) => ({ label: type, value: type })),
           props: {
             multiple: true
           }
@@ -58,7 +54,7 @@ export const useUploadFileRule = () => {
           type: 'inputNumber',
           field: 'fileSize',
           title: '大小限制(MB)',
-          value: 5,
+          value: 100,
           props: { min: 0 }
         },
         {

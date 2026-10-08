@@ -14,6 +14,5 @@ public class MaterialReferencePreviewReqVO {
     private Long targetContentVersionId;
     @NotEmpty
     @Size(max = 100)
-    @Valid
-    private List<MaterialReferenceFieldReqVO> fields;
+    private List<@Valid MaterialReferenceFieldReqVO> fields;
 }

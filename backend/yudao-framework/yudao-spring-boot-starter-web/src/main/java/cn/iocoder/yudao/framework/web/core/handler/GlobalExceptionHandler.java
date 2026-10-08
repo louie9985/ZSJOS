@@ -39,7 +39,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import tools.jackson.databind.exc.InvalidFormatException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -186,15 +185,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @SuppressWarnings("PatternVariableCanBeUsed")
     public CommonResult<?> methodArgumentTypeInvalidFormatExceptionHandler(HttpMessageNotReadableException ex) {
-        log.warn("[methodArgumentTypeInvalidFormatExceptionHandler]", ex);
-        if (ex.getCause() instanceof InvalidFormatException) {
-            InvalidFormatException invalidFormatException = (InvalidFormatException) ex.getCause();
-            return CommonResult.error(BAD_REQUEST.getCode(), String.format("请求参数类型错误:%s", invalidFormatException.getValue()));
-        }
-        if (StrUtil.startWith(ex.getMessage(), "Required request body is missing")) {
-            return CommonResult.error(BAD_REQUEST.getCode(), "请求参数类型错误: request body 缺失");
-        }
-        return defaultExceptionHandler(ServletUtils.getRequest(), ex);
+        // Deserializer exceptions can contain submitted values; do not echo or log the payload.
+        log.warn("[methodArgumentTypeInvalidFormatExceptionHandler][invalid request body]");
+        return CommonResult.error(BAD_REQUEST.getCode(), "请求参数类型或格式错误，请检查请求体");
     }
 
     /**

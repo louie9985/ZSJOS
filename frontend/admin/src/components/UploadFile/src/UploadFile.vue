@@ -32,6 +32,7 @@
         <div style="font-size: 8px">
           格式为 <b style="color: #f56c6c">{{ fileType.join('/') }}</b> 的文件
         </div>
+        <div v-if="fileSize > 0">单个文件不超过 {{ fileSize }} MB</div>
         <div style="font-size: 12px">可通过“上传剪贴板截图”直接读取截图</div>
       </template>
       <template #file="row">
@@ -68,6 +69,7 @@ import { useUpload } from '@/components/UploadFile/src/useUpload'
 import { UploadFile } from 'element-plus/es/components/upload/src/upload'
 import AttachmentItem from './AttachmentItem.vue'
 import ClipboardUploadActions from './ClipboardUploadActions.vue'
+import { DEFAULT_UPLOAD_FILE_TYPES } from './fileTypes'
 
 defineOptions({ name: 'UploadFile' })
 
@@ -76,7 +78,8 @@ const emit = defineEmits(['update:modelValue', 'uploading-change'])
 
 const props = defineProps({
   modelValue: propTypes.oneOfType<string | string[]>([String, Array<String>]).isRequired,
-  fileType: propTypes.array.def(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'pdf']), // 文件类型, 例如['png', 'jpg', 'jpeg']
+  fileType: propTypes.array.def(() => [...DEFAULT_UPLOAD_FILE_TYPES]),
+  fileSize: propTypes.number.def(100),
   limit: propTypes.number.def(5), // 数量限制
   autoUpload: propTypes.bool.def(true), // 自动上传
   drag: propTypes.bool.def(false), // 拖拽上传
@@ -116,6 +119,10 @@ const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
     props.fileType.some((type: string) => type.toLowerCase() === fileExtension)
   if (!isImg) {
     message.error(`文件格式不正确, 请上传${props.fileType.join('/')}格式!`)
+    return false
+  }
+  if (props.fileSize > 0 && file.size > props.fileSize * 1024 * 1024) {
+    message.error(`文件大小不能超过 ${props.fileSize} MB`)
     return false
   }
   message.success('正在上传文件，请稍候...')

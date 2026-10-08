@@ -230,7 +230,7 @@ public interface LeadConstants {
     String PERMISSION_APPEAL_REVIEW_QUALITY = "zsjos:lead:appeal:review-quality";
     String PERMISSION_APPEAL_REVIEW_CHAIRMAN = "zsjos:lead:appeal:review-chairman";
     int MAX_ATTACHMENTS = 9;
-    long MAX_ATTACHMENT_SIZE = 10L * 1024 * 1024;
+    long MAX_ATTACHMENT_SIZE = 100L * 1024 * 1024;
     int ATTACHMENT_URL_EXPIRATION_SECONDS = 600;
 
 }

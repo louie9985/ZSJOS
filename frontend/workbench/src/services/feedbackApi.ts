@@ -1,8 +1,24 @@
 import { createIdempotencyKey } from './idempotency'
-import { http, unwrap, type PageResult } from './api'
+import { http, unwrap, type PageResult, type BpmTask } from './api'
 import type { Timestamp } from './time'
 
 export type FeedbackType = 'REQUIREMENT' | 'BUG' | 'SUPPORT'
+export type FeedbackApprovalTask = {
+  id: string; name: string; nodeId?: string; assigneeUserId?: number; assigneeName?: string; createTime?: Timestamp
+}
+export type FeedbackApprovalSummary = { availability: 'AVAILABLE' | 'UNAVAILABLE'; currentTasks: FeedbackApprovalTask[] }
+export type FeedbackApproval = {
+  roundNo: number; latestRoundNo: number; version: number
+  rounds: Array<{ roundNo: number; status: string; submittedAt: Timestamp }>
+  availability: 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_REQUIRED'; unavailableReason?: string
+  fields: FeedbackField[]; values: Record<string, unknown>
+  lastUrgedAt?: Timestamp; nextUrgeAt?: Timestamp; canUrge: boolean
+  progress?: { status: number; currentTasks: FeedbackApprovalTask[]; nodes: Array<{
+    id: string; name: string; status?: number; startTime?: Timestamp; endTime?: Timestamp
+    candidates: Array<{ id: number; name?: string }>
+    tasks: Array<{ id: string; parentTaskId?: string; status?: number; assigneeName?: string; ownerName?: string; createTime?: Timestamp; endTime?: Timestamp; reason?: string }>
+  }> }
+}
 export type FeedbackStatus =
   | 'APPROVING'
   | 'APPROVAL_REJECTED'
@@ -53,6 +69,8 @@ export type FeedbackReply = {
 }
 
 export type FeedbackRecord = {
+  processInstanceId?: string
+  approvalSummary?: FeedbackApprovalSummary
   id: number
   feedbackType: FeedbackType
   feedbackNo: string
@@ -106,6 +124,11 @@ const createPath: Record<FeedbackType, string> = {
 }
 
 export const feedbackApi = {
+  approvalTask: async (id: string) => unwrap<BpmTask>(await http.get('/bpm/task/get-todo', { params: { id } })),
+  approval: async (id: number, roundNo?: number, approver = false) =>
+    unwrap<FeedbackApproval>(await http.get(`/zsjos/feedback/${id}/${approver ? 'approver-view/' : ''}approval`, { params: { roundNo } })),
+  urge: async (id: number, version: number, roundNo: number, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/feedback/${id}/urge`, { version, roundNo, idempotencyKey })),
   portal: async () => unwrap<FeedbackPortal>(await http.get('/zsjos/feedback/portal')),
   form: async (type: FeedbackType) =>
     unwrap<FeedbackForm>(await http.get('/zsjos/feedback/form', { params: { type } })),

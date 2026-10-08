@@ -73,6 +73,10 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FeedbackServiceImplTest {
+    @org.mockito.Spy private FeedbackApprovalService approvalService = new FeedbackApprovalService() {
+        @Override public java.util.List<cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackRespVO> enrich(
+                java.util.List<cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackRespVO> rows) { return rows; }
+    };
 
     @Mock private FeedbackMapper feedbackMapper;
     @Mock private FeedbackRoundMapper roundMapper;
@@ -159,6 +163,24 @@ class FeedbackServiceImplTest {
         verify(fileApi).presignGetUrl(3L, null);
         verify(fileApi).getFileInfo(3L);
         verify(feedbackMapper, never()).updateById(any(FeedbackDO.class));
+    }
+
+    @Test
+    void approverDetailDoesNotLeakTheLatestRoundOrConversations() {
+        var row = feedback(FeedbackConstants.TYPE_REQUIREMENT, FeedbackConstants.STATUS_APPROVING);
+        row.setApprovalRoundNo(2); row.setValueSnapshotJson("{\"newSecret\":\"new round\"}");
+        row.setLastReplySummary("latest discussion");
+        when(feedbackMapper.selectById(row.getId())).thenReturn(row);
+        var round = new cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackRoundDO();
+        round.setRoundNo(1); round.setStatus(FeedbackConstants.STATUS_APPROVAL_REJECTED); round.setProcessInstanceId("old-process");
+        when(roundMapper.selectByFeedbackId(row.getId())).thenReturn(List.of(round));
+        var projection = new cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackApprovalRespVO();
+        projection.setRoundNo(1);projection.setFields(List.of());projection.setValues(Map.of("old","original"));
+        org.mockito.Mockito.doReturn(projection).when(approvalService).getApprover(row.getId(),null,99L);
+        var result = service.getForApprover(row.getId(),99L);
+        assertEquals(Map.of("old","original"),result.getValues()); assertEquals(1,result.getApprovalRoundNo());
+        assertEquals("old-process",result.getProcessInstanceId());assertEquals(null,result.getLatestReplySummary());
+        assertEquals(null,result.getReplies());verify(replyMapper,never()).selectByFeedbackId(anyLong());
     }
 
     @Test

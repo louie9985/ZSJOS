@@ -39,6 +39,16 @@
 .announcement-rich-text { padding: var(--crm-sp-5) 0; line-height: 1.8; overflow-wrap: anywhere; }
 .announcement-rich-text img { display: block; max-width: 100%; height: auto; margin: var(--crm-sp-4) auto; }
 .announcement-rich-text a { color: var(--crm-color-primary); }
+.announcement-rich-text--tables { min-width: 0; max-width: 100%; }
+.announcement-table-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; margin-block: var(--crm-sp-3); }
+.announcement-table-scroll:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.announcement-rich-text--tables table { border-collapse: collapse; }
+.announcement-rich-text--tables td, .announcement-rich-text--tables th { box-sizing: border-box; border: 1px solid var(--crm-border); padding: var(--crm-sp-2); line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+.announcement-rich-text--tables th { background: var(--crm-bg-sunken); }
+/* Loaded tables can lack the editor's transient height metadata until selection.
+   Anchor column hit areas to the actual table container instead. */
+.notice-rich-text-editor .w-e-text-container [data-slate-editor] .column-resizer { height: 100%; pointer-events: none; }
+.notice-rich-text-editor .w-e-text-container [data-slate-editor] .resizer-line-hotzone { height: 100% !important; pointer-events: auto; }
 .announcement-files { padding-top: var(--crm-sp-4); border-top: 1px solid var(--crm-border); }
 .announcement-file { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--crm-sp-3); min-height: 44px; padding: 0 var(--crm-sp-3); color: var(--crm-text); border-radius: var(--crm-radius-sm); background: var(--crm-bg-sunken); }
 .announcement-file + .announcement-file { margin-top: var(--crm-sp-2); }
@@ -51,3 +61,6 @@
   .announcement-list-pane { height: calc(100vh - var(--crm-header-h) - 110px); }
   .announcement-detail-pane { display: none; }
 }
+
+.notice-origin-meta { display: flex; flex-wrap: wrap; gap: var(--crm-sp-1) var(--crm-sp-4); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; text-align: left; }
+.notice-origin-meta > span { min-width: 0; }

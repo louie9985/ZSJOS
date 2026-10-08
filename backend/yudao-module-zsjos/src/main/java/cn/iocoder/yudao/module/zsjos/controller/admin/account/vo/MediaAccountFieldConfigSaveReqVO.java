@@ -11,5 +11,5 @@ import java.util.List;
 public class MediaAccountFieldConfigSaveReqVO {
     @NotNull private Long id;
     @NotNull private Integer version;
-    @Valid @NotEmpty private List<MediaAccountFieldConfigRespVO.FieldVO> fields;
+    @NotEmpty private List<MediaAccountFieldConfigRespVO.@Valid FieldVO> fields;
 }

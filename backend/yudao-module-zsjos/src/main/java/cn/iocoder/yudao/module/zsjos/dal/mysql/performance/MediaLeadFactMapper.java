@@ -8,6 +8,9 @@ import java.util.List;
 
 @Mapper
 public interface MediaLeadFactMapper {
+    // 单笔订单总金额（元）达到门槛才计成交；总览与明细共用，不跨订单累计。
+    String CONVERSION_AMOUNT_CONDITION = " AND o.total_amount &gt;= 1280 ";
+
     @Select("""
         <script>
         SELECT l.id,l.lead_no leadNo,l.contribution_user_id_snapshot userId,
@@ -43,6 +46,7 @@ public interface MediaLeadFactMapper {
         JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=0
         WHERE o.tenant_id=#{tenantId} AND o.deleted=0 AND o.status='effective'
           AND o.order_type &lt;&gt; 'repurchase' AND o.lead_id IS NOT NULL AND o.effective_at IS NOT NULL
+        """ + CONVERSION_AMOUNT_CONDITION + """
           AND l.contribution_user_id_snapshot IS NOT NULL AND l.submitted_at IS NOT NULL
         <choose>
           <when test="scopeType == 'USER'">AND l.contribution_user_id_snapshot=#{scopeId}</when>

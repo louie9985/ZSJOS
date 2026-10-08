@@ -383,7 +383,7 @@ const emptyField = (type: ForcedFormFieldType): ForcedFormField => ({
   type,
   required: true,
   ...(type === 'text' || type === 'textarea' ? { maxLength: type === 'text' ? 200 : 1000 } : {}),
-  ...(type === 'attachment' ? { maxCount: 1, maxSizeMb: 20, allowedExtensions: ['pdf', 'jpg', 'png'] } : {})
+  ...(type === 'attachment' ? { maxCount: 1, maxSizeMb: 100, allowedExtensions: ['pdf', 'jpg', 'png'] } : {})
 })
 const addField = (type: ForcedFormFieldType) => form.fields.push(emptyField(type))
 const moveField = (index: number, offset: number) => {
@@ -402,7 +402,7 @@ const normalizeField = (field: ForcedFormField) => {
   if (field.type === 'textarea') field.maxLength = 1000
   if (field.type === 'attachment') {
     field.maxCount = 1
-    field.maxSizeMb = 20
+    field.maxSizeMb = 100
     field.allowedExtensions = ['pdf', 'jpg', 'png']
   }
 }

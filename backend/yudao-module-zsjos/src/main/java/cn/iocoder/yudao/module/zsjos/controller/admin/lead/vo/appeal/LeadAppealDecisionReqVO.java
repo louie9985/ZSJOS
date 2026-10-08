@@ -14,5 +14,5 @@ public class LeadAppealDecisionReqVO {
     @NotBlank private String taskId;
     @NotBlank @Size(max = 1000) private String reason;
     @NotBlank @Size(max = 100) private String idempotencyKey;
-    @Valid @Size(max = 9) private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
+    @Size(max = 9) private List<@Valid LeadAttachmentReqVO> attachments = new ArrayList<>();
 }

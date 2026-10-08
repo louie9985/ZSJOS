@@ -7,6 +7,14 @@ import java.util.List;
 
 @Mapper
 public interface LeadCalendarMapper {
+
+    @SelectProvider(type = LeadCalendarSearchSql.class, method = "page")
+    List<DueLead> searchPage(@Param("req") cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.calendar.LeadCalendarSearchReqVO req,
+            @Param("tenantId") Long tenantId, @Param("userId") Long userId, @Param("offset") long offset);
+    @SelectProvider(type = LeadCalendarSearchSql.class, method = "count")
+    long searchCount(@Param("req") cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.calendar.LeadCalendarSearchReqVO req,
+            @Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
     @Data
     class DueLead {
         private Long id;

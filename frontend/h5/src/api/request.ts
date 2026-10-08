@@ -35,6 +35,10 @@ const request = axios.create({
 
 // 请求拦截器
 request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // 大附件上传需独立于普通 API 的短超时；保留显式无限或更长超时。
+  if (config.data instanceof FormData && config.timeout !== 0) {
+    config.timeout = Math.max(config.timeout || 0, 10 * 60 * 1000)
+  }
   const token = getToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`

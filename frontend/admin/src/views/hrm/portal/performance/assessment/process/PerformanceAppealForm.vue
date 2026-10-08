@@ -28,7 +28,7 @@
       <el-form-item label="申诉附件" prop="appealFileUrls">
         <UploadFile
           v-model="formData.appealFileUrls"
-          :file-size="20"
+          :file-size="100"
           :limit="1"
           directory="hrm/performance/appeal"
         />

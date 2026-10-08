@@ -14,9 +14,9 @@ function renderField(field: string, record = row) {
 }
 
 describe('finance table raw response rendering', () => {
-  it('labels the finance partner identity as 兼职姓名', () => {
+  it('labels the finance partner identity as 兼职', () => {
     const column = createCashbackColumns([], [], () => {}).find(item => item.dataIndex === 'partnerName')!
-    expect(column.title).toBe('兼职姓名')
+    expect(column.title).toBe('兼职')
     expect(column.hideInTable).toBe(false)
   })
   it('uses raw amounts and rates despite a formatted first argument', () => {

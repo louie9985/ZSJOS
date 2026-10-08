@@ -67,6 +67,11 @@
       <el-table-column label="当前处理人" min-width="130">
         <template #default="{ row }">{{ row.assigneeName || '未分派' }}</template>
       </el-table-column>
+      <el-table-column v-if="feedbackType === 'REQUIREMENT'" label="当前审批" min-width="220">
+        <template #default="{ row }">{{ row.status !== 'APPROVING' ? '-' : row.approvalSummary?.availability === 'AVAILABLE'
+          ? row.approvalSummary.currentTasks.map(task => `${task.name} · ${task.assigneeName || '待分配'}`).join('；') || '暂无可处理任务'
+          : '审批信息暂不可用，请刷新' }}</template>
+      </el-table-column>
       <el-table-column
         label="最新回复"
         prop="latestReplySummary"
@@ -93,7 +98,7 @@
     />
   </ContentWrap>
 
-  <el-drawer v-model="detailOpen" :title="detail?.feedbackNo || `${title}详情`" size="760px">
+  <el-drawer v-model="detailOpen" :title="detail?.feedbackNo || `${title}详情`" size="min(760px, 100vw)">
     <div v-loading="detailLoading" class="feedback-detail">
       <el-alert
         v-if="detailError"
@@ -140,6 +145,17 @@
           class="mt-16px"
         />
 
+        <FeedbackApprovalPanel v-if="detail.feedbackType === 'REQUIREMENT'" :key="detail.id" :id="detail.id">
+          <template #default="{ fields, values }">
+            <el-descriptions :column="1" border>
+              <el-descriptions-item v-for="field in fields" :key="field.key" :label="field.label">
+                <AttachmentLinks v-if="fileValues(values?.[field.key]).length" :items="fileValues(values?.[field.key])" />
+                <span v-else>{{ displayValue(values?.[field.key]) }}</span>
+              </el-descriptions-item>
+            </el-descriptions>
+          </template>
+        </FeedbackApprovalPanel>
+        <template v-else>
         <h4 class="feedback-section-title">提交内容</h4>
         <el-descriptions :column="1" border>
           <el-descriptions-item
@@ -153,7 +169,7 @@
             <span v-else>{{ displayValue(detail.values?.[field.key]) }}</span>
           </el-descriptions-item>
         </el-descriptions>
-
+        </template>
         <template v-if="detail.completedResult">
           <h4 class="feedback-section-title">处理结果</h4>
           <p class="feedback-result">{{ detail.completedResult }}</p>
@@ -294,6 +310,7 @@ import { useMessage } from '@/hooks/web/useMessage'
 import { useUserStore } from '@/store/modules/user'
 import { formatDate } from '@/utils/formatTime'
 import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
+import FeedbackApprovalPanel from './FeedbackApprovalPanel.vue'
 
 const props = defineProps<{
   feedbackType: Exclude<FeedbackApi.FeedbackType, 'SURVEY'>

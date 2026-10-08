@@ -18,6 +18,9 @@ public class NoticeSaveReqVO {
     @Schema(description = "岗位公告编号", example = "1024")
     private Long id;
 
+    @Schema(description = "文章来源部门，缺省时沿用已有来源或当前操作人所属部门")
+    private Long sourceDeptId;
+
     @Schema(description = "公告标题", requiredMode = Schema.RequiredMode.REQUIRED, example = "小博主")
     @NotBlank(message = "公告标题不能为空")
     @Size(max = 50, message = "公告标题不能超过50个字符")

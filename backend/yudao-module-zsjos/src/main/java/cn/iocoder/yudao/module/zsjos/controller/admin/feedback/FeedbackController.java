@@ -41,6 +41,29 @@ public class FeedbackController {
 
     @Resource
     private FeedbackService feedbackService;
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackApprovalService approvalService;
+
+    @GetMapping("/{id}/approval")
+    @PreAuthorize("@ss.hasPermission('zsjos:feedback:read')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackApprovalRespVO> approval(
+            @PathVariable("id") Long id, @RequestParam(value = "roundNo", required = false) Integer roundNo) {
+        return success(approvalService.getOwn(id, roundNo, getLoginUserId()));
+    }
+
+    @GetMapping("/{id}/approver-view/approval")
+    @PreAuthorize("@ss.hasPermission('zsjos:feedback:read')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackApprovalRespVO> approverApproval(
+            @PathVariable("id") Long id, @RequestParam(value = "roundNo", required = false) Integer roundNo) {
+        return success(approvalService.getApprover(id, roundNo, getLoginUserId()));
+    }
+
+    @PostMapping("/{id}/urge")
+    @PreAuthorize("@ss.hasPermission('zsjos:feedback:requirement:urge')")
+    public CommonResult<Boolean> urge(@PathVariable("id") Long id, @Valid @RequestBody FeedbackActionVO.UrgeReq request) {
+        approvalService.urge(id, request, getLoginUserId());
+        return success(true);
+    }
 
     @GetMapping("/portal")
     @Operation(summary = "获得反馈工作台首页")

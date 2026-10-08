@@ -2954,6 +2954,28 @@ CREATE TABLE IF NOT EXISTS `system_menu` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜单权限表';
 
 -- system_notice
+-- V288: empty share metadata; permission metadata is installed by the ordered migration.
+CREATE TABLE IF NOT EXISTS system_notice_share (
+    id bigint NOT NULL AUTO_INCREMENT,
+    notice_id bigint NOT NULL COMMENT '公告编号',
+    token varchar(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '公开分享令牌',
+    attachment_ids varchar(512) NOT NULL COMMENT '允许公开的附件文件编号JSON',
+    active bit(1) NOT NULL DEFAULT b'0' COMMENT '是否开启',
+    version bigint NOT NULL DEFAULT 0 COMMENT '分享版本',
+    opened_by bigint NOT NULL COMMENT '开启人',
+    opened_at datetime NOT NULL COMMENT '开启时间',
+    closed_by bigint DEFAULT NULL COMMENT '关闭人',
+    closed_at datetime DEFAULT NULL COMMENT '关闭时间',
+    creator varchar(64) DEFAULT '',
+    create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '',
+    update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0',
+    tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (id), UNIQUE KEY uk_notice_share_token (token),
+    UNIQUE KEY uk_notice_share_tenant_notice (tenant_id,notice_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告对外分享';
+
 CREATE TABLE IF NOT EXISTS `system_notice` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '公告ID',
   `title` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '公告标题',
@@ -2968,6 +2990,11 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `target_dept_ids` json DEFAULT NULL COMMENT '草稿选择的部门编号',
   `target_user_ids` json DEFAULT NULL COMMENT '草稿选择的用户编号',
   `recipient_snapshot_complete` bit(1) NOT NULL DEFAULT b'0' COMMENT '发布名单快照已完成',
+  `source_dept_id` bigint DEFAULT NULL COMMENT '来源部门编号',
+  `source_dept_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '来源部门名称快照',
+  `publisher_id` bigint DEFAULT NULL COMMENT '实际发布人编号',
+  `publisher_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '实际发布人姓名快照',
+  `audience_summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '接收部门及指定用户范围快照',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -5319,6 +5346,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '考期安排编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
   `schedule_name` varchar(100) DEFAULT NULL COMMENT '手工填写的考期名称',
+  `background_color` varchar(7) DEFAULT NULL COMMENT '考期自选底色，空为默认配色',
   `schedule_type` varchar(16) NOT NULL COMMENT '时间类型：EXACT/MULTI_DAY',
   `exact_date` date DEFAULT NULL COMMENT '精确考试日期',
   `start_date` date DEFAULT NULL COMMENT '考试开始日期',
@@ -8018,3 +8046,32 @@ CREATE TABLE IF NOT EXISTS zsjos_media_lead_target_revision (
     deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
     PRIMARY KEY(id), KEY idx_media_lead_revision_target(tenant_id,target_id,id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exam calendar tenant-shared note (V290).
+CREATE TABLE IF NOT EXISTS `zsjos_exam_calendar_note` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `content` mediumtext NOT NULL COMMENT '富文本说明，图片使用稳定文件引用',
+  `version` bigint NOT NULL DEFAULT 0 COMMENT '并发编辑版本',
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_exam_note_tenant` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考期日历共享说明';
+CREATE TABLE IF NOT EXISTS `zsjos_exam_calendar_note_image` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `file_id` bigint NOT NULL COMMENT 'Infra文件编号',
+  `uploaded_by` bigint NOT NULL COMMENT '上传人',
+  `bound` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否被当前说明引用',
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_exam_note_image` (`tenant_id`,`file_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考期说明图片归属';

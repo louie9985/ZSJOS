@@ -38,7 +38,7 @@ describe('exam calendar latest request wins', () => {
       const setter = (key: string) => (value: unknown) => { state[key] = value }
       const bindings = {
         api: { examCalendar: { exactPage: fetch, multiDayPage: fetch, productOptions: fetch } },
-        requests: { current: { exact: 0, multiDay: 0, calendarMultiDay: 0, products: 0 } },
+        requests: { current: { exact: 0, multiDay: 0, calendarMultiDay: 0, products: 0 } }, locatingDay: { current: undefined },
         range: { start: dayjs('2026-10-01'), end: dayjs('2026-10-31') }, categoryId: undefined, displayStatus: undefined,
         setCalendarMultiDayRows: setter('rows'), setCalendarMultiDayLoading: setter('loading'), setCalendarMultiDayError: setter('error'), setSchedules: setter('rows'), setMultiDayRows: setter('rows'), setProducts: setter('rows'),
         setLoading: setter('loading'), setMultiDayLoading: setter('loading'), setProductLoading: setter('loading'),

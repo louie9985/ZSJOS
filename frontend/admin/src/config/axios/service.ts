@@ -58,6 +58,10 @@ const service: AxiosInstance = axios.create({
 // request拦截器
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // 大附件上传需独立于普通 API 的短超时；保留显式无限或更长超时。
+    if (config.data instanceof FormData && config.timeout !== 0) {
+      config.timeout = Math.max(config.timeout || 0, 10 * 60 * 1000)
+    }
     // 是否需要设置 token；命中白名单的接口（如 /login）不带 token
     let isToken = (config!.headers || {}).isToken !== false
     if (isToken && whiteList.some((v) => config.url?.includes(v))) {

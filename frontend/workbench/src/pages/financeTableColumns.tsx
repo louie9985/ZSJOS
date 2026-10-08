@@ -26,7 +26,7 @@ function percentage(value: unknown) {
 export const createCashbackColumns = (types: AdvancedFilterField['options'], statuses: AdvancedFilterField['options'], onDetail?: (id: number) => void): ProColumns<Cashback>[] => [
   { title: '返现单号', dataIndex: 'cashbackNo', fixed: 'left', render: (_, row) => onDetail ? <Button type="link" onClick={() => onDetail(row.id)}>{row.cashbackNo}</Button> : row.cashbackNo },
   { title: '返现受益人', dataIndex: 'beneficiaryName', render: (_, row) => row.beneficiaryName || '-' },
-  { title: '兼职姓名', dataIndex: 'partnerName', hideInTable: !onDetail },
+  { title: '兼职', dataIndex: 'partnerName', hideInTable: !onDetail },
   { title: '类型', dataIndex: 'type', render: (_, row) => types.find(item => item.value === row.type)?.label || '类型暂不可用' },
   { title: '客户／学员', key: 'customer', hideInTable: !onDetail, render: (_, row) => row.source?.studentName || row.source?.customerName || '-' },
   { title: '来源单据', key: 'source', hideInTable: !onDetail, render: (_, row) => row.source?.orderNo || row.source?.leadNo || (row.source?.orderAccess === 'denied' || row.source?.leadAccess === 'denied' ? '无权查看来源信息' : '历史来源信息缺失') },

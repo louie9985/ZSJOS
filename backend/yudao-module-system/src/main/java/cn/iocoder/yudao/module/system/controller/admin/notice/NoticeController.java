@@ -83,7 +83,7 @@ public class NoticeController {
     @PostMapping("/publish")
     @PreAuthorize("@ss.hasPermission('system:notice:publish')")
     public CommonResult<Boolean> publish(@RequestParam("id") Long id) {
-        noticeService.publishNotice(id);
+        noticeService.publishNotice(id, getLoginUserId());
         return success(true);
     }
 

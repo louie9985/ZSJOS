@@ -7,6 +7,11 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class CashbackPageReqVO extends PageParam {
+    @jakarta.validation.constraints.Size(max = 64)
+    private String sortField;
+    @jakarta.validation.constraints.Pattern(regexp = "ascend|descend", message = "排序方向不正确")
+    private String sortOrder;
+
     private String type;
     private String status;
     private String keyword;

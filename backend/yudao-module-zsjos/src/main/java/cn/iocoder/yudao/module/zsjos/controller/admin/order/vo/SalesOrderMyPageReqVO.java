@@ -11,6 +11,11 @@ import jakarta.validation.Valid;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class SalesOrderMyPageReqVO extends PageParam {
+    @jakarta.validation.constraints.Size(max = 64)
+    private String sortField;
+    @jakarta.validation.constraints.Pattern(regexp = "ascend|descend", message = "排序方向不正确")
+    private String sortOrder;
+
 
     @Pattern(regexp = "pending_approval|revision_required|effective|superseded|terminated", message = "订单状态不正确")
     private String status;

@@ -14,6 +14,7 @@ public class MediaStudentListRespVO extends MyStudentRespVO {
         private Long id;
         private String accountNo;
         private String nickname;
+        private String homepageUrl;
         private String platformValue;
         private String platformLabel;
     }

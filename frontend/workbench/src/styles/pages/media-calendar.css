@@ -369,7 +369,16 @@
   .media-calendar-toolbar { align-items: stretch; flex-direction: column; }
   .media-calendar-toolbar .ant-input-search,
   .media-calendar-toolbar > .ant-select { width: 100%; }
-  .media-calendar-shell { min-height: 520px; grid-template-columns: 190px minmax(0, 1fr); }
+  .media-calendar-shell { min-height: 240px; grid-template-columns: 112px minmax(0, 1fr); }
+  .media-calendar-info-head,
+  .media-calendar-info { padding-inline: var(--crm-sp-2); }
+  .media-calendar-info strong,
+  .media-calendar-info span { white-space: normal; overflow-wrap: anywhere; }
+  .media-calendar-info,
+  .media-calendar-row,
+  .media-calendar-cells { height: 96px; }
+  .media-calendar-info { overflow-y: auto; }
+  .media-calendar-toolbar > .ant-space { flex-wrap: wrap; }
   .media-schedule-page { height: auto; grid-template-columns: minmax(0, 1fr); overflow: visible; }
   .media-schedule-sidebar { border-right: 0; border-bottom: 1px solid var(--crm-border); }
   .media-schedule-filter-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
@@ -425,4 +434,17 @@
     display: none;
   }
   .personal-calendar-timeline { height: 960px; }
+}
+
+@media (max-width: 768px) {
+  /* A day agenda must remain readable even when short events overlap in time. */
+  .personal-calendar-timeline { display: block; height: auto; }
+  .personal-calendar-hours,
+  .personal-calendar-hour-line { display: none; }
+  .personal-calendar-track { display: grid; gap: var(--crm-gap); border: 0; }
+  .personal-calendar-timeline-event { position: static; width: auto !important; height: auto !important; padding: 0; }
+  .personal-calendar-timeline-card { height: auto; gap: var(--crm-sp-2); padding: var(--crm-sp-3); }
+  .personal-calendar-timeline-card strong,
+  .personal-calendar-timeline-card span,
+  .personal-calendar-timeline-card small { white-space: normal; overflow-wrap: anywhere; }
 }

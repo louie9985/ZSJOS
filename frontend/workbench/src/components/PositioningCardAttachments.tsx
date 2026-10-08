@@ -16,7 +16,7 @@ export default function PositioningCardAttachments({ value = [], onChange, cardI
   const write = (next: AttachmentItem[]) => onChange?.(next.map(item =>
     item.pending ? item.pending : (item.uploaded as UploadedAttachment).id))
   return <PositioningAttachmentPicker items={items} disabled={disabled} accept={POSITIONING_ATTACHMENT_ACCEPT}
-    hint="支持文档、图片、音频、视频，每份不超过 20 MB" onChange={write}
+    hint="支持文档、图片、音频、视频，每份不超过 100 MB" onChange={write}
     onDownload={async item => {
       if (!cardId) throw new Error('草稿尚未保存，请先保存草稿再读取附件')
       return await api.positioningCard.attachment(cardId, (item.uploaded as UploadedAttachment).id)

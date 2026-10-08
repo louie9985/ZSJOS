@@ -2,6 +2,7 @@ import { contentReviewApi } from './materialApi'
 import { workOrderApi } from './workOrderApi'
 import type { NavigateFunction } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
+import { feedbackApi } from './feedbackApi'
 import { api, ApiError, AuthenticationError, type NotifyMessage } from './api'
 import { detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailTab } from './leadFollowUp'
 
@@ -103,6 +104,8 @@ const legacyMediaRoute = (detail: NotifyMessage) => {
 
 export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
   detail.actionType === 'business_detail' && (
+    detail.sceneCode === 'zsjos.feedback.approval_urged'
+    ||
     isNotifyLeadActionCandidate(detail)
     || detail.sceneCode === 'zsjos.registration.task_created'
     || detail.sceneCode === 'zsjos.lead.public_pool'
@@ -153,6 +156,18 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
   if (detail.actionType === 'none') return
   if (detail.actionType !== 'business_detail') {
     deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    return
+  }
+  if (detail.sceneCode === 'zsjos.feedback.approval_urged') {
+    const taskId = detail.templateParams?.taskId
+    try {
+      if (typeof taskId !== 'string' || !taskId) throw new Error('审批任务标识缺失')
+      await feedbackApi.approvalTask(taskId)
+      deps.navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(taskId)}`)
+    } catch {
+      deps.warn('该审批已处理、已转办或当前账号无权处理，已打开消息详情')
+      deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    }
     return
   }
   if (detail.bizType === 'withdrawal' && isPositiveId(detail.bizId)) {

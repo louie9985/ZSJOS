@@ -20,6 +20,30 @@ public record LeadProductSnapshot(String productRef, String name, Long categoryI
                 level2CategoryId, level2CategoryName, skuRef, skuName, selectedAttrValuesJson, price, spuUnknown, skuUnknown, null);
     }
 
+    /** Legacy null flags mean not explicitly unknown, matching fromIntendedProduct. */
+    public static LeadProductSnapshot readHistorical(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            var mapper = cn.iocoder.yudao.framework.common.util.json.JsonUtils.getObjectMapper();
+            java.util.Map<String, Object> object = mapper.readerFor(java.util.Map.class)
+                    .with(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
+            if (object == null) throw new IllegalArgumentException();
+            for (String field : List.of("spuUnknown", "skuUnknown")) {
+                var value = object.get(field);
+                if (value == null) object.put(field, false);
+                else if (!(value instanceof Boolean)) throw new IllegalArgumentException();
+            }
+            return mapper.convertValue(object, LeadProductSnapshot.class);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid historical product snapshot");
+        }
+    }
+
+    public static LeadProductSnapshot readHistoricalQuietly(String json) {
+        try { return readHistorical(json); }
+        catch (RuntimeException ex) { return null; }
+    }
+
     public LeadProductSnapshot withSpecs(List<ProductSpecVO> specs) {
         return new LeadProductSnapshot(productRef, name, categoryId, categoryName, categoryPath, level1CategoryId,
                 level1CategoryName, level2CategoryId, level2CategoryName, skuRef, skuName,

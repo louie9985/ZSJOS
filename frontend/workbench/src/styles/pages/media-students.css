@@ -803,20 +803,50 @@
 .media-students-inbox-layout.is-list-collapsed .media-students-item.active { background: var(--crm-color-primary-bg); box-shadow: none; }
 .media-students-item:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
 
-/* Separate native controls keep account links out of the student-selection button. */
-.media-students-account-card { flex: none; flex-direction: column; align-items: stretch; gap: var(--crm-sp-2); }
-.media-students-card-select { display: flex; align-items: center; gap: var(--crm-sp-3); width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+/* Identity, operators and both account destinations are separate native controls. */
+.media-students-account-card { container: media-student-card / inline-size; flex: none; flex-direction: column; align-items: stretch; gap: var(--crm-sp-2); }
+.media-students-item.media-students-account-card { padding-block: var(--crm-sp-2); }
+.media-students-card-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 30%); align-items: start; gap: var(--crm-sp-2); width: 100%; min-width: 0; }
+.media-students-card-select { display: flex; align-items: flex-start; gap: var(--crm-sp-3); flex: 1 1 144px; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.media-students-card-select > .ant-avatar { flex: none; }
 .media-students-card-select:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
-.media-students-card-accounts { display: grid; gap: var(--crm-sp-1); width: 100%; min-width: 0; }
-.media-students-account-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: var(--crm-sp-2); }
-.media-students-account-platform { display: flex; align-items: baseline; gap: var(--crm-sp-1); min-width: 0; }
-.media-students-account-platform .ant-tag { margin: 0; white-space: normal; overflow-wrap: anywhere; }
-.media-students-account-link { display: flex; justify-content: flex-end; align-items: baseline; gap: var(--crm-sp-1); color: var(--crm-color-primary); text-align: right; min-width: 0; }
-.media-students-account-link .anticon { flex: none; }
-.media-students-account-link span:last-child, .media-students-account-name { overflow-wrap: anywhere; min-width: 0; text-align: right; }
+.media-students-card-accounts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); width: 100%; min-width: 0; }
+.media-students-account-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: var(--crm-sp-2); min-width: 0; padding: var(--crm-sp-1) var(--crm-sp-3); border-radius: var(--crm-radius-sm); background: transparent; }
+.media-students-account-row:only-child, .media-students-account-empty { grid-column: 1 / -1; }
+.media-students-account-link, .media-students-account-name { display: flex; align-items: flex-start; justify-content: flex-end; justify-self: end; max-width: 100%; gap: var(--crm-sp-1); min-width: 0; line-height: 1.5; overflow-wrap: anywhere; text-align: right; }
+.media-students-account-link > span:first-child { min-width: 0; }
+.media-students-account-row > .media-students-account-link,
+.media-students-account-row > .media-students-account-link:visited,
+.media-students-account-row > .media-students-account-link:hover,
+.media-students-account-row > .media-students-account-link:active { color: var(--crm-color-primary); }
+.media-students-account-link { padding: calc(var(--crm-sp-1) / 2) var(--crm-sp-2); border: 1px solid transparent; border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); }
+.media-students-account-link:hover { border-color: var(--crm-color-primary-border); background: color-mix(in srgb, var(--crm-color-primary) 16%, var(--crm-bg-container)); }
+.media-students-platform-icon { display: inline-flex; flex: 0 0 20px; width: 20px; height: 20px; align-items: center; justify-content: center; }
+.media-students-platform-icon svg { width: 100%; height: 100%; }
+.media-students-card-operators { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; gap: var(--crm-sp-1); max-width: 100%; min-width: 0; font-size: var(--crm-font-sm); color: var(--crm-text-secondary); }
+.media-students-operator, .media-students-operator-unassigned { display: inline-flex; align-items: flex-start; gap: var(--crm-sp-1); max-width: 100%; border: 1px solid transparent; border-radius: var(--crm-radius-sm); padding: var(--crm-sp-1) var(--crm-sp-2); background: var(--crm-color-primary-bg); color: var(--crm-color-primary); font: inherit; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.media-students-operator > .anticon, .media-students-operator-unassigned > .anticon { flex: none; margin-top: var(--crm-sp-1); }
+.media-students-operator > span:last-child { min-width: 0; }
+.media-students-operator:not(:disabled):hover { border-color: var(--crm-color-primary-border); background: color-mix(in srgb, var(--crm-color-primary) 16%, var(--crm-bg-container)); }
+.media-students-operator[aria-pressed=true] { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
+.media-students-operator:disabled, .media-students-operator-unassigned { background: var(--crm-bg-layout); color: var(--crm-text-secondary); cursor: default; }
+.media-students-operator:focus-visible, .media-students-account-link:focus-visible, .media-students-external-link:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.media-students-operator-filter { flex: none; min-width: 0; }
+.media-students-operator-filter .ant-tag { display: flex; width: 100%; align-items: center; margin: 0; white-space: normal; overflow-wrap: anywhere; }
+.media-students-operator-filter .ant-tag-close-icon { margin-inline-start: auto; }
 .media-students-account-empty, .media-students-account-name { color: var(--crm-text-secondary); }
-.media-students-inbox-layout.is-list-collapsed .media-students-card-select { justify-content: center; }
-@media (pointer: coarse) { .media-students-account-link { min-height: 44px; align-items: center; } }
+.media-students-inbox-layout.is-list-collapsed .media-students-card-select { justify-content: center; flex-basis: 0; }
+/* Keep the operator column beside the identity even in the narrow inbox. */
+.media-students-inbox-layout.is-list-collapsed .media-students-card-header { grid-template-columns: minmax(0, 1fr); }
+.media-students-account-row > .media-students-platform-icon { grid-column: 1; grid-row: 1; justify-self: center; }
+.media-students-account-row > .media-students-account-link,
+.media-students-account-row > .media-students-account-name { grid-column: 2; grid-row: 1; align-items: center; }
+@media (pointer: coarse) {
+  .media-students-account-link, .media-students-operator { min-height: 44px; align-items: center; }
+  .media-students-account-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .media-students-external-link { min-width: 44px; min-height: 44px; }
+  .media-students-external-link svg { width: 20px; height: 20px; }
+}
 .media-students-rail-pagination { display: flex; flex: none; flex-direction: column; align-items: center; gap: var(--crm-sp-1); font-size: var(--crm-font-sm); }
 .media-students-rail-pagination > span { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
 .media-students-rail-empty { text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
@@ -969,12 +999,14 @@
 }
 
 /* Match Lead Management cards while keeping the student identity and contacts full width. */
-.media-students-item.lead-inbox-item { flex: none; align-items: flex-start; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-lg); background: var(--crm-bg-container); box-shadow: var(--crm-shadow); font: inherit; }
-.media-students-item.lead-inbox-item.active { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); }
+.media-students-item.lead-inbox-item { flex: none; align-items: flex-start; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-sm); background: var(--crm-bg-container); box-shadow: none; font: inherit; }
+.media-students-item.lead-inbox-item.active { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); outline: none; border-inline-start-width: 1px; }
+.media-students-item.lead-inbox-item.active::before { display: none; }
+.media-students-item.lead-inbox-item:not(.active):hover { background: var(--crm-bg-layout); }
 .media-students-item-copy > .media-students-item-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--crm-sp-2); color: var(--crm-text); }
 .media-students-item-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .media-students-item-heading > span { flex: none; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
-.media-students-account-card .media-students-item-heading { flex-wrap: wrap; white-space: normal; overflow: visible; }
+.media-students-account-card .media-students-item-heading { flex-direction: column; align-items: flex-start; gap: var(--crm-sp-1); white-space: normal; overflow: visible; }
 .media-students-account-card .media-students-item-heading > span { flex: 0 1 auto; overflow-wrap: anywhere; }
 .media-students-load-more { flex: none; padding: var(--crm-sp-2); text-align: center; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); overflow-wrap: anywhere; }
 

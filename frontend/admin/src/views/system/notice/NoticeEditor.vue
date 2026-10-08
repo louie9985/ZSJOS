@@ -29,9 +29,18 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="文章来源" prop="sourceDeptId">
+          <el-select v-model="formData.sourceDeptId" filterable placeholder="请选择来源部门" :loading="audienceLoading" no-data-text="暂无可选部门，请联系管理员维护">
+            <el-option v-for="dept in sourceDepartments" :key="dept.id" :label="dept.name" :value="dept.id" />
+          </el-select>
+          <div class="el-form-item__tip">默认本人所属部门，可代其他部门发布；发布人由系统自动记录。</div>
+          <el-alert v-if="audienceLoadError" type="error" :title="audienceLoadError" :closable="false">
+            <el-button link @click="loadAudienceTree">重试</el-button>
+          </el-alert>
+        </el-form-item>
         <el-form-item label="发送范围" prop="audienceType">
           <el-radio-group v-model="formData.audienceType" @change="handleAudienceTypeChange">
-            <el-radio value="ALL">全员</el-radio>
+            <el-radio value="ALL">全体员工</el-radio>
             <el-radio value="TARGET">指定部门/用户</el-radio>
           </el-radio-group>
         </el-form-item>
@@ -75,7 +84,7 @@
             <Icon icon="ep:upload-filled" :size="28" />
             <div>拖拽文件到此处，或点击上传</div>
             <template #tip>
-              <div class="el-upload__tip">最多 10 个，支持图片、Office、PDF 和 ZIP</div>
+              <div class="el-upload__tip">最多 10 个，单个不超过 100 MB，支持图片、Office、PDF 和 ZIP</div>
             </template>
           </el-upload>
           <div v-if="uploadTasks.length" class="notice-attachment-list">
@@ -108,6 +117,9 @@
     <el-drawer v-model="previewVisible" title="公告预览" size="720px">
       <article class="notice-preview">
         <h1>{{ formData.title || '未填写标题' }}</h1>
+        <p>文章来源：{{ sourceDepartments.find(dept => dept.id === formData.sourceDeptId)?.name || '未选择' }}</p>
+        <p>发布人：发布时自动记录</p>
+        <p>接收部门/人员：{{ previewAudience }}</p>
         <Editor v-model="formData.content" readonly height="auto" />
         <section v-if="formData.attachments.length" class="notice-preview-files">
           <h3>附件</h3>
@@ -143,6 +155,7 @@ const publishing = ref(false)
 const previewVisible = ref(false)
 const noticeId = ref<number | undefined>(props.id)
 const formData = reactive({
+  sourceDeptId: undefined as number | undefined,
   title: '',
   type: undefined as number | undefined,
   content: '',
@@ -153,12 +166,18 @@ const formData = reactive({
   targetUserIds: [] as number[],
   attachments: [] as NoticeApi.NoticeAttachmentVO[]
 })
+const sourceDepartments = ref<NoticeApi.NoticeRecipientOptionsVO['departments']>([])
+const previewAudience = computed(() => formData.audienceType === 'ALL' ? '全体员工' : [
+  ...sourceDepartments.value.filter(dept => formData.targetDeptIds.includes(dept.id)).map(dept => `${dept.name}（含子部门）`),
+  ...(formData.targetUserIds.length ? [`指定用户 ${formData.targetUserIds.length} 人`] : [])
+].join('、'))
 const audienceTreeRef = ref()
 const audienceTree = ref<any[]>([])
 const audienceLoading = ref(false)
 const audienceLoadError = ref('')
 const audienceFilter = ref('')
 const rules: FormRules = {
+  sourceDeptId: [{ required: true, message: '请选择来源部门', trigger: 'change' }],
   title: [{ required: true, message: '公告标题不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '公告类型不能为空', trigger: 'change' }],
   content: [{ required: true, message: '公告正文不能为空', trigger: 'blur' }],
@@ -184,6 +203,7 @@ const load = async () => {
   loading.value = true
   try {
     const data = await NoticeApi.getNotice(props.id) as NoticeApi.NoticeVO
+    formData.sourceDeptId = data.sourceDeptId ?? formData.sourceDeptId
     formData.title = data.title
     formData.type = data.type
     formData.content = data.content
@@ -203,6 +223,7 @@ const load = async () => {
 }
 
 const saveDraft = async () => {
+  if (audienceLoading.value || audienceLoadError.value) { message.error(audienceLoadError.value || '部门加载中，请稍后重试'); return }
   await formRef.value?.validate()
   saving.value = true
   try {
@@ -235,6 +256,7 @@ const disabledHighlightDate = (date: Date) => date.getTime() < Date.now() - 60 *
 
 const allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip']
 const beforeUpload = (file: UploadRawFile) => {
+  if (!file.size || file.size > 100 * 1024 * 1024) { message.error('附件不能为空且不能超过 100 MB'); return false }
   const extension = file.name.split('.').pop()?.toLowerCase() || ''
   if (formData.attachments.length + activeUploadCount.value >= 10) { message.error('公告附件不能超过 10 个'); return false }
   if (!allowedExtensions.includes(extension)) { message.error('不支持该文件格式'); return false }
@@ -246,6 +268,8 @@ const loadAudienceTree = async () => {
   audienceLoadError.value = ''
   try {
     const options = await NoticeApi.getNoticeRecipientOptions()
+    sourceDepartments.value = options.departments
+    if (formData.sourceDeptId == null) formData.sourceDeptId = options.defaultSourceDeptId
   const depts = options.departments
   const users = options.users
   const usersByDept = new Map<number, NoticeApi.NoticeRecipientOptionsVO['users']>()

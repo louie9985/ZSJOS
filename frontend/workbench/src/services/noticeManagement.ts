@@ -21,18 +21,25 @@ export const NOTICE_TYPE_DICT = 'system_notice_type'
 export const NOTICE_STATUSES = { DRAFT: '草稿', PUBLISHED: '已发布', OFFLINE: '已下线' } as const
 export type NoticeStatus = keyof typeof NOTICE_STATUSES
 export type NoticeInput = {
+  sourceDeptId?: number;
   id?: number; title: string; type: number; content: string; audienceType: 'ALL' | 'TARGET'
   targetDeptIds: number[]; targetUserIds: number[]; highlightUntil?: number | null
   attachments: AnnouncementAttachment[]
 }
 export type ManagedNotice = Omit<NoticeInput, 'id' | 'highlightUntil'> & {
+  sourceDeptId?: number; sourceDeptName?: string; publisherId?: number; publisherName?: string; audienceSummary?: string;
   id: number; publishStatus: NoticeStatus; highlightUntil?: TimestampValue
   publishTime?: TimestampValue; offlineTime?: TimestampValue; createTime?: TimestampValue
   highlighted?: boolean; recipientCount?: number
 }
 export type NoticeRecipients = {
+  defaultSourceDeptId?: number;
   departments: { id: number; parentId: number; name: string }[]
   users: { id: number; nickname: string; deptId?: number; selectable: boolean; disabledReason?: string }[]
+}
+export function noticeAudienceText(notice: { audienceType?: string; audienceSummary?: string }) {
+  if (notice.audienceSummary) return notice.audienceSummary
+  return notice.audienceType === 'TARGET' ? '指定部门/用户（历史名称未记录）' : '全体员工'
 }
 export function noticeDownloadUrl(url?: string) {
   if (!url) return undefined

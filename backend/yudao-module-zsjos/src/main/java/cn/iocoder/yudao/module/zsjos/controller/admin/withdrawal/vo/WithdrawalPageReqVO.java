@@ -7,6 +7,11 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class WithdrawalPageReqVO extends PageParam {
+    @jakarta.validation.constraints.Size(max = 64)
+    private String sortField;
+    @jakarta.validation.constraints.Pattern(regexp = "ascend|descend", message = "排序方向不正确")
+    private String sortOrder;
+
     @jakarta.validation.constraints.Pattern(regexp = "SELF|ALL|USER")
     private String readScope;
     private Long targetUserId;

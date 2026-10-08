@@ -18,5 +18,5 @@ public class WorkPlanSearchReqVO extends PageParam {
     private Long ownerDeptId;
     private LocalDate startDate;
     private LocalDate endDate;
-    @Valid private List<WorkPlanDynamicFilterReqVO> dynamicFilters;
+    private List<@Valid WorkPlanDynamicFilterReqVO> dynamicFilters;
 }

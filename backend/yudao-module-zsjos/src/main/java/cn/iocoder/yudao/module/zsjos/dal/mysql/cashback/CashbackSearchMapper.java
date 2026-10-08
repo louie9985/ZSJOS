@@ -17,6 +17,12 @@ public interface CashbackSearchMapper {
             + "ORDER BY c.generated_at DESC, c.id DESC LIMIT #{limit} OFFSET #{offset}")
     List<CashbackDO> page(@Param("query") AdvancedFilterQuery query, @Param("offset") long offset, @Param("limit") int limit);
 
+    // orderSql is generated exclusively by BusinessSortSql's fixed allowlist.
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT c.* FROM zsjos_cashback c WHERE ${query.whereSql} ORDER BY ${orderSql} LIMIT #{limit} OFFSET #{offset}")
+    List<CashbackDO> sortedPage(@Param("query") AdvancedFilterQuery query, @Param("orderSql") String orderSql,
+                               @Param("offset") long offset, @Param("limit") int limit);
+
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("SELECT c.id,c.lead_id,c.order_id,c.partner_id,c.beneficiary_user_id FROM zsjos_cashback c "
             + "WHERE ${query.whereSql} AND c.id > #{after} ORDER BY c.id LIMIT #{limit}")

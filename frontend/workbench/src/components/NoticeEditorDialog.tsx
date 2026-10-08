@@ -46,9 +46,10 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
     try {
       const [nextTypes, nextRecipients] = await Promise.all([noticeManagement.types(), noticeManagement.recipients()])
       setTypes(nextTypes); setRecipients(nextRecipients)
+      if (form.getFieldValue('sourceDeptId') == null) form.setFieldValue('sourceDeptId', nextRecipients.defaultSourceDeptId)
     } catch (cause) { setOptionsError(cause instanceof Error ? cause.message : '表单选项加载失败') }
     finally { setOptionsLoading(false) }
-  }, [])
+  }, [form])
   useEffect(() => { void loadOptions() }, [loadOptions])
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty || blocked) { event.preventDefault(); event.returnValue = '' } }
@@ -95,6 +96,16 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
     targetUserIds: values.audienceType === 'TARGET' ? values.targetUserIds || [] : [],
     attachments: attachments.map((file, sort) => ({ ...file, sort }))
   })
+  const showPreview = () => {
+    const values = form.getFieldsValue(true)
+    const selectedDepartments = recipients?.departments.filter(dept => values.targetDeptIds?.includes(dept.id)) || []
+    const audienceSummary = values.audienceType === 'TARGET'
+      ? [...selectedDepartments.map(dept => `${dept.name}（含子部门）`), ...(values.targetUserIds?.length ? [`指定用户 ${values.targetUserIds.length} 人`] : [])].join('、')
+      : '全体员工'
+    setPreview({ ...payload(values), id: id || 0, publishStatus: 'DRAFT',
+      sourceDeptName: recipients?.departments.find(dept => dept.id === values.sourceDeptId)?.name,
+      audienceSummary, highlightUntil: values.highlightUntil?.valueOf() })
+  }
   const save = async (publish: boolean) => {
     if (busyRef.current || uploading || pendingUploads.current > 0 || uploads.length > 0 || !canSave || optionsError || optionsLoading) return
     if (publish && !noticePermission(permissions, 'publish')) return
@@ -121,6 +132,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
   }
   const upload = async (file: File) => {
     if (busyRef.current || !canSave) return
+    if (!file.size || file.size > 100 * 1024 * 1024) { void message.error('附件不能为空且不能超过 100 MB'); return }
     const uid = crypto.randomUUID()
     const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip']
     if (!extensions.includes(file.name.split('.').pop()?.toLowerCase() || '')) { void message.error('不支持该文件格式'); return }
@@ -137,7 +149,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
   }
   return <>
     <Modal open title={id ? '编辑公告草稿' : '新建公告'} width={1000} onCancel={close} mask={{ closable: false }} keyboard={!blocked}
-      footer={<Space wrap><Button onClick={close} disabled={blocked}>关闭</Button><Button onClick={() => setPreview({ ...payload(form.getFieldsValue(true)), id: id || 0, publishStatus: 'DRAFT', highlightUntil: form.getFieldValue('highlightUntil')?.valueOf() })}>预览</Button>
+      footer={<Space wrap><Button onClick={close} disabled={blocked}>关闭</Button><Button onClick={showPreview}>预览</Button>
         {canSave && <Button loading={busy} disabled={uploading || uploads.length > 0 || !!optionsError || optionsLoading} onClick={() => void save(false)}>保存草稿</Button>}
         {canSave && noticePermission(permissions, 'publish') && <Button type="primary" loading={busy} disabled={uploading || uploads.length > 0 || !!optionsError || optionsLoading} onClick={() => void save(true)}>保存并发布</Button>}
       </Space>}>
@@ -146,12 +158,15 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
       {!canSave && <Alert type="info" title={stateChanged ? '公告状态已变化，不能继续编辑。请关闭后查看最新详情。' : '草稿已保存。继续编辑需要公告修改权限；发布可从管理列表操作。'} />}
       <Spin spinning={optionsLoading}>
         <Form form={form} layout="vertical" disabled={busy || !canSave} onValuesChange={() => setDirty(true)} initialValues={{
-          title: initial?.title || '', type: initial?.type, content: initial?.content || '', audienceType: initial?.audienceType || 'ALL',
+          sourceDeptId: initial?.sourceDeptId, title: initial?.title || '', type: initial?.type, content: initial?.content || '', audienceType: initial?.audienceType || 'ALL',
           targetDeptIds: initial?.targetDeptIds || [], targetUserIds: initial?.targetUserIds || [], highlightUntil: initial?.highlightUntil ? dayjs(initial.highlightUntil) : null
         }}>
           <Form.Item name="title" label="公告标题" rules={[{ required: true, whitespace: true, message: '请输入公告标题' }, { max: 50 }]}><Input maxLength={50} showCount /></Form.Item>
           <Form.Item name="type" label="公告类型" rules={[{ required: true, message: '请选择公告类型' }]}><Select options={types.map(type => ({ value: Number(type.value), label: type.label }))} notFoundContent={<Empty description="暂无公告类型，请联系管理员配置字典" />} /></Form.Item>
-          <Form.Item name="audienceType" label="发送范围"><Radio.Group options={[{ value: 'ALL', label: '全员' }, { value: 'TARGET', label: '指定部门/用户' }]} /></Form.Item>
+          <Form.Item name="sourceDeptId" label="文章来源" rules={[{ required: true, message: '请选择来源部门' }]} help="默认本人所属部门，可选择代为发布的来源部门；发布人由系统记录实际发布人员。">
+            <Select showSearch optionFilterProp="label" placeholder="请选择来源部门" options={recipients?.departments.map(dept => ({ value: dept.id, label: dept.name }))} notFoundContent={<Empty description="暂无可选部门，请联系管理员维护" />} />
+          </Form.Item>
+          <Form.Item name="audienceType" label="发送范围"><Radio.Group options={[{ value: 'ALL', label: '全体员工' }, { value: 'TARGET', label: '指定部门/用户' }]} /></Form.Item>
           <Form.Item name="targetDeptIds" hidden><Input /></Form.Item><Form.Item name="targetUserIds" hidden><Input /></Form.Item>
           {audienceType === 'TARGET' && <Form.Item label="指定部门/用户" help="勾选部门将发送给该部门及全部子部门成员；部门与用户独立勾选，发布时合并去重。">
             <Input.Search value={filter} onChange={event => setFilter(event.target.value)} placeholder="搜索部门或用户（匹配项高亮）" allowClear />
@@ -167,7 +182,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
             <ClipboardUploadButtons disabled={busy || !canSave} canPaste={() => attachmentCount.current + pendingUploads.current < 10} onFiles={files => files.forEach(file => { void upload(file) })}>
               <Upload multiple accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" showUploadList={false} disabled={busy || !canSave} beforeUpload={file => { void upload(file); return false }}><Button disabled={busy || !canSave}>上传附件（最多 10 个）</Button></Upload>
             </ClipboardUploadButtons>
-            <Typography.Text type="secondary">支持图片、Office、PDF 和 ZIP；上传完成后可保存。</Typography.Text>
+            <Typography.Text type="secondary">支持图片、Office、PDF 和 ZIP，单个不超过 100 MB；上传完成后可保存。</Typography.Text>
             {uploads.map(task => <div key={task.uid}>{task.name}{task.error ? <Alert type="error" title={task.error} action={<Button onClick={() => setUploads(current => current.filter(item => item.uid !== task.uid))}>移除失败项</Button>} /> : <Progress percent={task.progress} />}</div>)}
             {attachments.map(file => <div key={file.infraFileId}><NoticeAttachments files={[file]} /><Button type="link" disabled={busy || !canSave} aria-label={`移除 ${file.fileName}`} onClick={() => { setAttachments(current => current.filter(item => item.infraFileId !== file.infraFileId)); setDirty(true) }}>移除</Button></div>)}
           </Form.Item>

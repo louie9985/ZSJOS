@@ -809,8 +809,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                         if (rawSnapshot != null && rawSnapshot.get("name") instanceof String name && !name.isBlank()) {
                             row.setProductName(name);
                         }
-                        var snapshot = JsonUtils.parseObjectQuietly(orderItem.getProductSnapshot(),
-                                cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.class);
+                        var snapshot = cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.readHistoricalQuietly(orderItem.getProductSnapshot());
                         if (snapshot != null) {
                             row.setSpecs(snapshot.displaySpecs());
                         }

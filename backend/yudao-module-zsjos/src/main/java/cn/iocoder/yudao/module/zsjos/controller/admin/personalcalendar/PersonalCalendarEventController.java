@@ -23,6 +23,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/personal-calendar")
 @Validated
 public class PersonalCalendarEventController {
+
+    @GetMapping("/search")
+    @PreAuthorize("@ss.hasPermission('zsjos:personal-calendar:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.personalcalendar.vo.PersonalCalendarEventRespVO>> search(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.personalcalendar.vo.PersonalCalendarSearchReqVO req) {
+        return success(service.search(req, getLoginUserId()));
+    }
+
     @Resource private PersonalCalendarEventService service;
 
     @GetMapping

@@ -19,6 +19,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/lead-follow-up-calendar")
 @Tag(name = "管理后台 - 销售客资跟进日历")
 public class LeadCalendarController {
+
+    @GetMapping("/search")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-follow-up-calendar:query') && @ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.calendar.LeadCalendarCardRespVO>> search(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.calendar.LeadCalendarSearchReqVO req) {
+        return success(service.search(req, getLoginUserId()));
+    }
+
     @Resource private LeadCalendarService service;
 
     @GetMapping("/days")

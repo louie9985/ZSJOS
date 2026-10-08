@@ -86,6 +86,8 @@ public class LeadObjectPermissionService {
             case "owner-transfer", "owner-release-public-sea" -> Objects.equals(userId, lead.getOwnerUserId());
             case "request-submitter-assist" -> canRequestSubmitterAssist(lead, userId);
             case "qualification-manage" -> canManageQualificationException(lead, userId);
+            case SupervisorLeadOverturnPolicy.OBJECT_ACTION -> lead.getOwnerUserId() != null
+                    && getManagedUserIds(userId).contains(lead.getOwnerUserId());
             default -> false;
         };
         if (!allowed) {

@@ -69,6 +69,7 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPol
 
 @Service
 public class LeadManagementServiceImpl implements LeadManagementService {
+    @Resource private SupervisorLeadOverturnService supervisorOverturnService;
     @Resource private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
     @Resource private LeadSubmitterAssistRequestMapper submitterAssistRequestMapper;
 
@@ -76,6 +77,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Resource
     private LeadMapper leadMapper;
+    @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource
     private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Resource
@@ -636,7 +638,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 && leadObjectPermissionService.canManageQualificationException(lead, currentUserId);
         if (canManageQualification && (suspended || recyclePending)) {
             if (suspended) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RESTORE, true));
+                if (restoreOwnerPolicy.isEligible(lead)) {
+                    actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RESTORE, true));
+                }
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RECYCLE, true));
             }
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
@@ -715,6 +719,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (currentUserId == null) return;
         Long scopedOwner = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
         if (scopedOwner == null || !leadObjectPermissionService.getManagedUserIds(currentUserId).contains(scopedOwner)) return;
+        if (STATUS_INVALID.equals(lead.getStatus())
+                && securityFrameworkService.hasPermission(SupervisorLeadOverturnPolicy.PERMISSION)) {
+            var overturn = supervisorOverturnService.action(lead, currentUserId);
+            if (overturn != null) actions.add(overturn);
+        }
         if (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_TRANSFER)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_TRANSFER, true));
@@ -733,7 +742,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));
         }
         if (SupervisorLeadActionPolicy.isAllowed(RESTORE, lead)
-                && leadAssignmentService.isEligibleSalesUser(scopedOwner)
+                && restoreOwnerPolicy.isEligible(lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RESTORE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RESTORE, true));
         }

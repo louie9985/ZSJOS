@@ -12,6 +12,6 @@ import java.util.List;
 @Data
 public class MaterialReferenceReqVO {
     @NotNull private Long targetContentVersionId;
-    @NotEmpty @Size(max = 100) @Valid private List<MaterialReferenceFieldReqVO> fields;
+    @NotEmpty @Size(max = 100) private List<@Valid MaterialReferenceFieldReqVO> fields;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 }

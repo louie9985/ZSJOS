@@ -61,6 +61,8 @@ import java.util.Objects;
 @Slf4j
 @Component
 public class FeedbackContentProvider implements BpmApprovalContentProvider {
+    @Resource
+    private cn.iocoder.yudao.module.bpm.api.task.BpmProcessProgressApi progressApi;
 
     private static final String PREFIX = "feedback:";
 
@@ -331,8 +333,7 @@ public class FeedbackContentProvider implements BpmApprovalContentProvider {
             return true;
         }
         try {
-            if (permissionProvider.hasPermission(feedback.getId(), "read-admin", viewerId)
-                    || permissionProvider.hasPermission(feedback.getId(), "read-approver", viewerId)) {
+            if (permissionProvider.hasPermission(feedback.getId(), "read-admin", viewerId)) {
                 return true;
             }
         } catch (Exception ex) {
@@ -340,7 +341,12 @@ public class FeedbackContentProvider implements BpmApprovalContentProvider {
             log.debug("[canView][反馈({}) 管理权限解析失败：{}]", feedback.getId(), ex.toString());
         }
         Map<String, Object> context = approvalContext(round);
-        return FeedbackApprovalContext.isApprover(context, viewerId);
+        if (FeedbackApprovalContext.isApprover(context, viewerId)) return true;
+        try {
+            return round != null && progressApi.isParticipant(round.getProcessInstanceId(), viewerId);
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     /** 提交人本人（仅员工主体；兼职端账号走 feedbackId 的另一套入口）。 */

@@ -49,6 +49,10 @@ export const getTaskTodoPage = async (params: any) => {
   return await request.get({ url: '/bpm/task/todo-page', params })
 }
 
+export const getTodoTask = async (id: string): Promise<{ id: string; processInstanceId?: string; processInstance?: { id: string } }> => {
+  return await request.get({ url: '/bpm/task/get-todo', params: { id } })
+}
+
 export const getTaskDonePage = async (params: any) => {
   return await request.get({ url: '/bpm/task/done-page', params })
 }

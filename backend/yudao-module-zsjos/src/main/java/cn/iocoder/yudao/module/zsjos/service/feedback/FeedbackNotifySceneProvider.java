@@ -26,11 +26,22 @@ public class FeedbackNotifySceneProvider implements NotifySceneProvider {
     @Override
     public List<NotifySceneRespDTO> getScenes() {
         return List.of(
+                urgeScene(),
                 scene(FeedbackConstants.NOTIFY_SCENE_READY_FOR_HANDLING, "新反馈待处理", ROLE_DISPATCHER),
                 scene("zsjos.feedback.employee_replied", "员工补充反馈", ROLE_HANDLER),
                 scene("zsjos.feedback.admin_replied", "反馈有新回复", ROLE_SUBMITTER),
                 scene("zsjos.feedback.completed", "反馈处理完成", ROLE_SUBMITTER),
                 scene("zsjos.feedback.survey_requested", "反馈满意度调研", ROLE_SUBMITTER));
+    }
+
+    private NotifySceneRespDTO urgeScene() {
+        return new NotifySceneRespDTO(FeedbackApprovalService.URGE_SCENE, "需求审批催办",
+                List.of(variable("feedbackNo", "反馈编号"), variable("feedbackTitle", "反馈标题"),
+                        variable("submitterName", "提交人"), variable("roundNo", "审批轮次"),
+                        variable("taskId", "审批任务标识"), variable("processInstanceId", "流程标识"),
+                        variable("taskName", "当前节点"), variable("deepLink", "审批入口")),
+                List.of(new NotifySceneRoleRespDTO("approver", "当前审批人")),
+                List.of(NotifyActionType.BUSINESS_DETAIL), false);
     }
 
     @Override

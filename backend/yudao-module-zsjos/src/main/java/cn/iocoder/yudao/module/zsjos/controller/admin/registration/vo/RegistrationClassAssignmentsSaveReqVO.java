@@ -13,7 +13,7 @@ import java.util.List;
 public class RegistrationClassAssignmentsSaveReqVO {
     @NotNull private Integer version;
     @NotBlank @Size(max = 64) private String idempotencyKey;
-    @Valid @NotEmpty private List<AssignmentReqVO> assignments;
+    @NotEmpty private List<@Valid AssignmentReqVO> assignments;
 
     @Data
     public static class AssignmentReqVO {

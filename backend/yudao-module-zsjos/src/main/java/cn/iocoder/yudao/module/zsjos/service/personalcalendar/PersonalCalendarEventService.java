@@ -20,6 +20,20 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PERSON
 
 @Service
 public class PersonalCalendarEventService {
+
+    public cn.iocoder.yudao.framework.common.pojo.PageResult<PersonalCalendarEventRespVO> search(
+            cn.iocoder.yudao.module.zsjos.controller.admin.personalcalendar.vo.PersonalCalendarSearchReqVO req, Long userId) {
+        Long ownerId = req.getReadScope() == null && req.getTargetUserId() == null ? userId
+                : readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId);
+        var page = mapper.selectSearch(req, ownerId);
+        var result = BeanUtils.toBean(page.getList(), PersonalCalendarEventRespVO.class);
+        if (!result.isEmpty()) {
+            var users = userApi.getUserMap(page.getList().stream().map(PersonalCalendarEventDO::getOwnerUserId).distinct().toList());
+            result.forEach(row -> { var owner = users.get(row.getOwnerUserId()); row.setOwnerName(owner == null ? "未知账号" : owner.getNickname()); });
+        }
+        return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(result, page.getTotal());
+    }
+
     public static final String STATUS_ACTIVE = "ACTIVE";
     public static final String SOURCE_MANUAL = "MANUAL";
 

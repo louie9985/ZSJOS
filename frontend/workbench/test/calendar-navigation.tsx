@@ -58,8 +58,9 @@ function Diagnostics() {
       const content = document.querySelector<HTMLElement>('.calendar-side-navigation-content')
       if (buttons.length !== 2 || !content) { setText('导航未渲染'); return }
       const [left, right] = buttons.map(button => button.getBoundingClientRect()), body = content.getBoundingClientRect()
-      const outside = left.right <= body.left && right.left >= body.right
-      const centered = Math.abs(left.top + left.height / 2 - (body.top + body.height / 2)) < 2
+      const mobile = innerWidth <= 768
+      const outside = mobile ? left.bottom <= body.top && right.bottom <= body.top : left.right <= body.left && right.left >= body.right
+      const centered = mobile ? Math.abs(left.top - right.top) < 2 : Math.abs(left.top + left.height / 2 - (body.top + body.height / 2)) < 2
       const fits = right.right <= innerWidth && left.left >= 0 && document.documentElement.scrollWidth <= innerWidth
       setText((outside && centered && fits ? '布局通过' : '布局待检查') + ' · 两侧独立 ' + outside + ' · 垂直居中 ' + centered + ' · 页面无横溢出 ' + fits + ' · 视口 ' + innerWidth + 'px · 最近请求 ' + (calls.at(-1) || '无'))
     }, 250)
@@ -70,7 +71,7 @@ function Diagnostics() {
 function Inner() {
   const Page = pages[(params.get('scene') || 'exam') as keyof typeof pages] || ExamCalendarPage
   const permissions = scenario === 'denied' ? [] : ['zsjos:personal-calendar:query', 'zsjos:lead-follow-up-calendar:query', 'zsjos:lead:query']
-  return <BrowserRouter><ThemeProvider><App><div style={{ height: 750 }}><Page permissions={permissions} /></div><Diagnostics /></App></ThemeProvider></BrowserRouter>
+  return <BrowserRouter><ThemeProvider><App><div style={{ height: innerWidth <= 768 ? 'auto' : 750 }}><Page permissions={permissions} /></div><Diagnostics /></App></ThemeProvider></BrowserRouter>
 }
 function Host() {
   const [scene, setScene] = useState(params.get('scene') || 'exam')

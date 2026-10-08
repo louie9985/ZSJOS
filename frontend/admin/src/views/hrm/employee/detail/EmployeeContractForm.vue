@@ -86,7 +86,7 @@
       <el-form-item label="附件">
         <UploadFile
           v-model="formData.fileUrls"
-          :file-size="16"
+          :file-size="100"
           :file-type="contractAttachmentFileTypes"
         />
       </el-form-item>

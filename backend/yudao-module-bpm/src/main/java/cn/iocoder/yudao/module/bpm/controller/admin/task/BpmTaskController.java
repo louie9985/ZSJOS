@@ -64,6 +64,27 @@ public class BpmTaskController {
     @Resource
     private DeptApi deptApi;
 
+    @GetMapping("/get-todo")
+    @Operation(summary = "按任务标识读取本人的当前待办")
+    @PreAuthorize("@ss.hasPermission('bpm:task:query')")
+    public CommonResult<BpmTaskRespVO> getTodo(@RequestParam("id") String id) {
+        Task task = taskService.getTask(id);
+        if (task == null || task.isSuspended() || !String.valueOf(getLoginUserId()).equals(task.getAssignee())
+                || !cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum.RUNNING.getStatus().equals(
+                cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils.getTaskStatus(task))) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_NOT_EXISTS);
+        }
+        BpmTaskRespVO result = taskService.getTodoTask(getLoginUserId(), id, task.getProcessInstanceId());
+        // The shared detail reader may fall back to another task if this one completes during the read.
+        if (result == null || !id.equals(result.getId())
+                || !cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum.RUNNING.getStatus().equals(result.getStatus())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_NOT_EXISTS);
+        }
+        return success(result);
+    }
+
     @GetMapping("todo-page")
     @Operation(summary = "获取 Todo 待办任务分页")
     @PreAuthorize("@ss.hasPermission('bpm:task:query')")

@@ -33,9 +33,9 @@ export default function PositioningEvidence({ card, onChanged, mode = 'all' }: {
     {mode !== 'files' && card.canUploadEvidence && <Button onClick={() => setOpen(true)}>{card.evidence?.length ? '追加确认凭证' : '上传确认凭证'}</Button>}
     <PositioningDialog title="上传学员确认凭证" open={open} mask={{ closable: false }} keyboard={false} onCancel={() => { if (!busy) setOpen(false) }}
       onOk={() => void submit()} okText="提交确认凭证" confirmLoading={busy} okButtonProps={{ disabled: !files.length }}>
-      <Alert type="info" message="请上传与学员确认本版定位卡的聊天记录、音频等凭证。至少一份，每份不超过 20 MB；提交成功后该版本才可应用。" />
+      <Alert type="info" message="请上传与学员确认本版定位卡的聊天记录、音频等凭证。至少一份，每份不超过 100 MB；提交成功后该版本才可应用。" />
       <Upload fileList={files} disabled={busy} multiple beforeUpload={file => {
-        if (!file.size || file.size > 20 * 1024 * 1024) { message.error('文件须为 1 字节至 20 MB'); return Upload.LIST_IGNORE }
+        if (!file.size || file.size > 100 * 1024 * 1024) { message.error('文件须为 1 字节至 100 MB'); return Upload.LIST_IGNORE }
         setFiles(current => current.length < 20 ? [...current, { uid: file.uid, name: file.name, file }] : current); return false
       }} onRemove={file => { setFiles(current => current.filter(row => row.uid !== file.uid)); return true }}><Button disabled={busy}>选择凭证附件</Button></Upload>
     </PositioningDialog>

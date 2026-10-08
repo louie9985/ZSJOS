@@ -73,6 +73,9 @@ import static org.junit.jupiter.api.Assertions.*;
     var data=new DeptDataPermissionRespDTO(); data.setAll(dataAll); data.setDeptIds(Set.of(10L));
     lenient().when(permissionApi.getDeptDataPermission(1L)).thenReturn(present?data:null);
     lenient().when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(ownPermission);
+    var targetPolicy=access.targetVisibility();
+    for(long person:List.of(1L,2L))for(Long department:Arrays.asList(null,10L,20L))
+     assertEquals(access.historicalRowAllowed(q("USER",person),department),targetPolicy.test(person,department),"Target snapshot policy");
     for(String type:List.of("SELF","USER","DEPT","CENTER")) for(long id:List.of(1L,2L)) {
      var query=q(type,id);var projected=access.historicalScope(query);
      for(Long dept:Arrays.asList(null,10L,20L)) {

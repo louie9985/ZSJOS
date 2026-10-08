@@ -122,7 +122,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
+  if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>
   if (menu?.path === APP_ROUTES.PERSONNEL) return <PersonnelPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.PARTNER) return <PartnerPage permissions={permissions}/>

@@ -89,6 +89,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
+    @Mock private RepurchaseDuplicateGuard repurchaseDuplicateGuard;
+    @Mock private RepurchaseCustomerService repurchaseCustomers;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService submissionIdentityService;
     @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Mock private PurchaseIntentMapper purchaseIntentMapper;
     @Mock private PaymentIntentMapper paymentIntentMapper;
@@ -887,7 +890,9 @@ class SalesOrderServiceImplTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"500.00", "0.00"})
     void reviseCreatesIndependentSuccessorAndPreservesRejectedOrder(String amount) {
+        String oldGifts = "[\"{\\\"code\\\":\\\"old\\\",\\\"name\\\":\\\"原礼品\\\"}\"]";
         SalesOrderDO order = new SalesOrderDO();
+        order.setGiftItems(oldGifts);
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
         order.setPersonId(10L); order.setPurchaseIntentId(800L);
         PurchaseIntentDO intent = purchaseIntent("offline_paid");
@@ -909,7 +914,13 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
                 .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
 
-        Long successorId = service.reviseAndResubmit(100L, 20L, request(new BigDecimal(amount), "13800138000", null));
+        var revision = request(new BigDecimal(amount), "13800138000", null);
+        revision.setGiftItems(List.of("old")); revision.setGiftShippingAddress("历史地址");
+        Long successorId = service.reviseAndResubmit(100L, 20L, revision);
+        assertEquals(oldGifts, order.getGiftItems());
+        assertEquals(List.of("old"), revision.getGiftItems());
+        verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(inserted ->
+                inserted.getGiftItems().startsWith("[{" ) && SalesOrderGiftSnapshot.read(inserted.getGiftItems()).getFirst().name().equals("原礼品")));
 
         assertEquals(101L, successorId);
         assertEquals(STATUS_SUPERSEDED, order.getStatus());
@@ -1166,6 +1177,51 @@ class SalesOrderServiceImplTest {
                 && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)
                 && Objects.equals(order.getFormalSalesUserId(), 20L)));
         verifyNoInteractions(opportunityMapper, lifecycleTaskService);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void matchedRepurchaseBelongsToCurrentSalesOrEducationWithOrWithoutEffectiveOrder(boolean education, boolean effectiveOrder) {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(77L); lead.setStatus(STATUS_WON);
+        lenient().when(leadMapper.selectLatestByPersonId(10L)).thenReturn(lead);
+        if (education) doThrow(cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(LEAD_SUBMITTER_IDENTITY_INVALID)).when(submissionIdentityService).requireSales(20L);
+        when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
+        lenient().when(orderMapper.hasEffectiveOrder(10L)).thenReturn(effectiveOrder);
+        SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
+        when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");
+        province.setType(2); province.setStatus(0); province.setLeafSelectable(true); when(areaApi.getArea(120000)).thenReturn(province);
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
+        doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
+        SalesOrderRepurchaseReqVO req = new SalesOrderRepurchaseReqVO(); req.setRepurchaseReason("继续学习");
+        req.setOrder(request(BigDecimal.ZERO, "13800138000", null));
+
+        req.setCustomerName(req.getOrder().getStudentName()); req.setCustomerMobile(req.getOrder().getStudentMobile()); req.setCustomerWechatId(req.getOrder().getStudentWechatId());
+        String originalRequest = JsonUtils.toJsonString(req);
+        Long id = service.createMatchedRepurchase(10L, 20L, req);
+
+        assertEquals(101L, id);
+        verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(order -> ORDER_TYPE_REPURCHASE.equals(order.getOrderType())
+                && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)
+                && Objects.equals(order.getFormalSalesUserId(), 20L)
+                && Objects.equals(order.getFormalOwnerIdentity(), education ? "education" : "sales")
+                && Objects.equals(order.getSubmitterCenterType(), education ? SUBMITTER_CENTER_STUDENT_DELIVERY : SUBMITTER_CENTER_SALES)));
+        verifyNoInteractions(opportunityMapper, lifecycleTaskService);
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
+        assertEquals(77L,lead.getOwnerUserId());
+        verify(orderMapper, never()).hasEffectiveOrder(anyLong());
+        var created = ArgumentCaptor.forClass(SalesOrderDO.class);
+        verify(orderMapper).insert(created.capture());
+        when(orderMapper.selectByIdempotencyKey(req.getOrder().getIdempotencyKey())).thenReturn(created.getValue());
+        var replay = JsonUtils.parseObject(originalRequest, SalesOrderRepurchaseReqVO.class);
+        assertEquals(id, service.createMatchedRepurchase(10L, 20L, replay));
+        verify(orderMapper, times(1)).insert(any(SalesOrderDO.class));
+        req.setRepurchaseReason("不同成交内容");
+        assertThrows(ServiceException.class, () -> service.createMatchedRepurchase(10L, 20L, req));
+
     }
 
     @Test

@@ -12,5 +12,5 @@ import java.util.List;
 public class MaterialSchemaSaveReqVO {
     private Long id;
     private Integer version;
-    @NotEmpty @Size(max = 100) @Valid private List<MaterialFieldDefinition> fields;
+    @NotEmpty @Size(max = 100) private List<@Valid MaterialFieldDefinition> fields;
 }

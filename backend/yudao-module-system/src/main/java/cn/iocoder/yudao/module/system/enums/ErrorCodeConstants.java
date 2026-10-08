@@ -81,6 +81,11 @@ public interface ErrorCodeConstants {
 
     // ========== 通知公告 1-002-008-000 ==========
     ErrorCode NOTICE_NOT_FOUND = new ErrorCode(1_002_008_001, "当前通知公告不存在");
+    ErrorCode NOTICE_SHARE_INVALID = new ErrorCode(1_002_008_007, "分享内容已失效");
+    ErrorCode NOTICE_SHARE_ALREADY_OPEN = new ErrorCode(1_002_008_008, "分享已开启，请刷新分享配置");
+    ErrorCode NOTICE_SHARE_CONFLICT = new ErrorCode(1_002_008_009, "分享状态已变化，请刷新后重试");
+    ErrorCode NOTICE_SHARE_CONFIG_INVALID = new ErrorCode(1_002_008_010, "外部阅读地址未正确配置，请联系管理员");
+    ErrorCode NOTICE_SHARE_RESOURCE_UNAVAILABLE = new ErrorCode(1_002_008_011, "分享附件不可用");
     ErrorCode NOTICE_NOT_DRAFT = new ErrorCode(1_002_008_002, "仅草稿公告允许编辑或删除");
     ErrorCode NOTICE_NOT_PUBLISHED = new ErrorCode(1_002_008_003, "当前公告未发布或已下线");
     ErrorCode NOTICE_ATTACHMENT_INVALID = new ErrorCode(1_002_008_004, "公告附件不存在、无权引用或不符合限制");

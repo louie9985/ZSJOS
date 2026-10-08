@@ -18,6 +18,14 @@ function nodes(node: ReactNode): Array<{ type: unknown; props: Record<string, un
 }
 
 describe('full-name exam month', () => {
+  it('applies saved colors to single-day and every cross-week multi-day segment', () => {
+    const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
+      exactRows={[{ ...exact(1), backgroundColor: '#ffcc00' }]}
+      multiDayRows={[{ ...multi(2), backgroundColor: '#001133' }]}
+      onDay={() => {}} statusLabel={scheduleStatusLabel} />)
+    expect(html.match(/background-color:#ffcc00;color:#000000/g)).toHaveLength(1)
+    expect(html.match(/background-color:#001133;color:#ffffff/g)).toHaveLength(2)
+  })
   it.each([1, 3, 4, 10, 110])('renders all %i single-day records with no overflow entry or status tags', count => {
     const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
       exactRows={Array.from({ length: count }, (_, i) => exact(i))} multiDayRows={[]}

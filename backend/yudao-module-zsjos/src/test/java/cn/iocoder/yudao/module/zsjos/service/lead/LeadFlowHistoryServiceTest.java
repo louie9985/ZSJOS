@@ -68,6 +68,18 @@ class LeadFlowHistoryServiceTest {
     }
 
     @Test
+    void supervisorDecisionHasItsOwnLabelAndValidityTransition() {
+        var decision = event(90L, SupervisorLeadOverturnPolicy.EVENT, submittedAt.plusHours(1), "invalid", "valid");
+        decision.setReason("主管复核证据充分");
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(decision));
+        var row = service.getHistory(7L, 99L).getFirst();
+        assertEquals("主管直接改判有效", row.getFlowNode());
+        assertEquals("无效", row.getLeadStatusBefore());
+        assertEquals("有效", row.getLeadStatusAfter());
+        assertEquals("主管复核证据充分", row.getReason());
+    }
+
+    @Test
     void mergesSourcesDeduplicatesReferencedAssignmentAndSortsNumericIds() {
         LocalDateTime occurredAt = submittedAt.plusMinutes(10);
         BusinessEventDO accepted = event(9L, "lead_assignment_accepted", occurredAt,

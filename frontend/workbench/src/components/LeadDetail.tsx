@@ -10,6 +10,7 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import LeadDetailOverview, { type LeadProfileVariant } from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
 import LeadAppealPanel from './LeadAppealPanel'
+import SupervisorLeadOverturnModal from './SupervisorLeadOverturnModal'
 import LeadFlowHistoryPanel from './LeadFlowHistoryPanel'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import LeadBasicInfoModal from './LeadBasicInfoModal'
@@ -34,8 +35,9 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant }: {
+export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant }: {
   lead: ManagedLead
+  refreshVersion?: number
   categories: DictData[]
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
@@ -59,6 +61,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
 }) {
   const readOnly = mode === 'student-readonly'
   const managerMode = mode === 'manager-readonly'
+  const [overturnToken, setOverturnToken] = useState<string>()
+  useEffect(() => { setOverturnToken(undefined) }, [lead.id])
   // Read-only planners still need the server-authorized sales follow-up history.
   const [studentInfoLinkMode, setStudentInfoLinkMode] = useState<'generate' | 'view'>()
   const visibleTabs = resolveVisibleLeadDetailTabs(baseTabs, lead.visibleTabs)
@@ -201,6 +205,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     setQualificationConfirmOpen(true)
   }
   const submitQualificationAction = async () => {
+    // The modal owns submission loading; close the confirmation without retaining its async spinner.
     setQualificationConfirmOpen(false)
     const action = qualificationAction
     const supervisorAction = managerMode || qualificationSupervisorAction
@@ -270,6 +275,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const toolbarActions: ToolbarAction[] = [
+    actions.has('SUPERVISOR_OVERTURN_VALID') && { key: 'supervisor-overturn-valid', icon: <CheckOutlined/>, label: '改判有效', disabled: !actions.get('SUPERVISOR_OVERTURN_VALID')?.enabled || !actions.get('SUPERVISOR_OVERTURN_VALID')?.qualificationToken, onClick: () => setOverturnToken(actions.get('SUPERVISOR_OVERTURN_VALID')?.qualificationToken) },
     actions.has('GENERATE_STUDENT_INFO_FORM') && { key: 'student-info-generate', icon: <FileAddOutlined/>, label: '生成信息收集表', onClick: () => setStudentInfoLinkMode('generate') },
     actions.has('VIEW_STUDENT_INFO_FORM_LINK') && { key: 'student-info-link', icon: <FileAddOutlined/>, label: '收集表链接', onClick: () => setStudentInfoLinkMode('view') },
     actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
@@ -292,8 +298,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     if (tab === 'student-info') return { key: tab, label: '学员信息', children: <StudentInfoPanel key={lead.id} leadId={lead.id}/> }
     if (tab === 'submitter-feedback') return { key: tab, label: '销售反馈', children: <LeadSubmitterFeedbackPanel key={lead.id} lead={lead} canCreate={!readOnly && actions.has('REPLY_SUBMITTER')} onChanged={onChanged} onDirtyChange={setFeedbackDirty}/> }
     if (tab === 'assist-history') return { key: tab, label: '协助历史', children: <LeadSubmitterAssistHistoryPanel key={lead.id} lead={lead} canReply={!readOnly && actions.has('SUBMITTER_ASSIST_REPLY')} onChanged={onChanged}/> }
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview followUpRefreshVersion={followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
-    if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={handleStandaloneFollowUpSuccess} onTotalChange={setFollowUpTotal}/></div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview followUpRefreshVersion={refreshVersion + followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
+    if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={refreshVersion + followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={handleStandaloneFollowUpSuccess} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
     if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
@@ -323,6 +329,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     {contextHeader}
     <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => { setInternalActiveTab(key); onTabChange?.(key) }} items={tabItems}/>
     {!readOnly && <>
+      {overturnToken && <SupervisorLeadOverturnModal key={lead.id} lead={lead} token={overturnToken} onClose={() => setOverturnToken(undefined)} onChanged={onChanged}/>}
       <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={() => void judgeInvalid()}>确认判无效</Button></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {invalidReasonError && <Alert type="error" showIcon message={invalidReasonError} action={<Button size="small" onClick={() => void loadInvalidReasons()}>重试</Button>}/>} 
@@ -351,7 +358,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
       <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)} onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
       <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={handleStandaloneFollowUpSuccess}/>
-      <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放至抢单池', releasePublicSea: '释放至公海池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={submitQualificationAction}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
+      <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原负责人', transfer: '转派客资', recycle: '回收客资', release: '释放至抢单池', releasePublicSea: '释放至公海池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={() => { void submitQualificationAction() }}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {qualificationAction === 'transfer' && <Form.Item label="目标销售" required><EmployeeSelect users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder={qualificationCandidatesLoading ? '正在加载可转派销售' : qualificationCandidates.length ? '选择目标销售' : '暂无可转派销售'} style={{ width: '100%' }}/></Form.Item>}
           {qualificationAction === 'releasePublicSea' && qualificationSupervisorAction && <Form.Item label="实际跟进销售（可不填）"><EmployeeSelect allowClear users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder="不指定则进入待分配" style={{ width: '100%' }}/></Form.Item>}

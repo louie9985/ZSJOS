@@ -1,6 +1,7 @@
 import dayjs, { type Dayjs } from 'dayjs'
 import type { ExamSchedule } from '../services/api'
 import { calendarWindow, coversExamDay, layoutMultiDayWeek } from './examCalendarLayout'
+import { examBackgroundStyle } from './examCalendarColor'
 
 type Props = {
   anchor: Dayjs
@@ -31,6 +32,7 @@ export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onD
             <div className="exam-calendar-events" style={{ gridRow: laneCount + 2 }}>
               {rows.map(item => <button type="button" key={item.id}
                 className={'exam-calendar-event exam-status-tone tone-' + item.recordStatus.toLowerCase()}
+                style={examBackgroundStyle(item.backgroundColor)}
                 aria-label={(item.scheduleName || '未命名考期') + '，' + statusLabel(item.recordStatus) + '，查看' + date.format('M月D日') + '全部考期'}
                 onClick={event => { event.stopPropagation(); onDay(date) }}>
                 <span>{item.scheduleName || '未命名考期'}</span>
@@ -43,7 +45,7 @@ export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onD
           return (
             <div key={schedule.id} className={'exam-multiDay-bar exam-status-tone tone-' + schedule.recordStatus.toLowerCase()}
               data-schedule-id={schedule.id}
-              style={{ gridColumn: (startColumn + 1) + ' / ' + (endColumn + 2), gridRow: lane + 2 }}>
+              style={{ ...examBackgroundStyle(schedule.backgroundColor), gridColumn: (startColumn + 1) + ' / ' + (endColumn + 2), gridRow: lane + 2 }}>
               {continuesBefore && <span aria-hidden="true">‹</span>}
               <span className="exam-multiDay-bar-label">{schedule.scheduleName || '未命名考期'}</span>
               {continuesAfter && <span aria-hidden="true">›</span>}

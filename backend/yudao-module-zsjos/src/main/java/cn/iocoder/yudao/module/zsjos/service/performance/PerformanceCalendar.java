@@ -8,10 +8,17 @@ import java.util.stream.Collectors;
 public final class PerformanceCalendar {
  private PerformanceCalendar() {}
  public static CalendarDay summarize(LocalDate day,List<PerformanceFact> receipts,List<PerformanceFact> tasks,LocalDateTime now){
+  return new Index(tasks).summarize(day,receipts,now);
+ }
+ private record Responsibility(Long lead,Long user,Long assignment) {}
+ public static final class Index {
+ private final Map<Responsibility,List<PerformanceFact>> tasks=new HashMap<>();
+ public Index(List<PerformanceFact> rows){for(var t:rows)if("lead_qualification".equals(t.getGroupKey()))tasks.computeIfAbsent(new Responsibility(t.getLeadId(),t.getUserId(),t.getAssignmentId()),k->new ArrayList<>()).add(t);}
+ public CalendarDay summarize(LocalDate day,List<PerformanceFact> receipts,LocalDateTime now){
   var received=receipts.stream().filter(x->x.getReceivedAt().toLocalDate().equals(day)).collect(Collectors.toMap(PerformanceFact::getLeadId,Function.identity(),(a,b)->a)).values();
   long valid=0,invalid=0,pending=0,overdue=0,ended=0,late=0,onTime=0,due=0,unknown=0;
   for(var receipt:received){
-   var rounds=tasks.stream().filter(t->"lead_qualification".equals(t.getGroupKey())&&Objects.equals(t.getLeadId(),receipt.getLeadId())&&Objects.equals(t.getUserId(),receipt.getUserId())&&Objects.equals(t.getAssignmentId(),receipt.getAssignmentId())).toList();
+   var rounds=tasks.getOrDefault(new Responsibility(receipt.getLeadId(),receipt.getUserId(),receipt.getAssignmentId()),List.of());
    var task=rounds.stream().max(Comparator.comparing(PerformanceFact::getId)).orElse(null);
    var originalDeadline=rounds.stream().filter(t->!cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.isAutomaticSource(t.getGenerationSource())).map(PerformanceFact::getDueAt).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
    if(task==null||task.getOutcome()==null){unknown++;continue;}
@@ -29,5 +36,6 @@ public final class PerformanceCalendar {
    else pending++;
   }
   return new CalendarDay(day,received.size(),valid,invalid,pending,overdue,ended,late,onTime,due,unknown);
+ }
  }
 }

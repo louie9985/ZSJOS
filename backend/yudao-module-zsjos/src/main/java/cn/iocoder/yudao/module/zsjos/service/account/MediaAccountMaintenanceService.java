@@ -32,6 +32,19 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class MediaAccountMaintenanceService {
+
+    public PageResult<MediaAccountCalendarItemRespVO> calendarSearch(MediaCalendarSearchReqVO req, Long userId) {
+        var scope = calendarScopeService.resolve(userId);
+        var page = accountMapper.selectCalendarSearch(req, scope.userIds(), scope.all());
+        var users = userMap(page.getList().stream()
+                .flatMap(row -> java.util.stream.Stream.of(row.getDirectorUserId(), row.getOwnerOperatorUserId())).toList());
+        Set<Long> personIds = page.getList().stream().map(MediaAccountDO::getStudentPersonId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, PersonDO> people = personIds.isEmpty() ? Map.of() : personMapper.selectBatchIds(personIds).stream()
+                .collect(Collectors.toMap(PersonDO::getId, Function.identity()));
+        return new PageResult<>(page.getList().stream().map(row -> toCalendar(row, users, people)).toList(), page.getTotal());
+    }
+
     public static final String DICT_CURRENT_STATUS = "zsjos_media_account_current_status";
     public static final String DICT_STAGE = "zsjos_media_account_stage";
     public static final String DICT_PRIMARY_PROBLEM = "zsjos_media_account_primary_problem";

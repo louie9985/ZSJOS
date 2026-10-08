@@ -22,7 +22,7 @@ public class WorkPlanSaveReqVO {
     @NotNull private LocalDate endDate;
     private Integer version;
     private String reason;
-    @Valid private List<WorkPlanTemplateFieldSaveReqVO> supplementalFields;
+    private List<@Valid WorkPlanTemplateFieldSaveReqVO> supplementalFields;
     private Map<String, Object> planFields;
-    @Valid private List<WorkTaskSaveReqVO> tasks;
+    private List<@Valid WorkTaskSaveReqVO> tasks;
 }

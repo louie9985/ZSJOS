@@ -505,7 +505,7 @@ public class MediaAccountProfileService {
         MediaAccountDO a=accounts.require(id);requireMaintain(a,userId);
         var f=configs.getPublished().getFields().stream().filter(x->x.getKey().equals(fieldKey)).findFirst().orElseThrow(()->exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
         if(!MediaAccountFieldPolicy.canWrite(f,a,userId))throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
-        if(!Set.of("image","record","attachment").contains(f.getType())||content.length==0||content.length>20*1024*1024)throw exception(MEDIA_ACCOUNT_ATTACHMENT_INVALID);
+        if(!Set.of("image","record","attachment").contains(f.getType())||content.length==0||content.length>100*1024*1024)throw exception(MEDIA_ACCOUNT_ATTACHMENT_INVALID);
         String verified=detectType(content);
         if(verified==null||"image".equals(f.getType())&&!verified.startsWith("image/"))throw exception(MEDIA_ACCOUNT_ATTACHMENT_INVALID);
         String safeName=name==null?"attachment":name.replaceAll("[\\\\/\\r\\n]","_");

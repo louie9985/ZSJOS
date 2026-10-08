@@ -1,3 +1,5 @@
+import BusinessSortMenu from '../components/BusinessSortMenu'
+import { sortableColumns, readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
 import BusinessTable from '../components/BusinessTable'
 import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
@@ -709,7 +711,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [studentSort, setStudentSort] = useState<{ key?: string; order?: "ascend" | "descend" }>({});
+  const [studentSort, setStudentSort] = useState<BusinessSort>({});
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
   const [selectedServiceId, setSelectedServiceId] = useState<number>();
   const [repurchaseOpen, setRepurchaseOpen] = useState(false);
@@ -821,7 +823,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
       if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRows([]); setTotal(0); setSelected(undefined); return; }
-      const baseRequestKey = `${JSON.stringify(readScope)}:${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
+      const baseRequestKey = `${JSON.stringify(studentSort)}:${JSON.stringify(readScope)}:${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
       const requestKey = options.force
         ? `${baseRequestKey}:force:${++forcedListSequence.current}`
@@ -832,6 +834,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       setError("");
       try {
         const page = await api.myStudents({
+          ...studentSort,
           ...(tenantReadAll ? readScope : {}),
           pageNo: targetPage,
           pageSize: PAGE_SIZE,
@@ -858,11 +861,11 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll, studentSort],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, classId, keyword, serviceStatus, readScope]);
+  }, [advancedFilter, classId, keyword, serviceStatus, readScope, studentSort]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
   const refreshCurrentStudent = useCallback(async () => {
     if (!selected) {
@@ -984,25 +987,15 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     { title: "客资编号", dataIndex: "leadNo", width: 150, render: value => value || "暂无客资编号" },
     { title: "手机号", dataIndex: "mobile", width: 140, render: value => value || "-" },
     { title: "微信号", dataIndex: "wechatId", width: 140, render: value => value || "-" },
-    { title: "班级", width: 180, render: (_, row) => row.services?.find(service => service.className)?.className || "未分班" },
-    { title: "课程服务", width: 240, render: (_, row) => row.services?.map(service => service.courseName || service.skuName || "课程服务").join("、") || "-" },
-    { title: "服务状态", width: 140, render: (_, row) => <Space wrap>{row.services?.map(service => <Tag key={service.serviceRelationId} color={service.status === "active" ? "success" : undefined}>{serviceStatusLabel(service.status)}</Tag>) || "-"}</Space> },
-    { title: "订单号", width: 170, render: (_, row) => row.services?.map(service => service.orderNo || `订单 ${service.orderId}`).join("、") || "-" },
+    { title: "班级", key: "className", width: 180, render: (_, row) => row.services?.find(service => service.className)?.className || "未分班" },
+    { title: "课程服务", key: "courses", width: 240, render: (_, row) => row.services?.map(service => service.courseName || service.skuName || "课程服务").join("、") || "-" },
+    { title: "服务状态", key: "serviceStatus", width: 140, render: (_, row) => <Space wrap>{row.services?.map(service => <Tag key={service.serviceRelationId} color={service.status === "active" ? "success" : undefined}>{serviceStatusLabel(service.status)}</Tag>) || "-"}</Space> },
+    { title: "订单号", key: "orderNos", width: 170, render: (_, row) => row.services?.map(service => service.orderNo || `订单 ${service.orderId}`).join("、") || "-" },
     { title: "激活时间", key: "activatedAt", width: 180, sorter: true, render: (_, row) => formatTimestamp(row.activatedAt) }
   ];
-  const studentTableColumns = studentTableColumnSource.map(column => {
-    const key = String(column.key || column.dataIndex || column.title);
-    return { ...column, key, sortOrder: studentSort.key === key ? studentSort.order : null };
-  });
-  const studentTableRows = useMemo(() => {
-    if (!studentSort.key || !studentSort.order) return rows;
-    const direction = studentSort.order === "ascend" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const av = studentSort.key === "activatedAt" ? new Date(String(a.activatedAt || 0)).getTime() : String(a.name || "");
-      const bv = studentSort.key === "activatedAt" ? new Date(String(b.activatedAt || 0)).getTime() : String(b.name || "");
-      return (av < bv ? -1 : av > bv ? 1 : 0) * direction;
-    });
-  }, [rows, studentSort]);
+  const studentTableColumns = sortableColumns(studentTableColumnSource, studentSort);
+  const changeStudentSort = (sort: BusinessSort) => { ++listGeneration.current; resetSelection(); setPageNo(1); setRows([]); setStudentSort(sort); };
+  const studentSortMenu = <BusinessSortMenu label="学员" value={studentSort} fields={sortChoices(studentTableColumnSource)} onChange={changeStudentSort} />;
   return (
     <section className="workspace-page registration-page">
       <header className="registration-filter-shell">
@@ -1020,20 +1013,20 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         className="lead-management-table"
         rowKey="personId"
 
-        filters={<>{[<Space key="student-filters" wrap><Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
+        filters={<>{[<Space key="student-filters" wrap>{studentSortMenu}<Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
 
         columnsState={{ persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
         loading={loading}
-        dataSource={studentTableRows}
+        dataSource={rows}
         pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: value => void load(value) }}
         scroll={{ x: 1400 }}
         locale={{ emptyText: error ? "学员列表加载失败" : "当前筛选下暂无学员" }}
         onRow={row => ({ onClick: () => { void loadStudent(row.personId); setDrawerOpen(true); } })}
         columns={studentTableColumns}
-        onChange={(_, __, sorter) => { const active = Array.isArray(sorter) ? sorter[0] : sorter; setStudentSort({ key: String(active?.columnKey || ""), order: active?.order || undefined }); }}
+        onChange={(_, __, sorter, extra) => { if (extra.action === "sort") changeStudentSort(readTableSort(sorter)); }}
       /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
         <aside className="lead-inbox-list-pane">
-          <div className="inbox-avatar-toolbar"><InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
             <AdvancedFilterToolbar
               scene="student"

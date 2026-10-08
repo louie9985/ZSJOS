@@ -27,4 +27,5 @@ public class FeedbackRoundDO extends TenantBaseDO {
     private String businessKey;
     private String rejectReason;
     private LocalDateTime submittedAt;
+    private LocalDateTime lastUrgedAt;
 }

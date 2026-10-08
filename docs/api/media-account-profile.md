@@ -29,7 +29,7 @@
 - 所有业务字段 `requiredForCreate=false`。`requiredForComplete` 只提醒，不阻止空白或部分保存；禁用、自动、未分配和 record 字段不计入缺失。`false` 与 `0` 是有效值。
 - `group`：PROFILE、POSITIONING、STATUS、METRICS、REVIEW。`type`：text、textarea、number、date、select、multi_select、boolean、image、record、url。文本上限 2000 字（账号名称和主页 ID 为 255 字）；记录正文 10000 字；链接限 HTTP(S)。
 - 选择项来自 System 字典，未变化的选择保留历史快照，不重新解析已改名/停用的标签。新选择验证当前字典。实体字段后续通过所属业务 API 接入，不能以本地选项代替。
-- 图片上传 PNG/JPEG/WebP，记录附件另支持 PDF；单个 20 MB、每条记录最多 20 个。上传验证类型头与对象权限，绑定验证当前租户/账号/上传人命名空间；历史展示文件 ID 与上传时名称，访问使用 Infra 短期签名。
+- 图片上传 PNG/JPEG/WebP，记录附件另支持 PDF；单个 100 MB、每条记录最多 20 个。上传验证类型头与对象权限，绑定验证当前租户/账号/上传人命名空间；历史展示文件 ID 与上传时名称，访问使用 Infra 短期签名。
 - `cover`（主页截图）默认 OPERATOR，由当前责任运营上传、替换和删除，仍须通过菜单权限及账号对象权限校验。头像和背景属于运营。运营 `work_format` 和编导 `content_format` 独立保存。
 - 系统来源 `sourceType` 为 ACCOUNT、STUDENT 或 PENDING；人工为 MANUAL。当前已接入账号编号、姓名、联系方式和现存状态/定位标签快照。陪跑天数、期段计算、经营指标等待后续来源和统计口径；不伪造零值；定位内容按下述单一来源契约展示。
 - 更新仅合并 changes；null 清除本字段；未提交字段不覆盖。保留已禁用历史数据和快照。账号行锁加版本 CAS、租户拦截与幂等记录保障一致性；旧版本冲突时必须刷新后重试，不自动覆盖另一人的修改。
@@ -94,6 +94,8 @@ V211 已于 2026-09-12 在开发库执行。执行前备份位于 `backups/mysql
 修正 V209 默认配置，并在其末尾执行 `script/sql/mysql/media-account-cover-operator.sql`。已执行 V209 的开发库仅执行该修正文件，不重跑权限或其他业务迁移。脚本为已发布配置中责任为 UNASSIGNED 的 cover 图片字段发布新版本，仅修改 ownerType 为 OPERATOR；保留所有其他字段属性、旧版本 JSON、管理员草稿和账号图片数据。已分配、缺失及已删除配置不受影响，重复执行不再发布版本。执行期间暂停管理员配置编辑与发布；旧草稿沿用现有合并最新字段流程。回退通过配置 API 将上一版本内容重新发布，不删除历史。
 
 新库使用修正后的 V209 默认值；这是尚未发布的开发基线修正，不新增编号迁移。两端继续消费现有 ownerType 与 editableFields 协议，运营责任不按角色名称推断。
+
+2026-10-08 展示修正：主页图未上传时，外层图片占位区与维护弹窗均读取已启用 `cover` 字段的 `ownerType` 展示责任标签；配置为 `OPERATOR` 时显示“运营填写”，仅配置为 `UNASSIGNED` 时显示“责任待配置”。字段缺失或停用时不补造责任标签，上传入口继续遵循服务端 `editableFields`。
 
 ## 账号交付弹窗与作品历史（2026-09-14）
 

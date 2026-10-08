@@ -18,3 +18,17 @@
 .course-calendar-timeline-card span, .course-calendar-timeline-card small { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
 .course-calendar-timeline-card .ant-space { margin-top: auto; }
 @media (max-width: 768px) { .course-calendar-page { height: auto; min-height: 100%; } .course-calendar-page .page-heading { align-items: flex-start; flex-direction: column; } .course-calendar-timeline { height: 960px; } }
+
+@media (max-width: 768px) {
+  .course-calendar-timeline { display: block; height: auto; }
+  .course-calendar-hours,
+  .course-calendar-hour-line { display: none; }
+  .course-calendar-track { display: grid; gap: var(--crm-gap); border: 0; }
+  .course-calendar-timeline-event { position: static; width: auto !important; height: auto !important; padding: 0; }
+  .course-calendar-timeline-card { height: auto; gap: var(--crm-sp-2); padding: var(--crm-sp-3); }
+  .course-calendar-timeline-card strong,
+  .course-calendar-timeline-card span,
+  .course-calendar-timeline-card small { white-space: normal; overflow-wrap: anywhere; }
+  .course-calendar-summary > .ant-space,
+  .course-calendar-summary > .ant-btn { display: none; }
+}

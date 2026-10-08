@@ -23,8 +23,10 @@ public interface WithdrawalMapper extends BaseMapperX<WithdrawalDO> {
         if (matchedIds != null && matchedIds.isEmpty()) return new PageResult<>(List.of(), 0L);
         var query = new LambdaQueryWrapperX<WithdrawalDO>()
                 .eqIfPresent(WithdrawalDO::getApplicantUserId, userId)
-                .eqIfPresent(WithdrawalDO::getStatus, req.getStatus())
-                .orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId);
+                .eqIfPresent(WithdrawalDO::getStatus, req.getStatus());
+        String sorting = cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.withdrawal(req.getSortField(), req.getSortOrder());
+        if (sorting == null) query.orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId);
+        else query.last("ORDER BY " + sorting);
         query.inIfPresent(WithdrawalDO::getId, matchedIds)
                 .eqIfPresent(WithdrawalDO::getApplicantUserId, req.getApplicantUserId())
                 .eqIfPresent(WithdrawalDO::getPartnerId, req.getPartnerId())

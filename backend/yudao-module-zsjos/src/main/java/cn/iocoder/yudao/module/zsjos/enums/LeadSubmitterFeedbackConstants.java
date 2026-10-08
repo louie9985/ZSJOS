@@ -9,6 +9,6 @@ public interface LeadSubmitterFeedbackConstants {
     String ADMIN_SUBJECT = "ADMIN";
     String PARTNER_SUBJECT = "PARTNER";
     int MAX_FILES = 20;
-    long MAX_FILE_SIZE = 20 * 1024 * 1024;
+    long MAX_FILE_SIZE = 100 * 1024 * 1024;
 }
 

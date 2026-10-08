@@ -25,6 +25,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     default PageResult<PersonDO> selectAllMediaStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
         query.apply(MEDIA_PERSON_PREDICATE);
+        applyMediaOperatorFilter(query, req, null, false);
         if (req.getClassId() != null || req.getServiceStatus() != null) {
             query.apply(STUDENT_RELATION_PREDICATE
                     + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}) AND "
@@ -40,7 +41,13 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     }
 
     default PageResult<PersonDO> selectTenantReadStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds) {
+        return selectTenantReadStudentPage(req, matchedIds, false);
+    }
+
+    default PageResult<PersonDO> selectTenantReadStudentPage(MyStudentPageReqVO req, java.util.Collection<Long> matchedIds,
+                                                            boolean media) {
         QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
+        if (media) applyMediaOperatorFilter(query, req, null, true);
         query.apply(STUDENT_RELATION_PREDICATE
                 + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}))",
                 req.getClassId(), req.getServiceStatus());
@@ -118,7 +125,13 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
 
     default PageResult<PersonDO> selectMediaStudentPage(MyStudentPageReqVO reqVO, Long userId,
                                                        java.util.Collection<Long> matchedIds) {
+        return selectMediaStudentPage(reqVO, userId, matchedIds, false);
+    }
+
+    default PageResult<PersonDO> selectMediaStudentPage(MyStudentPageReqVO reqVO, Long userId,
+                                                       java.util.Collection<Long> matchedIds, boolean explicitRead) {
         QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
+        applyMediaOperatorFilter(query, reqVO, userId, explicitRead);
         query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                 + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
                 + "AND ({1} IS NULL OR sr.class_id={1}) AND ({2} IS NULL OR sr.status={2}) "
@@ -126,6 +139,33 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
                 + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0} OR sr.operator_user_id={0}) "
                 + "AND sr.status='active' AND sr.acceptance_status='accepted')))" , userId, reqVO.getClassId(), reqVO.getServiceStatus());
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
+    /** Match the same services projected by MyStudentServiceImpl, before pagination and counting. */
+    static void applyMediaOperatorFilter(QueryWrapperX<PersonDO> query, MyStudentPageReqVO req,
+                                         Long subjectId, boolean explicitRead) {
+        if (req.getOperatorUserId() == null) return;
+        String scope = STUDENT_RELATION_PREDICATE + "AND sr.operator_user_id={0} ";
+        if (subjectId == null || explicitRead) {
+            scope += "AND ({1} IS NULL OR sr.class_id={1}) AND ({2} IS NULL OR sr.status={2}) ";
+            if (subjectId == null) {
+                // An assigned operator itself qualifies the relation as media; no account is required.
+                query.apply(scope + ")", req.getOperatorUserId(), req.getClassId(), req.getServiceStatus());
+            } else {
+                scope += "AND sr.status IN ('active','paused','completed') AND (sr.owner_user_id={3} "
+                        + "OR (sr.acceptance_status='accepted' AND (sr.content_director_user_id={3} "
+                        + "OR sr.career_planner_user_id={3} OR sr.operator_user_id={3}))))";
+                query.apply(scope, req.getOperatorUserId(), req.getClassId(), req.getServiceStatus(), subjectId);
+            }
+        } else {
+            // Default personal projection includes active accepted services visible through account participation.
+            scope += "AND sr.status='active' AND sr.acceptance_status='accepted' "
+                    + "AND (sr.content_director_user_id={1} OR sr.career_planner_user_id={1} OR sr.operator_user_id={1} "
+                    + "OR EXISTS (SELECT 1 FROM zsjos_media_account opma WHERE opma.student_person_id=sr.person_id "
+                    + "AND opma.tenant_id=sr.tenant_id AND opma.deleted=b'0' "
+                    + "AND (opma.director_user_id={1} OR opma.owner_operator_user_id={1}))))";
+            query.apply(scope, req.getOperatorUserId(), subjectId);
+        }
     }
 
     /**

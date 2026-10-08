@@ -39,6 +39,7 @@ import static org.mockito.Mockito.*;
 class LeadQualificationServiceImplTest {
     @InjectMocks private LeadQualificationServiceImpl service;
     @Mock private LeadMapper leadMapper;
+    @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Mock private LeadAssignmentHistoryMapper historyMapper;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private DictDataApi dictDataApi;
@@ -59,6 +60,22 @@ class LeadQualificationServiceImplTest {
         lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null);
         lenient().when(categorySnapshotService.requireEnabled(any()))
                 .thenReturn(new LeadCategorySnapshotService.Selection(null, null));
+    }
+
+    @Test
+    void restoreRejectsIneligibleOwnerBeforeAnyMutation() {
+        LeadDO lead = pendingLead(); lead.setStatus("suspended"); lead.setOwnerIdentity("education");
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        LeadDispositionReqVO request = new LeadDispositionReqVO();
+        request.setIdempotencyKey("disabled-owner"); request.setReason("恢复");
+        withTenant(() -> {
+            var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.restore(1L, 99L, request));
+            assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_QUALIFICATION_RESTORE_OWNER_INVALID.getCode(), error.getCode());
+        });
+        assertEquals("suspended", lead.getStatus());
+        verifyNoInteractions(lifecycleTaskService, notifyEventPublisher);
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
     }
 
     @Test
@@ -195,8 +212,7 @@ class LeadQualificationServiceImplTest {
         lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
-        when(permissionService.hasQualificationManageAll()).thenReturn(true);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(20L)));
+        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
         LeadDispositionReqVO request = new LeadDispositionReqVO();
         request.setIdempotencyKey("request-3"); request.setReason("主管恢复");
 
@@ -204,6 +220,30 @@ class LeadQualificationServiceImplTest {
 
         assertEquals("submitted", lead.getStatus());
         assertNull(lead.getSuspendedAt());
+        verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
+        verify(notifyEventPublisher).publish(eq(QUALIFICATION_RESTORED), eq(1L), anyString(),
+                eq(99L), any(LocalDateTime.class), anyMap());
+    }
+
+    @Test
+    void restoreEducationKeepsOriginalOwnerAndIdentity() {
+        LeadDO lead = pendingLead();
+        lead.setStatus("suspended");
+        lead.setOwnerIdentity("education");
+        lead.setSourceType("education_self_sourced");
+        lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
+        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
+        LeadDispositionReqVO request = new LeadDispositionReqVO();
+        request.setIdempotencyKey("request-3"); request.setReason("主管恢复");
+
+        withTenant(() -> service.restore(1L, 99L, request));
+
+        assertEquals("submitted", lead.getStatus());
+        assertNull(lead.getSuspendedAt());
+        assertEquals(20L, lead.getOwnerUserId());
+        assertEquals("education", lead.getOwnerIdentity());
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
         verify(notifyEventPublisher).publish(eq(QUALIFICATION_RESTORED), eq(1L), anyString(),
                 eq(99L), any(LocalDateTime.class), anyMap());

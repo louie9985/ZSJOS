@@ -18,6 +18,8 @@ export const getNoticeReadPage = (params: { id: number; scope: NoticeReadScope; 
   request.get<{ list: NoticeReadPerson[]; total: number }>({ url: '/system/notice/read-page', params, preserveBusinessError: true })
 
 export interface NoticeVO {
+  sourceDeptId?: number; sourceDeptName?: string; publisherId?: number; publisherName?: string; audienceSummary?: string;
+
   id: number | undefined
   title: string
   type: number
@@ -48,9 +50,13 @@ export interface NoticeAttachmentVO {
 }
 
 export interface NoticeRecipientOptionsVO {
+  defaultSourceDeptId?: number
   departments: Array<{ id: number; parentId: number; name: string }>
   users: Array<{ id: number; nickname: string; deptId?: number; selectable: boolean; disabledReason?: string }>
 }
+
+export const noticeAudienceText = (notice: Pick<NoticeVO, 'audienceType' | 'audienceSummary'>) =>
+  notice.audienceSummary || (notice.audienceType === 'TARGET' ? '指定部门/用户（历史名称未记录）' : '全体员工')
 
 // 查询公告列表
 export const getNoticePage = (params: PageParam) => {

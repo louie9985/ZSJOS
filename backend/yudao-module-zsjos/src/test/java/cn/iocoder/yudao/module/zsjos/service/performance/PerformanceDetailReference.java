@@ -39,7 +39,7 @@ class PerformanceDetailReference {
  }
  public Overview overview(Query q) {
   var o=orders(q);var r=receipts(q);var n=now();
-  var performance=List.of("today","week","month","quarter","year","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
+  var performance=List.of("today","week","month","lastMonth","quarter","year","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
   var conversion=List.of("month","lastMonth","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
   List<TargetProgress> progress=new ArrayList<>();
   for(String k:List.of("lastWeek","week","month","quarter","year")){var w=window(k,n);String period="lastWeek".equals(k)?"week":k;progress.add(new TargetProgress(k,w.label(),metric(w,o,r),targets.resolve(q.getScopeType(),q.getScopeId(),period,w.start().toLocalDate())));}
@@ -89,7 +89,7 @@ class PerformanceDetailReference {
 
  private Target matchingTarget(Query q,Long user,Window w){String period=targetPeriod(q,w);return period==null?null:targets.resolve("USER",user,period,w.start().toLocalDate());}
  public static String sourceGroup(PerformanceFact fact){return "repurchase".equals(fact.getOrderType())?"self":Set.of("inbound","self").contains(Objects.toString(fact.getGroupKey(),""))?fact.getGroupKey():"unknown";}
- private String sourceName(String k){return switch(Objects.toString(k,"unknown")){case "inbound"->"线上引流";case "self"->"非引流";case "repurchase"->"复购";default->"历史来源缺失";};}
+ private String sourceName(String k){return switch(Objects.toString(k,"unknown")){case "inbound"->"线上引流";case "self"->"非引流";case "repurchase"->"复购";default->"其他";};}
  private List<Group> groups(List<PerformanceFact> rows,Function<PerformanceFact,String> key,boolean product){
   BigDecimal total=rows.stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
   return rows.stream().collect(Collectors.groupingBy(key,LinkedHashMap::new,Collectors.toList())).entrySet().stream().map(e->{BigDecimal a=e.getValue().stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);String label=e.getKey().contains("|")?e.getKey().substring(e.getKey().indexOf('|')+1):e.getKey();return new Group(e.getKey(),label,a,product?e.getValue().stream().map(PerformanceFact::getLeadId).distinct().count():e.getValue().size(),ratio(a,total));}).sorted(Comparator.comparing(Group::amount).reversed()).toList();

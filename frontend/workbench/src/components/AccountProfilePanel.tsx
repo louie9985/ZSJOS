@@ -624,7 +624,7 @@ export default function AccountProfilePanel({
             <Button loading={uploading}>上传附件</Button>
           </Upload>
           <Typography.Text type="secondary">
-            PDF 或图片，单份不超过20MB，最多20份
+            PDF 或图片，单份不超过100MB，最多20份
           </Typography.Text>
         </Space>
       );
@@ -884,7 +884,9 @@ export default function AccountProfilePanel({
               <>
                 <FileImageOutlined />
                 <span>主页图尚未上传</span>
-                <Tag>责任待配置</Tag>
+                {fields
+                  .filter((f) => f.key === "cover")
+                  .map((f) => <span key={f.key}>{tag(f)}</span>)}
               </>
             )}
           </div>
@@ -1167,7 +1169,7 @@ export default function AccountProfilePanel({
                           f.type === "record"
                             ? "按次追加；图片或 PDF 附件；不计入待补"
                             : f.type === "image"
-                              ? "PNG / JPEG / WebP，最大 20 MB"
+                              ? "PNG / JPEG / WebP，最大 100 MB"
                               : f.dictType
                                 ? "管理员维护字典选项，保留选择时标签快照"
                                 : f.type === "url"
@@ -1286,7 +1288,7 @@ export default function AccountProfilePanel({
           </Button>
         </Upload>
         <Typography.Paragraph type="secondary">
-          图片或 PDF，单个不超过 20 MB，最多 20 个。
+          图片或 PDF，单个不超过 100 MB，最多 20 个。
         </Typography.Paragraph>
         {recordFiles.map((f) => (
           <div key={f.id}>

@@ -427,4 +427,14 @@ eam:
     message-bus:
       type: redis # 消息总线的类型
 
+system:
+  notice-share:
+    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+
+logging:
+  level:
+    # SQL DEBUG/TRACE output can expose bearer tokens and notice bodies.
+    cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeShareMapper: INFO
+    cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeMapper: INFO
+
 debug: false

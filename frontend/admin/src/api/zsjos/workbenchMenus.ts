@@ -37,10 +37,11 @@ export const createLead = (data: Record<string, unknown>, selfSourced = false, e
   })
 export const createExternalRepurchase = (data: Record<string, unknown>) =>
   request.post({ url: '/zsjos/sales-order/external-repurchase', data })
-export const uploadSalesOrderVoucher = (file: File) => {
+export const uploadSalesOrderVoucher = async (file: File) => {
   const data = new FormData()
   data.append('file', file)
-  return request.upload({ url: '/zsjos/sales-order/voucher/upload', data })
+  const response = await request.upload<{ data: { infraFileId: number; url: string; contentType?: string } }>({ url: '/zsjos/sales-order/voucher/upload', data, preserveBusinessError: true })
+  return response.data
 }
 export const decideDuplicateReview = (id: number, data: Record<string, unknown>) =>
   request.post({ url: `/zsjos/lead-duplicate-review/${id}/decision`, data })
@@ -94,3 +95,13 @@ export const batchTransferSubordinateLeads = (data: Record<string, unknown>) =>
   request.post({ url: '/zsjos/subordinate-sales/leads/batch-transfer', data })
 export const batchReleaseSubordinateLeads = (data: Record<string, unknown>) =>
   request.post({ url: '/zsjos/subordinate-sales/leads/batch-public-sea', data })
+
+export interface RepurchaseCustomerIdentity { customerName: string; customerMobile?: string; customerWechatId?: string }
+export interface RepurchaseCustomerCheck {
+  matchStatus: 'NO_MATCH' | 'EXISTING_CUSTOMER' | 'MULTIPLE_MATCH' | 'IDENTITY_CONFLICT' | 'REPURCHASE_BLOCKED'
+  canRepurchase: boolean; reason: string; personId?: number; customerName?: string; maskedMobile?: string
+}
+export const checkRepurchaseCustomer = (data: RepurchaseCustomerIdentity): Promise<RepurchaseCustomerCheck> =>
+  request.post({ url: '/zsjos/sales-order/repurchase/check-customer', data, preserveBusinessError: true })
+export const createCustomerRepurchase = (data: Record<string, unknown>) =>
+  request.post({ url: '/zsjos/sales-order/repurchase', data, preserveBusinessError: true })

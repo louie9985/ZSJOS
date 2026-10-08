@@ -21,8 +21,7 @@ public class BpmMessageSendWhenTaskCreatedReqDTO {
      */
     @NotEmpty(message = "流程实例的名字不能为空")
     private String processInstanceName;
-    @NotNull(message = "发起人的用户编号")
-    private Long startUserId;
+    private cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO startSubject;
     @NotEmpty(message = "发起人的昵称")
     private String startUserNickname;
 

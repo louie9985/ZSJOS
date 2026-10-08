@@ -35,6 +35,6 @@ public interface RegistrationConstants {
     String COMPLETION_BLOCK_ROUTE_REQUIRED = "route_required";
     String COMPLETION_BLOCK_ROUTE_ASSIGNEE_INVALID = "route_assignee_invalid";
     String COMPLETION_BLOCK_ATTACHMENT_REQUIRED = "attachment_required";
-    long MAX_ATTACHMENT_SIZE = 20L * 1024 * 1024;
+    long MAX_ATTACHMENT_SIZE = 100L * 1024 * 1024;
     int MAX_ATTACHMENTS_PER_ITEM = 9;
 }

@@ -154,9 +154,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 每分钟按租户扫描已到判定截止时间的 `submitted + owned` 客资，并在行锁下再次校验后改为 `suspended`。截止时间已到但扫描尚未提交时，当前销售仍可判定；扫描先提交后，跟进、判定、资料修改、转派和建单均由服务端拒绝。恢复与转派创建新判定轮次；回收进入 `recycle_pending` 并清除销售；释放进入抢单池，被抢后重新创建首跟任务。
 
-挂起是 Lead 客资模块的状态，不是学生交付状态。客资进入挂起后由原负责人所属部门负责人或上级负责人（销售主管线）处置，交付中心不作为该状态的操作主体。操作人仍须同时满足配置的 `zsjos:subordinate-sales:lead-*` 按钮权限和客资对象范围；系统不会按“交付中心”部门或角色名称自动放权。管理员可用 `zsjos:lead:qualification:manage-all` 跨部门处置。
+挂起是 Lead 客资模块的状态，不是学生交付状态。客资进入挂起后由原负责人所属部门负责人或上级负责人处置。学习规划师自拓且仍归教务负责的客资由其教务管理线恢复；恢复保留原负责人和负责人身份，不转给销售。操作人仍须同时满足配置的 `zsjos:subordinate-sales:lead-*` 按钮权限和客资对象范围；系统不会按“交付中心”部门或角色名称自动放权。管理员可用 `zsjos:lead:qualification:manage-all` 跨部门处置。
 
-销售主管通过独立的 `zsjos:subordinate-sales:lead-*` 按钮权限处置管理范围内的未成交客资。
+部门主管通过配置的 `zsjos:subordinate-sales:lead-*` 按钮权限处置管理范围内的未成交客资。
 
 销售本人可通过 `POST /zsjos/lead/owner/{leadId}/transfer`（权限
 `zsjos:lead:owner-transfer`）将本人负责的客资转派给启用销售；目标列表由
@@ -168,9 +168,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 `revision_required` 首购订单时，详情不返回 `OWNER_TRANSFER`，转派命令返回
 `LEAD_OWNER_TRANSFER_DEAL_ACTIVE`；订单主动终止后恢复。该约束不改变主管、资格异常或管理员转派权限。
 判有效前释放进入抢单池并清除当前归属；判有效后释放创建公海周期，保留正式归属，
-可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。恢复还要求当前原负责人仍是有效销售人员；若负责人已转为非销售岗位，详情不会展示恢复动作，只能转派、回收或释放至抢单池。
+可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。恢复时，销售归属沿用有效销售人员校验；教务自拓且负责人身份为 education 的客资复用教务自拓入口的启用账号、启用部门和人员状态校验。负责人资格不满足时，详情不展示恢复动作，后端也拒绝恢复。恢复重新启动判定轮次，保留原归属。
 
-普通主管必须是原销售部门或其上级部门负责人，只能转派给本人管理部门及子部门的启用销售专员。`zsjos:lead:qualification:manage-all` 允许当前租户内跨部门处置，但不绕过租户隔离。超时挂起和主管处置通过既有业务通知机制通知相关销售、操作主管及原销售部门负责人链。
+普通主管必须是原负责人部门或其上级部门负责人，只能转派给本人管理部门及子部门的启用销售专员。`zsjos:lead:qualification:manage-all` 允许当前租户内跨部门处置，但不绕过租户隔离。超时挂起和主管处置通过既有业务通知机制通知相关销售、操作主管及原负责人部门负责人链。
 
 旧的 `POST /zsjos/lead/{id}/admin-transfer` 不接受 `suspended` 或 `recycle_pending` 客资，异常客资必须通过上述专用处置接口，避免绕过理由、轮次重启和分配历史规则。
 
@@ -193,7 +193,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 - 命令：`POST /admin-api/zsjos/lead/{id}/submitter-assist-request`。
 - 请求字段：`problem`（必填，最多 1000 字）、`expectedAssistance`（必填，最多 1000 字）、
   `remark`（选填，最多 2000 字）、`attachments`（选填，最多 9 个 Infra 文件引用）和
-  `idempotencyKey`（必填）。附件沿用 Lead 管理端上传契约，仅支持 JPG、PNG、WebP，单文件不超过 10 MB。
+  `idempotencyKey`（必填）。附件沿用 Lead 管理端上传契约，仅支持 JPG、PNG、WebP，单文件不超过 100 MB。
 - 命令使用 Lead 统一对象读取权限，并写入独立的 `zsjos_lead_submitter_assist_request` 快照和
   `lead_submitter_assist_requested` 业务事件。用户可见标识始终为快照 `leadNo`。
 - 内部员工提交时，消息和 `lead_submitter_assist` 待办均落给提交人。兼职提交时，主消息发送给

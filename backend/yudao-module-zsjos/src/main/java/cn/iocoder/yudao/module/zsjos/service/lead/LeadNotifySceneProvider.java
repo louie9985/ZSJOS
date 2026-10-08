@@ -77,6 +77,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(QUALIFICATION_RELEASED, "异常客资释放到抢单池", ROLE_PREVIOUS_OWNER, ROLE_ALL_ELIGIBLE_SALES),
                 scene(APPEAL_SUBMITTED, "客资申诉待处理", ROLE_APPEAL_REVIEWERS, ROLE_OWNER),
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
+                scene(SupervisorLeadOverturnPolicy.SCENE, "主管直接改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
                 scene(SUBMITTER_SUPPLEMENTED, "提交人补充资料", ROLE_OWNER),
@@ -346,6 +347,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("event.time", event.getOccurredAt());
         values.put("event.scene", event.getSceneCode());
         if (event.getPayload() != null) {
+            copyContext(values, event.getPayload(), "overturn.reason");
             copyContext(values, event.getPayload(), "assignment.attempt", "assignment.reason",
                     "category.before", "category.after", "followUp.method", "followUp.result",
                     "followUp.remark", "followUp.nextAt", "qualification.reason", "appeal.id",
@@ -403,6 +405,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 AGING_POOL_EXITED_NOTICE).contains(sceneCode)) {
             variables.add(variable("agingPool.cycleId", "公海周期编号"));
             variables.add(variable("agingPool.dueAt", "进入公海时间"));
+        }
+        if (SupervisorLeadOverturnPolicy.SCENE.equals(sceneCode)) {
+            variables.add(variable("overturn.reason", "主管改判理由"));
         }
         if (ASSIGNED.equals(sceneCode) || REASSIGNED.equals(sceneCode)) {
             variables.add(variable("assignment.historyId", "派单历史编号"));

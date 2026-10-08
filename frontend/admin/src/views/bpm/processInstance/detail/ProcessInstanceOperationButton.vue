@@ -644,7 +644,7 @@ const APPROVAL_ATTACHMENT_FILE_TYPES = [
   'bmp',
   'webp'
 ]
-const APPROVAL_ATTACHMENT_FILE_SIZE = 5
+const APPROVAL_ATTACHMENT_FILE_SIZE = 100
 
 // ========== 审批信息 ==========
 const runningTask = ref<any>() // 运行中的任务

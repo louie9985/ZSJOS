@@ -35,6 +35,9 @@ public class SalesOrderListItemRespVO {
     private String studentSpecialRequirements;
     private String materialDeliveryContact;
     private String giftItems;
+    private java.util.List<String> giftItemCodes;
+    private java.util.List<cn.iocoder.yudao.module.zsjos.service.order.SalesOrderGiftSnapshot> giftItemSnapshots;
+    private boolean giftItemsInvalid;
     private String giftShippingAddress;
     private String repurchaseReason;
     private String terminationReason;

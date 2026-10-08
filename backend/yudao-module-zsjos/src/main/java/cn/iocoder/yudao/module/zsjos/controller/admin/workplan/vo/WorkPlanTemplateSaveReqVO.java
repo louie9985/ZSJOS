@@ -14,8 +14,8 @@ public class WorkPlanTemplateSaveReqVO {
     @NotBlank private String name;
     private String description;
     @NotBlank private String periodMode;
-    @Valid private List<WorkPlanTemplateFieldSaveReqVO> fields;
+    private List<@Valid WorkPlanTemplateFieldSaveReqVO> fields;
     private List<Long> applicableDeptIds;
     private Boolean includeChildDepartments;
-    @Valid private List<WorkPlanTemplateItemSaveReqVO> presetItems;
+    private List<@Valid WorkPlanTemplateItemSaveReqVO> presetItems;
 }

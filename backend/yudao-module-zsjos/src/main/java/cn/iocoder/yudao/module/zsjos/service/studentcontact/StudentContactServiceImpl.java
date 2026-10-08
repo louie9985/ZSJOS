@@ -828,7 +828,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
     public StudentContactAttachmentRespVO uploadAttachment(Long relationId, Long userId, MultipartFile file) throws IOException {
         requireOwned(relationId, userId);
-        if (file == null || file.isEmpty() || file.getSize() > 20L * 1024 * 1024) {
+        if (file == null || file.isEmpty() || file.getSize() > 100L * 1024 * 1024) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
         FileInfoRespDTO saved = fileApi.createFileInfo(file.getBytes(), file.getOriginalFilename(),

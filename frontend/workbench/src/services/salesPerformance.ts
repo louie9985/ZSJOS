@@ -10,6 +10,8 @@ export type Overview = { asOf: string; attributionAvailableSince: string | null;
 export type Analysis = { asOf: string; start: string; end: string; averages: Metric[]; trend: Metric[]; sources: Group[]; products: Group[]; contributors: Group[]; contributionMetrics: { userId: number; name: string; actual: Metric; floorRate: number | null; sprintRate: number | null; share: number | null }[]; averageTrends: Record<string, Metric[]>; target: Target | null }
 export type CalendarDay = { date: string; received: number; valid: number; invalid: number; pending: number; overdue: number; ended: number; lateCompleted: number; onTime: number; dueCount: number; unknown: number }
 export type LeadReport = { asOf: string; start: string; end: string; workload: Record<string, number>; categories: Group[]; stages: Group[]; calendar: CalendarDay[]; funnel: Group[]; followUp: Group[]; categoryTrend: CategoryPoint[] }
+export type LeadWorkload = Omit<LeadReport, 'calendar' | 'funnel'>
+export type LeadCalendar = Pick<LeadReport, 'asOf' | 'start' | 'end' | 'calendar' | 'funnel'>
 export type CategoryPoint = { bucket: string; category: string; count: number }
 export type MissingTarget = Scope & { name: string; department: string; periodStart: string; reason: string }
 export type Detail = { id: number; number?: string; kind: string; label: string; occurredAt: string; amount?: number; state: string; leadId?: number; ownerName?: string; assigneeName?: string; receivedAt?: string; dueAt?: string; category?: string; stage?: string; overdueMinutes?: number }
@@ -44,6 +46,8 @@ export const performanceApi = {
  overview: (query: Query, signal?: AbortSignal) => get<Overview>(`${BASE}/overview`, query, signal),
  analysis: (query: Query, signal?: AbortSignal) => get<Analysis>(`${BASE}/analysis`, query, signal),
  leads: (query: Query, signal?: AbortSignal) => get<LeadReport>(`${BASE}/leads`, query, signal),
+ leadWorkload: (query: Query, signal?: AbortSignal) => get<LeadWorkload>(`${BASE}/lead-workload`, query, signal),
+ leadCalendar: (query: Query, signal?: AbortSignal) => get<LeadCalendar>(`${BASE}/lead-calendar`, query, signal),
  history: (query: Query, signal?: AbortSignal) => get<HistoryMonth[]>(`${BASE}/history`, query, signal),
  missingTargets: (query: Query, signal?: AbortSignal) => get<MissingTarget[]>(`${BASE}/missing-targets`, query, signal),
  details: (query: Query, signal?: AbortSignal) => get<{ list: Detail[]; total: number }>(`${BASE}/details`, query, signal),
@@ -69,4 +73,4 @@ export function periodRange(key: string, now = new Date()): { start: string; end
 }
 
 export function averageFormula(metric: Metric) { return `${money(metric.averageAmount)} ÷ ${metric.averageOrders} 笔 = ${money(metric.average)} / 笔（剔除整单 0 和 0.01）` }
-export function conversionRule(key?: string) { return ['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时已首购成交的客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资。' : '（当月新接有效客资中当月成交数＋往期接收60日内于当月成交数）÷（当月新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。' }
+export function conversionRule(key?: string) { return ['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（当月新接有效客资中当月成交数＋往期接收60日内于当月成交数）÷（当月新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。' }

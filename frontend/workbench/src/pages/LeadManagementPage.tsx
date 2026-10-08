@@ -30,6 +30,7 @@ import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { NameAvatar } from '../components/LeadDetailOverview'
 import LeadDetail from '../components/LeadDetail'
+import { LEAD_FOLLOW_UP_CHANGED } from '../services/leadFollowUpEvents'
 import {
   dictionaryDisplayLabel,
   leadRelationTypesLabel,
@@ -70,7 +71,7 @@ import {
 
 const PAGE_SIZE = 20
 type LeadAudience = 'all'
-type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean; pageSize?: number }
+type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean; pageSize?: number; preserveSelection?: boolean }
 type LeadBatchFormAction = LeadBatchAction
 
 const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
@@ -202,6 +203,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [channelError, setChannelError] = useState(false)
   const [selectedId, setSelectedId] = useState<number | undefined>(requestedLeadId)
   const [detail, setDetail] = useState<ManagedLead>()
+  const [detailRefreshVersion, setDetailRefreshVersion] = useState(0)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [followUpDirty, setFollowUpDirty] = useState(false)
@@ -322,7 +324,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         return next
       })
       setPageNo(targetPage)
-      if (replace) setSelectedId(current => resolveLeadSelection(result.list, {
+      if (replace && !options.preserveSelection) setSelectedId(current => resolveLeadSelection(result.list, {
         preferredId: options.preferredSelectedId,
         currentId: current,
         requestedId: routeSelectionRef.current ?? requestedLeadId,
@@ -434,6 +436,28 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     ])
   }, [loadDetail, loadMetadata, loadPage, pageNo, useTableLayout])
 
+  useEffect(() => {
+    const onFollowUpChanged = (event: Event) => {
+      const leadId = (event as CustomEvent<number>).detail
+      if (!detailOnly) void loadPage(useTableLayout ? pageNo : 1, true, ++requestVersion.current, { silent: true, preserveSelection: true })
+      if (selectedId === leadId) {
+        // Keep the mounted form and its draft; only invalidate the server-backed history.
+        setDetailRefreshVersion(value => value + 1)
+        void loadDetail(leadId, true)
+      }
+    }
+    window.addEventListener(LEAD_FOLLOW_UP_CHANGED, onFollowUpChanged)
+    return () => window.removeEventListener(LEAD_FOLLOW_UP_CHANGED, onFollowUpChanged)
+  }, [detailOnly, loadDetail, loadPage, pageNo, selectedId, useTableLayout])
+
+  const refreshPage = () => {
+    setDetailRefreshVersion(value => value + 1)
+    void loadMetadata()
+    void loadFilterProfile()
+    void loadPage(1, true, ++requestVersion.current, { preserveSelection: true })
+    if (selectedId) void loadDetail(selectedId, true)
+  }
+
   useEffect(() => { itemIdsRef.current = items.map(item => item.id) }, [items])
 
   /**
@@ -510,7 +534,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     : detailError
       ? <Alert type="error" showIcon message={detailError} action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail
-        ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
+        ? <LeadDetail lead={detail} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
           onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} profileVariant="contact-rows" hideProviderOwner/>
@@ -685,7 +709,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         </div>)}
       </div>
       <div className="lead-filter-actions">
-        <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadFilterProfile(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
+        <Button icon={<ReloadOutlined/>} onClick={refreshPage}>刷新</Button>
       </div>
     </>}
     <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
@@ -698,7 +722,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
             <Button icon={<DownOutlined />} disabled={!selectedRowKeys.length || !batchMenuItems.length}>批量操作</Button>
           </Dropdown>}
           filters={<AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>}
-          onReload={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current) }}
+          onReload={refreshPage}
           error={initialError}
           unauthorized={Boolean(initialError && isLeadInboxUnauthorized(initialError))}
           widthPersistenceKey="crm-lead-management-table-column-widths"

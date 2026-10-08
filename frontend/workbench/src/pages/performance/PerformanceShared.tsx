@@ -5,9 +5,9 @@ import type { DataNode } from 'antd/es/tree'
 import { performanceApi, money, periodRange, type Group, type OrgNode, type Scope } from '../../services/salesPerformance'
 export { AverageTrend, Funnel } from './PerformanceCharts'
 import './performance.css'
-export function useResource<T>(loader: (signal: AbortSignal) => Promise<T>, dependencies: unknown[]) {
+export function useResource<T>(loader: (signal: AbortSignal) => Promise<T>, dependencies: unknown[], retainData = false) {
  const [data,setData]=useState<T>(), [error,setError]=useState(''), [loading,setLoading]=useState(true), [version,setVersion]=useState(0)
- useEffect(()=>{ const controller=new AbortController();setLoading(true);setError('');setData(undefined)
+ useEffect(()=>{ const controller=new AbortController();setLoading(true);setError('');if(!retainData)setData(undefined)
   loader(controller.signal).then(value=>{if(!controller.signal.aborted)setData(value)}).catch((e: unknown)=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'加载失败，请重试')}).finally(()=>{if(!controller.signal.aborted)setLoading(false)})
   return ()=>controller.abort()
  // Requests are keyed by explicit primitive business parameters.
@@ -20,8 +20,8 @@ export function Resource({state,children}:{state:{loading:boolean;error:string;r
  if(state.error)return <Alert type="error" showIcon title={state.error} action={<Button onClick={state.reload}>重试</Button>}/>
  return <>{children}</>
 }
-export function PerformanceShell({targets=false,initialKey,children}:{targets?:boolean;initialKey?:string;children:(scope:Scope,node:OrgNode,reloadTree:()=>void,nodes:OrgNode[],select:(key:string)=>void)=>ReactNode}) {
- const tree=useResource(signal=>performanceApi.tree(targets,signal),[targets]);const [selected,setSelected]=useState<string|undefined>(initialKey);const [keyword,setKeyword]=useState('');const [collapsed,setCollapsed]=useState(false);const [open,setOpen]=useState(false)
+export function PerformanceShell({targets=false,initialKey,retainStatistics=false,children}:{targets?:boolean;initialKey?:string;retainStatistics?:boolean;children:(scope:Scope,node:OrgNode,reloadTree:()=>void,nodes:OrgNode[],select:(key:string)=>void,treeLoading:boolean)=>ReactNode}) {
+ const tree=useResource(signal=>performanceApi.tree(targets,signal),[targets],retainStatistics);const [selected,setSelected]=useState<string|undefined>(initialKey);const [keyword,setKeyword]=useState('');const [collapsed,setCollapsed]=useState(false);const [open,setOpen]=useState(false)
  const active=tree.data?.find(x=>x.key===selected&&x.selectable)??tree.data?.find(x=>x.selectable)
  const nodes=useMemo(()=>{const rows=tree.data??[];const keep=new Set<string>();for(const x of rows.filter(n=>!keyword||n.title.includes(keyword))){let current:OrgNode|undefined=x;while(current&&!keep.has(current.key)){keep.add(current.key);current=rows.find(n=>n.key===current?.parentKey)}}
  const build=(parent?:string):DataNode[]=>rows.filter(n=>(n.parentKey===parent||parent===undefined&&!rows.some(x=>x.key===n.parentKey))&&keep.has(n.key)).map(n=>({key:n.key,title:n.title,selectable:n.selectable,children:build(n.key)}));return build()
@@ -30,7 +30,7 @@ export function PerformanceShell({targets=false,initialKey,children}:{targets?:b
  return <div className={`performance-shell ${collapsed?'is-collapsed':''}`}>
   <aside className="performance-tree"><Button type="text" aria-label={collapsed?'展开组织树':'收起组织树'} icon={collapsed?<MenuUnfoldOutlined/>:<MenuFoldOutlined/>} onClick={()=>setCollapsed(!collapsed)}/>{!collapsed&&content}</aside>
   <main className="performance-main"><div className="performance-mobile-tree"><Button icon={<MenuUnfoldOutlined/>} onClick={()=>setOpen(true)}>选择组织 / 人员</Button></div><Drawer title="统计范围" open={open} onClose={()=>setOpen(false)} placement="left">{content}</Drawer>
-  <Resource state={tree}>{active?children({scopeType:active.scopeType,scopeId:active.scopeId},active,tree.reload,tree.data??[],setSelected):<Empty description={targets?'暂无可设置对象，请先配置销售组织及数据范围':'暂无授权业绩视图，请联系管理员配置权限和数据范围'}/>}</Resource></main>
+  <Resource state={retainStatistics&&tree.data?{...tree,loading:false}:tree}>{active?children({scopeType:active.scopeType,scopeId:active.scopeId},active,tree.reload,tree.data??[],setSelected,tree.loading):<Empty description={targets?'暂无可设置对象，请先配置销售组织及数据范围':'暂无授权业绩视图，请联系管理员配置权限和数据范围'}/>}</Resource></main>
  </div>
 }
 export function DateFilter({value,onChange,grain,onGrain}:{value:{start:string;end:string;cumulative?:boolean;periodKey?:string};onChange:(v:{start:string;end:string;cumulative?:boolean;periodKey?:string})=>void;grain?:'day'|'week'|'month';onGrain?:(v:'day'|'week'|'month')=>void}) {

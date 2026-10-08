@@ -48,3 +48,11 @@ describe('performance calculation presentation',()=>{
   expect(normalizePerformanceDates({dueAt:time,receivedAt:time,previousStart:time,previousEnd:time})).toEqual({dueAt:'2026-09-28T09:00:00',receivedAt:'2026-09-28T09:00:00',previousStart:'2026-09-28T09:00:00',previousEnd:'2026-09-28T09:00:00'})
  })
 })
+
+it('states the inclusive per-order conversion threshold for every period',()=>{
+ for(const key of ['month','lastMonth','last7','last30','last60','last90']) {
+  expect(conversionRule(key)).toContain('≥1280元')
+  expect(conversionRule(key)).toContain('不跨订单累计')
+  expect(conversionRule(key)).toContain('未达标的期间有效客资仍在分母')
+ }
+})

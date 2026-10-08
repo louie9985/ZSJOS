@@ -21,7 +21,6 @@ public class LeadJudgeInvalidReqVO extends LeadQualificationCommandReqVO {
     @Size(max = 2000)
     private String description;
 
-    @Valid
     @Size(max = 9)
-    private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
+    private List<@Valid LeadAttachmentReqVO> attachments = new ArrayList<>();
 }

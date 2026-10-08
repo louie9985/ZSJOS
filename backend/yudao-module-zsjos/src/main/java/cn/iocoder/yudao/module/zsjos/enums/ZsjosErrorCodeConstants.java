@@ -34,7 +34,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode EXAM_SCHEDULE_CATEGORY_INVALID = new ErrorCode(1_900_018_004, "产品分类不存在或已停用");
     ErrorCode EXAM_SCHEDULE_STATE_INVALID = new ErrorCode(1_900_018_005, "当前考期状态不允许该操作");
     ErrorCode EXAM_SCHEDULE_PERMISSION_DENIED = new ErrorCode(1_900_018_006, "无权管理考期安排");
-    ErrorCode EXAM_SCHEDULE_ENDED_IMMUTABLE = new ErrorCode(1_900_018_007, "已结束考期不能修改");
+    ErrorCode EXAM_SCHEDULE_ENDED_IMMUTABLE = new ErrorCode(1_900_018_007, "考期已过期，请先编辑日期再发布");
+    ErrorCode EXAM_SCHEDULE_DATE_IN_PAST = new ErrorCode(1_900_018_014, "单日日期或多日结束日期不能早于北京时间今天");
     ErrorCode EXAM_SCHEDULE_SKU_NO_MATCH = new ErrorCode(1_900_018_008, "所选规格未匹配到有效 SKU，请重新选择");
     ErrorCode EXAM_SCHEDULE_SCOPE_INVALID = new ErrorCode(1_900_018_009, "考期必须选择一个分类或一个产品范围");
     ErrorCode EXAM_SCHEDULE_SCOPE_CLEAR_REQUIRED = new ErrorCode(1_900_018_010, "原规格条件已失效，请明确清除或替换后保存");
@@ -245,7 +246,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_QUALIFICATION_EXCEPTION_TYPE_INVALID = new ErrorCode(1_900_003_032, "异常客资类型无效");
     ErrorCode LEAD_QUALIFICATION_DISPOSITION_INVALID = new ErrorCode(1_900_003_033, "当前客资状态不允许执行该处置");
     ErrorCode LEAD_QUALIFICATION_TRANSFER_TARGET_INVALID = new ErrorCode(1_900_003_034, "目标销售无效、不在管理范围内或与当前销售相同");
-    ErrorCode LEAD_QUALIFICATION_RESTORE_OWNER_INVALID = new ErrorCode(1_900_003_035, "原销售已停用或不再具备销售专员资格，请改用转派、回收或释放");
+    ErrorCode LEAD_QUALIFICATION_RESTORE_OWNER_INVALID = new ErrorCode(1_900_003_035, "原负责人已停用或不再符合该客资的负责人资格，无法恢复");
     ErrorCode LEAD_APPEAL_STATE_INVALID = new ErrorCode(1_900_003_036, "当前客资状态或申诉轮次不允许提交申诉");
     ErrorCode LEAD_APPEAL_NOT_EXISTS = new ErrorCode(1_900_003_037, "客资申诉不存在");
     ErrorCode LEAD_APPEAL_ALREADY_HANDLED = new ErrorCode(1_900_003_038, "该申诉已由其他人员处理");
@@ -350,6 +351,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_DICTIONARY_LABEL_UNAVAILABLE = new ErrorCode(1_900_006_031, "所选订单字典名称不可用，请刷新选项后重试");
     ErrorCode SALES_ORDER_HISTORICAL_SNAPSHOT_INVALID = new ErrorCode(1_900_006_029, "历史订单课程快照无法解析，不能接续补正");
     ErrorCode SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE = new ErrorCode(1_900_006_015, "该客户已有活动复购订单");
+    ErrorCode SALES_ORDER_GIFT_SNAPSHOT_INVALID = new ErrorCode(1_900_006_083, "历史礼品快照无法解析，请联系管理员核实，不能直接重提");
+    ErrorCode SALES_ORDER_GIFT_SELECTION_INVALID = new ErrorCode(1_900_006_084, "礼品不存在、已停用或不是可选叶子项目，请重新选择");
+    ErrorCode SALES_ORDER_GIFT_ADDRESS_REQUIRED = new ErrorCode(1_900_006_085, "选择礼品后邮寄地址必填且不超过1000字");
+    ErrorCode SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT = new ErrorCode(1_900_006_080, "复购客户身份已变化或姓名、联系方式不一致，请重新核实");
+    ErrorCode SALES_ORDER_REPURCHASE_MULTIPLE_MATCH = new ErrorCode(1_900_006_081, "联系方式对应多个客户，请联系管理员核实");
+    ErrorCode SALES_ORDER_REPURCHASE_DUPLICATE = new ErrorCode(1_900_006_082, "该客户已有相同缴费记录，请核实是否重复录单");
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
@@ -603,6 +610,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode FEEDBACK_CHAIRMAN_INVALID = new ErrorCode(1_900_016_016, "boss 角色必须且只能配置一名启用用户");
     ErrorCode FEEDBACK_SURVEY_ALREADY_REQUESTED = new ErrorCode(1_900_016_017, "该反馈已发起过满意度调研");
     ErrorCode FEEDBACK_SURVEY_STATE_INVALID = new ErrorCode(1_900_016_018, "满意度调研尚未发起或已提交");
+    ErrorCode FEEDBACK_APPROVAL_ROUND_INVALID = new ErrorCode(1_900_016_019, "审批轮次不存在或已变化，请刷新后重试");
+    ErrorCode FEEDBACK_URGE_NOT_RUNNING = new ErrorCode(1_900_016_020, "该轮审批已结束或尚未启动，不能催办");
+    ErrorCode FEEDBACK_URGE_COOLDOWN = new ErrorCode(1_900_016_021, "本轮刚刚催办过，请在 {} 后重试");
+    ErrorCode FEEDBACK_URGE_NO_RECIPIENT = new ErrorCode(1_900_016_022, "当前没有可接收催办的审批人，请刷新或联系管理员");
+    ErrorCode FEEDBACK_URGE_NOTIFICATION_UNAVAILABLE = new ErrorCode(1_900_016_023, "催办通知未配置或不可用，请联系管理员");
     ErrorCode LEAD_SALES_STAGE_DEFAULT_INVALID = new ErrorCode(1_900_091_001, "默认销售阶段未配置或已停用，请联系管理员");
     ErrorCode LEAD_SALES_STAGE_INVALID = new ErrorCode(1_900_091_002, "销售阶段不存在或已停用，请重新选择");
     ErrorCode POSITIONING_INTERVIEW_INVALID = new ErrorCode(1_900_090_001, "定位访谈字段无效或必填确认未完成");

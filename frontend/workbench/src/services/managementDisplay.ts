@@ -2,7 +2,7 @@ import type { BusinessAudit, NotifyRule, NotifyScene, UserRelationLog } from './
 
 // Presentation of fixed audit/transport/command protocols; these are not configurable business options.
 const auditSources: Record<BusinessAudit['sourceType'], string> = {
-  ADMIN: '管理端', PARTNER: '合作方', PUBLIC_CALLBACK: '公开回调', SYSTEM: '系统任务', EXPLICIT: '业务明细',
+  ADMIN: '管理端', PARTNER: '兼职', PUBLIC_CALLBACK: '公开回调', SYSTEM: '系统任务', EXPLICIT: '业务明细',
 }
 const auditCategories: Record<string, string> = { business: '业务操作', sensitive_read: '敏感读取', system: '系统任务' }
 const auditResults: Record<BusinessAudit['resultStatus'], string> = { STARTED: '执行中', SUCCESS: '成功', FAILURE: '失败' }

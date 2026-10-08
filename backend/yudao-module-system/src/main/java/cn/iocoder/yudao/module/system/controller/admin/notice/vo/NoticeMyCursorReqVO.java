@@ -15,7 +15,7 @@ public class NoticeMyCursorReqVO {
     @Schema(description = "每批数量", defaultValue = "20")
     @Min(1) @Max(100)
     private Integer limit = 20;
-    @Schema(description = "标题关键词")
+    @Schema(description = "标题、来源部门或发布人关键词")
     private String keyword;
     @Schema(description = "公告类型")
     private Integer type;

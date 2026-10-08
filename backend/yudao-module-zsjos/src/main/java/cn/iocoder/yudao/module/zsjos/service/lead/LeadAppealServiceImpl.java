@@ -403,36 +403,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         appeal.setDecidedAt(now);
         appealMapper.updateById(appeal);
         if (overturn) {
-            OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
-            boolean createOpportunity = opportunity == null;
-            if (createOpportunity) {
-                opportunity = new OpportunityDO();
-                opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
-                opportunity.setLeadId(lead.getId());
-                opportunity.setExpectedProductSummary(
-                        LeadBasicInfoService.productSummary(intendedProductMapper.selectListByLeadId(lead.getId())));
-                opportunity.setVersion(0);
-            }
-            opportunity.setPersonId(lead.getPersonId());
-            opportunity.setOwnerUserId(lead.getOwnerUserId());
-            opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
-            opportunity.setLostAt(null);
-            opportunity.setLostReason(null);
-            if (createOpportunity) opportunityMapper.insert(opportunity);
-            else opportunityMapper.updateById(opportunity);
-            lead.setStatus(STATUS_VALID);
-            lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-            lead.setInvalidReason(null);
-            lead.setInvalidReasonLabelSnapshot(null);
-            lead.setInvalidDescription(null);
-            lead.setInvalidEvidenceRefs(null);
-            lead.setAppealDeadlineAt(null);
-            lead.setQualifiedByUserId(userId);
-            lead.setQualifiedAt(now);
-            lead.setConvertedAt(now);
-            lead.setValidDescription(reqVO.getReason().trim());
-            LeadMapper.advanceActivity(lead, now);
-            leadMapper.updateById(lead);
+            LeadValidityRestoration.restore(lead, userId, reqVO.getReason(), now,
+                    leadMapper, opportunityMapper, intendedProductMapper);
             cashbackService.ensureValidCashback(lead.getId());
         } else {
             leadMapper.touchActivity(lead.getId(), now);

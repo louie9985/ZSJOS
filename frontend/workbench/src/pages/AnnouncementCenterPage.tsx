@@ -12,7 +12,7 @@ import { useInboxTableLayout } from '../services/inboxLayout'
 
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import NoticeManagementPage from './NoticeManagementPage'
-import { noticePermission, noticeView } from '../services/noticeManagement'
+import { noticePermission, noticeView, noticeAudienceText } from '../services/noticeManagement'
 
 const CURSOR_LIMIT = 20
 
@@ -23,8 +23,13 @@ export function AnnouncementDetail({ item }: { item?: Announcement }) {
       <Space wrap><Tag color="blue">{item.type === 1 ? '通知' : '公告'}</Tag>{!item.read && <Badge status="processing" text="未读"/>}</Space>
       <Typography.Title level={3}>{item.title}</Typography.Title>
       <Typography.Text type="secondary">发布于 {formatTimestamp(item.publishTime)} {item.highlighted && <Tag color="gold">高亮中</Tag>}</Typography.Text>
+      <div className="notice-origin-meta">
+        <span>文章来源：{item.sourceDeptName || '未记录'}</span>
+        <span>发布人：{item.publisherName || '未记录'}</span>
+        <span>接收部门/人员：{noticeAudienceText(item)}</span>
+      </div>
     </header>
-    <SafeRichText html={item.content || ''}/>
+    <SafeRichText announcementTables html={item.content || ''}/>
     {item.attachments.length > 0 && <section className="announcement-files">
       <Typography.Title level={5}>附件</Typography.Title>
       <NoticeAttachments key={item.id} files={item.attachments} reload={async () => (await api.announcement(item.id)).attachments} />
@@ -169,7 +174,7 @@ function MyAnnouncements() {
   return <section className={`workspace-page announcement-page${useTableLayout ? ' announcement-table-page' : ''}`}>
     <div className="page-heading">
       <Typography.Title level={4}>通知公告</Typography.Title>
-      <Space wrap><Input.Search allowClear value={searchText} placeholder="搜索公告标题或正文" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { setSearchText(event.target.value); if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></Space>
+      <Space wrap><Input.Search allowClear value={searchText} placeholder="搜索标题、来源部门或发布人" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { setSearchText(event.target.value); if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></Space>
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
     {useTableLayout ? <>
@@ -189,6 +194,9 @@ function MyAnnouncements() {
         { title: '正文', dataIndex: 'content', width: 360, ellipsis: true, render: (_, item) => announcementText(item.content) },
         { title: '高亮状态', dataIndex: 'highlighted', width: 110, render: (_, item) => item.highlighted ? <Tag color="gold">高亮中</Tag> : '普通' },
         { title: '高亮截止时间', dataIndex: 'highlightUntil', render: (_, item) => formatTimestamp(item.highlightUntil), width: 170 },
+        { title: '文章来源', dataIndex: 'sourceDeptName', width: 160, render: value => value || '未记录' },
+        { title: '发布人', dataIndex: 'publisherName', width: 110, render: value => value || '未记录' },
+        { title: '接收部门/人员', width: 230, ellipsis: true, render: (_, item) => noticeAudienceText(item) },
         { title: '发布时间', dataIndex: 'publishTime', render: (_, item) => formatTimestamp(item.publishTime), width: 170 },
         { title: '阅读状态', render: (_, item) => item.read ? '已读' : <Tag color="processing">未读</Tag>, width: 100 },
         { title: '阅读时间', dataIndex: 'readTime', render: (_, item) => formatTimestamp(item.readTime), width: 170 },
@@ -202,6 +210,10 @@ function MyAnnouncements() {
         {loading ? <Skeleton active paragraph={{ rows: 8 }}/> : items.length === 0 ? <Empty description="暂无公告"/> : <>
           <List dataSource={items} renderItem={item => <button type="button" className={`announcement-list-item${selected?.id === item.id ? ' active' : ''}${item.read ? '' : ' unread'}`} onClick={() => void openDetail(item.id)}>
             <span className="announcement-list-title">{item.highlighted && <Tag color="gold">高亮</Tag>}{item.title}</span>
+            <span className="notice-origin-meta">
+              <span>文章来源：{item.sourceDeptName || '未记录'}</span><span>发布人：{item.publisherName || '未记录'}</span>
+              <span>接收部门/人员：{noticeAudienceText(item)}</span>
+            </span>
             <span className="announcement-list-meta"><Badge status={item.read ? 'default' : 'processing'}/>{formatTimestamp(item.publishTime)}</span>
           </button>}/>
           <div ref={loadMoreRef} className="announcement-load-more">

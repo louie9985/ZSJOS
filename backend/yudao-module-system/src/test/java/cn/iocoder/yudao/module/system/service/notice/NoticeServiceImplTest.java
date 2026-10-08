@@ -57,7 +57,29 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
 
     @BeforeEach
     void setUp() {
+        AdminUserDO publisher = new AdminUserDO(); publisher.setId(900L); publisher.setNickname("测试发布人"); publisher.setDeptId(900L);
+        DeptDO origin = new DeptDO(); origin.setId(900L); origin.setName("测试来源部门");
+        when(userService.getUser(900L)).thenReturn(publisher);
+        when(deptService.getDept(900L)).thenReturn(origin);
         when(xssCleaner.clean(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    void shouldAllow100MbZipAndRejectOneByteOverBeforeStorage() throws Exception {
+        var upload = org.mockito.Mockito.mock(org.springframework.web.multipart.MultipartFile.class);
+        when(upload.getOriginalFilename()).thenReturn("notice.zip");
+        when(upload.getSize()).thenReturn(100L * 1024 * 1024);
+        when(upload.getBytes()).thenReturn(new byte[]{80, 75});
+        when(upload.getContentType()).thenReturn("application/zip");
+        when(fileApi.createFileInfo(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("notice.zip"),
+                org.mockito.ArgumentMatchers.eq("system/notice/7"), org.mockito.ArgumentMatchers.eq("application/zip")))
+                .thenReturn(file(101L, USER_ID));
+        assertEquals(101L, noticeService.uploadAttachment(upload, USER_ID).getInfraFileId());
+        when(upload.getSize()).thenReturn(100L * 1024 * 1024 + 1);
+        assertServiceException(() -> noticeService.uploadAttachment(upload, USER_ID), NOTICE_ATTACHMENT_INVALID);
+        org.mockito.Mockito.verify(fileApi, org.mockito.Mockito.times(1)).createFileInfo(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -91,7 +113,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
 
         noticeService.updateNotice(request, USER_ID);
         noticeService.updateNotice(request, USER_ID);
-        noticeService.publishNotice(id);
+        noticeService.publishNotice(id, 900L);
 
         List<NoticeAttachmentDO> saved = attachmentMapper.selectListByNoticeId(id);
         assertEquals(List.of(102L, 101L), saved.stream().map(NoticeAttachmentDO::getInfraFileId).toList());
@@ -135,12 +157,48 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    void shouldSaveAndPublishCopiedAttachmentsWithoutChangingPublishedSource() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p>原正文</p>");
+        request.setAttachments(List.of(attachment(101L)));
+        Long sourceId = noticeService.createNotice(request, USER_ID);
+        noticeService.publishNotice(sourceId, 900L);
+        NoticeDO source = noticeMapper.selectById(sourceId);
+        NoticeAttachmentDO sourceAttachment = attachmentMapper.selectListByNoticeId(sourceId).get(0);
+
+        Long copyId = noticeService.copyNotice(sourceId);
+        NoticeAttachmentDO copyAttachment = attachmentMapper.selectListByNoticeId(copyId).get(0);
+        assertNotEquals(sourceAttachment.getId(), copyAttachment.getId());
+        assertNull(noticeMapper.selectById(copyId).getPublishTime());
+        request.setId(copyId);
+        request.setTitle("修改后的副本");
+        request.setContent("<p>副本正文</p>");
+
+        // A different authorized editor may retain the copied binding without owning the upload.
+        noticeService.updateNotice(request, 8L);
+        assertEquals(NoticePublishStatusEnum.DRAFT.getStatus(), noticeMapper.selectById(copyId).getPublishStatus());
+        noticeService.updateNotice(request, 8L);
+        noticeService.publishNotice(copyId, 900L);
+
+        NoticeDO publishedCopy = noticeMapper.selectById(copyId);
+        assertEquals(NoticePublishStatusEnum.PUBLISHED.getStatus(), publishedCopy.getPublishStatus());
+        assertNotNull(publishedCopy.getPublishTime());
+        assertEquals("修改后的副本", publishedCopy.getTitle());
+        assertEquals("<p>副本正文</p>", publishedCopy.getContent());
+        assertEquals(List.of(copyAttachment.getId()), attachmentMapper.selectListIncludingDeletedByNoticeId(copyId)
+                .stream().map(NoticeAttachmentDO::getId).toList());
+        assertEquals(101L, noticeService.getMyNotice(copyId, 8L).getAttachments().get(0).getInfraFileId());
+        assertEquals(source, noticeMapper.selectById(sourceId));
+        assertEquals(List.of(sourceAttachment), attachmentMapper.selectListByNoticeId(sourceId));
+    }
+
+    @Test
     void shouldRetainCopiedAttachmentButRejectReaddingAnotherUsersRemovedUpload() {
         when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
         NoticeSaveReqVO request = saveRequest("<p>正文</p>");
         request.setAttachments(List.of(attachment(101L)));
         Long sourceId = noticeService.createNotice(request, USER_ID);
-        noticeService.publishNotice(sourceId);
+        noticeService.publishNotice(sourceId, 900L);
         Long copyId = noticeService.copyNotice(sourceId);
         request.setId(copyId);
 
@@ -203,7 +261,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     void shouldEnforceDraftOnlyMutationAndLifecycleTransitions() {
         NoticeDO notice = insertNotice(NoticePublishStatusEnum.DRAFT, null);
 
-        noticeService.publishNotice(notice.getId());
+        noticeService.publishNotice(notice.getId(), 900L);
         NoticeDO published = noticeMapper.selectById(notice.getId());
         assertEquals(NoticePublishStatusEnum.PUBLISHED.getStatus(), published.getPublishStatus());
         assertNotNull(published.getPublishTime());
@@ -278,7 +336,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
         request.setTargetUserIds(List.of(USER_ID, USER_ID));
 
         Long id = noticeService.createNotice(request, USER_ID);
-        noticeService.publishNotice(id);
+        noticeService.publishNotice(id, 900L);
 
         assertEquals(1, recipientMapper.selectListByNoticeId(id).size());
         assertEquals(id, noticeService.getMyNotice(id, USER_ID).getId());
@@ -317,7 +375,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
         request.setTargetDeptIds(List.of(10L));
         request.setTargetUserIds(List.of(USER_ID));
         Long id = noticeService.createNotice(request, USER_ID);
-        noticeService.publishNotice(id);
+        noticeService.publishNotice(id, 900L);
 
         assertEquals(Set.of(USER_ID, 30L), recipientMapper.selectListByNoticeId(id).stream()
                 .map(row -> row.getUserId()).collect(java.util.stream.Collectors.toSet()));
@@ -331,6 +389,58 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
         request.setTargetUserIds(List.of(USER_ID));
 
         assertServiceException(() -> noticeService.createNotice(request, USER_ID), NOTICE_RECIPIENT_INVALID);
+    }
+
+    @Test
+    void shouldFreezeSelectedSourceActualPublisherAndAudience() {
+        AdminUserDO author = user(USER_ID, 10L); author.setNickname("撰稿人");
+        DeptDO source = new DeptDO(); source.setId(10L); source.setName("考务部");
+        DeptDO audience = new DeptDO(); audience.setId(20L); audience.setName("综合行政部");
+        when(userService.getUser(USER_ID)).thenReturn(author);
+        when(deptService.getDept(10L)).thenReturn(source);
+        when(deptService.getDeptMap(List.of(20L))).thenReturn(java.util.Map.of(20L, audience));
+        when(permissionService.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of(USER_ID));
+        when(userService.getUserList(Set.of(USER_ID))).thenReturn(List.of(author));
+        NoticeSaveReqVO request = saveRequest("<p>来源快照</p>");
+        request.setAudienceType("TARGET"); request.setTargetDeptIds(List.of(20L)); request.setTargetUserIds(List.of(USER_ID));
+        Long id = noticeService.createNotice(request, USER_ID);
+        assertEquals(10L, noticeService.getNotice(id).getSourceDeptId());
+        assertNull(noticeService.getNotice(id).getPublisherName());
+        noticeService.publishNotice(id, 900L);
+        source.setName("更名后的部门");
+        audience.setName("更名后的接收部门");
+        var detail = noticeService.getMyNotice(id, USER_ID);
+        assertEquals("考务部", detail.getSourceDeptName());
+        assertEquals("测试发布人", detail.getPublisherName());
+        assertEquals(900L, detail.getPublisherId());
+        assertEquals("综合行政部（含子部门）、指定用户 1 人", detail.getAudienceSummary());
+        var copy = noticeService.getNotice(noticeService.copyNotice(id));
+        assertEquals(10L, copy.getSourceDeptId());
+        assertNull(copy.getPublisherName()); assertNull(copy.getPublisherId());
+    }
+
+    @Test
+    void shouldAllowSelectedSourceAndRetainItForOlderUpdateClients() {
+        DeptDO source = new DeptDO(); source.setId(20L); source.setName("综合行政部");
+        when(deptService.getDept(20L)).thenReturn(source);
+        NoticeSaveReqVO request = saveRequest("<p>代部门发布</p>"); request.setSourceDeptId(20L);
+        Long id = noticeService.createNotice(request, 900L);
+        request.setId(id); request.setSourceDeptId(null);
+        noticeService.updateNotice(request, 900L);
+        noticeService.publishNotice(id, 900L);
+        assertEquals("综合行政部", noticeService.getNotice(id).getSourceDeptName());
+        assertEquals("全体员工", noticeService.getNotice(id).getAudienceSummary());
+    }
+
+    @Test
+    void shouldRejectInvalidSourceAndLeaveLegacyMetadataUnknown() {
+        NoticeSaveReqVO request = saveRequest("<p>无效来源</p>"); request.setSourceDeptId(404L);
+        org.mockito.Mockito.doThrow(cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(DEPT_NOT_FOUND))
+                .when(deptService).validateDeptList(List.of(404L));
+        assertServiceException(() -> noticeService.createNotice(request, USER_ID), DEPT_NOT_FOUND);
+        NoticeDO legacy = insertNotice(NoticePublishStatusEnum.PUBLISHED, LocalDateTime.now());
+        assertNull(noticeService.getMyNotice(legacy.getId(), USER_ID).getSourceDeptName());
+        assertNull(noticeService.getMyNotice(legacy.getId(), USER_ID).getPublisherName());
     }
 
     private AdminUserDO user(Long id, Long deptId) {

@@ -52,6 +52,9 @@ public class CalendarNotificationSnapshotService {
         details.put("exactDate", row.getExactDate()); details.put("startDate", row.getStartDate());
         details.put("endDate", row.getEndDate()); details.put("categoryPathSnapshot", row.getCategoryPathSnapshot());
         details.put("selectedSpecsJson", row.getSelectedSpecsJson()); details.put("frozenSkusJson", row.getFrozenSkusJson());
+        var attachmentIds = cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleAttachmentService.ids(row.getAttachmentIdsJson());
+        // Preserve the fingerprint of historical versions that never contained attachments.
+        if (!attachmentIds.isEmpty()) details.put("attachmentIds", attachmentIds);
         String title = cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleService.displayName(row);
         String time = row.getExactDate() != null ? row.getExactDate().toString() : row.getStartDate() + " - " + row.getEndDate();
         return fingerprint(new CalendarNotifySnapshotDO().setCalendarType("EXAM").setCalendarId(row.getId())

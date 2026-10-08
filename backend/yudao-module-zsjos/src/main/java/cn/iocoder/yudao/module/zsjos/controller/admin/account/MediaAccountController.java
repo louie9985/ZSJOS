@@ -31,6 +31,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RestController
 @RequestMapping("/zsjos/media-account")
 public class MediaAccountController {
+
+    @GetMapping("/calendar/search")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-calendar:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarItemRespVO>> search(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaCalendarSearchReqVO req) {
+        return success(maintenanceService.calendarSearch(req, getLoginUserId()));
+    }
+
     @Resource private MediaAccountService mediaAccountService;
     @Resource private MediaAccountMaintenanceService maintenanceService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.account.MediaAccountDeleteService deleteService;

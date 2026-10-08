@@ -22,18 +22,36 @@
         {{ detailData.templateContent }}
       </el-descriptions-item>
     </el-descriptions>
+    <el-button v-if="isFeedbackUrgeNotification(detailData)" type="primary" :loading="taskLoading" class="mt-16px" @click="openTask">
+      查看审批任务
+    </el-button>
   </Dialog>
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
 import * as NotifyMessageApi from '@/api/system/notify/message'
+import { feedbackUrgeTaskTarget, isFeedbackUrgeNotification } from '@/utils/feedbackUrgeNotification'
 
 defineOptions({ name: 'MyNotifyMessageDetailDetail' })
 
 const dialogVisible = ref(false) // 弹窗的是否展示
 const detailLoading = ref(false) // 表单的加载中
 const detailData = ref({} as NotifyMessageApi.NotifyMessageVO) // 详情数据
+const router = useRouter()
+const message = useMessage()
+const taskLoading = ref(false)
+const openTask = async () => {
+  taskLoading.value = true
+  try {
+    await router.push(await feedbackUrgeTaskTarget(detailData.value))
+    dialogVisible.value = false
+  } catch {
+    message.warning('审批任务已结束、已转交或暂时无法访问，请稍后重试')
+  } finally {
+    taskLoading.value = false
+  }
+}
 
 /** 打开弹窗 */
 const open = async (data: NotifyMessageApi.NotifyMessageVO) => {

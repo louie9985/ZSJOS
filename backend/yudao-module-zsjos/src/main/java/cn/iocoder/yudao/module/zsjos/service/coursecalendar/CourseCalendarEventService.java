@@ -17,6 +17,12 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class CourseCalendarEventService {
+
+    public cn.iocoder.yudao.framework.common.pojo.PageResult<CourseCalendarRespVO> search(CourseCalendarSearchReqVO req) {
+        var page = mapper.selectSearch(req);
+        return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(page.getList().stream().map(this::toResp).toList(), page.getTotal());
+    }
+
     public static final String DICT_TYPE = "zsjos_course_form";
     @Resource private CourseCalendarEventMapper mapper;
     @Resource private DictDataApi dictDataApi;

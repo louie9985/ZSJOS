@@ -1,3 +1,6 @@
+import CalendarSearch from '../components/CalendarSearch'
+import { useCalendarHighlight } from '../components/useCalendarHighlight'
+import { calendarSearchApi, searchPresentation, findCalendarPage } from '../services/calendarSearch'
 import { LinkedText } from '../components/ResourceLink'
 import CalendarSideNavigation, { moveCalendarMonth } from '../components/CalendarSideNavigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -10,6 +13,7 @@ import { DICT_TYPE } from '../constants'
 import { formatTimestamp } from '../services/time'
 import LeadDetail from '../components/LeadDetail'
 import FollowUpModal from '../components/FollowUpModal'
+import { notifyLeadFollowUpChanged } from '../services/leadFollowUpEvents'
 import '../styles/pages/lead-follow-up-calendar.css'
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '加载失败，请重试'
@@ -31,6 +35,8 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
   const [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
   const [detailId, setDetailId] = useState<number>(), [detailDirty, setDetailDirty] = useState(false)
   const [categories, setCategories] = useState<DictData[]>([]), [channels, setChannels] = useState<DictData[]>([])
+  const [highlightedId, setHighlightedId] = useState<number>()
+  useCalendarHighlight(highlightedId, cards)
   const detailSequence = useRef(0)
   const start = anchor.startOf('month').startOf('week').format('YYYY-MM-DD')
   const end = dayjs(start).add(42, 'day').format('YYYY-MM-DD')
@@ -79,7 +85,11 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
 
   if (!canView) return <Alert type="warning" showIcon title="无权查看销售客资跟进日历，请联系管理员配置权限" />
   return <section className="workspace-page lead-calendar-page">
-    <div className="page-heading"><div><Typography.Title level={4}>销售客资跟进日历</Typography.Title><Typography.Text type="secondary">我的待跟进客资 · 按跟进截止日期展示</Typography.Text></div><Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button></div>
+    <div className="page-heading"><div><Typography.Title level={4}>销售客资跟进日历</Typography.Title><Typography.Text type="secondary">我的待跟进客资 · 按跟进截止日期展示</Typography.Text></div><Space><CalendarSearch scopeLabel="本人未完成的跟进待办" search={calendarSearchApi.lead} present={searchPresentation.lead} onLocate={async (row, signal) => {
+      const item = searchPresentation.lead(row); const date = dayjs(item.start)
+      const fresh = await findCalendarPage(pageNo => leadCalendarApi.cards({ start: item.start, end: date.add(1, 'day').format('YYYY-MM-DD'), pageNo, pageSize: 24, sort, direction }, signal), card => card.lead.id === row.lead.id, signal)
+      setHighlightedId(row.lead.id); setAnchor(date); setDay(date); setPage(fresh.pageNo); setCards(fresh.list); setTotal(fresh.total); setRevision(value => value + 1)
+    }} /><Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button></Space></div>
     <CalendarSideNavigation onNavigate={direction => { setDay(undefined); setAnchor(value => moveCalendarMonth(value, direction)) }}>
     {error ? <Alert type="error" showIcon title={error} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={loading}>
       <Calendar value={anchor} mode="month" onPanelChange={setAnchor}
@@ -107,7 +117,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
         <div className="lead-calendar-grid">{cards.map(card => {
           const { lead, lastFollowUp } = card
           const canFollow = allowed(permissions, 'zsjos:lead-follow-up:create') && lead.availableActions?.some(action => action.code === 'ADD_FOLLOW_UP' && action.enabled)
-          return <article className="lead-calendar-card" key={lead.id}>
+          return <article className="lead-calendar-card" key={lead.id} data-calendar-located={lead.id === highlightedId}>
             <div className="lead-calendar-card-body"><Typography.Title level={5}>{lead.submittedName || '未填写姓名'}</Typography.Title>
               <div>手机号：<Typography.Text copyable={lead.submittedMobile ? { text: lead.submittedMobile } : false}>{lead.submittedMobile || '未填写'}</Typography.Text></div>
               <div>微信号：<Typography.Text copyable={lead.submittedWechatId ? { text: lead.submittedWechatId } : false}>{lead.submittedWechatId || '未填写'}</Typography.Text></div>
@@ -129,8 +139,8 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
     <Modal title="客资详情" open={Boolean(detailId)} onCancel={closeDetail} footer={null} mask={{ closable: false }} width="min(1200px, calc(100vw - 32px))" destroyOnHidden>
       {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId && void loadDetail(detailId)}>重试</Button>} /> : detail && <LeadDetail lead={detail} categories={categories}
         categoryLabel={value => categories.find(item => item.value === value)?.label || '未记录分类'} channelLabel={value => channels.find(item => item.value === value)?.label || '未记录渠道'}
-        mode="owner" autoExpandFollowUp={false} onDirtyChange={setDetailDirty} onChanged={refresh} />}
+        mode="owner" autoExpandFollowUp={false} onDirtyChange={setDetailDirty} onChanged={() => { notifyLeadFollowUpChanged(detail.id); refresh() }} />}
     </Modal>
-    {followUp && <FollowUpModal lead={followUp} open onClose={() => setFollowUp(undefined)} onSuccess={refresh} />}
+    {followUp && <FollowUpModal lead={followUp} open onClose={() => setFollowUp(undefined)} onSuccess={() => { notifyLeadFollowUpChanged(followUp.id); refresh() }} />}
   </section>
 }

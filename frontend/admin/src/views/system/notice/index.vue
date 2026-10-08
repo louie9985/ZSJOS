@@ -10,8 +10,8 @@
   <template v-else>
     <ContentWrap>
       <el-form ref="queryFormRef" :model="queryParams" :inline="true" label-width="72px" class="-mb-15px">
-        <el-form-item label="公告标题" prop="title">
-          <el-input v-model="queryParams.title" clearable placeholder="请输入公告标题" class="!w-240px" @keyup.enter="handleQuery" />
+        <el-form-item label="关键词" prop="title">
+          <el-input v-model="queryParams.title" clearable placeholder="标题、来源部门或发布人" class="!w-240px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="发布状态" prop="publishStatus">
           <el-select v-model="queryParams.publishStatus" clearable placeholder="全部状态" class="!w-200px">
@@ -32,7 +32,10 @@
 
     <ContentWrap>
       <el-table v-loading="loading" :data="list">
-        <el-table-column label="公告标题" prop="title" min-width="260" show-overflow-tooltip />
+        <el-table-column label="关键词" prop="title" min-width="260" show-overflow-tooltip />
+        <el-table-column label="文章来源" min-width="150"><template #default="{ row }">{{ row.sourceDeptName || '未记录' }}</template></el-table-column>
+        <el-table-column label="发布人" min-width="110"><template #default="{ row }">{{ row.publishStatus === 'DRAFT' ? '待发布' : row.publisherName || '未记录' }}</template></el-table-column>
+        <el-table-column label="接收部门/人员" min-width="220" show-overflow-tooltip><template #default="{ row }">{{ NoticeApi.noticeAudienceText(row) }}</template></el-table-column>
         <el-table-column label="公告类型" prop="type" width="110" align="center">
           <template #default="scope"><dict-tag :type="DICT_TYPE.SYSTEM_NOTICE_TYPE" :value="scope.row.type" /></template>
         </el-table-column>

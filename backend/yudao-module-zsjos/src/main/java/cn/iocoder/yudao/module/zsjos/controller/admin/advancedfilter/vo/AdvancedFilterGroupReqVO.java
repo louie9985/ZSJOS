@@ -12,6 +12,6 @@ import java.util.List;
 public class AdvancedFilterGroupReqVO {
     @Pattern(regexp = "AND|OR", message = "筛选逻辑只能是 AND 或 OR")
     private String logic = "AND";
-    @Valid @Size(max = 20) private List<AdvancedFilterConditionReqVO> conditions = new ArrayList<>();
-    @Valid @Size(max = 5) private List<AdvancedFilterGroupReqVO> groups = new ArrayList<>();
+    @Size(max = 20) private List<@Valid AdvancedFilterConditionReqVO> conditions = new ArrayList<>();
+    @Size(max = 5) private List<@Valid AdvancedFilterGroupReqVO> groups = new ArrayList<>();
 }

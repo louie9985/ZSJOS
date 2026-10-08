@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 public class ZsjosProductAttrSaveReqVO {
     @NotNull private Long spuId;
-    @Valid private List<Attr> attrs = List.of();
+    private List<@Valid Attr> attrs = List.of();
 
     @Data
     public static class Attr {
@@ -20,7 +20,7 @@ public class ZsjosProductAttrSaveReqVO {
         @NotBlank @Size(max = 50) private String attrName;
         @NotNull private Boolean required;
         @NotNull private Integer sort;
-        @NotEmpty @Valid private List<Value> values;
+        @NotEmpty private List<@Valid Value> values;
     }
     @Data
     public static class Value {

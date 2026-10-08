@@ -14,10 +14,9 @@ import java.util.List;
 @Data
 public class LeadInboxFilterConfigVO {
 
-    @Valid
     @NotEmpty(message = "至少配置一个一级分组")
     @Size(max = 20, message = "一级分组不能超过 20 个")
-    private List<GroupVO> groups = new ArrayList<>();
+    private List<@Valid GroupVO> groups = new ArrayList<>();
 
     @Data
     public static class GroupVO {
@@ -37,20 +36,17 @@ public class LeadInboxFilterConfigVO {
         @Deprecated
         @Size(max = 20, message = "二级标题不能超过 20 个字符")
         private String sectionLabel;
-        @Valid
         @Size(max = 2, message = "每个分组最多配置两个条件")
-        private List<ConditionVO> conditions = new ArrayList<>();
+        private List<@Valid ConditionVO> conditions = new ArrayList<>();
         /**
          * 单行时代的二级筛选项。仅为反序列化既有已发布 JSON 保留，
          * 校验时归一化进 {@link #sections} 后清空；新配置一律写入 {@code sections}。
          */
         @Deprecated
-        @Valid
         @Size(max = 20, message = "每个分组的二级筛选项不能超过 20 个")
-        private List<OptionVO> options = new ArrayList<>();
-        @Valid
+        private List<@Valid OptionVO> options = new ArrayList<>();
         @Size(max = 3, message = "每个分组最多配置三行二级筛选")
-        private List<SectionVO> sections = new ArrayList<>();
+        private List<@Valid SectionVO> sections = new ArrayList<>();
     }
 
     /** 二级筛选行，例如“当前环节”“快捷条件”。一行内多个筛选项互斥。 */
@@ -64,9 +60,8 @@ public class LeadInboxFilterConfigVO {
         private String label;
         @NotNull(message = "二级行排序不能为空")
         private Integer sort;
-        @Valid
         @Size(max = 20, message = "每行二级筛选项不能超过 20 个")
-        private List<OptionVO> options = new ArrayList<>();
+        private List<@Valid OptionVO> options = new ArrayList<>();
     }
 
     @Data
@@ -81,9 +76,8 @@ public class LeadInboxFilterConfigVO {
         private Integer sort;
         @NotNull(message = "筛选项显隐不能为空")
         private Boolean enabled;
-        @Valid
         @Size(max = 2, message = "每个筛选项最多配置两个条件")
-        private List<ConditionVO> conditions = new ArrayList<>();
+        private List<@Valid ConditionVO> conditions = new ArrayList<>();
     }
 
     @Data

@@ -26,7 +26,7 @@
         ></el-table-column
       >
       <el-table-column
-        :label="exceptionType === 'suspended' ? '当前销售' : '回收来源销售'"
+        :label="exceptionType === 'suspended' ? '当前负责人' : '回收来源负责人'"
         min-width="140"
       >
         <template #default="scope">{{ ownerText(scope.row) }}</template>
@@ -154,7 +154,7 @@ const confirmVisible = ref(false)
 const idempotencyKey = ref<string>()
 const dialogTitle = computed(
   () =>
-    ({ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' })[
+    ({ restore: '恢复原负责人', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' })[
       action.value
     ]
 )
@@ -164,7 +164,7 @@ const confirmAction = computed(() => {
     candidates.value.find((item) => item.id === salesUserId.value)?.nickname || '目标销售'
   return (
     {
-      restore: `恢复客资「${leadName}」至原销售`,
+      restore: `恢复客资「${leadName}」至原负责人`,
       transfer: `将客资「${leadName}」转派给「${salesName}」`,
       recycle: `回收客资「${leadName}」`,
       release: `将客资「${leadName}」释放到抢单池`

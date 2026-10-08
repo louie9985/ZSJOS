@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class NoticeMyPageReqVO extends PageParam {
-    @Schema(description = "标题关键词")
+    @Schema(description = "标题、来源部门或发布人关键词")
     private String keyword;
     @Schema(description = "公告类型")
     private Integer type;

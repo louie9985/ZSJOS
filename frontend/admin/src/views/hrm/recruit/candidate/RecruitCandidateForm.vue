@@ -125,7 +125,7 @@
       <el-form-item label="简历附件" prop="resumeUrls">
         <UploadFile
           v-model="formData.resumeUrls"
-          :file-size="20"
+          :file-size="100"
           :file-type="['doc', 'docx', 'pdf']"
           :limit="5"
           directory="hrm/recruit/candidate/resume"

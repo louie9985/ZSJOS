@@ -48,6 +48,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PurchaseIntentService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseCustomerService repurchaseCustomers;
     @Resource private PurchaseIntentMapper purchaseIntentMapper;
     @Resource private PaymentIntentMapper paymentIntentMapper;
     @Resource private PaymentTransactionMapper transactionMapper;
@@ -63,6 +64,7 @@ public class PurchaseIntentService {
     @Resource private cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi notifyBusinessEventApi;
 
     public PurchaseIntentRespVO current(PurchaseIntentSaveDraftReqVO request, Long userId) {
+        resolveCustomerRepurchase(request, userId, false);
         resolvePerson(request, false);
         if (request.getPersonId() == null) return null;
         PurchaseIntentDO intent = purchaseIntentMapper.selectActive(request.getLeadId(), request.getPersonId(), request.getPurchaseType(), request.getSourceKey(), userId);
@@ -71,6 +73,7 @@ public class PurchaseIntentService {
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseIntentRespVO saveDraft(PurchaseIntentSaveDraftReqVO request, Long userId) {
+        resolveCustomerRepurchase(request, userId, true);
         resolvePerson(request, true);
         validateDraft(request);
         PurchaseIntentDO intent = request.getId() == null ? null : purchaseIntentMapper.selectByIdForUpdate(request.getId());
@@ -442,6 +445,28 @@ public class PurchaseIntentService {
         validateAmount(amount);
         if (amount.signum() == 0) throw exception(PURCHASE_INTENT_ONLINE_AMOUNT_INVALID);
     }
+    private void resolveCustomerRepurchase(PurchaseIntentSaveDraftReqVO request, Long userId, boolean create) {
+        if (!"customer_repurchase".equals(request.getPurchaseType())) return;
+        if (request.getLeadId() != null || request.getOpportunityId() != null || request.getDraft() == null)
+            throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        Object raw = request.getDraft().get("repurchaseIdentity");
+        if (!(raw instanceof Map<?, ?>)) throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        var identity = JsonUtils.convertObject(raw, cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.RepurchaseCustomerCheckReqVO.class);
+        var checked = repurchaseCustomers.checkCustomer(userId, identity);
+        if (!checked.isCanRepurchase()) throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        Long personId = checked.getPersonId();
+        if (personId == null && create) {
+            var person = personIdentityWriteService.resolveOrCreate(StrUtil.trim(identity.getCustomerName()),
+                    StrUtil.trimToNull(identity.getCustomerMobile()), StrUtil.trimToNull(identity.getCustomerWechatId()), "active");
+            var command = new cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderRepurchaseReqVO();
+            command.setCustomerName(identity.getCustomerName()); command.setCustomerMobile(identity.getCustomerMobile()); command.setCustomerWechatId(identity.getCustomerWechatId());
+            repurchaseCustomers.requireIdentity(person.getId(), command);
+            personId = person.getId();
+        }
+        if (request.getPersonId() != null && !request.getPersonId().equals(personId)) throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        request.setPersonId(personId);
+    }
+
     private void resolvePerson(PurchaseIntentSaveDraftReqVO request, boolean createExternal) {
         if (request.getPersonId() != null) return;
         if (request.getLeadId() != null) {

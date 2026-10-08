@@ -72,10 +72,42 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
+    void educationQualificationScopeUsesOwnerDepartmentNotQueryAll() {
+        LeadDO education = lead(20L, 20L);
+        education.setOwnerIdentity("education"); education.setSourceType("education_self_sourced");
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 101L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L)));
+        org.junit.jupiter.api.Assertions.assertTrue(service.canManageQualificationException(education, 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 40L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 20L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 40L));
+        org.junit.jupiter.api.Assertions.assertTrue(service.canRead(education, 40L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
+        org.junit.jupiter.api.Assertions.assertFalse(service.canRead(education, 40L));
+    }
+
+    @Test
     void readAllowsOriginalSubmitter() {
         when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
 
         assertReadAllowed(10L);
+    }
+
+    @Test
+    void supervisorOverturnUsesManagedDepartmentsWithoutReadAllBypass() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L)));
+        when(adminUserApi.getUserListByDeptIds(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenReturn(List.of(user(20L, 101L)));
+        assertActionAllowed(30L, SupervisorLeadOverturnPolicy.OBJECT_ACTION);
+        when(deptApi.getDeptListByLeaderUserId(40L)).thenReturn(List.of());
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(40L);
+            assertThrows(ServiceException.class, () -> service.check(1L, SupervisorLeadOverturnPolicy.OBJECT_ACTION));
+        }
     }
 
     @Test

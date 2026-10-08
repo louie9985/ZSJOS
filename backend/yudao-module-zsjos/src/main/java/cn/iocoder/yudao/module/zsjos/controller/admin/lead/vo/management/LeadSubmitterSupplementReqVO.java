@@ -16,6 +16,6 @@ public class LeadSubmitterSupplementReqVO {
     private String leadCategory;
     private List<Object> intendedProducts;
     @NotBlank @Size(max = 1000) private String remark;
-    @Valid @Size(max = 9) private List<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO> attachments;
+    @Size(max = 9) private List<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.@Valid LeadAttachmentReqVO> attachments;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 }

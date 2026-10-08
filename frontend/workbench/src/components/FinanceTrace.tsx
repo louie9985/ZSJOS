@@ -66,7 +66,7 @@ export function CashbackDetail({ id, permissions, onClose, onChanged }: { id?: n
         {detail.status === 'blocked' && <Alert type="warning" showIcon title="该笔返现已禁止提现" description={detail.blockReason} />}
         <Descriptions column={{ xs: 1, sm: 2 }} bordered items={[
           { key: 'no', label: '返现编号', children: detail.cashbackNo }, { key: 'beneficiary', label: '返现受益人', children: detail.beneficiaryName || '历史归属信息缺失' },
-          { key: 'partner', label: '合作方', children: detail.partnerName || '-' }, { key: 'product', label: '返现产品快照', children: detail.productNameSnapshot || '-' },
+          { key: 'partner', label: '兼职', children: detail.partnerName || '-' }, { key: 'product', label: '返现产品快照', children: detail.productNameSnapshot || '-' },
           { key: 'type', label: '类型', children: financeOptions.options('type').find(x => x.value === detail.type)?.label || '类型暂不可用' },
           { key: 'status', label: '状态', children: financeOptions.options('status').find(x => x.value === detail.status)?.label || '状态暂不可用' },
           { key: 'base', label: '返现基数', children: detail.type === 'valid' ? '固定金额返现，不适用' : money(detail.baseAmount) },

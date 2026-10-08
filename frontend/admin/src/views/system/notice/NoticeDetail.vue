@@ -12,13 +12,14 @@
         <NoticeReadStatistics v-if="activeTab === 'reading' && notice.id != null" :key="notice.id" :id="notice.id" />
         <div v-else>
         <h2>{{ notice.title }}</h2>
+        <el-button v-if="notice.publishStatus === 'PUBLISHED' && checkPermi(['system:notice:query']) && checkPermi(['system:notice:share'])" @click="sharing = true">对外分享</el-button>
+        <NoticeShareDialog v-if="sharing" :notice="notice" @close="sharing = false" />
         <el-descriptions :column="1" border>
           <el-descriptions-item label="公告类型"><dict-tag :type="DICT_TYPE.SYSTEM_NOTICE_TYPE" :value="notice.type" /></el-descriptions-item>
           <el-descriptions-item label="发布状态">{{ statusLabels[notice.publishStatus] }}</el-descriptions-item>
-          <el-descriptions-item label="接收范围">
-            <template v-if="notice.audienceType === 'TARGET'">指定部门/用户（{{ notice.targetDeptIds?.length || 0 }} 个部门，{{ notice.targetUserIds?.length || 0 }} 个指定用户<span v-if="notice.recipientCount != null">，发布时接收人数 {{ notice.recipientCount }}</span>）</template>
-            <template v-else>全员</template>
-          </el-descriptions-item>
+          <el-descriptions-item label="文章来源">{{ notice.sourceDeptName || '未记录' }}</el-descriptions-item>
+          <el-descriptions-item label="发布人">{{ notice.publishStatus === 'DRAFT' ? '发布时自动记录' : notice.publisherName || '未记录' }}</el-descriptions-item>
+          <el-descriptions-item label="接收部门/人员">{{ NoticeApi.noticeAudienceText(notice) }}</el-descriptions-item>
           <el-descriptions-item label="发布时间">{{ notice.publishTime ? formatDate(notice.publishTime) : '-' }}</el-descriptions-item>
           <el-descriptions-item label="高亮截止时间">{{ notice.highlightUntil ? formatDate(notice.highlightUntil) : '-' }}</el-descriptions-item>
         </el-descriptions>
@@ -39,10 +40,13 @@
 <script setup lang="ts">
 import * as NoticeApi from '@/api/system/notice'
 import NoticeReadStatistics from './NoticeReadStatistics.vue'
+import NoticeShareDialog from './NoticeShareDialog.vue'
+import { checkPermi } from '@/utils/permission'
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
 
 const visible = ref(false)
+const sharing = ref(false)
 const activeTab = ref('content')
 const loading = ref(false)
 const error = ref('')
@@ -65,7 +69,7 @@ const load = async () => {
     if (current === generation) error.value = cause instanceof Error ? cause.message : '公告详情加载失败'
   } finally { if (current === generation) loading.value = false }
 }
-const open = (id: number) => { activeTab.value = 'content'; noticeId.value = id; visible.value = true; void load() }
+const open = (id: number) => { sharing.value = false; activeTab.value = 'content'; noticeId.value = id; visible.value = true; void load() }
 watch(visible, value => { if (!value) { generation++; notice.value = undefined } })
 defineExpose({ open })
 </script>

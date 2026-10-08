@@ -129,6 +129,24 @@ class NoticeMapperTest extends BaseDbUnitTest {
         assertEquals(List.of(notice.getId()), rows.stream().map(NoticeDO::getId).toList());
     }
 
+    @Test
+    void sourceSearchMustKeepAudienceAndTenantBoundariesForBothPaginationModes() {
+        TenantContextHolder.setTenantId(1L);
+        NoticeDO visible = publishedNotice("公开标题"); visible.setSourceDeptName("考务部"); visible.setPublisherName("发布人员"); noticeMapper.insert(visible);
+        NoticeDO hidden = publishedNotice("定向标题"); hidden.setSourceDeptName("考务部"); hidden.setPublisherName("发布人员"); hidden.setAudienceType("TARGET"); noticeMapper.insert(hidden);
+        NoticeDO draft = publishedNotice("未发布"); draft.setSourceDeptName("考务部"); draft.setPublishStatus("DRAFT"); noticeMapper.insert(draft);
+        TenantContextHolder.setTenantId(2L);
+        NoticeDO other = publishedNotice("其他租户"); other.setSourceDeptName("考务部"); noticeMapper.insert(other);
+        TenantContextHolder.setTenantId(1L);
+        var query = new cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeMyPageReqVO(); query.setKeyword("考务");
+        assertEquals(List.of(visible.getId()), noticeMapper.selectPublishedPage(query, 7L).getList().stream().map(NoticeDO::getId).toList());
+        assertEquals(List.of(visible.getId()), noticeMapper.selectPublishedCursor(7L, LocalDateTime.now(), null, null, null, 20, "考务", null, null, null, null).stream().map(NoticeDO::getId).toList());
+        query.setKeyword("发布人员"); assertEquals(1L, noticeMapper.selectPublishedPage(query, 7L).getTotal());
+        query.setKeyword("不存在"); assertEquals(0L, noticeMapper.selectPublishedPage(query, 7L).getTotal());
+        var admin = new cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticePageReqVO(); admin.setTitle("考务");
+        assertEquals(3L, noticeMapper.selectPage(admin).getTotal());
+    }
+
     private NoticeDO publishedNotice(String title) {
         NoticeDO notice = new NoticeDO();
         notice.setTitle(title);

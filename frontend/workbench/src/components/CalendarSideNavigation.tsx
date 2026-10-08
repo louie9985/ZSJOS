@@ -25,5 +25,6 @@ export default function CalendarSideNavigation({ children, onNavigate, previousL
       <Tooltip title={nextLabel}><Button className="calendar-side-navigation-arrow" aria-label={nextLabel}
         icon={<RightOutlined />} onClick={() => onNavigate(1)} /></Tooltip>
     </div>
+    <span className="calendar-mobile-hint">左右滑动查看完整日历</span>
   </div>
 }

@@ -46,9 +46,16 @@ public class LeadSubmissionIdentityService {
     }
 
     public void requireEducationSubmitter(Long userId) {
-        if (!isValidInternalUser(requireEnabledAccount(userId))) {
+        if (!isEligibleEducationOwner(userId)) {
             throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
         }
+    }
+
+    public boolean isEligibleEducationOwner(Long userId) {
+        if (userId == null) return false;
+        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
+                && isValidInternalUser(user);
     }
 
     public void requireSales(Long userId) {

@@ -43,6 +43,25 @@ class SubordinateSalesCommandServiceTest {
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Test
+    void educationRestoreRequiresManagedOwnerAndCurrentTenant() {
+        LeadDO lead = lead(1L, 20L); lead.setStatus("suspended"); lead.setAssignmentStatus("owned");
+        lead.setOwnerIdentity("education"); lead.setSourceType("education_self_sourced");
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        service.restoreOne(1L, 10L, "恢复", "education-restore");
+        verify(qualificationService).restore(eq(1L), eq(10L), any());
+        assertEquals("education", lead.getOwnerIdentity());
+        assertEquals(20L, lead.getOwnerUserId());
+        clearInvocations(qualificationService);
+        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 30L, "越部门", "wrong-manager"));
+        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 20L, "自行恢复", "owner"));
+        TenantContextHolder.setTenantId(2L);
+        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 10L, "跨租户", "wrong-tenant"));
+        verify(leadMapper).selectByIdForUpdate(1L, 2L);
+        verifyNoInteractions(qualificationService);
+    }
+
+    @Test
     void manualPublicSeaPreservesLeadOwnershipAndStates() {
         LeadDO lead = lead(1L, 20L); lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);

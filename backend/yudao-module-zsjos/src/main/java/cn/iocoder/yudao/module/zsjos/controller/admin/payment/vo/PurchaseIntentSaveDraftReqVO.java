@@ -18,7 +18,7 @@ public class PurchaseIntentSaveDraftReqVO {
     private Long opportunityId;
     @NotBlank @Size(max = 64) private String sourceKey;
     @NotNull private Map<String, Object> draft;
-    @Valid @NotEmpty private List<@NotNull Item> items;
+    @NotEmpty private List<@Valid @NotNull Item> items;
     @NotNull @DecimalMin("0.00") @Digits(integer = 16, fraction = 2) private BigDecimal totalAmount;
     @NotBlank @Size(max = 128) private String idempotencyKey;
     private Integer version;

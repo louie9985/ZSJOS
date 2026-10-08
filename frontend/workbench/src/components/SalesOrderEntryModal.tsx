@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Typography, message, TreeSelect } from 'antd'
 import { CopyOutlined, DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -7,6 +7,7 @@ import { createIdempotencyKey } from '../services/idempotency'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import { validateSalesOrderAmounts, validateSalesOrderSubmission } from '../services/salesOrder'
+import { readOrderGifts, giftOptions } from '../services/orderGifts'
 import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -65,9 +66,10 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, studentRepurchase, open, onClose, onSubmitted }: {
+export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, customerRepurchase, studentRepurchase, open, onClose, onSubmitted }: {
   lead: SalesOrderEntryLead; orderId?: number; repurchase?: boolean
-  externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string }
+  externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string; expectedPersonId?: number }
+  customerRepurchase?: boolean
   studentRepurchase?: boolean
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
@@ -90,6 +92,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [collectionMode, setCollectionMode] = useState<CollectionMode>('offline_paid')
   const [purchaseIntent, setPurchaseIntent] = useState<PurchaseIntent>()
   const [draftSaving, setDraftSaving] = useState(false)
+  const submittedDraft = useRef<{ key: string; payload: string; draft: PurchaseIntent } | undefined>(undefined)
   const [revisionOrder, setRevisionOrder] = useState<SalesOrder>()
   const transactionLocked = orderId ? revisionOrder?.transactionLocked !== false : Boolean(purchaseIntent?.paymentLocked)
 
@@ -97,7 +100,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
   const paymentLinkActionLabel = getPaymentLinkActionLabel(collectionMode, orderId, purchaseIntent)
-  const purchaseType: PurchaseIntentDraftRequest['purchaseType'] = externalCustomer ? 'external_repurchase'
+  const purchaseType: PurchaseIntentDraftRequest['purchaseType'] = customerRepurchase ? 'customer_repurchase' : externalCustomer ? 'external_repurchase'
     : studentRepurchase ? 'student_repurchase' : repurchase ? 'lead_repurchase' : 'lead_first_purchase'
   const purchaseSource = { purchaseType, leadId: externalCustomer || studentRepurchase ? undefined : lead.id,
     personId: studentRepurchase ? lead.id : lead.personId,
@@ -113,9 +116,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       ])
       setAreas(areaResult as AreaNode[]); setCatalog(catalogResult as LeadCatalog)
       const leaf = (nodes: any[]): any[] => nodes.flatMap(n => n.children?.length ? leaf(n.children) : n.code ? [{ value: n.code, title: n.name }] : [])
-      setGiftNodes(leaf(giftResult as any[]))
+
       setDicts(Object.fromEntries(dictTypes.map((type, index) => [type, dictResults[index] as DictData[]])))
       const order = orderResult as SalesOrder | undefined
+      const historicalGifts = readOrderGifts(order)
+      setGiftNodes(giftOptions(leaf(giftResult as any[]), historicalGifts))
       const retained = [
         [DICT_TYPE.ORDER_STUDENT_NATURE, 'studentNature', order?.studentNature, order?.studentNatureLabelSnapshot],
         [DICT_TYPE.ORDER_SERVICE_PERIOD, 'servicePeriod', order?.servicePeriod, order?.servicePeriodLabelSnapshot],
@@ -145,14 +150,14 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         studentSource: order?.studentSourceLabelSnapshot ? order.studentSource : undefined, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
         feeMode: order?.feeModeLabelSnapshot ? order.feeMode : undefined, paymentMethod: order?.paymentMethodLabelSnapshot ? order.paymentMethod : undefined, remark: order?.remark,
         specialRequirements: order?.studentSpecialRequirements, materialDeliveryContact: order?.materialDeliveryContact,
-        giftItems: order?.giftItems, giftShippingAddress: order?.giftShippingAddress,
+        giftItems: order?.giftItemCodes ?? historicalGifts.map(item => item.code), giftShippingAddress: order?.giftShippingAddress,
         items: order?.items.map(item => ({ courseKey: `${item.productRef}::${item.skuRef}`, actualAmount: item.actualAmount }))
           || [{ courseKey: hasPrimary ? primary : undefined, actualAmount: undefined }]
       })
       setVouchers((order?.paymentVouchers || []).map(file => ({ uid: String(file.infraFileId), name: file.originalName,
         type: file.contentType, status: 'done', url: file.fileUrl, uploaded: file })))
       if (!orderId) {
-        const current = await api.currentPurchaseIntent(purchaseSource)
+        const current = await api.currentPurchaseIntent({ ...purchaseSource, ...(customerRepurchase ? { draft: { repurchaseIdentity: externalCustomer } } : {}) })
         setPurchaseIntent(current); setCollectionMode(current?.collectionMode || 'offline_paid')
         if (current?.draft) {
           const draft = current.draft as Partial<Values> & { customerPaidAt?: number }
@@ -173,7 +178,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
 
   useEffect(() => {
     if (!open) return
-    resetIntent()
+    resetIntent(); submittedDraft.current = undefined
     setConfirmOpen(false); setPendingValues(undefined)
     form.resetFields(); setVouchers([]); void load()
   }, [open, lead.id, lead.submittedName, lead.submittedMobile, lead.submittedWechatId, orderId, resetIntent])
@@ -190,7 +195,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     })
     const draftTotal = draftItems.reduce((sum, item) => sum + Math.round(item.actualAmount * 100), 0) / 100
     return { ...purchaseSource, id: purchaseIntent?.id, version: purchaseIntent?.version, collectionMode,
-      draft: { ...values, customerPaidAt: values.customerPaidAt?.valueOf(), studentMobile: values.mobile, studentWechatId: values.wechatId },
+      draft: { ...values, repurchaseIdentity: customerRepurchase ? externalCustomer : undefined, customerPaidAt: values.customerPaidAt?.valueOf(), studentMobile: values.mobile, studentWechatId: values.wechatId },
       items: draftItems, totalAmount: Number(draftTotal.toFixed(2)), idempotencyKey }
   }
   const saveDraft = async (createLink = false) => {
@@ -253,7 +258,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
         studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
         materialDeliveryContact: values.materialDeliveryContact?.trim() || undefined,
-        giftItems: values.giftItems?.length ? values.giftItems : undefined, giftShippingAddress: values.giftShippingAddress?.trim() || undefined,
+        giftItems: values.giftItems || [], giftShippingAddress: values.giftShippingAddress?.trim() || undefined,
         items: values.items.map(item => { const [spuRef, skuRef] = item.courseKey!.split('::'); return { spuRef, skuRef, actualAmount: Number(item.actualAmount) } }),
         paymentVouchers: [], idempotencyKey
       }
@@ -261,7 +266,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         if (!orderId) {
           const draftRequest = buildDraftRequest(values, `purchase:${idempotencyKey}`)
           if (!draftRequest) return
-          const saved = await api.savePurchaseIntentDraft(draftRequest)
+          const payload = JSON.stringify({ ...draftRequest, id: undefined, version: undefined })
+          const previous = submittedDraft.current
+          const saved = previous?.key === idempotencyKey && previous.payload === payload
+            ? previous.draft : await api.savePurchaseIntentDraft(draftRequest)
+          submittedDraft.current = { key: idempotencyKey, payload, draft: saved }
           setPurchaseIntent(saved); request.purchaseIntentId = saved.id
         }
         const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
@@ -271,7 +280,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           const repurchaseReason = values.repurchaseReason!.trim()
           let submittedOrderId: number
           if (externalCustomer) {
-            submittedOrderId = await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason, order: request })
+            submittedOrderId = await (customerRepurchase ? api.submitCustomerRepurchase : api.submitExternalRepurchase)({ ...externalCustomer, repurchaseReason, order: request })
           } else if (studentRepurchase) {
             submittedOrderId = await api.submitStudentRepurchase(lead.id, { customerName: request.studentName, customerMobile: request.studentMobile, customerWechatId: request.studentWechatId, repurchaseReason, order: request })
           } else {
@@ -321,10 +330,10 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>

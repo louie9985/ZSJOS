@@ -9,7 +9,7 @@ const dialog = ref<InstanceType<typeof ExternalRepurchaseDialog>>()
     endpoint="/zsjos/sales-order/my-page"
     description="历史客户复购订单记录"
     ><template #actions="{ reload }"
-      ><el-button type="primary" @click="dialog?.open()">新增复购</el-button
+      ><el-button v-hasPermi="['zsjos:sales-order:create']" type="primary" @click="dialog?.open()">新增复购</el-button
       ><ExternalRepurchaseDialog ref="dialog" @success="reload" /></template
   ></WorkbenchListPage>
 </template>

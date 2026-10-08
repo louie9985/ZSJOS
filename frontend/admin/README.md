@@ -359,3 +359,10 @@ src/views/zsjos/components/LeadCreateDialog.vue 与 React 工作台共享原销�
 完整契约：[客资提交与分配](../../docs/api/zsjos-lead-submission-dispatch.md)。静态检查仍使用 pnpm ts:check；隔离浏览器入口为 test/self-sourced-auto.html，与工作台联合验收脚本为 ../workbench/test/self-sourced-auto-browser.py。开发夹具使用合成 API 数据，不执行真实客资写入。
 
 本轮教务同步：教务使用原 zsjos:lead:education-self-sourced:create，仍累计校验跟进、判定功能权限及本人对象权限；没有权限整笔拒绝，不自动授权。两类自动来源分别保存，历史无标记记录不补处理。
+
+
+## 中世健交叉复购录单（2026-09-30）
+
+历史客户复购页面使用统一客户身份预检与复购接口；校验成功前不展示完整订单表单，变更姓名或联系方式立即失效校验。原有 sales-order:create 权限由菜单按钮和后端共同执行。销售、教务可交叉为准确命中的客户录入新购买，原客资/服务关系不变；本次订单归当前录单人，失败重试保留幂等键。参见 [订单契约](../../docs/api/zsjos-sales-order.md)。双端隔离浏览器验收脚本：../workbench/test/repurchase-customer-browser.py。
+
+本次同步修复该弹窗的凭证上传响应解包及响应式状态更新，上传完成后才允许提交，并将真实文件 ID 传给订单接口。移动端缴费方式与支付方式改为单列；后端明确错误保留原业务提示。

@@ -36,6 +36,8 @@ public class FeedbackObjectPermissionProvider implements ZsjosObjectPermissionPr
     private FeedbackRoundMapper roundMapper;
     @Resource
     private PermissionApi permissionApi;
+    @Resource
+    private cn.iocoder.yudao.module.bpm.api.task.BpmProcessProgressApi progressApi;
 
     @Override
     public String getBizType() {
@@ -66,9 +68,8 @@ public class FeedbackObjectPermissionProvider implements ZsjosObjectPermissionPr
      * 该用户是不是这条反馈**任一轮次**的指定审批人。
      *
      * <p>遍历所有轮次而不是只看最新一轮：多轮审批时历史轮次的审批人回来翻单子，
-     * 仍然应该看得到——他当时确实审过。判定完全依赖提交时冻结的
-     * {@code approval_context_json}，不看角色、不看部门负责人字段的当前值，
-     * 否则人事变动会让历史审批记录对不上。
+     * 仍然应该看得到——他当时确实审过。冻结指定审批人与 BPM 实际任务参与关系
+     * 共同支持历史读取和转办/委派/加签，不从当前角色或部门负责人反推历史权限。
      */
     private boolean isApproverOfAnyRound(Long feedbackId, Long userId) {
         if (userId == null) {
@@ -79,9 +80,9 @@ public class FeedbackObjectPermissionProvider implements ZsjosObjectPermissionPr
             if (rounds == null) {
                 return false;
             }
-            return rounds.stream()
-                    .anyMatch(round -> FeedbackApprovalContext.isApprover(
-                            FeedbackApprovalContext.parse(round), userId));
+            if (rounds.stream().anyMatch(round -> FeedbackApprovalContext.isApprover(
+                    FeedbackApprovalContext.parse(round), userId))) return true;
+            return rounds.stream().anyMatch(round -> progressApi.isParticipant(round.getProcessInstanceId(), userId));
         } catch (Exception ex) {
             // 查不到轮次就不放行：这里宁可少放行，也不能把单据暴露给非审批人。
             return false;

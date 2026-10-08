@@ -31,6 +31,7 @@ class FeedbackObjectPermissionProviderTest {
     @Mock private FeedbackMapper feedbackMapper;
     @Mock private FeedbackRoundMapper roundMapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.bpm.api.task.BpmProcessProgressApi progressApi;
     @InjectMocks private FeedbackObjectPermissionProvider provider;
 
     @Test

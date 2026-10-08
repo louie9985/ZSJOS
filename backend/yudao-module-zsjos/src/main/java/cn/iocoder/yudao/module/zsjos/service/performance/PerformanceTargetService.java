@@ -16,6 +16,46 @@ public class PerformanceTargetService {
  @Resource private PerformanceTargetMapper mapper;
  @Resource private PerformanceRevisionMapper revisions;
  @Resource private PerformanceAccess access;
+ public record Period(String type,LocalDate start) {}
+ /** One report owns this snapshot; it is never retained across requests or used for writes. */
+ public final class Batch {
+  private final List<PerformanceTargetDO> rows;
+  private final List<PerformanceOrgDO> organizations;
+  private final List<cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> sales;
+  private final Map<Long,String> userNames=new HashMap<>(),deptNames=new HashMap<>();
+  private final java.util.function.BiPredicate<Long,Long> visible;
+  private final Map<String,Target> resolved=new HashMap<>();
+  private Batch(Collection<Period> periods,Collection<Long> extraUsers) {
+   var dates=periods.stream().map(Period::start).toList();
+   rows=dates.isEmpty()?List.of():mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>()
+     .between(PerformanceTargetDO::getPeriodStart,Collections.min(dates),Collections.max(dates))
+     .in(PerformanceTargetDO::getPeriodType,periods.stream().map(Period::type).distinct().toList()));
+   organizations=access.orgs();sales=access.sales();visible=access.targetVisibility();
+   Set<Long> users=new HashSet<>(extraUsers),depts=new HashSet<>();
+   sales.forEach(x->users.add(x.getId()));
+   rows.forEach(x->{if("USER".equals(x.getScopeType()))users.add(x.getScopeId());if(x.getDeptId()!=null)depts.add(x.getDeptId());if(x.getCenterId()!=null)depts.add(x.getCenterId());});
+   organizations.forEach(x->{depts.add(x.getDeptId());depts.add(x.getCenterId());});depts.remove(null);users.remove(null);
+   access.users(users).forEach(x->userNames.put(x.getId(),x.getNickname()));
+   access.departments(depts).forEach(x->deptNames.put(x.getId(),x.getName()));
+  }
+  private String name(String type,Long id){return "USER".equals(type)?userNames.getOrDefault(id,"历史人员"):deptNames.getOrDefault(id,"历史组织");}
+  public Target resolve(String input,Long id,String period,LocalDate start) {
+   String type="SELF".equals(input)?"USER":input,key=type+":"+id+":"+period+":"+start;
+   var existing=resolved.get(key);if(existing!=null)return existing;
+   Target result;
+   if("quarter".equals(period)||"year".equals(period)) {
+    BigDecimal f=BigDecimal.ZERO,s=BigDecimal.ZERO;int missing=0;
+    for(int i=0;i<("year".equals(period)?12:3);i++){var t=resolve(type,id,"month",start.plusMonths(i));f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
+    result=new Target(null,type,id,name(type,id),period,start,f,s,f,s,false,missing==0,missing,null);
+   } else result=PerformanceTargetService.this.resolve(type,id,period,start,rows.stream().filter(x->period.equals(x.getPeriodType())&&start.equals(x.getPeriodStart())).toList(),new HashSet<>(),null,this);
+   resolved.put(key,result);return result;
+  }
+ }
+ public Batch batch(Collection<Period> requested,Collection<Long> users) {
+  Set<Period> periods=new LinkedHashSet<>();
+  for(var p:requested)if("quarter".equals(p.type())||"year".equals(p.type()))for(int i=0;i<("year".equals(p.type())?12:3);i++)periods.add(new Period("month",p.start().plusMonths(i)));else periods.add(p);
+  return new Batch(periods,users);
+ }
  public boolean readableIndividual(String type,Long id,String period,LocalDate start){if(!"USER".equals(type))return true;return rows(period,start).stream().filter(x->type.equals(x.getScopeType())&&id.equals(x.getScopeId())).allMatch(x->access.departmentAllowed(x.getDeptId()));}
  public List<PerformanceTargetDO> rows(String period,LocalDate start) {
   return mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getPeriodType,period).eq(PerformanceTargetDO::getPeriodStart,start));
@@ -30,9 +70,12 @@ public class PerformanceTargetService {
   return resolve(type,id,period,start,rows(period,start),new HashSet<>(),null);
  }
  private Target resolve(String type,Long id,String period,LocalDate start,List<PerformanceTargetDO> rows,Set<String> path,List<MissingTarget> missingRows) {
+  return resolve(type,id,period,start,rows,path,missingRows,null);
+ }
+ private Target resolve(String type,Long id,String period,LocalDate start,List<PerformanceTargetDO> rows,Set<String> path,List<MissingTarget> missingRows,Batch batch) {
   String key=type+id;if(!path.add(key))throw PerformanceAccess.invalid("目标组织关联存在循环");
   var row=rows.stream().filter(x->type.equals(x.getScopeType())&&id.equals(x.getScopeId())).findFirst().orElse(null);
-  if(row!=null&&"USER".equals(type)){var q=new Query();q.setScopeType("USER");q.setScopeId(id);if(!access.historicalRowAllowed(q,row.getDeptId()))row=null;}
+  if(row!=null&&"USER".equals(type)){var q=new Query();q.setScopeType("USER");q.setScopeId(id);if(!(batch==null?access.historicalRowAllowed(q,row.getDeptId()):batch.visible.test(id,row.getDeptId())))row=null;}
   BigDecimal f=BigDecimal.ZERO,s=BigDecimal.ZERO;int missing=0;
   if("USER".equals(type)) {missing=row==null?1:0;if(row==null&&missingRows!=null)missingRows.add(missingRow(type,id,start,"保底、冲刺目标未设置")); f=row==null?null:row.getFloorAmount();s=row==null?null:row.getSprintAmount();}
   else {
@@ -40,17 +83,17 @@ public class PerformanceTargetService {
    if("CENTER".equals(type)) {
     Set<Long> recordedDepartments=new HashSet<>();
     rows.stream().filter(x->!"CENTER".equals(x.getScopeType())&&x.getDeptId()!=null).forEach(x->{recordedDepartments.add(x.getDeptId());if(id.equals(x.getCenterId()))children.add(x.getDeptId());});
-    access.orgs().stream().filter(x->"DEPT".equals(x.getKind())&&id.equals(x.getCenterId())&&!recordedDepartments.contains(x.getDeptId())).forEach(x->children.add(x.getDeptId()));
+    (batch==null?access.orgs():batch.organizations).stream().filter(x->"DEPT".equals(x.getKind())&&id.equals(x.getCenterId())&&!recordedDepartments.contains(x.getDeptId())).forEach(x->children.add(x.getDeptId()));
    } else {
     childType="USER";
     Set<Long> recorded=new HashSet<>();rows.stream().filter(x->"USER".equals(x.getScopeType())).forEach(x->{recorded.add(x.getScopeId());if(id.equals(x.getDeptId()))children.add(x.getScopeId());});
-    access.sales().stream().filter(x->id.equals(x.getDeptId())&&!recorded.contains(x.getId())&&Objects.equals(x.getStatus(),0)).forEach(x->children.add(x.getId()));
+    (batch==null?access.sales():batch.sales).stream().filter(x->id.equals(x.getDeptId())&&!recorded.contains(x.getId())&&Objects.equals(x.getStatus(),0)).forEach(x->children.add(x.getId()));
    }
    if(children.isEmpty()){missing++;if(missingRows!=null)missingRows.add(missingRow(type,id,start,"无可汇总的下级目标"));}
-   for(Long child:children){var t=resolve(childType,child,period,start,rows,new HashSet<>(path),missingRows);f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
+   for(Long child:children){var t=resolve(childType,child,period,start,rows,new HashSet<>(path),missingRows,batch);f=f.add(z(t.floorAmount()));s=s.add(z(t.sprintAmount()));missing+=t.missing();}
   }
   boolean manual=row!=null&&Boolean.TRUE.equals(row.getManual());
-  return new Target(row==null?null:row.getId(),type,id,name(type,id),period,start,f,s,manual?row.getFloorAmount():f,manual?row.getSprintAmount():s,manual,missing==0,missing,row==null?null:row.getVersion());
+  return new Target(row==null?null:row.getId(),type,id,batch==null?name(type,id):batch.name(type,id),period,start,f,s,manual?row.getFloorAmount():f,manual?row.getSprintAmount():s,manual,missing==0,missing,row==null?null:row.getVersion());
  }
  public List<MissingTarget> missing(String type,Long id,LocalDate start){
   List<MissingTarget> result=new ArrayList<>();resolve("SELF".equals(type)?"USER":type,id,"month",start,rows("month",start),new HashSet<>(),result);return result;

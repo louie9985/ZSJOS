@@ -27,6 +27,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import DateTimeText from '../components/DateTimeText'
 import BpmApprovalDetail from '../components/bpm/BpmApprovalDetail'
+import { feedbackApi } from '../services/feedbackApi'
 import { bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from '../components/bpm/bpmStatus'
 import {
   api,
@@ -173,6 +174,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
 }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const linkedTaskId = new URLSearchParams(location.search).get('taskId')
   const { message } = App.useApp()
   const screens = Grid.useBreakpoint()
   const resolvedInitialView = initialView || (location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo')
@@ -263,12 +265,18 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setUnauthorized(false)
     try {
       const result = await api.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
+      let linkedTask: BpmTask | undefined
+      if (view === 'todo' && linkedTaskId && !preserveSelection) {
+        try { linkedTask = await feedbackApi.approvalTask(linkedTaskId) }
+        catch { if (seq === requestSeq.current) message.warning('目标审批已处理、已转办或无权处理') }
+      }
       if (seq !== requestSeq.current) return
-      setTasks(result.list)
+      setTasks(linkedTask ? appendTasks([linkedTask], result.list) : result.list)
       setTotal(result.total)
       setLoadedPage(useTableLayout ? tablePage : 1)
       setCounts(current => ({ ...current, [view]: result.total }))
-      setSelectedId(current => preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
+      setSelectedId(current => linkedTask?.id ?? (preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
+      if (linkedTask) setDrawerOpen(true)
     } catch (loadError) {
       if (seq !== requestSeq.current) return
       console.error('[BpmApprovalCenter] loadFirstPage - error:', loadError)
@@ -281,7 +289,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [canQuery, keyword, permissions, tablePage, tablePageSize, useTableLayout, view])
+  }, [canQuery, keyword, permissions, tablePage, tablePageSize, useTableLayout, view, linkedTaskId, message])
 
   const loadMore = useCallback(async () => {
     if (!canQuery || loading || loadingMoreRef.current || tasks.length >= total) return

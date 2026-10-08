@@ -22,6 +22,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/exam-calendar")
 @Validated
 public class ExamScheduleController {
+
+    @GetMapping("/search")
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamScheduleRespVO>> search(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamCalendarSearchReqVO req) {
+        return success(service.search(req, getLoginUserId()));
+    }
+
     @Resource private ExamScheduleService service;
     @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarMaintenanceNotificationService notification;
 

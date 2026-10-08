@@ -320,6 +320,7 @@ public class LeadFlowHistoryService {
             Map.entry("lead_assignment_accepted", "接单"), Map.entry("lead_claimed", "抢单"),
             Map.entry("lead_follow_up_recorded", "新增跟进"), Map.entry("lead_appeal_submitted", "提交申诉"),
             Map.entry("lead_appeal_overturned", "申诉改判"), Map.entry("lead_appeal_upheld", "申诉维持原判"),
+            Map.entry(SupervisorLeadOverturnPolicy.EVENT, "主管直接改判有效"),
             Map.entry("lead_restored", "恢复客资"), Map.entry("lead_basic_info_updated", "修改基础信息"),
             Map.entry("lead_qualification_started", "开始有效性判定"),
             Map.entry("lead_submitter_supplemented", "提交人补充资料"),

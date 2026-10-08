@@ -225,7 +225,7 @@ public class PositioningInterviewService {
   byte[] content=file==null||file.isEmpty()?null:file.getBytes();
   // 允许文档、图片、音频、视频；以探测结果为准，避免客户端伪造 Content-Type。
   String detected=PositioningAttachmentTypes.detectAllowed(name,content);
-  if(file==null||file.isEmpty()||file.getSize()>20L*1024*1024||detected==null)throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
+  if(file==null||file.isEmpty()||file.getSize()>100L*1024*1024||detected==null)throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
   String directory=directory(relationId,relation.getPersonId(),userId);
   var info=fileApi.createFileInfo(content,name,directory,detected);
   var row=new PositioningInterviewAttachmentDO();row.setStudentPersonId(relation.getPersonId());row.setFileId(info.getId());row.setFileName(name);row.setFileSize(file.getSize());

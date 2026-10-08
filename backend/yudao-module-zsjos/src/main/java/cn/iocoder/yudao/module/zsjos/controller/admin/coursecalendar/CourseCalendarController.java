@@ -17,6 +17,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Tag(name="管理后台 - 课程日历")
 @RestController @RequestMapping("/zsjos/course-calendar") @Validated
 public class CourseCalendarController {
+
+    @GetMapping("/search")
+    @PreAuthorize("@ss.hasPermission('zsjos:course-calendar:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.coursecalendar.vo.CourseCalendarRespVO>> search(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.coursecalendar.vo.CourseCalendarSearchReqVO req) {
+        return success(service.search(req));
+    }
+
     @Resource private CourseCalendarEventService service;
     @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarMaintenanceNotificationService notification;
     @GetMapping("/page") @Operation(summary="查询课程日历") @PreAuthorize("@ss.hasPermission('zsjos:course-calendar:query')")

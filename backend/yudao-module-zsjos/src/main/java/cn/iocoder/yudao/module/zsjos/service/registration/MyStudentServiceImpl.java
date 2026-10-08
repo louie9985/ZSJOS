@@ -54,7 +54,17 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<MyStudentRespVO> getMyPage(Long userId, MyStudentPageReqVO reqVO) {
+        var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.StudentListSort.create();
+        if (sorting.requested(reqVO.getSortField(), reqVO.getSortOrder())) {
+            return sorting.page(reqVO.getSortField(), reqVO.getSortOrder(), reqVO.getPageNo(), reqVO.getPageSize(), (page, size) -> {
+                var batch = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(reqVO, MyStudentPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(page); batch.setPageSize(size);
+                return getMyPage(userId, batch);
+            });
+        }
+
         if (reqVO.getReadScope() != null || reqVO.getTargetUserId() != null) {
             return getExplicitReadPage(userId, reqVO, false);
         }
@@ -219,8 +229,10 @@ public class MyStudentServiceImpl implements MyStudentService {
         List<Long> matchedIds = media
                 ? advancedFilterService.matchMediaStudentPersonIds(req.getAdvancedFilter(), actorId)
                 : advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), subjectId == null ? actorId : subjectId);
-        PageResult<PersonDO> page = subjectId == null ? personMapper.selectTenantReadStudentPage(req, matchedIds)
-                : media ? personMapper.selectMediaStudentPage(req, subjectId, matchedIds)
+        PageResult<PersonDO> page = subjectId == null ? (media
+                ? personMapper.selectTenantReadStudentPage(req, matchedIds, true)
+                : personMapper.selectTenantReadStudentPage(req, matchedIds))
+                : media ? personMapper.selectMediaStudentPage(req, subjectId, matchedIds, true)
                 : personMapper.selectMyStudentPage(req, subjectId, matchedIds);
         List<Long> personIds = page.getList().stream().map(PersonDO::getId).toList();
         List<ServiceRelationDO> relations = subjectId == null
@@ -332,7 +344,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             return;
         }
         try {
-            LeadProductSnapshot snapshot = JsonUtils.parseObject(productSnapshot, LeadProductSnapshot.class);
+            LeadProductSnapshot snapshot = LeadProductSnapshot.readHistorical(productSnapshot);
             if (snapshot == null) {
                 row.setCourseName("历史课程信息缺失");
                 return;
@@ -343,7 +355,7 @@ public class MyStudentServiceImpl implements MyStudentService {
                     .map(node -> node.name()).filter(StrUtil::isNotBlank).toList());
             row.setSpecs(snapshot.displaySpecs());
             if (StrUtil.isNotBlank(snapshot.selectedAttrValuesJson())) {
-                Map<?, ?> values = JsonUtils.parseObject(snapshot.selectedAttrValuesJson(), Map.class);
+                Map<?, ?> values = JsonUtils.parseObjectQuietly(snapshot.selectedAttrValuesJson(), Map.class);
                 if (values != null) {
                     row.setAttributeValues(values.values().stream().filter(Objects::nonNull).map(String::valueOf)
                             .filter(StrUtil::isNotBlank).distinct().toList());

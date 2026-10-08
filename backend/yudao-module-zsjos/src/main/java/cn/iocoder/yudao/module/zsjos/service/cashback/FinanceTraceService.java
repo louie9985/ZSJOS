@@ -122,8 +122,7 @@ public class FinanceTraceService {
                 var sales = userMap.get(order.getFormalSalesUserId()); source.setSalesName(sales == null ? null : sales.getNickname());
                 SalesOrderItemDO item = itemMap.get(row.getOrderItemId());
                 if (item != null && Objects.equals(item.getOrderId(), order.getId())) {
-                    var snapshot = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObjectQuietly(item.getProductSnapshot(),
-                            cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.class);
+                    var snapshot = cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot.readHistoricalQuietly(item.getProductSnapshot());
                     if (snapshot != null) { source.setProductName(snapshot.name()); source.setSkuName(snapshot.skuName()); }
                     source.setQuantity(item.getQuantity());
                     source.setUnitPrice(item.getUnitPrice()); source.setDiscountAmount(item.getDiscountAmount()); source.setItemPayableAmount(item.getPayableAmount());

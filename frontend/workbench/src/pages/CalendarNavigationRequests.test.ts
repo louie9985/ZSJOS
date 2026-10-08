@@ -34,7 +34,7 @@ describe.each(['CourseCalendarPage', 'MediaCalendarPage'])('%s navigation reques
       const run = loader(page, {
         api: { courseCalendar: { page: fetch }, mediaAccount: { calendar: fetch } },
         requestSequence: { current: 0 }, range: { start: dayjs('2026-10-01'), end: dayjs('2026-10-31') },
-        director: undefined, keyword: '', operator: undefined, stage: undefined, status: undefined,
+        director: undefined, keyword: '', operator: undefined, stage: undefined, status: undefined, locationTarget: { current: undefined },
         setRows: setter('rows'), setUnscheduled: setter('unscheduled'), setLoading: setter('loading'), setError: setter('error'), ApiError: class extends Error {},
       })
       const response = (id: number) => page === 'CourseCalendarPage' ? [{ id }] : { list: [{ id }], unscheduledCount: id }

@@ -28,6 +28,24 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/sales-order")
 public class SalesOrderController {
     @Resource private SalesOrderService orderService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseCustomerService repurchaseCustomers;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseSubmissionService repurchaseSubmission;
+
+    @PostMapping("/repurchase/check-customer")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
+    @Operation(summary = "复购录单前精确识别客户及校验资格")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<RepurchaseCustomerCheckRespVO> checkRepurchaseCustomer(@Valid @RequestBody RepurchaseCustomerCheckReqVO req) {
+        return success(repurchaseCustomers.checkCustomer(WebFrameworkUtils.getLoginUserId(), req));
+    }
+
+    @PostMapping("/repurchase")
+    @Operation(summary = "销售与教务按客户身份提交复购订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<Long> createRepurchase(@Valid @RequestBody SalesOrderRepurchaseReqVO req) {
+        return success(repurchaseSubmission.submit(WebFrameworkUtils.getLoginUserId(), req));
+    }
+
     @Resource private ZsjosProductSkuService skuService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderSupervisorConfirmationService supervisorConfirmationService;
 

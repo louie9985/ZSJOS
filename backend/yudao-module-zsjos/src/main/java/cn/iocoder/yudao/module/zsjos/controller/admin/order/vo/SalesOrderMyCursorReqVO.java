@@ -10,6 +10,11 @@ import lombok.Data;
 
 @Data
 public class SalesOrderMyCursorReqVO {
+    @jakarta.validation.constraints.Size(max = 64)
+    private String sortField;
+    @jakarta.validation.constraints.Pattern(regexp = "ascend|descend", message = "排序方向不正确")
+    private String sortOrder;
+
     private String cursor;
     @Min(1) @Max(100) private Integer limit = 20;
     @Pattern(regexp = "pending_approval|revision_required|effective|superseded|terminated", message = "订单状态不正确")

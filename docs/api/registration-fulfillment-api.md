@@ -48,7 +48,7 @@ completed cases.
 Existing `legacy_planner` cases still require one snapshotted planner route. Study-planner candidates are enabled users holding
 role code `study_planner` inside the selected department subtree; content-director candidates are
 enabled users holding post code `content_director` inside that subtree. Completion revalidates every
-selected assignee. Attachment items allow at most nine files, 20 MB each, in JPG/PNG/WebP/PDF/Word/
+selected assignee. Attachment items allow at most nine files, 100 MB each, in JPG/PNG/WebP/PDF/Word/
 Excel formats; required attachment items must contain at least one file. Department and assignee names
 are stored as completion-time snapshots on the case routes.
 
@@ -153,6 +153,9 @@ Contact-record and extension-history reads use the standard `pageNo`/`pageSize` 
 The overview exposes optional one-time content-director and career-planner assignments only after acceptance. Candidates come exclusively from the corresponding `/system/user-relation` scene. These assignments create no task and do not gate contact work. Contact tabs and records remain scoped to the selected service relation; collaborator visibility is projected by the published tenant configuration.
 
 ## Content director students
+
+- `GET /zsjos/media-students/page` and `POST /zsjos/media-students/search-page` accept optional positive `operatorUserId`. It intersects keyword, service-period and advanced filters before pagination/counting. It matches the current operator of a service visible in the selected read scope, including visible historical services; it is distinct from the account-level advanced filter `mediaAccount.ownerOperatorUserId`. A matching student does not need an account. The filter never broadens tenant, student or service visibility. The shared request VO carries this additive field; ordinary student endpoints do not consume it.
+- List and detail account summaries expose optional `homepageUrl`, projected from the authorized account's `detailValuesJson.homepage_url`. Missing/non-text values produce null; no URL is synthesized from nickname or platform ID. Workbench exposes two independent links under the existing account query permission: the SVG platform logo opens the saved valid HTTP(S) homepage in a new tab, while the account name retains the internal account-tab link with navigation guards. Missing/invalid homepage values disable only the external logo link, never the internal account link. Without account query permission both are plain content. Both projections include the field so refreshing detail cannot erase an existing card link.
 
 - `GET /zsjos/media-students/page` defaults to the tenant media scope when System `hasTenantReadAllAccess` or configured `zsjos:media-student:query-all` allows it; otherwise it retains the existing personal service-owner/collaborator scope. Explicit `SELF` remains personal; existing administrator `USER` queries retain their System authorization. `ALL` is accepted for configured media full readers without a target user.
 - The full media scope includes people with media collaborators or retained accounts, positioning cards or interviews, including historical services and unbound drafts. It excludes unrelated sales-only people and deleted/cross-tenant records. Course projections contain media-related services only; surviving assets may have no remaining course relationship. Class/status filters match those same media service relations.
@@ -302,7 +305,7 @@ Workbench 学员搜索完成后保留结果内的当前学员，否则选中首�
 
 ### Media student inbox account summaries
 
-The media-only `/zsjos/media-students/page` response adds a required `accounts` array per student (`id`, `accountNo`, `nickname`, `platformValue`, `platformLabel`). Existing pagination, student fields and read scopes are unchanged. The media service batch-loads accounts for the authorized page and filters them through the account permission provider using batch-loaded service relations. Account read predicates are shared with single-object checks; student visibility does not broaden account access. Ordering remains update time descending then ID descending. `platformLabel` is the persisted dictionary snapshot, never a current-label repair. Detail account projections additionally expose `platformValue` so saved changes can refresh inbox cards without reloading the list. Generic student responses and Vue Admin APIs remain unchanged. No SQL or grants are required.
+The media-only `/zsjos/media-students/page` response adds a required `accounts` array per student (`id`, `accountNo`, `nickname`, `platformValue`, `platformLabel`, optional `homepageUrl`). Existing pagination, student fields and read scopes are unchanged. The media service batch-loads accounts for the authorized page and filters them through the account permission provider using batch-loaded service relations. Account read predicates are shared with single-object checks; student visibility does not broaden account access. Ordering remains update time descending then ID descending. `platformLabel` is the persisted dictionary snapshot, never a current-label repair. Detail account projections additionally expose `platformValue` so saved changes can refresh inbox cards without reloading the list. Generic student responses and Vue Admin APIs remain unchanged. No SQL or grants are required.
 
 
 ### 自由班级选择（2026-09-28）

@@ -55,7 +55,7 @@
 
 审批人在工作台的审批中心（`/bpm/task/todo`）处理需求反馈，不需要反馈管理菜单。审批内容卡由 `FeedbackContentProvider` 按 businessKey 解析，规则如下：
 
-- **可见性**：持有 `zsjos:feedback:*:manage`（管理口径）、提交人本人、或该轮次 `approval_context_json` 里记录的指定审批人（部门负责人 / 董事长）三者之一即可查看。审批人此前按 `read-admin` 判定，会看到「无权查看」提示，而审批按钮仍然可点，等于逼人盲签。
+- **可见性**：持有对应类型管理权限、提交人本人、该轮次 `approval_context_json` 里记录的指定审批人，或该轮 BPM 实际任务 assignee/owner 参与人可查看。参与其他轮次不授予本轮读取权限；转办、委派和加签后的实际任务参与关系通过 BPM 公共 API 校验。
 - **轮次**：卡片按**该任务所属轮次**的快照渲染，不是最新一轮。`businessKey` 的四段里第二段是 `workOrderId`（不是 feedbackId），第四段是轮次；轮次解析要按段取，`split(":")` 取巧会静默命中另一条记录。
 - **申请内容**：按 `round.formSnapshotJson` + `round.valueSnapshotJson` 渲染用户填写的字段，字典标签用提交时冻结的那份，不查当前字典。
 - **附件**：申请附件与处理结果附件都下发预签名地址和真实 MIME（`contentType`）。前端 `AttachmentGrid` 只看 MIME 决定走图片预览还是下载链接，缺 MIME 时图片会静默降级成文字链接。单个文件签名失败只丢该附件，不影响其余内容与分组。
@@ -72,3 +72,24 @@
 ## 当前租户管理员读取
 
 个人列表新增可选 readScope=SELF|ALL|USER、targetUserId，默认本人。管理员 ALL/USER 为只读投影；查看他人不标记已读、不回复或重提。ADMIN 与 PARTNER 同号用户不能获得对方的本人动作。基础功能权限保留，详见 tenant-admin-read-all.md。
+
+## 审批进度和手动催办（V294）
+
+员工最近反馈、个人列表及管理列表的 `approvalSummary` 为审批中需求提供 `availability` 和 `currentTasks`（任务、节点、当前审批人、到达时间）。服务端对已授权列表批量查询 BPM，不按每条记录加载完整流程。工单 `assigneeName` 仍表示审批通过后的处理人。
+
+| 方法 | 路径 | 权限与对象边界 |
+| --- | --- | --- |
+| GET | `/zsjos/feedback/{id}/approval?roundNo=` | `zsjos:feedback:read` + `read-own`，包含已有租户管理员只读边界 |
+| GET | `/zsjos/feedback/{id}/approver-view/approval?roundNo=` | 同一功能权限 + `read-approver`；只返回该用户获授权的轮次 |
+| GET | `/zsjos/feedback-management/{id}/approval?roundNo=` | `zsjos:feedback:query-admin` + 对应反馈类型 `read-admin` |
+| POST | `/zsjos/feedback/{id}/urge` | `zsjos:feedback:requirement:urge` + `urge-own`，仅 ADMIN 提交人本人 |
+
+省略 `roundNo` 返回当前读取身份可见的最新轮次。响应包括 `rounds`、`roundNo`、`latestRoundNo`、`version`、该轮 `fields/values` 快照、`progress`（节点、任务、时间、意见、候选人）、`lastUrgedAt/nextUrgeAt/canUrge`。`availability` 为 `AVAILABLE`、`NOT_REQUIRED` 或 `UNAVAILABLE`；仅快照明确关闭审批时返回无需审批，缺失流程不能伪装成免审批。
+
+BPM 通过 `BpmProcessProgressApi` 提供不含流程变量和写命令的内部 DTO。ZSJOS 先做业务授权，BPM 再校验租户；调用者无需新增通用流程查询权限。审批人轮次读取除原冻结指定审批人外，接受该轮 BPM 任务实际 assignee/owner 的参与关系，以覆盖转办、委派及加签；不以参与其他轮次放行本轮。审批中心内容卡使用相同轮次边界。
+
+催办请求为 `{version, roundNo, idempotencyKey}`。对反馈行加锁后验证身份、最新轮次、审批状态及每轮 30 分钟间隔；新轮次不继承旧轮次冷却。BPM 实时可处理任务为接收人来源，排除挂起、等待前序及已通过等待加签完成的任务，按启用员工去重。无接收人、审批已结束、旧版本、错误轮次、冷却中、缺少持久通知规则分别返回稳定错误码 `1_900_016_022/020/012/019/021/023`。
+
+通知场景 `zsjos.feedback.approval_urged` 默认站内通知，固定接收人和任务引用在事件中冻结，使用 System 的事务内 durable outbox；成功表示已持久受理，不表示接收人已经阅读或渠道已送达。轮次催办时间、工单 `APPROVAL_URGE` 历史及事件在同一事务提交；失败回滚，重试同一幂等键不重复发布。没有自动催办或流程推进副作用。
+
+消息从已授权的 `templateParams.taskId` 定位 `/bpm/task/todo?taskId=`，通过新增 `GET /bpm/task/get-todo?id=` 重新验证当前登录人的可处理任务，不受列表第一页限制；结束或转办后保留消息详情并提示，不打开其他任务。两端历史表单使用选中轮次快照和重新签名的附件 URL。

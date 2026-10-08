@@ -1,0 +1,100 @@
+# -*- coding: utf-8 -*-
+"""Real Chrome + actual five calendar pages with isolated synthetic transport."""
+import re
+import tempfile
+from pathlib import Path
+from playwright.sync_api import sync_playwright, expect
+
+OUT = Path(tempfile.mkdtemp(prefix='calendar-search-browser-'))
+URL = 'http://127.0.0.1:5241/test/calendar-search.html'
+
+def search(page, text='命中'):
+    field = page.get_by_role('searchbox', name='日历搜索关键词')
+    field.fill(text)
+    field.press('Enter')
+    return page.get_by_role('dialog', name='跨月份搜索')
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome', headless=True)
+    for width, zone in [(1440, 'Asia/Shanghai'), (390, 'Asia/Shanghai'), (1440, 'America/Los_Angeles')]:
+        for kind in ['personal', 'course', 'exam', 'media', 'lead']:
+            page = browser.new_page(viewport={'width': width, 'height': 1000}, timezone_id=zone)
+            errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.clock.set_fixed_time('2026-10-08T01:00:00Z')
+            page.goto(URL + '?kind=' + kind)
+            page.get_by_role('button', name=re.compile('跨月份搜索$')).click()
+            drawer = search(page)
+            expect(drawer.get_by_text('共 21 条', exact=True)).to_be_visible()
+            drawer.locator('.ant-pagination-item-2').click()
+            expect(drawer.get_by_role('button', name='定位到日历')).to_have_count(1)
+            drawer.screenshot(path=str(OUT / f'{kind}-search-{width}.png'))
+            drawer.get_by_role('button', name='定位到日历').click()
+            expect(drawer).not_to_be_visible()
+            expect(page.locator('[data-calendar-located="true"]').first).to_be_visible()
+            page.screenshot(path=str(OUT / f'{kind}-located-{width}.png'))
+            if kind in ['media', 'lead']:
+                assert 2 in page.evaluate('window.calendarSearchFixture.pageCalls')
+            if kind != 'media':
+                page.get_by_role('dialog').get_by_role('button', name=re.compile('^(关闭|Close)$')).click()
+            page.get_by_role('button', name=re.compile('跨月份搜索$')).click()
+            expect(page.locator('.ant-pagination-item-active')).to_have_attribute('title', '2')
+            assert not errors, errors
+            print('PASS paged search, location, highlight and retained state', kind, width, zone, flush=True)
+            page.close()
+
+    page = browser.new_page(viewport={'width': 390, 'height': 1000}, timezone_id='Asia/Shanghai')
+    page.goto(URL + '?kind=personal')
+    page.get_by_role('button', name=re.compile('跨月份搜索$')).click()
+    drawer = search(page, '空结果')
+    expect(drawer.get_by_text('没有符合当前条件的安排')).to_be_visible()
+    page.evaluate("window.calendarSearchFixture.setBehavior('error')")
+    search(page)
+    expect(drawer.get_by_text('验证用查询失败')).to_be_visible()
+    page.evaluate("window.calendarSearchFixture.setBehavior('normal')")
+    drawer.get_by_role('button', name=re.compile(r'^重\s*试$')).click()
+    expect(drawer.get_by_text('共 21 条')).to_be_visible()
+    search(page, '慢请求')
+    search(page, '空结果')
+    expect(drawer.get_by_text('没有符合当前条件的安排')).to_be_visible()
+    page.wait_for_timeout(900)
+    expect(drawer.get_by_text('没有符合当前条件的安排')).to_be_visible()
+    page.evaluate("window.calendarSearchFixture.setBehavior('denied')")
+    search(page)
+    expect(drawer.get_by_text('无权搜索此日历，请联系管理员')).to_be_visible()
+    page.evaluate("window.calendarSearchFixture.setBehavior('normal')")
+    search(page)
+    drawer.locator('.ant-pagination-item-2').click()
+    page.evaluate('window.calendarSearchFixture.remove()')
+    drawer.get_by_role('button', name='定位到日历').click()
+    expect(drawer.get_by_text('该搜索结果已失效或不再符合当前条件，请重新搜索')).to_be_visible()
+    expect(drawer.get_by_text('共 20 条')).to_be_visible()
+    print('PASS empty/error/retry/stale/denied/expired refresh', flush=True)
+    drawer.get_by_role('searchbox', name='日历搜索关键词').fill('')
+    expect(drawer.get_by_text('输入关键词查找其他月份的安排')).to_be_visible()
+    search(page)
+    drawer.get_by_role('textbox', name='开始日期').fill('2027-03-01')
+    drawer.get_by_role('textbox', name='开始日期').press('Enter')
+    drawer.get_by_role('textbox', name='结束日期').fill('2027-03-31')
+    drawer.get_by_role('textbox', name='结束日期').press('Enter')
+    search(page)
+    page.wait_for_function("window.calendarSearchFixture.calls.at(-1).query.rangeEnd === '2027-03-31'")
+    drawer.get_by_role('combobox', name='搜索结果排序').click()
+    page.get_by_text('日期从新到旧', exact=True).last.click()
+    page.wait_for_function("window.calendarSearchFixture.calls.at(-1).query.sort === 'desc'")
+    page.evaluate("window.dispatchEvent(new StorageEvent('storage', { key: 'tenantId', newValue: '999' }))")
+    expect(drawer).not_to_be_visible()
+    page.get_by_role('button', name=re.compile('跨月份搜索$')).click()
+    expect(page.get_by_role('searchbox', name='日历搜索关键词')).to_have_value('')
+    expect(drawer.get_by_text('输入关键词查找其他月份的安排')).to_be_visible()
+    drawer.get_by_role('button', name=re.compile('^(关闭|Close)$')).click()
+    page.get_by_role('combobox', name='查看范围').click()
+    page.get_by_role('combobox', name='查看范围').press('ArrowDown')
+    page.get_by_role('combobox', name='查看范围').press('Enter')
+    page.get_by_role('button', name=re.compile('跨月份搜索$')).click()
+    search(page)
+    page.wait_for_function("window.calendarSearchFixture.calls.at(-1).scope.readScope === 'ALL'")
+    expect(drawer.get_by_text('搜索范围：全部人员（只读）；日期默认不限')).to_be_visible()
+    print('PASS clear/date/sort/session reset and personal scope inheritance', flush=True)
+    browser.close()
+print('Screenshots:', OUT)

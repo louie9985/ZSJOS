@@ -35,6 +35,7 @@ public class FeedbackRespVO {
     private String supportTypeValue;
     private String supportTypeLabel;
     private String processInstanceId;
+    private FeedbackApprovalRespVO.Summary approvalSummary;
     private Integer approvalRoundNo;
     private String rejectReason;
     private String completedResult;

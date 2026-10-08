@@ -36,7 +36,7 @@ public class MediaAccountProfileController {
     @PostMapping("/files")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:edit','zsjos:media-account:maintenance')")
     public CommonResult<FileVO> upload(@PathVariable Long id,@RequestParam String fieldKey,@RequestParam MultipartFile file) throws IOException {
-        if (file.isEmpty() || file.getSize() > 20L * 1024 * 1024) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+        if (file.isEmpty() || file.getSize() > 100L * 1024 * 1024) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
                 cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_ATTACHMENT_INVALID);
         return success(service.upload(id,fieldKey,file.getBytes(),file.getOriginalFilename(),file.getContentType(),getLoginUserId()));
     }

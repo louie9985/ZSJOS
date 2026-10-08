@@ -15,6 +15,24 @@ import java.util.List;
 
 @Mapper
 public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
+
+    default PageResult<MediaAccountDO> selectCalendarSearch(
+            cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaCalendarSearchReqVO req,
+            Collection<Long> visibleUserIds, boolean all) {
+        var filters = new MediaAccountCalendarPageReqVO();
+        filters.setCurrentStatusValue(req.getCurrentStatusValue());
+        filters.setStageValue(req.getStageValue());
+        filters.setDirectorUserId(req.getDirectorUserId());
+        filters.setOperatorUserId(req.getOperatorUserId());
+        var query = calendarQuery(filters, visibleUserIds, all);
+        query.isNotNull(MediaAccountDO::getMaintenanceStartDate).isNotNull(MediaAccountDO::getMaintenanceEndDate);
+        cn.iocoder.yudao.module.zsjos.dal.mysql.calendar.CalendarSearchQuery.keyword(query, req.getKeyword(), "account_no", "nickname");
+        cn.iocoder.yudao.module.zsjos.dal.mysql.calendar.CalendarSearchQuery.dates(query, req, "maintenance_start_date", "maintenance_end_date", false);
+        query.last(cn.iocoder.yudao.module.zsjos.dal.mysql.calendar.CalendarSearchQuery.order(req, "maintenance_start_date", "maintenance_end_date", "id",
+                java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))));
+        return selectPage(req, query);
+    }
+
     default int claimDelete(Long id, Integer version, String processId, Long requester, Long reviewer, String reason) {
         return update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id).eq(MediaAccountDO::getVersion,version)
                 .and(w -> w.isNull(MediaAccountDO::getDeleteStatus).or().ne(MediaAccountDO::getDeleteStatus,"pending"))

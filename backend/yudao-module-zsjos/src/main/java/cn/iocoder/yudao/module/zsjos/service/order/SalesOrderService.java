@@ -11,6 +11,7 @@ import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 public interface SalesOrderService {
     Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO);
     Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO);
+    Long createMatchedRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO reqVO);
     Long createExternalRepurchase(Long userId, SalesOrderRepurchaseReqVO reqVO);
     Long createStudentRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO reqVO);
     Long reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);

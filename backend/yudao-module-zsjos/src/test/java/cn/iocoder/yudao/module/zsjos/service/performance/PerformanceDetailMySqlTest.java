@@ -71,7 +71,7 @@ class PerformanceDetailMySqlTest {
                         var expected=reference.details(q);var actual=current.details(q);
                         assertTrue(multiset(expected.getList()).equals(multiset(actual.getList())),type+"/conversion/"+key);comparisons++;
                     }
-                    for(String group:List.of("inbound|线上引流","self|非引流","unknown|历史来源缺失")){
+                    for(String group:List.of("inbound|线上引流","self|非引流","unknown|其他")){
                         for(String metric:List.of("orders","conversion")){
                             Query q=query(type,scope,metric);q.setDimension("source");q.setGroupKey(group);q.setPageSize(1000000);
                             assertTrue(multiset(reference.details(q).getList()).equals(multiset(current.details(q).getList())),"Source projection");comparisons++;

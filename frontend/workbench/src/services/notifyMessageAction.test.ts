@@ -1,5 +1,6 @@
 import { contentReviewApi } from './materialApi'
 import { workOrderApi } from './workOrderApi'
+import { feedbackApi } from './feedbackApi'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, type NotifyMessage } from './api'
 import {
@@ -162,6 +163,25 @@ describe('notify message business actions', () => {
     expect(orderRead).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalledWith(warning)
     expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+  })
+
+  it('opens the exact urged task only after checking current ownership', async () => {
+    const lookup = vi.spyOn(feedbackApi, 'approvalTask').mockResolvedValue({ id: 'task-7' } as never)
+    const navigate = vi.fn()
+    const item = message({ readStatus: true, bizType: 'feedback', sceneCode: 'zsjos.feedback.approval_urged', templateParams: { taskId: 'task-7' } })
+    expect(isNotifyBusinessActionCandidate(item)).toBe(true)
+    await executeNotifyMessageAction(item, { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(lookup).toHaveBeenCalledWith('task-7')
+    expect(navigate).toHaveBeenCalledWith('/bpm/task/todo?taskId=task-7')
+  })
+
+  it('keeps stale or reassigned urge messages readable without selecting another task', async () => {
+    vi.spyOn(feedbackApi, 'approvalTask').mockRejectedValue(new ApiError(403, 'forbidden'))
+    const navigate = vi.fn(), warn = vi.fn()
+    await executeNotifyMessageAction(message({ readStatus: true, bizType: 'feedback', sceneCode: 'zsjos.feedback.approval_urged', templateParams: { taskId: 'old-task' } }),
+      { navigate, warn, refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+    expect(warn).toHaveBeenCalled()
   })
 
   it('resolves supervisor notifications to an exact approval task', async () => {

@@ -185,3 +185,9 @@
   .feedback-record-meta { align-items: flex-start; flex-direction: column; gap: var(--crm-sp-1); }
   .feedback-detail-title { align-items: flex-start; }
 }
+.feedback-approval-panel { min-width: 0; overflow-wrap: anywhere; }
+.feedback-approval-heading { margin-bottom: var(--crm-sp-4); }
+.feedback-approval-heading .ant-typography { margin: 0; }
+.feedback-approval-task { margin: var(--crm-sp-2) 0; color: var(--crm-text-secondary); }
+.feedback-approval-reason { white-space: pre-wrap; }
+.feedback-approval-summary { overflow-wrap: anywhere; margin-bottom: var(--crm-sp-2); }

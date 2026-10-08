@@ -682,6 +682,7 @@ otherwise
   they currently lead, including child departments.
 - V078 将 V007 的两个固定入口收拢为单一“客资管理”页面，原权限节点保留为隐藏范围能力；不根据角色名、岗位名或前端标签推断数据范围。
 - V121 退役独立“异常客资”页面菜单；挂起与回收待处理客资仍通过统一“客资管理”读取，恢复、转派、回收、释放动作由详情 `availableActions` 返回并在 `lead-action-toolbar` 中展示。后端异常处置 API 与权限标识保留。
+- 教务自拓挂起恢复沿用配置的 `zsjos:subordinate-sales:lead-restore` 权限与原负责人部门管理关系；原负责人资格由教务自拓入口同源校验，恢复不改变负责人及 education 身份。该操作权限不授予全量查询；销售主管跨部门可见性必须检查 `zsjos:lead:query-all` 等实际授权。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
 - V195 将“我的订单”和“团队订单”合并为“订单管理”。统一查询使用 `zsjos:sales-order:query-management`，订单提交人集合由 System 数据权限（本人、部门、部门及下属、指定部门或全部）动态解析，多角色范围取并集；旧菜单、角色授权和订单筛选模板迁移后逻辑删除，订单业务记录不改写。
 
@@ -1002,3 +1003,21 @@ Sales performance uses configured self/department/center view permissions plus S
 
 
 Media student partner status reads use the existing media-student query permission, student object read authorization and media student visibility/tenant scope. The new media-students/{personId}/partner-context projection returns only binding status to non-inviting readers. Invitation codes and canInviteStudent require both create-student permission and a current active/accepted director relationship; original invitation creation and Admin binding APIs remain unchanged. See [student partner invitation](../api/student-partner-invitation.md).
+
+
+## Exact-identity cross-owner repurchase (2026-09-30)
+
+The approved sales/education cross-owner purchase command uses existing sales-order:create and enabled internal personnel checks. Its exact name/contact preflight reveals only the matched customer and masked contact, never a tenant customer listing or other owners’ details. A dedicated repurchase-customer object boundary verifies tenant membership; command execution revalidates the exact supplied identity under the Person lock. The new order belongs to the current submitter; Lead ownership and student service relations remain unchanged. Existing student-repurchase-only access remains scoped to its original entry. See [the order API contract](../api/zsjos-sales-order.md).
+
+## 公告对外分享（2026-10-08）
+
+System 独立持有公告分享，不依赖 PMS。管理操作同时要求 system:notice:query 与 system:notice:share；默认不公开、不自动授权角色。已发布 ALL/TARGET 公告由有权人员明确开启后，专用随机令牌允许匿名阅读正文及所选附件。跨租户仅用于定位令牌，随后恢复所属租户过滤并检查租户、分享和公告状态；原内部接收范围不限制公开链接。下线同事务关闭分享，重新开启轮换令牌，复制不继承。外部阅读不写员工已读。详见 [接口与权限契约](../api/notice-public-share.md)。
+
+
+## 需求反馈审批进度与催办（2026-10-08）
+
+需求反馈审批进度使用反馈业务读取权限和对象范围访问 BPM 只读公共 API，不附加通用流程查询权限。提交人及获授权管理读取可查看所属反馈的历史轮次；审批人只可读取冻结指定本人或 BPM 实际任务 assignee/owner 参与的轮次。催办使用独立 `zsjos:feedback:requirement:urge` 按钮权限与 ADMIN 提交人本人约束，管理员全量读取不授予催办；接收人来自该轮实时可处理任务，排除等待加签和挂起任务，事件按员工身份冻结。详见 [反馈审批与催办接口](../api/feedback-management.md#审批进度和手动催办v294)。
+
+## 主管直接改判有效（2026-10-08）
+
+主管详情支持独立的 `SUPERVISOR_OVERTURN_VALID` 服务端动作，新增 `zsjos:subordinate-sales:lead-overturn-valid` 按钮权限；范围沿用主管部门及子部门，不由全量读取或申诉审批权限扩大。仅无申诉或首轮维持无效的已归属无效客资可处理，事务内重查申诉及判定 token。主管详情其他操作仍按各自权限控制，不因改判变为普通销售编辑入口。见 [接口、数据与验证契约](../api/supervisor-lead-overturn.md)。

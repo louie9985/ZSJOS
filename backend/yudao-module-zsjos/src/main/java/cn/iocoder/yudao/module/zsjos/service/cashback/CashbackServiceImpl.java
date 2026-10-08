@@ -52,6 +52,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 @Slf4j
 public class CashbackServiceImpl implements CashbackService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService sortFilterService;
+
 
     static final String OBSERVATION_DAYS_KEY = "zsjos.cashback.observation-days";
     static final int DEFAULT_OBSERVATION_DAYS = 7;
@@ -165,7 +167,19 @@ public class CashbackServiceImpl implements CashbackService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<CashbackRespVO> getFinancePage(CashbackPageReqVO request) {
+        if (request.getSortField() != null || request.getSortOrder() != null) {
+            var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.FinanceListSort.cashback(
+                    ("type".equals(request.getSortField()) || "status".equals(request.getSortField())) ? sortFilterService.catalog("cashback") : null);
+            sorting.requested(request.getSortField(), request.getSortOrder());
+            if (cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.cashback(request.getSortField(), request.getSortOrder()) == null) return sorting.page(request.getSortField(), request.getSortOrder(), request.getPageNo(), request.getPageSize(), (page, size) -> {
+                var batch = BeanUtils.toBean(request, CashbackPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(page); batch.setPageSize(size);
+                return getFinancePage(batch);
+            });
+        }
+
         var page = searchService.search(request, null);
         PageResult<CashbackRespVO> result = BeanUtils.toBean(page, CashbackRespVO.class);
         financeTraceService.enrichCashbacks(result.getList(), page.getList());

@@ -26,6 +26,23 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/subordinate-sales")
 public class SubordinateSalesController {
     @Resource private SubordinateSalesService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadOverturnService overturnService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAttachmentService attachmentService;
+
+    @PostMapping("/leads/{leadId}/overturn-valid")
+    @Operation(summary = "主管直接改判客资有效")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-overturn-valid')")
+    public CommonResult<Boolean> overturnValid(@PathVariable Long leadId, @Valid @RequestBody LeadOverturnValidReqVO request) {
+        overturnService.overturn(leadId, getLoginUserId(), request);
+        return success(true);
+    }
+
+    @PostMapping("/overturn-attachment/upload")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-overturn-valid')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO> uploadOverturnAttachment(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return success(attachmentService.upload(file));
+    }
 
     @GetMapping("/page")
     @Operation(summary = "获得下属销售分页")

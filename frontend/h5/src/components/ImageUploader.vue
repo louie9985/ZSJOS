@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<{
 const { fileList, uploading, addFile, removeFile, retryFile, reset, getUploadedFiles } = useUpload(props.maxCount)
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const maxFileSize = 10 * 1024 * 1024
+const maxFileSize = 100 * 1024 * 1024
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -39,7 +39,7 @@ function onFileChange(event: Event) {
       continue
     }
     if (file.size > maxFileSize) {
-      showToast(`${file.name} 不能超过 10MB`)
+      showToast(`${file.name} 不能超过 100MB`)
       continue
     }
     addFile(file)

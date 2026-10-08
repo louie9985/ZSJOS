@@ -23,9 +23,13 @@
           ><el-form-item label="微信号" :required="!form.customerMobile.trim()"
             ><el-input v-model="form.customerWechatId" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
-          ><el-form-item label="学员姓名" prop="studentName"
-            ><el-input v-model="form.studentName" /></el-form-item></el-col
+           v-if="checked?.canRepurchase"><el-form-item label="学员姓名" prop="studentName"
+            ><el-input v-model="form.studentName" disabled /></el-form-item></el-col
       ></el-row>
+      <el-button :loading="checking" @click="checkCustomer">校验客户</el-button>
+      <el-alert v-if="identityError" :title="identityError" type="error" show-icon class="mt-12px" />
+      <el-alert v-if="checked" :title="checked.reason" :description="[checked.customerName, checked.maskedMobile].filter(Boolean).join(' · ')" :type="checked.canRepurchase ? 'success' : 'warning'" show-icon class="mt-12px" />
+      <template v-if="checked?.canRepurchase">
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="学员性质" prop="studentNature"
@@ -95,7 +99,7 @@
                 :value="i.value" /></el-select></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
-        ><el-col :span="12"
+        ><el-col :xs="24" :sm="12"
           ><el-form-item label="缴费方式" prop="feeMode"
             ><el-select v-model="form.feeMode" class="w-100%"
               ><el-option
@@ -103,7 +107,7 @@
                 :key="i.value"
                 :label="i.label"
                 :value="i.value" /></el-select></el-form-item></el-col
-        ><el-col :span="12"
+        ><el-col :xs="24" :sm="12"
           ><el-form-item label="支付方式" prop="paymentMethod"
             ><el-select v-model="form.paymentMethod" class="w-100%"
               ><el-option
@@ -155,10 +159,11 @@
           </div>
         </div>
       </el-form-item>
+      </template>
     </el-form>
     <template #footer
       ><el-button @click="visible = false">取消</el-button
-      ><el-button type="primary" :loading="saving" :disabled="!!optionError || hasUploading" @click="submit"
+      ><el-button type="primary" :loading="saving" :disabled="!checked?.canRepurchase || checking || !!optionError || hasUploading" @click="submit"
         >提交复购</el-button
       ></template
     >
@@ -175,6 +180,24 @@ const emit = defineEmits<{ success: [] }>()
 const message = useMessage()
 const visible = ref(false)
 const saving = ref(false)
+const checking = ref(false)
+const checked = ref<MenuApi.RepurchaseCustomerCheck>()
+const identityError = ref('')
+let identitySequence = 0
+let submissionKey = crypto.randomUUID()
+const checkCustomer = async () => {
+  const current = ++identitySequence
+  checked.value = undefined; identityError.value = ''
+  if (!form.customerName.trim() || !form.customerMobile.trim() && !form.customerWechatId.trim()) {
+    identityError.value = '请填写姓名及手机号或微信号'; return
+  }
+  checking.value = true
+  try {
+    const result = await MenuApi.checkRepurchaseCustomer({ customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim() || undefined, customerWechatId: form.customerWechatId.trim() || undefined })
+    if (current === identitySequence) { checked.value = result; if (result.canRepurchase) { form.studentName = form.customerName.trim(); void loadOptions() } }
+  } catch (e: any) { if (current === identitySequence) identityError.value = e?.msg || e?.message || '客户校验失败，请重试' }
+  finally { if (current === identitySequence) checking.value = false }
+}
 const optionLoading = ref(false)
 const optionError = ref('')
 const formRef = ref<FormInstance>()
@@ -214,6 +237,9 @@ const empty = () => ({
   repurchaseReason: ''
 })
 const form = reactive(empty())
+watch(() => [form.customerName, form.customerMobile, form.customerWechatId], () => {
+  identitySequence++; checked.value = undefined; identityError.value = ''; checking.value = false; submissionKey = crypto.randomUUID()
+}, { flush: 'sync' })
 const rules: FormRules = {
   customerName: [{ required: true }],
   customerMobile: [
@@ -260,7 +286,7 @@ const open = () => {
   Object.assign(form, empty())
   vouchers.value = []
   visible.value = true
-  void loadOptions()
+  checked.value = undefined; identityError.value = ''; submissionKey = crypto.randomUUID()
 }
 const isImage = (item: VoucherItem) => item.type.startsWith('image/')
 const removeVoucher = (uid: string) => {
@@ -288,13 +314,13 @@ const handleVoucherSelect = (file: UploadFile) => {
     return
   }
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-  const item: VoucherItem = {
+  const item = reactive<VoucherItem>({
     uid: file.uid.toString(),
     name: file.name,
     type: file.raw.type,
     raw: file.raw,
     status: 'failed'
-  }
+  })
   if (file.raw.size === 0) {
     item.error = '文件不能为空'
   } else if (!allowed.includes(file.raw.type)) {
@@ -306,6 +332,7 @@ const handleVoucherSelect = (file: UploadFile) => {
   if (item.status === 'uploading') void uploadVoucher(item)
 }
 const submit = async () => {
+  if (!checked.value?.canRepurchase || checking.value) { message.warning('请先校验客户身份'); return }
   await formRef.value?.validate()
   if (hasUploading.value) {
     message.warning('请等待缴费凭证上传完成')
@@ -324,7 +351,8 @@ const submit = async () => {
     const [provinceCode, cityCode] = form.region
     const province = areas.value.find((i) => i.selectionCode === provinceCode)
     const city = province?.children?.find((i: any) => i.selectionCode === cityCode)
-    await MenuApi.createExternalRepurchase({
+    await MenuApi.createCustomerRepurchase({
+      expectedPersonId: checked.value.personId,
       customerName: form.customerName.trim(),
       customerMobile: form.customerMobile.trim() || undefined,
       customerWechatId: form.customerWechatId.trim() || undefined,
@@ -346,7 +374,7 @@ const submit = async () => {
         paymentMethod: form.paymentMethod,
         items: [{ spuRef: form.spuRef, skuRef: form.skuRef, actualAmount: form.actualAmount }],
         paymentVouchers: vouchers.value.map((item) => ({ infraFileId: item.infraFileId })),
-        idempotencyKey: crypto.randomUUID()
+        idempotencyKey: submissionKey
       }
     })
     message.success('复购订单已提交')

@@ -1,3 +1,4 @@
+import type { BusinessSort } from './businessListSort'
 import axios, { type AxiosProgressEvent, type AxiosRequestConfig } from "axios";
 import { withExamClock } from './examReedit';
 import type { AxiosHeaderValue } from "axios";
@@ -592,6 +593,7 @@ export type ExamCategoryOption = {
   path: Array<{ id: number; name: string }>;
 };
 export type ExamSchedule = {
+  backgroundColor?: string | null;
   serverTime?: Timestamp;
   reeditDeadline?: Timestamp;
   canReedit?: boolean;
@@ -614,11 +616,15 @@ export type ExamSchedule = {
   recordStatus: ExamScheduleRecordStatus;
   displayStatus: ExamScheduleDisplayStatus;
   remark?: string;
+  attachments?: import('./examScheduleAttachments').ExamAttachment[];
   publishedAt?: Timestamp;
   createTime?: Timestamp;
   updateTime?: Timestamp;
 };
 export type ExamScheduleInput = {
+  attachmentIds?: number[];
+  /** Omitted preserves an existing color; empty string restores the default. */
+  backgroundColor?: string | null;
   scheduleName: string;
   clearedInvalidAttrs?: string[];
   scheduleType: ExamScheduleType;
@@ -800,6 +806,7 @@ export type MediaStudentAccountSummary = {
   id: number;
   accountNo?: string;
   nickname?: string;
+  homepageUrl?: string;
   platformValue?: string;
   platformLabel?: string;
 };
@@ -811,6 +818,7 @@ export type MediaStudentDetail = {
     id: number;
     accountNo: string;
     nickname?: string;
+    homepageUrl?: string;
     platformLabel?: string;
     platformValue?: string;
     stage?: string;
@@ -1522,6 +1530,7 @@ export type ManagedLead = {
       | "QUALIFICATION_RECYCLE"
       | "QUALIFICATION_RELEASE"
       | "SUPERVISOR_RESTORE"
+      | "SUPERVISOR_OVERTURN_VALID"
       | "SUPERVISOR_TRANSFER"
       | "SUPERVISOR_RECYCLE"
       | "SUPERVISOR_RELEASE_CLAIM_POOL"
@@ -1529,6 +1538,7 @@ export type ManagedLead = {
       | "OWNER_TRANSFER"
       | "OWNER_RELEASE_PUBLIC_SEA";
     enabled: boolean;
+    qualificationToken?: string;
   }>;
 };
 export type LeadComplaintEvidence = {
@@ -1819,7 +1829,8 @@ export type PurchaseIntentDraftRequest = {
     | "lead_first_purchase"
     | "lead_repurchase"
     | "student_repurchase"
-    | "external_repurchase";
+    | "external_repurchase"
+    | "customer_repurchase";
   leadId?: number;
   personId?: number;
   sourceKey: string;
@@ -1930,7 +1941,10 @@ export type SalesOrder = {
   remark?: string;
   studentSpecialRequirements?: string;
   materialDeliveryContact?: string;
-  giftItems?: string[]; giftShippingAddress?: string;
+  giftItems?: string; giftShippingAddress?: string;
+  giftItemCodes?: string[];
+  giftItemSnapshots?: import('./orderGifts').GiftSnapshot[];
+  giftItemsInvalid?: boolean;
   items: Array<{
     id: number;
     productRef: string;
@@ -2030,6 +2044,7 @@ export type SalesOrderListItem = Pick<
   | "remark"
   | "studentSpecialRequirements"
   | "materialDeliveryContact"
+  | "giftItems" | "giftItemCodes" | "giftItemSnapshots" | "giftItemsInvalid" | "giftShippingAddress"
   | "repurchaseReason"
   | "terminationReason"
 >> & {
@@ -2866,6 +2881,7 @@ export type SubordinatePauseAllResult = {
   alreadyPausedCount: number;
 };
 export type NotifyMessage = {
+  templateParams?: Record<string, unknown>;
   id: number;
   templateNickname: string;
   templateTitle?: string;
@@ -2899,6 +2915,8 @@ export type AnnouncementAttachment = {
   downloadUrl?: string;
 };
 export type Announcement = {
+  sourceDeptId?: number; sourceDeptName?: string; publisherId?: number; publisherName?: string; audienceSummary?: string;
+  audienceType?: 'ALL' | 'TARGET';
   id: number;
   title: string;
   type: number;
@@ -3124,6 +3142,10 @@ const expireAuthentication = (
 };
 
 http.interceptors.request.use((config) => {
+  // 大附件上传需独立于普通 API 的短超时；保留显式无限或更长超时。
+  if (config.data instanceof FormData && config.timeout !== 0) {
+    config.timeout = Math.max(config.timeout || 0, 10 * 60 * 1000)
+  }
   const request = config as typeof config & {
     _zsjosAuthPlatform?: AuthPlatform;
     _zsjosImpersonationSessionId?: number;
@@ -3630,7 +3652,7 @@ export const api = {
       unwrap<boolean>(await http.delete(`/zsjos/personal-calendar/${id}`)),
   },
   examCalendar: {
-    reedit: async (id: number, operationKey: string) => unwrap<ExamScheduleInput>(
+    reedit: async (id: number, operationKey: string) => unwrap<ExamScheduleInput & { attachments?: import('./examScheduleAttachments').ExamAttachment[] }>(
       await http.post('/zsjos/exam-calendar/reedit/' + id, { operationKey })),
     notifyUsers: async (keyword?: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<CalendarNotifyUser>>(await http.get('/zsjos/calendar-notification/users', { params: { calendarType: 'EXAM', keyword, pageNo, pageSize } })),
     productOptions: async () => unwrap<ExamProductOption[]>(await http.get('/zsjos/exam-calendar/product-options')),
@@ -4672,7 +4694,7 @@ export const api = {
     data: Pick<
       PurchaseIntentDraftRequest,
       "purchaseType" | "leadId" | "personId" | "sourceKey"
-    >,
+    > & { draft?: Record<string, unknown> },
   ) =>
     unwrap<PurchaseIntent | undefined>(
       await http.post("/zsjos/purchase-intent/current", data),
@@ -4715,6 +4737,10 @@ export const api = {
         order,
       }),
     ),
+  checkRepurchaseCustomer: async (data: RepurchaseCustomerIdentity) =>
+    unwrap<RepurchaseCustomerCheck>(await http.post('/zsjos/sales-order/repurchase/check-customer', data)),
+  submitCustomerRepurchase: async (data: RepurchaseCustomerIdentity & { expectedPersonId?: number; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
+    unwrap<number>(await http.post('/zsjos/sales-order/repurchase', data)),
   submitExternalRepurchase: async (data: {
     customerName: string;
     customerMobile?: string;
@@ -4793,10 +4819,10 @@ export const api = {
     unwrap<SalesOrderStatusCounts>(
       await http.get("/zsjos/sales-order/my-status-counts"),
     ),
-  managementSalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+  managementSalesOrderPage: async (params: BusinessSort & { pageNo: number; pageSize: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
     ? unwrap<PageResult<SalesOrderListItem>>(await http.post("/zsjos/sales-order/management-search-page", params))
     : unwrap<PageResult<SalesOrderListItem>>(await http.get("/zsjos/sales-order/management-page", { params })),
-  managementSalesOrderCursor: async (params: { cursor?: string; limit?: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+  managementSalesOrderCursor: async (params: BusinessSort & { cursor?: string; limit?: number; status?: SalesOrder["status"]; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
     ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post("/zsjos/sales-order/management-search-cursor", params))
     : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get("/zsjos/sales-order/management-cursor", { params })),
   managementSalesOrderStatusCounts: async () => unwrap<SalesOrderStatusCounts>(await http.get("/zsjos/sales-order/management-status-counts")),
@@ -5867,7 +5893,7 @@ export const api = {
     data: { version: number; idempotencyKey: string; reason: string },
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
-  myStudents: async (params: {
+  myStudents: async (params: BusinessSort & {
     readScope?: "SELF" | "ALL" | "USER";
     targetUserId?: number;
     pageNo: number;
@@ -5888,6 +5914,7 @@ export const api = {
     page: async (params: {
       pageNo: number;
       pageSize: number;
+      operatorUserId?: number;
       keyword?: string;
       inServicePeriod?: boolean;
       advancedFilter?: AdvancedFilterGroup;
@@ -6176,3 +6203,9 @@ export const api = {
       }),
     ),
 };
+
+export type RepurchaseCustomerIdentity = { customerName: string; customerMobile?: string; customerWechatId?: string }
+export type RepurchaseCustomerCheck = {
+  matchStatus: 'NO_MATCH' | 'EXISTING_CUSTOMER' | 'MULTIPLE_MATCH' | 'IDENTITY_CONFLICT' | 'REPURCHASE_BLOCKED'
+  canRepurchase: boolean; reason: string; personId?: number; customerName?: string; maskedMobile?: string
+}

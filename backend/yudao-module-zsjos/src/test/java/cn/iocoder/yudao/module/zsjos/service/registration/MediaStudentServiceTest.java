@@ -48,6 +48,8 @@ class MediaStudentServiceTest {
         var visible = new MediaAccountDO().setId(20L).setStudentPersonId(1L)
                 .setNickname("账号").setPlatformValue("douyin").setPlatformLabelSnapshot("历史平台名");
         var hidden = new MediaAccountDO().setId(21L).setStudentPersonId(1L);
+        visible.setDetailValuesJson("{\"homepage_url\":\"https://www.douyin.com/user/example\"}");
+        hidden.setDetailValuesJson("{\"homepage_url\":\"https://example.com/private\"}");
         when(accountMapper.selectByStudents(List.of(1L, 2L))).thenReturn(List.of(visible, hidden));
         when(accountPermissionProvider.filterReadable(List.of(visible, hidden), 10L)).thenReturn(List.of(visible));
         var result = service.getPage(10L, request);
@@ -55,8 +57,17 @@ class MediaStudentServiceTest {
         assertEquals(1, result.getList().get(0).getAccounts().size());
         assertEquals("历史平台名", result.getList().get(0).getAccounts().get(0).getPlatformLabel());
         assertEquals("douyin", result.getList().get(0).getAccounts().get(0).getPlatformValue());
+        assertEquals("https://www.douyin.com/user/example", result.getList().get(0).getAccounts().get(0).getHomepageUrl());
         assertTrue(result.getList().get(1).getAccounts().isEmpty());
         verifyNoInteractions(accountService, positioningMapper, contentMapper, ticketMapper);
+    }
+
+    @Test
+    void homepageProjectionDoesNotInventMissingOrNonTextValues() {
+        for (String json : List.of("{}", "{\"homepage_url\":null}", "{\"homepage_url\":123}", "{\"homepage_url\":\" \"}")) {
+            org.junit.jupiter.api.Assertions.assertNull(MediaStudentService.accountHomepageUrl(new MediaAccountDO().setDetailValuesJson(json)));
+        }
+        org.junit.jupiter.api.Assertions.assertNull(MediaStudentService.accountHomepageUrl(new MediaAccountDO()));
     }
 
     @Test
@@ -130,6 +141,7 @@ class MediaStudentServiceTest {
         MyStudentRespVO student = new MyStudentRespVO();
         student.setPersonId(2L); student.setServices(List.of());
         MediaAccountDO visible = new MediaAccountDO().setId(3L).setAccountNo("MA-3");
+        visible.setDetailValuesJson("{\"homepage_url\":\"https://example.com/saved-profile\"}");
         MediaAccountDO foreign = new MediaAccountDO().setId(99L).setAccountNo("MA-99");
         foreign.setUpdateTime(java.time.LocalDateTime.now());
         when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
@@ -141,6 +153,7 @@ class MediaStudentServiceTest {
         var result = service.getDetail(1L, 2L);
 
         assertEquals(List.of(3L), result.getAccounts().stream().map(MediaStudentDetailRespVO.AccountVO::getId).toList());
+        assertEquals("https://example.com/saved-profile", result.getAccounts().get(0).getHomepageUrl());
         assertTrue(result.getOperationTimeline().stream().noneMatch(row -> "account-99".equals(row.getKey())));
         verify(positioningMapper).selectByStudentAndAccountIds(2L, List.of(3L));
         verify(positioningSubmissionMapper).selectByStudentAndAccountIds(2L, List.of(3L));

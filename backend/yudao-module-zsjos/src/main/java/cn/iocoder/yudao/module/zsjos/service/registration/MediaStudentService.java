@@ -52,11 +52,20 @@ public class MediaStudentService {
             row.setAccounts(grouped.getOrDefault(student.getPersonId(), List.of()).stream().map(account -> {
                 var summary = BeanUtils.toBean(account, MediaStudentListRespVO.AccountVO.class);
                 summary.setPlatformLabel(account.getPlatformLabelSnapshot());
+                summary.setHomepageUrl(accountHomepageUrl(account));
                 return summary;
             }).toList());
             return row;
         }).toList();
         return new PageResult<>(rows, page.getTotal());
+    }
+
+    /** Only project the saved homepage, never synthesize a URL from an account identifier. */
+    static String accountHomepageUrl(MediaAccountDO account) {
+        if (account.getDetailValuesJson() == null || account.getDetailValuesJson().isBlank()) return null;
+        var values = JsonUtils.parseObject(account.getDetailValuesJson(), Map.class);
+        var homepage = values == null ? null : values.get("homepage_url");
+        return homepage instanceof String url && !url.isBlank() ? url.trim() : null;
     }
 
     @Resource private MyStudentService myStudentService;
@@ -100,6 +109,7 @@ public class MediaStudentService {
         result.setAccounts(accounts.stream().map(account -> {
             MediaStudentDetailRespVO.AccountVO row = BeanUtils.toBean(account, MediaStudentDetailRespVO.AccountVO.class);
             row.setPlatformLabel(account.getPlatformLabelSnapshot());
+            row.setHomepageUrl(accountHomepageUrl(account));
             row.setStage(account.getSStage());
             row.setStageLabelSnapshot(account.getSStageLabelSnapshot());
             var accountDetail = accountService.projectStudentReadOnly(account);

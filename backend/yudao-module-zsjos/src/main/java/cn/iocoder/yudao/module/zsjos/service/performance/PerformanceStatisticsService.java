@@ -19,18 +19,35 @@ public class PerformanceStatisticsService {
  @Resource private PerformanceFactMapper facts;
  @Resource private PerformanceDetailMapper detailQueries;
  @Resource private PerformanceTargetService targets;
+ @Resource private PerformanceReportMapper reports;
+ private Clock clock=Clock.system(ZONE);
  private Long tenant(){return TenantContextHolder.getRequiredTenantId();}
- private LocalDateTime now(){return LocalDateTime.now(ZONE);}
- private List<PerformanceFact> authorizedRows(Query q,List<PerformanceFact> rows){return rows.stream().filter(x->access.historicalRowAllowed(q,x.getDeptId())).toList();}
- private List<PerformanceFact> orders(Query q){access.authorize(q,false);return authorizedRows(q,facts.orders(tenant(),q.getScopeType(),q.getScopeId()));}
- private List<PerformanceFact> receipts(Query q){return authorizedRows(q,facts.receipts(tenant(),q.getScopeType(),q.getScopeId()));}
- private Set<Long> users(Query q){
-  Set<Long> users=new HashSet<>();
-  if(Set.of("SELF","USER").contains(q.getScopeType()))users.add(q.getScopeId());
-  else for(var u:access.sales()){var m=access.mapping(u.getDeptId());if(m!=null&&("DEPT".equals(q.getScopeType())?q.getScopeId().equals(m.getDeptId()):q.getScopeId().equals(m.getCenterId()))&&access.departmentAllowed(u.getDeptId()))users.add(u.getId());}
-  return users;
+ private LocalDateTime now(){return LocalDateTime.now(clock);}
+ private PerformanceReportQuery request(Query q,LocalDateTime n) {
+  access.authorize(q,false);var scope=access.historicalScope(q);
+  var r=new PerformanceReportQuery();r.setTenant(tenant());r.setType(q.getScopeType());r.setId(q.getScopeId());
+  r.setAllDepartments(scope.allDepartments());r.setMissingDepartment(scope.missingDepartment());r.setDepartments(scope.departments());
+  r.setNow(n);r.setToday(n.toLocalDate().atStartOfDay());r.setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay());return r;
  }
- private List<PerformanceFact> tasks(Query q){return authorizedRows(q,facts.tasks(tenant(),q.getScopeType(),q.getScopeId()));}
+ private void interval(PerformanceReportQuery r,Window w){r.setStart(w.start());r.setEnd(w.end());}
+ private Window reportRange(Query q,PerformanceReportQuery r,LocalDateTime n){
+  if(q.isCumulative()){var first=detailQueries.firstDate(r);q.setStart((first==null?n:first).toLocalDate());q.setEnd(n.toLocalDate());q.setGrain("month");}
+  var w=range(q,n);interval(r,w);r.setDueEnd(dueWindow(q,w,n).end());return w;
+ }
+ private Map<String,PerformanceAggregate> amounts(PerformanceReportQuery r,List<Window> windows,String grouping){
+  if(windows.isEmpty())return Map.of();
+  r.setIntervals(windows.stream().map(w->new PerformanceReportQuery.Interval(w.key(),w.start(),w.end())).toList());r.setGrouping(grouping);
+  Map<String,PerformanceAggregate> values=new LinkedHashMap<>();
+  for(var x:reports.amounts(r))values.put(x.getKey()+"/"+x.getGroupKey(),x);return values;
+ }
+ private PerformanceAggregate amount(Map<String,PerformanceAggregate> data,Window w,String group){return data.getOrDefault(w.key()+"/"+group,new PerformanceAggregate());}
+ private Metric metric(Window w,PerformanceAggregate a,PerformanceConversion.Population population){
+  var people=population.at(w);long converted=people.values().stream().filter(x->x.order()!=null).count();
+  return new Metric(w.key(),w.label(),w.start(),w.end(),a.getAmount(),a.getCount(),converted,people.size(),ratio(BigDecimal.valueOf(converted),BigDecimal.valueOf(people.size())),ratio(a.getAverageAmount(),BigDecimal.valueOf(a.getAverageOrders())),a.getAverageAmount(),a.getAverageOrders());
+ }
+ private List<PerformanceFact> conversionReceipts(PerformanceReportQuery r,List<PerformanceFact> orders){
+  r.setConversionLeadIds(orders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(Collectors.toSet()));return detailQueries.conversionReceipts(r);
+ }
  public static Metric metric(Window w,List<PerformanceFact> orders,List<PerformanceFact> receipts) {
   var selected=orders.stream().filter(x->w.contains(x.getOccurredAt())).toList();
   BigDecimal amount=selected.stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
@@ -41,86 +58,108 @@ public class PerformanceStatisticsService {
   return new Metric(w.key(),w.label(),w.start(),w.end(),amount,selected.size(),won,population.size(),ratio(BigDecimal.valueOf(won),BigDecimal.valueOf(population.size())),ratio(averageAmount,BigDecimal.valueOf(avg.size())),averageAmount,avg.size());
  }
  public Overview overview(Query q) {
-  var o=orders(q);var r=receipts(q);var n=now();
-  var performance=List.of("today","week","month","quarter","year","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
-  var conversion=List.of("month","lastMonth","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
+  var n=now();var r=request(q,n);
+  var keys=List.of("today","week","month","lastMonth","quarter","year","last7","last30","last60","last90","lastWeek");
+  var windows=keys.stream().map(k->window(k,n)).toList();
+  r.setStart(windows.stream().map(Window::start).min(Comparator.naturalOrder()).orElseThrow());r.setEnd(n);
+  var orders=detailQueries.conversionOrders(r);var population=new PerformanceConversion.Population(orders,conversionReceipts(r,orders));
+  var sums=amounts(r,windows,"total");Map<String,Metric> metrics=new HashMap<>();
+  for(var w:windows)metrics.put(w.key(),metric(w,amount(sums,w,"total"),population));
+  var performance=keys.subList(0,10).stream().map(metrics::get).toList();
+  var conversion=List.of("month","lastMonth","last7","last30","last60","last90").stream().map(metrics::get).toList();
+  var targetKeys=List.of("lastWeek","week","month","quarter","year");
+  var batch=targets.batch(targetKeys.stream().map(k->new PerformanceTargetService.Period("lastWeek".equals(k)?"week":k,window(k,n).start().toLocalDate())).toList(),List.of(q.getScopeId()));
   List<TargetProgress> progress=new ArrayList<>();
-  for(String k:List.of("lastWeek","week","month","quarter","year")){var w=window(k,n);String period="lastWeek".equals(k)?"week":k;progress.add(new TargetProgress(k,w.label(),metric(w,o,r),targets.resolve(q.getScopeType(),q.getScopeId(),period,w.start().toLocalDate())));}
-  var t=tasks(q).stream().filter(this::manualTask).toList();Map<String,Long> pending=new LinkedHashMap<>();
-  pending.put("accept",t.stream().filter(x->pending(x)&&"lead_assignment_accept".equals(x.getGroupKey())).count());
-  pending.put("qualification",t.stream().filter(x->Boolean.TRUE.equals(x.getCurrentQualification())&&(pending(x)||"overdue".equals(x.getOutcome()))&&"lead_qualification".equals(x.getGroupKey())&&x.getDueAt()!=null&&!x.getDueAt().isAfter(n)).count());
-  pending.put("todayFollowUp",t.stream().filter(x->pending(x)&&follow(x)&&x.getDueAt()!=null&&x.getDueAt().toLocalDate().equals(n.toLocalDate())).count());
-  pending.put("overdueFollowUp",t.stream().filter(x->pending(x)&&follow(x)&&x.getDueAt()!=null&&x.getDueAt().isBefore(n)).count());
-  pending.put("missingTarget",(long)progress.get(2).target().missing());
-  var missing=o.stream().filter(x->x.getDeptId()==null||x.getCenterId()==null).toList();
-  return new Overview(n,facts.availableSince(tenant(),q.getScopeType(),q.getScopeId()),progress,performance,conversion,pending,missing.size(),missing.stream().map(PerformanceFact::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add),access.has("zsjos:sales-performance:detail"));
+  for(var k:targetKeys){var w=window(k,n);progress.add(new TargetProgress(k,w.label(),metrics.get(k),batch.resolve(q.getScopeType(),q.getScopeId(),"lastWeek".equals(k)?"week":k,w.start().toLocalDate())));}
+  Map<String,Long> pending=new LinkedHashMap<>();for(var x:reports.pending(r))pending.put(x.getKey(),x.getCount());pending.put("missingTarget",(long)progress.get(2).target().missing());
+  var missing=reports.missingAttribution(r);
+  return new Overview(n,facts.availableSince(tenant(),q.getScopeType(),q.getScopeId()),progress,performance,conversion,pending,missing.getCount(),missing.getAmount(),access.has("zsjos:sales-performance:detail"));
  }
- private boolean manualTask(PerformanceFact x){return !(Set.of("lead_first_follow_up","lead_qualification").contains(x.getGroupKey())&&cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.isAutomaticSource(x.getGenerationSource()));}
  private boolean pending(PerformanceFact x){return "pending".equals(x.getStatus());}
- private boolean follow(PerformanceFact x){return Set.of("lead_first_follow_up","lead_follow_up_reminder").contains(x.getGroupKey());}
- private void cumulative(Query q,List<PerformanceFact> o,List<PerformanceFact> r){if(q.isCumulative()){var first=java.util.stream.Stream.concat(o.stream().map(PerformanceFact::getOccurredAt),r.stream().map(PerformanceFact::getReceivedAt)).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(now());q.setStart(first.toLocalDate());q.setEnd(now().toLocalDate());q.setGrain("month");}}
- private Window range(Query q){var n=now();if(q.getPeriodKey()!=null)return window(q.getPeriodKey(),n);LocalDate start=q.getStart()==null?n.toLocalDate().withDayOfMonth(1):q.getStart();LocalDate end=q.getEnd()==null?n.toLocalDate():q.getEnd();if(end.isBefore(start))throw PerformanceAccess.invalid("结束日期不能早于开始日期");return new Window("range","所选期间",start.atStartOfDay(),end.plusDays(1).atStartOfDay().isAfter(n)?n:end.plusDays(1).atStartOfDay());}
- private Window dueWindow(Query q,Window factsWindow){
-  // A plan due later today belongs to today's workload even though no future sales facts are counted.
-  if("lastWeek".equals(q.getPeriodKey())||"lastMonth".equals(q.getPeriodKey()))return factsWindow;
-  LocalDate last=q.getPeriodKey()==null&&q.getEnd()!=null?q.getEnd():now().toLocalDate();
-  return new Window(factsWindow.key(),factsWindow.label(),factsWindow.start(),last.plusDays(1).atStartOfDay());
+ private Window range(Query q){return range(q,now());}
+ private Window range(Query q,LocalDateTime n){if(q.getPeriodKey()!=null)return window(q.getPeriodKey(),n);LocalDate start=q.getStart()==null?n.toLocalDate().withDayOfMonth(1):q.getStart();LocalDate end=q.getEnd()==null?n.toLocalDate():q.getEnd();if(end.isBefore(start))throw PerformanceAccess.invalid("结束日期不能早于开始日期");return new Window("range","所选期间",start.atStartOfDay(),end.plusDays(1).atStartOfDay().isAfter(n)?n:end.plusDays(1).atStartOfDay());}
+ private Window dueWindow(Query q,Window w){return dueWindow(q,w,now());}
+ private Window dueWindow(Query q,Window w,LocalDateTime n){
+  if("lastWeek".equals(q.getPeriodKey())||"lastMonth".equals(q.getPeriodKey()))return w;
+  LocalDate last=q.getPeriodKey()==null&&q.getEnd()!=null?q.getEnd():n.toLocalDate();return new Window(w.key(),w.label(),w.start(),last.plusDays(1).atStartOfDay());
  }
  public Analysis analysis(Query q){
-  var o=orders(q);var r=receipts(q);cumulative(q,o,r);var w=range(q);var selected=o.stream().filter(x->w.contains(x.getOccurredAt())).toList();
-  List<Metric> averages=new ArrayList<>();averages.add(metric(new Window("all","整体",w.start(),w.end()),o,r));
-  for(String k:List.of("inbound","self"))averages.add(metric(new Window(k,sourceName(k),w.start(),w.end()),o.stream().filter(x->k.equals(sourceGroup(x))).toList(),List.of()));
-  List<Metric> trend=new ArrayList<>();LocalDate d=w.start().toLocalDate();
-  while(d.atStartOfDay().isBefore(w.end())){LocalDate next=switch(q.getGrain()){case "week"->d.with(TemporalAdjusters.next(DayOfWeek.MONDAY));case "month"->d.withDayOfMonth(1).plusMonths(1);default->d.plusDays(1);};var end=next.atStartOfDay().isAfter(w.end())?w.end():next.atStartOfDay();trend.add(metric(new Window(d.toString(),d.toString(),d.atStartOfDay(),end),o,r));d=next;}
-  var products=authorizedRows(q,facts.products(tenant(),q.getScopeType(),q.getScopeId())).stream().filter(x->w.contains(x.getOccurredAt())).toList();
-  List<Contribution> contributions=new ArrayList<>();Set<Long> members=new LinkedHashSet<>(users(q));selected.stream().map(PerformanceFact::getUserId).filter(Objects::nonNull).forEach(members::add);
-  // Current account status controls personnel rows, never the historical facts or share denominator.
-  members.retainAll(access.enabledUserIds(members));
-  for(Long user:members){var personOrders=o.stream().filter(x->user.equals(x.getUserId())).toList();var personReceipts=r.stream().filter(x->user.equals(x.getUserId())).toList();var m=metric(w,personOrders,personReceipts);String name=selected.stream().filter(x->user.equals(x.getUserId())&&x.getUserName()!=null).map(PerformanceFact::getUserName).findFirst().orElseGet(()->{var u=access.user(user);return u==null?"历史人员":u.getNickname();});var t=matchingTarget(q,user,w);contributions.add(new Contribution(user,name,m,t==null||!t.complete()?null:ratio(m.amount(),t.floorAmount()),t==null||!t.complete()?null:ratio(m.amount(),t.sprintAmount()),ratio(m.amount(),averages.getFirst().amount())));}
-  Map<String,List<Metric>> averageTrends=new LinkedHashMap<>();for(String group:List.of("all","inbound","self")){var subset="all".equals(group)?o:o.stream().filter(x->group.equals(sourceGroup(x))).toList();averageTrends.put(group,trend.stream().map(t->metric(new Window(t.key(),t.label(),t.start(),t.end()),subset,List.of())).toList());}
-  return new Analysis(now(),w.start().toLocalDate(),q.getEnd()==null?now().toLocalDate():q.getEnd(),averages,trend,groups(selected,x->sourceGroup(x)+"|"+sourceName(sourceGroup(x)),false),groups(products,x->Objects.toString(x.getGroupKey(),"unknown")+"|"+Objects.toString(x.getLabel(),"历史产品名称缺失"),true),groups(selected.stream().filter(x->members.contains(x.getUserId())).toList(),x->Objects.toString(x.getUserId(),"unknown")+"|"+Objects.toString(x.getUserName(),"历史姓名缺失"),false).stream().map(g->new Group(g.key(),g.label(),g.amount(),g.count(),ratio(g.amount(),averages.getFirst().amount()))).toList(),contributions,averageTrends,targetPeriod(q,w)==null?null:targets.resolve(q.getScopeType(),q.getScopeId(),targetPeriod(q,w),w.start().toLocalDate()));
+  var n=now();var r=request(q,n);var w=reportRange(q,r,n);
+  var orders=detailQueries.conversionOrders(r);var receipts=conversionReceipts(r,orders);
+  var population=new PerformanceConversion.Population(orders,receipts);
+  List<Window> buckets=new ArrayList<>();
+  for(LocalDate d=w.start().toLocalDate();d.atStartOfDay().isBefore(w.end());){
+   LocalDate next=switch(q.getGrain()){case "week"->d.with(TemporalAdjusters.next(DayOfWeek.MONDAY));case "month"->d.withDayOfMonth(1).plusMonths(1);default->d.plusDays(1);};
+   buckets.add(new Window(d.toString(),d.toString(),d.atStartOfDay(),next.atStartOfDay().isAfter(w.end())?w.end():next.atStartOfDay()));d=next;
+  }
+  var windows=new ArrayList<>(buckets);windows.add(w);
+  var sums=amounts(r,windows,"total");var sources=amounts(r,windows,"source");
+  var sourcePopulations=new HashMap<String,PerformanceConversion.Population>();
+  for(var group:List.of("all","inbound","self"))sourcePopulations.put(group,new PerformanceConversion.Population("all".equals(group)?orders:orders.stream().filter(x->group.equals(sourceGroup(x))).toList(),List.of()));
+  List<Metric> averages=new ArrayList<>();averages.add(metric(new Window("all","整体",w.start(),w.end()),amount(sums,w,"total"),population));
+  for(var group:List.of("inbound","self"))averages.add(metric(new Window(group,sourceName(group),w.start(),w.end()),amount(sources,w,group),sourcePopulations.get(group)));
+  var trend=buckets.stream().map(b->metric(b,amount(sums,b,"total"),population)).toList();
+  Map<String,List<Metric>> averageTrends=new LinkedHashMap<>();for(var group:List.of("all","inbound","self"))averageTrends.put(group,buckets.stream().map(b->metric(b,amount("all".equals(group)?sums:sources,b,"all".equals(group)?"total":group),sourcePopulations.get(group))).toList());
+  var byUser=amounts(r,List.of(w),"user");Set<Long> members=new LinkedHashSet<>();
+  if(Set.of("SELF","USER").contains(q.getScopeType()))members.add(q.getScopeId());
+  else {
+   var orgs=access.orgs().stream().collect(Collectors.toMap(x->x.getDeptId(),Function.identity(),(a,b)->a));
+   for(var user:access.sales()){var mapping=orgs.get(user.getDeptId());if(mapping!=null&&q.getScopeId().equals("DEPT".equals(q.getScopeType())?mapping.getDeptId():mapping.getCenterId())&&(r.isAllDepartments()||r.getDepartments().contains(user.getDeptId())))members.add(user.getId());}
+  }
+  byUser.values().stream().map(PerformanceAggregate::getUserId).filter(Objects::nonNull).forEach(members::add);
+  var people=access.users(members).stream().filter(x->Objects.equals(x.getStatus(),0)).collect(Collectors.toMap(x->x.getId(),Function.identity()));members.retainAll(people.keySet());
+  String period=targetPeriod(q,w,n);Set<Long> targetUsers=new HashSet<>(members);if(Set.of("SELF","USER").contains(q.getScopeType()))targetUsers.add(q.getScopeId());
+  var targetBatch=period==null?null:targets.batch(List.of(new PerformanceTargetService.Period(period,w.start().toLocalDate())),targetUsers);
+  var orderGroups=orders.stream().filter(x->x.getUserId()!=null).collect(Collectors.groupingBy(PerformanceFact::getUserId));
+  var receiptGroups=receipts.stream().filter(x->x.getUserId()!=null).collect(Collectors.groupingBy(PerformanceFact::getUserId));
+  List<Contribution> contributions=new ArrayList<>();
+  for(Long user:members){var personOrders=orderGroups.getOrDefault(user,List.of());var pop=new PerformanceConversion.Population(personOrders,receiptGroups.getOrDefault(user,List.of()));var actual=metric(w,amount(byUser,w,user.toString()),pop);String name=personOrders.stream().map(PerformanceFact::getUserName).filter(Objects::nonNull).findFirst().orElse(people.get(user).getNickname());var target=targetBatch==null?null:targetBatch.resolve("USER",user,period,w.start().toLocalDate());contributions.add(new Contribution(user,name,actual,target==null||!target.complete()?null:ratio(actual.amount(),target.floorAmount()),target==null||!target.complete()?null:ratio(actual.amount(),target.sprintAmount()),ratio(actual.amount(),averages.getFirst().amount())));}
+  var products=amounts(r,List.of(w),"product");var contributorSums=amounts(r,List.of(w),"contributor");
+  var contributorGroups=aggregateGroups(contributorSums,w,false).stream().filter(g->members.stream().anyMatch(id->g.key().startsWith(id+"|"))).map(g->new Group(g.key(),g.label(),g.amount(),g.count(),ratio(g.amount(),averages.getFirst().amount()))).toList();
+  return new Analysis(n,w.start().toLocalDate(),q.getEnd()==null?n.toLocalDate():q.getEnd(),averages,trend,aggregateGroups(sources,w,true),aggregateGroups(products,w,false),contributorGroups,contributions,averageTrends,targetBatch==null?null:targetBatch.resolve(q.getScopeType(),q.getScopeId(),period,w.start().toLocalDate()));
  }
- private String targetPeriod(Query q,Window w){
-  LocalDate d=w.start().toLocalDate(),end=q.getEnd()==null?now().toLocalDate():q.getEnd();String period=null;
+ private List<Group> aggregateGroups(Map<String,PerformanceAggregate> sums,Window w,boolean source){
+  var rows=sums.values().stream().filter(x->w.key().equals(x.getKey())&&x.getCount()>0).toList();var total=rows.stream().map(PerformanceAggregate::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
+  return rows.stream().map(x->{String key=source?x.getGroupKey()+"|"+sourceName(x.getGroupKey()):x.getGroupKey();String label=key.contains("|")?key.substring(key.indexOf('|')+1):key;return new Group(key,label,x.getAmount(),x.getCount(),ratio(x.getAmount(),total));}).sorted(Comparator.comparing(Group::amount).reversed()).toList();
+ }
+ private String targetPeriod(Query q,Window w,LocalDateTime n){
+  LocalDate d=w.start().toLocalDate(),end=q.getEnd()==null?n.toLocalDate():q.getEnd();String period=null;
   if(q.getPeriodKey()!=null&&Set.of("week","lastWeek","month","lastMonth","quarter","year").contains(q.getPeriodKey()))period=switch(q.getPeriodKey()){case "lastWeek"->"week";case "lastMonth"->"month";default->q.getPeriodKey();};
   else if(d.getDayOfYear()==1&&end.equals(d.plusYears(1).minusDays(1)))period="year";
   else if(d.getDayOfMonth()==1&&(d.getMonthValue()-1)%3==0&&end.equals(d.plusMonths(3).minusDays(1)))period="quarter";
-  else if(d.getDayOfMonth()==1&&(end.equals(d.withDayOfMonth(d.lengthOfMonth()))||d.equals(now().toLocalDate().withDayOfMonth(1))&&end.equals(now().toLocalDate())))period="month";
+  else if(d.getDayOfMonth()==1&&(end.equals(d.withDayOfMonth(d.lengthOfMonth()))||d.equals(n.toLocalDate().withDayOfMonth(1))&&end.equals(n.toLocalDate())))period="month";
   else if(d.getDayOfWeek()==DayOfWeek.MONDAY&&end.equals(d.plusDays(6)))period="week";
   return period;
  }
 
- private Target matchingTarget(Query q,Long user,Window w){String period=targetPeriod(q,w);return period==null?null:targets.resolve("USER",user,period,w.start().toLocalDate());}
  public static String sourceGroup(PerformanceFact fact){return "repurchase".equals(fact.getOrderType())?"self":Set.of("inbound","self").contains(Objects.toString(fact.getGroupKey(),""))?fact.getGroupKey():"unknown";}
  private String sourceName(String k){return switch(Objects.toString(k,"unknown")){case "inbound"->"线上引流";case "self"->"非引流";case "repurchase"->"复购";default->"其他";};}
- private List<Group> groups(List<PerformanceFact> rows,Function<PerformanceFact,String> key,boolean product){
-  BigDecimal total=rows.stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
-  return rows.stream().collect(Collectors.groupingBy(key,LinkedHashMap::new,Collectors.toList())).entrySet().stream().map(e->{BigDecimal a=e.getValue().stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);String label=e.getKey().contains("|")?e.getKey().substring(e.getKey().indexOf('|')+1):e.getKey();return new Group(e.getKey(),label,a,product?e.getValue().stream().map(PerformanceFact::getLeadId).distinct().count():e.getValue().size(),ratio(a,total));}).sorted(Comparator.comparing(Group::amount).reversed()).toList();
- }
  public List<HistoryMonth> history(Query q){
-  var o=orders(q);int year=q.getYear()==null?now().getYear():q.getYear();var n=now();List<HistoryMonth> result=new ArrayList<>();
-  for(int m=1;m<=12;m++){
-   var start=LocalDate.of(year,m,1).atStartOfDay();boolean future=start.isAfter(n);var end=start.plusMonths(1);
-   if(!future&&end.isAfter(n))end=n;
-   var previousStart=start.minusYears(1);var previousEnd=end.minusYears(1);
-   result.add(new HistoryMonth(m,future?null:metric(new Window("m","",start,end),o,List.of()).amount(),
-    future?null:metric(new Window("p","",previousStart,previousEnd),o,List.of()).amount(),start,end,previousStart,previousEnd,future));
-  }return result;
+  var n=now();var r=request(q,n);int year=q.getYear()==null?n.getYear():q.getYear();List<HistoryMonth> rows=new ArrayList<>();List<Window> windows=new ArrayList<>();
+  for(int m=1;m<=12;m++){var start=LocalDate.of(year,m,1).atStartOfDay();boolean future=start.isAfter(n);var end=start.plusMonths(1);if(!future&&end.isAfter(n))end=n;var previousStart=start.minusYears(1);var previousEnd=end.minusYears(1);rows.add(new HistoryMonth(m,null,null,start,end,previousStart,previousEnd,future));if(!future){windows.add(new Window("m"+m,"",start,end));windows.add(new Window("p"+m,"",previousStart,previousEnd));}}
+  var sums=amounts(r,windows,"total");return rows.stream().map(x->new HistoryMonth(x.month(),x.future()?null:sums.getOrDefault("m"+x.month()+"/total",new PerformanceAggregate()).getAmount(),x.future()?null:sums.getOrDefault("p"+x.month()+"/total",new PerformanceAggregate()).getAmount(),x.start(),x.end(),x.previousStart(),x.previousEnd(),x.future())).toList();
  }
  private List<Group> countGroups(List<PerformanceFact> rows,Function<PerformanceFact,String> key){return rows.stream().collect(Collectors.groupingBy(key,LinkedHashMap::new,Collectors.mapping(PerformanceFact::getLeadId,Collectors.toSet()))).entrySet().stream().map(e->new Group(e.getKey(),e.getKey(),BigDecimal.ZERO,e.getValue().size(),ratio(BigDecimal.valueOf(e.getValue().size()),BigDecimal.valueOf(rows.stream().map(PerformanceFact::getLeadId).distinct().count())))).toList();}
+ public LeadWorkload leadWorkload(Query q){var n=now();var r=request(q,n);var w=reportRange(q,r,n);return workload(q,r,w,n,reports.receipts(r));}
+ public LeadCalendar leadCalendar(Query q){var n=now();var r=request(q,n);var w=reportRange(q,r,n);checkCalendar(q,w);return calendar(q,r,w,n,reports.receipts(r),true);}
+ private void checkCalendar(Query q,Window w){if(java.time.temporal.ChronoUnit.DAYS.between(w.start().toLocalDate(),q.getEnd()==null?w.end().toLocalDate():q.getEnd())>31)throw PerformanceAccess.invalid("日历每次仅支持一个月");}
  public LeadReport leads(Query q){
-  var o=orders(q);var all=receipts(q);cumulative(q,o,all);var w=range(q);if(q.isCalendar()&&java.time.temporal.ChronoUnit.DAYS.between(w.start().toLocalDate(),q.getEnd()==null?w.end().toLocalDate():q.getEnd())>31)throw PerformanceAccess.invalid("日历每次仅支持一个月");var n=now();var selected=all.stream().filter(x->w.contains(x.getReceivedAt())).toList();var allTasks=tasks(q);var tasks=allTasks.stream().filter(this::manualTask).toList();
-  Map<String,Long> work=new LinkedHashMap<>();work.put("received",selected.stream().map(PerformanceFact::getLeadId).distinct().count());work.put("valid",selected.stream().filter(x->Set.of("valid","converted","won").contains(x.getStatus())).map(PerformanceFact::getLeadId).distinct().count());
-  var userIds=users(q);var assignments=authorizedRows(q,facts.assignments(tenant(),q.getScopeType(),q.getScopeId()));work.put("assigned",assignments.stream().filter(x->"dispatch".equals(x.getGroupKey())&&w.contains(x.getOccurredAt())).map(PerformanceFact::getLeadId).distinct().count());work.put("missed",assignments.stream().filter(x->"timeout".equals(x.getGroupKey())&&w.contains(x.getOccurredAt())).map(PerformanceFact::getLeadId).distinct().count());work.put("followUps",authorizedRows(q,facts.followUps(tenant(),q.getScopeType(),q.getScopeId())).stream().filter(x->w.contains(x.getOccurredAt())).count());
-  List<CalendarDay> calendar=new ArrayList<>();
-  for(LocalDate d=w.start().toLocalDate();q.isCalendar()&&!d.isAfter(q.getEnd()==null?w.end().toLocalDate():q.getEnd());d=d.plusDays(1)){
-   calendar.add(PerformanceCalendar.summarize(d,selected,allTasks,n));
-  }
-
-  Set<Long> ids=selected.stream().map(PerformanceFact::getLeadId).collect(Collectors.toSet());long converted=o.stream().filter(x->"first_purchase".equals(x.getOrderType())&&ids.contains(x.getLeadId())&&selected.stream().anyMatch(r->Objects.equals(r.getLeadId(),x.getLeadId())&&Objects.equals(r.getUserId(),x.getUserId())&&Objects.equals(r.getReceivedAt(),x.getReceivedAt()))).map(PerformanceFact::getLeadId).distinct().count();
-  List<Group> funnel=List.of(count("received","接收客资",work.get("received")),count("valid","有效客资",work.get("valid")),count("converted","成交客资",converted));
-  var followWindow=dueWindow(q,w);var follow=tasks.stream().filter(x->follow(x)&&followWindow.contains(x.getDueAt())).toList();
-  return new LeadReport(n,w.start().toLocalDate(),q.getEnd()==null?n.toLocalDate():q.getEnd(),work,countGroups(selected,x->Objects.toString(x.getCategory(),"历史分类缺失")),countGroups(selected,x->Objects.toString(x.getStage(),"阶段未记录")),calendar,funnel,List.of(count("completed","已完成",follow.stream().filter(x->"completed".equals(x.getStatus())).count()),count("pending","未到期未完成",follow.stream().filter(x->pending(x)&&(x.getDueAt()==null||!x.getDueAt().isBefore(n))).count()),count("overdue","逾期未完成",follow.stream().filter(x->pending(x)&&x.getDueAt().isBefore(n)).count()),count("cancelled","已取消",follow.stream().filter(x->"cancelled".equals(x.getStatus())).count())),categoryTrend(selected,q.getGrain(),w));
+  var n=now();var r=request(q,n);var w=reportRange(q,r,n);if(q.isCalendar())checkCalendar(q,w);var receipts=reports.receipts(r);
+  var work=workload(q,r,w,n,receipts);var calendar=calendar(q,r,w,n,receipts,q.isCalendar());
+  return new LeadReport(n,work.start(),work.end(),work.workload(),work.categories(),work.stages(),calendar.calendar(),calendar.funnel(),work.followUp(),work.categoryTrend());
+ }
+ private LeadWorkload workload(Query q,PerformanceReportQuery r,Window w,LocalDateTime n,List<PerformanceFact> receipts){
+  Map<String,Long> counts=new HashMap<>();reports.activity(r).forEach(x->counts.put(x.getKey(),x.getCount()));
+  Map<String,Long> work=new LinkedHashMap<>();work.put("received",receipts.stream().map(PerformanceFact::getLeadId).distinct().count());work.put("valid",receipts.stream().filter(x->Set.of("valid","converted","won").contains(x.getStatus())).map(PerformanceFact::getLeadId).distinct().count());
+  for(var key:List.of("assigned","missed","followUps"))work.put(key,counts.getOrDefault(key,0L));
+  return new LeadWorkload(n,w.start().toLocalDate(),q.getEnd()==null?n.toLocalDate():q.getEnd(),work,countGroups(receipts,x->Objects.toString(x.getCategory(),"历史分类缺失")),countGroups(receipts,x->Objects.toString(x.getStage(),"阶段未记录")),List.of(count("completed","已完成",counts.getOrDefault("completed",0L)),count("pending","未到期未完成",counts.getOrDefault("pending",0L)),count("overdue","逾期未完成",counts.getOrDefault("overdue",0L)),count("cancelled","已取消",counts.getOrDefault("cancelled",0L))),categoryTrend(receipts,q.getGrain(),w));
+ }
+ private LeadCalendar calendar(Query q,PerformanceReportQuery r,Window w,LocalDateTime n,List<PerformanceFact> receipts,boolean includeDays){
+  List<CalendarDay> days=new ArrayList<>();
+  if(includeDays){var tasks=reports.calendarTasks(r);var indexed=new PerformanceCalendar.Index(tasks);for(LocalDate d=w.start().toLocalDate();!d.isAfter(q.getEnd()==null?w.end().toLocalDate():q.getEnd());d=d.plusDays(1))days.add(indexed.summarize(d,receipts,n));}
+  long received=receipts.stream().map(PerformanceFact::getLeadId).distinct().count(),valid=receipts.stream().filter(x->Set.of("valid","converted","won").contains(x.getStatus())).map(PerformanceFact::getLeadId).distinct().count();
+  long converted=reports.cohortOrders(r).stream().map(PerformanceFact::getLeadId).distinct().count();
+  return new LeadCalendar(n,w.start().toLocalDate(),q.getEnd()==null?n.toLocalDate():q.getEnd(),days,List.of(count("received","接收客资",received),count("valid","有效客资",valid),count("converted","成交客资",converted)));
  }
  private List<CategoryPoint> categoryTrend(List<PerformanceFact> rows,String grain,Window window){
   Map<String,Map<String,Set<Long>>> buckets=new TreeMap<>();
@@ -152,9 +191,9 @@ public class PerformanceStatisticsService {
    var first=detailQueries.firstDate(request);
    q.setStart((first==null?n:first).toLocalDate());q.setEnd(n.toLocalDate());q.setGrain("month");
   }
-  var w=range(q);
+  var w=range(q,n);
   request.setMetric(q.getMetric()).setDimension(q.getDimension()).setGroupKey(q.getGroupKey())
-    .setStart(w.start()).setEnd(w.end()).setDueEnd(dueWindow(q,w).end())
+    .setStart(w.start()).setEnd(w.end()).setDueEnd(dueWindow(q,w,n).end())
     .setNow(n).setToday(n.toLocalDate().atStartOfDay()).setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay())
     .setOffset((long)(q.getPageNo()-1)*q.getPageSize()).setSize(q.getPageSize());
   if("conversion".equals(q.getMetric()))return conversionDetails(request,w);

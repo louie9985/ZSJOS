@@ -20,7 +20,7 @@
       :disabled="!canUpdate"
       :file-type="fileTypes"
       :limit="20"
-      :file-size="20"
+      :file-size="100"
     />
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>

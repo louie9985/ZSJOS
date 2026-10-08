@@ -29,18 +29,18 @@ public interface NoticeMapper extends BaseMapperX<NoticeDO> {
 
     default PageResult<NoticeDO> selectPage(NoticePageReqVO reqVO) {
         return selectPage(reqVO, new QueryWrapperX<NoticeDO>()
-                .likeIfPresent("title", reqVO.getTitle())
                 .eqIfPresent("status", reqVO.getStatus())
                 .eqIfPresent("publish_status", reqVO.getPublishStatus())
+                .and(reqVO.getTitle() != null && !reqVO.getTitle().isBlank(), w -> w.like("title", reqVO.getTitle()).or().like("source_dept_name", reqVO.getTitle()).or().like("publisher_name", reqVO.getTitle()))
                 .orderByDesc("id"));
     }
 
     default PageResult<NoticeDO> selectPublishedPage(NoticeMyPageReqVO reqVO, Long userId) {
         return selectPage(reqVO, new QueryWrapperX<NoticeDO>()
                 .eq("publish_status", "PUBLISHED")
-                .likeIfPresent("title", reqVO.getKeyword())
                 .eqIfPresent("type", reqVO.getType())
                 .betweenIfPresent("publish_time", reqVO.getPublishTime())
+                .and(reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank(), w -> w.like("title", reqVO.getKeyword()).or().like("source_dept_name", reqVO.getKeyword()).or().like("publisher_name", reqVO.getKeyword()))
                 .apply(Boolean.TRUE.equals(reqVO.getHighlighted()), "highlight_until IS NOT NULL AND highlight_until > NOW()")
                 .apply(Boolean.FALSE.equals(reqVO.getHighlighted()), "(highlight_until IS NULL OR highlight_until <= NOW())")
                 .and(userId != null, w -> w.isNull("audience_type").or().eq("audience_type", "ALL")
@@ -58,9 +58,9 @@ public interface NoticeMapper extends BaseMapperX<NoticeDO> {
                                                   LocalDateTime[] publishTime) {
         QueryWrapper<NoticeDO> query = new QueryWrapperX<NoticeDO>()
                 .eq("publish_status", "PUBLISHED")
-                .likeIfPresent("title", keyword)
                 .eqIfPresent("type", type)
                 .betweenIfPresent("publish_time", publishTime)
+                .and(keyword != null && !keyword.isBlank(), w -> w.like("title", keyword).or().like("source_dept_name", keyword).or().like("publisher_name", keyword))
                 .apply(Boolean.TRUE.equals(highlighted), "highlight_until IS NOT NULL AND highlight_until > {0}", snapshotTime)
                 .apply(Boolean.FALSE.equals(highlighted), "(highlight_until IS NULL OR highlight_until <= {0})", snapshotTime)
                 .and(w -> w.isNull("audience_type").or().eq("audience_type", "ALL")

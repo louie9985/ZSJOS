@@ -8,6 +8,7 @@ import lombok.Data;
 
 @Data
 public class SalesOrderRepurchaseReqVO {
+    private Long expectedPersonId; // Optimistic identity binding, not authorization.
     @Size(max = 100) private String customerName;
     @Size(max = 32) private String customerMobile;
     @Size(max = 64) private String customerWechatId;

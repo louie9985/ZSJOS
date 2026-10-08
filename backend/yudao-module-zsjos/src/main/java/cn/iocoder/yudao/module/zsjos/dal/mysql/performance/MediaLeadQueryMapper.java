@@ -28,6 +28,7 @@ public interface MediaLeadQueryMapper {
         (SELECT MIN(o.effective_at) FROM zsjos_order o
          WHERE o.tenant_id=l.tenant_id AND o.deleted=0 AND o.lead_id=l.id
            AND o.status='effective' AND o.order_type &lt;&gt; 'repurchase'
+        """ + MediaLeadFactMapper.CONVERSION_AMOUNT_CONDITION + """
            AND o.effective_at &lt;= #{now})
         """;
 

@@ -11,7 +11,7 @@ export type PendingAttachment = { uid: string; file: File }
 export type AttachmentItem = { key: string; name: string; type?: string; size?: number; uploaded?: UploadedAttachment; pending?: PendingAttachment }
 
 export const MAX_ATTACHMENT_COUNT = 20
-export const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024
+export const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024
 
 /** Positioning attachments accept documents, images, audio and video in one field. */
 export const POSITIONING_ATTACHMENT_ACCEPT = [
@@ -101,7 +101,7 @@ export default function PositioningAttachmentPicker({ items, onChange, accept = 
   }
   const beforeUpload: UploadProps['beforeUpload'] = file => {
     setError('')
-    if (!file.size || file.size > MAX_ATTACHMENT_SIZE) { setError(`${file.name} 大小须为 1 字节至 20 MB`); return Upload.LIST_IGNORE }
+    if (!file.size || file.size > MAX_ATTACHMENT_SIZE) { setError(`${file.name} 大小须为 1 字节至 100 MB`); return Upload.LIST_IGNORE }
     if (!isAllowed(file)) { setError(`${file.name} 不是支持的格式，请上传文档、图片、音频或视频`); return Upload.LIST_IGNORE }
     if (shown.length >= maxCount) { setError(`最多上传 ${maxCount} 个附件`); return Upload.LIST_IGNORE }
     const next: AttachmentItem = { key: `pending-${file.uid}`, name: file.name, type: file.type, size: file.size, pending: { uid: file.uid, file } }

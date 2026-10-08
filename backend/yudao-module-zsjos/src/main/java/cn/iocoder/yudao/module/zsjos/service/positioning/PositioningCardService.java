@@ -73,7 +73,7 @@ public class PositioningCardService {
         // 与定位访谈同一白名单：文档、图片、音频、视频，且扩展名须与真实内容一致。
         String detected = PositioningAttachmentTypes.detectAllowed(name, bytes);
         if (fields.stream().noneMatch(f -> f.getKey().equals(fieldKey) && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))
-                || bytes.length == 0 || bytes.length > 20 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+                || bytes.length == 0 || bytes.length > 100 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
         var file = positioningFileApi.createFileInfo(bytes, PositioningAttachmentTypes.storageName(name),
                 fileDirectory(id) + fieldKey, detected);
         return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(file.getId(), 300));

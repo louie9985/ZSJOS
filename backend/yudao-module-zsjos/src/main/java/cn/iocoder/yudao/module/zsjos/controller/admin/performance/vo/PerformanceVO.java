@@ -42,6 +42,9 @@ public final class PerformanceVO {
    long lateCompleted,long onTime,long dueCount,long unknown) {}
  public record LeadReport(LocalDateTime asOf,LocalDate start,LocalDate end,Map<String,Long> workload,List<Group> categories,List<Group> stages,
    List<CalendarDay> calendar,List<Group> funnel,List<Group> followUp,List<CategoryPoint> categoryTrend) {}
+ public record LeadWorkload(LocalDateTime asOf,LocalDate start,LocalDate end,Map<String,Long> workload,List<Group> categories,List<Group> stages,
+   List<Group> followUp,List<CategoryPoint> categoryTrend) {}
+ public record LeadCalendar(LocalDateTime asOf,LocalDate start,LocalDate end,List<CalendarDay> calendar,List<Group> funnel) {}
  public record CategoryPoint(String bucket,String category,long count) {}
  public record MissingTarget(String scopeType,Long scopeId,String name,String department,LocalDate periodStart,String reason) {}
  public record Detail(Long id,String number,String kind,String label,LocalDateTime occurredAt,BigDecimal amount,String state,
@@ -63,7 +66,7 @@ public final class PerformanceVO {
   @NotBlank @Size(max=500) private String reason;
   private Integer version;
  }
- @Data public static class TargetBatch { @NotEmpty @Size(max=200) @Valid private List<TargetEdit> items; }
+ @Data public static class TargetBatch { @NotEmpty @Size(max=200) private List<@Valid TargetEdit> items; }
  @Data public static class OrgEdit {
   @NotNull private Long deptId; @NotNull private Long centerId;
   @NotNull @Pattern(regexp="DEPT|CENTER") private String kind;

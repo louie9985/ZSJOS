@@ -44,12 +44,13 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 public class NoticeServiceImpl implements NoticeService {
     private static final int MAX_TITLE_LENGTH = 50;
     private static final String COPY_TITLE_SUFFIX = "（副本）";
-    private static final long MAX_ATTACHMENT_SIZE = 20L * 1024 * 1024;
+    private static final long MAX_ATTACHMENT_SIZE = 100L * 1024 * 1024;
     private static final int DOWNLOAD_URL_TTL_SECONDS = 600;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip");
 
     @Resource private NoticeMapper noticeMapper;
+    @Resource private NoticeShareMapper noticeShareMapper;
     @Resource private NoticeAttachmentMapper attachmentMapper;
     @Resource private NoticeReadMapper readMapper;
     @Resource private NoticeReadStatisticsMapper statisticsMapper;
@@ -66,6 +67,8 @@ public class NoticeServiceImpl implements NoticeService {
     public Long createNotice(NoticeSaveReqVO reqVO, Long userId) {
         NoticeDO notice = BeanUtils.toBean(reqVO, NoticeDO.class);
         applyAudience(notice, reqVO);
+        applySource(notice, reqVO.getSourceDeptId(), userId);
+        notice.setAudienceSummary(describeAudience(notice));
         notice.setContent(cleanContent(reqVO.getContent()));
         notice.setStatus(CommonStatusEnum.ENABLE.getStatus());
         notice.setPublishStatus(NoticePublishStatusEnum.DRAFT.getStatus());
@@ -83,6 +86,8 @@ public class NoticeServiceImpl implements NoticeService {
                 .map(NoticeAttachmentDO::getInfraFileId).collect(Collectors.toSet());
         NoticeDO update = BeanUtils.toBean(reqVO, NoticeDO.class);
         applyAudience(update, reqVO);
+        applySource(update, reqVO.getSourceDeptId() == null ? existing.getSourceDeptId() : reqVO.getSourceDeptId(), userId);
+        update.setAudienceSummary(describeAudience(update));
         update.setContent(cleanContent(reqVO.getContent()));
         update.setPublishStatus(null);
         update.setStatus(CommonStatusEnum.ENABLE.getStatus());
@@ -135,6 +140,11 @@ public class NoticeServiceImpl implements NoticeService {
                 userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
         Set<Long> permitted = permissionService.getEnabledUserIdsByPermission("system:notice:read");
         NoticeRecipientOptionsRespVO result = new NoticeRecipientOptionsRespVO();
+        Long actorId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        AdminUserDO actor = actorId == null ? null : userService.getUser(actorId);
+        if (actor != null && depts.stream().anyMatch(dept -> Objects.equals(dept.getId(), actor.getDeptId()))) {
+            result.setDefaultSourceDeptId(actor.getDeptId());
+        }
         result.setDepartments(depts.stream().map(dept -> {
             NoticeRecipientDeptVO vo = new NoticeRecipientDeptVO();
             vo.setId(dept.getId()); vo.setParentId(dept.getParentId()); vo.setName(dept.getName()); return vo;
@@ -165,12 +175,20 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
-    public void publishNotice(Long id) {
+    public void publishNotice(Long id, Long userId) {
         NoticeDO notice = lockNotice(id);
         requireDraft(notice);
         freezeRecipients(notice);
         NoticeDO update = new NoticeDO();
         update.setId(id);
+        userService.validateUserList(List.of(userId));
+        AdminUserDO publisher = userService.getUser(userId);
+        if (publisher == null) throw exception(USER_NOT_EXISTS);
+        applySource(update, notice.getSourceDeptId(), userId);
+        if (update.getSourceDeptId() == null) throw exception(DEPT_NOT_FOUND);
+        update.setPublisherId(userId);
+        update.setPublisherName(publisher.getNickname());
+        update.setAudienceSummary(describeAudience(notice));
         update.setPublishStatus(NoticePublishStatusEnum.PUBLISHED.getStatus());
         update.setRecipientSnapshotComplete(true);
         update.setPublishTime(LocalDateTime.now());
@@ -191,6 +209,7 @@ public class NoticeServiceImpl implements NoticeService {
         update.setPublishStatus(NoticePublishStatusEnum.OFFLINE.getStatus());
         update.setOfflineTime(LocalDateTime.now());
         noticeMapper.updateById(update);
+        noticeShareMapper.closeActive(id, cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
         announceChange(id);
     }
 
@@ -202,6 +221,9 @@ public class NoticeServiceImpl implements NoticeService {
         copy.setTitle(StrUtil.subWithLength(source.getTitle(), 0,
                 MAX_TITLE_LENGTH - COPY_TITLE_SUFFIX.length()) + COPY_TITLE_SUFFIX);
         copy.setType(source.getType());
+        copy.setSourceDeptId(source.getSourceDeptId());
+        copy.setSourceDeptName(source.getSourceDeptName());
+        copy.setAudienceSummary(source.getAudienceSummary());
         copy.setContent(source.getContent());
         copy.setAudienceType(source.getAudienceType());
         copy.setTargetDeptIds(source.getTargetDeptIds());
@@ -395,6 +417,33 @@ public class NoticeServiceImpl implements NoticeService {
         NoticeDO notice = id == null ? null : noticeMapper.selectByIdForUpdate(id);
         if (notice == null) throw exception(NOTICE_NOT_FOUND);
         return notice;
+    }
+
+    private void applySource(NoticeDO notice, Long deptId, Long userId) {
+        if (deptId == null && userId != null) {
+            AdminUserDO actor = userService.getUser(userId);
+            deptId = actor == null ? null : actor.getDeptId();
+        }
+        if (deptId == null) return; // Legacy drafts may lack a source; publication requires one.
+        deptService.validateDeptList(List.of(deptId));
+        DeptDO dept = deptService.getDept(deptId);
+        if (dept == null) throw exception(DEPT_NOT_FOUND);
+        notice.setSourceDeptId(deptId);
+        notice.setSourceDeptName(dept.getName());
+    }
+
+    private String describeAudience(NoticeDO notice) {
+        if (!"TARGET".equals(notice.getAudienceType())) return "全体员工";
+        List<Long> ids = parseIds(notice.getTargetDeptIds());
+        Map<Long, DeptDO> departments = ids.isEmpty() ? Map.of() : deptService.getDeptMap(ids);
+        List<String> parts = new ArrayList<>();
+        for (Long id : ids) {
+            DeptDO dept = departments.get(id);
+            parts.add(dept == null ? "部门已不可用" : dept.getName() + "（含子部门）");
+        }
+        int users = parseIds(notice.getTargetUserIds()).size();
+        if (users > 0) parts.add("指定用户 " + users + " 人");
+        return String.join("、", parts);
     }
 
     private void applyAudience(NoticeDO notice, NoticeSaveReqVO req) {

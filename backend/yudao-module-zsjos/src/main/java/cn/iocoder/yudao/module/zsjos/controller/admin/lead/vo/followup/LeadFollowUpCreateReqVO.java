@@ -19,6 +19,6 @@ public class LeadFollowUpCreateReqVO {
     @NotBlank @Size(max = 2000) private String remark;
     // Required for pre-deal follow-up; the service validates against the locked Lead state.
     private LocalDateTime nextFollowUpAt;
-    @Valid @Size(max = 9) private List<LeadAttachmentReqVO> images = new ArrayList<>();
+    @Size(max = 9) private List<@Valid LeadAttachmentReqVO> images = new ArrayList<>();
     @NotBlank @Size(max = 64) private String idempotencyKey;
 }

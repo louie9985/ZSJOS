@@ -38,7 +38,7 @@
 - 必填：`rangeStart`、`rangeEnd`、`pageNo`、`pageSize`。
 - 可选：`keyword`、`currentStatusValue`、`stageValue`、`directorUserId`、`operatorUserId`。
 
-查询使用闭区间相交规则 `startDate <= rangeEnd && endDate >= rangeStart`。普通查询由服务端统一应用账号对象范围：保留 `zsjos:media-calendar:query-all` 作为账号日历全量兜底；否则先按 System 部门数据权限解析当前用户及其可见下属，再匹配账号的所属编导或运营。主管可见范围来自部门数据权限，不靠用户名、角色名或前端推断。编导/运营筛选不扩大可见范围。迁移将原 `zsjos:media-account:query-all` 关系同时继承为日历页面查询和查看全部，避免只有范围按钮而无法访问页面。
+查询使用闭区间相交规则 `startDate <= rangeEnd && endDate >= rangeStart`。普通查询由服务端统一应用账号对象范围：本人编导或运营关系为基础；`zsjos:media-calendar:query-managed` 允许叠加 System 有界部门范围，`zsjos:media-calendar:query-all` 或 System 当前租户全量读取能力允许查看全部。编导/运营筛选不扩大可见范围；角色授权仅由管理员通过 System 角色管理配置，迁移不继承或补发授权。
 
 响应包含 `list`、`total` 和 `unscheduledCount`。`list` 每个账号只返回当前快照区间一次；日期不完整的账号不进入 `list`，但计入当前其他筛选下的 `unscheduledCount`。
 
@@ -70,3 +70,7 @@
 ## 已移除的旧阶段流转
 
 `POST /zsjos/media-account/{id}/advance-stage` 和 `rollback-stage` 已从运行时 Controller 和 Service 移除，旧客户端请求按标准路由不存在处理（404）。阶段不再通过推进或回退命令改变，只能在上述状态维护接口中作为普通字典字段自由选择。原有的 S0-S6 阶段日志查询接口 `legacy-stage-history` 已一并移除，阶段历史由 `maintenance-history` 承载。
+
+## 跨月份搜索
+
+工作台的账号日历、我的日历分别新增 `/zsjos/media-account/calendar/search`、`/zsjos/personal-calendar/search`，复用各自的数据范围。账号保留月内筛选，跨月定位时清除月内关键词以显示目标，其他条件保留。双端原有接口契约不变。详见[日历跨月份搜索](calendar-search.md)。

@@ -153,6 +153,8 @@ public class FeedbackServiceImpl implements FeedbackService {
     private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource
     private PartnerMapper partnerMapper;
+    @Resource
+    private FeedbackApprovalService approvalService;
 
     @Override
     public FeedbackRespVO.Portal getPortal(Long userId) {
@@ -161,8 +163,8 @@ public class FeedbackServiceImpl implements FeedbackService {
                 portalEntry(TYPE_REQUIREMENT, "提交需求", "提交软件系统和网站建设需求"),
                 portalEntry(TYPE_BUG, "BUG 反馈", "反馈系统使用中遇到的问题"),
                 portalEntry(TYPE_SUPPORT, "技术支持", "申请账号、软件、设备或网络支持")));
-        portal.setRecent(feedbackMapper.selectRecentBySubmitter(userId, 5).stream()
-                .map(row -> toCard(row, userId, false)).toList());
+        portal.setRecent(approvalService.enrich(feedbackMapper.selectRecentBySubmitter(userId, 5).stream()
+                .map(row -> toCard(row, userId, false)).toList()));
         return portal;
     }
 
@@ -411,13 +413,13 @@ public class FeedbackServiceImpl implements FeedbackService {
         PageResult<FeedbackDO> page = explicit ? feedbackMapper.selectReadPage(request, subject == null ? null : SUBJECT_ADMIN, subject)
                 : feedbackMapper.selectMyPage(request, userId);
         boolean readOnly = explicit && !"SELF".equals(request.getReadScope());
-        return new PageResult<>(page.getList().stream().map(row -> {
+        return new PageResult<>(approvalService.enrich(page.getList().stream().map(row -> {
             FeedbackRespVO result = toCard(row, userId, false);
             if (readOnly || !SUBJECT_ADMIN.equals(row.getSubmitterSubjectType())) {
                 suppressOwnActions(result);
             }
             return result;
-        }).toList(),
+        }).toList()),
                 page.getTotal());
     }
 
@@ -454,12 +456,25 @@ public class FeedbackServiceImpl implements FeedbackService {
     @ZsjosPermission(bizType = "feedback", bizId = "#id",
             action = FeedbackObjectPermissionProvider.ACTION_READ_APPROVER)
     public FeedbackRespVO getForApprover(Long id, Long userId) {
-        FeedbackRespVO result = toDetail(require(id), userId, false);
+        var row = require(id);
+        var approval = approvalService.getApprover(id, null, userId);
+        var round = roundMapper.selectByFeedbackId(id).stream()
+                .filter(item -> Objects.equals(item.getRoundNo(), approval.getRoundNo())).findFirst()
+                .orElseThrow(() -> exception(FEEDBACK_NOT_EXISTS));
+        // An old-round approver must not receive the newest submission or its conversations/results.
+        FeedbackRespVO result = toCard(row, userId, false);
+        result.setTitle("第 " + round.getRoundNo() + " 轮需求审批");
+        result.setFields(approval.getFields()); result.setValues(approval.getValues());
+        result.setApprovalRoundNo(round.getRoundNo()); result.setProcessInstanceId(round.getProcessInstanceId());
+        result.setStatus(round.getStatus()); result.setRejectReason(round.getRejectReason());
+        result.setCreateTime(round.getSubmittedAt()); result.setLastActivityAt(round.getSubmittedAt());
+        result.setLatestReplySummary(null); result.setAssigneeUserId(null); result.setAssigneeName(null);
         // 审批人看的是别人的单子，一切"以本人身份操作"的入口都要收起来：
         // 「修改并重提」「回复」在后端都走 read-own/reply-own，放出去只会点了报错。
         result.setCanResubmit(false);
         result.setCanReply(false);
         result.setCanSubmitSurvey(false);
+        result.setUnread(false);
         return result;
     }
 
@@ -550,7 +565,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     public PageResult<FeedbackRespVO> getAdminPage(String type, FeedbackPageReqVO request, Long userId) {
         requireSubmissionType(type);
         PageResult<FeedbackDO> page = feedbackMapper.selectAdminPage(request, type);
-        return new PageResult<>(page.getList().stream().map(row -> toCard(row, userId, true)).toList(),
+        return new PageResult<>(approvalService.enrich(page.getList().stream().map(row -> toCard(row, userId, true)).toList()),
                 page.getTotal());
     }
 
@@ -958,6 +973,8 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private FeedbackRespVO toCard(FeedbackDO row, Long userId, boolean admin) {
         FeedbackRespVO result = new FeedbackRespVO();
+        result.setProcessInstanceId(row.getProcessInstanceId());
+        result.setApprovalRoundNo(row.getApprovalRoundNo());
         result.setId(row.getId());
         result.setFeedbackType(row.getFeedbackType());
         result.setFeedbackNo(row.getFeedbackNo());

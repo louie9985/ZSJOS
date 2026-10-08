@@ -113,3 +113,9 @@
 .exam-multiDay-bar { border-inline-width: 3px; }
 .exam-calendar-page .calendar-side-navigation-content { overflow: visible; }
 .exam-calendar-page .calendar-side-navigation { flex: 0 0 auto; }
+
+@media (max-width: 768px) {
+  .exam-calendar-page .calendar-side-navigation-content { overflow-x: auto; }
+  .exam-month { min-width: 700px; }
+  .exam-calendar-toolbar > .ant-space { flex-wrap: wrap; }
+}

@@ -28,6 +28,7 @@ public class MediaStudentDetailRespVO {
         private Long id;
         private String accountNo;
         private String nickname;
+        private String homepageUrl;
         private String platformLabel;
         private String platformValue;
         private String stage;

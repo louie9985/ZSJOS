@@ -149,3 +149,7 @@ running processes before diagnosing a local startup issue.
 - Existing system or domain behavior: its owning backend module.
 - New Zhongshijian-specific business capability: `yudao-module-zsjos`.
 - Cross-surface behavior: update each affected contract consumer, but do not duplicate business truth between clients.
+
+## 公告公开阅读
+
+System 公告新增独立分享服务；Admin 与 Workbench 管理入口共用服务端接口和权限，H5 的 /notice/share 匿名路由负责外部阅读。后端 /public-api/system/notice-share/** 通过专用分享令牌授权，不使用 ADMIN 或 PARTNER 登录身份。分享地址由 system.notice-share.public-base-url（默认 ZSJOS_PUBLIC_H5_BASE_URL）生成，不取浏览器管理端域名。PMS 仅为设计参考，没有模块调用或依赖。部署与资源可达性要求见 [公告分享部署](../operations/notice-public-share-deployment.md)。

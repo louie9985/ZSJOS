@@ -1,0 +1,14 @@
+.calendar-search-content { width: 100%; }
+.calendar-search-content > .ant-space-item { width: 100%; }
+.calendar-search-filters { display: flex; gap: var(--crm-gap); flex-wrap: wrap; }
+.calendar-search-filters .ant-picker { min-width: 0; flex: 1 1 260px; }
+.calendar-search-filters .ant-select { min-width: 150px; }
+.calendar-search-drawer .calendar-search-result { gap: var(--crm-gap); align-items: flex-start; text-align: left; }
+.calendar-search-result > div { min-width: 0; overflow-wrap: anywhere; }
+.calendar-search-result > button { flex-shrink: 0; }
+.calendar-search-summary { margin-top: var(--crm-sp-2); white-space: pre-wrap; }
+[data-calendar-located="true"] { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; scroll-margin: var(--crm-sp-4); }
+@media (max-width: 768px) {
+  .calendar-search-drawer .calendar-search-result { flex-direction: column; align-items: stretch; }
+  .calendar-search-filters .ant-select { width: 100%; }
+}

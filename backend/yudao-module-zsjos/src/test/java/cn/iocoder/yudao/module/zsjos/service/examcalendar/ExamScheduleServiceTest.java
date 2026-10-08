@@ -26,6 +26,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ExamScheduleServiceTest {
+    private static final LocalDate BUSINESS_TODAY = LocalDate.of(2026, 10, 8);
+
+    @org.junit.jupiter.api.BeforeEach void fixBusinessClock() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "clock", java.time.Clock.fixed(
+                java.time.Instant.parse("2026-10-08T01:00:00Z"), java.time.ZoneId.of("Asia/Shanghai")));
+    }
     @org.junit.jupiter.api.BeforeAll static void initializeTableMetadata() {
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
                 new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "exam-test"), ExamScheduleDO.class);
@@ -160,7 +166,7 @@ class ExamScheduleServiceTest {
     @Test
     void rejectsPublishingOrUpdatingExactSchedulesIntoHistory() {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
-        LocalDate yesterday = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).minusDays(1);
+        LocalDate yesterday = BUSINESS_TODAY.minusDays(1);
         when(mapper.selectForUpdate(9L)).thenReturn(new ExamScheduleDO().setId(9L).setScheduleType("EXACT")
                 .setExactDate(yesterday).setRecordStatus("DRAFT"));
         assertEquals(1_900_018_007,
@@ -170,7 +176,7 @@ class ExamScheduleServiceTest {
         update.setExactDate(yesterday);
         when(mapper.selectForUpdate(10L)).thenReturn(new ExamScheduleDO().setId(10L).setScheduleType("EXACT")
                 .setExactDate(yesterday.plusDays(2)).setRecordStatus("DRAFT"));
-        assertEquals(1_900_018_007,
+        assertEquals(1_900_018_014,
                 assertThrows(ServiceException.class, () -> service.update(10L, update, 20L)).getCode());
         verify(mapper, never()).updateById(any(ExamScheduleDO.class));
     }
@@ -235,14 +241,14 @@ class ExamScheduleServiceTest {
         when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
         var req = multiDayReq(); req.setScheduleType("ROUGH");
         assertEquals(1_900_018_002, assertThrows(ServiceException.class, () -> service.create(req,20L)).getCode());
-        var today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var today = BUSINESS_TODAY;
         var row = new ExamScheduleDO().setId(9L).setScheduleType("MULTI_DAY").setStartDate(today.minusDays(3))
                 .setEndDate(today.minusDays(1)).setRecordStatus("DRAFT").setCalendarVersion(1);
         when(mapper.selectForUpdate(9L)).thenReturn(row);
         when(mapper.selectById(9L)).thenReturn(row);
         assertThrows(ServiceException.class, () -> service.publish(9L,20L));
         assertThrows(ServiceException.class, () -> service.previewTransition(9L,"PUBLISHED",20L));
-        assertThrows(ServiceException.class, () -> service.update(9L,multiDayReq(),20L));
+        service.update(9L,multiDayReq(),20L);
         row.setEndDate(today.plusDays(2));
         service.publish(9L,20L);
         assertEquals("PUBLISHED",row.getRecordStatus());
@@ -255,6 +261,48 @@ class ExamScheduleServiceTest {
         assertTrue(snapshot.getDetailsJson().contains("startDate"));
         assertFalse(snapshot.getDetailsJson().contains("rough"));
         assertEquals("2026-10-01 - 2026-10-08",snapshot.getTimeSnapshot());
+    }
+
+    @Test void rejectsPastCreationBeforeAnyWrite() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var yesterday = BUSINESS_TODAY.minusDays(1);
+        for (var req : List.of(exactReq(), multiDayReq())) {
+            if ("EXACT".equals(req.getScheduleType())) req.setExactDate(yesterday);
+            else { req.setStartDate(yesterday.minusDays(2)); req.setEndDate(yesterday); }
+            assertEquals(1_900_018_014, assertThrows(ServiceException.class,
+                    () -> service.create(req, 20L)).getCode());
+        }
+        verifyNoInteractions(mapper, notificationSnapshots);
+    }
+
+    @Test void expiredDraftCanBeRescheduledButCannotRemainExpired() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var today = BUSINESS_TODAY;
+        var row = new ExamScheduleDO().setId(9L).setScheduleType("EXACT")
+                .setExactDate(today.minusDays(1)).setRecordStatus("DRAFT").setCalendarVersion(1);
+        when(mapper.selectForUpdate(9L)).thenReturn(row);
+        var req = exactReq(); req.setExactDate(today.minusDays(1));
+        assertEquals(1_900_018_014, assertThrows(ServiceException.class,
+                () -> service.update(9L, req, 20L)).getCode());
+        verifyNoInteractions(notificationSnapshots);
+        req.setExactDate(today);
+        service.update(9L, req, 20L);
+        var saved = ArgumentCaptor.forClass(ExamScheduleDO.class);
+        verify(mapper).update(saved.capture(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        assertEquals(today, saved.getValue().getExactDate());
+        assertEquals("DRAFT", saved.getValue().getRecordStatus());
+    }
+
+    @Test void createsTodayAndFutureExactAndOngoingMultiDay() {
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        var today = BUSINESS_TODAY;
+        for (int offset : List.of(0, 1)) {
+            var exact = exactReq(); exact.setExactDate(today.plusDays(offset));
+            service.create(exact, 20L);
+            var multi = multiDayReq(); multi.setStartDate(today.minusDays(2)); multi.setEndDate(today.plusDays(offset));
+            service.create(multi, 20L);
+        }
+        verify(mapper, times(4)).insert(any(ExamScheduleDO.class));
     }
 
     private static ExamScheduleSaveReqVO exactReq() {

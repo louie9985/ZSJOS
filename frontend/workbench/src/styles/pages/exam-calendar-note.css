@@ -1,0 +1,31 @@
+.exam-note-layout { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--crm-gap); align-items: start; min-width: 0; }
+.exam-note-calendar { grid-column: span 9; min-width: 0; }
+.exam-note-panel { grid-column: span 3; min-width: 0; padding: var(--crm-sp-4); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.exam-note-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--crm-sp-2); margin-bottom: var(--crm-sp-4); }
+.exam-note-heading h5 { margin: 0; }
+.exam-note-actions { display: flex; align-items: center; gap: var(--crm-sp-1); flex-shrink: 0; margin-left: auto; }
+.exam-note-actions .ant-btn { height: 32px; border-radius: var(--crm-radius-md); box-shadow: none; }
+.exam-note-actions .exam-note-expand { width: 32px; }
+.exam-note-actions .exam-note-expand:not(:disabled) { color: var(--crm-text-secondary); }
+.exam-note-actions .exam-note-edit:not(:disabled) { color: var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.exam-note-actions .ant-btn:not(:disabled):hover { color: var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.exam-note-actions .ant-btn:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.exam-note-rich-text { line-height: 1.8; overflow-wrap: anywhere; min-width: 0; }
+.exam-note-rich-text img { display: block; max-width: 100%; height: auto; margin-block: var(--crm-sp-3); }
+.exam-note-rich-text a { color: var(--crm-color-primary); }
+.exam-note-rich-text p { white-space: pre-wrap; }
+.exam-note-rich-text ul, .exam-note-rich-text ol { padding-inline-start: 1.5em; }
+.exam-note-table-scroll { max-width: 100%; overflow-x: auto; }
+.exam-note-rich-text table { border-collapse: collapse; min-width: 100%; }
+.exam-note-rich-text td, .exam-note-rich-text th { border: 1px solid var(--crm-border); padding: var(--crm-sp-2); min-width: 80px; }
+.exam-note-modal .ant-modal-body { max-height: 70vh; overflow-y: auto; }
+.exam-note-editor { --w-e-textarea-bg-color: var(--crm-bg-container); --w-e-textarea-color: var(--crm-text); --w-e-toolbar-bg-color: var(--crm-bg-container); --w-e-toolbar-color: var(--crm-text); margin-block: var(--crm-sp-3); }
+.exam-note-editor .w-e-bar { flex-wrap: wrap; }
+@media (max-width: 768px) {
+  .exam-note-calendar, .exam-note-panel { grid-column: 1 / -1; }
+  .exam-note-panel { grid-row: 1; }
+  .exam-note-actions .ant-btn { min-height: 44px; }
+  .exam-note-actions .exam-note-expand { width: 44px; }
+  .exam-note-modal { top: var(--crm-sp-3); padding-bottom: var(--crm-sp-3); }
+  .exam-note-modal .ant-modal-body { max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px); }
+}

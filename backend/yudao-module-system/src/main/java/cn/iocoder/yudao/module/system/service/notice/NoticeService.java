@@ -17,7 +17,7 @@ public interface NoticeService {
     NoticeRespVO getNotice(Long id);
     NoticeRecipientOptionsRespVO getRecipientOptions();
     NoticeAttachmentVO uploadAttachment(MultipartFile file, Long userId) throws Exception;
-    void publishNotice(Long id);
+    void publishNotice(Long id, Long userId);
     void offlineNotice(Long id);
     Long copyNotice(Long id);
     PageResult<NoticeMyRespVO> getMyNoticePage(NoticeMyPageReqVO reqVO, Long userId);

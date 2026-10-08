@@ -22,7 +22,7 @@ public class MediaScreenProperties {
 
     private boolean enabled = false;
     private List<String> trustedProxies = new ArrayList<>();
-    @Valid private List<Client> clients = new ArrayList<>();
+    private List<@Valid Client> clients = new ArrayList<>();
     @Valid private Cache cache = new Cache();
     @Valid private Limits limits = new Limits();
     @Valid private NewMedia newMedia = new NewMedia();

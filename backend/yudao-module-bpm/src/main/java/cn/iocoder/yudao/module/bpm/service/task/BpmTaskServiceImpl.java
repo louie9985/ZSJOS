@@ -2001,7 +2001,14 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                     // 发送消息
                     Long startAdminUserId = cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO
                             .getAdminUserId(processInstance.getStartUserId());
-                    AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
+                    AdminUserRespDTO startUser = null;
+                    if (startAdminUserId != null) {
+                        try { startUser = adminUserApi.getUser(startAdminUserId); }
+                        catch (RuntimeException ex) {
+                            // Display-name lookup must not prevent notification to the assigned approver.
+                            log.warn("[processTaskAssigned][taskId({}) initiator lookup unavailable: {}]", task.getId(), ex.getClass().getSimpleName());
+                        }
+                    }
                     messageService.sendMessageWhenTaskAssigned(BpmTaskConvert.INSTANCE.convert(processInstance, startUser, task));
                 });
             }

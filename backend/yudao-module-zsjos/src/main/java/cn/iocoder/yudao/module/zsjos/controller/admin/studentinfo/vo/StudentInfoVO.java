@@ -36,7 +36,7 @@ public final class StudentInfoVO {
     @Data public static class Save {
         private Long id;
         @NotNull @Min(0) private Integer revision;
-        @NotNull @Size(min=16,max=16) @Valid private List<Field> fields;
+        @NotNull @Size(min=16,max=16) private List<@Valid Field> fields;
     }
     @Data public static class Publish {
         @NotNull private Long id;

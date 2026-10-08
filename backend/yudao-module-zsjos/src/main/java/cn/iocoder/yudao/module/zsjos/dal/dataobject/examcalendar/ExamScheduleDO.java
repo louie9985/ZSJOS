@@ -18,6 +18,7 @@ public class ExamScheduleDO extends TenantBaseDO {
     @TableId private Long id;
     private String scheduleType;
     private String scheduleName;
+    private String backgroundColor;
     private LocalDate exactDate;
     private LocalDate startDate;
     private LocalDate endDate;
@@ -31,6 +32,7 @@ public class ExamScheduleDO extends TenantBaseDO {
     private String categoryPathSnapshot;
     private String recordStatus;
     private String remark;
+    private String attachmentIdsJson;
     private LocalDateTime publishedAt;
     private Integer calendarVersion;
     private LocalDateTime revokedAt;

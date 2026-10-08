@@ -44,6 +44,26 @@ class LeadSubmissionIdentityServiceTest {
     }
 
     @Test
+    void educationOwnerEligibilityChecksAccountDepartmentAndPersonnel() {
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(null));
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
+        AdminUserRespDTO owner = user(20L, 10L, Set.of());
+        owner.setStatus(CommonStatusEnum.DISABLE.getStatus());
+        when(adminUserApi.getUser(20L)).thenReturn(owner);
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
+        owner.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(CommonStatusEnum.DISABLE.getStatus());
+        when(deptApi.getDept(10L)).thenReturn(dept);
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
+        dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
+        when(personnelStateService.isEnabled(20L)).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertTrue(service.isEligibleEducationOwner(20L));
+        assertDoesNotThrow(() -> service.requireEducationSubmitter(20L));
+    }
+
+    @Test
     void ordinarySubmissionAllowsSelfScopedEnabledInternalUserWithoutPost() {
         allowEnabledPersonnel(1L);
         AdminUserRespDTO user = user(1L, 10L, Set.of());

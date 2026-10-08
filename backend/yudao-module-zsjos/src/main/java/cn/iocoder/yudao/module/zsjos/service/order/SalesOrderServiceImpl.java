@@ -75,7 +75,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.dao.DuplicateKeyException;
-import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -91,9 +90,12 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class SalesOrderServiceImpl implements SalesOrderService {
     private static final Set<String> VOUCHER_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
-    private static final long MAX_VOUCHER_SIZE = 10L * 1024 * 1024;
+    private static final long MAX_VOUCHER_SIZE = 100L * 1024 * 1024;
     private static final String LEGACY_VOUCHER_ORIGIN = "https://crm.zhongshijian.top";
 
+    @Resource private RepurchaseDuplicateGuard repurchaseDuplicateGuard;
+    @Resource private RepurchaseCustomerService repurchaseCustomers;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService submissionIdentityService;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderItemMapper itemMapper;
     @Resource private SalesOrderApprovalRoundMapper roundMapper;
@@ -176,7 +178,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "enter-deal")
     public Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
         LeadDO lead = requireRepurchaseLead(leadId, userId);
-        return createRepurchase(lead.getPersonId(), null, lead.getOwnerUserId(), userId,
+        return createRepurchase(lead.getPersonId(), null, userId, userId,
                 reqVO.getRepurchaseReason(), reqVO.getOrder(), true, SUBMITTER_CENTER_SALES, lead.getOwnerIdentity());
     }
 
@@ -207,6 +209,33 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         return createRepurchase(personId, null, userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), true,
                 SUBMITTER_CENTER_STUDENT_DELIVERY);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "repurchase-customer", bizId = "#personId", action = "create")
+    public Long createMatchedRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO req) {
+        repurchaseCustomers.requireActor(userId);
+        repurchaseCustomers.requireIdentity(personId, req);
+        if (!Objects.equals(StrUtil.trim(req.getCustomerName()), StrUtil.trim(req.getOrder().getStudentName()))
+                || !Objects.equals(StrUtil.trimToNull(req.getCustomerMobile()), StrUtil.trimToNull(req.getOrder().getStudentMobile()))
+                || !Objects.equals(StrUtil.trimToNull(req.getCustomerWechatId()), StrUtil.trimToNull(req.getOrder().getStudentWechatId())))
+            throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        if (req.getOrder().getPurchaseIntentId() != null) {
+            PurchaseIntentDO draft = purchaseIntentMapper.selectByIdForUpdate(req.getOrder().getPurchaseIntentId());
+            if (draft == null || !Objects.equals(draft.getPersonId(), personId)
+                    || !Objects.equals(draft.getInitiatorUserId(), userId)
+                    || !"customer_repurchase".equals(draft.getPurchaseType())) throw exception(PURCHASE_INTENT_PERMISSION_DENIED);
+        }
+        String identity;
+        try { submissionIdentityService.requireSales(userId); identity = "sales"; }
+        catch (ServiceException ex) {
+            if (!Objects.equals(ex.getCode(), LEAD_SUBMITTER_IDENTITY_INVALID.getCode())) throw ex;
+            submissionIdentityService.requireEducationSubmitter(userId); identity = "education";
+        }
+        // The unified historical-customer entry permits purchases without a prior effective order.
+        return createRepurchase(personId, null, userId, userId, req.getRepurchaseReason(), req.getOrder(), false,
+                "education".equals(identity) ? SUBMITTER_CENTER_STUDENT_DELIVERY : SUBMITTER_CENTER_SALES, identity);
     }
 
     private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
@@ -243,6 +272,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             throw exception(SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE);
         }
         ValidatedSubmission validated = validateSubmission(submission, userId, List.of());
+        repurchaseDuplicateGuard.check(personId, submission);
         PaymentIntentDO paymentIntent = validatePurchaseIntent(submission, validated.total(), personId, null);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
@@ -418,7 +448,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<SalesOrderListItemRespVO> getManagementPage(SalesOrderMyPageReqVO reqVO, Long userId) {
+        var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.OrderListSort.create();
+        if (sorting.requested(reqVO.getSortField(), reqVO.getSortOrder())
+                && cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.order(reqVO.getSortField(), reqVO.getSortOrder()) == null) {
+            return sorting.page(reqVO.getSortField(), reqVO.getSortOrder(), reqVO.getPageNo(), reqVO.getPageSize(), (page, size) -> {
+                var batch = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(reqVO, SalesOrderMyPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(page); batch.setPageSize(size);
+                return getManagementPage(batch, userId);
+            });
+        }
+
         SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
         if (scope.isEmpty()) return PageResult.empty();
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
@@ -432,7 +473,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public CursorPageResult<SalesOrderListItemRespVO> getManagementCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId) {
+        var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.OrderListSort.create();
+        if (sorting.requested(reqVO.getSortField(), reqVO.getSortOrder())) {
+            String context = cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(java.util.Arrays.asList(
+                    cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId(), userId,
+                    reqVO.getStatus(), reqVO.getKeyword(), reqVO.getAdvancedFilter()));
+            return sorting.cursor(reqVO.getSortField(), reqVO.getSortOrder(), reqVO.getCursor(), context, reqVO.getLimit(), (page, size) -> {
+                var batch = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(reqVO, SalesOrderMyPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(page); batch.setPageSize(size);
+                return getManagementPage(batch, userId);
+            });
+        }
+
         SalesOrderManagementScope scope = permissionService.resolveManagementScope(userId);
         if (scope.isEmpty()) return new CursorPageResult<>(List.of(), null, false);
         List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
@@ -1326,8 +1380,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         List<VoucherRef> vouchers = validateVouchers(req.getPaymentVouchers(), userId);
         if (vouchers.isEmpty()) throw exception(SALES_ORDER_VOUCHER_REQUIRED);
-        validateGifts(req);
-        return new ValidatedSubmission(items, vouchers, total.setScale(2), labels);
+        List<SalesOrderGiftSnapshot> gifts = validateGifts(req,
+                previousOrder == null ? null : previousSnapshot.project(previousOrder).getGiftItems());
+        return new ValidatedSubmission(items, vouchers, total.setScale(2), labels, gifts);
     }
 
     private String validateSelection(String type, String value, String previousValue, String previousLabel) {
@@ -1341,24 +1396,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return label;
     }
 
-    private void validateGifts(SalesOrderSubmitReqVO req) {
-        if (req.getGiftItems() == null || req.getGiftItems().isEmpty()) return;
-        LinkedHashSet<String> codes = new LinkedHashSet<>(req.getGiftItems());
-        if (codes.stream().anyMatch(StrUtil::isBlank)) throw new IllegalArgumentException("礼品编码无效");
-        if (StrUtil.isBlank(req.getGiftShippingAddress()) || req.getGiftShippingAddress().length() > 1000)
-            throw new IllegalArgumentException("选择礼品后邮寄地址必填且不超过1000字");
-        List<GiftConfigDO> all = giftConfigMapper.selectList(null);
-        Map<String, GiftConfigDO> byCode = all.stream().collect(java.util.stream.Collectors.toMap(GiftConfigDO::getCode, x -> x, (a,b)->a));
-        List<Map<String,Object>> snapshots = new ArrayList<>();
-        for (String code : codes) {
-            GiftConfigDO g = byCode.get(code);
-            if (g == null || !Objects.equals(g.getStatus(), 0)) throw new IllegalArgumentException("礼品不存在或已停用");
-            if (all.stream().anyMatch(x -> Objects.equals(x.getParentId(), g.getId()))) throw new IllegalArgumentException("只能选择叶子礼品");
-            List<String> path = new ArrayList<>(); GiftConfigDO cur = g; Set<Long> seen = new HashSet<>();
-            while (cur != null && cur.getId()!=null && seen.add(cur.getId())) { path.add(cur.getName()); Long pid=cur.getParentId(); cur=pid==null||pid==0?null:all.stream().filter(x->Objects.equals(x.getId(),pid)).findFirst().orElse(null); }
-            Collections.reverse(path); snapshots.add(Map.of("code",code,"name",g.getName(),"path",path,"snapshotAt",LocalDateTime.now().toString()));
-        }
-        req.setGiftItems(snapshots.stream().map(JsonUtils::toJsonString).toList());
+    private List<SalesOrderGiftSnapshot> validateGifts(SalesOrderSubmitReqVO req, String previousJson) {
+        List<SalesOrderGiftSnapshot> gifts = SalesOrderGiftSnapshot.resolve(req.getGiftItems(), previousJson,
+                () -> giftConfigMapper.selectList(null), LocalDateTime.now());
+        if (!gifts.isEmpty() && (StrUtil.isBlank(req.getGiftShippingAddress()) || req.getGiftShippingAddress().length() > 1000))
+            throw exception(SALES_ORDER_GIFT_ADDRESS_REQUIRED);
+        return gifts;
     }
 
     private RegionSnapshot validateRegion(String provinceCode, String cityCode) {
@@ -1429,11 +1472,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setRemark(StrUtil.trim(req.getRemark())); order.setStudentSpecialRequirements(StrUtil.trim(req.getStudentSpecialRequirements()));
         order.setMaterialDeliveryContact(StrUtil.trim(req.getMaterialDeliveryContact()));
         order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
-        order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
-        order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
-        order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
-                order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
-                order.setGiftItems(req.getGiftItems() == null ? null : cn.hutool.json.JSONUtil.toJsonStr(req.getGiftItems()));
+        order.setGiftItems(JsonUtils.toJsonString(validated.gifts()));
         order.setPaymentVoucherRefs(JsonUtils.toJsonString(validated.vouchers())); order.setSubmittedAt(now);
     }
 
@@ -1542,6 +1581,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
         history.apply(result);
         result.setGiftItems(order.getGiftItems()); result.setGiftShippingAddress(order.getGiftShippingAddress());
+        try {
+            var gifts = SalesOrderGiftSnapshot.read(order.getGiftItems());
+            result.setGiftItemSnapshots(gifts);
+            result.setGiftItemCodes(gifts.stream().map(SalesOrderGiftSnapshot::code).toList());
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) {
+            result.setGiftItemsInvalid(true);
+        }
         result.setItems(itemMapper.selectListByOrderId(order.getId()).stream().map(this::convertItem).toList());
         result.setPaymentVouchers(convertVouchers(order.getPaymentVoucherRefs()));
         if (round != null) {
@@ -1736,6 +1782,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStudentSpecialRequirements(order.getStudentSpecialRequirements());
         result.setMaterialDeliveryContact(order.getMaterialDeliveryContact());
         result.setRepurchaseReason(order.getRepurchaseReason()); result.setTerminationReason(order.getTerminationReason());
+        result.setGiftItems(order.getGiftItems()); result.setGiftShippingAddress(order.getGiftShippingAddress());
+        try {
+            var gifts = SalesOrderGiftSnapshot.read(order.getGiftItems());
+            result.setGiftItemSnapshots(gifts);
+            result.setGiftItemCodes(gifts.stream().map(SalesOrderGiftSnapshot::code).toList());
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) {
+            result.setGiftItemsInvalid(true);
+        }
         result.setProductSummary(summarizeOrderItems(items));
         if (round != null) result.setApprovalRoundNo(round.getRoundNo());
         result.setStudentNatureLabelSnapshot(history.label("studentNature"));
@@ -1780,7 +1834,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return items.stream().map(item -> {
             try {
                 if (!JsonUtils.isJsonObject(item.getProductSnapshot())) throw new IllegalArgumentException("invalid product snapshot");
-                LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
+                LeadProductSnapshot snapshot = LeadProductSnapshot.readHistorical(item.getProductSnapshot());
                 if (snapshot != null) {
                     return StrUtil.blankToDefault(snapshot.name(), "历史未记录")
                             + (StrUtil.isBlank(snapshot.skuName()) ? "" : " / " + snapshot.skuName());
@@ -1865,9 +1919,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LeadProductSnapshot snapshot = null;
         try {
             if (StrUtil.isNotBlank(item.getProductSnapshot())) {
-                snapshot = JsonUtils.getObjectMapper().readValue(item.getProductSnapshot(), LeadProductSnapshot.class);
+                snapshot = LeadProductSnapshot.readHistorical(item.getProductSnapshot());
             }
-        } catch (JacksonException ignored) {
+        } catch (RuntimeException ignored) {
             // Historical snapshots are not allowed to make an otherwise valid finance export fail.
         }
         String name = snapshot == null ? "历史未记录" : snapshot.name();
@@ -1903,7 +1957,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private LeadProductSnapshot historicalProductSnapshot(SalesOrderItemDO item) {
         if (StrUtil.isBlank(item.getProductSnapshot())) return null;
         try {
-            LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
+            LeadProductSnapshot snapshot = LeadProductSnapshot.readHistorical(item.getProductSnapshot());
             if (snapshot == null) return null;
             return snapshot.specs() == null ? snapshot.withSpecs(snapshot.displaySpecs()) : snapshot;
         } catch (RuntimeException ignored) {
@@ -1951,7 +2005,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private record ValidatedItem(LeadProductSnapshot snapshot, BigDecimal actualAmount) {}
-    private record ValidatedSubmission(List<ValidatedItem> items, List<VoucherRef> vouchers, BigDecimal total, Map<String, String> labels) {}
+    private record ValidatedSubmission(List<ValidatedItem> items, List<VoucherRef> vouchers, BigDecimal total, Map<String, String> labels, List<SalesOrderGiftSnapshot> gifts) {}
     private record OrderTaskContext(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {}
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}

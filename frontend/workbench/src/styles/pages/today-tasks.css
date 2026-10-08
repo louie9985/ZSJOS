@@ -264,6 +264,12 @@
   margin: auto;
 }
 
+.home-announcement-pagination {
+  flex: 0 0 auto;
+  padding: var(--crm-sp-3) 0;
+  text-align: center;
+}
+
 /* Status hues remain independent of the user's primary colour. */
 .home-announcement-summary { margin-right: auto; color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
 .home-announcement-count,.home-announcement-unread,.home-announcement-pin { position: relative; display: inline-flex; align-items: center; gap: var(--crm-sp-2); padding: 2px var(--crm-sp-2); border: 1px solid var(--crm-color-error-border); border-radius: var(--crm-radius-sm); color: var(--crm-color-error-text); background: var(--crm-color-error-bg); font-size: var(--crm-font-sm); white-space: nowrap; isolation: isolate; }

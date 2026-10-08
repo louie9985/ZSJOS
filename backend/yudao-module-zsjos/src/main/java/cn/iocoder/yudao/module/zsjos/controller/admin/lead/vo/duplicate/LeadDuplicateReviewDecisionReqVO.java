@@ -18,6 +18,6 @@ public class LeadDuplicateReviewDecisionReqVO {
     private Long matchedLeadId;
     private Long selectedSalesUserId;
     @NotBlank @Size(max = 2000) private String opinion;
-    @Valid @Size(max = 9) private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
+    @Size(max = 9) private List<@Valid LeadAttachmentReqVO> attachments = new ArrayList<>();
     @NotBlank @Size(max = 128) private String idempotencyKey;
 }

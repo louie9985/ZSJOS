@@ -1,6 +1,25 @@
 import request from '@/config/axios'
 
 export type FeedbackType = 'REQUIREMENT' | 'BUG' | 'SUPPORT' | 'SURVEY'
+export type FeedbackApprovalTask = {
+  id: string; name: string; nodeId?: string; assigneeUserId?: number; assigneeName?: string; createTime?: number
+}
+export type FeedbackApprovalSummary = { availability: 'AVAILABLE' | 'UNAVAILABLE'; currentTasks: FeedbackApprovalTask[] }
+export type FeedbackApproval = {
+  roundNo: number; latestRoundNo: number; version: number
+  rounds: Array<{ roundNo: number; status: string; submittedAt: number }>
+  availability: 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_REQUIRED'; unavailableReason?: string
+  fields: FeedbackField[]; values: Record<string, unknown>
+  lastUrgedAt?: number; nextUrgeAt?: number; canUrge: boolean
+  progress?: { status: number; currentTasks: FeedbackApprovalTask[]; nodes: Array<{
+    id: string; name: string; status?: number; startTime?: number; endTime?: number
+    candidates: Array<{ id: number; name?: string }>
+    tasks: Array<{ id: string; parentTaskId?: string; status?: number; assigneeName?: string; ownerName?: string; createTime?: number; endTime?: number; reason?: string }>
+  }> }
+}
+
+export const getApproval = (id: number, roundNo?: number): Promise<FeedbackApproval> =>
+  request.get({ url: `/zsjos/feedback-management/${id}/approval`, params: { roundNo } })
 export type FeedbackStatus =
   | 'APPROVING'
   | 'APPROVAL_REJECTED'
@@ -39,6 +58,7 @@ export interface FeedbackReply {
 }
 
 export interface FeedbackRecord {
+  approvalSummary?: FeedbackApprovalSummary
   id: number
   feedbackType: FeedbackType
   feedbackNo: string

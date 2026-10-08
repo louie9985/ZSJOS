@@ -38,6 +38,15 @@ public class FeedbackManagementController {
 
     @Resource
     private FeedbackService feedbackService;
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackApprovalService approvalService;
+
+    @GetMapping("/{id}/approval")
+    @PreAuthorize("@ss.hasPermission('zsjos:feedback:query-admin')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackApprovalRespVO> approval(
+            @PathVariable("id") Long id, @RequestParam(value = "roundNo", required = false) Integer roundNo) {
+        return success(approvalService.getAdmin(id, roundNo, getLoginUserId()));
+    }
 
     @GetMapping("/requirement/page")
     @Operation(summary = "获得需求反馈分页")

@@ -57,11 +57,13 @@ import static cn.iocoder.yudao.module.zsjos.service.audit.AuditActionCatalog.*;
 @Service
 @Slf4j
 public class WithdrawalServiceImpl implements WithdrawalService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService sortTraceService;
+
 
     private static final BigDecimal DEFAULT_MIN_AMOUNT = new BigDecimal("10.00");
     private static final Pattern CARD_PATTERN = Pattern.compile("\\d{12,32}");
     private static final Set<String> PROOF_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
-    private static final long MAX_PROOF_SIZE = 20L * 1024 * 1024;
+    private static final long MAX_PROOF_SIZE = 100L * 1024 * 1024;
     @Resource private cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService advancedFilterService;
     @Resource private WithdrawalMapper withdrawalMapper;
     @Resource private WithdrawalItemMapper itemMapper;
@@ -277,7 +279,18 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<WithdrawalRespVO> getManagementPage(WithdrawalPageReqVO request) {
+        var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.FinanceListSort.withdrawal();
+        if (sorting.requested(request.getSortField(), request.getSortOrder())
+                && cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.withdrawal(request.getSortField(), request.getSortOrder()) == null) {
+            return sorting.page(request.getSortField(), request.getSortOrder(), request.getPageNo(), request.getPageSize(), (page, size) -> {
+                var batch = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(request, WithdrawalPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(page); batch.setPageSize(size);
+                return sortTraceService.enrichWithdrawalPage(getManagementPage(batch));
+            });
+        }
+
         PageResult<WithdrawalDO> page = (request.getAdvancedFilter() == null ? withdrawalMapper.selectPageByApplicant(request, null)
                 : withdrawalMapper.selectPageByApplicant(request, null, advancedFilterService.matchFinanceIds("withdrawal", request.getAdvancedFilter())));
         return new PageResult<>(page.getList().stream().map(item -> toResponse(item, true)).toList(), page.getTotal());

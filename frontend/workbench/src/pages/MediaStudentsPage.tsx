@@ -22,7 +22,7 @@ import { APP_ROUTES } from '../constants'
 import dayjs from 'dayjs'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
-import MediaStudentInboxCard, { ACCOUNT_PLATFORM_DICT, mediaStudentAccountHref } from '../components/MediaStudentInboxCard'
+import MediaStudentInboxCard, { mediaStudentAccountHref, type StudentOperator } from '../components/MediaStudentInboxCard'
 import type { MediaStudentListItem } from '../services/api'
 import StudentDetail from '../components/StudentDetail'
 import OperatorAssignmentDialog from '../components/OperatorAssignmentDialog'
@@ -229,16 +229,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     if (scroll.firstElementChild) observer.observe(scroll.firstElementChild)
     return () => observer.disconnect()
   }, [rows, listCollapsed])
-  const [accountPlatforms, setAccountPlatforms] = useState<DictData[]>([])
-  const [platformError, setPlatformError] = useState('')
-  const [platformRetry, setPlatformRetry] = useState(0)
-  useEffect(() => {
-    let disposed = false
-    setPlatformError('')
-    api.dictDataByType(ACCOUNT_PLATFORM_DICT).then(values => { if (!disposed) setAccountPlatforms(values) })
-      .catch(cause => { if (!disposed) setPlatformError(errorText(cause)) })
-    return () => { disposed = true }
-  }, [platformRetry])
   const [selectedServiceId, setSelectedServiceId] = useState<number>(), [selectedAccountId, setSelectedAccountId] = useState<number>()
   const [accountMissing, setAccountMissing] = useState<Record<number, number>>({})
   const updateMissing = useCallback((id: number, count: number) => setAccountMissing(current => current[id] === count ? current : { ...current, [id]: count }), [])
@@ -256,6 +246,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [assignmentTarget, setAssignmentTarget] = useState<{ personId: number; personNo?: string; name?: string; relationId: number }>()
   const [keyword, setKeyword] = useState(''), [pageNo, setPageNo] = useState(1)
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
+  const [operatorFilter, setOperatorFilter] = useState<StudentOperator>()
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
@@ -422,7 +413,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
     try {
       const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined,
-        inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter })
+        inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter, operatorUserId: operatorFilter?.id })
       if (run !== listRun.current) return
       firstListLoad.current = false
       if (!append) loadedKeyword.current = keyword
@@ -456,7 +447,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         else { setRows([]); if (!keepDetail) setDetail(undefined); setError(errorText(cause)) }
       }
     } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
-  }, [keyword, loadDetail, params, servicePeriodTab, advancedFilter])
+  }, [keyword, loadDetail, params, servicePeriodTab, advancedFilter, operatorFilter])
   const cancelPendingList = () => {
     ++searchIntent.current; ++listRun.current; listBusy.current = false; setLoading(false)
   }
@@ -484,6 +475,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     if (next === advancedFilter) void loadPage(1)
     else setAdvancedFilter(next)
     return true
+  }
+  const changeOperatorFilter = async (next?: StudentOperator) => {
+    if (servicePeriodBusy.current || next?.id === operatorFilter?.id) return
+    const intent = ++searchIntent.current
+    const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS) ?? !dialog
+    if (!allowed || intent !== searchIntent.current) return
+    cancelPendingList()
+    firstListLoad.current = false
+    ++detailRun.current; setDetailLoading(false)
+    setRows([]); setPageNo(1); setHasMore(false); setLoading(true)
+    setOperatorFilter(next)
   }
   const changeServicePeriodTab = async (next: string) => {
     if (next === servicePeriodTab || servicePeriodBusy.current) return
@@ -522,7 +524,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   useEffect(() => {
     const initialLink = firstListLoad.current
     void loadPage(1, undefined, false, false, initialLink)
-  }, [keyword, servicePeriodTab, advancedFilter])
+  }, [keyword, servicePeriodTab, advancedFilter, operatorFilter])
   useEffect(() => () => { ++listRun.current; ++detailRun.current }, [])
   useEffect(() => {
     if (location.key === initialLocationKey.current) return
@@ -1200,10 +1202,13 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
-        {platformError && <Tooltip title={`平台样式加载失败：${platformError}`}><Button size="small" aria-label="重试平台样式" icon={<ReloadOutlined />} onClick={() => setPlatformRetry(value => value + 1)}>{!listCollapsed && '平台样式加载失败，重试'}</Button></Tooltip>}
+        {operatorFilter && <div className="media-students-operator-filter"><Tag closable={!servicePeriodSaving}
+          onClose={event => { event.preventDefault(); void changeOperatorFilter() }}
+          title={`当前运营：${operatorFilter.name}`}>{listCollapsed ? '运营' : `当前运营：${operatorFilter.name}`}</Tag></div>}
         <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
           {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <MediaStudentInboxCard key={x.personId} student={x} selected={selectedId === x.personId} collapsed={listCollapsed}
-            platforms={accountPlatforms} canOpenAccount={hasPermission(permissions, 'zsjos:media-account:query')}
+            canOpenAccount={hasPermission(permissions, 'zsjos:media-account:query')} operatorFilterId={operatorFilter?.id}
+            filteringDisabled={servicePeriodSaving} onOperatorFilter={operator => void changeOperatorFilter(operator)}
             onOpen={accountId => { cancelPendingList(); const href = mediaStudentAccountHref(x.personId, accountId); if (workspaceNavigation) void workspaceNavigation.open(href); else { listSelectionNavigation.current = true; setParams(new URLSearchParams(href.split('?')[1]), { replace: true }); void loadDetail(x.personId, undefined, accountId) } }} />)
             : !error && (listCollapsed ? <Tooltip title="暂无可见学员"><span className="media-students-rail-empty" role="status">暂无<br />学员</span></Tooltip> : <Empty description="暂无可见学员" />)}
           <div ref={loadMoreRef} className="media-students-load-more" role="status">

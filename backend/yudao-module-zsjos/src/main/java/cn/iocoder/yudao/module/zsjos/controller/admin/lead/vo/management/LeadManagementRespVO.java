@@ -109,6 +109,7 @@ public class LeadManagementRespVO {
     public static class ActionVO {
         private String code;
         private Boolean enabled;
+        private String qualificationToken;
 
         public ActionVO(String code, Boolean enabled) {
             this.code = code;

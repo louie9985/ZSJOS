@@ -26,6 +26,14 @@ public final class FeedbackActionVO {
 
     @Data
     @EqualsAndHashCode(callSuper = true)
+    public static class UrgeReq extends VersionedCommand {
+        @NotNull
+        @jakarta.validation.constraints.Min(1)
+        private Integer roundNo;
+    }
+
+    @Data
+    @EqualsAndHashCode(callSuper = true)
     public static class ResubmitReq extends VersionedCommand {
         @NotNull
         private Integer configVersion;

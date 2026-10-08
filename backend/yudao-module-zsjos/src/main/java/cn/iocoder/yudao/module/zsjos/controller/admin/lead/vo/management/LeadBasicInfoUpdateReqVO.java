@@ -17,7 +17,7 @@ public class LeadBasicInfoUpdateReqVO {
     @NotBlank @Size(max = 32) private String provinceCode;
     @NotBlank @Size(max = 32) private String cityCode;
     @Size(max = 64) private String leadCategory;
-    @Valid @Size(min = 1, max = 20) private List<LeadProductReqVO> intendedProducts;
+    @Size(min = 1, max = 20) private List<@Valid LeadProductReqVO> intendedProducts;
     @NotBlank @Size(max = 500) private String reason;
 
     @AssertTrue(message = "手机号和微信号至少填写一个")

@@ -17,6 +17,18 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 @Service
 @Validated
 public class LeadCalendarService {
+
+    public PageResult<LeadCalendarCardRespVO> search(LeadCalendarSearchReqVO req, Long userId) {
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        Objects.requireNonNull(userId);
+        long total = mapper.searchCount(req, tenantId, userId);
+        if (total == 0) return new PageResult<>(List.of(), 0L);
+        var rows = mapper.searchPage(req, tenantId, userId, ((long) req.getPageNo() - 1) * req.getPageSize());
+        // Reuse the authorized and masked Lead projection; search never emits raw contact columns.
+        return new PageResult<>(rows.stream().map(row -> new LeadCalendarCardRespVO(
+                managementService.getLead(row.getId(), userId), row.getDeadline(), null, false)).toList(), total);
+    }
+
     @Resource private LeadCalendarMapper mapper;
     @Resource private LeadManagementService managementService;
     @Resource private LeadFollowUpService followUpService;

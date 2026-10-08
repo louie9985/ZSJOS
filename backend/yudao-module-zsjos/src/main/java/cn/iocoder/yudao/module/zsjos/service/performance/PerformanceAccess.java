@@ -61,6 +61,16 @@ public class PerformanceAccess {
  public void targetWriteObject(String type,Long id){targetObject(type,id);Long deptId=id;if("USER".equals(type)){var u=user(id);if(u==null)throw denied();if(!CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))throw invalid("该人员已停用，请刷新后重新设置目标");deptId=u.getDeptId();var scope=permissionApi.getDeptDataPermission(getLoginUserId());if(id.equals(getLoginUserId())&&scope!=null&&Boolean.TRUE.equals(scope.getSelf()))return;}if(!commandDepartmentAllowed(deptId))throw denied();}
  public List<PerformanceOrgDO> orgs() {return orgMapper.selectList();}
  public AdminUserRespDTO user(Long id) {return userApi.getUser(id);}
+ public List<AdminUserRespDTO> users(Collection<Long> ids) {return ids.isEmpty()?List.of():userApi.getUserList(ids);}
+ public List<DeptRespDTO> departments(Collection<Long> ids) {return ids.isEmpty()?List.of():deptApi.getDeptList(ids);}
+ public java.util.function.BiPredicate<Long,Long> targetVisibility() {
+  Long reader=getLoginUserId();boolean self=has("zsjos:sales-performance:self");
+  boolean all=permissionApi.hasTenantReadAllAccess(reader);
+  var scope=all?null:permissionApi.getDeptDataPermission(reader);
+  boolean unrestricted=all||scope!=null&&Boolean.TRUE.equals(scope.getAll());
+  Set<Long> departments=scope==null||scope.getDeptIds()==null?Set.of():new HashSet<>(scope.getDeptIds());
+  return (user,dept)->self&&Objects.equals(reader,user)||unrestricted||dept!=null&&departments.contains(dept);
+ }
  public DeptRespDTO dept(Long id) {return id==null?null:deptApi.getDept(id);}
  public List<DeptRespDTO> departments() {return deptApi.getChildDeptList(0L);}
  public List<AdminUserRespDTO> sales() {

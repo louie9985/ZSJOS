@@ -13,6 +13,14 @@ public class NoticeRespVO {
     @Schema(description = "通知公告序号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;
 
+    /** 来源部门与发布人展示使用公告保存的快照，不回查当前人员归属。 */
+    private Long sourceDeptId;
+    private String sourceDeptName;
+    private Long publisherId;
+    private String publisherName;
+    private String audienceSummary;
+
+
     @Schema(description = "公告标题", requiredMode = Schema.RequiredMode.REQUIRED, example = "小博主")
     private String title;
 

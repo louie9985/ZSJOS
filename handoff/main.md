@@ -29420,3 +29420,76 @@ uoyi-vue-pro.system_menu: insert only four absent rows with fixed IDs/names/perm
 - Verification: 定向重跑内部提交人和兼职当前负责人两条测试，2 passed；`git diff --check` passed。完整 `LeadSubmitterActionServiceTest` 共 9 条，其中 2 条既有兼职历史负责人 mock 分支失败，与本次截止时间改动无关。
 - Dependencies/integration impact: 无新增依赖、权限、SQL、分支、提交、推送或外部服务操作；保留当前工作树其他未提交改动。
 - Remaining/unverified: 未执行真实登录工作台和目标数据库验证；部署后新创建的协助任务生效，既有无截止任务按本次约定不自动改写。
+
+## Workstream Registration - main-bpm-attachment-file-types-20260930 - 2026-09-30
+
+- Workstream ID: `main-bpm-attachment-file-types-20260930`
+- Goal: 补全审批表单设计器“文件上传”组件的常见办公文档、压缩包和图片格式选项，使同一附件字段支持混合文件上传。
+- Non-goals: 不改变上传接口、后端文件校验、权限、数据库、表单运行时组件、分支、提交、推送或外部服务。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d43cc180c3a3e92740888b521fc2ea4e006a0560`
+- Target branch/integration order: 当前本地 `main`; None。
+- Ownership scope: `frontend/admin/src/components/FormCreate/src/config/useUploadFileRule.ts`; `handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 `UploadFile.vue` 按文件扩展名校验；无新增依赖。
+- Verification plan: 配置内容检查、`git diff --check`，必要时 admin TypeScript 检查。
+
+## Delivery - main-bpm-attachment-file-types-20260930 - 2026-09-30
+
+- Result: 表单设计器“文件上传”默认可选类型补全为 `doc/docx`、`xls/xlsx`、`ppt/pptx`、`txt`、`pdf`、`zip/rar/7z` 及 `jpg/jpeg/png/gif/webp`，同一附件字段可配置并上传混合文件。
+- Changed files: `frontend/admin/src/components/FormCreate/src/config/useUploadFileRule.ts`; `handoff/main.md`。
+- Verification: `git diff --check` passed. `pnpm ts:check` reached the existing `frontend/admin/src/api/zsjos/withdrawal/index.ts` duplicate identifier errors (`applicantName`, `partnerName`, `paidByName`, `cashbackCount`, `availableBalanceSnapshot`, `approvedAmount`); no error referenced the changed file.
+- Dependencies/integration impact: 无新增依赖、API、数据库、权限、分支、提交、推送或外部服务操作；保留工作树其他未提交改动。
+- Remaining/unverified: 未执行真实浏览器上传；运行时仍受后端文件大小、文件安全策略和上传接口限制约束。
+
+## Registration — cross-owner-repurchase-20260930
+- Environment: local (no explicit environment value or file); branch main; worktree D:/ZSJ-OS; base d43cc180c3a3e92740888b521fc2ea4e006a0560; owner this chat /root. Integration None.
+- Goal: approved exact-identity preflight and cross sales/education repurchase, current submitter owns new order; preserve customer/Lead/history and existing permission configuration.
+- Ownership: SalesOrder controller/service/repurchase VOs; focused RepurchaseCustomer service and permission provider; related payment draft authorization only as required; existing person/order mappers and error constants as necessary; React ExternalRepurchasePage/SalesOrderEntryModal/api; Vue ExternalRepurchaseDialog/workbenchMenus API; focused tests/browser fixtures; sales-order API/state/permission/frontend docs; this record.
+- Non-goals: dependencies, schema/grants, history repair, shared service changes, deployment, Git operations. Preserve existing unrelated changes.
+- Verification: focused backend authorization/identity/idempotency/transaction tests, both static checks, real component browser checks at desktop/mobile, scoped UTF-8/diff checks. Target-environment checks reported separately.
+
+- Registration scope update: include Workbench RouteHost.tsx and Admin externalRepurchase/index.vue solely to pass/enforce existing create permission; include order/payment tests and repurchase browser fixtures. No menu/role grants.
+
+
+## Delivery — cross-owner-repurchase-20260930 — 2026-09-30T17:49+08:00
+- Environment/worktree: local; main; D:/ZSJ-OS; base and delivery HEAD d43cc180c3a3e92740888b521fc2ea4e006a0560; owner this chat /root. Integration None. Reuses the registration above.
+- Result: exact-identity preflight now precedes the full order form in React and Vue. The unified repurchase API permits authorized sales/education staff to create a new order against the same Person across original ownership; current submitter owns the new order. Original Lead, Opportunity, first conversion, orders and service relationships remain intact. No duplicate Lead or self-sourced automation is created.
+- Backend: dedicated tenant/feature/object permission and transactional orchestration; contact reservation for unknown customers; locked identity recheck; effective-first-order and active-repurchase guards; duplicate voucher/payment-time/course/amount guard; original idempotency/approval/payment behavior reused. React customer_repurchase drafts bind exact identity and current initiator. Existing external/lead/student interfaces retain their prior identity and object boundaries.
+- Frontends: preflight loading/error/retry/conflict states, stale-response invalidation, locked order identity and stable retry keys; stable draft/voucher reuse. Fixed the existing Vue voucher envelope unwrap and non-reactive upload completion that blocked this flow. Payment selectors stack on narrow screens. Both clients consume the same backend contract and existing configured permission; no role grants.
+- Files: the registered order/controller/VO/error/payment services and focused tests; React API/page/order editor/RouteHost; Vue API/dialog/page; isolated browser fixtures; docs/api/zsjos-sales-order.md, docs/architecture/data-and-permission-flow.md, docs/business/lead-order-state-machine.md, docs/frontend/zsjos-menu-coverage.md, frontend/admin/README.md, frontend/workbench/docs/customer-repurchase.md.
+- Backend verification: final focused Maven reactor suite PASS, 111 tests, 0 failures/errors/skips. Includes exact identity, tenant/permission, both cross-owner identities, replay, duplicate checks, new/known customer drafts, and 3 isolated H2/Spring-proxy transaction tests. Transaction collaborators are test doubles; this is not full target MySQL/MyBatis/BPM integration evidence. Log: %TEMP%/cross-repurchase-backend-final.log.
+- Frontend verification: Workbench typecheck and final production build PASS; Admin final build:local PASS. Admin ts:check still fails only on the 12 pre-existing duplicate identifiers in src/api/zsjos/withdrawal/index.ts (lines 15–16 and 40–45), with no changed-file diagnostics. Existing bundle-size warnings remain. Final logs: %TEMP%/cross-repurchase-workbench-build-final.log, cross-repurchase-admin-final.log and cross-repurchase-admin-build-final.log.
+- Browser verification: actual React/Vue components with synthetic API transport PASS at 1440 and 390 widths: early identity checks, identity change invalidation, multiple/conflict/blocked/no-match outcomes, network retry, stale responses, full submission and retry, correct voucher ID, stable order key/draft, and Workbench denied state. Desktop/mobile screenshots and mobile footers visually reviewed in %TEMP%/zsjos-repurchase-customer. Test command: python frontend/workbench/test/repurchase-customer-browser.py.
+- Content verification: scoped strict UTF-8/no replacement-character scan and documentation link check PASS; git diff --check PASS. Task-generated tracked TypeScript build cache restored; unrelated pre-existing edits/untracked files preserved.
+- Unverified: actual authenticated target API/MySQL query integration, real concurrent requests, cross-account navigation/data visibility, online payment settlement, configured BPM approval and notification delivery. The new code has not been deployed and shared services were not restarted; isolated tests do not replace that target acceptance.
+- Operational scope: no database changes, migrations, dependency additions, role/permission assignments, shared service changes, deployment, branch/worktree changes, staging, commits or pushes. Only task-owned fixture servers on 5195/5196 were used and stopped. Ownership released.
+
+## Scope update — main-bpm-attachment-file-types-20260930 — 2026-10-01 18:44 北京时间
+- Environment local; branch main; worktree D:/ZSJ-OS; HEAD/base d43cc180c3a3e92740888b521fc2ea4e006a0560; owner /root. Reuses prior registration; target branch/integration None.
+- Goal: repair actual runtime fallback and persist new-field fileType; preserve explicit existing restrictions and unrelated changes.
+- Ownership: frontend/admin/src/components/UploadFile/src/fileTypes.ts; frontend/admin/src/components/UploadFile/src/UploadFile.vue; frontend/admin/src/components/FormCreate/src/config/useUploadFileRule.ts; docs/frontend/bpm-attachment-upload.md; handoff/main.md (serialized append).
+- Non-goals: no database/form-instance rewrite, dependency, service, permission or deployment changes.
+- Verification: focused compiler/runtime checks for defaults, serialization, explicit PDF-only and mixed extensions; scoped lint/diff; browser if accessible.
+
+## Delivery — main-bpm-attachment-file-types-20260930 — 2026-10-01 18:47 北京时间
+- Context: local/main/D:/ZSJ-OS; HEAD unchanged d43cc180c3a3e92740888b521fc2ea4e006a0560; owner /root; scope registration above.
+- Result: runtime UploadFile fallback and designer use one shared default; new field rules persist independent props.fileType arrays. Existing explicit lists (including PDF-only and empty list semantics) are preserved. No saved forms or deployed process snapshots rewritten.
+- Changed files: frontend/admin/src/components/UploadFile/src/fileTypes.ts; frontend/admin/src/components/UploadFile/src/UploadFile.vue; frontend/admin/src/components/FormCreate/src/config/useUploadFileRule.ts; docs/frontend/bpm-attachment-upload.md; handoff/main.md.
+- Evidence: actual SFC script/template compiler PASS; executed source-based checks PASS for runtime vue-types default factory, independent arrays, serialized rule, JPG/PNG/DOCX/PDF/ZIP acceptance, EXE rejection, PDF-only rejection of JPG, empty allowlist and hint binding. Scoped ESLint, Prettier and git diff --check PASS. Check harness corrected to use installed vue/compiler-sfc export and TypeScript 6 transpile options before final passing run. No new dependency/test facility.
+- Browser limitation: opened local site with connected browser, observed login-expired dialog. Actual upload storage, authenticated form persistence/approval redisplay and visual acceptance remain unverified. Full typecheck not rerun; prior unrelated withdrawal duplicate-field errors are not resolved by this change.
+- Scope/impact: other admin callers omitting fileType also inherit extended defaults; explicit restrictions unchanged. No DB, permission, service lifecycle, deployment, branch, commit or push actions; unrelated changes preserved. Ownership released.
+
+## Registration — local-exam-note-conflict-images-20261008
+- Owner: Codex /root; environment: local (fallback); branch: main; worktree: D:/ZSJ-OS; base: cf592507644bcce748b1458c8917689343e5373b. Target branch/integration: None.
+- Goal: merge latest image URL mappings after note version conflicts while preserving draft mappings, including different signed URLs for the same file.
+- Ownership: frontend/workbench/src/components/ExamCalendarNotePanel.tsx; docs/frontend/exam-calendar-note.md; handoff/main.md (serialized append).
+- Non-goals: backend, authorization, storage, layout, dependencies, services and unrelated changes.
+- Dependencies: existing note API and HTML conversion; previous note workstream ownership released.
+- Verification: Workbench typecheck, browser DOM conversion of existing/new/refreshed image URLs using the actual conflict handler, scoped diff checks.
+
+## Delivery — local-exam-note-conflict-images-20261008
+- Conflict reload now unions image mappings by URL; retains draft uploads and old signed URLs, adds latest images and refreshed URLs. Repeated reloads deduplicate identical URLs. Documentation synchronized.
+- Verification: npm run typecheck PASS. Headless real Chrome executed the source conflict handler and noteSaveHtml with browser DOMParser: existing and refreshed URLs for file 1, latest file 2, draft upload file 3 all converted correctly; repeated reload retained four mappings; unknown URLs remained rejected. Scoped whitespace check passed.
+- Limits: verified browser DOM/handler behavior, not the full interactive clipboard flow or live backend/storage integration. No service/database/dependency/Git operations. Ownership released.

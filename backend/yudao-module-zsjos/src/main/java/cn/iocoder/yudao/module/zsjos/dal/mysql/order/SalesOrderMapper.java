@@ -143,7 +143,9 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (matchedOrderIds != null) {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
         }
-        query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
+        String sorting = cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.order(reqVO.getSortField(), reqVO.getSortOrder());
+        if (sorting == null) query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
+        else query.last("ORDER BY " + sorting);
         return selectPage(reqVO, query);
     }
 

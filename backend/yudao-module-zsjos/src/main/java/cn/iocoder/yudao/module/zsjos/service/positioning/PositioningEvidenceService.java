@@ -63,7 +63,7 @@ public class PositioningEvidenceService {
         requireWritable(cardId, requireSubmission(cardId, submissionId), userId);
         // 确认凭证与定位卡附件同源：聊天记录截图、语音、视频等，走同一白名单。
         String detected = PositioningAttachmentTypes.detectAllowed(name, bytes);
-        if (bytes.length == 0 || bytes.length > 20 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        if (bytes.length == 0 || bytes.length > 100 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
         var file = fileApi.createFileInfo(bytes, PositioningAttachmentTypes.storageName(name), directory(cardId, submissionId, userId), detected);
         return new PositioningCardService.CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), null);
     }

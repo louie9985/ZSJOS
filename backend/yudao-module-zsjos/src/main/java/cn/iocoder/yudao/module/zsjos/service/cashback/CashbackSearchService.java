@@ -53,7 +53,9 @@ public class CashbackSearchService {
         long matched = System.nanoTime();
         var compiled = query.build();
         long total = mapper.count(compiled), counted = System.nanoTime();
-        var rows = total == 0 ? List.<CashbackDO>of() : mapper.page(compiled,
+        String sorting = cn.iocoder.yudao.module.zsjos.service.sorting.BusinessSortSql.cashback(request.getSortField(), request.getSortOrder());
+        var rows = total == 0 ? List.<CashbackDO>of() : sorting != null ? mapper.sortedPage(compiled, sorting,
+                (long) (request.getPageNo() - 1) * request.getPageSize(), request.getPageSize()) : mapper.page(compiled,
                 (long) (request.getPageNo() - 1) * request.getPageSize(), request.getPageSize());
         long ended = System.nanoTime();
         log.debug("Cashback search filtersMs={} matchMs={} countMs={} pageMs={} candidates={} total={}",

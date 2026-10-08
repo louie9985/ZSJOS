@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.zsjos.dal.mysql.performance;
 /** Count and page use the same authorized population, including historical duplicate facts. */
 public final class PerformanceDetailSql {
     private PerformanceDetailSql() {}
-    private static String scoped(String fact) {
+    static String scoped(String fact) {
         String body = fact.replaceFirst("(?s)\\s*ORDER BY[^<]+</script>", "</script>")
                 .replace("<script>", "").replace("</script>", "");
         return "SELECT f.* FROM (" + body + ") f WHERE <choose>"
@@ -23,7 +23,9 @@ public final class PerformanceDetailSql {
         String result = "orders_base AS (" + scoped(PerformanceFactSql.ORDERS) + ")";
         if (q.getGroupKey() == null || q.getDimension() == null) return result + ", orders AS (SELECT * FROM orders_base)";
         return result + switch (q.getDimension()) {
-            case "source" -> ", orders AS (SELECT * FROM orders_base WHERE " + equal("CASE WHEN order_type='repurchase' OR group_key='self' THEN 'self|非引流' WHEN group_key='inbound' THEN 'inbound|线上引流' ELSE 'unknown|历史来源缺失' END") + ")";
+            // Retain the legacy unknown key while matching the current report's display label.
+            case "source" -> ", orders AS (SELECT * FROM orders_base WHERE CAST(CASE WHEN CAST(order_type AS BINARY)=CAST('repurchase' AS BINARY) OR CAST(group_key AS BINARY)=CAST('self' AS BINARY) THEN 'self|非引流' WHEN CAST(group_key AS BINARY)=CAST('inbound' AS BINARY) THEN 'inbound|线上引流' ELSE 'unknown|其他' END AS BINARY)"
+                    + "=CAST(CASE WHEN #{groupKey}='unknown|历史来源缺失' THEN 'unknown|其他' ELSE #{groupKey} END AS BINARY))";
             case "contributor" -> ", orders AS (SELECT * FROM orders_base WHERE " + equal("COALESCE(CAST(user_id AS CHAR),'')") + ")";
             case "product" -> ", products AS (" + scoped(PerformanceFactSql.PRODUCTS) + "), product_amounts AS ("
                     + "SELECT lead_id,SUM(amount) amount FROM products WHERE " + equal("CONCAT(COALESCE(CAST(group_key AS CHAR),'unknown'),'|',COALESCE(label,'历史产品名称缺失'))")

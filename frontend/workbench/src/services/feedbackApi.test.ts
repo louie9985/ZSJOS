@@ -3,6 +3,20 @@ import { http } from './api'
 import { feedbackApi } from './feedbackApi'
 
 describe('feedback API contract', () => {
+  it('separates authorized round reads and preserves the caller urge replay key', async () => {
+    const get = vi.spyOn(http, 'get').mockResolvedValue({ data: { code: 0, data: {} } })
+    const post = vi.spyOn(http, 'post').mockResolvedValue({ data: { code: 0, data: true } })
+    await feedbackApi.approval(42, 1)
+    await feedbackApi.approval(42, 2, true)
+    await feedbackApi.urge(42, 3, 2, 'same-attempt')
+    await feedbackApi.urge(42, 3, 2, 'same-attempt')
+    expect(get.mock.calls).toEqual([
+      ['/zsjos/feedback/42/approval', { params: { roundNo: 1 } }],
+      ['/zsjos/feedback/42/approver-view/approval', { params: { roundNo: 2 } }]
+    ])
+    expect(post.mock.calls[0]).toEqual(['/zsjos/feedback/42/urge', { version: 3, roundNo: 2, idempotencyKey: 'same-attempt' }])
+    expect(post.mock.calls[1]).toEqual(post.mock.calls[0])
+  })
   afterEach(() => vi.restoreAllMocks())
 
   it('uses the three independent creation endpoints with config version and idempotency keys', async () => {

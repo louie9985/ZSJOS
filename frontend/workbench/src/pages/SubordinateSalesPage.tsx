@@ -141,7 +141,7 @@ function BatchResultModal({
   );
 }
 
-function ManagedLeadDetail({ leadId, onBack }: { leadId: number; onBack: () => void }) {
+function ManagedLeadDetail({ leadId, onBack, onChanged }: { leadId: number; onBack: () => void; onChanged: () => void }) {
   const [lead, setLead] = useState<ManagedLead>()
   const [categories, setCategories] = useState<DictData[]>([])
   const [channels, setChannels] = useState<DictData[]>([])
@@ -181,7 +181,7 @@ function ManagedLeadDetail({ leadId, onBack }: { leadId: number; onBack: () => v
           categoryLabel={value => dictionaryDisplayLabel(categories, value, categoryError)}
           channelLabel={value => dictionaryDisplayLabel(channels, value, channelError)}
           mode="manager-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined}
-          onChanged={() => void load()}/>
+          onChanged={() => { void load(); onChanged() }}/>
           : <Empty description="客资详情不可用"/>}
   </div>
 }
@@ -435,6 +435,7 @@ function SalesDetail({
     return (
       <ManagedLeadDetail
         leadId={detailLeadId}
+        onChanged={() => { void loadLeads(); onChanged() }}
         onBack={() => setDetailLeadId(undefined)}
       />
     );

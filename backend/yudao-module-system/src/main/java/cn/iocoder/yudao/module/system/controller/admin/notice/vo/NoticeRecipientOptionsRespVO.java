@@ -12,6 +12,8 @@ public class NoticeRecipientOptionsRespVO {
     @Schema(description = "启用的部门列表", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<NoticeRecipientDeptVO> departments;
 
+    private Long defaultSourceDeptId;
+
     @Schema(description = "启用的用户列表；无公告阅读权限的用户不可选", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<NoticeRecipientUserVO> users;
 }

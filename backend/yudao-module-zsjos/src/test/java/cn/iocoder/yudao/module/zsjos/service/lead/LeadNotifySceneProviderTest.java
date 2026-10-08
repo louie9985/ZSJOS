@@ -200,8 +200,9 @@ class LeadNotifySceneProviderTest {
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(44, scenes.size());
-        assertEquals(44, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertEquals(scenes.size(), scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertTrue(variableKeys(scene(scenes, SupervisorLeadOverturnPolicy.SCENE)).contains("overturn.reason"));
+        assertFalse(variableKeys(scene(scenes, SupervisorLeadOverturnPolicy.SCENE)).contains("appeal.id"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("lead.name"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
@@ -347,6 +348,20 @@ class LeadNotifySceneProviderTest {
         assertFalse("wechat-full".equals(masked.get("lead.wechatId")));
         assertEquals("13800138000", full.get("lead.mobile"));
         assertEquals("wechat-full", full.get("lead.wechatId"));
+    }
+
+    @Test
+    void supervisorOverturnUsesBusinessNumberReasonAndActualSubmitterOwner() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setLeadNo("KZ-OV-TEST");
+        lead.setProviderOwnerType("system_user"); lead.setProviderOwnerId(10L); lead.setOwnerUserId(20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        var event = NotifyBusinessEvent.builder().sceneCode(SupervisorLeadOverturnPolicy.SCENE)
+                .bizId(1L).operatorUserId(30L).payload(Map.of("overturn.reason", "主管核实有效", "ownerUserId", 20L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.admin(10L),NotifyRecipientDTO.admin(20L)),
+                provider.resolveRecipients(event,Set.of(ROLE_SUBMITTER,ROLE_OWNER)));
+        var values = provider.resolveVariables(event,NotifyRecipientDTO.admin(20L));
+        assertEquals("KZ-OV-TEST",values.get("lead.no"));
+        assertEquals("主管核实有效",values.get("overturn.reason"));
     }
 
     @Test

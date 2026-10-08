@@ -144,3 +144,9 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 `zsjos:lead-follow-up-calendar:query` 与现有客资读取权限累积生效；快捷跟进和历史读取
 继续使用现有独立按钮权限。V277 只新增菜单元数据，不写角色授权。
 详见 [销售客资跟进日历](../api/lead-follow-up-calendar.md)。
+
+
+2026-09-30：历史客户复购沿用既有双端路由及服务端菜单，页面支持准确身份预检后销售/教务交叉复购，操作仍需 zsjos:sales-order:create。没有新建菜单、角色授权或全量客户查询入口。参见 [订单契约](../api/zsjos-sales-order.md)。
+
+
+2026-10-08：主管直接改判有效仅在 Workbench 客资管理与下属销售详情提供，复用 `SUPERVISOR_OVERTURN_VALID` 动作和独立按钮权限。Vue Admin 不增加此操作，其客资详情及申诉处理保持原入口；新增动作字段兼容读取。V289 仅添加菜单按钮与通知元数据，不分配角色。见 [操作与发布说明](../api/supervisor-lead-overturn.md)。

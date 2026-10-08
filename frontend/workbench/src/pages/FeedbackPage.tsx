@@ -23,6 +23,7 @@ import {
   type FeedbackType
 } from '../services/feedbackApi'
 import { formatTimestamp } from '../services/time'
+import FeedbackApprovalPanel from '../components/FeedbackApprovalPanel'
 import { useSearchParams } from 'react-router-dom'
 import ResizableDrawer from '../components/ResizableDrawer'
 import { FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
@@ -96,6 +97,9 @@ function FeedbackCard({ item, onClick, disabled = false }: { item: FeedbackRecor
       <Tag color={STATUS_META[item.status].color}>{STATUS_META[item.status].label}</Tag>
     </div>
     <strong className="feedback-record-title">{item.title}</strong>
+    {item.status === 'APPROVING' && <div className="feedback-approval-summary">当前审批：{item.approvalSummary?.availability === 'AVAILABLE'
+      ? item.approvalSummary.currentTasks.map(task => `${task.name} · ${task.assigneeName || '待分配'}`).join('；') || '暂无可处理任务'
+      : '审批信息暂不可用，请刷新'}</div>}
     <div className="feedback-record-meta">
       <span>提交人：{item.submitterName || "未知人员"}</span>
       <span>处理人：{item.assigneeName || '待分派'}</span>
@@ -386,8 +390,11 @@ export default function FeedbackPage({ permissions, tenantReadAll = false }: { p
           { key: 'activity', label: '最后更新', children: formatTimestamp(detail.lastActivityAt) }
         ]}/>
         {detail.rejectReason && <Alert className="feedback-detail-alert" type="error" showIcon message="审批驳回" description={detail.rejectReason}/>}
-        <Typography.Title level={5}>提交内容</Typography.Title>
-        <ValueDescriptions fields={detail.fields} values={detail.values}/>
+        {detail.feedbackType === 'REQUIREMENT' ? <FeedbackApprovalPanel key={`${detail.id}:${approverView}:${readOnly}`} id={detail.id} approver={approverView}
+          readOnly={readOnly || approverView} canUrge={hasPermission(permissions, 'zsjos:feedback:requirement:urge')}
+          renderValues={(fields, values) => <ValueDescriptions fields={fields} values={values}/>}
+          onUrged={() => { void refreshAll() }}/>
+          : <><Typography.Title level={5}>提交内容</Typography.Title><ValueDescriptions fields={detail.fields} values={detail.values}/></>}
         {detail.completedResult && <section className="feedback-detail-section"><Typography.Title level={5}>处理结果</Typography.Title><p>{detail.completedResult}</p><AttachmentLinks items={detail.resultAttachments}/></section>}
         <section className="feedback-detail-section"><Typography.Title level={5}>沟通记录</Typography.Title>{detail.replies?.length ? <Timeline items={detail.replies.map(reply => ({ children: <div><div><strong>{reply.authorName || '未知用户'}</strong><Tag className="feedback-author-tag">{reply.authorType === 'EMPLOYEE' ? '员工' : '处理人员'}</Tag></div><p>{reply.content}</p><AttachmentLinks items={reply.attachments}/><Typography.Text type="secondary">{formatTimestamp(reply.createTime)}</Typography.Text></div> }))}/> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无沟通记录"/>}</section>
         {detail.survey && <section className="feedback-detail-section"><Typography.Title level={5}>满意度</Typography.Title>{detail.survey.status === 'PENDING' ? <Alert type="info" showIcon message="等待评价"/> : <ValueDescriptions fields={detail.survey.fields} values={detail.survey.values}/>}</section>}

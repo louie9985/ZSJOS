@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { scheduleInput, scheduleStatusLabel } from './ExamCalendarPage'
 
 describe('ExamCalendarPage contracts', () => {
+  it.each(['#12ab34', ''])('submits selected color or explicit clear %s', backgroundColor => {
+    for (const scheduleType of ['EXACT', 'MULTI_DAY'] as const) {
+      expect(scheduleInput({ scheduleType, scheduleName: '选色考期', backgroundColor }).backgroundColor).toBe(backgroundColor)
+    }
+  })
   it('serializes exact schedules without multiDay dates', () => {
     expect(scheduleInput({
       scheduleType: 'EXACT', exactDate: dayjs('2026-10-10'), scheduleName: '任意名称', remark: ' 上午场 '

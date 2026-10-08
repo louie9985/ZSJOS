@@ -49,3 +49,7 @@ typecheck / build，以及 `frontend/workbench/test/lead-calendar-browser.py` �
 桌面／手机合成接口流程。浏览器夹具不代表已更新运行后端；本次未重启本地旧后端，
 认证后端到端验收仍待加载新版本。全链 fresh/upgrade 验证受既有 Core schema/baseline
 差异阻断，不能以本次独立菜单与查询验证代替发布验收。
+
+## 跨月份搜索
+
+`GET /zsjos/lead-follow-up-calendar/search` 支持不限月份的关键词及可选日期查询，原 `/days`、`/cards` 的 42 天限制不变。结果仍限本人未完成待办；定位按当前排序查找目标所在卡片页。详见[日历跨月份搜索](calendar-search.md)。

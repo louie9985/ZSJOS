@@ -1,3 +1,4 @@
+import { giftSummary } from '../services/orderGifts'
 import BusinessTable from './BusinessTable'
 import ProductSpecs from './ProductSpecs'
 import { useState } from 'react'
@@ -267,7 +268,9 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
               { key: 'sales', label: '成交负责人', value: order.formalSalesUserName || '历史未记录' },
               { key: 'remark', label: '订单备注', value: order.remark },
               { key: 'requirements', label: '学生特殊要求', value: order.studentSpecialRequirements },
-              { key: 'delivery', label: '教材邮递联系', value: order.materialDeliveryContact }
+              { key: 'delivery', label: '教材邮递联系', value: order.materialDeliveryContact },
+              { key: 'gifts', label: '礼品', value: giftSummary(order) },
+              { key: 'giftAddress', label: '礼品邮寄地址', value: order.giftShippingAddress }
             ]}/>
           </section>
           <section className="sales-order-content-section">

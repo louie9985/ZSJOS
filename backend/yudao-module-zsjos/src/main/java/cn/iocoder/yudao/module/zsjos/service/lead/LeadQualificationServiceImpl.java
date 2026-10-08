@@ -40,6 +40,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private LeadMapper leadMapper;
+    @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private DictDataApi dictDataApi;
@@ -203,7 +204,9 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (!STATUS_SUSPENDED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
-        requireEligibleSales(lead.getOwnerUserId(), userId, false);
+        if (!restoreOwnerPolicy.isEligible(lead)) {
+            throw exception(LEAD_QUALIFICATION_RESTORE_OWNER_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管恢复并重启判定");
         lead.setStatus(STATUS_SUBMITTED);

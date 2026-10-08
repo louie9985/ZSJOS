@@ -10,6 +10,8 @@ import java.time.LocalDate;
 @Data
 public class ExamScheduleSaveReqVO {
     @NotBlank @Size(max = 100) private String scheduleName;
+    @jakarta.validation.constraints.Pattern(regexp = "^(|#[0-9a-fA-F]{6})$", message = "考期底色须为六位十六进制颜色")
+    private String backgroundColor;
     @NotBlank @Size(max = 16) private String scheduleType;
     private LocalDate exactDate;
     private LocalDate startDate;
@@ -19,4 +21,5 @@ public class ExamScheduleSaveReqVO {
     @Size(max = 100) private java.util.Map<@NotBlank String, @NotBlank String> selectedAttrs;
     @Size(max = 100) private java.util.Set<@NotBlank String> clearedInvalidAttrs;
     @Size(max = 1000) private String remark;
+    @Size(max = 10) private java.util.List<@NotNull @jakarta.validation.constraints.Positive Long> attachmentIds;
 }

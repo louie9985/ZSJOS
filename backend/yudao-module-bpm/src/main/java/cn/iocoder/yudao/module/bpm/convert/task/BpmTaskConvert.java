@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.bpm.convert.task;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.date.DateUtils;
@@ -172,9 +173,16 @@ public interface BpmTaskConvert {
     default BpmMessageSendWhenTaskCreatedReqDTO convert(ProcessInstance processInstance, AdminUserRespDTO startUser,
                                                         Task task) {
         BpmMessageSendWhenTaskCreatedReqDTO reqDTO = new BpmMessageSendWhenTaskCreatedReqDTO();
+        var subject = cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO.fromFlowableId(processInstance.getStartUserId());
+        String nickname = null;
+        if (subject != null && cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN.getValue().equals(subject.getUserType())) {
+            nickname = startUser == null ? null : startUser.getNickname();
+        } else if (subject != null && cn.iocoder.yudao.framework.common.enums.UserTypeEnum.PARTNER.getValue().equals(subject.getUserType())) {
+            nickname = MapUtil.getStr(processInstance.getProcessVariables(), "externalStartUserName");
+        }
         reqDTO.setProcessInstanceId(processInstance.getProcessInstanceId())
-                .setProcessInstanceName(processInstance.getName()).setStartUserId(startUser.getId())
-                .setStartUserNickname(startUser.getNickname()).setTaskId(task.getId()).setTaskName(task.getName())
+                .setProcessInstanceName(processInstance.getName()).setStartSubject(subject)
+                .setStartUserNickname(StrUtil.blankToDefault(nickname, "发起人信息不可用")).setTaskId(task.getId()).setTaskName(task.getName())
                 .setAssigneeUserId(NumberUtils.parseLong(task.getAssignee()));
         return reqDTO;
     }
