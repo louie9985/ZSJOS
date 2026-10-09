@@ -43,6 +43,44 @@ class SubordinateSalesServiceImplTest {
     @Mock private BusinessTaskMapper taskMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PostApi postApi;
+    @Mock private NewcomerPoolService newcomerPoolService;
+
+    @Test
+    void newcomerConfigAllowsManagedEligibleSales() {
+        var user = subordinate(20L, 0, 5L);
+        var post = new PostRespDTO(); post.setId(5L);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
+        var candidate = new LeadAssignmentUserRespVO(); candidate.setId(20L);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate));
+        service.updateNewcomerPool(20L, newcomerRequest(), 10L);
+        verify(newcomerPoolService).update(20L, true, 5);
+    }
+
+    @Test
+    void newcomerConfigRejectsOutOfScopeBeforeMutation() {
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of());
+        assertThrows(ServiceException.class, () -> service.updateNewcomerPool(20L, newcomerRequest(), 10L));
+        org.mockito.Mockito.verifyNoInteractions(newcomerPoolService, commandService);
+    }
+
+    @Test
+    void newcomerConfigRejectsIneligibleSalesBeforeMutation() {
+        var user = subordinate(20L, 1, 5L);
+        var post = new PostRespDTO(); post.setId(5L);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of());
+        assertThrows(ServiceException.class, () -> service.updateNewcomerPool(20L, newcomerRequest(), 10L));
+        org.mockito.Mockito.verifyNoInteractions(newcomerPoolService, commandService);
+    }
+
+    private cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateNewcomerPoolReqVO newcomerRequest() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateNewcomerPoolReqVO();
+        request.setEnabled(true); request.setDailyQuota(5); return request;
+    }
     @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper;

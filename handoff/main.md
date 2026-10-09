@@ -29493,3 +29493,11 @@ uoyi-vue-pro.system_menu: insert only four absent rows with fixed IDs/names/perm
 - Conflict reload now unions image mappings by URL; retains draft uploads and old signed URLs, adds latest images and refreshed URLs. Repeated reloads deduplicate identical URLs. Documentation synchronized.
 - Verification: npm run typecheck PASS. Headless real Chrome executed the source conflict handler and noteSaveHtml with browser DOMParser: existing and refreshed URLs for file 1, latest file 2, draft upload file 3 all converted correctly; repeated reload retained four mappings; unknown URLs remained rejected. Scoped whitespace check passed.
 - Limits: verified browser DOM/handler behavior, not the full interactive clipboard flow or live backend/storage integration. No service/database/dependency/Git operations. Ownership released.
+
+## Registration — local-migration-schema-drift-20261008
+- Owner: Codex /root; environment: local (fallback); branch: main; worktree: D:/ZSJ-OS; base: cf11407a4b8a2d1485165477ad31c6278f2cec58. Target branch/integration: None.
+- Goal: remove recurring migration blocking caused by local module selection and stale Core desired schema while preserving existing database data and unrelated worktree changes.
+- Ownership: script/sql/mysql/modules/core.json; script/sql/mysql/schema/core.sql; script/sql/mysql/00-bootstrap-schema.sql; deploy/production/.env.example; docs/operations/database-migrations.md; handoff/main.md (serialized append).
+- Non-goals: no database deletion or bulk repair, no role/permission changes, no dependency/service/Git operations, no edits to applied numbered migrations.
+- Dependencies: local database is read-only evidence; existing migration runner and Core manifest contracts.
+- Verification: schema/source consistency, focused schema-drift tests, static migration checks, and read-only drift comparison against the local database.

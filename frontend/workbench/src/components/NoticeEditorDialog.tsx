@@ -148,7 +148,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
     finally { pendingUploads.current -= 1 }
   }
   return <>
-    <Modal open title={id ? '编辑公告草稿' : '新建公告'} width={1000} onCancel={close} mask={{ closable: false }} keyboard={!blocked}
+    <Modal open title={id ? '编辑公告草稿' : '新建公告'} width="min(1400px, calc(100vw - 32px))" onCancel={close} mask={{ closable: false }} keyboard={!blocked}
       footer={<Space wrap><Button onClick={close} disabled={blocked}>关闭</Button><Button onClick={showPreview}>预览</Button>
         {canSave && <Button loading={busy} disabled={uploading || uploads.length > 0 || !!optionsError || optionsLoading} onClick={() => void save(false)}>保存草稿</Button>}
         {canSave && noticePermission(permissions, 'publish') && <Button type="primary" loading={busy} disabled={uploading || uploads.length > 0 || !!optionsError || optionsLoading} onClick={() => void save(true)}>保存并发布</Button>}

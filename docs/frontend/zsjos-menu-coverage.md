@@ -138,6 +138,8 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 
 ## 销售业绩（2026-09-22）
 
+2026-10-09：新手池配置入口位于 Workbench `/zsjos/subordinate-sales` 销售详情，使用独立按钮权限 `zsjos:subordinate-sales:newcomer-pool`。Vue Admin 不新增编辑页面；两端继续消费原 System 菜单权限。下属销售返回新增额度字段及 `active|inactive` 状态，自动派单统一在后端生效。V295 只添加按钮元数据，角色由管理员配置。见 [派单契约](../api/zsjos-lead-submission-dispatch.md)。
+
 用户明确要求两页仅员工工作台：`/zsjos/sales-performance`（`zsjos/salesPerformance/index`）和 `/zsjos/sales-performance-target`（`zsjos/salesPerformanceTarget/index`）。Vue Admin 过滤对应不可渲染组件；System 菜单与角色仍是唯一授权来源。见 [接口与口径](../api/sales-performance.md)。
 
 销售客资跟进日历仅由 React Workbench 渲染，Vue Admin 过滤其组件。页面权限

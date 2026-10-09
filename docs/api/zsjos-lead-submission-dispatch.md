@@ -123,7 +123,13 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 规则参数范围为接单超时 10–3600 秒、最大尝试 1–20 次。修改只影响之后提交的客资，进行中客资继续使用提交时规则快照。
 
-自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。每次派单最多旋转初始池长度的三倍，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
+自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。普通轮询最多旋转初始池长度的三倍，新手优先扫描额外旋转最多一圈，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
+
+主管可在工作台“下属销售”详情中配置新手池开关与每人每日优先接单额度（正整数）。`PUT /zsjos/subordinate-sales/{salesUserId}/newcomer-pool` 使用独立按钮权限 `zsjos:subordinate-sales:newcomer-pool`，并校验当前租户、System 管理部门及子部门范围和目标销售接单资格。列表及详情返回 `newcomerPoolStatus=active|inactive`、`newcomerDailyQuota`、`newcomerAcceptedToday`、`newcomerRemainingToday`。自动派单先扫描在线池中今日尚有额度的新手，再执行原有普通轮询；无可接新手时直接回退。派单历史的 `newcomer_priority` 标记优先路径，仅这类派单被成功接受时按北京时间接单日期消耗额度；拒单、超时、指定派单、自拓和主动抢单均不计入。关闭配置保留额度和当日计数，重启不清零；调低额度不追改已接数量，也不撤回已有待接客资。配置和日计数属于租户内销售本人，多位有权主管看到同一状态。迁移只定义权限元数据，不授予任何角色。
+
+发布顺序：已有环境在 Core V294 后执行 `V295__newcomer_priority_dispatch.sql`，再部署后端和工作台；管理员在角色管理中分配新按钮权限。全新环境使用 `bootstrap.sql` 及后续 Core 迁移链。迁移只增加两张空业务表、历史标记列、按钮元数据和版本记录，不迁移历史接单数；已有派单标记默认 false。回滚应用时保留新增结构和审计数据。
+
+专项验证命令：`python script/sql/mysql/tools/test_newcomer_pool.py --fresh`。脚本创建并保留唯一命名的隔离测试库，覆盖首次/重复/部分执行恢复、失败不登记成功版本、原子计数及租户日期隔离，不修改开发业务库。
 
 派单状态接口的资格判断复用人员关系场景配置的候选资格规则（权限或岗位及账号启用状态），不加载候选列表的部门名称；部门资料可见范围不参与该资格判断。候选列表仍按原有流程补充展示资料。
 

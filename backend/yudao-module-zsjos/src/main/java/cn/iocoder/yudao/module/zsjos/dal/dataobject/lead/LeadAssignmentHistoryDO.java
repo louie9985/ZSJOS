@@ -28,4 +28,5 @@ public class LeadAssignmentHistoryDO extends TenantBaseDO {
     private Long candidateUserId;
     private LocalDateTime expiresAt;
     private LocalDateTime responseAt;
+    private Boolean newcomerPriority;
 }

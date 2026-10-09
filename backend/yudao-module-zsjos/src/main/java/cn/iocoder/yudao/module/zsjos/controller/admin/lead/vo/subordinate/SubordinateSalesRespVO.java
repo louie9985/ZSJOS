@@ -17,6 +17,9 @@ public class SubordinateSalesRespVO {
     private Boolean eligible;
     private Boolean canReceiveNewLeads;
     private String newcomerPoolStatus;
+    private Integer newcomerDailyQuota;
+    private Integer newcomerAcceptedToday;
+    private Integer newcomerRemainingToday;
     private Long todayPendingCount;
     private Long todayFollowUpTotalCount;
     private Long todayFollowUpRemainingCount;

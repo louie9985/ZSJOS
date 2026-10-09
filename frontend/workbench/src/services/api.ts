@@ -2798,7 +2798,10 @@ export type SubordinateSales = {
   accepting: boolean;
   eligible: boolean;
   canReceiveNewLeads: boolean;
-  newcomerPoolStatus: "not_available";
+  newcomerPoolStatus: "active" | "inactive";
+  newcomerDailyQuota: number;
+  newcomerAcceptedToday: number;
+  newcomerRemainingToday: number;
   todayPendingCount: number;
   todayFollowUpRemainingCount?: number;
   todayFollowUpTotalCount?: number;
@@ -5539,6 +5542,10 @@ export const api = {
     unwrap<SubordinateSales>(
       await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`),
     ),
+  updateSubordinateNewcomerPool: async (salesUserId: number, enabled: boolean, dailyQuota: number) =>
+    unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/newcomer-pool`, {
+      enabled, dailyQuota,
+    })),
   subordinateSalesLeads: async (
     salesUserId: number,
     params: {

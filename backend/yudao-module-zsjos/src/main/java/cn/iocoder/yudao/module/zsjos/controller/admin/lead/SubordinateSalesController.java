@@ -108,6 +108,14 @@ public class SubordinateSalesController {
         service.updateDispatchMode(salesUserId, reqVO, getLoginUserId()); return success(true);
     }
 
+    @PutMapping("/{salesUserId}/newcomer-pool")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:newcomer-pool')")
+    public CommonResult<Boolean> updateNewcomerPool(@PathVariable Long salesUserId,
+                                                     @Valid @RequestBody SubordinateNewcomerPoolReqVO reqVO) {
+        service.updateNewcomerPool(salesUserId, reqVO, getLoginUserId());
+        return success(true);
+    }
+
     @PutMapping("/dispatch-mode/pause-all")
     @Operation(summary = "暂停全部下属销售接单")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:pause-all')")

@@ -18,7 +18,7 @@ final class SubordinateSalesFilterFields {
         add(result, select(Sensitivity.STANDARD, "subordinate.presence", STATUS, "在岗状态", options("online", "在线", "offline", "离线"), scene));
         add(result, select(Sensitivity.STANDARD, "subordinate.accepting", STATUS, "接单状态", options("true", "开启", "false", "关闭"), scene));
         add(result, select(Sensitivity.STANDARD, "subordinate.eligible", STATUS, "接单资格", options("true", "具备资格", "false", "暂无资格"), scene));
-        add(result, select(Sensitivity.STANDARD, "subordinate.newcomerPoolStatus", STATUS, "新人池状态", options("active", "启用", "inactive", "未启用"), scene));
+        add(result, select(Sensitivity.STANDARD, "subordinate.newcomerPoolStatus", STATUS, "新手池状态", options("active", "启用", "inactive", "未启用"), scene));
         add(result, number(Sensitivity.STANDARD, "subordinate.todayPendingCount", "业务指标", "今日待办数", scene));
         add(result, select(Sensitivity.STANDARD, "subordinate.todayFollowUpStatus", "业务指标", "今日跟进状态", options("completed", "已完成", "pending", "待完成"), scene));
         add(result, number(Sensitivity.STANDARD, "subordinate.firstFollowTimeoutCount", "业务指标", "首次跟进超时数", scene));

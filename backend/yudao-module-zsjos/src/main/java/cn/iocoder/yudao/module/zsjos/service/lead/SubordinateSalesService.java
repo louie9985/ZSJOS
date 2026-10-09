@@ -18,6 +18,7 @@ public interface SubordinateSalesService {
     List<LeadAssignmentUserRespVO> getTransferCandidates(Long managerUserId);
     void updateAccountStatus(Long salesUserId, SubordinateAccountStatusReqVO reqVO, Long managerUserId);
     void updateDispatchMode(Long salesUserId, SubordinateDispatchModeReqVO reqVO, Long managerUserId);
+    void updateNewcomerPool(Long salesUserId, SubordinateNewcomerPoolReqVO reqVO, Long managerUserId);
     SubordinatePauseAllRespVO pauseAllDispatch(Long managerUserId);
     void transferLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
     void restoreLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);

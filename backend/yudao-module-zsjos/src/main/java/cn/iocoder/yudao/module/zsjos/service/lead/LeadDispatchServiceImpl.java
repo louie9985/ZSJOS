@@ -61,6 +61,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private NewcomerPoolService newcomerPoolService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -129,6 +130,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         }
         Set<Long> eligible = assignmentService.getEligibleSalesUsers().stream()
                 .map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
+        Set<Long> priorityUsers = newcomerPoolService.availableUsers(eligible, newcomerPoolService.today());
         try {
             long poolSize = dispatchRedisRepository.poolSize();
             if (poolSize == 0) {
@@ -136,7 +138,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 return;
             }
             long scanBudget = poolSize * MAX_POOL_SCAN_ROUNDS;
-            for (long scanned = 0; scanned < scanBudget; scanned++) {
+            for (long scanned = 0; scanned < scanBudget + poolSize; scanned++) {
+                boolean priorityPass = scanned < poolSize;
                 Long chosen = dispatchRedisRepository.rotateNext();
                 if (chosen == null) {
                     continue;
@@ -145,6 +148,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                     dispatchRedisRepository.removeFromPool(chosen);
                     continue;
                 }
+                if (priorityPass && !priorityUsers.contains(chosen)) continue;
                 if (!dispatchRedisRepository.isOnline(chosen)) {
                     dispatchRedisRepository.removeFromPool(chosen);
                     continue;
@@ -157,6 +161,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                     continue;
                 }
                 try {
+                    if (priorityPass && !newcomerPoolService.lockAvailable(chosen)) {
+                        releaseReservation(lead.getId(), chosen);
+                        continue;
+                    }
                     int attempt = tried.size() + 1;
                     LocalDateTime expiresAt = activityAt.plusSeconds(config.acceptTimeoutSeconds());
                     if (leadMapper.updateUnassignedToPending(lead.getId(), chosen, expiresAt, attempt, activityAt) == 0) {
@@ -169,7 +177,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                     lead.setAssignmentAttemptCount(attempt);
                     LeadMapper.advanceActivity(lead, activityAt);
                     LeadAssignmentHistoryDO history = addHistory(lead, ACTION_DISPATCH, chosen, operatorUserId,
-                            rule.getId(), attempt, expiresAt, null, activityAt);
+                            rule.getId(), attempt, expiresAt, null, activityAt, priorityPass);
                     lifecycleTaskService.createAssignmentTask(lead.getId(), chosen, history.getId(),
                             expiresAt, lead.getDispatchMode());
                     notifySales(chosen, lead.getId(), priorAction == null ? "assigned" : "reassigned");
@@ -211,11 +219,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
     public void accept(Long leadId, Long userId, Long expectedAssignmentHistoryId) {
         // Hold the Lead row across round validation and ownership update; history uses a current read.
-        LeadDO lead = expectedAssignmentHistoryId == null ? requireLead(leadId)
-                : leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        LeadAssignmentHistoryDO dispatch = historyMapper.selectLatestDispatch(leadId, true);
         if (expectedAssignmentHistoryId != null) {
-            var dispatch = historyMapper.selectLatestDispatch(leadId, true);
             if (!ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     || !Objects.equals(userId, lead.getPendingAssigneeUserId())
                     || dispatch == null || !Objects.equals(expectedAssignmentHistoryId, dispatch.getId())
@@ -233,6 +240,11 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LocalDateTime acceptedAt = LocalDateTime.now();
         if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_OWNED, userId, acceptedAt) == 0) {
             throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
+        }
+        if (DISPATCH_AUTO.equals(lead.getDispatchMode()) && dispatch != null
+                && Objects.equals(userId, dispatch.getCandidateUserId())
+                && Boolean.TRUE.equals(dispatch.getNewcomerPriority())) {
+            newcomerPoolService.recordAcceptance(userId);
         }
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, userId, userId,
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
@@ -612,7 +624,14 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     private LeadAssignmentHistoryDO addHistory(LeadDO lead, String action, Long candidate, Long operator,
                                                Long ruleId, Integer attempt, LocalDateTime expiresAt,
                                                String reason, LocalDateTime occurredAt) {
+        return addHistory(lead, action, candidate, operator, ruleId, attempt, expiresAt, reason, occurredAt, false);
+    }
+
+    private LeadAssignmentHistoryDO addHistory(LeadDO lead, String action, Long candidate, Long operator,
+                                               Long ruleId, Integer attempt, LocalDateTime expiresAt,
+                                               String reason, LocalDateTime occurredAt, boolean newcomerPriority) {
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
+        history.setNewcomerPriority(newcomerPriority);
         history.setOwnerIdentitySnapshot(ACTION_CLAIM.equals(action) ? OWNER_SALES
                 : ACTION_ACCEPT.equals(action) ? lead.getOwnerIdentity()
                 : ACTION_DISPATCH.equals(action) && SOURCE_PARTNER.equals(lead.getSourceType())

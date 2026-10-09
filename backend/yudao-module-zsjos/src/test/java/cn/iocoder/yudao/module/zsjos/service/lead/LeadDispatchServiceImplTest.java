@@ -31,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_QUALIFICATION_DISPOSITION_INVALID;
@@ -51,7 +52,11 @@ import static org.mockito.Mockito.times;
 @ExtendWith(MockitoExtension.class)
 class LeadDispatchServiceImplTest {
 
-    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
+    @BeforeEach void setUp() {
+        TenantContextHolder.setTenantId(1L);
+        org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null);
+        org.mockito.Mockito.lenient().when(newcomerPoolService.today()).thenReturn(java.time.LocalDate.of(2026, 10, 9));
+    }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Mock private PartnerLeadAssignmentService partnerAssignmentService;
@@ -87,6 +92,8 @@ class LeadDispatchServiceImplTest {
     private LeadAgingPoolService agingPoolService;
     @Mock
     private LeadClaimDailyCounterMapper claimDailyCounterMapper;
+    @Mock
+    private NewcomerPoolService newcomerPoolService;
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
@@ -107,6 +114,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.updateUnassignedToPending(eq(1L), eq(11L), any(), eq(2), any())).thenReturn(1);
         doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(92L); return 1; }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
         if (timeout) assertEquals(1, service.processExpired()); else service.reject(1L, 10L);
+        verify(newcomerPoolService, never()).recordAcceptance(any());
         verify(notifyEventPublisher).publish(eq("zsjos.lead.reassigned"), eq(1L), eq("lead-dispatch:92"), any(), any(),
                 org.mockito.ArgumentMatchers.argThat(context -> Long.valueOf(11L).equals(context.get("pendingSalesUserId"))
                         && Integer.valueOf(2).equals(context.get("assignment.attempt"))));
@@ -161,10 +169,11 @@ class LeadDispatchServiceImplTest {
     @Test
     void specifiedEducationAcceptanceFreezesEducationHistory() {
         LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
-        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
         service.accept(1L, 10L);
         assertEquals("education", lead.getOwnerIdentity());
+        verify(newcomerPoolService, never()).recordAcceptance(any());
         var capture = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
         verify(historyMapper).insert(capture.capture());
         assertEquals("education", capture.getValue().getOwnerIdentitySnapshot());
@@ -178,7 +187,7 @@ class LeadDispatchServiceImplTest {
         lead.setAssignmentStatus("pending_acceptance");
         lead.setPendingAssigneeUserId(10L);
         lead.setAssignmentAttemptCount(2);
-        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
         doAnswer(invocation -> {
             var history = invocation.getArgument(0, cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
@@ -320,6 +329,119 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
+    void acceptedPriorityDispatchConsumesQuotaOnlyAfterPendingUpdate() {
+        LeadDO lead = lead();
+        lead.setDispatchMode("auto");
+        lead.setAssignmentStatus("pending_acceptance");
+        lead.setPendingAssigneeUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var dispatch = new LeadAssignmentHistoryDO();
+        dispatch.setId(91L);
+        dispatch.setCandidateUserId(10L);
+        dispatch.setNewcomerPriority(true);
+        when(historyMapper.selectLatestDispatch(1L, true)).thenReturn(dispatch);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
+
+        service.accept(1L, 10L, 91L);
+
+        verify(newcomerPoolService).recordAcceptance(10L);
+    }
+
+    @Test
+    void stalePriorityAcceptanceDoesNotConsumeQuota() {
+        LeadDO lead = lead();
+        lead.setDispatchMode("auto");
+        lead.setAssignmentStatus("pending_acceptance");
+        lead.setPendingAssigneeUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var dispatch = new LeadAssignmentHistoryDO();
+        dispatch.setId(91L);
+        dispatch.setCandidateUserId(10L);
+        dispatch.setNewcomerPriority(true);
+        when(historyMapper.selectLatestDispatch(1L, true)).thenReturn(dispatch);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(0);
+
+        assertThrows(ServiceException.class, () -> service.accept(1L, 10L, 91L));
+
+        verify(newcomerPoolService, never()).recordAcceptance(any());
+    }
+
+    @Test
+    void retryPrioritizesNewcomerAndMarksDispatchHistory() {
+        LeadDO lead = retryableLead();
+        when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
+        when(newcomerPoolService.availableUsers(eq(Set.of(10L, 11L)), any())).thenReturn(Set.of(11L));
+        when(newcomerPoolService.lockAvailable(11L)).thenReturn(true);
+        when(dispatchRedisRepository.poolSize()).thenReturn(2L);
+        when(dispatchRedisRepository.rotateNext()).thenReturn(10L, 11L);
+        when(dispatchRedisRepository.isOnline(11L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(11L)).thenReturn(true);
+        when(dispatchRedisRepository.tryReserve(1L, 11L, 120)).thenReturn(true);
+        when(leadMapper.updateUnassignedToPending(eq(1L), eq(11L), any(), eq(1), any())).thenReturn(1);
+
+        assertEquals(1, service.processUnassignedRetries());
+
+        var history = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(11L, history.getValue().getCandidateUserId());
+        assertEquals(true, history.getValue().getNewcomerPriority());
+        verify(dispatchRedisRepository, never()).tryReserve(eq(1L), eq(10L), anyInt());
+    }
+
+    @Test
+    void retryFallsBackWhenNewcomerCannotReceive() {
+        LeadDO lead = retryableLead();
+        when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
+        when(newcomerPoolService.availableUsers(eq(Set.of(10L, 11L)), any())).thenReturn(Set.of(11L));
+        when(dispatchRedisRepository.poolSize()).thenReturn(2L);
+        when(dispatchRedisRepository.rotateNext()).thenReturn(10L, 11L, 10L);
+        when(dispatchRedisRepository.isOnline(11L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(11L)).thenReturn(false);
+        when(dispatchRedisRepository.isOnline(10L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(10L)).thenReturn(true);
+        when(dispatchRedisRepository.tryReserve(1L, 10L, 120)).thenReturn(true);
+        when(leadMapper.updateUnassignedToPending(eq(1L), eq(10L), any(), eq(1), any())).thenReturn(1);
+
+        assertEquals(1, service.processUnassignedRetries());
+
+        var history = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(10L, history.getValue().getCandidateUserId());
+        assertEquals(false, history.getValue().getNewcomerPriority());
+    }
+
+    @Test
+    void multipleNewcomersFollowTheExistingRotationOrder() {
+        var first = retryableLead();
+        var second = retryableLead(); second.setId(2L);
+        when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(first, second));
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L), salesUser(12L)));
+        when(newcomerPoolService.availableUsers(any(), any())).thenReturn(Set.of(11L, 12L));
+        when(newcomerPoolService.lockAvailable(11L)).thenReturn(true);
+        when(newcomerPoolService.lockAvailable(12L)).thenReturn(true);
+        when(dispatchRedisRepository.poolSize()).thenReturn(3L);
+        when(dispatchRedisRepository.rotateNext()).thenReturn(10L, 11L, 12L);
+        when(dispatchRedisRepository.isOnline(11L)).thenReturn(true);
+        when(dispatchRedisRepository.isOnline(12L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(11L)).thenReturn(true);
+        when(dispatchRedisRepository.isAccepting(12L)).thenReturn(true);
+        when(dispatchRedisRepository.tryReserve(any(), any(), eq(120))).thenReturn(true);
+        when(leadMapper.updateUnassignedToPending(any(), any(), any(), eq(1), any())).thenReturn(1);
+        assertEquals(2, service.processUnassignedRetries());
+        var history = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
+        verify(historyMapper, times(2)).insert(history.capture());
+        assertEquals(List.of(11L, 12L), history.getAllValues().stream().map(LeadAssignmentHistoryDO::getCandidateUserId).toList());
+        assertTrue(history.getAllValues().stream().allMatch(LeadAssignmentHistoryDO::getNewcomerPriority));
+    }
+
+    @Test
     void retryMovesLeadToPoolAfterThreeRoundsOfPausedSales() {
         LeadDO lead = retryableLead();
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
@@ -333,7 +455,7 @@ class LeadDispatchServiceImplTest {
 
         assertEquals(1, service.processUnassignedRetries());
 
-        verify(dispatchRedisRepository, times(3)).rotateNext();
+        verify(dispatchRedisRepository, times(4)).rotateNext();
         verify(dispatchRedisRepository, never()).tryReserve(any(), any(), anyInt());
         verify(leadMapper).updateById(lead);
         assertEquals("public_pool", lead.getAssignmentStatus());

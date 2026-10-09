@@ -3,7 +3,7 @@ import SubordinateSalesStatusFilter from "../components/SubordinateSalesStatusFi
 import { createIdempotencyKey } from '../services/idempotency'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Empty, Form, Input, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
+import { Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import {
   ArrowLeftOutlined,
@@ -221,6 +221,24 @@ function SalesDetail({
   const [resultOpen, setResultOpen] = useState(false);
   const [detailLeadId, setDetailLeadId] = useState<number>();
   const [form] = Form.useForm();
+  const [newcomerForm] = Form.useForm<{ enabled: boolean; dailyQuota: number }>();
+  const [newcomerOpen, setNewcomerOpen] = useState(false);
+  const [newcomerSaving, setNewcomerSaving] = useState(false);
+  const saveNewcomer = async () => {
+    const values = await newcomerForm.validateFields().catch(() => undefined);
+    if (!values) return;
+    setNewcomerSaving(true);
+    try {
+      await api.updateSubordinateNewcomerPool(sales.userId, values.enabled, values.dailyQuota);
+      message.success("新手池配置已保存");
+      setNewcomerOpen(false);
+      onChanged();
+    } catch (saveError) {
+      message.error(saveError instanceof Error ? saveError.message : "新手池配置失败");
+    } finally {
+      setNewcomerSaving(false);
+    }
+  };
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -522,7 +540,21 @@ function SalesDetail({
                       </div>
                       <div className="subordinate-profile-row">
                         <span className="subordinate-field-label">新手池</span>
-                        <span className="subordinate-field-value subordinate-field-empty">暂未开放</span>
+                        <span className="subordinate-field-value">
+                          <Tag color={sales.newcomerPoolStatus === "active" ? "success" : "default"}>
+                            {sales.newcomerPoolStatus === "active" ? "启用" : "未启用"}
+                          </Tag>
+                          {sales.newcomerDailyQuota > 0 && `今日已用 ${sales.newcomerAcceptedToday}/${sales.newcomerDailyQuota} 条，剩余 ${sales.newcomerRemainingToday} 条`}
+                          {permissions.includes("zsjos:subordinate-sales:newcomer-pool") && (
+                            <Button type="link" size="small" onClick={() => {
+                              newcomerForm.setFieldsValue({
+                                enabled: sales.newcomerPoolStatus === "active",
+                                dailyQuota: sales.newcomerDailyQuota || 1,
+                              });
+                              setNewcomerOpen(true);
+                            }}>配置</Button>
+                          )}
+                        </span>
                       </div>
                       <div className="subordinate-profile-row">
                         <span className="subordinate-field-label">今日跟进状态</span>
@@ -645,6 +677,19 @@ function SalesDetail({
           },
         ]}
       />
+      <Modal title="配置新手池" open={newcomerOpen} confirmLoading={newcomerSaving}
+        onOk={() => void saveNewcomer()} onCancel={() => setNewcomerOpen(false)}>
+        <Form form={newcomerForm} layout="vertical">
+          <Form.Item name="enabled" label="启用新手池" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="dailyQuota" label="每日优先接单额度"
+            rules={[{ required: true, type: "integer", min: 1, max: 2147483647, message: "请输入有效的正整数" }]}>
+            <InputNumber min={1} max={2147483647} precision={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Typography.Text type="secondary">今日已接 {sales.newcomerAcceptedToday} 条；修改额度不会清除已用数量。</Typography.Text>
+        </Form>
+      </Modal>
       <Modal
         open={batchOpen}
         title={`批量${SUPERVISOR_LEAD_ACTION_LABELS[batchType]}客资`}
@@ -837,6 +882,17 @@ export default function SubordinateSalesPage({
     reasonForm.resetFields();
     setReasonAction(action);
   };
+  const refreshSelectedSales = async () => {
+    if (!selectedSales) return;
+    const userId = selectedSales.userId;
+    try {
+      const updated = await api.subordinateSalesOverview(userId);
+      setSelectedSales(current => current?.userId === userId ? updated : current);
+      setRows(current => current.map(row => row.userId === userId ? updated : row));
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "销售详情刷新失败，请重试");
+    }
+  };
   const confirmPauseAll = () => {
     Modal.confirm({
       title: "确认一键下班",
@@ -955,7 +1011,7 @@ export default function SubordinateSalesPage({
               sales={selectedSales}
               permissions={permissions}
               onBack={() => setSelectedSales(undefined)}
-              onChanged={() => void loadFirstPage(true)}
+              onChanged={() => void refreshSelectedSales()}
               onReasonAction={openReasonAction}
             />
           ) : (

@@ -4364,6 +4364,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_history` (
   `candidate_user_id` bigint DEFAULT NULL COMMENT '本次候选销售用户编号',
   `expires_at` datetime DEFAULT NULL COMMENT '本次接单截止时间',
   `response_at` datetime DEFAULT NULL COMMENT '响应或超时处理时间',
+  `newcomer_priority` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否按新手池优先派出',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_lead_occurred_at` (`tenant_id`,`lead_id`,`occurred_at`),
   KEY `idx_tenant_to_owner` (`tenant_id`,`to_owner_user_id`)
@@ -4511,6 +4512,29 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资派单规则';
+
+-- zsjos_newcomer_pool_config (fresh baseline; deployed environments use V295)
+CREATE TABLE IF NOT EXISTS `zsjos_newcomer_pool_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `enabled` bit(1) NOT NULL DEFAULT b'0',
+  `daily_quota` int NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_user` (`tenant_id`,`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售新手池配置';
+
+CREATE TABLE IF NOT EXISTS `zsjos_newcomer_pool_daily` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `business_date` date NOT NULL,
+  `accepted_count` int NOT NULL DEFAULT '0',
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_user_date` (`tenant_id`,`user_id`,`business_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售新手池每日成功接单数';
 
 -- zsjos_sales_dispatch_preference
 CREATE TABLE IF NOT EXISTS `zsjos_sales_dispatch_preference` (

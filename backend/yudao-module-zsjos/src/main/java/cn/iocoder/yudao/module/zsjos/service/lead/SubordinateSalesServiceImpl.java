@@ -53,6 +53,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SubordinateSalesCommandService commandService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private NewcomerPoolService newcomerPoolService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper followUpRecordMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
@@ -179,6 +180,22 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         SalesDispatchStatusRespVO after = dispatchStatusService.updateModeByManager(salesUserId, reqVO.getAccepting());
         commandService.addAudit("dispatch_mode", managerUserId, salesUserId, null,
                 before.getMode(), after.getMode(), reason);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(
+            bizType = "subordinate-sales", bizId = "#salesUserId", action = "newcomer-pool")
+    public void updateNewcomerPool(Long salesUserId, SubordinateNewcomerPoolReqVO reqVO, Long managerUserId) {
+        requireSalesSubordinate(salesUserId, managerUserId);
+        boolean eligible = assignmentService.getEligibleSalesUsers().stream()
+                .anyMatch(user -> Objects.equals(user.getId(), salesUserId));
+        if (!eligible) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
+        var before = newcomerPoolService.config(salesUserId);
+        String oldValue = before == null ? "inactive" : before.getEnabled() + ":" + before.getDailyQuota();
+        newcomerPoolService.update(salesUserId, reqVO.getEnabled(), reqVO.getDailyQuota());
+        commandService.addAudit("newcomer_pool", managerUserId, salesUserId, null,
+                oldValue, reqVO.getEnabled() + ":" + reqVO.getDailyQuota(), "主管配置新手池");
     }
 
     @Override
@@ -313,7 +330,14 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         row.setAccepting("accepting".equals(dispatch.getMode())); row.setEligible(eligible);
         row.setCanReceiveNewLeads(CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) && eligible
                 && "online".equals(dispatch.getPresence()) && Boolean.TRUE.equals(row.getAccepting()));
-        row.setNewcomerPoolStatus("not_available");
+        var newcomerConfig = newcomerPoolService.config(user.getId());
+        int acceptedToday = newcomerPoolService.accepted(user.getId(), newcomerPoolService.today());
+        boolean newcomerEnabled = newcomerConfig != null && Boolean.TRUE.equals(newcomerConfig.getEnabled());
+        int quota = newcomerConfig == null ? 0 : newcomerConfig.getDailyQuota();
+        row.setNewcomerPoolStatus(newcomerEnabled ? "active" : "inactive");
+        row.setNewcomerDailyQuota(quota);
+        row.setNewcomerAcceptedToday(acceptedToday);
+        row.setNewcomerRemainingToday(newcomerEnabled ? Math.max(0, quota - acceptedToday) : 0);
         // Count leads, not tasks: first-follow and reminder tasks can coexist for one lead.
         var todayTasks = tasks.stream().filter(task -> BIZ_TYPE_LEAD.equals(task.getBizType()) && isFollowUpTask(task.getTaskType()))
                 .filter(task -> TASK_STATUS_PENDING.equals(task.getStatus()) || "completed".equals(task.getStatus()))
