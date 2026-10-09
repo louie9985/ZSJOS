@@ -111,3 +111,32 @@ operation permissions. It appends those menu IDs only to packages that already c
 System Management and creates no role grant or published layout. Because `V139-V146` are
 owned by concurrent workstreams and are not yet present here, final bootstrap ordering and
 the V147 verification row must be integrated only after those files land.
+
+## Restoring a full database dump locally
+
+A full logical backup produced by the ZSJOS dump tooling (`zsjos_full_<timestamp>.tar.gz`)
+is restored with `script/sql/mysql/tools/restore_full_dump.py`. It targets the local
+Docker MySQL container only; there is no remote-host option by design.
+
+```text
+python script/sql/mysql/tools/restore_full_dump.py --archive <path>/zsjos_full_<stamp>.tar.gz
+python script/sql/mysql/tools/restore_full_dump.py --archive <path>/zsjos_full_<stamp>.tar.gz --apply
+python script/sql/mysql/tools/restore_full_dump.py --archive <path>/zsjos_full_<stamp>.tar.gz --apply --reset-password
+```
+
+The archive's own database name is `zsjos`, while the local application and
+`script/docker/docker-compose.yml` connect to `ruoyi-vue-pro`. The script therefore rewrites
+only the two standalone `CREATE DATABASE` / `USE` lines to the `--database` value; table names
+and data are untouched. A run without `--apply` verifies checksums, extracts, rewrites, and
+reports the target database state without writing anything.
+
+`--apply` first dumps the current target database to `backups/mysql/` (git-ignored), then
+imports. The import contains `DROP TABLE` / `CREATE TABLE`, so it replaces every same-named
+table. `V*.sql` migration history and `zsjos_module_schema_version` come from the backup, which
+may be older than the checked-out code; re-run `zsjos-db migrate` afterwards when the backup
+trails the current code baseline.
+
+`--reset-password` sets `system_users.password` and `zsjos_partner_account.password` for all
+non-deleted rows to one BCrypt hash of `--password` (default `Test@123456`). The hash uses the
+`$2a$` prefix and cost 10, matching Spring Security's `BCryptPasswordEncoder`. Tokens in
+`system_oauth2_*` are not cleared, so an already-issued token stays valid until it expires.
