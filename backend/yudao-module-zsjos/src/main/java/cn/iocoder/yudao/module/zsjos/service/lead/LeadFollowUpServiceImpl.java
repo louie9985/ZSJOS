@@ -74,8 +74,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, rollbackFor = Exception.class)
     public LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, LocalDateTime nextFollowUpAt) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-        if (lead == null || !isSelfSourced(lead.getSourceType()) || lead.getSourceProviderUserId() != null
-                || !Boolean.TRUE.equals(lead.getSourceProviderRecorded()) || !DISPATCH_SELF.equals(lead.getDispatchMode())
+        if (lead == null || !LeadSourceInterpretation.resolve(lead).unlinked() || !DISPATCH_SELF.equals(lead.getDispatchMode())
                 || !Objects.equals(operatorUserId, lead.getOwnerUserId()) || !STATUS_SUBMITTED.equals(lead.getStatus())
                 || lead.getCurrentAssignmentFirstFollowUpAt() != null) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         LeadFollowUpCreateReqVO command = new LeadFollowUpCreateReqVO();

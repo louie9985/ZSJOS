@@ -28,6 +28,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private Long formalSalesUserId;
     // Imported presentation evidence is independent of BPM and never grants ownership.
     private String importedActorSnapshot;
+    // Explicitly reviewed corrections, independent of the original imported employee evidence.
+    private String repairedActorSnapshot;
     // Business identity at conversion time; never re-resolve it from the employee's current roles.
     private String formalOwnerIdentity;
     private String submitterCenterType;
@@ -50,6 +52,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private LocalDateTime customerPaidAt;
     private String feeMode;
     private String paymentMethod;
+    private String feeModeLabelSnapshot;
+    private String paymentMethodLabelSnapshot;
     private String remark;
     private String studentSpecialRequirements;
     private String materialDeliveryContact;

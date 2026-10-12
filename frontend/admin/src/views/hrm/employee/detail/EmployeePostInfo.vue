@@ -9,28 +9,20 @@
         {{ employee.leaderEmployeeName || '-' }}
       </el-descriptions-item>
       <el-descriptions-item label="入职状态">
-        <dict-tag
-          v-if="employee.entryStatus != null"
-          :type="DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS"
-          :value="employee.entryStatus"
-        />
-        <span v-else>-</span>
+        <span>{{
+          employee.entryStatusLabel ||
+          (employee.entryStatus == null ? '-' : `历史代码 ${employee.entryStatus}`)
+        }}</span>
       </el-descriptions-item>
       <el-descriptions-item label="员工状态">
-        <dict-tag
-          v-if="employee.status != null"
-          :type="DICT_TYPE.HRM_EMPLOYEE_STATUS"
-          :value="employee.status"
-        />
-        <span v-else>-</span>
+        <span>{{
+          employee.statusLabel || (employee.status == null ? '-' : `历史代码 ${employee.status}`)
+        }}</span>
       </el-descriptions-item>
       <el-descriptions-item label="聘用形式">
-        <dict-tag
-          v-if="employee.type != null"
-          :type="DICT_TYPE.HRM_EMPLOYEE_TYPE"
-          :value="employee.type"
-        />
-        <span v-else>-</span>
+        <span>{{
+          employee.typeLabel || (employee.type == null ? '-' : `历史代码 ${employee.type}`)
+        }}</span>
       </el-descriptions-item>
       <el-descriptions-item label="入职时间">
         {{ formatHrmDateTime(employee.entryTime) }}
@@ -38,10 +30,19 @@
       <el-descriptions-item label="试用期">
         {{ employee.probation != null ? `${employee.probation} 个月` : '-' }}
       </el-descriptions-item>
-      <el-descriptions-item label="转正时间">
+      <el-descriptions-item label="计划转正日期">{{
+        formatHrmDateTime(employee.plannedRegularTime)
+      }}</el-descriptions-item>
+      <el-descriptions-item label="计划离职日期">{{
+        formatHrmDateTime(employee.plannedLeaveTime)
+      }}</el-descriptions-item>
+      <el-descriptions-item v-if="employee.legacyDateSource" label="日期来源">{{
+        employee.legacyDateSource
+      }}</el-descriptions-item>
+      <el-descriptions-item label="实际转正日期">
         {{ formatHrmDateTime(employee.regularTime) }}
       </el-descriptions-item>
-      <el-descriptions-item label="离职时间">
+      <el-descriptions-item label="实际离职日期">
         {{ formatHrmDateTime(employee.leaveTime) }}
       </el-descriptions-item>
       <el-descriptions-item label="工作城市">{{ employee.workCity || '-' }}</el-descriptions-item>
@@ -75,7 +76,6 @@
 </template>
 
 <script lang="ts" setup>
-import { DICT_TYPE } from '@/utils/dict'
 import type { HrmEmployeeVO } from '@/api/hrm/employee'
 import { formatHrmDateTime } from '@/views/hrm/utils/format'
 import EmployeeChangeRecordList from './EmployeeChangeRecordList.vue'

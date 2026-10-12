@@ -39,6 +39,61 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
     @Test
+    void sortingScansAuthorizedPagesAndKeepsFiltersBeforeReturningRequestedPage() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        request.setSortField("name"); request.setSortOrder("ascend"); request.setPageNo(2); request.setPageSize(1);
+        request.setKeyword("测试"); request.setInServicePeriod(true); request.setOperatorUserId(20L);
+        request.setReadScope("SELF");
+        var filter = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();
+        request.setAdvancedFilter(filter);
+        when(myStudentService.getMediaPage(eq(10L), any())).thenAnswer(invocation -> {
+            var batch = invocation.getArgument(1, cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO.class);
+            assertEquals(200, batch.getPageSize());
+            org.junit.jupiter.api.Assertions.assertNull(batch.getSortField());
+            org.junit.jupiter.api.Assertions.assertNull(batch.getSortOrder());
+            assertEquals(request.getKeyword(), batch.getKeyword());
+            assertEquals(true, batch.getInServicePeriod()); assertEquals(20L, batch.getOperatorUserId());
+            assertEquals("SELF", batch.getReadScope()); assertEquals(filter, batch.getAdvancedFilter());
+            var rows = java.util.stream.LongStream.rangeClosed(batch.getPageNo() == 1 ? 1 : 201, batch.getPageNo() == 1 ? 200 : 201)
+                    .mapToObj(id -> { var row = new MyStudentRespVO(); row.setPersonId(id); row.setName(id == 201 ? "陈" : "张"); return row; }).toList();
+            return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(rows, 201L);
+        });
+        when(accountMapper.selectByStudents(anyList())).thenReturn(List.of());
+        when(accountPermissionProvider.filterReadable(anyList(), eq(10L))).thenReturn(List.of());
+        var result = service.getPage(10L, request);
+        assertEquals(201L, result.getTotal());
+        assertEquals(200L, result.getList().getFirst().getPersonId());
+        verify(myStudentService, times(2)).getMediaPage(eq(10L), any());
+        assertEquals("name", request.getSortField()); assertEquals(1, request.getPageSize());
+    }
+
+    @Test
+    void accountSortingUsesOnlyReadableAccountProjection() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        request.setSortField("accounts"); request.setSortOrder("ascend");
+        var first = new MyStudentRespVO(); first.setPersonId(1L);
+        var second = new MyStudentRespVO(); second.setPersonId(2L);
+        when(myStudentService.getMediaPage(eq(10L), any())).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(first, second), 2L));
+        var hidden = new MediaAccountDO().setId(1L).setStudentPersonId(1L).setNickname("阿");
+        var visible = new MediaAccountDO().setId(2L).setStudentPersonId(2L).setNickname("张");
+        when(accountMapper.selectByStudents(List.of(1L, 2L))).thenReturn(List.of(hidden, visible));
+        when(accountPermissionProvider.filterReadable(List.of(hidden, visible), 10L)).thenReturn(List.of(visible));
+        var result = service.getPage(10L, request);
+        assertEquals(List.of(2L, 1L), result.getList().stream().map(MyStudentRespVO::getPersonId).toList());
+        assertTrue(result.getList().getLast().getAccounts().isEmpty());
+    }
+
+    @Test
+    void invalidMediaSortFailsBeforeReadingAnyStudent() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        request.setSortField("internalId"); request.setSortOrder("ascend");
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.getPage(10L, request));
+        verifyNoInteractions(myStudentService, accountMapper);
+    }
+
+    @Test
     void pageProjectsOnlyReadableAccountsWithoutLoadingDetails() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
         var first = new MyStudentRespVO(); first.setPersonId(1L);

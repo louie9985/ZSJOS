@@ -352,8 +352,8 @@ export default function LeadSubmissionPage({
               message={currentContactResult.error || (currentContactResult.matched ? '客资已存在，已激活提醒' : '未发现重复客资，可继续填写提交。')}
               action={currentContactResult.error && <Button onClick={() => void checkContact()}>重试</Button>} />}
           </Space>
-          {selfSourced && <><Title level={5}>客资提供方</Title><Row gutter={[24, 0]}>
-            <Col xs={24} md={12}><Form.Item name="newMediaProviderUserId" preserve={false} extra="选填；提交后不可补选或更改"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear placeholder="请选择新媒体提供方" notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></Col>
+          {selfSourced && <><Alert type="info" showIcon message={providerId != null ? "业务来源：新媒体引流，由本人代录" : "业务来源：本人自拓，无新媒体引流"}/><Title level={5}>客资提供方</Title><Row gutter={[24, 0]}>
+            <Col xs={24} md={12}><Form.Item name="newMediaProviderUserId" preserve={false} extra="由新媒体引流、本人先收到信息时，请选择对应新媒体人员；未选择表示本人获客、无新媒体引流。提交后不可补选或更改。"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear placeholder="请选择新媒体提供方" notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></Col>
           </Row></>}
           {automatic && <Alert showIcon type="info" message="提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。" description="仅查重通过并新建客资时自动处理；激活已有客资或进入复核仍按原流程。" />}
           <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
@@ -402,7 +402,7 @@ export default function LeadSubmissionPage({
               {
                 key: 'dispatch', label: selfSourced ? '新媒体提供方' : '派单模式',
                 children: selfSourced
-                  ? (providers.find(item => item.id === summary?.newMediaProviderUserId)?.nickname || '未指定')
+                  ? (summary?.newMediaProviderUserId != null ? `新媒体引流 · ${providers.find(item => item.id === summary?.newMediaProviderUserId)?.nickname || '人员信息待加载'}` : '本人自拓 · 无新媒体引流')
                   : summary?.dispatchMode === LEAD_ASSIGNMENT_MODE.SPECIFIED
                     ? `指定销售 · ${sales.find(item => item.id === summary?.specifiedSalesUserId)?.nickname || '未选择'}`
                     : '自动分配'

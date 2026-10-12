@@ -39,6 +39,23 @@ class ExamScheduleObjectPermissionProviderTest {
         assertTrue(provider.hasPermission(9L, "update", 20L));
         assertTrue(provider.hasPermission(9L, "publish", 20L));
         assertTrue(provider.hasPermission(9L, "revoke", 20L));
+        assertTrue(provider.hasPermission(9L, "delete", 20L));
+        assertFalse(provider.hasPermission(9L, "unsupported", 20L));
+    }
+
+    @Test void deleteRejectsOtherTenantsDeletedRowsAndMissingPermission() {
+        var row = schedule();
+        when(mapper.selectById(9L)).thenReturn(row);
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(true);
+        assertTrue(provider.hasPermission(9L, "delete", 20L));
+        row.setTenantId(11L);
+        assertFalse(provider.hasPermission(9L, "delete", 20L));
+        row.setTenantId(10L); row.setDeleted(true);
+        assertFalse(provider.hasPermission(9L, "delete", 20L));
+        row.setDeleted(false);
+        when(permissionApi.hasAnyPermissions(20L, ExamScheduleService.PERMISSION_MANAGE)).thenReturn(false);
+        assertFalse(provider.hasPermission(9L, "delete", 20L));
+        when(mapper.selectById(9L)).thenReturn(null);
         assertFalse(provider.hasPermission(9L, "delete", 20L));
     }
 

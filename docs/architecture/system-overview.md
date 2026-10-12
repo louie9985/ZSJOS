@@ -152,4 +152,4 @@ running processes before diagnosing a local startup issue.
 
 ## 公告公开阅读
 
-System 公告新增独立分享服务；Admin 与 Workbench 管理入口共用服务端接口和权限，H5 的 /notice/share 匿名路由负责外部阅读。后端 /public-api/system/notice-share/** 通过专用分享令牌授权，不使用 ADMIN 或 PARTNER 登录身份。分享地址由 system.notice-share.public-base-url（默认 ZSJOS_PUBLIC_H5_BASE_URL）生成，不取浏览器管理端域名。PMS 仅为设计参考，没有模块调用或依赖。部署与资源可达性要求见 [公告分享部署](../operations/notice-public-share-deployment.md)。
+System 公告新增独立分享服务；Admin 与 Workbench 管理入口共用服务端接口和权限。新分享由后端 /public-api/system/notice-share/page 输出包含标题、摘要和正文的 UTF-8 HTML，供匿名阅读及聊天预览；H5 的 /notice/share 匿名路由保留历史 fragment 链接。后端 /public-api/system/notice-share/** 通过专用分享令牌授权，不使用 ADMIN 或 PARTNER 登录身份。分享地址由 system.notice-share.public-base-url（默认 ZSJOS_PUBLIC_H5_BASE_URL）生成，不取浏览器管理端域名。新页面查询参数令牌须在代理/APM 中隐藏；正文清理、附件选择及失效/租户校验复用 System 原有服务。PMS 仅为设计参考，没有模块调用或依赖。部署与资源可达性要求见 [公告分享部署](../operations/notice-public-share-deployment.md)。

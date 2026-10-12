@@ -9,11 +9,21 @@ const multiDay = (id: number, start: string, end: string, status: ExamSchedule['
 })
 
 describe('exam calendar range layout', () => {
-  it('queries all 42 visible days, including adjacent months and year boundaries', () => {
+  it('queries only the selected month at year boundaries', () => {
     const { start, end } = calendarWindow(dayjs('2026-12-10'))
-    expect(start.format('YYYY-MM-DD')).toBe('2026-11-29')
-    expect(end.format('YYYY-MM-DD')).toBe('2027-01-09')
-    expect(end.diff(start, 'day')).toBe(41)
+    expect(start.format('YYYY-MM-DD')).toBe('2026-12-01')
+    expect(end.format('YYYY-MM-DD')).toBe('2026-12-31')
+    expect(end.diff(start, 'day')).toBe(30)
+  })
+
+  it('clips bars and continuation flags to the visible month without lanes for adjacent-only records', () => {
+    const range = calendarWindow(dayjs('2026-12-01'))
+    const first = layoutMultiDayWeek([multiDay(1, '2026-11-29', '2026-11-30'),
+      multiDay(2, '2026-11-29', '2026-12-02')], dayjs('2026-11-29'), range)
+    expect(first.laneCount).toBe(1)
+    expect(first.segments[0]).toMatchObject({ startColumn: 2, endColumn: 3, continuesBefore: true, continuesAfter: false })
+    const last = layoutMultiDayWeek([multiDay(3, '2026-12-30', '2027-01-02')], dayjs('2026-12-27'), range)
+    expect(last.segments[0]).toMatchObject({ startColumn: 3, endColumn: 4, continuesBefore: false, continuesAfter: true })
   })
 
   it('includes both boundaries and one-day windows without inventing exact dates', () => {

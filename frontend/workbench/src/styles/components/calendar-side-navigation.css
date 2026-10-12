@@ -95,3 +95,27 @@
   .calendar-side-navigation-content .ant-picker-calendar-header .ant-select { flex: 1; width: auto; min-width: 0; }
   .calendar-side-navigation-content .ant-picker-calendar-mode-switch { flex-basis: 100%; }
 }
+
+/* Let complete month agendas determine row height instead of clipping each date. */
+:is(.personal-calendar-page, .course-calendar-page) .ant-picker-calendar.ant-picker-calendar-full .ant-picker-panel .ant-picker-calendar-date-content {
+  height: auto;
+  min-height: 72px;
+  overflow: visible;
+}
+
+:is(.personal-calendar-page, .course-calendar-page) .ant-picker-content {
+  table-layout: fixed;
+}
+
+:is(.personal-calendar-page, .course-calendar-page) .ant-picker-content td {
+  vertical-align: top;
+}
+
+:is(.personal-calendar-page, .course-calendar-page) {
+  height: auto;
+  min-height: 100%;
+}
+
+:is(.personal-calendar-page, .course-calendar-page) .calendar-side-navigation {
+  flex: 0 0 auto;
+}

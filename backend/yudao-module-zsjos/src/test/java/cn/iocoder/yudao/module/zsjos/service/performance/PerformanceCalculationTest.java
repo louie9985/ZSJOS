@@ -49,7 +49,8 @@ class PerformanceCalculationTest {
  @Test void expiredAndUnrelatedTransfersDoNotConvert(){var n=LocalDateTime.of(2026,9,22,12,0);var m=PerformanceStatisticsService.metric(PerformancePeriods.window("month",n),List.of(order(1,"1280",n.minusDays(80),n.minusDays(1),"first_purchase")),List.of(receipt(1,n.minusDays(2))));assertEquals(0,m.converted());assertEquals(1,m.denominator());}
 
  private PerformanceFact sourced(PerformanceFact fact, String source, Long provider) {
-  fact.setSourceType(source); fact.setSourceProviderUserId(provider); return fact;
+  fact.setSourceType(source); fact.setSourceProviderUserId(provider); fact.setSourceProviderRecorded(true);
+  if(provider!=null){fact.setProviderOwnerType("system_user");fact.setProviderOwnerId(provider);} return fact;
  }
  @Test void allSixConversionPeriodsExcludeUnlinkedSelfSourcedButKeepMoney() {
   var now=LocalDateTime.of(2026,9,28,12,0);
@@ -82,7 +83,7 @@ class PerformanceCalculationTest {
   var m=PerformanceStatisticsService.metric(PerformancePeriods.window("month",now),List.of(old,fresh),List.of());
   assertEquals(0,m.denominator());assertEquals(0,m.converted());assertNull(m.rate());
   assertEquals(new BigDecimal("3280"),m.amount());assertEquals(2,m.orders());
-  old.setSourceProviderUserId(99L);
+  old.setSourceProviderUserId(99L); old.setProviderOwnerType("system_user"); old.setProviderOwnerId(99L);
   var restored=PerformanceStatisticsService.metric(PerformancePeriods.window("month",now),List.of(old,fresh),List.of());
   assertEquals(1,restored.denominator());assertEquals(1,restored.converted());
  }

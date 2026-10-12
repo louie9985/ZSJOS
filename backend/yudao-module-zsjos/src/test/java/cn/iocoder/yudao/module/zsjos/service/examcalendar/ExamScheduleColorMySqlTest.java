@@ -68,7 +68,7 @@ class ExamScheduleColorMySqlTest {
     @Test void realPersistenceRoundtripClearLegacyClientReeditAndTenantIsolation() {
         long tenant = System.currentTimeMillis(); TenantContextHolder.setTenantId(tenant);
         for (String type : new String[]{"EXACT", "MULTI_DAY"}) {
-            var req = new ExamScheduleSaveReqVO().setScheduleName("底色持久化考试").setScheduleType(type).setBackgroundColor("#aabbcc");
+            var req = new ExamScheduleSaveReqVO().setIdempotencyKey(java.util.UUID.randomUUID().toString()).setScheduleName("底色持久化考试").setScheduleType(type).setBackgroundColor("#aabbcc");
             if (type.equals("EXACT")) req.setExactDate(LocalDate.of(2099,10,10));
             else req.setStartDate(LocalDate.of(2099,10,10)).setEndDate(LocalDate.of(2099,10,20));
             long id = service.create(req, 20L);

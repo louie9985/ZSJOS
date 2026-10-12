@@ -1,0 +1,18 @@
+# local-material-upload-sort-20261011
+
+## Registration
+- Environment: local (ZSJOS_AGENT_ENV unset; environment file absent).
+- Owner: Codex /root; branch: main; worktree: D:/ZSJ-OS; base: c82c8605d86aef5c8f4cd328600bc7c3efc2bf90.
+- Goal: sort Material Browse All and Mine by initial material creation/upload time descending, with id descending for ties, before server pagination.
+- Non-goals: no favorite/recommendation/Admin default ordering change; no permissions, schema, data, dependencies, service lifecycle, branch, commit or push changes.
+- Ownership: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/material/vo/MaterialPageReqVO.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/material/MaterialMapper.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/material/MaterialUploadSortTest.java; frontend/workbench/src/services/materialApi.ts; frontend/workbench/src/pages/MaterialLibraryPage.tsx; frontend/workbench/test/material-browse-search-browser.py; docs/api/material-library.md; this record.
+- Dependencies: existing optional request parameters, material createTime audit field and server paging; existing material browser fixture. Target branch/integration: None.
+- Verification: focused mapper ordering/filter tests including omitted-parameter Admin compatibility; Workbench typecheck; existing real-browser fixture on desktop/mobile covering tab requests, pagination, filters and error states; scoped diff checks. Live authenticated backend acceptance requires deployed code and a session.
+
+## Delivery - 2026-10-11
+- Implemented optional validated `sortBy=createTime` on the existing material page request. All/Mine send it; Mapper orders by create_time DESC, id DESC before pagination. No client-side page sorting. Initial save is the upload timestamp; edits, reviews and interactions do not move items forward.
+- Other consumers omit the parameter and retain their existing ordering. Read-only Admin inspection confirmed its query starts with pageNo/pageSize and passes through the existing API. No Admin changes required for this additive optional contract.
+- Passed: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am test '-Dtest=MaterialUploadSortTest,MaterialPersonalFilterTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Dstyle.color=never' -q`: 4 tests, 0 failures/errors/skips. Covers All/Mine, ordinary/manager reads, page 1/2 SQL order, same-time id tie-breaker, existing personal filters, old Admin/favorite/recommendation order and invalid sort rejection. Initial invocation failed because PowerShell split an unquoted dotted Maven property; quoting the property resolved it.
+- Passed: Workbench `npm run typecheck`; `python frontend/workbench/test/material-browse-search-browser.py` in real headless Chrome at 1440 and 390 widths using the existing synthetic transport. Confirms All/Mine sort requests, search/pagination retention, favorite omission, empty/error/retry/denied flows. Screenshots under the local temporary material-browse-search directory. This is fixture verification, not authenticated backend data acceptance.
+- Passed scoped `git diff --check` and final diff review. Existing unrelated changes preserved; only the registered files changed. Ownership released.
+- Limits: backend restart/deployment was not authorized or performed; live authenticated sorting remains unverified until both code changes are deployed. No production build needed for the request-only frontend change; no routes, assets, layout, bundling or dependencies changed. No database edits or service operations, commit or push.

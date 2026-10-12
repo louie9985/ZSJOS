@@ -27,12 +27,39 @@ public class SalesOrderSnapshot {
     public record Selection(String type, String value, String label) {}
 
     public record ImportedActor(Long orderUserId, Long sourceEmployeeId, String name, String nameSource) {}
+    public record RepairedActors(Integer version, Long tenantId, String orderNo, String repairKey,
+                                 String capturedAt, Actor submitter, Actor formalSales) {}
     public record ImportedActors(Integer version, Long tenantId, String orderNo, String sourceSystem,
                                  String sourceSha256, Long sourceOrderId, String sourceCapturedAt,
                                  ImportedActor submitter, ImportedActor formalSales) {}
 
     /** Restored evidence may fill missing names, but cannot replace recorded round history. */
     public static SalesOrderSnapshot read(String raw, SalesOrderDO current) {
+        SalesOrderSnapshot result = readOriginal(raw, current);
+        if (current == null || current.getRepairedActorSnapshot() == null) return result;
+        try {
+            RepairedActors repair = JsonUtils.getObjectMapper().readValue(
+                    current.getRepairedActorSnapshot(), RepairedActors.class);
+            if (repair == null || !Integer.valueOf(1).equals(repair.version())
+                    || current.getTenantId() == null || !current.getTenantId().equals(repair.tenantId())
+                    || current.getOrderNo() == null || !current.getOrderNo().equals(repair.orderNo())
+                    || !"order-actors-v312".equals(repair.repairKey())
+                    || repair.capturedAt() == null || repair.capturedAt().isBlank()) return result;
+            // A correction never authorizes an object or follows a later ownership transfer.
+            if (validRepairActor(repair.submitter(), current.getSubmitterUserId())) result.submitter = repair.submitter();
+            if (validRepairActor(repair.formalSales(), current.getFormalSalesUserId())) result.formalSales = repair.formalSales();
+        } catch (RuntimeException ex) {
+            log.warn("Order actor correction could not be parsed");
+        }
+        return result;
+    }
+
+    private static boolean validRepairActor(Actor actor, Long userId) {
+        return actor != null && userId != null && "ADMIN".equals(actor.subjectType())
+                && userId.equals(actor.id()) && actor.name() != null && !actor.name().isBlank();
+    }
+
+    private static SalesOrderSnapshot readOriginal(String raw, SalesOrderDO current) {
         SalesOrderSnapshot result = read(raw);
         if (current == null || current.getImportedActorSnapshot() == null
                 || Integer.valueOf(-1).equals(result.getSnapshotVersion())) return result;

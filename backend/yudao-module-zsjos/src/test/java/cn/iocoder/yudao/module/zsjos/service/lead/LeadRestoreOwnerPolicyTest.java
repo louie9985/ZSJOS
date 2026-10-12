@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -15,8 +17,11 @@ class LeadRestoreOwnerPolicyTest {
     @Mock private LeadAssignmentService assignmentService;
     @Mock private LeadSubmissionIdentityService identityService;
 
-    @Test void educationSelfSourcedUsesEducationEligibilityOnly() {
-        LeadDO lead = lead("education", "education_self_sourced");
+    @ParameterizedTest
+    @CsvSource({"education_self_sourced,self", "partner,specified"})
+    void supportedEducationOwnershipUsesEmployeeEligibilityOnly(String source, String dispatchMode) {
+        LeadDO lead = lead("education", source);
+        lead.setDispatchMode(dispatchMode);
         when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
         assertTrue(policy.isEligible(lead));
         when(identityService.isEligibleEducationOwner(20L)).thenReturn(false);
@@ -24,8 +29,13 @@ class LeadRestoreOwnerPolicyTest {
         verifyNoInteractions(assignmentService);
     }
 
-    @Test void otherEducationSourcesDoNotGainRestoration() {
-        assertFalse(policy.isEligible(lead("education", "internal_new_media")));
+    @ParameterizedTest
+    @CsvSource({"internal_new_media,specified", "sales_self_sourced,self", "partner,auto",
+            "partner,self", "partner,", ",specified"})
+    void otherEducationSourcesDoNotGainRestoration(String source, String dispatchMode) {
+        LeadDO lead = lead("education", source);
+        lead.setDispatchMode(dispatchMode);
+        assertFalse(policy.isEligible(lead));
         verifyNoInteractions(identityService, assignmentService);
     }
 
@@ -50,4 +60,12 @@ class LeadRestoreOwnerPolicyTest {
         lead.setOwnerUserId(20L); lead.setOwnerIdentity(identity); lead.setSourceType(source);
         return lead;
     }
+    @Test void assistedEducationRetainsRestorationAfterSourceCorrection() {
+        LeadDO lead=lead("education","internal_new_media");
+        lead.setSubmissionSourceType("education_self_sourced");lead.setDispatchMode("self");
+        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        assertTrue(policy.isEligible(lead));verifyNoInteractions(assignmentService);
+        lead.setSubmissionSourceType("sales_self_sourced");assertFalse(policy.isEligible(lead));
+    }
+
 }

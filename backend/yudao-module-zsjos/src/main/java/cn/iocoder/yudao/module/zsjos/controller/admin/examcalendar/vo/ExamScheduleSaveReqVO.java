@@ -9,6 +9,8 @@ import java.time.LocalDate;
 
 @Data
 public class ExamScheduleSaveReqVO {
+    /** Required for create; updates keep their existing path-based identity. */
+    private String idempotencyKey;
     @NotBlank @Size(max = 100) private String scheduleName;
     @jakarta.validation.constraints.Pattern(regexp = "^(|#[0-9a-fA-F]{6})$", message = "考期底色须为六位十六进制颜色")
     private String backgroundColor;

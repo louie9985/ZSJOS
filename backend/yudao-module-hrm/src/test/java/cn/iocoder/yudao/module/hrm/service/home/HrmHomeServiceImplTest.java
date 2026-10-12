@@ -310,13 +310,13 @@ public class HrmHomeServiceImplTest extends BaseMockitoUnitTest {
         HrmEmployeeDO birthdayEmployee = new HrmEmployeeDO().setId(2L).setName("李四")
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus())
                 .setBirthday(date.minusYears(28).atStartOfDay())
-                .setAge(28).setRegularTime(date.atTime(10, 0));
+                .setAge(28).setPlannedRegularTime(date.atTime(10, 0));
         HrmEmployeeDO pendingEntryEmployee = new HrmEmployeeDO().setId(3L).setName("赵六")
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus())
                 .setEntryTime(date.atTime(9, 0));
         HrmEmployeeDO pendingLeaveEmployee = new HrmEmployeeDO().setId(4L).setName("孙七")
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus())
-                .setLeaveTime(date.minusDays(1).atTime(18, 0));
+                .setPlannedLeaveTime(date.atTime(17, 0));
         HrmEmployeeDO leftEmployee = new HrmEmployeeDO().setId(5L).setName("周八")
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
                 .setBirthday(date.minusYears(30).atStartOfDay()).setLeaveTime(date.atTime(18, 0));

@@ -22,6 +22,29 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SalesOrderRevisionMapperTest {
     @Test
+    void approvalStateQueryKeepsOldAndSuccessorOrdersSeparate() throws Exception {
+        var source = new DriverManagerDataSource("jdbc:h2:mem:approval" + UUID.randomUUID() + ";MODE=MySQL", "sa", "");
+        try (var keepAlive = source.getConnection()) {
+            var jdbc = new JdbcTemplate(source);
+            jdbc.execute("CREATE TABLE zsjos_order(id BIGINT PRIMARY KEY, tenant_id BIGINT, status VARCHAR(32), order_no VARCHAR(64), student_name VARCHAR(64), student_mobile VARCHAR(32), deleted BOOLEAN DEFAULT FALSE)");
+            jdbc.execute("CREATE TABLE zsjos_order_approval_round(id BIGINT PRIMARY KEY, order_id BIGINT, tenant_id BIGINT, process_instance_id VARCHAR(64), deleted BOOLEAN DEFAULT FALSE)");
+            jdbc.execute("INSERT INTO zsjos_order VALUES(1,1,'superseded','OLD-A','example','',FALSE),(2,1,'pending_approval','NEW-B','example','',FALSE),(3,1,'revision_required','REV-C','example','',FALSE),(4,2,'pending_approval','OTHER','example','',FALSE),(5,1,'effective','DELETED','example','',TRUE)");
+            jdbc.execute("INSERT INTO zsjos_order_approval_round VALUES(1,1,1,'p-old',FALSE),(2,2,1,'p-new',FALSE),(3,3,1,'p-revise',FALSE),(4,4,2,'p-other',FALSE),(5,5,1,'p-deleted',FALSE),(6,2,2,'p-wrong-tenant',FALSE)");
+            var config = new MybatisConfiguration();
+            config.setEnvironment(new Environment("test", new JdbcTransactionFactory(), source));
+            config.addMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper.class);
+            var factory = new MybatisSqlSessionFactoryBuilder().build(config);
+            try (var session = factory.openSession()) {
+                var mapper = session.getMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper.class);
+                assertEquals(java.util.List.of("p-old"), mapper.selectApprovalProcessIds(1L, "superseded", null, null));
+                assertEquals(java.util.List.of("p-new"), mapper.selectApprovalProcessIds(1L, "pending_approval", "NEW", java.util.List.of(2L, 3L)));
+                assertTrue(mapper.selectApprovalProcessIds(1L, "revision_required", "NEW", null).isEmpty());
+                assertEquals(java.util.Set.of("p-old", "p-new", "p-revise"), new java.util.HashSet<>(mapper.selectApprovalProcessIds(1L, null, null, null)));
+            }
+        }
+    }
+
+    @Test
     void paymentUniqueKeyAndOfflineSnapshotAreTenantScopedAndRollbackTogether() throws Exception {
         var source = new DriverManagerDataSource("jdbc:h2:mem:revision" + UUID.randomUUID() + ";MODE=MySQL", "sa", "");
         try (var keepAlive = source.getConnection()) {

@@ -153,6 +153,7 @@ export type MaterialSaveRequest = {
 }
 
 export type MaterialPageParams = {
+  sortBy?: 'createTime'
   versionStatus?: MaterialVersion['status']
   platform?: string
   pageNo: number

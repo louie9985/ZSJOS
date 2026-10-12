@@ -417,4 +417,16 @@ class LeadNotifySceneProviderTest {
     private static List<String> variableKeys(NotifySceneRespDTO scene) {
         return scene.getVariables().stream().map(NotifySceneVariableRespDTO::getKey).toList();
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    void mediaAssistedEntryStillNotifiesProvider(String entry) {
+        var lead=new LeadDO().setId(1L).setSourceType(SOURCE_INTERNAL_NEW_MEDIA).setSubmissionSourceType(entry)
+                .setSourceUserId(20L).setSourceProviderRecorded(true).setSourceProviderUserId(20L)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        var event=NotifyBusinessEvent.builder().sceneCode(CREATED).bizId(1L).operatorUserId(10L).build();
+        org.junit.jupiter.api.Assertions.assertNull(provider.evaluateRule(event,Set.of(ROLE_NEW_MEDIA_PROVIDER),Set.of()));
+        assertEquals(Set.of(NotifyRecipientDTO.admin(20L)),provider.resolveRecipients(event,Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+    }
+
 }

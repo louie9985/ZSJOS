@@ -8,6 +8,23 @@ import java.util.List;
 
 @Mapper
 public interface BusinessEventMapper extends BaseMapperX<BusinessEventDO> {
+    default java.util.Map<Long, Long> selectLatestInvalidIds(List<Long> leadIds) {
+        if (leadIds.isEmpty()) return java.util.Map.of();
+        var result = new java.util.HashMap<Long, Long>();
+        selectList(new LambdaQueryWrapperX<BusinessEventDO>()
+                .select(BusinessEventDO::getId, BusinessEventDO::getAggregateId)
+                .eq(BusinessEventDO::getAggregateType, "lead").in(BusinessEventDO::getAggregateId, leadIds)
+                .eq(BusinessEventDO::getEventType, "lead_qualified_invalid"))
+                .forEach(event -> result.merge(event.getAggregateId(), event.getId(), Math::max));
+        return result;
+    }
+    default Long selectLatestInvalidId(Long leadId) {
+        var event = selectOne(new LambdaQueryWrapperX<BusinessEventDO>()
+                .eq(BusinessEventDO::getAggregateType, "lead").eq(BusinessEventDO::getAggregateId, leadId)
+                .eq(BusinessEventDO::getEventType, "lead_qualified_invalid")
+                .orderByDesc(BusinessEventDO::getId).last("LIMIT 1"));
+        return event == null ? 0L : event.getId();
+    }
 
     default List<BusinessEventDO> selectTodayByUserIds(List<Long> userIds,
             java.time.LocalDateTime start, java.time.LocalDateTime end) {

@@ -1,6 +1,15 @@
 -- Module schema only; no business rows.
 SET NAMES utf8mb4;
 CREATE TABLE IF NOT EXISTS hrm_employee (
+  `planned_regular_time` datetime DEFAULT NULL,
+  `planned_leave_time` datetime DEFAULT NULL,
+  `version` bigint NOT NULL DEFAULT 0,
+  `type_label` varchar(255) DEFAULT NULL,
+  `status_label` varchar(255) DEFAULT NULL,
+  `entry_status_label` varchar(255) DEFAULT NULL,
+  `legacy_date_source` varchar(128) DEFAULT NULL,
+  `legacy_regular_time` datetime DEFAULT NULL,
+  `legacy_leave_time` datetime DEFAULT NULL,
     id bigint NOT NULL AUTO_INCREMENT,
     name varchar(255) NOT NULL,
     job_number varchar(64) DEFAULT NULL,
@@ -185,6 +194,15 @@ CREATE TABLE IF NOT EXISTS hrm_employee_file (
 );
 
 CREATE TABLE IF NOT EXISTS hrm_employee_change_record (
+  `state` varchar(24) DEFAULT NULL,
+  `version` bigint NOT NULL DEFAULT 0,
+  `operation_key` varchar(64) DEFAULT NULL,
+  `change_mode` varchar(24) DEFAULT NULL,
+  `planned_time` datetime DEFAULT NULL,
+  `actual_time` datetime DEFAULT NULL,
+  `before_snapshot` longtext,
+  `after_snapshot` longtext,
+  `request_hash` varchar(64) DEFAULT NULL,
     id bigint NOT NULL AUTO_INCREMENT,
     employee_id bigint NOT NULL,
     type tinyint DEFAULT NULL,

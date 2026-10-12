@@ -5,6 +5,8 @@ import type { DataNode } from 'antd/es/tree'
 import { performanceApi, money, periodRange, type Group, type OrgNode, type Scope } from '../../services/salesPerformance'
 export { AverageTrend, Funnel } from './PerformanceCharts'
 import './performance.css'
+import { useRetainedPageActive } from '../../layouts/RetainedReviewRoutes'
+import { useLocation } from 'react-router-dom'
 export function useResource<T>(loader: (signal: AbortSignal) => Promise<T>, dependencies: unknown[], retainData = false) {
  const [data,setData]=useState<T>(), [error,setError]=useState(''), [loading,setLoading]=useState(true), [version,setVersion]=useState(0)
  useEffect(()=>{ const controller=new AbortController();setLoading(true);setError('');if(!retainData)setData(undefined)
@@ -21,7 +23,9 @@ export function Resource({state,children}:{state:{loading:boolean;error:string;r
  return <>{children}</>
 }
 export function PerformanceShell({targets=false,initialKey,retainStatistics=false,children}:{targets?:boolean;initialKey?:string;retainStatistics?:boolean;children:(scope:Scope,node:OrgNode,reloadTree:()=>void,nodes:OrgNode[],select:(key:string)=>void,treeLoading:boolean)=>ReactNode}) {
+ const activePage=useRetainedPageActive(),location=useLocation()
  const tree=useResource(signal=>performanceApi.tree(targets,signal),[targets],retainStatistics);const [selected,setSelected]=useState<string|undefined>(initialKey);const [keyword,setKeyword]=useState('');const [collapsed,setCollapsed]=useState(false);const [open,setOpen]=useState(false)
+ useEffect(()=>setOpen(false),[activePage,location.key])
  const active=tree.data?.find(x=>x.key===selected&&x.selectable)??tree.data?.find(x=>x.selectable)
  const nodes=useMemo(()=>{const rows=tree.data??[];const keep=new Set<string>();for(const x of rows.filter(n=>!keyword||n.title.includes(keyword))){let current:OrgNode|undefined=x;while(current&&!keep.has(current.key)){keep.add(current.key);current=rows.find(n=>n.key===current?.parentKey)}}
  const build=(parent?:string):DataNode[]=>rows.filter(n=>(n.parentKey===parent||parent===undefined&&!rows.some(x=>x.key===n.parentKey))&&keep.has(n.key)).map(n=>({key:n.key,title:n.title,selectable:n.selectable,children:build(n.key)}));return build()

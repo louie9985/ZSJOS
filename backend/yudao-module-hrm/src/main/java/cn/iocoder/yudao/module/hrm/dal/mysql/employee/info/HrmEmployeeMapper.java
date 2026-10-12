@@ -172,7 +172,7 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
 
     @SuppressWarnings("UnusedReturnValue")
     default int updateProfile(HrmEmployeeDO updateObj, Set<String> updateFields) {
-        return update(new LambdaUpdateWrapper<HrmEmployeeDO>()
+        return update(new LambdaUpdateWrapper<HrmEmployeeDO>().setSql("version = version + 1")
                 .set(updateFields.contains(HrmEmployeeArchiveFieldEnum.NAME.getName()), HrmEmployeeDO::getName, updateObj.getName())
                 .set(updateFields.contains(HrmEmployeeArchiveFieldEnum.MOBILE.getName()), HrmEmployeeDO::getMobile, updateObj.getMobile())
                 .set(updateFields.contains(HrmEmployeeArchiveFieldEnum.COUNTRY.getName()), HrmEmployeeDO::getCountry, updateObj.getCountry())
@@ -242,14 +242,15 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
                 .in(HrmEmployeeChangeRecordDO::getType,
                         HrmEmployeeChangeTypeEnum.REGULAR.getType(),
                         HrmEmployeeChangeTypeEnum.TRANSFER.getType());
-        query.betweenIfPresent(HrmEmployeeChangeRecordDO::getEffectTime, effectTimes);
+        query.eq(HrmEmployeeChangeRecordDO::getState, "APPLIED").eq(HrmEmployeeChangeRecordDO::getChangeMode, "BUSINESS");
+        query.betweenIfPresent(HrmEmployeeChangeRecordDO::getActualTime, effectTimes);
         query.groupBy(HrmEmployeeChangeRecordDO::getType);
         return selectMaps(query);
     }
 
     default List<HrmEmployeeDO> selectListByRegularTimeBeforeOrEqual(LocalDateTime deadlineTime) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeDO>()
-                .le(HrmEmployeeDO::getRegularTime, deadlineTime)
+                .le(HrmEmployeeDO::getPlannedRegularTime, deadlineTime)
                 .in(HrmEmployeeDO::getEntryStatus, HrmEmployeeEntryStatusEnum.ACTIVE_STATUSES)
                 .eq(HrmEmployeeDO::getStatus, HrmEmployeeStatusEnum.PROBATION.getStatus())
                 .orderByAsc(HrmEmployeeDO::getRegularTime)
@@ -297,14 +298,14 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
         LocalDateTime[] monthTimes = LocalDateTimeUtils.getMonthDateTimeRange(
                 now.getYear(), now.getMonthValue());
         if (HrmEmployeeTodoTypeEnum.PENDING_LEAVE.getType().equals(todoType)) {
-            query.betweenIfPresent(HrmEmployeeDO::getLeaveTime, monthTimes);
+            query.betweenIfPresent(HrmEmployeeDO::getPlannedLeaveTime, monthTimes);
         } else if (HrmEmployeeTodoTypeEnum.CONTRACT_EXPIRE.getType().equals(todoType)) {
             query.innerJoin(HrmEmployeeContractDO.class, HrmEmployeeContractDO::getEmployeeId,
                     HrmEmployeeDO::getId).distinct();
             query.betweenIfPresent(HrmEmployeeContractDO::getEndTime, monthTimes);
         } else if (HrmEmployeeTodoTypeEnum.REGULAR.getType().equals(todoType)) {
             query.eq(HrmEmployeeDO::getStatus, HrmEmployeeStatusEnum.PROBATION.getStatus());
-            query.betweenIfPresent(HrmEmployeeDO::getRegularTime, monthTimes);
+            query.betweenIfPresent(HrmEmployeeDO::getPlannedRegularTime, monthTimes);
         } else if (HrmEmployeeTodoTypeEnum.PENDING_ENTRY.getType().equals(todoType)) {
             query.betweenIfPresent(HrmEmployeeDO::getEntryTime, monthTimes);
         } else if (HrmEmployeeTodoTypeEnum.BIRTHDAY.getType().equals(todoType)) {
@@ -356,7 +357,8 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
                         HrmEmployeeDO::getId)
                 .eq(HrmEmployeeChangeRecordDO::getType, changeType)
                 .distinct();
-        query.betweenIfPresent(HrmEmployeeChangeRecordDO::getEffectTime, monthTimes);
+        query.eq(HrmEmployeeChangeRecordDO::getState, "APPLIED").eq(HrmEmployeeChangeRecordDO::getChangeMode, "BUSINESS");
+        query.betweenIfPresent(HrmEmployeeChangeRecordDO::getActualTime, monthTimes);
     }
 
     private MPJLambdaWrapperX<HrmEmployeeDO> buildQueryWrapper(HrmEmployeePageReqVO reqVO) {
@@ -378,6 +380,8 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
         }
         query.betweenIfPresent(HrmEmployeeDO::getEntryTime, reqVO.getEntryTime());
         query.betweenIfPresent(HrmEmployeeDO::getRegularTime, reqVO.getRegularTime());
+        query.betweenIfPresent(HrmEmployeeDO::getPlannedRegularTime, reqVO.getPlannedRegularTime());
+        query.betweenIfPresent(HrmEmployeeDO::getPlannedLeaveTime, reqVO.getPlannedLeaveTime());
         query.leIfPresent(HrmEmployeeDO::getEntryTime, ArrayUtils.get(reqVO.getActiveTime(), 1));
         LocalDateTime activeBeginTime = ArrayUtils.get(reqVO.getActiveTime(), 0);
         if (activeBeginTime != null) {

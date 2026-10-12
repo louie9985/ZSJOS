@@ -2,8 +2,7 @@ import type { Dayjs } from 'dayjs'
 import type { ExamSchedule } from '../services/api'
 
 export const calendarWindow = (anchor: Dayjs) => {
-  const start = anchor.startOf('month').startOf('week')
-  return { start, end: start.add(41, 'day') }
+  return { start: anchor.startOf('month'), end: anchor.endOf('month').startOf('day') }
 }
 
 export const schedulesForRecordStatus = (rows: ExamSchedule[], status?: ExamSchedule['recordStatus']) =>
@@ -22,8 +21,10 @@ export type MultiDaySegment = {
   continuesAfter: boolean
 }
 
-export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs) {
+export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs,
+  visibleRange = { start: weekStart, end: weekStart.add(6, 'day') }) {
   const days = Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day').format('YYYY-MM-DD'))
+  const first = visibleRange.start.format('YYYY-MM-DD'), last = visibleRange.end.format('YYYY-MM-DD')
   const laneEnds: number[] = []
   const segments: MultiDaySegment[] = []
   const candidates = rows.filter(row => row.scheduleType === 'MULTI_DAY' && row.startDate && row.endDate
@@ -31,14 +32,15 @@ export function layoutMultiDayWeek(rows: ExamSchedule[], weekStart: Dayjs) {
     .sort((a, b) => a.startDate!.localeCompare(b.startDate!)
       || b.endDate!.localeCompare(a.endDate!) || a.id - b.id)
   for (const schedule of candidates) {
-    const covered = days.map((day, i) => coversExamDay(schedule, day) ? i : -1).filter(i => i >= 0)
+    const covered = days.map((day, i) => day >= first && day <= last && coversExamDay(schedule, day) ? i : -1).filter(i => i >= 0)
+    if (!covered.length) continue
     const startColumn = covered[0], endColumn = covered[covered.length - 1]
     let lane = laneEnds.findIndex(end => end < startColumn)
     if (lane === -1) lane = laneEnds.length
     laneEnds[lane] = endColumn
     segments.push({ schedule, startColumn, endColumn, lane,
-      continuesBefore: schedule.startDate! < days[0],
-      continuesAfter: schedule.endDate! > days[6] })
+      continuesBefore: schedule.startDate! < days[startColumn],
+      continuesAfter: schedule.endDate! > days[endColumn] })
   }
   return { segments, laneCount: laneEnds.length }
 }

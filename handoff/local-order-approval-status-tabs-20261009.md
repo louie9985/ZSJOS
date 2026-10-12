@@ -1,0 +1,18 @@
+# 成交订单审批状态页签
+
+## Registration
+- Workstream: local-order-approval-status-tabs-20261009; owner Codex /root.
+- Environment: local (environment override and environment file absent); branch main; worktree D:/ZSJ-OS; base c82c8605d86aef5c8f4cd328600bc7c3efc2bf90. Target branch/integration order: None.
+- Goal: approved order-state tabs: 全部、待审核、待重提、已通过、已终止、历史旧单（已重提）; preserve BPM visibility and command authorization.
+- Non-goals: workflow/state transitions, permissions, database/config publication, supervisor-confirmation tabs, shared service restart, dependencies, Git operations.
+- Ownership: ZSJOS SalesOrderPageReqVO, SalesOrderApprovalFilterProfileRespVO, SalesOrderApprovalRoundMapper, SalesOrderServiceImpl and focused order tests; Workbench SalesOrderApprovalPage.tsx, SalesOrderDetailCards.tsx, MySalesOrderPage.tsx, services/api.ts and focused approval browser/test fixtures; docs/api/zsjos-sales-order.md; this record.
+- Contracts: add explicit orderState query and server-provided orderStates metadata; retain legacy groups/handled for Vue Admin compatibility. Order state intersects keyword/advanced filters before BPM pagination. Existing BPM todo/done scope is retained.
+- Verification: focused Java behavior/mapper/contract tests, Workbench typecheck and existing order tests, isolated browser desktop/mobile tabs, pagination reset, errors/empty/permissions and detail action gating; scoped diff. Use isolated build resources if concurrent builds are present.
+
+## Delivery
+- Implemented server-provided lifecycle tabs and explicit orderState across page/cursor/search queries. State/keyword/advanced conditions select process IDs before BPM paging/counting; current user/center scope and task authorization remain unchanged. Legacy groups/handled contracts retained for Vue Admin. No SQL migration or shared configuration publication required.
+- Workbench renders six confirmed tabs; shared status badges and MySalesOrder labels use 待重提 / 历史旧单（已重提）. Tab/center changes reset page/cursor/selection/drawer. Completed tasks remain read-only even while an order is pending another center.
+- Java: isolated Maven reactor PASS, 84 tests (SalesOrderServiceImplTest 76, SalesOrderRevisionMapperTest 2, controller permission 1, object permission 5), zero failures/errors. Six changed Java source/test files byte-match the tested temporary build. Added query execution coverage for old/successor separation, status/keyword/advanced intersection, deleted/cross-tenant exclusion; service coverage for BPM pagination, legacy Admin query, invalid/cross-state cursor and metadata order. Initial H2 incompatibility with b'0' resolved using portable FALSE.
+- Frontend: npm run typecheck PASS; focused existing order tests 40/40 PASS. Real Chrome fixtures at 1440/390 PASS: tab labels/order, state requests/results, stale response isolation, table pagination/center reset, pending versus handled action gating, mobile history overflow menu, empty/error/retry/denied. Screenshots visually inspected in C:/Users/EDY/AppData/Local/Temp/order-approval-status-browser. Test transport isolated, no real decisions submitted.
+- Scoped UTF-8/diff checks PASS. Direct API documentation updated. No dependencies, Git branch/commit operations, database writes or shared service restart. Existing unrelated changes preserved.
+- Limit: live authenticated new-backend request and deployment not executed; running service still needs a separately authorized update. Deploy backend before Workbench. Vue compatibility is verified at its existing request contract and service tests, not a live Vue browser session. No production build required for this change (no routes/assets/dependencies/bundling changes). Ownership released.

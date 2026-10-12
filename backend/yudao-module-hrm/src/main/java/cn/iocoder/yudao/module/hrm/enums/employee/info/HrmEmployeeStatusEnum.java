@@ -47,7 +47,8 @@ public enum HrmEmployeeStatusEnum implements ArrayValuable<Integer> {
      * 可转为全职的员工状态集合
      */
     public static final Set<Integer> CONVERTIBLE_TO_FULL_TIME_STATUSES = SetUtils.asSet(
-            INTERN.getStatus(), PART_TIME.getStatus());
+            INTERN.getStatus(), PART_TIME.getStatus(), LABOR.getStatus(),
+            CONSULTANT.getStatus(), REHIRE.getStatus(), OUTSOURCE.getStatus());
 
     /**
      * 状态

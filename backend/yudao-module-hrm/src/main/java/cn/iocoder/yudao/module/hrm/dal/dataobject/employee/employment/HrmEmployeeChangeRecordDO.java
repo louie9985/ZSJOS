@@ -120,4 +120,15 @@ public class HrmEmployeeChangeRecordDO extends BaseDO {
      */
     private String remark;
 
+
+    private String state;
+    private Long version;
+    private String operationKey;
+    private String changeMode;
+    private LocalDateTime plannedTime;
+    private LocalDateTime actualTime;
+    private String beforeSnapshot;
+    private String afterSnapshot;
+    private String requestHash;
+
 }

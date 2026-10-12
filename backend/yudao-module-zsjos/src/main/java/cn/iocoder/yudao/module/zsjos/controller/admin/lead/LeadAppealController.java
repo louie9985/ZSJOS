@@ -27,6 +27,15 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/lead/appeal")
 public class LeadAppealController {
     @Resource private LeadAppealService appealService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAppealReviewDetailService reviewDetailService;
+
+    @GetMapping("/{id}/review-detail")
+    @Operation(summary = "获得当前申诉任务授权的客资详情")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
+    public CommonResult<LeadAppealReviewDetailRespVO> getReviewDetail(
+            @PathVariable Long id, @RequestParam String taskId) {
+        return success(reviewDetailService.getDetail(id, taskId, WebFrameworkUtils.getLoginUserId()));
+    }
 
     @GetMapping("/lead/{leadId}/list")
     @Operation(summary = "获得客资申诉记录")
@@ -35,6 +44,15 @@ public class LeadAppealController {
             + "'zsjos:lead:appeal:review-chairman','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
     public CommonResult<List<LeadAppealRespVO>> getList(@PathVariable Long leadId) {
         return success(appealService.getLeadAppeals(leadId, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/lead/{leadId}/context")
+    @Operation(summary = "获得当前判定申诉上下文")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:appeal-read','zsjos:lead:appeal:create',"
+            + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
+            + "'zsjos:lead:appeal:review-chairman','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
+    public CommonResult<LeadAppealContextRespVO> getContext(@PathVariable Long leadId) {
+        return success(appealService.getAppealContext(leadId, WebFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/lead/{leadId}/submit")

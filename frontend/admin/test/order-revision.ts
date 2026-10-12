@@ -1,5 +1,6 @@
 // UTF-8. Isolated browser fixture: all HTTP requests use test data only.
 import { createApp, h } from 'vue'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import Page from '../src/views/zsjos/mySalesOrder/index.vue'
@@ -8,7 +9,7 @@ import { setupStore } from '../src/store'
 import { setupI18n } from '../src/plugins/vueI18n'
 const params = new URLSearchParams(location.search)
 const mode = params.get('mode') || 'offline'
-const order = { id: 1, orderNo: 'TEST-REVISION', studentName: '测试学员', canRevise: true, status: 'revision_required', totalAmount: 500, collectionMode: mode === 'online' ? 'online_link' : mode === 'unknown' ? undefined : 'offline_paid', transactionLocked: mode === 'online', paymentStatus: 'paid', items: [{ id: 1, productRef: 'spu-1', skuRef: 'sku-1', productName: '测试课程', skuName: '原规格', actualAmount: 500 }], paymentVouchers: [], studentNatureLabelSnapshot: '测试', servicePeriodLabelSnapshot: '测试', studentSourceLabelSnapshot: '测试', feeModeLabelSnapshot: '测试', paymentMethodLabelSnapshot: '测试' }
+const order = { id: 1, orderNo: 'TEST-REVISION', studentName: '测试学员', leadProfile: { submittedMobile: '13900139000', submittedWechatId: 'lead-wx' }, canRevise: true, status: 'revision_required', totalAmount: 500, collectionMode: mode === 'online' ? 'online_link' : mode === 'unknown' ? undefined : 'offline_paid', transactionLocked: mode === 'online', paymentStatus: 'paid', items: [{ id: 1, productRef: 'spu-1', skuRef: 'sku-1', productName: '测试课程', skuName: '原规格', actualAmount: 500 }], paymentVouchers: [], studentNatureLabelSnapshot: '测试', servicePeriodLabelSnapshot: '测试', studentSourceLabelSnapshot: '测试', feeModeLabelSnapshot: '测试', paymentMethodLabelSnapshot: '测试' }
 service.defaults.adapter = async config => {
   const url = config.url || ''
   if (config.method !== 'get') throw new Error('Fixture blocks writes')
@@ -20,6 +21,10 @@ service.defaults.adapter = async config => {
 }
 const app = createApp({ render: () => h('main', { style: 'padding:16px' }, [h('div', { id: 'result', role: 'status' }, '测试请求尚未提交'), h(Page)]) })
 setupStore(app)
+const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { render: () => null } }] })
+app.use(router)
+await router.push('/')
+await router.isReady()
 await setupI18n(app)
 app.use(ElementPlus)
 app.component('ContentWrap', { render() { return h('div', this.$slots.default?.()) } })

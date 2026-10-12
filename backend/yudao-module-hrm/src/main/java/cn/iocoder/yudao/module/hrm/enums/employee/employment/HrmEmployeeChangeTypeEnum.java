@@ -23,7 +23,11 @@ public enum HrmEmployeeChangeTypeEnum implements ArrayValuable<Integer> {
     PROMOTION(6, "晋升"),
     DEMOTION(7, "降级"),
     FULL_TIME(8, "转为全职"),
-    REHIRE(9, "再入职");
+    REHIRE(9, "再入职"),
+    ENTRY(10, "入职"),
+    QUIT(11, "离职"),
+    GENERAL(12, "人员变更"),
+    CANCEL_QUIT(13, "取消离职");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(HrmEmployeeChangeTypeEnum::getType).toArray(Integer[]::new);

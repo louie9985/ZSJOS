@@ -77,6 +77,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertMap;
 import static cn.iocoder.yudao.framework.common.util.object.ObjectUtils.cloneIgnoreId;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
@@ -126,7 +129,7 @@ import static org.mockito.Mockito.when;
  *
  * @author 芋道源码
  */
-@Import({HrmEmployeeServiceImpl.class, HrmEmployeeServiceImplTest.TransactionTemplateTestConfiguration.class})
+@Import({HrmEmployeeServiceImpl.class, HrmEmployeeManualLifecycle.class, HrmEmployeeServiceImplTest.TransactionTemplateTestConfiguration.class})
 public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -149,6 +152,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
 
     @MockitoBean
     private AdminUserApi adminUserApi;
+    @MockitoBean
+    private cn.iocoder.yudao.module.system.api.dict.DictDataApi dictionaries;
     @MockitoBean
     private NotifyMessageSendApi notifyMessageSendApi;
     @MockitoBean
@@ -176,517 +181,88 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
 
     @BeforeEach
     public void setUpChangeRecordService() {
+        lenient().when(dictionaries.getDictDataList(anyString())).thenAnswer(i -> java.util.stream.IntStream.rangeClosed(1,8)
+                .mapToObj(n->new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO().setValue(String.valueOf(n)).setLabel("合成字典"+n)).toList());
         lenient().when(changeRecordService.createEmployeeChangeRecord(any())).thenAnswer(invocation -> {
             HrmEmployeeChangeRecordCreateReqVO reqVO = invocation.getArgument(0);
             return BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordDO.class).setId(randomLongId());
         });
     }
 
-    @Test
-    public void testConfirmEmployeeEntry_success() {
-        // mock 数据
-        Long candidateId = randomLongId();
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus())
-                .setEntryTime(null).setCandidateId(candidateId)
-                .setDeptId(10L).setPostName("开发工程师").setPostLevel("P5")
-                .setWorkAddress("杭州").setLeaderEmployeeId(11L)
-                .setRegularTime(LocalDateTime.now().plusMonths(1))
-                .setLeaveTime(LocalDateTime.now().plusYears(1)));
-        employeeMapper.insert(employee);
-        HrmEmployeeConfirmEntryReqVO confirmReqVO = BeanUtils.toBean(
-                randomEmployeeSaveReqVO(o -> o.setId(employee.getId())
-                        .setEntryTime(LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS)).setCandidateId(candidateId)
-                        .setDeptId(null).setPostName(null).setPostLevel(null)
-                        .setWorkAddress(null).setLeaderEmployeeId(null)
-                        .setType(HrmEmployeeTypeEnum.INFORMAL.getType())
-                        .setStatus(HrmEmployeeStatusEnum.INTERN.getStatus())),
-                HrmEmployeeConfirmEntryReqVO.class);
-
-        // 调用
-        employeeService.confirmEmployeeEntry(confirmReqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(LocalDate.now(), dbEmployee.getEntryTime().toLocalDate());
-        assertNull(dbEmployee.getDeptId());
-        assertNull(dbEmployee.getPostName());
-        assertNull(dbEmployee.getPostLevel());
-        assertNull(dbEmployee.getWorkAddress());
-        assertNull(dbEmployee.getLeaderEmployeeId());
-        assertNull(dbEmployee.getRegularTime());
-        assertNull(dbEmployee.getLeaveTime());
-        verify(recruitCandidateService).confirmRecruitCandidateEntry(
-                candidateId, dbEmployee.getEntryTime());
+    // The former date-driven state-machine tests are replaced by manual command contract tests.
+    private HrmEmployeeSaveReqVO command(HrmEmployeeDO employee, int type) {
+        return BeanUtils.toBean(employee, HrmEmployeeSaveReqVO.class).setChangeMode("BUSINESS")
+                .setVersion(employee.getVersion()).setOperationKey(java.util.UUID.randomUUID().toString())
+                .setChangeType(type).setActualTime(LocalDate.now().atStartOfDay()).setChangeReason("实际人员变更");
     }
 
-    @Test
-    public void testConfirmEmployeeEntry_lifecycleListenerFailureRollback() {
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus())
-                .setEntryTime(null).setCandidateId(null));
-        employeeMapper.insert(employee);
-        HrmEmployeeConfirmEntryReqVO confirmReqVO = BeanUtils.toBean(
-                randomEmployeeSaveReqVO(o -> o.setId(employee.getId())
-                        .setEntryTime(LocalDateTime.now().minusMinutes(1))
-                        .setCandidateId(null)), HrmEmployeeConfirmEntryReqVO.class);
-        doThrow(new IllegalStateException("EAM lifecycle listener failed")).when(lifecycleEventPublisher)
-                .publish(eq(HrmEmployeeLifecycleEventType.ENTRY_CONFIRMED), eq(employee.getId()),
-                        any(HrmEmployeeDO.class), eq(employee.getId()));
-
-        assertThrows(IllegalStateException.class,
-                () -> employeeService.confirmEmployeeEntry(confirmReqVO));
-
-        HrmEmployeeDO unchanged = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus(), unchanged.getEntryStatus());
-        assertNull(unchanged.getEntryTime());
+    @Test public void testManualEntryAndReplay() {
+        var employee=randomEmployeeDO(e->e.setEntryStatus(2).setCandidateId(99L)); employeeMapper.insert(employee);
+        var req=BeanUtils.toBean(command(employee,10).setEntryStatus(1),HrmEmployeeConfirmEntryReqVO.class);
+        employeeService.confirmEmployeeEntry(req); employeeService.confirmEmployeeEntry(req);
+        assertEquals(1,employeeMapper.selectById(employee.getId()).getEntryStatus());
+        verify(recruitCandidateService,times(1)).confirmRecruitCandidateEntry(eq(99L),any());
+        verify(lifecycleEventPublisher,times(1)).publish(eq(HrmEmployeeLifecycleEventType.ENTRY_CONFIRMED),anyLong(),any(),eq(employee.getId()));
     }
-
-    @Test
-    public void testConfirmEmployeeEntry_statusInvalid() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO();
-        employeeMapper.insert(employee);
-        HrmEmployeeConfirmEntryReqVO reqVO = BeanUtils.toBean(
-                randomEmployeeSaveReqVO(o -> o.setId(employee.getId())), HrmEmployeeConfirmEntryReqVO.class);
-
-        // 调用，并断言异常
-        assertServiceException(() -> employeeService.confirmEmployeeEntry(reqVO),
-                EMPLOYEE_CONFIRM_ENTRY_STATUS_INVALID);
+    @Test public void testManualRehireRetainsSelectedStatusAndDate() {
+        var employee=randomEmployeeDO(e->e.setEntryStatus(4)); employeeMapper.insert(employee);
+        var req=BeanUtils.toBean(command(employee,9).setEntryStatus(1).setStatus(2).setRegularTime(null),HrmEmployeeRehireReqVO.class).setEmployeeId(employee.getId());
+        employeeService.rehireEmployee(req);
+        var saved=employeeMapper.selectById(employee.getId()); assertEquals(2,saved.getStatus()); assertNull(saved.getRegularTime());
+        verify(lifecycleEventPublisher).publish(eq(HrmEmployeeLifecycleEventType.REHIRED),anyLong(),any(),eq(employee.getId()));
     }
-
-    @Test
-    public void testRehireEmployee_success() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
-                .setLeaveTime(LocalDate.now().minusDays(1).atTime(18, 30))
-                .setDeptId(10L).setPostName("开发工程师").setPostLevel("P5")
-                .setWorkAddress("杭州").setLeaderEmployeeId(11L));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime entryTime = LocalDateTime.now().minusMinutes(1).withNano(0);
-        HrmEmployeeRehireReqVO reqVO = BeanUtils.toBean(
-                randomEmployeeSaveReqVO(), HrmEmployeeRehireReqVO.class);
-        reqVO.setEmployeeId(employee.getId()).setEntryTime(entryTime)
-                .setCompanyAgeStartTime(entryTime)
-                .setDeptId(20L).setPostName("技术经理").setPostLevel("P7")
-                .setLeaderEmployeeId(null).setWorkCity("上海").setWorkAddress("浦东新区")
-                .setWorkDetailAddress("张江路 1 号")
-                .setType(HrmEmployeeTypeEnum.FORMAL.getType()).setStatus(null).setProbation(3);
-
-        // 调用
-        employeeService.rehireEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(entryTime, dbEmployee.getEntryTime());
-        assertEquals(entryTime, dbEmployee.getCompanyAgeStartTime());
-        assertNull(dbEmployee.getLeaveTime());
-        assertEquals(HrmEmployeeStatusEnum.PROBATION.getStatus(), dbEmployee.getStatus());
-        assertEquals(20L, dbEmployee.getDeptId());
-        assertEquals("技术经理", dbEmployee.getPostName());
-        assertNull(dbEmployee.getLeaderEmployeeId());
-        verify(quitInfoService).deleteEmployeeQuitInfo(employee.getId());
-        verify(changeRecordService).createEmployeeChangeRecord(argThat((HrmEmployeeChangeRecordCreateReqVO record) ->
-                HrmEmployeeChangeTypeEnum.REHIRE.getType().equals(record.getType())
-                        && employee.getDeptId().equals(record.getOldDeptId())
-                        && reqVO.getDeptId().equals(record.getNewDeptId())));
+    @Test public void testManualTransferAndFuturePlan() {
+        var employee=randomEmployeeDO(e->e.setDeptId(10L)); employeeMapper.insert(employee);
+        var req=new HrmEmployeeTransferReqVO().setEmployeeId(employee.getId()).setReason(1).setNewDeptId(20L)
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString()).setEffectTime(LocalDate.now().plusDays(3).atStartOfDay()).setChangeMode("PLAN");
+        employeeService.transferEmployee(req);
+        assertEquals(10L,employeeMapper.selectById(employee.getId()).getDeptId());
+        verifyNoInteractions(lifecycleEventPublisher);
+        var saved=employeeMapper.selectById(employee.getId());
+        req.setChangeMode("BUSINESS").setVersion(saved.getVersion()).setOperationKey(java.util.UUID.randomUUID().toString()).setEffectTime(LocalDate.now().atStartOfDay());
+        employeeService.transferEmployee(req);
+        assertEquals(20L,employeeMapper.selectById(employee.getId()).getDeptId());
     }
-
-    @Test
-    public void testRehireEmployee_statusInvalid() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO();
-        employeeMapper.insert(employee);
-        // 准备参数
-        HrmEmployeeRehireReqVO reqVO = randomPojo(HrmEmployeeRehireReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setEntryTime(LocalDate.now().atStartOfDay())
-                        .setType(HrmEmployeeTypeEnum.FORMAL.getType()));
-
-        // 调用，并断言异常
-        assertServiceException(() -> employeeService.rehireEmployee(reqVO), EMPLOYEE_REHIRE_STATUS_INVALID);
+    @Test public void testManualRegularPositionAndRollback() {
+        var employee=randomEmployeeDO(e->e.setStatus(2)); employeeMapper.insert(employee);
+        var req=new HrmEmployeeRegularReqVO().setEmployeeId(employee.getId()).setReason(1).setNewDeptId(20L)
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString()).setEffectTime(LocalDate.now().atStartOfDay());
+        doThrow(new IllegalStateException("listener failed")).when(lifecycleEventPublisher).publish(any(),anyLong(),any(),anyLong());
+        assertThrows(IllegalStateException.class,()->employeeService.regularEmployee(req));
+        assertEquals(2,employeeMapper.selectById(employee.getId()).getStatus());
+        assertTrue(employeeChangeRecordMapper.selectList().isEmpty());
     }
-
-    @Test
-    public void testChangeEmployee_effectiveTransfer() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o.setDeptId(10L)
-                .setPostName("开发工程师").setPostLevel("P5")
-                .setWorkAddress("杭州").setLeaderEmployeeId(11L));
-        employeeMapper.insert(employee);
-        doAnswer(invocation -> {
-            HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-            assertEquals(10L, dbEmployee.getDeptId());
-            assertEquals("开发工程师", dbEmployee.getPostName());
-            HrmEmployeeChangeRecordCreateReqVO record = invocation.getArgument(0);
-            return BeanUtils.toBean(record, HrmEmployeeChangeRecordDO.class).setId(randomLongId());
-        }).when(changeRecordService).createEmployeeChangeRecord(argThat(record ->
-                employee.getId().equals(record.getEmployeeId())));
-        // 准备参数
-        HrmEmployeeTransferReqVO reqVO = new HrmEmployeeTransferReqVO();
-        reqVO.setEmployeeId(employee.getId());
-        reqVO.setReason(1);
-        reqVO.setNewDeptId(20L);
-        reqVO.setNewPostName("技术经理");
-        reqVO.setNewPostLevel("P7");
-        reqVO.setNewWorkAddress("上海");
-        reqVO.setNewLeaderEmployeeId(null);
-        reqVO.setEffectTime(LocalDate.now().atStartOfDay());
-
-        // 调用
-        employeeService.transferEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(20L, dbEmployee.getDeptId());
-        assertEquals("技术经理", dbEmployee.getPostName());
-        verify(changeRecordService).createEmployeeChangeRecord(argThat(record ->
-                employee.getDeptId().equals(record.getOldDeptId())
-                        && employee.getPostName().equals(record.getOldPostName())
-                        && reqVO.getEffectTime().equals(record.getEffectTime())));
+    @Test public void testManualFullTimeFromOutsource() {
+        var employee=randomEmployeeDO(e->e.setType(2).setStatus(8)); employeeMapper.insert(employee);
+        var req=new HrmEmployeeConvertToFullTimeReqVO().setEmployeeId(employee.getId()).setReason(1).setStatus(2).setProbation(0)
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString()).setEffectTime(LocalDate.now().atStartOfDay());
+        employeeService.convertEmployeeToFullTime(req);
+        var saved=employeeMapper.selectById(employee.getId()); assertEquals(1,saved.getType()); assertEquals(2,saved.getStatus()); assertNull(saved.getRegularTime());
     }
-
-    @Test
-    public void testRegularEmployee_updatePosition() {
-        // mock 数据
-        HrmEmployeeDO leader = randomEmployeeDO();
-        employeeMapper.insert(leader);
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setStatus(HrmEmployeeStatusEnum.PROBATION.getStatus()).setProbation(3)
-                .setDeptId(10L).setPostName("开发工程师").setPostLevel("P5")
-                .setWorkAddress("杭州").setLeaderEmployeeId(null));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime effectTime = LocalDate.now().atStartOfDay();
-        HrmEmployeeRegularReqVO reqVO = new HrmEmployeeRegularReqVO();
-        reqVO.setEmployeeId(employee.getId()).setReason(1).setEffectTime(effectTime)
-                .setNewDeptId(20L).setNewPostName("技术经理").setNewPostLevel("P7")
-                .setNewWorkAddress("上海").setNewLeaderEmployeeId(leader.getId());
-
-        // 调用
-        employeeService.regularEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeStatusEnum.REGULAR.getStatus(), dbEmployee.getStatus());
-        assertEquals(3, dbEmployee.getProbation());
-        assertEquals(effectTime, dbEmployee.getRegularTime());
-        assertEquals(20L, dbEmployee.getDeptId());
-        assertEquals("技术经理", dbEmployee.getPostName());
-        assertEquals("P7", dbEmployee.getPostLevel());
-        assertEquals("上海", dbEmployee.getWorkAddress());
-        assertEquals(leader.getId(), dbEmployee.getLeaderEmployeeId());
-        verify(changeRecordService).createEmployeeChangeRecord(argThat(record ->
-                employee.getDeptId().equals(record.getOldDeptId())
-                        && reqVO.getNewDeptId().equals(record.getNewDeptId())
-                        && reqVO.getNewPostName().equals(record.getNewPostName())));
+    @Test public void testManualQuitPlanAndActual() {
+        var employee=randomEmployeeDO(); employeeMapper.insert(employee);
+        var req=new HrmEmployeeQuitReqVO().setEmployeeId(employee.getId()).setType(1).setReason(1)
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString()).setChangeMode("PLAN")
+                .setPlanQuitTime(LocalDate.now().plusDays(2).atStartOfDay());
+        employeeService.quitEmployee(req); assertEquals(1,employeeMapper.selectById(employee.getId()).getEntryStatus());
+        verifyNoInteractions(lifecycleEventPublisher);
+        req.setChangeMode("BUSINESS").setVersion(1L).setOperationKey(java.util.UUID.randomUUID().toString()).setActualTime(LocalDate.now().atStartOfDay());
+        employeeService.quitEmployee(req); assertEquals(4,employeeMapper.selectById(employee.getId()).getEntryStatus());
     }
-
-    @Test
-    public void testConvertEmployeeToFullTime_withProbationAndPosition() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setType(HrmEmployeeTypeEnum.INFORMAL.getType())
-                .setStatus(HrmEmployeeStatusEnum.INTERN.getStatus()).setProbation(0)
-                .setDeptId(10L).setPostName("实习开发").setPostLevel("实习")
-                .setWorkAddress("杭州").setLeaderEmployeeId(null));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime effectTime = LocalDate.now().atStartOfDay();
-        HrmEmployeeConvertToFullTimeReqVO reqVO = new HrmEmployeeConvertToFullTimeReqVO();
-        reqVO.setEmployeeId(employee.getId()).setReason(1).setProbation(3).setEffectTime(effectTime)
-                .setNewDeptId(20L).setNewPostName("开发工程师").setNewPostLevel("P5")
-                .setNewWorkAddress("上海");
-
-        // 调用
-        employeeService.convertEmployeeToFullTime(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeTypeEnum.FORMAL.getType(), dbEmployee.getType());
-        assertEquals(HrmEmployeeStatusEnum.PROBATION.getStatus(), dbEmployee.getStatus());
-        assertEquals(3, dbEmployee.getProbation());
-        assertEquals(effectTime.plusMonths(3), dbEmployee.getRegularTime());
-        assertEquals(20L, dbEmployee.getDeptId());
-        assertEquals("开发工程师", dbEmployee.getPostName());
-        verify(changeRecordService).createEmployeeChangeRecord(argThat(record ->
-                Integer.valueOf(3).equals(record.getProbation())
-                        && reqVO.getNewDeptId().equals(record.getNewDeptId())));
+    @Test public void testManualCancelQuitAndInvalidTransition() {
+        var employee=randomEmployeeDO(e->e.setEntryStatus(3)); employeeMapper.insert(employee);
+        var req=new HrmEmployeeCancelQuitReqVO().setEmployeeId(employee.getId()).setReason("员工取消离职")
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString());
+        employeeService.cancelEmployeeQuit(req); assertEquals(1,employeeMapper.selectById(employee.getId()).getEntryStatus());
+        req.setVersion(1L).setOperationKey(java.util.UUID.randomUUID().toString());
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->employeeService.cancelEmployeeQuit(req));
     }
-
-    @Test
-    public void testChangeEmployee_future() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o.setDeptId(10L));
-        employeeMapper.insert(employee);
-        // 准备参数
-        HrmEmployeeTransferReqVO reqVO = new HrmEmployeeTransferReqVO();
-        reqVO.setEmployeeId(employee.getId());
-        reqVO.setReason(1);
-        reqVO.setNewDeptId(20L);
-        reqVO.setEffectTime(LocalDate.now().plusDays(1).atStartOfDay());
-
-        // 调用
-        employeeService.transferEmployee(reqVO);
-
-        // 断言
-        assertEquals(10L, employeeMapper.selectById(employee.getId()).getDeptId());
-        verify(changeRecordService).createEmployeeChangeRecord(argThat(record ->
-                employee.getDeptId().equals(record.getOldDeptId())
-                        && reqVO.getEffectTime().equals(record.getEffectTime())));
-    }
-
-    @Test
-    public void testApplyEmployeeChange_success() {
-        // mock 数据
-        LocalDateTime effectTime = LocalDate.now().atStartOfDay();
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setDeptId(10L).setPostName("开发工程师").setPostLevel("P5")
-                .setWorkAddress("杭州").setLeaderEmployeeId(11L));
-        employeeMapper.insert(employee);
-        HrmEmployeeChangeRecordDO changeRecord = HrmEmployeeChangeRecordDO.builder()
-                .employeeId(employee.getId()).type(HrmEmployeeChangeTypeEnum.TRANSFER.getType())
-                .newDeptId(20L).newPostName("技术经理").newPostLevel("P7")
-                .newWorkAddress("上海").newLeaderEmployeeId(21L).effectTime(effectTime).build();
-
-        // 调用
-        employeeService.applyEmployeeChange(changeRecord);
-
-        // 断言
-        HrmEmployeeDO changedEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(20L, changedEmployee.getDeptId());
-        assertEquals("技术经理", changedEmployee.getPostName());
-    }
-
-    @Test
-    public void testApplyEmployeeChange_typeInvalid() {
-        // 准备参数
-        HrmEmployeeChangeRecordDO changeRecord = HrmEmployeeChangeRecordDO.builder()
-                .employeeId(randomLongId()).type(99).build();
-
-        // 调用，并断言异常
-        assertServiceException(() -> employeeService.applyEmployeeChange(changeRecord),
-                EMPLOYEE_CHANGE_TYPE_INVALID, changeRecord.getType());
-    }
-
-    @Test
-    public void testApplyEmployeeRegular_success() {
-        // mock 数据
-        LocalDateTime regularTime = LocalDateTime.now().minusMinutes(1);
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setStatus(HrmEmployeeStatusEnum.PROBATION.getStatus())
-                .setRegularTime(regularTime));
-        employeeMapper.insert(employee);
-
-        // 调用
-        List<HrmEmployeeDO> regularEmployees =
-                employeeService.getDueRegularEmployeeList(LocalDateTime.now());
-        assertTrue(employeeService.applyEmployeeRegular(employee.getId()));
-
-        // 断言
-        assertEquals(1, regularEmployees.size());
-        assertEquals(employee.getId(), regularEmployees.get(0).getId());
-        assertEquals(HrmEmployeeStatusEnum.REGULAR.getStatus(),
-                employeeMapper.selectById(employee.getId()).getStatus());
-    }
-
-    @Test
-    public void testApplyEmployeeQuit_success() {
-        // mock 数据
-        LocalDate effectTime = LocalDate.now();
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus())
-                .setCompanyAgeStartTime(effectTime.minusYears(3).atStartOfDay()));
-        employeeMapper.insert(employee);
-        LocalDateTime planQuitTime = LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS);
-        HrmEmployeeQuitInfoDO quitInfo = HrmEmployeeQuitInfoDO.builder()
-                .employeeId(employee.getId()).planQuitTime(planQuitTime).build();
-
-        // 调用
-        boolean result = employeeService.applyEmployeeQuit(quitInfo);
-
-        // 断言
-        assertTrue(result);
-        HrmEmployeeDO leftEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.LEFT.getStatus(), leftEmployee.getEntryStatus());
-        assertEquals(planQuitTime, leftEmployee.getLeaveTime());
-        assertEquals(3, leftEmployee.getCompanyAge());
-    }
-
-    @Test
-    public void testApplyEmployeeRegular_leftEmployee_doesNotRevive() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
-                .setStatus(HrmEmployeeStatusEnum.PROBATION.getStatus())
-                .setRegularTime(LocalDateTime.now().minusDays(1)));
-        employeeMapper.insert(employee);
-
-        // 调用
-        boolean result = employeeService.applyEmployeeRegular(employee.getId());
-
-        // 断言
-        assertFalse(result);
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.LEFT.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(HrmEmployeeStatusEnum.PROBATION.getStatus(), dbEmployee.getStatus());
-    }
-
-    @Test
-    public void testQuitEmployee_pendingLeave() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus())
-                .setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime planQuitTime = LocalDateTime.now().plusDays(10).withNano(0);
-        HrmEmployeeQuitReqVO reqVO = randomPojo(HrmEmployeeQuitReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setPlanQuitTime(planQuitTime)
-                        .setApplyQuitTime(LocalDateTime.now().minusDays(1).withNano(0))
-                        .setSalarySettlementTime(planQuitTime).setType(1).setReason(1));
-
-        // 调用
-        employeeService.quitEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(planQuitTime, dbEmployee.getLeaveTime());
-        verify(quitInfoService).saveEmployeeQuitInfo(argThat(quitInfo ->
-                employee.getId().equals(quitInfo.getEmployeeId())
-                        && employee.getStatus().equals(quitInfo.getOldEmployeeStatus())
-                        && reqVO.getApplyQuitTime().toLocalDate().atStartOfDay()
-                                .equals(quitInfo.getApplyQuitTime())
-                        && reqVO.getSalarySettlementTime().toLocalDate().atStartOfDay()
-                                .equals(quitInfo.getSalarySettlementTime())));
-    }
-
-    @Test
-    public void testQuitEmployee_sameDayNaturalDates() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus())
-                .setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()));
-        employeeMapper.insert(employee);
-        // 准备参数：申请、计划离职和薪资结算在同一自然日，时刻先后不影响日期校验
-        LocalDate quitDate = LocalDate.now().plusDays(10);
-        HrmEmployeeQuitReqVO reqVO = randomPojo(HrmEmployeeQuitReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setPlanQuitTime(quitDate.atTime(9, 0))
-                        .setApplyQuitTime(quitDate.atTime(18, 0))
-                        .setSalarySettlementTime(quitDate.atStartOfDay()).setType(1).setReason(1));
-
-        // 调用
-        employeeService.quitEmployee(reqVO);
-
-        // 断言
-        verify(quitInfoService).saveEmployeeQuitInfo(argThat(quitInfo ->
-                quitDate.atStartOfDay().equals(quitInfo.getApplyQuitTime())
-                        && quitDate.atStartOfDay().equals(quitInfo.getSalarySettlementTime())));
-    }
-
-    @Test
-    public void testQuitEmployee_effective() {
-        // mock 数据
-        LocalDate companyAgeStartDate = LocalDate.now().minusYears(3);
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus())
-                .setCompanyAgeStartTime(companyAgeStartDate.atStartOfDay()));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime planQuitTime = LocalDateTime.now().minusMinutes(1).withNano(0);
-        HrmEmployeeQuitReqVO reqVO = randomPojo(HrmEmployeeQuitReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setPlanQuitTime(planQuitTime)
-                        .setApplyQuitTime(planQuitTime.minusDays(7))
-                        .setSalarySettlementTime(planQuitTime).setType(1).setReason(1));
-
-        // 调用
-        employeeService.quitEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.LEFT.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(3, dbEmployee.getCompanyAge());
-    }
-
-    @Test
-    public void testQuitEmployee_statusInvalid() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus()));
-        employeeMapper.insert(employee);
-        // 准备参数
-        HrmEmployeeQuitReqVO reqVO = randomPojo(HrmEmployeeQuitReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setPlanQuitTime(LocalDateTime.now()).setType(1).setReason(1));
-
-        // 调用，并断言异常
-        assertServiceException(() -> employeeService.quitEmployee(reqVO), EMPLOYEE_QUIT_STATUS_INVALID);
-    }
-
-    @Test
-    public void testQuitEmployee_leftUpdate() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
-                .setCompanyAgeStartTime(LocalDate.now().minusYears(2).atStartOfDay()));
-        employeeMapper.insert(employee);
-        // 准备参数
-        LocalDateTime planQuitTime = LocalDateTime.now().minusDays(1).withNano(0);
-        HrmEmployeeQuitReqVO reqVO = randomPojo(HrmEmployeeQuitReqVO.class,
-                o -> o.setEmployeeId(employee.getId()).setPlanQuitTime(planQuitTime)
-                        .setApplyQuitTime(planQuitTime.minusDays(7))
-                        .setSalarySettlementTime(planQuitTime).setType(1).setReason(1));
-
-        // 调用
-        employeeService.quitEmployee(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.LEFT.getStatus(), dbEmployee.getEntryStatus());
-        assertEquals(planQuitTime, dbEmployee.getLeaveTime());
-        assertEquals(1, dbEmployee.getCompanyAge());
-        verify(quitInfoService).saveEmployeeQuitInfo(argThat(quitInfo ->
-                employee.getId().equals(quitInfo.getEmployeeId())));
-    }
-
-    @Test
-    public void testCancelEmployeeQuit_success() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus())
-                .setLeaveTime(LocalDateTime.now().plusDays(10)));
-        employeeMapper.insert(employee);
-        HrmEmployeeCancelQuitReqVO reqVO = new HrmEmployeeCancelQuitReqVO()
-                .setEmployeeId(employee.getId()).setReason("员工撤回离职");
-        when(quitInfoService.validateQuitInfoByEmployeeId(employee.getId()))
-                .thenReturn(new HrmEmployeeQuitInfoDO().setId(randomLongId()).setEmployeeId(employee.getId()));
-
-        // 调用
-        employeeService.cancelEmployeeQuit(reqVO);
-
-        // 断言
-        HrmEmployeeDO dbEmployee = employeeMapper.selectById(employee.getId());
-        assertEquals(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus(), dbEmployee.getEntryStatus());
-        assertNull(dbEmployee.getLeaveTime());
-        verify(quitInfoService).validateQuitInfoByEmployeeId(employee.getId());
-        verify(quitInfoService).deleteEmployeeQuitInfo(employee.getId());
-    }
-
-    @Test
-    public void testCancelEmployeeQuit_statusInvalid() {
-        // mock 数据
-        HrmEmployeeDO employee = randomEmployeeDO(o -> o
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus()));
-        employeeMapper.insert(employee);
-        HrmEmployeeCancelQuitReqVO reqVO = new HrmEmployeeCancelQuitReqVO()
-                .setEmployeeId(employee.getId()).setReason("员工撤回离职");
-
-        // 调用，并断言异常
-        assertServiceException(() -> employeeService.cancelEmployeeQuit(reqVO),
-                EMPLOYEE_QUIT_CANCEL_STATUS_INVALID);
+    @Test public void testLegacyAutomaticEntrypointsNeverChangeFacts() {
+        var employee=randomEmployeeDO(e->e.setStatus(2).setEntryStatus(3).setRegularTime(LocalDateTime.now().minusDays(2))); employeeMapper.insert(employee);
+        assertFalse(employeeService.applyEmployeeRegular(employee.getId()));
+        assertFalse(employeeService.applyEmployeeQuit(new HrmEmployeeQuitInfoDO().setEmployeeId(employee.getId()).setPlanQuitTime(LocalDateTime.now().minusDays(1))));
+        assertFalse(employeeService.applyEmployeeChange(new HrmEmployeeChangeRecordDO().setEmployeeId(employee.getId()).setType(4).setEffectTime(LocalDateTime.now().minusDays(1))));
+        var saved=employeeMapper.selectById(employee.getId()); assertEquals(2,saved.getStatus()); assertEquals(3,saved.getEntryStatus()); verifyNoInteractions(lifecycleEventPublisher);
     }
 
     @Test
@@ -708,8 +284,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 "companyAgeStartTime", "companyAge");
         assertEquals(30, employee.getAge());
         assertEquals(birthday, employee.getBirthday());
-        assertEquals(HrmEmployeeStatusEnum.PROBATION.getStatus(), employee.getStatus());
-        assertEquals(entryTime.plusMonths(3), employee.getRegularTime());
+        assertEquals(reqVO.getStatus(), employee.getStatus());
+        assertNull(employee.getRegularTime());
         assertEquals(entryTime, employee.getCompanyAgeStartTime());
         assertEquals(0, employee.getCompanyAge());
     }
@@ -744,7 +320,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         // 断言
         HrmEmployeeDO employee = employeeMapper.selectById(employeeId);
         assertEquals(HrmEmployeeStatusEnum.REGULAR.getStatus(), employee.getStatus());
-        assertEquals(entryTime, employee.getRegularTime());
+        assertNull(employee.getRegularTime());
     }
 
     @Test
@@ -779,7 +355,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         // 准备参数
         HrmEmployeeCreateFromUserReqVO firstReqVO = new HrmEmployeeCreateFromUserReqVO()
                 .setUserId(firstUser.getId()).setJobNumber("HRM-BATCH-001").setMobile(firstUser.getMobile())
-                .setDeptId(firstUser.getDeptId()).setType(HrmEmployeeTypeEnum.FORMAL.getType())
+                .setDeptId(firstUser.getDeptId()).setType(HrmEmployeeTypeEnum.FORMAL.getType()).setStatus(1)
                 .setProbation(0).setEntryTime(LocalDate.now().atTime(9, 0));
         HrmEmployeeCreateFromUserReqVO secondReqVO = new HrmEmployeeCreateFromUserReqVO()
                 .setUserId(secondUser.getId()).setJobNumber("HRM-BATCH-002").setMobile(secondUser.getMobile())
@@ -872,11 +448,11 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         // 断言
         HrmEmployeeDO employee = employeeMapper.selectById(dbEmployee.getId());
         assertPojoEquals(reqVO, employee, "age", "entryStatus", "type", "status",
-                "probation", "regularTime", "leaveTime", "companyAge");
-        assertEquals(dbEmployee.getType(), employee.getType());
-        assertEquals(dbEmployee.getStatus(), employee.getStatus());
-        assertEquals(dbEmployee.getProbation(), employee.getProbation());
-        assertEquals(dbEmployee.getRegularTime(), employee.getRegularTime());
+                "probation", "regularTime", "leaveTime", "companyAge", "version");
+        assertEquals(reqVO.getType(), employee.getType());
+        assertEquals(reqVO.getStatus(), employee.getStatus());
+        assertEquals(reqVO.getProbation(), employee.getProbation());
+        assertEquals(reqVO.getRegularTime(), employee.getRegularTime());
         assertEquals(2, employee.getCompanyAge());
     }
 
@@ -1252,10 +828,10 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         HrmEmployeeDO updatedEmployee = employeeMapper.selectByJobNumber("IMPORT001");
         assertEquals(updateEmployee.getId(), updatedEmployee.getId());
         assertEquals("导入后", updatedEmployee.getName());
-        assertEquals(updateEmployee.getType(), updatedEmployee.getType());
-        assertEquals(updateEmployee.getStatus(), updatedEmployee.getStatus());
-        assertEquals(0, updatedEmployee.getProbation());
-        assertEquals(updateEmployee.getRegularTime(), updatedEmployee.getRegularTime());
+        assertEquals(HrmEmployeeTypeEnum.INFORMAL.getType(), updatedEmployee.getType());
+        assertEquals(HrmEmployeeStatusEnum.INTERN.getStatus(), updatedEmployee.getStatus());
+        assertEquals(3, updatedEmployee.getProbation());
+        assertNull(updatedEmployee.getRegularTime());
     }
 
     @Test
@@ -1620,13 +1196,13 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setLeaveTime(monthBeginTime.plusDays(4))));
         employeeChangeRecordMapper.insert(HrmEmployeeChangeRecordDO.builder()
                 .employeeId(entryEmployee.getId()).type(HrmEmployeeChangeTypeEnum.REGULAR.getType())
-                .effectTime(monthBeginTime.plusDays(5)).build());
+                .effectTime(monthBeginTime.plusDays(5)).actualTime(monthBeginTime.plusDays(5)).state("APPLIED").changeMode("BUSINESS").build());
         employeeChangeRecordMapper.insert(HrmEmployeeChangeRecordDO.builder()
                 .employeeId(entryEmployee.getId()).type(HrmEmployeeChangeTypeEnum.REGULAR.getType())
-                .effectTime(monthBeginTime.plusDays(6)).build());
+                .effectTime(monthBeginTime.plusDays(6)).actualTime(monthBeginTime.plusDays(6)).state("APPLIED").changeMode("BUSINESS").build());
         employeeChangeRecordMapper.insert(HrmEmployeeChangeRecordDO.builder()
                 .employeeId(entryEmployee.getId()).type(HrmEmployeeChangeTypeEnum.TRANSFER.getType())
-                .effectTime(monthBeginTime.plusDays(7)).build());
+                .effectTime(monthBeginTime.plusDays(7)).actualTime(monthBeginTime.plusDays(7)).state("APPLIED").changeMode("BUSINESS").build());
 
         // 调用
         Map<Integer, Long> countMap = employeeService.getEmployeeSurveyCountMap();
@@ -1689,7 +1265,9 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setProbation(0).setRegularTime(null).setLeaveTime(null)
                 .setPostName(randomString()).setPostLevel("P6").setWorkCity("杭州").setWorkAddress("西湖区")
                 .setWorkDetailAddress("文三路").setChannelId(null).setCompanyAgeStartTime(null)
-                .setCompanyAge(null).setCandidateId(null).setRemark(randomString());
+                .setCompanyAge(null).setCandidateId(null).setRemark(randomString())
+                .setVersion(0L).setOperationKey(java.util.UUID.randomUUID().toString()).setChangeMode("CORRECTION").setChangeReason("测试纠错")
+                .setActualTime(null).setPlannedTime(null).setChangeType(null).setPlanId(null).setPlanVersion(null).setCommandRequestHash(null).setPlannedRegularTime(null).setPlannedLeaveTime(null);
         return randomPojo(HrmEmployeeSaveReqVO.class, ArrayUtils.append(consumer, consumers));
     }
 
@@ -1710,7 +1288,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setPostName(randomString()).setPostLevel("P6").setWorkCity("杭州").setWorkAddress("西湖区")
                 .setWorkDetailAddress("文三路").setChannelId(null)
                 .setCompanyAgeStartTime(LocalDate.now().minusYears(1).atStartOfDay()).setCompanyAge(1)
-                .setCandidateId(null).setRemark(randomString()).setDeleted(false);
+                .setCandidateId(null).setRemark(randomString())
+                .setVersion(0L).setPlannedRegularTime(null).setPlannedLeaveTime(null).setTypeLabel(null).setStatusLabel(null).setEntryStatusLabel(null).setDeleted(false);
         return randomPojo(HrmEmployeeDO.class, ArrayUtils.append(consumer, consumers));
     }
 
@@ -1734,7 +1313,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setUserMobile(null).setBankCardNumber(null).setBankAreaId(null).setBankName(null)
                 .setBankBranchName(null).setFirstSocialSecurity(null).setFirstAccumulationFund(null)
                 .setSocialSecurityNumber(null).setAccumulationFundNumber(null)
-                .setSocialSecurityStartMonth(null).setSchemeName(null).setRemark(randomString());
+                .setSocialSecurityStartMonth(null).setSchemeName(null).setRemark(randomString()).setPlannedRegularTime(null).setPlannedLeaveTime(null);
         return randomPojo(HrmEmployeeImportExcelVO.class, ArrayUtils.append(consumer, consumers));
     }
 

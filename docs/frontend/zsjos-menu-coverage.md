@@ -81,6 +81,10 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 56 | 素材导入记录 | `/zsjos/material-library/imports` | `admin_embed` | `zsjos/materialImport/index` |
 | 57 | 内容审核 | `/zsjos/material-library/content-review` | `ContentReviewBatchPage` | Workbench 原生页 |
 | 58 | 内容生产 | `/zsjos/material-library/content-production` | `ContentProductionPage` | Workbench 原生页 |
+| 59 | 积分兑换码 | `/zsjos/points-redemption` | `PointsRedemptionPage` | 不注册；服务端组件为 `zsjos-workbench`，复用 Admin 过滤规则 |
+| 60 | 积分套餐 | `/zsjos/points-packages` | `PointsPackagePage` | `zsjos/pointsPackages/index` |
+
+中世健积分兑换码的权限、BPM Simple 流程及密钥配置见[积分兑换码说明](../api/points-redemption.md)。套餐查看与保存采用独立权限，两端共用 API；密钥通过既有 Vue 配置管理页维护，不向员工端新增密钥接口。
 
 通知公告的只读查看页仅在存在附件时展示附件标题与列表；无附件时不展示附件区域或“无附件”占位。此规则适用于 React 员工工作台与 Vue 管理端。
 

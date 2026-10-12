@@ -30,13 +30,15 @@ public class ConfigSaveReqVO {
     private String key;
 
     @Schema(description = "参数键值", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
-    @NotBlank(message = "参数键值不能为空")
     @Size(max = 500, message = "参数键值长度不能超过 500 个字符")
+    @lombok.ToString.Exclude
     private String value;
 
     @Schema(description = "是否可见", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     @NotNull(message = "是否可见不能为空")
     private Boolean visible;
+
+    private Boolean sensitive;
 
     @Schema(description = "备注", example = "备注一下很帅气！")
     private String remark;

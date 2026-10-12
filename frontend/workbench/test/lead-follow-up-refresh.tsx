@@ -10,19 +10,31 @@ import LeadManagementPage from '../src/pages/LeadManagementPage'
 import LeadFollowUpCalendarPage from '../src/pages/LeadFollowUpCalendarPage'
 import { api, type ManagedLead, type LeadFollowUp, type DictData } from '../src/services/api'
 import { leadCalendarApi } from '../src/services/leadCalendar'
-import { DICT_TYPE, STORAGE_KEYS } from '../src/constants'
+import { DICT_TYPE, STORAGE_KEYS, LEAD_FILTER_SECTION } from '../src/constants'
 import dayjs from 'dayjs'
 import '../src/styles/index.css'
-const state = { records: [] as LeadFollowUp[], reads: 0, fail: false, posts: 0, leadId: 1 }
+const params = new URLSearchParams(location.search)
+const filterRegression = params.has('filterRegression')
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const state = { records: [] as LeadFollowUp[], reads: 0, fail: false, posts: 0, leadId: 1, listReads: 0, detailReads: 0 }
 Object.assign(window, { refreshFixture: state })
 localStorage.setItem(STORAGE_KEYS.THEME, JSON.stringify({ inboxLayoutMode: new URLSearchParams(location.search).get('layout') || 'split' }))
 const lead = (id = 1) => ({ id, leadNo: `KZ-TEST-${id}`, submittedName: `刷新测试${id}`, status: 'won', leadCategory: 'A',
   leadCategoryLabelSnapshot: 'A类', salesStage: 'contacted', salesStageLabelSnapshot: '已触达',
   visibleTabs: ['follow-ups'], overviewVisible: true, availableActions: [{ code: 'ADD_FOLLOW_UP', enabled: true }], attachments: [], intendedProducts: [] }) as ManagedLead
 api.dictDataByType = async type => (type === DICT_TYPE.LEAD_FOLLOW_UP_QUICK_NOTE ? [] : type === DICT_TYPE.LEAD_SALES_STAGE ? [{ value: 'contacted', label: '已触达' }] : type === DICT_TYPE.LEAD_CATEGORY ? [{value:'A',label:'A类'}] : [{value:'test',label:'测试选项'}]) as DictData[]
-api.leadInboxFilterProfile = async () => ({ groups: [{ key: 'all', label: '全部', sections: [] }] })
-api.allLeadPage = async () => ({ list: [lead()], total: 1 })
-api.managedLead = async id => lead(id)
+api.leadInboxFilterProfile = async () => ({ groups: [{ key: 'all', label: '全部', sections: filterRegression ? [{ key: LEAD_FILTER_SECTION.QUICK_CONDITION, label: '快捷条件', options: [{ key: 'all', label: '全部' }, { key: 'today', label: '今日待跟进' }] }] : [] }] })
+api.allLeadPage = async query => {
+  if (filterRegression && state.posts) await wait(params.get('slow') === 'list' ? 300 : 20)
+  state.listReads++
+  const list = filterRegression && state.posts && query.inboxQuick === 'today' ? [] : [lead()]
+  return { list, total: list.length }
+}
+api.managedLead = async id => {
+  if (filterRegression && state.posts) await wait(params.get('slow') === 'detail' ? 300 : 20)
+  state.detailReads++
+  return lead(id)
+}
 api.leadFollowUpPage = async () => { state.reads++; if (state.fail) throw new Error('测试记录加载失败'); return { list: [...state.records], total: state.records.length } }
 api.createLeadFollowUp = async (id, data) => { state.posts++; const record = { id: state.records.length+1, leadId: id, occurredAt: Date.now(), remark: data.remark, methodLabel:'测试方式', resultLabel:'测试结果', operatorName:'测试销售', images:[] } as LeadFollowUp; state.records.unshift(record); return record }
 leadCalendarApi.days = async () => [{ date: dayjs().format('YYYY-MM-DD'), count: 1 }]

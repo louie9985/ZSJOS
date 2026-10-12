@@ -91,7 +91,7 @@
       ></template
     >
   </el-dialog>
-  <el-dialog v-model="revisionOpen" title="补正并重新提交" width="620px">
+  <el-dialog v-model="revisionOpen" title="补正并重新提交" width="min(620px, calc(100vw - 24px))">
     <el-alert title="未展示字段沿用当前订单快照；补正后教务和财务将重新审批。" type="info" show-icon class="mb-12px" />
     <el-alert v-if="revision.collectionMode === 'online_link'" title="线上已到账：本次仅补正资料，原课程、规格和金额保持不变。" type="info" show-icon class="mb-12px" />
     <el-form label-width="100px">
@@ -106,8 +106,8 @@
       <el-form-item label="学员姓名" required
         ><el-input v-model="revision.studentName"
       /></el-form-item>
-      <el-form-item label="手机号"><el-input v-model="revision.studentMobile" /></el-form-item>
-      <el-form-item label="微信号"><el-input v-model="revision.studentWechatId" /></el-form-item>
+      <el-form-item label="手机号" required><el-input v-model="revision.studentMobile" maxlength="32" /></el-form-item>
+      <el-form-item label="微信号" required><el-input v-model="revision.studentWechatId" maxlength="64" /></el-form-item>
       <el-form-item
         v-for="(item, index) in revision.items"
         :key="index"
@@ -221,6 +221,8 @@ const openRevision = async () => {
   if (detail.value.collectionMode === 'online_link' && detail.value.paymentStatus !== 'paid')
     return message.warning('线上支付尚未确认到账，请核实收款记录')
   Object.assign(revision, structuredClone(toRaw(detail.value)))
+  revision.studentMobile = revision.studentMobile?.trim() || detail.value.leadProfile?.submittedMobile?.trim()
+  revision.studentWechatId = revision.studentWechatId?.trim() || detail.value.leadProfile?.submittedWechatId?.trim()
   refreshedDictionaryFields.value = revisionDictionaryFields.filter(field => !detail.value[field.key + 'LabelSnapshot']).map(field => field.key)
   const dictionaries = await getSimpleDictDataList()
   for (const field of revisionDictionaryFields) {
@@ -232,6 +234,10 @@ const openRevision = async () => {
 }
 const resubmit = async () => {
   if (!detail.value || !revision.studentName?.trim()) return message.warning('请填写学员姓名')
+  if (!revision.studentMobile?.trim()) return message.warning('请填写手机号')
+  if (!/^1\d{10}$/.test(revision.studentMobile.trim())) return message.warning('手机号格式不正确')
+  if (!revision.studentWechatId?.trim()) return message.warning('请填写微信号')
+  if (revision.studentWechatId.trim().length > 64) return message.warning('微信号最多64个字符')
   if (refreshedDictionaryFields.value.some(key => !revision[key])) return message.warning('请重新选择历史未记录的字典项')
   revising.value = true
   try {
@@ -240,8 +246,8 @@ const resubmit = async () => {
       buyerName: revision.buyerName?.trim() || undefined,
       studentName: revision.studentName.trim(),
       studentNature: revision.studentNature,
-      studentMobile: revision.studentMobile?.trim() || undefined,
-      studentWechatId: revision.studentWechatId?.trim() || undefined,
+      studentMobile: revision.studentMobile.trim(),
+      studentWechatId: revision.studentWechatId.trim(),
       provinceCode: revision.provinceCode,
       provinceName: revision.provinceName,
       cityCode: revision.cityCode,

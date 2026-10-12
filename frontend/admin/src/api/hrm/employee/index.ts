@@ -2,6 +2,21 @@ import request from '@/config/axios'
 
 // HRM 员工档案 VO
 export interface HrmEmployeeVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  planId?: number
+  planVersion?: number
+  typeLabel?: string
+  statusLabel?: string
+  entryStatusLabel?: string
+  legacyDateSource?: string
   id?: number // 员工编号
   name: string // 员工姓名
   jobNumber?: string // 工号
@@ -67,11 +82,37 @@ export interface HrmEmployeeDeptStatisticsVO {
 
 // HRM 员工再入职 Request VO
 export interface HrmEmployeeRehireReqVO extends HrmEmployeeVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
 }
 
 // HRM 员工转正 Request VO
 export interface HrmEmployeeRegularReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   reason?: number // 异动原因
   newDeptId?: number // 新部门编号；未填写表示不变
@@ -85,6 +126,19 @@ export interface HrmEmployeeRegularReqVO {
 
 // HRM 员工调岗 Request VO
 export interface HrmEmployeeTransferReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   reason?: number // 异动原因
   newDeptId?: number // 新部门编号
@@ -98,6 +152,19 @@ export interface HrmEmployeeTransferReqVO {
 
 // HRM 员工晋升 Request VO
 export interface HrmEmployeePromoteReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   reason?: number // 异动原因
   newDeptId?: number // 新部门编号
@@ -111,6 +178,19 @@ export interface HrmEmployeePromoteReqVO {
 
 // HRM 员工降级 Request VO
 export interface HrmEmployeeDemoteReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   reason?: number // 异动原因
   newDeptId?: number // 新部门编号
@@ -124,6 +204,19 @@ export interface HrmEmployeeDemoteReqVO {
 
 // HRM 员工转为全职 Request VO
 export interface HrmEmployeeConvertToFullTimeReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   reason?: number // 异动原因
   probation?: number // 试用期，单位月
@@ -138,6 +231,18 @@ export interface HrmEmployeeConvertToFullTimeReqVO {
 
 // HRM 从后台用户批量创建员工 Request VO
 export interface HrmEmployeeCreateFromUserReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  planId?: number
+  planVersion?: number
   userId: number // 后台用户编号
   jobNumber: string // 工号
   mobile: string // 员工手机号
@@ -178,6 +283,19 @@ export interface HrmEmployeeImportResponse {
 
 // HRM 员工离职 Request VO
 export interface HrmEmployeeQuitReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId?: number // 员工编号
   planQuitTime?: number // 计划离职时间
   applyQuitTime?: number // 申请离职时间
@@ -189,6 +307,19 @@ export interface HrmEmployeeQuitReqVO {
 
 // HRM 员工取消离职 Request VO
 export interface HrmEmployeeCancelQuitReqVO {
+  version?: number
+  operationKey?: string
+  changeMode?: 'CORRECTION' | 'BUSINESS' | 'PLAN'
+  changeType?: number
+  changeReason?: string
+  actualTime?: number
+  plannedTime?: number
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  regularTime?: number
+  status?: number
+  planId?: number
+  planVersion?: number
   employeeId: number // 员工编号
   reason: string // 取消原因
 }

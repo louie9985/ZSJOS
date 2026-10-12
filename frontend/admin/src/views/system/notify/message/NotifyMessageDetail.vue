@@ -46,13 +46,33 @@
         {{ formatDate(detailData.createTime) }}
       </el-descriptions-item>
     </el-descriptions>
+    <el-button
+      v-if="detailData.actionType === 'business_detail' && detailData.bizType === 'hrm_employee'"
+      class="mt-16px"
+      type="primary"
+      @click="openEmployee"
+      >查看员工档案</el-button
+    >
   </Dialog>
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
+import * as EmployeeApi from '@/api/hrm/employee'
 import * as NotifyMessageApi from '@/api/system/notify/message'
 
+const router = useRouter()
+const message = useMessage()
+async function openEmployee() {
+  try {
+    if (!detailData.value.bizId) return
+    await EmployeeApi.getEmployee(detailData.value.bizId)
+    await router.push({ name: 'HrmEmployeeDetail', params: { id: detailData.value.bizId } })
+    dialogVisible.value = false
+  } catch {
+    message.warning('员工档案不可访问或暂时加载失败')
+  }
+}
 defineOptions({ name: 'SystemNotifyMessageDetail' })
 
 const dialogVisible = ref(false) // 弹窗的是否展示

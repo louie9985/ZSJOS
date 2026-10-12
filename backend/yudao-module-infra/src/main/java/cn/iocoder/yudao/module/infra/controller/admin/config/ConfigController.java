@@ -39,6 +39,7 @@ public class ConfigController {
     @Resource
     private ConfigService configService;
 
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @PostMapping("/create")
     @Operation(summary = "创建参数配置")
     @PreAuthorize("@ss.hasPermission('infra:config:create')")
@@ -46,6 +47,7 @@ public class ConfigController {
         return success(configService.createConfig(createReqVO));
     }
 
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @PutMapping("/update")
     @Operation(summary = "修改参数配置")
     @PreAuthorize("@ss.hasPermission('infra:config:update')")
@@ -88,7 +90,7 @@ public class ConfigController {
         if (config == null) {
             return success(null);
         }
-        if (!config.getVisible()) {
+        if (Boolean.TRUE.equals(config.getSensitive()) || !Boolean.TRUE.equals(config.getVisible())) {
             throw exception(ErrorCodeConstants.CONFIG_GET_VALUE_ERROR_IF_VISIBLE);
         }
         return success(config.getValue());

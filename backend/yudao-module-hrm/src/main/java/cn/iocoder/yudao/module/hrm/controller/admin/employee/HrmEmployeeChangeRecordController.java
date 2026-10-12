@@ -52,6 +52,24 @@ public class HrmEmployeeChangeRecordController {
                 changeRecordService.getEmployeeChangeRecordListByEmployeeId(employeeId)));
     }
 
+    @Resource
+    private cn.iocoder.yudao.module.hrm.service.employee.info.HrmEmployeePlanService planService;
+
+    @org.springframework.web.bind.annotation.PostMapping("/cancel")
+    @PreAuthorize("@ss.hasPermission('hrm:employee:update')")
+    public CommonResult<Boolean> cancel(@jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+            cn.iocoder.yudao.module.hrm.controller.admin.employee.vo.changerecord.HrmEmployeePlanCancelReqVO req) {
+        planService.cancel(req);
+        return success(true);
+    }
+
+    @GetMapping("/command-options")
+    @PreAuthorize("@ss.hasPermission('hrm:employee:query')")
+    public CommonResult<List<java.util.Map<String, Object>>> commandOptions() {
+        return success(java.util.Arrays.stream(cn.iocoder.yudao.module.hrm.enums.employee.employment.HrmEmployeeChangeTypeEnum.values())
+                .map(e -> java.util.Map.<String, Object>of("value", e.getType(), "label", e.getName())).toList());
+    }
+
     // ==================== 拼接 VO ====================
 
     private List<HrmEmployeeChangeRecordRespVO> buildEmployeeChangeRecordRespVOList(

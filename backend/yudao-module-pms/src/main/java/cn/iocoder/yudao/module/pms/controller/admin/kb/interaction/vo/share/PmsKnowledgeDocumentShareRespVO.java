@@ -22,6 +22,9 @@ public class PmsKnowledgeDocumentShareRespVO {
     @Schema(description = "外部查看令牌", requiredMode = Schema.RequiredMode.REQUIRED)
     private String token;
 
+    @Schema(description = "服务端生成的公开阅读地址；配置不可用时为空，仍允许关闭分享")
+    private String url;
+
     @Schema(description = "分享状态", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
 

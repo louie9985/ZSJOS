@@ -103,6 +103,11 @@ public class PartnerAppFinanceController {
         return success(appealService.getPartnerLeadAppeals(leadId, partnerId()));
     }
 
+    @GetMapping("/lead/appeal/lead/{leadId}/context")
+    public CommonResult<LeadAppealContextRespVO> appealContext(@PathVariable Long leadId) {
+        return success(appealService.getPartnerAppealContext(leadId, partnerId()));
+    }
+
     @PostMapping("/lead/appeal/lead/{leadId}/submit")
     public CommonResult<Long> submitAppeal(@PathVariable Long leadId,
                                             @Valid @RequestBody LeadAppealSubmitReqVO request) {

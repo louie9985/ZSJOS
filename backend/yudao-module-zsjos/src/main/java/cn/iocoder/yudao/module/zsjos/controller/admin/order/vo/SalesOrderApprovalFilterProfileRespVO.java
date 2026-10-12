@@ -12,6 +12,12 @@ import java.util.List;
 public class SalesOrderApprovalFilterProfileRespVO {
     private List<GroupVO> groups;
     private List<CenterVO> centers;
+    private List<OptionVO> orderStates;
+
+    public SalesOrderApprovalFilterProfileRespVO(List<GroupVO> groups, List<CenterVO> centers) {
+        this.groups = groups;
+        this.centers = centers;
+    }
 
     @Data
     @NoArgsConstructor

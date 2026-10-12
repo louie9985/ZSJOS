@@ -176,7 +176,7 @@ public class EamEmployeeAssetServiceImpl implements EamEmployeeAssetService {
             taskMapper.updateById(new EamEmployeeAssetTaskDO().setId(openTask.getId())
                     .setLatestEventKey(event.getEventKey())
                     .setLeaderUserId(employee.getLeaderUserId()).setDeptIdSnapshot(employee.getDeptId())
-                    .setPlannedLeaveTime(employee.getLeaveTime()));
+                    .setPlannedLeaveTime(employee.getPlannedLeaveTime() != null ? employee.getPlannedLeaveTime() : employee.getLeaveTime()));
             return;
         }
         EamEmployeeAssetTaskDO task = new EamEmployeeAssetTaskDO();
@@ -188,7 +188,7 @@ public class EamEmployeeAssetServiceImpl implements EamEmployeeAssetService {
         task.setLeaderUserId(employee.getLeaderUserId());
         task.setEmployeeNameSnapshot(employee.getName());
         task.setDeptIdSnapshot(employee.getDeptId());
-        task.setPlannedLeaveTime(employee.getLeaveTime());
+        task.setPlannedLeaveTime(employee.getPlannedLeaveTime() != null ? employee.getPlannedLeaveTime() : employee.getLeaveTime());
         taskMapper.insert(task);
         if (taskType != TASK_PROVISIONING) snapshotTaskItems(task, employee.getId());
     }
@@ -364,7 +364,7 @@ public class EamEmployeeAssetServiceImpl implements EamEmployeeAssetService {
         audit.setEventKey(eventKey); audit.setLatestEventKey(eventKey); audit.setType(TASK_CANCELLED);
         audit.setStatus(TASK_CANCELLED); audit.setEmployeeId(employee.getId());
         audit.setLeaderUserId(employee.getLeaderUserId()); audit.setEmployeeNameSnapshot(employee.getName());
-        audit.setDeptIdSnapshot(employee.getDeptId()); audit.setPlannedLeaveTime(employee.getLeaveTime());
+        audit.setDeptIdSnapshot(employee.getDeptId()); audit.setPlannedLeaveTime(employee.getPlannedLeaveTime() != null ? employee.getPlannedLeaveTime() : employee.getLeaveTime());
         taskMapper.insert(audit);
     }
 

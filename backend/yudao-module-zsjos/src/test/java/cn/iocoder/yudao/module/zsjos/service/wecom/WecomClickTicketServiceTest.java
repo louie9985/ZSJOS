@@ -80,6 +80,13 @@ class WecomClickTicketServiceTest {
         verifyNoInteractions(orderMapper, partnerAccountMapper);
     }
 
+    @Test void hrmTargetsExistingAdminEmbedEntryAndNeverPartner() {
+        var result = service.resolve(ticket(service.createClickUrl(context(2, "hrm_employee"))));
+        assertEquals("/hrm/employee/list?employeeId=42", result.getTargetPath());
+        assertNull(service.resolve(ticket(service.createClickUrl(context(3, "hrm_employee")))).getTargetPath());
+        verifyNoInteractions(orderMapper, leadMapper, partnerAccountMapper);
+    }
+
     @Test void withdrawalAndFeedbackKeepPartnerDetailDestinations() {
         for (String type : new String[]{"withdrawal", "feedback"}) {
             var result = service.resolve(ticket(service.createClickUrl(context(3, type))));

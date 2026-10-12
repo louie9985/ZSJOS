@@ -42,17 +42,22 @@ try:
                 errors = []
                 page.on('pageerror', lambda e: errors.append(str(e)))
                 base = f'http://127.0.0.1:{port}/test/notice-share.html'
-                def open_detail(suffix=''):
+                def open_management(suffix=''):
                     page.goto(base + suffix)
-                    if client == 'vue': page.get_by_role('button', name='打开公告', exact=True).click()
-                open_detail()
+                    if suffix != '?no-query=1':
+                        expect(page.get_by_role('button', name='查看', exact=True).first).to_be_visible(timeout=15000)
+                open_management()
                 try:
                     expect(page.get_by_role('button', name='对外分享', exact=True)).to_be_visible(timeout=15000)
                 except Exception:
                     page.screenshot(path=str(OUT / f'{client}-failure.png'), full_page=True)
                     print('Fixture errors:', errors, 'Body:', page.locator('body').inner_text()[:1500], flush=True)
                     raise
+                expect(page.get_by_role('row').filter(has=page.get_by_role('button', name='查看', exact=True)).get_by_role('button', name='对外分享', exact=True)).to_be_visible()
+                page.screenshot(path=str(OUT / f'{client}-{width}-management.png'), full_page=True)
                 page.get_by_role('button', name='对外分享', exact=True).click()
+                page.get_by_text('预览对外正文', exact=True).click()
+                expect(page.get_by_text('面向学员、合作伙伴的课程介绍。', exact=True)).to_be_visible()
                 expect(page.get_by_role('button', name='开启分享', exact=True)).to_be_visible()
                 expect(page.get_by_text('原内部接收范围：1 个部门，0 名指定人员。', exact=True)).to_be_visible()
                 expect(page.get_by_role('checkbox', name='课程介绍.pdf')).not_to_be_checked()
@@ -63,6 +68,11 @@ try:
                 expect(page.get_by_role('checkbox', name='课程介绍.pdf')).to_be_disabled()
                 assert page.evaluate('window.shareFixture.selected.join()') == '101'
                 old = page.get_by_role('textbox', name='公开链接').input_value()
+                assert '/public-api/system/notice-share/page?token=' in old and '#' not in old
+                page.context.grant_permissions(['clipboard-read', 'clipboard-write'])
+                page.get_by_role('button', name='复制链接', exact=True).click()
+                expect(page.get_by_text('链接已复制', exact=True)).to_be_visible()
+                assert page.evaluate('navigator.clipboard.readText()') == old
                 with page.expect_download() as download:
                     page.get_by_role('button', name='下载二维码', exact=True).click()
                 download.value.save_as(OUT / f'{client}-{width}-qr.png')
@@ -76,9 +86,22 @@ try:
                 page.get_by_role('button', name='开启分享', exact=True).click()
                 expect(page.get_by_role('textbox', name='公开链接')).not_to_have_value(old)
                 assert not any('mark-read' in x for x in page.evaluate('window.shareFixture.calls'))
-                open_detail('?denied=1')
+                for suffix in ['?denied=1', '?no-query=1', '?draft=1', '?offline=1']:
+                    open_management(suffix)
+                    expect(page.get_by_role('button', name='对外分享', exact=True)).to_have_count(0)
+                open_management()
+                page.evaluate('window.shareFixture.detailFail = true')
+                page.get_by_role('button', name='对外分享', exact=True).click()
+                expect(page.get_by_text('公告加载失败，请重试', exact=True).first).to_be_visible()
+                expect(page.get_by_role('button', name='开启分享', exact=True)).to_have_count(0)
+                page.evaluate('window.shareFixture.detailFail = false; window.shareFixture.stale = true')
+                page.get_by_role('button', name='对外分享', exact=True).click()
+                expect(page.get_by_text('公告状态已变化，只有已发布公告可以对外分享', exact=True).first).to_be_visible()
                 expect(page.get_by_role('button', name='对外分享', exact=True)).to_have_count(0)
-                open_detail()
+                open_management()
+                page.get_by_role('button', name='查看', exact=True).click()
+                expect(page.get_by_role('dialog').get_by_role('button', name='对外分享', exact=True)).to_have_count(0)
+                open_management()
                 page.evaluate('window.shareFixture.fail = true')
                 page.get_by_role('button', name='对外分享', exact=True).click()
                 expect(page.get_by_text('分享配置加载失败', exact=True).first).to_be_visible()

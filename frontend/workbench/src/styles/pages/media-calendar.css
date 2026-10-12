@@ -386,29 +386,31 @@
   .media-schedule-month-grid { grid-auto-rows: minmax(96px, auto); }
 }
 .personal-calendar-events {
-  min-height: 72px;
-  overflow: hidden;
+  min-width: 0;
 }
 
 .personal-calendar-event {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--crm-sp-2);
   min-width: 0;
   margin-top: var(--crm-sp-1);
-  padding: 1px var(--crm-sp-2);
+  padding: var(--crm-sp-1) var(--crm-sp-2);
   border-left: 3px solid var(--crm-color-primary);
   background: var(--crm-color-primary-bg);
 }
 
-.personal-calendar-event .ant-badge-status-text {
-  display: block;
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.personal-calendar-event-title {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: var(--crm-font-sm);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
+
+.personal-calendar-event > .ant-space:empty { display: none; }
 
 .personal-calendar-timeline-wrap { max-height: min(70vh, 720px); overflow: auto; }
 .personal-calendar-timeline { display: grid; min-width: 0; grid-template-columns: 56px minmax(0, 1fr); height: 1152px; }
@@ -426,10 +428,6 @@
 .personal-calendar-timeline-card .ant-space { margin-top: auto; }
 
 @media (max-width: 768px) {
-  .personal-calendar-page .ant-picker-calendar-date-content {
-    height: 56px;
-  }
-
   .personal-calendar-event .ant-space {
     display: none;
   }

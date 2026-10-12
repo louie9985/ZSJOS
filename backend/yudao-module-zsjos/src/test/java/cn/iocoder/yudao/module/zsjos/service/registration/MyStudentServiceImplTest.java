@@ -52,6 +52,22 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class MyStudentServiceImplTest {
     @Test
+    void historicalStudentWithoutOrderRetainsServiceAndCourseSnapshot() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(1L); relation.setPersonId(2L); relation.setOwnerUserId(8L);
+        relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
+        relation.setServiceSnapshot(JsonUtils.toJsonString(LeadProductSnapshot.unknown()));
+        PersonDO person = new PersonDO(); person.setId(2L); person.setName("历史学员");
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(8L, 2L)).thenReturn(List.of(relation));
+        when(personMapper.selectById(2L)).thenReturn(person);
+        MyStudentRespVO result = service.getMyStudent(8L, 2L);
+        assertEquals(1, result.getServices().size());
+        assertEquals("未明确课程", result.getServices().getFirst().getCourseName());
+        org.junit.jupiter.api.Assertions.assertNull(result.getServices().getFirst().getOrderId());
+        org.junit.jupiter.api.Assertions.assertNull(result.getServices().getFirst().getOrderNo());
+        verifyNoInteractions(orderMapper, orderItemMapper, leadMapper);
+    }
+    @Test
     void accountFilterIdsReachPersonalAndAllPaginationWithoutChangingTotal() {
         var req = new MyStudentPageReqVO();
         var filter = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();

@@ -10,6 +10,11 @@ import java.io.IOException;
 import java.util.List;
 
 public interface LeadAppealService {
+    boolean canReviewAppeal(Long appealId, Long userId);
+    LeadAppealContextRespVO getReviewContext(Long appealId, String taskId, Long userId);
+    LeadAppealContextRespVO getAppealContext(Long leadId, Long userId);
+    LeadAppealContextRespVO getPartnerAppealContext(Long leadId, Long partnerId);
+    boolean canHandleAppeal(Long appealId, Long userId);
     List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId);
     List<LeadAppealRespVO> getPartnerLeadAppeals(Long leadId, Long partnerId);
     Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO);

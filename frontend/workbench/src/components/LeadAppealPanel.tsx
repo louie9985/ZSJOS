@@ -1,39 +1,33 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Form, Image, Input, Modal, Skeleton, Space, Tag, Timeline, Typography, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Skeleton, Space, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type LeadAppeal, type LeadAppealEvidence, type ManagedLead } from '../services/api'
-import { formatTimestamp } from '../services/time'
+import { api, type LeadAppeal, type LeadAppealContext, type LeadAppealEvidence, type ManagedLead } from '../services/api'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
-import { invalidReasonSnapshotLabel } from '../services/leadManagement'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
+import LeadAppealAttachments from './LeadAppealAttachments'
+import LeadAppealDecisionForm from './LeadAppealDecisionForm'
+import LeadAppealProcess from './LeadAppealProcess'
+import { canDecideAppeal } from '../services/leadAppealReview'
 
-const STAGE_LABELS = { sales_manager: '负责人主管复核', quality: '质控复核', chairman: '董事长终审' }
-const STATUS_LABELS = {
-  sales_manager_reviewing: '负责人主管复核中', quality_reviewing: '质控复核中', chairman_reviewing: '董事长终审中',
-  overturned: '已改判有效', upheld: '维持无效', withdrawn: '已撤回'
-}
-
-function Evidence({ items }: { items?: LeadAppealEvidence[] }) {
-  if (!items?.length) return null
-  return <Image.PreviewGroup><div className="appeal-evidence-grid">{items.map(item =>
-    <Image key={item.infraFileId} src={item.fileUrl} alt={item.originalName}/>)}</div></Image.PreviewGroup>
-}
+export type AppealReviewContext = { context: LeadAppealContext; appealId: number; reload: () => Promise<LeadAppealContext>; read: () => Promise<LeadAppealContext>; onBusyChange?: (busy: boolean) => void }
 
 export function canSubmitLeadAppeal(
-  lead: Pick<ManagedLead, 'relationTypes' | 'status'>,
-  latest?: Pick<LeadAppeal, 'roundNo' | 'status'>
+  context?: { canSubmit: boolean; nextRoundNo: number | null }
 ) {
-  return lead.relationTypes.includes('submitter') && lead.status === 'invalid'
-    && (!latest || (latest.status === 'upheld' && latest.roundNo < 3))
+  return context?.canSubmit === true && context.nextRoundNo != null
 }
 
-export default function LeadAppealPanel({ lead, onChanged }: {
+export default function LeadAppealPanel({ lead, onChanged, readOnly = false, review, onDirtyChange }: {
   lead: ManagedLead
   onChanged: () => void
+  readOnly?: boolean
+  review?: AppealReviewContext
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const [items, setItems] = useState<LeadAppeal[]>([])
+  const [context, setContext] = useState<Awaited<ReturnType<typeof api.leadAppealContext>>>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
@@ -41,28 +35,41 @@ export default function LeadAppealPanel({ lead, onChanged }: {
   const [evidence, setEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [decisionDirty, setDecisionDirty] = useState(false)
+  const [decisionSaving, setDecisionSaving] = useState(false)
+  useEffect(() => { review?.onBusyChange?.(decisionSaving) }, [decisionSaving, review?.onBusyChange])
+  const dirty = decisionDirty || Boolean(reason.trim()) || evidence.length > 0 || saving
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    try { setItems(await api.leadAppeals(lead.id)) }
+    try { const result = await api.leadAppealContext(lead.id); setContext(result); setItems(result.records) }
     catch (loadError) { setError(loadError instanceof Error ? loadError.message : '申诉记录加载失败') }
     finally { setLoading(false) }
   }, [lead.id])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (review) { setContext(review.context); setItems(review.context.records); setLoading(false); setError('') }
+    else void load()
+  }, [load, review?.context])
 
-  const latest = items.at(-1)
-  const canSubmit = canSubmitLeadAppeal(lead, latest)
-  const nextRound = latest ? latest.roundNo + 1 : 1
+  const latest = items.filter(item => item.currentCycle).at(-1)
+  const canSubmit = !readOnly && canSubmitLeadAppeal(context)
+  const nextRound = context?.nextRoundNo ?? 1
 
   const openAppeal = () => { resetIntent(); setConfirmOpen(false); setOpen(true) }
-  const closeAppeal = () => { setConfirmOpen(false); setOpen(false) }
+  const closeAppeal = () => {
+    if (saving || ((reason.trim() || evidence.length) && !window.confirm('放弃尚未提交的申诉内容？'))) return
+    setConfirmOpen(false); setOpen(false); setReason(''); setEvidence([])
+  }
 
   const submit = async () => {
     setConfirmOpen(false)
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(evidence, api.uploadLeadAppealImage, setEvidence)
       if (uploadResult.failed) { message.error('有申诉图片上传失败，请重试失败项'); return }
-      await api.submitLeadAppeal(lead.id, { reason: reason.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
+      await api.submitLeadAppeal(lead.id, {
+        invalidEventId: context!.invalidEventId, reason: reason.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
       complete()
       message.success(`第 ${nextRound} 次申诉已提交`)
       setOpen(false); setReason(''); setEvidence([]); await load(); onChanged()
@@ -74,26 +81,20 @@ export default function LeadAppealPanel({ lead, onChanged }: {
     setConfirmOpen(true)
   }
 
+  const reloadContext = () => review ? review.read() : api.leadAppealContext(lead.id)
+  const attachments = (item: LeadAppeal, field: 'evidence' | 'invalidEvidenceSnapshot' | 'decisionEvidence') =>
+    <LeadAppealAttachments items={item[field]} reload={async () => (await reloadContext()).records.find(row => row.id === item.id)?.[field] ?? []} />
   if (loading) return <Skeleton active paragraph={{ rows: 6 }}/>
   if (error) return <Alert type="error" showIcon message={error} action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>
   return <div className="lead-appeal-panel">
     <div className="lead-appeal-panel-header">
-      <div><Typography.Title level={5}>申诉记录</Typography.Title><Typography.Text type="secondary">最多三次，每次维持无效后由提交人手动发起下一轮。</Typography.Text></div>
+      <div><Typography.Title level={5}>申诉记录</Typography.Title><Typography.Text type="secondary">每次无效判定独立申诉，周期内最多三轮；维持无效后手动发起下一轮。</Typography.Text></div>
       {canSubmit && <Button type="primary" onClick={openAppeal}>发起第 {nextRound} 次申诉</Button>}
     </div>
-    {!items.length ? <Empty description={canSubmit ? '尚未发起申诉' : '暂无申诉记录'}/> : <Timeline items={items.map(item => ({
-      color: item.status === 'overturned' ? 'green' : item.status === 'upheld' ? 'red' : 'blue',
-      children: <section className="appeal-timeline-item">
-        <Space wrap><Typography.Text strong>第 {item.roundNo} 次申诉</Typography.Text><Tag>{STAGE_LABELS[item.reviewStage]}</Tag><Tag color={item.status === 'overturned' ? 'success' : item.status === 'upheld' ? 'error' : 'processing'}>{STATUS_LABELS[item.status]}</Tag></Space>
-        <Typography.Paragraph type="secondary">提交人：{item.applicantUserName || `用户 #${item.applicantUserId}`} · {formatTimestamp(item.submittedAt)}</Typography.Paragraph>
-        <Typography.Text type="secondary">原无效结论</Typography.Text>
-        <Typography.Paragraph>{[invalidReasonSnapshotLabel(item.invalidReasonSnapshot), item.invalidDescriptionSnapshot].filter(Boolean).join('：') || '-'}</Typography.Paragraph>
-        <Evidence items={item.invalidEvidenceSnapshot}/>
-        <Typography.Text type="secondary">申诉理由</Typography.Text><Typography.Paragraph>{item.reason}</Typography.Paragraph><Evidence items={item.evidence}/>
-        {item.decisionReason && <><Typography.Text type="secondary">裁决意见</Typography.Text><Typography.Paragraph>{item.decisionReason}</Typography.Paragraph><Evidence items={item.decisionEvidence}/><Typography.Text type="secondary">处理人：{item.reviewerUserName || `用户 #${item.reviewerUserId}`} · {formatTimestamp(item.decidedAt)}</Typography.Text></>}
-      </section>
-    }))}/>} 
-    {latest?.roundNo === 3 && latest.status === 'upheld' && <Alert type="error" showIcon message="董事长已终审维持无效，该客资不再允许申诉。"/>}
+    {!items.length ? <Empty description={canSubmit ? '尚未发起申诉' : '暂无申诉记录'}/> : <LeadAppealProcess items={items} targetId={review?.appealId} attachments={attachments}
+      decision={item => canDecideAppeal(item, review?.appealId) && !readOnly ? <LeadAppealDecisionForm key={item.id} item={item} onDirtyChange={setDecisionDirty} onBusyChange={setDecisionSaving}
+        onDecided={async () => { setDecisionDirty(false); await review!.reload() }} /> : null} />}
+    {latest?.roundNo === 3 && latest.status === 'upheld' && <Alert type="error" showIcon message="董事长已终审维持无效，本次无效判定不再允许申诉。"/>}
     <Modal title={`发起第 ${nextRound} 次申诉`} open={open} onCancel={closeAppeal} footer={<Space><Button onClick={closeAppeal}>取消</Button><IrreversiblePopconfirm action={`提交客资「${lead.submittedName}」的第 ${nextRound} 次申诉`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={prepareSubmit}>提交申诉</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Alert type="info" showIcon message={nextRound === 1 ? '本轮由销售直属部门负责人处理' : nextRound === 2 ? '本轮由质控部门处理' : '本轮由董事长最终裁决'}/>

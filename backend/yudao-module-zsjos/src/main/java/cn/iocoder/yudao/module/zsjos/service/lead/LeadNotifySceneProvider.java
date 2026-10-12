@@ -214,35 +214,32 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         if (lead == null) return NotifySendResult.failure("LEAD_SOURCE_RECORD_MISSING", "客资记录不可用", false);
         if (lead.getSourceType() == null) return NotifySendResult.failure(
                 "LEAD_SOURCE_SNAPSHOT_MISSING", "缺少客资来源快照", false);
-        if (SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType()) || SOURCE_PARTNER.equals(lead.getSourceType())) {
+        if (SOURCE_PARTNER.equals(lead.getSourceType())
+                || SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType()) && !isAssistedEntry(lead)) {
             return NotifySendResult.skipped("LEAD_SOURCE_LINK_NOT_APPLICABLE");
         }
-        if (!isSelfSourced(lead.getSourceType())) return NotifySendResult.failure(
+        if (!isSelfSourced(lead.getSourceType()) && !isAssistedEntry(lead)) return NotifySendResult.failure(
                 "LEAD_SOURCE_SNAPSHOT_MISSING", "客资来源快照无法识别", false);
-        if (!Boolean.TRUE.equals(lead.getSourceProviderRecorded())) return NotifySendResult.failure(
-                "LEAD_SOURCE_SNAPSHOT_MISSING", "来源提供方选择快照缺失，需核对历史写入", false);
+        var source = LeadSourceInterpretation.resolve(lead);
+        if (source.needsReview()) return NotifySendResult.failure(
+                source.reason() == LeadSourceInterpretation.Reason.NOT_RECORDED ? "LEAD_SOURCE_SNAPSHOT_MISSING" : "LEAD_SOURCE_ATTRIBUTION_MISMATCH",
+                "客资来源提供方记录需核实", false);
+        if (source.unlinked()) return NotifySendResult.skipped("LEAD_SOURCE_PROVIDER_NOT_SELECTED");
         Long selected = lead.getSourceProviderUserId();
-        if (selected == null) {
-            if (lead.getProviderOwnerId() != null || lead.getProviderOwnerType() != null) {
-                return NotifySendResult.failure("LEAD_SOURCE_ATTRIBUTION_MISMATCH", "提供方选择与归属不一致", false);
-            }
-            return NotifySendResult.skipped("LEAD_SOURCE_PROVIDER_NOT_SELECTED");
-        }
-        if (!PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
-                || !Objects.equals(selected, lead.getProviderOwnerId())) return NotifySendResult.failure(
-                "LEAD_SOURCE_ATTRIBUTION_MISMATCH", "提供方选择与归属不一致", false);
         if (event.getOperatorUserId() == null) return NotifySendResult.failure(
                 "LEAD_SOURCE_OPERATOR_MISSING", "缺少实际提交人", false);
         return Objects.equals(selected, event.getOperatorUserId())
                 ? NotifySendResult.skipped("LEAD_SOURCE_PROVIDER_IS_OPERATOR") : null;
     }
 
+    private boolean isAssistedEntry(LeadDO lead) {
+        return SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType())
+                && isSelfSourced(lead.getSubmissionSourceType());
+    }
+
     private Long resolveNewMediaProvider(LeadDO lead, Long operatorUserId) {
-        if (lead == null || !cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
-                || !Boolean.TRUE.equals(lead.getSourceProviderRecorded())
-                || lead.getSourceProviderUserId() == null
-                || !PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
-                || !Objects.equals(lead.getSourceProviderUserId(), lead.getProviderOwnerId())
+        if (lead == null || !(isSelfSourced(lead.getSourceType()) || isAssistedEntry(lead))
+                || LeadSourceInterpretation.resolve(lead).state() != LeadSourceInterpretation.State.LINKED
                 || Objects.equals(lead.getProviderOwnerId(), operatorUserId)) {
             return null;
         }
@@ -288,7 +285,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("lead.mobile", fullContact ? lead.getSubmittedMobile() : DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
         values.put("lead.sourceType", lead.getSourceType());
-        values.put("lead.submitterIdentityLabel", SOURCE_EDUCATION_SELF.equals(lead.getSourceType()) ? "教务" : SOURCE_SALES_SELF.equals(lead.getSourceType()) ? "销售" : "提交人");
+        String entrySource = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        values.put("lead.submitterIdentityLabel", SOURCE_EDUCATION_SELF.equals(entrySource) ? "教务" : SOURCE_SALES_SELF.equals(entrySource) ? "销售" : "提交人");
         values.put("owner.identityLabel", ownerIdentityLabel(lead.getOwnerIdentity()));
         values.put("lead.sourceChannel", lead.getSourceChannelLabelSnapshot());
         values.put("lead.province", lead.getProvinceName());

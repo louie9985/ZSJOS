@@ -57,9 +57,9 @@ describe('exam calendar latest request wins', () => {
     }
   })
 
-  it('refreshes current views after save and transition', () => {
+  it('refreshes current views after save, transition and draft deletion', () => {
     expect(source).toContain('scheduleInput(values)')
-    expect(source.match(/await reloadVisible\(\)/g)).toHaveLength(2)
+    expect(source.match(/await reloadVisible\(\)/g)).toHaveLength(3)
     expect(source).not.toContain('Promise.all([load(), multiDayOpen')
   })
 })

@@ -56,4 +56,12 @@ public class HrmEmployeeDemoteReqVO {
         return reason == null || HrmEmployeeChangeReasonEnum.DEMOTION_REASONS.contains(reason);
     }
 
+
+    private Long version;
+    @jakarta.validation.constraints.NotBlank
+    @Size(max = 64)
+    private String operationKey;
+    @jakarta.validation.constraints.Pattern(regexp = "BUSINESS|PLAN")
+    private String changeMode = "BUSINESS";
+
 }

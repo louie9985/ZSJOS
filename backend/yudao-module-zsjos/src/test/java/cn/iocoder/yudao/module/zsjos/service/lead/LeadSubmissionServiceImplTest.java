@@ -98,6 +98,11 @@ class LeadSubmissionServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
+        org.mockito.Mockito.lenient().doAnswer(call -> {
+            LeadDO lead=call.getArgument(0); Long selected=call.getArgument(2);
+            if(selected!=null){lead.setProviderOwnerType("system_user");lead.setProviderOwnerId(selected);lead.setContributionUserIdSnapshot(selected);}
+            return null;
+        }).when(providerAttributionService).apply(any(),any(),any(),any());
         var initialStage = new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO();
         initialStage.setValue("pending_contact"); initialStage.setLabel("待触达"); initialStage.setStatus(0);
         org.mockito.Mockito.lenient().when(dictDataApi.getDictDataList(LeadSalesStageSnapshot.DICT_TYPE))
@@ -481,16 +486,29 @@ class LeadSubmissionServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
     }
 
-    @Test
-    void linkedProviderAndDuplicateReviewKeepExistingFlow() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void linkedProviderAndDuplicateReviewKeepExistingFlow(boolean education) {
         LeadCreateReqVO req=validDuplicateRequest();req.setNewMediaProviderUserId(2L);prepareDuplicateValidation(req);
         when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
         when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
-        service.createSelfSourced(req,1L);org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
+        if (education) service.createEducationSelfSourced(req,1L); else service.createSelfSourced(req,1L);
+        org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
         assertEquals(2L,saved.get().getSourceProviderUserId());
+        assertEquals(2L,saved.get().getSourceUserId());
+        assertEquals(SOURCE_INTERNAL_NEW_MEDIA,saved.get().getSourceType());
+        assertEquals(education ? SOURCE_EDUCATION_SELF : SOURCE_SALES_SELF,saved.get().getSubmissionSourceType());
+        assertEquals(DISPATCH_SELF,saved.get().getDispatchMode());
+        verify(identityService).requireNewMediaProvider(2L);
+        verify(dispatchService).start(saved.get(),1L,1L);
+        // Entry identity survives later owner transfers and a retry cannot create another Lead.
+        saved.get().setOwnerIdentity("sales"); saved.get().setOwnerUserId(99L);
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
+        if (education) service.createEducationSelfSourced(req,1L); else service.createSelfSourced(req,1L);
+        verify(leadMapper,org.mockito.Mockito.times(1)).insert(any(LeadDO.class));
     }
 
     private static LeadCreateReqVO baseRequest() {
@@ -605,6 +623,48 @@ class LeadSubmissionServiceImplTest {
         assertEquals(1L, saved.get().getSourceUserId());
         verify(dispatchService).start(saved.get(), 1L, 1L);
         verify(identityService, never()).requireSales(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    void approvedAssistedReviewPreservesEntryAndProvider(String entry) {
+        LeadCreateReqVO req=validDuplicateRequest(); req.setDispatchMode(DISPATCH_SELF);
+        req.setSpecifiedSalesUserId(1L); req.setNewMediaProviderUserId(2L); prepareDuplicateValidation(req);
+        var identity=new LeadSubmissionIdentityService.Resolution(SOURCE_EDUCATION_SELF.equals(entry)
+                ? LeadSubmissionIdentityService.Identity.EDUCATION : LeadSubmissionIdentityService.Identity.SALES,null);
+        when(identityService.resolveHistoricalSubmission(1L,entry,null)).thenReturn(identity);
+        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
+        when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
+        service.createApprovedFromReview(req,1L,null,entry,null,"分类快照","渠道快照");
+        assertEquals(SOURCE_INTERNAL_NEW_MEDIA,saved.get().getSourceType());
+        assertEquals(entry,saved.get().getSubmissionSourceType());
+        assertEquals(2L,saved.get().getSourceUserId());
+        verify(dispatchService).start(saved.get(),1L,1L);
+        org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void partnerSourceDepartmentNeverUsesSameNumberedEmployee(boolean hasOwnership) {
+        LeadCreateReqVO req=validDuplicateRequest();prepareDuplicateValidation(req);
+        org.mockito.Mockito.reset(attachmentService);
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
+        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
+        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        if(hasOwnership){
+            when(partnerOwnershipService.getByPartnerId(10L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO()
+                .setPartnerId(10L).setEmployeeUserId(30L).setEmployeeNameSnapshot("归属员工"));
+            when(adminUserApi.getUser(30L)).thenReturn(user(30L,300L,null));
+        }
+        java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
+        when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
+        service.createForPartner(req,20L,10L);
+        assertEquals(20L,saved.get().getSourceUserId());
+        assertEquals(hasOwnership?300L:null,saved.get().getSourceDeptId());
+        verify(adminUserApi,never()).getUser(20L);
     }
 
 }

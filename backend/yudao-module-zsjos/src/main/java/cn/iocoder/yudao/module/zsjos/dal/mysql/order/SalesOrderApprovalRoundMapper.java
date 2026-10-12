@@ -11,6 +11,18 @@ import java.util.List;
 
 @Mapper
 public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApprovalRoundDO> {
+    @Select("<script>SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
+            + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.tenant_id = o.tenant_id AND r.deleted = FALSE "
+            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL "
+            + "<if test='status != null'>AND o.status = #{status} </if>"
+            + "<if test='keyword != null'>AND (o.order_no LIKE CONCAT('%', #{keyword}, '%') "
+            + "OR o.student_name LIKE CONCAT('%', #{keyword}, '%') OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%')) </if>"
+            + "<if test='orderIds != null'>AND o.id IN "
+            + "<foreach collection='orderIds' item='id' open='(' separator=',' close=')'>#{id}</foreach> </if>"
+            + "</script>")
+    List<String> selectApprovalProcessIds(@Param("tenantId") Long tenantId, @Param("status") String status,
+                                         @Param("keyword") String keyword, @Param("orderIds") List<Long> orderIds);
+
     default SalesOrderApprovalRoundDO selectLatestByOrderId(Long orderId) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderApprovalRoundDO>()
                 .eq(SalesOrderApprovalRoundDO::getOrderId, orderId)

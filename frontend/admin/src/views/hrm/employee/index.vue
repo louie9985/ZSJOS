@@ -70,7 +70,29 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item v-show="showMoreQuery" label="转正时间" prop="regularTime">
+      <el-form-item v-show="showMoreQuery" label="计划转正日期" prop="plannedRegularTime">
+        <el-date-picker
+          v-model="queryParams.plannedRegularTime"
+          :default-time="[new Date('1 00:00:00'), new Date('1 23:59:59')]"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          class="!w-220px"
+        />
+      </el-form-item>
+      <el-form-item v-show="showMoreQuery" label="计划离职日期" prop="plannedLeaveTime">
+        <el-date-picker
+          v-model="queryParams.plannedLeaveTime"
+          :default-time="[new Date('1 00:00:00'), new Date('1 23:59:59')]"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          class="!w-220px"
+        />
+      </el-form-item>
+      <el-form-item v-show="showMoreQuery" label="实际转正日期" prop="regularTime">
         <el-date-picker
           v-model="queryParams.regularTime"
           :default-time="[new Date('1 00:00:00'), new Date('1 23:59:59')]"
@@ -247,34 +269,46 @@
       <el-table-column label="直属上级" align="center" prop="leaderEmployeeName" min-width="120" />
       <el-table-column label="聘用形式" align="center" prop="type" width="100">
         <template #default="{ row }">
-          <dict-tag v-if="row.type != null" :type="DICT_TYPE.HRM_EMPLOYEE_TYPE" :value="row.type" />
+          <span v-if="row.type != null">{{ row.typeLabel || `历史代码 ${row.type}` }}</span>
           <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="员工状态" align="center" prop="status" width="100">
         <template #default="{ row }">
-          <dict-tag
-            v-if="row.status != null"
-            :type="DICT_TYPE.HRM_EMPLOYEE_STATUS"
-            :value="row.status"
-          />
+          <span v-if="row.status != null">{{ row.statusLabel || `历史代码 ${row.status}` }}</span>
           <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="入职状态" align="center" prop="entryStatus" width="100">
         <template #default="{ row }">
-          <dict-tag
-            v-if="row.entryStatus != null"
-            :type="DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS"
-            :value="row.entryStatus"
-          />
+          <span v-if="row.entryStatus != null">{{
+            row.entryStatusLabel || `历史代码 ${row.entryStatus}`
+          }}</span>
           <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column
-        label="转正时间"
+        label="实际转正日期"
         align="center"
         prop="regularTime"
+        width="180"
+        :formatter="dateFormatter"
+      />
+      <el-table-column
+        label="计划转正日期"
+        prop="plannedRegularTime"
+        width="180"
+        :formatter="dateFormatter"
+      />
+      <el-table-column
+        label="计划离职日期"
+        prop="plannedLeaveTime"
+        width="180"
+        :formatter="dateFormatter"
+      />
+      <el-table-column
+        label="实际离职日期"
+        prop="leaveTime"
         width="180"
         :formatter="dateFormatter"
       />
@@ -415,6 +449,8 @@ const queryParams = reactive({
   leaderEmployeeId: undefined as number | undefined,
   postName: undefined as string | undefined,
   regularTime: undefined as string[] | undefined,
+  plannedRegularTime: undefined as string[] | undefined,
+  plannedLeaveTime: undefined as string[] | undefined,
   workAddress: undefined as string | undefined,
   channelId: undefined as number | undefined,
   type: undefined as number | undefined,
@@ -627,10 +663,7 @@ function getEmployeeMoreActions(employee: EmployeeApi.HrmEmployeeVO) {
         { command: 'promotion', label: '晋升' },
         { command: 'demotion', label: '降级' }
       )
-      if (
-        employee.status === HrmEmployeeStatus.INTERN ||
-        employee.status === HrmEmployeeStatus.PART_TIME
-      ) {
+      if ([3, 4, 5, 6, 7, 8].includes(employee.status || 0)) {
         actions.push({ command: 'full-time', label: '转为全职' })
       }
       if (employee.entryStatus === HrmEmployeeEntryStatus.ACTIVE) {
@@ -723,7 +756,12 @@ async function handleMoreCommand(command: string, employee: EmployeeApi.HrmEmplo
           }
         }
       )
-      await EmployeeApi.cancelEmployeeQuit({ employeeId: employee.id, reason: value })
+      await EmployeeApi.cancelEmployeeQuit({
+        employeeId: employee.id,
+        reason: value,
+        version: employee.version,
+        operationKey: crypto.randomUUID()
+      })
       message.success('已取消离职')
       await handleEmployeeChanged()
     } catch {}
@@ -866,6 +904,8 @@ function isEmployeeInsuranceEligible(employee: EmployeeApi.HrmEmployeeVO) {
 
 /** 初始化 */
 onMounted(() => {
+  const employeeId = Number(route.query.employeeId)
+  if (employeeId > 0) router.push({ name: 'HrmEmployeeDetail', params: { id: employeeId } })
   applyHomeFilter()
   refreshList()
 })

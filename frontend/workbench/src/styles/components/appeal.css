@@ -44,3 +44,53 @@
 .appeal-decision-actions {
   margin-top: var(--crm-sp-5);
 }
+
+.appeal-shared-detail { min-width: 0; }
+.appeal-lead-context { padding: 0 var(--crm-sp-5) var(--crm-sp-4); }
+.lead-appeal-panel { container-type: inline-size; }
+.appeal-review-layout { display: grid; grid-template-columns: minmax(0, 9fr) minmax(0, 3fr); gap: var(--crm-sp-6); align-items: start; }
+.appeal-review-main { min-width: 0; display: flex; flex-direction: column; gap: var(--crm-sp-5); }
+.appeal-material-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--crm-sp-5); }
+.appeal-material-comparison > section { min-width: 0; padding: var(--crm-sp-4); }
+.appeal-cycle { display: flex; flex-direction: column; gap: var(--crm-sp-4); }
+.appeal-cycle-heading, .appeal-round-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crm-sp-3); }
+.appeal-cycle-heading { justify-content: space-between; }
+.appeal-cycle-heading h5 { margin: 0; }
+.appeal-round { min-width: 0; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.appeal-round.is-target { border-color: var(--crm-color-primary-border); }
+.appeal-round-heading { padding: var(--crm-sp-3) var(--crm-sp-4); background: var(--crm-bg-layout); border-bottom: 1px solid var(--crm-border); border-radius: var(--crm-radius-md) var(--crm-radius-md) 0 0; }
+.appeal-original-conclusion { padding: var(--crm-sp-4); border-bottom: 1px solid var(--crm-border); }
+.appeal-record-field { display: grid; grid-template-columns: 5em minmax(0, 1fr); gap: var(--crm-sp-2); margin-top: var(--crm-sp-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.appeal-record-field > span, .appeal-record-meta { color: var(--crm-text-secondary); }
+.appeal-record-meta { font-size: var(--crm-font-sm); margin: var(--crm-sp-2) 0; overflow-wrap: anywhere; }
+.appeal-record-evidence { display: flex; flex-direction: column; gap: var(--crm-sp-2); margin-top: var(--crm-sp-3); }
+.appeal-flow-cycle + .appeal-flow-cycle { margin-top: var(--crm-sp-5); }
+.appeal-flow-list { list-style: none; padding: 0 0 0 var(--crm-sp-3); margin: var(--crm-sp-4) 0 0; }
+.appeal-flow-list li { position: relative; padding: 0 0 var(--crm-sp-5) var(--crm-sp-4); border-left: 1px solid var(--crm-border); overflow-wrap: anywhere; }
+.appeal-flow-list li::before { content: ''; position: absolute; left: -4px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--crm-text-secondary); }
+.appeal-flow-list li[data-pending="true"]::before { background: var(--crm-color-primary); }
+.appeal-flow-list li:last-child { border-left-color: transparent; }
+.appeal-flow-list .ant-typography { white-space: pre-wrap; }
+.appeal-review-main .ant-typography { white-space: pre-wrap; overflow-wrap: anywhere; }
+.appeal-review-main h5, .appeal-review-history h5 { margin-top: 0; }
+.appeal-attachment-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--crm-sp-3); }
+.appeal-review-history { min-width: 0; border-left: 1px solid var(--crm-border); padding-left: var(--crm-sp-5); }
+.appeal-review-history summary { padding: var(--crm-sp-3) 0; cursor: pointer; overflow-wrap: anywhere; color: var(--crm-text-secondary); }
+.appeal-history-item { display: flex; flex-direction: column; gap: var(--crm-sp-2); width: 100%; margin: var(--crm-sp-2) 0; padding: var(--crm-sp-4); border: 1px solid transparent; border-radius: var(--crm-radius-sm); text-align: left; color: var(--crm-text); background: var(--crm-bg-container); cursor: pointer; overflow-wrap: anywhere; font: inherit; }
+.appeal-history-item span { color: var(--crm-text-secondary); }
+.appeal-history-item:hover, .appeal-history-item.is-selected { background: var(--crm-color-primary-bg); border-color: var(--crm-color-primary-border); }
+.appeal-history-item strong { font-weight: 500; }
+.appeal-decision-result { display: flex; flex-direction: column; gap: var(--crm-sp-4); padding-top: var(--crm-sp-5); border-top: 1px solid var(--crm-border); }
+.appeal-round > .appeal-decision-form { display: flex; flex-direction: column; gap: var(--crm-sp-3); padding: var(--crm-sp-4); border-top: 1px solid var(--crm-border); }
+.appeal-round > .appeal-decision-form h5 { margin: 0; }
+.appeal-decision-footer { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-4); padding: var(--crm-sp-4) 0; background: var(--crm-bg-container); border-top: 1px solid var(--crm-border); }
+@container (max-width: 900px) {
+  .appeal-material-comparison { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 700px) {
+  .appeal-review-layout { grid-template-columns: minmax(0, 1fr); }
+  .appeal-review-history { grid-row: 1; border-left: 0; border-bottom: 1px solid var(--crm-border); padding: 0 0 var(--crm-sp-4); }
+  .appeal-decision-footer { flex-wrap: wrap; }
+  .appeal-decision-footer .ant-btn { min-height: 44px; }
+  .lead-appeal-panel-header { flex-wrap: wrap; }
+}

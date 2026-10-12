@@ -30,6 +30,8 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
+import lead_source_contract as source_contract
 
 MYSQL_CONTAINER = os.environ.get("ZSJOS_MYSQL_CONTAINER", "zsjos-mysql-1")
 PASSWORD_FILE = os.environ.get(
@@ -75,7 +77,7 @@ COL_SPACE = {
     "zsjos_lead": {
         "source_user_id": "poly",
         "provider_owner_id": "poly",
-        "source_provider_user_id": "poly",
+        "source_provider_user_id": "staff",
         "partner_id": "partner_main",
         "owner_user_id": "staff",
         "recycle_source_owner_user_id": "staff",
@@ -320,7 +322,7 @@ def _mysql(sql, db=None, init=None):
         cmd += ["--init-command", init]
     cmd += ["-e", sql]
     p = subprocess.run(cmd, capture_output=True, text=True)
-    if p.returncode != 0 and "Warning" not in p.stderr:
+    if p.returncode != 0:
         raise RuntimeError(p.stderr.strip())
     return [l.split("\t") for l in p.stdout.rstrip("\n").split("\n") if l]
 
@@ -332,6 +334,8 @@ def _mysql_script(sql, db):
            "-p" + open(PASSWORD_FILE).read().strip(),
            "--default-character-set=utf8mb4", "-N", "-B", "--binary-mode", db]
     p = subprocess.run(cmd, input=sql, capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("MySQL import failed; transaction was not committed. Inspect target state before retry.")
     return p.stdout, p.stderr
 
 
@@ -459,6 +463,19 @@ def resolve_reference(table, col, value, pot, pools, staff_map=None):
     没命中说明这个员工要按备份原 ID 补建(见 plan_user_inserts),
     此时原值本身就是目标库里的 ID,可直接保留。
     """
+    if table == 'zsjos_lead' and col in source_contract.SOURCE_REFERENCES and not source_contract.null(value):
+        if col == 'source_provider_user_id' or pot == 'system_user' or (col == 'source_user_id' and pot is None):
+            if value not in pools['staff']:
+                raise ValueError(f'Unresolved employee source reference: {col}; no cross-domain fallback')
+            if value not in (staff_map or {}):
+                raise ValueError(f'Employee source mapping is unconfirmed: {col}')
+            return staff_map[value], None
+        if pot == 'partner':
+            domain = 'partner_main' if col == 'provider_owner_id' else 'partner_account'
+            if value not in pools[domain]:
+                raise ValueError(f'Unresolved {domain} reference: {col}')
+            return value, None
+        raise ValueError(f'Unconfirmed source identity domain: {col}')
     if value in (None, "NULL", ""):
         return value, None
     if not value.lstrip("-").isdigit():
@@ -844,6 +861,10 @@ def apply_():
     if skipped:
         print(f"      跳过 {len(skipped)} 人(ID 已被占用): {skipped}")
     full_staff_map = dict(staff_map)
+    if user_rows:
+        # Identity-preserving inserts are explicit mappings; occupied/skipped IDs are not evidence.
+        id_index = user_cols.index('id')
+        full_staff_map.update({row[id_index]: row[id_index] for row in user_rows})
 
     # ---- 2. 兼职主体 + 账号(整表,连带引用重映射)----------------------
     partner_tables = ["zsjos_partner", "zsjos_partner_account"]
@@ -859,7 +880,9 @@ def apply_():
     print(f"\n[3/4] 导入业务表 {len(biz_tables)} 张")
 
     # ---- 4. 组装 SQL -----------------------------------------------------
-    stmts = ["SET FOREIGN_KEY_CHECKS=0;", "SET UNIQUE_CHECKS=0;",
+    initial_source = source_fingerprint(SOURCE_DB)
+    initial_target = source_fingerprint(TARGET_DB)
+    stmts = ["SET NAMES utf8mb4;", "START TRANSACTION;", "SET FOREIGN_KEY_CHECKS=0;", "SET UNIQUE_CHECKS=0;",
              "SET SESSION sql_mode='NO_AUTO_VALUE_ON_ZERO';"]
     notes = []
 
@@ -894,19 +917,31 @@ def apply_():
             vals = []
             for c in use:
                 v = r[sidx[c]]
-                nv, why = resolve_reference(t, c, v, pot, pools, full_staff_map)
+                try:
+                    nv, why = resolve_reference(t, c, v, pot, pools, full_staff_map)
+                except ValueError as error:
+                    number = r[sidx['lead_no']] if t == 'zsjos_lead' and 'lead_no' in sidx else t
+                    raise ValueError(f'{number}: {error}') from error
                 if why:
                     notes.append(f"{t}.{c}={v} -> {why}")
                 vals.append(nv)
+            if t == "zsjos_lead":
+                source_contract.validate_import(dict(zip(use, vals)))
             out.append(vals)
         stmts.append(emit_insert(t, use, out,
                                  coltypes=column_types(TARGET_DB, t)))
         print(f"    {t:44s} {len(out):>7} 行")
 
-    stmts.append("SET FOREIGN_KEY_CHECKS=1;")
+    stmts.append(source_contract.POSTCHECK_SQL)
+    stmts.append("SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1; COMMIT;")
     sql = "\n".join(stmts)
     with open("/tmp/merge_payload.sql", "w", encoding="utf-8") as f:
         f.write(sql)
+
+    if initial_source != source_fingerprint(SOURCE_DB) or initial_target != source_fingerprint(TARGET_DB):
+        raise ValueError('Source or target changed during preparation; review a fresh snapshot')
+    manifest = source_contract.metadata(sql, __file__, SOURCE_DB, TARGET_DB, initial_source, initial_target)
+    Path('/tmp/merge_payload.meta.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
 
     print(f"\n[4/4] SQL 已生成: /tmp/merge_payload.sql ({len(sql) / 1024 / 1024:.1f} MB)")
     print(f"    补建员工: {len(user_rows)} 人(沿用备份原 ID)")
@@ -918,12 +953,29 @@ def apply_():
     print("\n下一步: 确认已停服后执行 --write")
 
 
+def source_fingerprint(db):
+    # Includes schema and contents; stale generated SQL cannot overwrite later source/target edits.
+    tables = sorted(set(tables_in(db)) | {'system_users', 'system_dept'})
+    snapshot = []
+    for table in tables:
+        cols = columns_of(db, table)
+        rows = fetch_rows(db, table, cols)
+        snapshot.append((table, cols, column_types(db, table), sorted(source_contract.digest(row) for row in rows)))
+    return source_contract.digest(snapshot)
+
+
 def write_payload():
     path = "/tmp/merge_payload.sql"
     if not os.path.exists(path):
         print("找不到 /tmp/merge_payload.sql,先跑 --apply")
         sys.exit(1)
     sql = open(path, encoding="utf-8").read()
+    saved_path = Path('/tmp/merge_payload.meta.json')
+    if not saved_path.is_file():
+        raise ValueError('Legacy payload has no source contract metadata; execution refused')
+    expected = source_contract.metadata(sql, __file__, SOURCE_DB, TARGET_DB,
+                                        source_fingerprint(SOURCE_DB), source_fingerprint(TARGET_DB))
+    source_contract.verify_metadata(json.loads(saved_path.read_text(encoding='utf-8')), expected)
     out, err = _mysql_script(sql, TARGET_DB)
     print("stderr:", (err.strip() or "(clean)")[:1000])
     if out.strip():
@@ -1005,7 +1057,8 @@ def audit_apply():
         stmts.append(f"DELETE FROM `{t}`;")
         stmts.append(emit_insert(t, use, out, coltypes=ttypes))
         print(f"  {t:34s} {len(out):>8} 行")
-    stmts.append("SET FOREIGN_KEY_CHECKS=1;")
+    stmts.append(source_contract.POSTCHECK_SQL)
+    stmts.append("SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1; COMMIT;")
     sql = "\n".join(stmts)
     with open("/tmp/merge_audit.sql", "w", encoding="utf-8") as f:
         f.write(sql)
@@ -1128,7 +1181,8 @@ def dict_backfill(write=False):
             f"{sql_value(typ)},{status or 0},{sql_value(color_type)},"
             f"{sql_value(css_class)},{sql_value(remark)},'merge',NOW(),"
             "'merge',NOW(),b'0');")
-    stmts.append("SET FOREIGN_KEY_CHECKS=1;")
+    stmts.append(source_contract.POSTCHECK_SQL)
+    stmts.append("SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1; COMMIT;")
     sql = "\n".join(stmts)
     open("/tmp/merge_dict.sql", "w", encoding="utf-8").write(sql)
     o, e = _mysql_script(sql, TARGET_DB)

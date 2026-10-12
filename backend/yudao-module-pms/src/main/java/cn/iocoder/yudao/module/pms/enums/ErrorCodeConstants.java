@@ -96,6 +96,8 @@ public interface ErrorCodeConstants {
     ErrorCode KNOWLEDGE_FAVORITE_DUPLICATE = new ErrorCode(1_053_130_051, "该知识对象已关注");
     ErrorCode KNOWLEDGE_DOCUMENT_SHARE_ALREADY_OPEN = new ErrorCode(1_053_130_060, "该文档已开启分享");
     ErrorCode KNOWLEDGE_DOCUMENT_SHARE_INVALID = new ErrorCode(1_053_130_061, "文档分享不存在或已失效");
+    ErrorCode KNOWLEDGE_DOCUMENT_SHARE_CONFIG_INVALID = new ErrorCode(1_053_130_062, "知识库公开分享地址未配置或配置无效");
+    ErrorCode KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE = new ErrorCode(1_053_130_063, "分享文件暂时不可用");
     ErrorCode KNOWLEDGE_CONTENT_PERMISSION_NOT_EXISTS = new ErrorCode(1_053_130_070, "知识内容协作权限不存在");
     ErrorCode KNOWLEDGE_CONTENT_ACCESS_DENIED = new ErrorCode(1_053_130_071, "无权访问该知识内容");
     ErrorCode KNOWLEDGE_CONTENT_WRITE_ACCESS_DENIED = new ErrorCode(1_053_130_072, "无权编辑该知识内容");

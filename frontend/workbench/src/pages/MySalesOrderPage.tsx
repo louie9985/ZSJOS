@@ -124,7 +124,7 @@ export default function MySalesOrderPage() {
         setLeadDetailModalLeadId(detail.leadId)
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine"
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" informationLayout="table"
           onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
           onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
         : <Empty description="从左侧选择一条订单"/>
@@ -141,7 +141,7 @@ export default function MySalesOrderPage() {
     <div className="sales-order-inbox-actions">
       {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => { setTablePage(1); setStatus(key as StatusTab) }} items={[
         { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
-        { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `已被重提 ${counts.superseded}` }
+        { key: 'revision_required', label: `待重提 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
       ]}/>}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
     </div>
     {countsError && <Alert

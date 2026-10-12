@@ -28,6 +28,7 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Resource
     private ConfigMapper configMapper;
+    @Resource private ConfigSecretSupport secrets;
 
     @Override
     public Long createConfig(ConfigSaveReqVO createReqVO) {
@@ -38,6 +39,7 @@ public class ConfigServiceImpl implements ConfigService {
         // 插入参数配置
         ConfigDO config = ConfigConvert.INSTANCE.convert(createReqVO);
         config.setType(ConfigTypeEnum.CUSTOM.getType());
+        secrets.prepare(config, null);
         configMapper.insert(config);
         return config.getId();
     }
@@ -46,12 +48,13 @@ public class ConfigServiceImpl implements ConfigService {
     public void updateConfig(ConfigSaveReqVO updateReqVO) {
         validateZsjosLoginConfig(updateReqVO.getKey(), updateReqVO.getValue());
         // 校验自己存在
-        validateConfigExists(updateReqVO.getId());
+        ConfigDO previous = validateConfigExists(updateReqVO.getId());
         // 校验参数配置 key 的唯一性
         validateConfigKeyUnique(updateReqVO.getId(), updateReqVO.getKey());
 
         // 更新参数配置
         ConfigDO updateObj = ConfigConvert.INSTANCE.convert(updateReqVO);
+        secrets.prepare(updateObj, previous);
         configMapper.updateById(updateObj);
     }
 
@@ -111,6 +114,13 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public String getRuntimeValue(String key) {
+        ConfigDO row = getConfigByKey(key);
+        if (row == null) return null;
+        return Boolean.TRUE.equals(row.getSensitive()) ? secrets.decrypt(row.getValue()) : row.getValue();
+    }
+
+    @Override
     public String getDefaultUserAvatar() {
         ConfigDO config = getConfigByKey(DEFAULT_USER_AVATAR_KEY);
         return config == null || config.getValue() == null || config.getValue().isBlank() ? null : config.getValue();
@@ -132,6 +142,7 @@ public class ConfigServiceImpl implements ConfigService {
         if (config == null || !ConfigTypeEnum.SYSTEM.getType().equals(config.getType())) {
             throw exception(CONFIG_NOT_EXISTS);
         }
+        if (Boolean.TRUE.equals(config.getSensitive())) throw exception(CONFIG_VALUE_INVALID);
         configMapper.updateById(new ConfigDO().setId(config.getId()).setValue(value));
     }
 

@@ -22,6 +22,26 @@ import static org.mockito.Mockito.when;
 public class PmsKnowledgeDocumentShareControllerTest {
 
     @Test
+    public void existingShareUsesServerUrlAndRemainsRevocableWhenConfigurationIsMissing() {
+        var service = mock(PmsKnowledgeDocumentShareService.class);
+        var urls = new cn.iocoder.yudao.module.pms.service.kb.interaction.PmsKnowledgeShareUrl();
+        ReflectionTestUtils.setField(urls, "publicBaseUrl", "https://public.example.com");
+        var controller = new PmsKnowledgeDocumentShareController();
+        ReflectionTestUtils.setField(controller, "documentShareService", service);
+        ReflectionTestUtils.setField(controller, "shareUrl", urls);
+        var share = new cn.iocoder.yudao.module.pms.dal.dataobject.kb.interaction.PmsKnowledgeDocumentShareDO()
+                .setId(1L).setDocumentId(2L).setToken("existing-token");
+        when(service.getActiveDocumentShare(2L, null)).thenReturn(share);
+        assertEquals("https://public.example.com/public-api/pms/kb/document-share/page?token=existing-token",
+                controller.getDocumentShare(2L).getData().getUrl());
+        ReflectionTestUtils.setField(urls, "publicBaseUrl", "");
+        assertNull(controller.getDocumentShare(2L).getData().getUrl());
+        assertEquals(1L, controller.getDocumentShare(2L).getData().getId());
+        controller.closeShare(2L);
+        verify(service).closeShare(2L, null);
+    }
+
+    @Test
     public void testGetDocumentByToken_fileUsesDefaultPreviewUrl() {
         // mock 数据
         String token = "share-token";

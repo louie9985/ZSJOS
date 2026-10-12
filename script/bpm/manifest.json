@@ -910,6 +910,35 @@
       "minimumMigration": "V271",
       "path": "zsjos_media_account_delete/1.0.0/process.bpmn20.xml",
       "requiresTenantRoleConfiguration": true
+    },
+    {
+      "processKey": "zsjos_points_redemption",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "supervisorReview",
+        "chairmanReview"
+      ],
+      "businessVariables": [
+        "requestNo",
+        "packageName",
+        "creditsAmount",
+        "reason"
+      ],
+      "assigneeVariables": [],
+      "runtimeOnlyVariables": [
+        "requestNo",
+        "packageName",
+        "creditsAmount",
+        "reason"
+      ],
+      "businessKeyFormat": "points-redemption:{requestId}",
+      "minimumMigration": "V296",
+      "path": "zsjos_points_redemption/1.0.0/process-model.json",
+      "sha256": "b8286ce6b8039932e74875f0bd4497cbda433db9904732edf5652b0f1aa8a2ea",
+      "requiresTenantRoleConfiguration": false,
+      "requiresUserConfiguration": true
     }
   ]
 }

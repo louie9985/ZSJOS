@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -11,6 +12,8 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class RegistrationPoolPageReqVO extends PageParam {
     private String status;
+    @Pattern(regexp = "pending|processed|all")
+    private String statusGroup;
     @Size(max = 100) private String keyword;
     @Valid private AdvancedFilterGroupReqVO advancedFilter;
 }

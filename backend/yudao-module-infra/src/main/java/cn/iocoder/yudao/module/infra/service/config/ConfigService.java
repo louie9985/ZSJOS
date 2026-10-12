@@ -15,6 +15,8 @@ import java.util.List;
  */
 public interface ConfigService {
 
+    String getRuntimeValue(String key);
+
     String DEFAULT_USER_AVATAR_KEY = "zsjos.user.default-avatar";
 
     /**

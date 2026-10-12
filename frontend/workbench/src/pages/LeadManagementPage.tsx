@@ -1,3 +1,4 @@
+import { LeadAppealPendingTag } from '../components/LeadAppealSummary'
 import BusinessTable from '../components/BusinessTable'
 import { createIdempotencyKey } from '../services/idempotency'
 import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
@@ -33,6 +34,7 @@ import LeadDetail from '../components/LeadDetail'
 import { LEAD_FOLLOW_UP_CHANGED } from '../services/leadFollowUpEvents'
 import {
   dictionaryDisplayLabel,
+  leadQualificationDisplayLabel,
   leadRelationTypesLabel,
   leadSnapshotLabel,
   hasNextLeadInboxPage,
@@ -51,7 +53,6 @@ import {
   LEAD_FILTER_SECTION,
   LEAD_HANDLING_STAGE_LABELS,
   LEAD_OPERATIONAL_STATUS_LABELS,
-  LEAD_QUALIFICATION_STATUS_LABELS,
   LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
 import { parseLeadDetailTab, shouldBlockLeadSwitch } from '../services/leadFollowUp'
@@ -154,10 +155,11 @@ function productText(lead: ManagedLead) {
 }
 
 function LeadStateTags({ lead }: { lead: ManagedLead }) {
+  if (lead.status === 'closed') return <Tag>{leadQualificationDisplayLabel(lead)}</Tag>
   return <Space size={4}>
     <Tag color={lead.qualificationStatus === 'invalid' ? 'red' : lead.qualificationStatus === 'valid' ? 'green' : 'gold'}>
-      {protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}
-    </Tag>
+      {leadQualificationDisplayLabel(lead, '未知有效状态')}
+    </Tag><LeadAppealPendingTag lead={lead} />
     {lead.followUpStatus && <Tag color="blue">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Tag>}
     {lead.operationalStatus === 'suspended' && <Tag color="orange">已挂起</Tag>}
   </Space>
@@ -382,7 +384,8 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       const loaded = await api.managedLead(id)
       if (version !== detailRequestVersion.current) return
       setDetail(loaded)
-      setItems(current => current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : pinLeadFirst(current, loaded))
+      // 静默刷新不能把已被服务端筛选排除的客资重新插入列表。
+      setItems(current => current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : silent ? current : pinLeadFirst(current, loaded))
     } catch (loadError) {
       if (version !== detailRequestVersion.current) return
       setDetail(undefined)
@@ -427,11 +430,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
 
   const refreshAfterLeadChange = useCallback(async (id: number) => {
     setSelectedId(id)
+    if (routeSelectionRef.current === id) routeSelectionRef.current = undefined
     const version = ++requestVersion.current
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
     await Promise.all([
       loadMetadata(),
-      loadPage(useTableLayout ? pageNo : 1, true, version, { preferredSelectedId: id, silent: true }),
+      loadPage(useTableLayout ? pageNo : 1, true, version, { preferredSelectedId: id, silent: true, preserveSelection: true }),
       loadDetail(id, true)
     ])
   }, [loadDetail, loadMetadata, loadPage, pageNo, useTableLayout])
@@ -439,6 +443,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   useEffect(() => {
     const onFollowUpChanged = (event: Event) => {
       const leadId = (event as CustomEvent<number>).detail
+      if (routeSelectionRef.current === leadId) routeSelectionRef.current = undefined
       if (!detailOnly) void loadPage(useTableLayout ? pageNo : 1, true, ++requestVersion.current, { silent: true, preserveSelection: true })
       if (selectedId === leadId) {
         // Keep the mounted form and its draft; only invalidate the server-backed history.
@@ -537,7 +542,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         ? <LeadDetail lead={detail} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
-          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} profileVariant="contact-rows" hideProviderOwner/>
+          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} profileVariant="contact-rows"/>
         : <Empty description="从左侧选择一条客资"/>
 
   const allLeadTableColumns: ProColumns<ManagedLead>[] = [
@@ -553,7 +558,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       { key: 'channel', title: '渠道', render: (_: unknown, item: ManagedLead) => leadSnapshotLabel(item.sourceChannelLabelSnapshot, item.sourceChannel) },
       { key: 'region', title: '地区', render: (_: unknown, item: ManagedLead) => [item.provinceName, item.cityName].filter(Boolean).join(' / ') || '-' },
       { key: 'product', title: '意向产品', render: (_: unknown, item: ManagedLead) => productText(item) },
-      { key: 'qualificationStatus', title: '有效性状态', render: (_: unknown, item: ManagedLead) => item.qualificationStatus ? protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, item.qualificationStatus, '未知状态') : '—' },
+      { key: 'qualificationStatus', title: '有效性状态', render: (_: unknown, item: ManagedLead) => <Space wrap>{item.status === 'closed' || item.qualificationStatus ? leadQualificationDisplayLabel(item) : '—'}<LeadAppealPendingTag lead={item} /></Space> },
       { key: 'followUpStatus', title: '跟进状态', render: (_: unknown, item: ManagedLead) => item.followUpStatus ? protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, item.followUpStatus, '未知状态') : '—' },
       { key: 'operationalStatus', title: '运营状态', render: (_: unknown, item: ManagedLead) => item.operationalStatus ? protocolDisplayLabel(LEAD_OPERATIONAL_STATUS_LABELS, item.operationalStatus, '未知状态') : '—' },
       { key: 'handlingStage', title: '处理阶段', render: (_: unknown, item: ManagedLead) => item.handlingStage ? protocolDisplayLabel(LEAD_HANDLING_STAGE_LABELS, item.handlingStage, '未知阶段') : '—' },

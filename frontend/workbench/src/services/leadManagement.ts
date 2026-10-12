@@ -1,4 +1,15 @@
 import type { Timestamp } from './time'
+import { LEAD_QUALIFICATION_STATUS_LABELS, LEAD_STATUS_LABELS } from '../constants'
+
+export function leadQualificationDisplayLabel(
+  lead: Pick<import('./api').ManagedLead, 'status' | 'qualificationStatus'>,
+  unknownLabel = '未知状态'
+): string {
+  // The legacy qualification projection falls back to pending even after closure.
+  // Display the server's explicit terminal status without changing qualification or actions.
+  if (lead.status === 'closed') return LEAD_STATUS_LABELS.closed
+  return protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, unknownLabel)
+}
 
 // Relationship identifiers come from LeadManagementService, never from user role names.
 const relationLabels: Record<string, string> = { submitter: '提交人', owner: '负责人', student_service_owner: '学员服务负责人' }

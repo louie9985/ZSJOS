@@ -5,3 +5,5 @@
 调度任务每 10 分钟按租户执行。合同提醒只处理在职员工最新的执行中合同，且合同开启 `expireRemind`；周年提醒按 `entryTime` 自然周年计算，2 月 29 日在非闰年顺延到 3 月 1 日。每个员工/接收人组合使用提醒类型、目标日期、员工和接收人组成幂等键。
 
 三类提醒均创建 ZSJOS 业务待办并发送站内信，接收人可通过 `POST /zsjos/business-task/{id}/complete-employee-reminder` 完成；生日旧完成接口继续兼容。
+
+新增转正、离职和人事异动提醒独立使用 `/hrm/employee-reminder/lifecycle-config`，只发送消息，不创建业务待办；参见 [人工维护与人事到期提醒](hrm-manual-lifecycle.md)。现有三类提醒的待办契约保持不变。

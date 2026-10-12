@@ -13,11 +13,17 @@ public class LeadRestoreOwnerPolicy {
 
     public boolean isEligible(LeadDO lead) {
         if (lead.getOwnerUserId() == null) return false;
-        // Education self-sourced ownership uses the same eligibility as its creation entry point.
-        // This only validates the retained owner; operation permission and manager scope remain separate.
+        // Restoring existing education ownership does not accept a new lead: current acceptance
+        // permission and partner assignment relations must not invalidate the persisted ownership.
+        // Operation permission and manager scope remain separate from retained-owner eligibility.
         if (OWNER_EDUCATION.equals(lead.getOwnerIdentity())) {
-            return SOURCE_EDUCATION_SELF.equals(lead.getSourceType())
-                    && identityService.isEligibleEducationOwner(lead.getOwnerUserId());
+            boolean supportedSource = SOURCE_EDUCATION_SELF.equals(lead.getSourceType())
+                    || SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType())
+                    && SOURCE_EDUCATION_SELF.equals(lead.getSubmissionSourceType())
+                    && DISPATCH_SELF.equals(lead.getDispatchMode())
+                    || SOURCE_PARTNER.equals(lead.getSourceType())
+                    && DISPATCH_SPECIFIED.equals(lead.getDispatchMode());
+            return supportedSource && identityService.isEligibleEducationOwner(lead.getOwnerUserId());
         }
         return assignmentService.isEligibleSalesUser(lead.getOwnerUserId());
     }

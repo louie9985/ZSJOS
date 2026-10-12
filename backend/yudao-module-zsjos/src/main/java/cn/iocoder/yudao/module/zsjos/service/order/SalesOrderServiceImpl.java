@@ -122,6 +122,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private OrderContactCompletionService contactCompletionService;
     @Resource private SalesOrderCommandService commandService;
     @Resource private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
     @Resource private SalesOrderNumberService orderNumberService;
@@ -168,6 +169,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         allocateOnlinePayment(order, paymentIntent, now);
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(leadId, order.getId(), createdItems, validated.items());
+        contactCompletionService.complete(order, leadId, userId);
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
         agingPoolService.markDealPending(leadId, userId, now);
         return order.getId();
@@ -179,7 +181,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
         LeadDO lead = requireRepurchaseLead(leadId, userId);
         return createRepurchase(lead.getPersonId(), null, userId, userId,
-                reqVO.getRepurchaseReason(), reqVO.getOrder(), true, SUBMITTER_CENTER_SALES, lead.getOwnerIdentity());
+                reqVO.getRepurchaseReason(), reqVO.getOrder(), true, SUBMITTER_CENTER_SALES, lead.getOwnerIdentity(), lead.getId());
     }
 
     @Override
@@ -254,6 +256,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder,
                                   String submitterCenterType, String formalOwnerIdentity) {
+        return createRepurchase(personId, sourceLeadId, formalSalesUserId, userId, reason, submission,
+                requireEffectiveOrder, submitterCenterType, formalOwnerIdentity, null);
+    }
+
+    private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
+                                  SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder,
+                                  String submitterCenterType, String formalOwnerIdentity, Long contactLeadId) {
         String requestFingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(
                 personId, userId, submitterCenterType, StrUtil.trim(reason), submission)));
         Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey(),
@@ -291,6 +300,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         allocateOnlinePayment(order, paymentIntent, now);
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(sourceLeadId, order.getId(), createdItems, validated.items());
+        contactCompletionService.complete(order, contactLeadId, userId);
         startRound(order, null, userId, submission.getIdempotencyKey(), validated, 1, now);
         return order.getId();
     }
@@ -390,6 +400,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setSupersededByOrderId(successor.getId()); orderMapper.updateById(order);
         List<SalesOrderItemDO> createdItems = insertItems(successor.getId(), validated.items());
         createDealCashbacks(successor.getLeadId(), successor.getId(), createdItems, validated.items());
+        contactCompletionService.complete(successor, successor.getLeadId(), userId);
         startRound(successor, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
         if (latest != null) businessTaskCommandService.completeByKey(TASK_REVISION_KEY_PREFIX + latest.getId(), now);
         if (lead != null) agingPoolService.markDealPending(lead.getId(), userId, now);
@@ -653,7 +664,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         boolean advanced = advancedFilterService.hasConditions(reqVO.getAdvancedFilter());
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
         LeadInboxFilterQuery filter;
-        if (advanced) {
+        if (reqVO.getOrderState() != null) {
+            if (!Set.of("all", STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
+                    STATUS_TERMINATED, STATUS_SUPERSEDED).contains(reqVO.getOrderState())) {
+                throw exception(LEAD_INBOX_FILTER_INVALID);
+            }
+            // Order progress includes both the user's pending and completed BPM tasks.
+            filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of());
+        } else if (advanced) {
             filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of());
         } else if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
             filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of(
@@ -666,11 +684,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         filter = restrictTaskFilter(filter, allowedTaskKeys);
         if (filter.matchNone()) return PageResult.empty();
-        List<String> processIds = advanced
+        List<String> processIds;
+        if (reqVO.getOrderState() != null) {
+            List<Long> orderIds = advanced ? advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter()) : null;
+            if (orderIds != null && orderIds.isEmpty()) return PageResult.empty();
+            processIds = roundMapper.selectApprovalProcessIds(TenantContextHolder.getRequiredTenantId(),
+                    "all".equals(reqVO.getOrderState()) ? null : reqVO.getOrderState(),
+                    StrUtil.blankToDefault(reqVO.getKeyword(), null), orderIds);
+        } else {
+            processIds = advanced
                 ? roundMapper.selectProcessInstanceIdsByOrderIdsAndKeyword(
                         TenantContextHolder.getTenantId(), advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter()),
                         StrUtil.blankToDefault(reqVO.getKeyword(), null))
                 : searchProcessIds(reqVO.getKeyword());
+        }
         if (processIds != null && processIds.isEmpty()) return PageResult.empty();
         List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
         List<OrderTaskContext> contexts = new ArrayList<>();
@@ -724,11 +751,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private String approvalCursorContext(SalesOrderPageReqVO reqVO) {
         return Integer.toHexString(Objects.hash(reqVO.getCenter(), reqVO.getHandled(), reqVO.getGroupKey(),
-                reqVO.getOptionKey(), reqVO.getKeyword(), reqVO.getAdvancedFilter()));
+                reqVO.getOptionKey(), reqVO.getKeyword(), reqVO.getAdvancedFilter(), reqVO.getOrderState()));
     }
 
     private boolean isDoneApproval(SalesOrderPageReqVO reqVO) {
-        return Boolean.TRUE.equals(reqVO.getHandled()) || "done".equals(reqVO.getGroupKey());
+        return reqVO.getOrderState() == null
+                && (Boolean.TRUE.equals(reqVO.getHandled()) || "done".equals(reqVO.getGroupKey()));
     }
 
     private record ApprovalCursor(LocalDateTime time, String id) {}
@@ -758,7 +786,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<SalesOrderApprovalFilterProfileRespVO.CenterVO> centers = new ArrayList<>();
         if (allowedTaskKeys.contains(TASK_REGISTRATION)) centers.add(new SalesOrderApprovalFilterProfileRespVO.CenterVO(CENTER_REGISTRATION, "报名履约中心"));
         if (allowedTaskKeys.contains(TASK_FINANCE)) centers.add(new SalesOrderApprovalFilterProfileRespVO.CenterVO(CENTER_FINANCE, "财务中心"));
-        return new SalesOrderApprovalFilterProfileRespVO(groups, centers);
+        return new SalesOrderApprovalFilterProfileRespVO(groups, centers, List.of(
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO("all", "全部", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_PENDING_APPROVAL, "待审核", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_REVISION_REQUIRED, "待重提", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_EFFECTIVE, "已通过", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_TERMINATED, "已终止", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_SUPERSEDED, "历史旧单（已重提）", null)));
     }
 
     private String centerTaskKey(String center) {
@@ -1350,7 +1384,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderSnapshot previousSnapshot = previousOrder == null ? new SalesOrderSnapshot()
                 : readSnapshot(roundMapper.selectById(previousOrder.getCurrentApprovalRoundId()));
         Map<String, String> labels = new LinkedHashMap<>();
-        if (StrUtil.isBlank(req.getStudentMobile()) && StrUtil.isBlank(req.getStudentWechatId())) throw exception(SALES_ORDER_CONTACT_REQUIRED);
+        if (StrUtil.isBlank(req.getStudentMobile()) || StrUtil.isBlank(req.getStudentWechatId())) throw exception(SALES_ORDER_CONTACT_REQUIRED);
         if (StrUtil.isNotBlank(req.getStudentMobile()) && !ValidationUtils.isMobile(req.getStudentMobile().trim())) {
             throw exception(LEAD_MOBILE_INVALID);
         }
@@ -1580,6 +1614,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStudentSpecialRequirements(order.getStudentSpecialRequirements()); result.setMaterialDeliveryContact(order.getMaterialDeliveryContact());
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
         history.apply(result);
+        applyRecordedFeeModeLabel(result, order);
+        applyRecordedPaymentMethodLabel(result, order);
         result.setGiftItems(order.getGiftItems()); result.setGiftShippingAddress(order.getGiftShippingAddress());
         try {
             var gifts = SalesOrderGiftSnapshot.read(order.getGiftItems());
@@ -1797,6 +1833,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStudentSourceLabelSnapshot(history.label("studentSource"));
         result.setFeeModeLabelSnapshot(history.label("feeMode"));
         result.setPaymentMethodLabelSnapshot(history.label("paymentMethod"));
+        setRecordedPaymentLabels(result, order);
         SalesOrderRespVO.LeadProfileVO leadHistory = history.getLeadProfile();
         if (leadHistory != null) {
             result.setLeadNo(leadHistory.getLeadNo());
@@ -1865,6 +1902,38 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return result;
     }
 
+    /** The round snapshot is the primary label source; imported orders that predate it keep their
+     * recorded selection on the order itself (V299). Clearing the missing marker keeps the flag
+     * consistent with the label actually returned. */
+    private void applyRecordedFeeModeLabel(SalesOrderRespVO target, SalesOrderDO order) {
+        if (StrUtil.isNotBlank(target.getFeeModeLabelSnapshot())) return;
+        if (StrUtil.isBlank(order.getFeeModeLabelSnapshot())) return;
+        target.setFeeModeLabelSnapshot(order.getFeeModeLabelSnapshot());
+        clearMissingLabel(target.getHistoryMissingFields(), "feeMode");
+    }
+
+    private void applyRecordedPaymentMethodLabel(SalesOrderRespVO target, SalesOrderDO order) {
+        if (StrUtil.isNotBlank(target.getPaymentMethodLabelSnapshot())) return;
+        if (StrUtil.isBlank(order.getPaymentMethodLabelSnapshot())) return;
+        target.setPaymentMethodLabelSnapshot(order.getPaymentMethodLabelSnapshot());
+        clearMissingLabel(target.getHistoryMissingFields(), "paymentMethod");
+    }
+
+    private void setRecordedPaymentLabels(SalesOrderListItemRespVO target, SalesOrderDO order) {
+        if (StrUtil.isBlank(target.getFeeModeLabelSnapshot()) && StrUtil.isNotBlank(order.getFeeModeLabelSnapshot())) {
+            target.setFeeModeLabelSnapshot(order.getFeeModeLabelSnapshot());
+            clearMissingLabel(target.getHistoryMissingFields(), "feeMode");
+        }
+        if (StrUtil.isBlank(target.getPaymentMethodLabelSnapshot()) && StrUtil.isNotBlank(order.getPaymentMethodLabelSnapshot())) {
+            target.setPaymentMethodLabelSnapshot(order.getPaymentMethodLabelSnapshot());
+            clearMissingLabel(target.getHistoryMissingFields(), "paymentMethod");
+        }
+    }
+
+    private void clearMissingLabel(Map<String, String> missing, String field) {
+        if (missing != null) missing.remove(field);
+    }
+
     private FinanceOrderExportRowRespVO convertFinanceExportRow(SalesOrderDO currentOrder, SalesOrderApprovalRoundDO round,
             List<SalesOrderItemDO> items, Map<String, List<BpmProcessNodeStatusRespDTO>> statuses,
             Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
@@ -1879,7 +1948,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 .filter(StrUtil::isNotBlank).distinct().collect(java.util.stream.Collectors.joining(" / ")));
         row.setCourseSummary(items.stream().map(this::courseSummary).collect(java.util.stream.Collectors.joining("；")));
         row.setTotalAmount(order.getTotalAmount()); row.setCustomerPaidAt(order.getCustomerPaidAt());
-        row.setPaymentMethod(StrUtil.blankToDefault(history.label("paymentMethod"), "历史未记录"));
+        row.setPaymentMethod(StrUtil.blankToDefault(history.label("paymentMethod"),
+                StrUtil.blankToDefault(currentOrder.getPaymentMethodLabelSnapshot(), "历史未记录")));
         row.setFormalSalesName(history.getFormalSales() == null ? "历史未记录" : StrUtil.blankToDefault(history.getFormalSales().name(), "历史未记录"));
         row.setSubmitterName(history.getSubmitter() == null ? "历史未记录" : StrUtil.blankToDefault(history.getSubmitter().name(), "历史未记录"));
         row.setSubmittedAt(order.getSubmittedAt()); row.setEffectiveAt(order.getEffectiveAt());
@@ -2010,4 +2080,3 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}
 }
-

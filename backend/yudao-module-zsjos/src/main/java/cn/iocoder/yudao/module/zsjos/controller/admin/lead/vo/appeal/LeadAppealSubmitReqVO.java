@@ -11,6 +11,9 @@ import java.util.List;
 
 @Data
 public class LeadAppealSubmitReqVO {
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.PositiveOrZero
+    private Long invalidEventId;
     @NotBlank @Size(max = 1000) private String reason;
     @NotBlank @Size(max = 100) private String idempotencyKey;
     @Size(max = 9) private List<@Valid LeadAttachmentReqVO> attachments = new ArrayList<>();

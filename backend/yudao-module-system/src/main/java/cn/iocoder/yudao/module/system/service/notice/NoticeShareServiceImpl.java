@@ -63,7 +63,7 @@ public class NoticeShareServiceImpl implements NoticeShareService {
         if (share.getId() == null) shareMapper.insert(share);
         else shareMapper.reopen(share);
         NoticeShareRespVO result = response(share);
-        result.setUrl(baseUrl + "/notice/share#token=" + share.getToken());
+        result.setUrl(baseUrl + "/public-api/system/notice-share/page?token=" + share.getToken());
         return result;
     }
 
@@ -154,7 +154,7 @@ public class NoticeShareServiceImpl implements NoticeShareService {
             result.setClosedAt(result.isActive() ? null : share.getClosedAt());
             if (result.isActive()) {
                 // Configuration loss must not prevent revoking an already active share.
-                try { result.setUrl(requireBaseUrl() + "/notice/share#token=" + share.getToken()); }
+                try { result.setUrl(requireBaseUrl() + "/public-api/system/notice-share/page?token=" + share.getToken()); }
                 catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
                     if (!Objects.equals(e.getCode(), NOTICE_SHARE_CONFIG_INVALID.getCode())) throw e;
                 }

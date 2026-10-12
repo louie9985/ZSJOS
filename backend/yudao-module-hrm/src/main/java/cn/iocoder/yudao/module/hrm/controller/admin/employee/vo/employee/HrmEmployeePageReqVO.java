@@ -97,4 +97,8 @@ public class HrmEmployeePageReqVO extends SortablePageParam {
     @Schema(hidden = true)
     private LocalDateTime[] activeTime;
 
+    @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime[] plannedRegularTime;
+    @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime[] plannedLeaveTime;
 }

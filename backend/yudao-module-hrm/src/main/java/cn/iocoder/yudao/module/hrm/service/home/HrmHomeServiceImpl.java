@@ -499,12 +499,12 @@ public class HrmHomeServiceImpl implements HrmHomeService {
             }
             if (HrmEmployeeEntryStatusEnum.ACTIVE_STATUSES.contains(entryStatus)) {
                 addEmployeeDateItem(items, HrmHomeCalendarItemTypeEnum.REGULAR,
-                        employee, employee.getRegularTime(), startDate, endDate);
+                        employee, employee.getPlannedRegularTime(), startDate, endDate);
             }
             HrmEmployeeQuitInfoDO quitInfo = quitInfoMap.get(employee.getId());
-            if (quitInfo != null) {
+            if (employee.getPlannedLeaveTime() != null) {
                 addEmployeeDateItem(items, HrmHomeCalendarItemTypeEnum.LEAVE,
-                        employee, quitInfo.getPlanQuitTime(), startDate, endDate);
+                        employee, employee.getPlannedLeaveTime(), startDate, endDate);
             }
         }
     }

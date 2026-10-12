@@ -23,4 +23,8 @@ public class SalesPerformanceController {
  @GetMapping("/lead-calendar") public CommonResult<LeadCalendar> leadCalendar(@Valid Query q){return success(service.leadCalendar(q));}
  @GetMapping("/missing-targets") public CommonResult<List<MissingTarget>> missingTargets(@Valid Query q){return success(service.missingTargets(q));}
  @GetMapping("/details") public CommonResult<PageResult<Detail>> details(@Valid Query q){return success(service.details(q));}
+ @GetMapping("/order-details") public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.OrderDetailVO.Response> orderDetails(
+   @Valid cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.OrderDetailVO.Query q){return success(service.orderDetails(q));}
+ @GetMapping("/conversion-details") public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.ConversionDetailVO.Response> conversionDetails(
+   @Valid cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.ConversionDetailVO.Query q){return success(service.conversionDetails(q));}
 }

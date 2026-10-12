@@ -26,6 +26,14 @@ public final class SupervisorLeadOverturnPolicy {
     public static ErrorCode rejection(LeadDO lead, List<LeadAppealDO> appeals, OpportunityDO opportunity) {
         if (!STATUS_INVALID.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || lead.getOwnerUserId() == null || lead.getClosedAt() != null) return STATE_INVALID;
+        return rejection(lead, appeals, opportunity, 0L);
+    }
+
+    public static ErrorCode rejection(LeadDO lead, List<LeadAppealDO> history, OpportunityDO opportunity, long cycle) {
+        if (!STATUS_INVALID.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                || lead.getOwnerUserId() == null || lead.getClosedAt() != null) return STATE_INVALID;
+        if (LeadAppealCycles.unresolvedHistory(history, cycle)) return APPEAL_BLOCKED;
+        var appeals = LeadAppealCycles.current(history, cycle);
         if (!appeals.isEmpty() && !(appeals.size() == 1 && Integer.valueOf(1).equals(appeals.getFirst().getRoundNo())
                 && APPEAL_STATUS_UPHELD.equals(appeals.getFirst().getStatus())
                 && APPEAL_STAGE_SALES_MANAGER.equals(appeals.getFirst().getReviewStage()))) return APPEAL_BLOCKED;

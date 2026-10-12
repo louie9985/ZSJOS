@@ -19,6 +19,8 @@ import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -39,6 +41,7 @@ import static org.mockito.Mockito.*;
 class LeadQualificationServiceImplTest {
     @InjectMocks private LeadQualificationServiceImpl service;
     @Mock private LeadMapper leadMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Mock private LeadAssignmentHistoryMapper historyMapper;
     @Mock private BusinessEventMapper eventMapper;
@@ -97,6 +100,7 @@ class LeadQualificationServiceImplTest {
 
         assertEquals("valid", lead.getStatus());
         assertNull(lead.getSuspendedAt());
+        verify(leadMapper).updateClearingSuspension(lead);
         assertEquals("owned", lead.getAssignmentStatus());
         assertEquals("已确认有明确学习意向", lead.getValidDescription());
         assertEquals(20L, lead.getQualifiedByUserId());
@@ -220,21 +224,28 @@ class LeadQualificationServiceImplTest {
 
         assertEquals("submitted", lead.getStatus());
         assertNull(lead.getSuspendedAt());
+        verify(leadMapper).updateClearingSuspension(lead);
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
         verify(notifyEventPublisher).publish(eq(QUALIFICATION_RESTORED), eq(1L), anyString(),
                 eq(99L), any(LocalDateTime.class), anyMap());
     }
 
-    @Test
-    void restoreEducationKeepsOriginalOwnerAndIdentity() {
+    @ParameterizedTest
+    @CsvSource({"education_self_sourced,self", "partner,specified"})
+    void restoreEducationKeepsOriginalOwnerAndIdentity(String source, String dispatchMode) {
         LeadDO lead = pendingLead();
         lead.setStatus("suspended");
         lead.setOwnerIdentity("education");
-        lead.setSourceType("education_self_sourced");
+        lead.setSourceType(source);
+        lead.setDispatchMode(dispatchMode);
         lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
-        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
+        LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
+        LeadSubmissionIdentityService identityService = mock(LeadSubmissionIdentityService.class);
+        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "restoreOwnerPolicy", policy);
         LeadDispositionReqVO request = new LeadDispositionReqVO();
         request.setIdempotencyKey("request-3"); request.setReason("主管恢复");
 
@@ -242,11 +253,23 @@ class LeadQualificationServiceImplTest {
 
         assertEquals("submitted", lead.getStatus());
         assertNull(lead.getSuspendedAt());
+        verify(leadMapper).updateClearingSuspension(lead);
         assertEquals(20L, lead.getOwnerUserId());
         assertEquals("education", lead.getOwnerIdentity());
+        assertEquals(source, lead.getSourceType());
+        assertEquals(dispatchMode, lead.getDispatchMode());
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
         verify(notifyEventPublisher).publish(eq(QUALIFICATION_RESTORED), eq(1L), anyString(),
                 eq(99L), any(LocalDateTime.class), anyMap());
+        ArgumentCaptor<BusinessEventDO> event = ArgumentCaptor.forClass(BusinessEventDO.class);
+        verify(eventMapper).insert(event.capture());
+        assertEquals("主管恢复", event.getValue().getReason());
+        when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(event.getValue());
+        withTenant(() -> service.restore(1L, 99L, request));
+        verify(lifecycleTaskService, times(1)).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
+        verify(eventMapper, times(1)).insert(any(BusinessEventDO.class));
+        verify(leadMapper, times(1)).updateClearingSuspension(lead);
+        verifyNoInteractions(assignmentService);
     }
 
     @Test
@@ -269,6 +292,7 @@ class LeadQualificationServiceImplTest {
 
         assertEquals("submitted", lead.getStatus());
         assertNull(lead.getSuspendedAt());
+        verify(leadMapper).updateClearingSuspension(lead);
         assertEquals("owned", lead.getAssignmentStatus());
     }
 

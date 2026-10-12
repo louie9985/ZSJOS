@@ -10,6 +10,7 @@ def open_page(page,app,width=1440):
  if app=='admin':page.get_by_role('button',name='打开复购').click()
  page.get_by_label('客户姓名',exact=True).fill('测试客户')
  page.get_by_label('手机号',exact=True).fill('13800138000')
+ page.get_by_label('微信号',exact=True).fill('test-wechat')
 def check(page):
  page.get_by_role('button',name='校验客户').click()
  expect(page.get_by_text('已识别客户，本次订单归属当前录单人',exact=True)).to_be_visible()
@@ -113,6 +114,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='确认执行',exact=True).click()
  expect(page.get_by_text('模拟提交失败',exact=True).last).to_be_visible()
  page.evaluate('repurchaseFixture.submitFail=false')
+ expect(dialog.locator('button.ant-btn-loading')).to_have_count(0)
  dialog.get_by_role('button',name='提交审批').click()
  page.get_by_role('button',name='确认执行',exact=True).click()
  expect(page.get_by_text('复购订单已提交审批',exact=True)).to_be_visible()

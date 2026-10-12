@@ -26,6 +26,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ExamScheduleServiceTest {
+    @org.junit.jupiter.api.BeforeEach void createTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L); }
+    @org.junit.jupiter.api.AfterEach void clearCreateTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
     private static final LocalDate BUSINESS_TODAY = LocalDate.of(2026, 10, 8);
 
     @org.junit.jupiter.api.BeforeEach void fixBusinessClock() {
@@ -272,7 +274,8 @@ class ExamScheduleServiceTest {
             assertEquals(1_900_018_014, assertThrows(ServiceException.class,
                     () -> service.create(req, 20L)).getCode());
         }
-        verifyNoInteractions(mapper, notificationSnapshots);
+        verify(mapper, never()).insert(any(ExamScheduleDO.class));
+        verifyNoInteractions(notificationSnapshots);
     }
 
     @Test void expiredDraftCanBeRescheduledButCannotRemainExpired() {
@@ -306,14 +309,14 @@ class ExamScheduleServiceTest {
     }
 
     private static ExamScheduleSaveReqVO exactReq() {
-        ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
+        ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO().setIdempotencyKey(java.util.UUID.randomUUID().toString());
         req.setScheduleType("EXACT"); req.setExactDate(LocalDate.of(2026, 10, 10));
         req.setScheduleName("自由考期"); req.setRemark("上午场");
         return req;
     }
 
     private static ExamScheduleSaveReqVO multiDayReq() {
-        ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO();
+        ExamScheduleSaveReqVO req = new ExamScheduleSaveReqVO().setIdempotencyKey(java.util.UUID.randomUUID().toString());
         req.setScheduleType("MULTI_DAY"); req.setStartDate(LocalDate.of(2026, 10, 1));
         req.setEndDate(LocalDate.of(2026, 10, 15)); req.setScheduleName("自由考期");
         return req;

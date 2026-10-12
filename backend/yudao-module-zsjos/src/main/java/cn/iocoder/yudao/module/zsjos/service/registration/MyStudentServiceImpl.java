@@ -267,10 +267,10 @@ public class MyStudentServiceImpl implements MyStudentService {
         relations = relations == null ? List.of() : relations;
         PersonDO person = personMapper.selectById(personId);
         if (person == null) throw exception(STUDENT_NOT_EXISTS);
-        Set<Long> orderIds = relations.stream().map(ServiceRelationDO::getOrderId).collect(Collectors.toSet());
+        Set<Long> orderIds = relations.stream().map(ServiceRelationDO::getOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, SalesOrderDO> orders = orderIds.isEmpty() ? Map.of() : orderMapper.selectBatchIds(orderIds).stream()
                 .collect(Collectors.toMap(SalesOrderDO::getId, Function.identity()));
-        Set<Long> itemIds = relations.stream().map(ServiceRelationDO::getOrderItemId).collect(Collectors.toSet());
+        Set<Long> itemIds = relations.stream().map(ServiceRelationDO::getOrderItemId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, SalesOrderItemDO> items = itemIds.isEmpty() ? Map.of() : orderItemMapper.selectBatchIds(itemIds).stream()
                 .collect(Collectors.toMap(SalesOrderItemDO::getId, Function.identity()));
         Set<Long> collaboratorIds = relations.stream()
@@ -291,11 +291,11 @@ public class MyStudentServiceImpl implements MyStudentService {
         result.setPersonId(personId);
         result.setPersonNo(person.getPersonNo());
         result.setInServicePeriod(person.getInServicePeriod());
-        Long relatedLeadId = relations.stream().map(relation -> orders.get(relation.getOrderId()))
+        Long relatedLeadId = relations.stream().map(relation -> (relation.getOrderId() == null ? null : orders.get(relation.getOrderId())))
                 .filter(Objects::nonNull).map(SalesOrderDO::getLeadId).filter(Objects::nonNull).findFirst().orElse(null);
         Long ownedLeadId = relations.stream()
                 .filter(relation -> Objects.equals(userId, relation.getOwnerUserId()) && "active".equals(relation.getStatus()))
-                .map(relation -> orders.get(relation.getOrderId())).filter(Objects::nonNull)
+                .map(relation -> (relation.getOrderId() == null ? null : orders.get(relation.getOrderId()))).filter(Objects::nonNull)
                 .map(SalesOrderDO::getLeadId).filter(Objects::nonNull).findFirst().orElse(null);
         LeadDO relatedLead = relatedLeadId == null ? null : leadMapper.selectById(relatedLeadId);
         result.setLeadId(ownedLeadId);
@@ -306,7 +306,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         result.setServices(relations.stream().map(relation -> {
             MyStudentRespVO.ServiceVO row = new MyStudentRespVO.ServiceVO();
             row.setServiceRelationId(relation.getId()); row.setOrderId(relation.getOrderId()); row.setOrderItemId(relation.getOrderItemId());
-            SalesOrderDO order = orders.get(relation.getOrderId()); SalesOrderItemDO item = items.get(relation.getOrderItemId());
+            SalesOrderDO order = (relation.getOrderId() == null ? null : orders.get(relation.getOrderId())); SalesOrderItemDO item = (relation.getOrderItemId() == null ? null : items.get(relation.getOrderItemId()));
             LeadDO serviceLead = order == null || order.getLeadId() == null ? null : leads.get(order.getLeadId());
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());
             row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());

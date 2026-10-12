@@ -6,6 +6,8 @@
 
 保留 `GET /admin-api/zsjos/media-students/page` 普通分页；有高级条件时使用只读 `POST /admin-api/zsjos/media-students/search-page`，JSON 请求沿用 `MyStudentPageReqVO` 的 `pageNo`、`pageSize`、`keyword`、`inServicePeriod` 和 `advancedFilter`。响应仍为 `CommonResult<PageResult<MediaStudentListRespVO>>`，列表与总数都在过滤之后计算。POST 标注 `ZsjosAudit.Mode.READ_ONLY`。
 
+2026-10-09：两个查询入口支持可选 `sortField` / `sortOrder`，对筛选后可见的完整媒体学员投影排序，再返回目标页。支持字段及显示文本规则见[业务列表排序](business-list-sorting.md)。切换高级筛选、服务期、运营、搜索与加载更多时保留排序，顶部排序按钮遵守相同的页面离开保护。
+
 | fieldKey | 名称 | 实际字段 | 选项来源 |
 |---|---|---|---|
 | mediaAccount.ownerOperatorUserId | 责任运营 | zsjos_media_account.owner_operator_user_id | 当前用户可读账号的真实责任运营 ID，经 System 用户 API 解析；保留仍有归属记录的停用人员 |

@@ -72,4 +72,15 @@ public class HrmEmployeeQuitReqVO {
         return quitReason != null && quitReason.getQuitType().equals(type);
     }
 
+
+    private Long version;
+    @jakarta.validation.constraints.NotBlank
+    @jakarta.validation.constraints.Size(max = 64)
+    private String operationKey;
+
+
+    @jakarta.validation.constraints.Pattern(regexp = "BUSINESS|PLAN")
+    private String changeMode = "BUSINESS";
+    private java.time.LocalDateTime actualTime;
+
 }

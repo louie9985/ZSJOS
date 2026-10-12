@@ -1,4 +1,6 @@
 import ProductSpecs from './ProductSpecs'
+import LeadAppealSummary from './LeadAppealSummary'
+import { isLeadAppealPending, leadAppealSummaryLabel } from '../services/leadAppealSummary'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, App, Button, Empty, Image, Tag, Typography } from 'antd'
 import {
@@ -14,10 +16,9 @@ import { formatTimestamp } from '../services/time'
 import { copyText } from '../services/copyText'
 import {
   LEAD_DISPATCH_MODE_LABELS,
-  LEAD_QUALIFICATION_STATUS_LABELS,
   LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
-import { protocolDisplayLabel } from '../services/leadManagement'
+import { leadQualificationDisplayLabel, protocolDisplayLabel } from '../services/leadManagement'
 import LeadFollowUpCharts from './LeadFollowUpCharts'
 import SubjectAvatar from './SubjectAvatar'
 
@@ -236,7 +237,7 @@ export function buildLeadFlowEvents(lead: ManagedLead): Array<{ time?: number; l
       list.push({
         time: lead.submittedAt,
         label: '提交客资',
-        detail: lead.sourceUserName ? `提交人：${lead.sourceUserName}` : undefined
+        detail: lead.sourceUserName ? `来源人员：${lead.sourceUserName}` : undefined
       })
     }
     if (lead.dispatchMode) {
@@ -577,9 +578,14 @@ function operationalColor(status?: string): StatusColor {
 function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
   const items: { label: string; value: string; color: StatusColor }[] = [
     {
-      label: '有效性判定',
-      value: protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知'),
-      color: qualificationColor(lead.qualificationStatus),
+      label: lead.status === 'closed' ? '客资状态' : '有效性判定',
+      value: leadQualificationDisplayLabel(lead, '未知'),
+      color: lead.status === 'closed' ? 'gray' : qualificationColor(lead.qualificationStatus),
+    },
+    {
+      label: '申诉状态',
+      value: leadAppealSummaryLabel(lead),
+      color: isLeadAppealPending(lead) ? 'orange' : 'gray',
     },
     {
       label: '跟进状态',
@@ -599,7 +605,7 @@ function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
     <div className="lead-status-labels">
       {items.map(item => (
         <div key={item.label} className={`lead-status-label-item color-${item.color}`}>
-          <span className="lead-status-label-name">{item.label}</span>
+          <span className="lead-status-label-name" style={item.label === '申诉状态' ? { flexShrink: 0, whiteSpace: 'nowrap' } : undefined}>{item.label}</span>
           <span className="lead-status-label-value">{item.value}</span>
         </div>
       ))}
@@ -629,7 +635,7 @@ export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) 
   }
 }
 
-export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots, profileVariant = 'default', followUpRefreshVersion = 0 }: {
+export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots, onViewAppeal, profileVariant = 'default', followUpRefreshVersion = 0 }: {
   lead?: ManagedLead
   student?: MyStudent
   categoryLabel: (value?: string) => string
@@ -642,6 +648,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   profileVariant?: LeadProfileVariant
   hideProviderOwner?: boolean
   followUpRefreshVersion?: number
+  onViewAppeal?: () => void
   slots?: LeadOverviewSlots
 }) {
   const sourceDispatchTag = lead ? leadSourceDispatchTag(lead) : undefined
@@ -699,19 +706,24 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 </div>}
                 {lead && <div className="lead-profile-meta">
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">来源</span>
+                    <span className="lead-field-label">业务来源</span>
                     <span className="lead-field-value lead-source-value">
                       <span className="lead-source-label">{lead.sourceLabel || '来源未配置'}</span>
                       {sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}
                     </span>
                   </div>
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">提交人</span>
+                    <span className="lead-field-label">来源人员</span>
                     <span className="lead-field-value">{lead.sourceUserName || '-'}</span>
                   </div>
                   {!hideProviderOwner && <div className="lead-profile-row">
                     <span className="lead-field-label">提供方</span>
-                    <span className="lead-field-value">{lead.providerOwnerNameSnapshot || '-'}</span>
+                    <span className="lead-field-value" style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                      {(lead.providerOwnerNameSnapshot || lead.providerOwnerId != null) && <>
+                        {lead.providerOwnerNameSnapshot || '名称待核实'}{' · '}
+                      </>}
+                      {lead.providerIdentityLabel || '身份待核实'}
+                    </span>
                   </div>}
                   <div className="lead-profile-row">
                     <span className="lead-field-label">负责人</span>
@@ -818,7 +830,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
           {/* 窄屏时优先置顶的状态提示与操作区；桌面端仍位于右侧栏顶部 */}
           {(!studentContext && lead || toolbar) && (
             <div className="lead-overview-priority">
-              {!studentContext && lead && <AsideAlerts lead={lead} />}
+              {!studentContext && lead && (isLeadAppealPending(lead) ? <LeadAppealSummary lead={lead} onView={onViewAppeal} /> : <AsideAlerts lead={lead} />)}
               {toolbar}
             </div>
           )}

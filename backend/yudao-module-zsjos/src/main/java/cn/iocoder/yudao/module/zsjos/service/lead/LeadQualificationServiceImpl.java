@@ -40,6 +40,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
     @Resource private BusinessEventMapper eventMapper;
@@ -97,7 +98,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setInvalidReasonLabelSnapshot(null);
         lead.setInvalidDescription(null);
         lead.setInvalidEvidenceRefs(null);
-        leadMapper.updateById(lead);
+        leadMapper.updateClearingSuspension(lead);
         lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
         addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, STATUS_VALID,
                 reqVO.getRemark().trim(), key, Map.of("roundNo", lead.getQualificationRoundNo(),
@@ -114,6 +115,9 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_QUALIFIED_INVALID)) return;
+        if (appealMapper.selectListByLeadId(leadId).stream().anyMatch(LeadAppealCycles::active)) {
+            throw exception(LEAD_APPEAL_STATE_INVALID);
+        }
         boolean previouslyValid = STATUS_VALID.equals(lead.getStatus());
         if (previouslyValid) {
             if (!Objects.equals(userId, lead.getOwnerUserId())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
@@ -213,7 +217,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setSuspendedAt(null);
         LeadMapper.advanceActivity(lead, now);
         lifecycleTaskService.createQualificationTask(lead, lead.getOwnerUserId(), now);
-        leadMapper.updateById(lead);
+        leadMapper.updateClearingSuspension(lead);
         addEvent(EVENT_LEAD_RESTORED, lead, userId, STATUS_SUSPENDED, STATUS_SUBMITTED,
                 reqVO.getReason().trim(), key, Map.of("ownerUserId", lead.getOwnerUserId()));
         publishDispositionNotification(QUALIFICATION_RESTORED, lead, userId, key,
@@ -252,7 +256,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setNextFollowUpAt(null);
         LeadMapper.advanceActivity(lead, now);
         lifecycleTaskService.createQualificationTask(lead, reqVO.getSalesUserId(), now);
-        leadMapper.updateById(lead);
+        leadMapper.updateClearingSuspension(lead);
         addEvent(EVENT_LEAD_TRANSFERRED, lead, userId, suspended ? STATUS_SUSPENDED : ASSIGNMENT_RECYCLE_PENDING,
                 STATUS_SUBMITTED, reqVO.getReason().trim(), key,
                 Map.of("fromOwnerUserId", fromOwner, "toOwnerUserId", reqVO.getSalesUserId(),

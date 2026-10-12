@@ -2,6 +2,13 @@ import request from '@/config/axios'
 
 // HRM 员工端员工档案 VO
 export interface HrmPortalEmployeeVO {
+  typeLabel?: string
+  statusLabel?: string
+  entryStatusLabel?: string
+  plannedRegularTime?: number
+  plannedLeaveTime?: number
+  legacyDateSource?: string
+
   id: number // 员工档案编号
   name?: string // 员工姓名
   avatar?: string // 员工头像

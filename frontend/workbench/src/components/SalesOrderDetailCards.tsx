@@ -8,9 +8,10 @@ import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem
 import { formatTimestamp } from '../services/time'
 import { canReviewSalesOrderTask } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
+import SalesOrderInformationTable from './SalesOrderInformationTable'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
-  pending_approval: '待审核', revision_required: '已驳回待修改', effective: '已通过', superseded: '已被重提', terminated: '已终止'
+  pending_approval: '待审核', revision_required: '待重提', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止'
 }
 export const SALES_ORDER_STATUS_COLORS: Record<SalesOrder['status'], string> = {
   pending_approval: 'gold', revision_required: 'red', effective: 'green', superseded: 'default', terminated: 'default'
@@ -112,16 +113,19 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
   </section>
 }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
+  informationLayout?: 'cards' | 'table'
   onApprove?: () => void
   onReject?: () => void
   onRequestSupervisor?: () => void
   onRevise?: () => void
   onTerminate?: () => void
 }) {
+  const tableLayout = informationLayout === 'table'
+  const InformationFields = tableLayout ? SalesOrderInformationTable : DetailFieldGrid
   const task = approvalContext || order
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
   const supervisorConfirmation = task.taskDefinitionKey === 'registrationReview'
@@ -162,7 +166,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       type: 'warning' as const, title: '订单审批已终止', description: order.terminationReason || '未记录终止原因'
     }
     if (order.status === 'superseded') return {
-      type: 'info' as const, title: '该订单已被重提', description: '历史订单和审批结果已保留，请查看接续的新订单。'
+      type: 'info' as const, title: '该订单为历史旧单（已重提）', description: '历史订单和审批结果已保留，请查看接续的新订单。'
     }
     if (order.status === 'effective') return {
       type: 'success' as const, title: '订单审批已通过',
@@ -184,7 +188,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
     </div>
     {order.historyMissingFields?.leadProfile && <Alert type="info" showIcon title="客资档案历史未记录"/>}
     <div className="sales-order-detail-layout">
-      <main className="sales-order-detail-main">
+      <main className={`sales-order-detail-main${tableLayout ? ' information-table' : ''}`}>
         <section className="sales-order-information">
       {leadProfile && <section className="sales-order-info-block sales-order-info-block-wide">
         <div className="sales-order-section-heading"><Typography.Text strong>客户档案</Typography.Text></div>
@@ -200,8 +204,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         </div>
         <div className="lead-profile-meta">
           <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">提交人</span><span className="lead-field-value">{leadProfile.sourceUserName || '历史未记录'}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">业务来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">来源人员</span><span className="lead-field-value">{leadProfile.sourceUserName || '历史未记录'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '历史未记录'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>
@@ -210,11 +214,11 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </section>}
       <section className="sales-order-info-block">
         <div className="sales-order-section-heading"><Typography.Text strong>订单概览</Typography.Text></div>
-        <DetailFieldGrid items={[
+        <InformationFields items={[
           { key: 'orderNo', label: '订单号', value: order.orderNo },
           { key: 'orderType', label: '订单类型', value: order.orderType === 'repurchase' ? '复购' : '首购' },
           { key: 'round', label: '审批轮次', value: `第 ${order.approvalRoundNo || 1} 轮` },
-          { key: 'status', label: '当前状态', value: SALES_ORDER_STATUS_LABELS[order.status] },
+          { key: 'status', label: '当前状态', value: tableLayout ? <Tag color={SALES_ORDER_STATUS_COLORS[order.status]}>{SALES_ORDER_STATUS_LABELS[order.status]}</Tag> : SALES_ORDER_STATUS_LABELS[order.status] },
           { key: 'center', label: '当前中心', value: SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''] || '-' },
           { key: 'submittedAt', label: '提交时间', value: formatTimestamp(order.submittedAt) },
           { key: 'effectiveAt', label: '通过时间', value: formatTimestamp(order.effectiveAt) },
@@ -227,7 +231,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </section>
       <section className="sales-order-info-block">
         <div className="sales-order-section-heading"><Typography.Text strong>学员资料</Typography.Text></div>
-        <DetailFieldGrid items={[
+        <InformationFields items={[
           { key: 'buyer', label: '购买方', value: order.buyerName },
           { key: 'student', label: '学员姓名', value: order.studentName },
           { key: 'nature', label: '学员性质', value: order.studentNatureLabelSnapshot || "历史未记录" },
@@ -238,7 +242,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </section>
       <section className="sales-order-info-block sales-order-info-block-wide">
         <div className="sales-order-section-heading"><Typography.Text strong>成交与付款</Typography.Text><Typography.Text className="sales-order-total-amount">¥{Number(order.totalAmount).toFixed(2)}</Typography.Text></div>
-        <DetailFieldGrid items={[
+        <InformationFields items={[
           { key: 'paidAt', label: '客户付款时间', value: formatTimestamp(order.customerPaidAt) },
           { key: 'feeMode', label: '缴费方式', value: order.feeModeLabelSnapshot || "历史未记录" },
           { key: 'paymentMethod', label: '支付方式', value: order.paymentMethodLabelSnapshot || "历史未记录" },
@@ -256,14 +260,14 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <section className="sales-order-content-section">
           <div className="sales-order-section-heading"><Typography.Text strong>成交课程</Typography.Text></div>
           <BusinessTable tableKey="sales-order-detail-cards-1" columnMode="native" mode="compact" rowKey="id" size="small" pagination={false} dataSource={order.items} columns={[
-            { title: '课程', render: (_, item) => <div><strong>{item.productName || item.skuName || '-'}</strong><div>{item.categoryPath?.join(' / ')}</div><ProductSpecs product={item} />{item.skuName && item.skuName !== item.productName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}</div> },
+            { title: '课程', render: (_, item) => <div><strong>{item.productName || item.skuName || '-'}</strong>{tableLayout ? <div className="sales-order-course-tags">{item.categoryPath?.map((label, index) => <Tag key={index} color={index === 0 ? 'blue' : 'cyan'}>{label}</Tag>)}</div> : <div>{item.categoryPath?.join(' / ')}</div>}<ProductSpecs product={item} />{item.skuName && item.skuName !== item.productName && <Typography.Text type="secondary">{item.skuName}</Typography.Text>}</div> },
             { title: '实际成交金额', width: 150, render: (_, item) => `¥${Number(item.actualAmount).toFixed(2)}` }
           ]}/>
         </section>
         <section className="sales-order-bottom-grid">
           <section className="sales-order-content-section">
             <div className="sales-order-section-heading"><Typography.Text strong>备注与服务</Typography.Text></div>
-            <DetailFieldGrid columns={1} items={[
+            <InformationFields columns={1} items={[
               { key: 'submitter', label: '实际提交人', value: order.submitterUserName || '历史未记录' },
               { key: 'sales', label: '成交负责人', value: order.formalSalesUserName || '历史未记录' },
               { key: 'remark', label: '订单备注', value: order.remark },

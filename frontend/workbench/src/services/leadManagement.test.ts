@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
+import { leadQualificationDisplayLabel } from './leadManagement'
 import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, pinLeadFirst, prioritizeLeads, protocolDisplayLabel, resolveLeadSelection, resolvedDisplayLabel, snapshotDisplayLabel, snapshotOrDictionaryDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
@@ -21,6 +22,18 @@ const lead = (id: number, name: string): ManagedLead => ({
 })
 
 describe('lead management paging helpers', () => {
+  it('displays closure even when the legacy qualification projection remains pending', () => {
+    const closed = { ...lead(1, '关闭客资'), status: 'closed' }
+    expect(leadQualificationDisplayLabel(closed)).toBe('已关闭')
+    expect(closed.qualificationStatus).toBe('pending')
+  })
+
+  it('preserves qualification labels on active and won leads', () => {
+    expect(leadQualificationDisplayLabel(lead(1, '待判定客资'))).toBe('待判定')
+    expect(leadQualificationDisplayLabel({ status: 'valid', qualificationStatus: 'valid' })).toBe('已判有效')
+    expect(leadQualificationDisplayLabel({ status: 'invalid', qualificationStatus: 'invalid' })).toBe('已判无效')
+    expect(leadQualificationDisplayLabel({ status: 'won', qualificationStatus: 'valid' })).toBe('已判有效')
+  })
   it('merges lazy-loaded pages without duplicate records', () => {
     expect(mergeUniqueLeads([lead(1, '旧名称')], [lead(1, '新名称'), lead(2, '客户二')]))
       .toEqual([lead(1, '新名称'), lead(2, '客户二')])

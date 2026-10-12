@@ -12,6 +12,8 @@ public class LeadAppealRespVO {
     private String leadNo;
     private String leadName;
     private Integer roundNo;
+    private Long invalidEventId;
+    private Boolean currentCycle;
     private String reviewStage;
     private String status;
     private Long applicantUserId;

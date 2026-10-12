@@ -26,8 +26,18 @@ public final class PerformanceVO {
  public record Organization(Long deptId,Long centerId,String kind) {}
  public record Revision(Long id,String reason,String before,String after,String operatorName,LocalDateTime at) {}
  public record Node(String key,String parentKey,String title,String scopeType,Long scopeId,boolean selectable) {}
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
  public record Metric(String key,String label,LocalDateTime start,LocalDateTime end,BigDecimal amount,long orders,
-   long converted,long denominator,BigDecimal rate,BigDecimal average,BigDecimal averageAmount,long averageOrders) {}
+   Long converted,Long denominator,BigDecimal rate,BigDecimal average,BigDecimal averageAmount,long averageOrders,
+   String sourceStatus,long sourceReviewCount) {
+  public Metric(String key,String label,LocalDateTime start,LocalDateTime end,BigDecimal amount,long orders,
+    long converted,long denominator,BigDecimal rate,BigDecimal average,BigDecimal averageAmount,long averageOrders) {
+   this(key,label,start,end,amount,orders,converted,denominator,rate,average,averageAmount,averageOrders,"ready",0);
+  }
+  public Metric withSourceReview(long count) {
+   return count==0?this:new Metric(key,label,start,end,amount,orders,null,null,null,average,averageAmount,averageOrders,"review_required",count);
+  }
+ }
  public record Group(String key,String label,BigDecimal amount,long count,BigDecimal share) {}
  public record Target(Long id,String scopeType,Long scopeId,String name,String periodType,LocalDate periodStart,
    BigDecimal automaticFloor,BigDecimal automaticSprint,BigDecimal floorAmount,BigDecimal sprintAmount,

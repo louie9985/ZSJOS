@@ -31,6 +31,7 @@ public final class AuditActionCatalog {
     public static final String WITHDRAWAL_PAYOUT = "withdrawal.payout";
 
     public static final Map<String, Set<String>> ACTIONS = Map.of(
+            "points", Set.of("points-redemption.reveal"),
             CATEGORY_CASHBACK, Set.of(CASHBACK_BLOCK, CASHBACK_UNBLOCK),
             CATEGORY_EXPORT, Set.of(EXPORT_CREATE, EXPORT_GENERATE, EXPORT_DOWNLOAD, EXPORT_CANCEL),
             CATEGORY_IMPERSONATION, Set.of(IMPERSONATION_START, IMPERSONATION_END, IMPERSONATION_READ),

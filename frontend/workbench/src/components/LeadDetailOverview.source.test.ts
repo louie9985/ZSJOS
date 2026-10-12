@@ -17,13 +17,14 @@ describe('Lead detail source dispatch tag', () => {
     expect(leadSourceDispatchTag({ sourceType: 'internal_new_media' })).toBeUndefined()
   })
 
-  it('hides the provider row from lead detail overview output', () => {
+  it('shows the provider and server identity label in management without guessing missing names', () => {
     const source = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
     expect(source).toContain('hideProviderOwner?: boolean')
     expectSourceToContainTokens(source, '!hideProviderOwner && <div className="lead-profile-row">')
-    expectSourceToContainTokens(source, 'providerOwnerNameSnapshot || \'-\'')
+    expect(source).toContain('lead.providerIdentityLabel')
+    expect(source).toContain('名称待核实')
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
-    expect(page).toContain('hideProviderOwner/>')
+    expect(page).not.toContain('hideProviderOwner/>')
   })
 
   it('keeps the mobile priority block separate from the auxiliary sidebar', () => {

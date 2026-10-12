@@ -6,6 +6,7 @@ export interface PmsKnowledgeDocumentShareVO {
   documentId: number // 文档编号
   shareUserIds: number[] // 内部分享成员用户编号列表
   token: string // 外部查看令牌
+  url?: string // 后端按公开域名生成；配置不可用时不返回
   status: number // 分享状态
   createTime: number // 创建时间
   closeUserId?: number // 关闭人用户编号

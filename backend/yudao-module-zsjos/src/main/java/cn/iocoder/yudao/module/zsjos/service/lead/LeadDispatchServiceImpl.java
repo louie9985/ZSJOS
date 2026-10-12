@@ -69,10 +69,12 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LocalDateTime now = LocalDateTime.now();
         if (DISPATCH_SELF.equals(lead.getDispatchMode())) {
             lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(submitterUserId);
-            lead.setOwnerIdentity(SOURCE_EDUCATION_SELF.equals(lead.getSourceType()) ? OWNER_EDUCATION : OWNER_SALES);
+            String entrySource = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+            lead.setOwnerIdentity(SOURCE_EDUCATION_SELF.equals(entrySource) ? OWNER_EDUCATION : OWNER_SALES);
             lead.setOwnershipStartedAt(now); LeadMapper.advanceActivity(lead, now); leadMapper.updateById(lead);
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, submitterUserId,
-                    submitterUserId, null, 1, null, ownerIdentityLabel(lead.getOwnerIdentity()) + "自拓直接归属", now);
+                    submitterUserId, null, 1, null, ownerIdentityLabel(lead.getOwnerIdentity()) + (SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType())
+                            ? "代录新媒体客资直接归属" : "自拓直接归属"), now);
             lead.setCurrentAssignmentHistoryId(history.getId());
             lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                     lead.getId(), submitterUserId, history.getId(), now, EVENT_LEAD_ACCEPTED, ASSIGNMENT_UNASSIGNED));

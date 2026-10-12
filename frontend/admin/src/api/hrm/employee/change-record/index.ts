@@ -2,6 +2,14 @@ import request from '@/config/axios'
 
 // HRM 员工异动记录 VO
 export interface HrmEmployeeChangeRecordVO {
+  state?: string
+  version?: number
+  changeMode?: string
+  plannedTime?: number
+  actualTime?: number
+  beforeSnapshot?: string
+  afterSnapshot?: string
+
   id?: number // 异动记录编号
   employeeId?: number // 员工编号
   type?: number // 异动类型
@@ -33,3 +41,16 @@ export const getEmployeeChangeRecordList = async (employeeId: number) => {
     params: { employeeId }
   })
 }
+
+export const getCommandOptions = () =>
+  request.get<Array<{ value: number; label: string }>>({
+    url: '/hrm/employee/change-record/command-options'
+  })
+export const cancelPlan = (data: {
+  id: number
+  employeeId: number
+  version: number
+  employeeVersion: number
+  operationKey: string
+  reason: string
+}) => request.post({ url: '/hrm/employee/change-record/cancel', data })

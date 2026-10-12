@@ -107,6 +107,12 @@ class LeadProviderAttributionServiceTest {
         assertNull(lead.getContributionUserIdSnapshot());
     }
 
+    @Test
+    void missingSelectedEmployeeCannotCreateAnIncompleteProviderSnapshot() {
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+            () -> service.apply(new LeadDO(), LeadSubmissionIdentityService.Identity.SALES, 99L, LocalDateTime.now()));
+    }
+
     private void assertSystemAttribution(LeadDO lead, Long userId, String userName, LocalDateTime countedAt) {
         assertEquals("system_user", lead.getProviderOwnerType());
         assertEquals(userId, lead.getProviderOwnerId());

@@ -22,7 +22,7 @@ public interface HrmEmployeeChangeRecordMapper extends BaseMapperX<HrmEmployeeCh
     default List<HrmEmployeeChangeRecordDO> selectListByAppliedTimeNullAndEffectTimeBeforeOrEqual(
             LocalDateTime deadlineTime, Collection<Integer> types) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeChangeRecordDO>()
-                .isNull(HrmEmployeeChangeRecordDO::getAppliedTime)
+                .eq(HrmEmployeeChangeRecordDO::getState, "PENDING")
                 .le(HrmEmployeeChangeRecordDO::getEffectTime, deadlineTime)
                 .in(HrmEmployeeChangeRecordDO::getType, types)
                 .orderByAsc(HrmEmployeeChangeRecordDO::getEffectTime)
@@ -33,7 +33,9 @@ public interface HrmEmployeeChangeRecordMapper extends BaseMapperX<HrmEmployeeCh
                                                                                        LocalDateTime[] effectTimes) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeChangeRecordDO>()
                 .in(HrmEmployeeChangeRecordDO::getEmployeeId, employeeIds)
-                .betweenIfPresent(HrmEmployeeChangeRecordDO::getEffectTime, effectTimes)
+                .eq(HrmEmployeeChangeRecordDO::getState, "APPLIED")
+                .eq(HrmEmployeeChangeRecordDO::getChangeMode, "BUSINESS")
+                .betweenIfPresent(HrmEmployeeChangeRecordDO::getActualTime, effectTimes)
                 .orderByDesc(HrmEmployeeChangeRecordDO::getEffectTime)
                 .orderByDesc(HrmEmployeeChangeRecordDO::getId));
     }

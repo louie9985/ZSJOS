@@ -126,7 +126,7 @@ public class StudentContactServiceImpl implements StudentContactService {
             result.setVisibleTabs(visible);
         }
         if (permissionApi.hasAnyPermissions(userId, cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.READ)) {
-            SalesOrderDO collectionOrder = orderMapper.selectById(relation.getOrderId());
+            SalesOrderDO collectionOrder = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
             if (collectionOrder != null && collectionOrder.getLeadId() != null
                     && studentInfoPermission.hasPermission(collectionOrder.getLeadId(), "read", userId)) {
                 List<String> tabs = new ArrayList<>(result.getVisibleTabs());
@@ -581,7 +581,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                     "director-handover:" + relationId + ":" + relation.getVersion(), List.of(previous), Map.of());
         }
         if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) {
-            SalesOrderDO order = orderMapper.selectById(relation.getOrderId());
+            SalesOrderDO order = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
             LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
             PersonDO student = personMapper.selectById(relation.getPersonId());
             Map<String, Object> context = new LinkedHashMap<>();
@@ -726,7 +726,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     private Long createTask(ServiceRelationDO relation, String type, LocalDateTime dueAt, String key, Long configId) {
-        SalesOrderDO order = orderMapper.selectById(relation.getOrderId());
+        SalesOrderDO order = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
         String number = order == null ? null : order.getOrderNo();
         String label = TYPE_FIRST_CONTACT.equals(type) ? "首次联系" : TYPE_STUDY_PLAN.equals(type) ? "制定学习计划" : "联系学员";
         return taskCommandService.create(new BusinessTaskCreateCommand(type, BIZ_TYPE, relation.getId(), relation.getOwnerUserId(),

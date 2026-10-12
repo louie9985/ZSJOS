@@ -74,7 +74,7 @@ public class HrmEmployeeChangeRecordServiceImplTest extends BaseDbUnitTest {
         LocalDate beginEffectTime = LocalDate.of(2026, 7, 1);
         HrmEmployeeChangeRecordDO firstRecord = randomChangeRecordDO(employeeId,
                 HrmEmployeeChangeTypeEnum.TRANSFER, beginEffectTime.plusDays(2));
-        firstRecord.setAppliedTime(beginEffectTime.plusDays(2).atStartOfDay());
+        firstRecord.setAppliedTime(beginEffectTime.plusDays(2).atStartOfDay()).setActualTime(beginEffectTime.plusDays(2).atStartOfDay()).setState("APPLIED").setChangeMode("BUSINESS");
         changeRecordMapper.insert(firstRecord);
         HrmEmployeeChangeRecordDO secondRecord = randomChangeRecordDO(employeeId,
                 HrmEmployeeChangeTypeEnum.PROMOTION, beginEffectTime.plusDays(10));
@@ -109,7 +109,7 @@ public class HrmEmployeeChangeRecordServiceImplTest extends BaseDbUnitTest {
         // 断言
         assertEquals(5, employeeRecords.size());
         assertEquals(laterRecord.getId(), employeeRecords.get(0).getId());
-        assertEquals(4, rangeRecords.size());
+        assertEquals(1, rangeRecords.size());
         assertEquals(0, emptyRecords.size());
         assertEquals(4, effectTimeRecords.size());
         assertEquals(earlierRecord.getId(), effectTimeRecords.get(2).getId());
@@ -120,7 +120,7 @@ public class HrmEmployeeChangeRecordServiceImplTest extends BaseDbUnitTest {
             Long employeeId, HrmEmployeeChangeTypeEnum changeType, LocalDate effectTime) {
         return randomPojo(HrmEmployeeChangeRecordDO.class, o -> o.setId(null).setEmployeeId(employeeId)
                 .setType(changeType.getType()).setReason(1).setEffectTime(effectTime.atStartOfDay())
-                .setAppliedTime(null).setDeleted(false));
+                .setAppliedTime(null).setState("PENDING").setChangeMode("PLAN").setOperationKey(null).setVersion(0L).setDeleted(false));
     }
 
 }

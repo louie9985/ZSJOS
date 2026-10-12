@@ -65,6 +65,9 @@ public class HrmEmployeeApiImpl implements HrmEmployeeApi {
         result.setStatus(employee.getStatus());
         result.setEntryTime(employee.getEntryTime());
         result.setLeaveTime(employee.getLeaveTime());
+        result.setPlannedLeaveTime(employee.getPlannedLeaveTime());
+        result.setRegularTime(employee.getRegularTime());
+        result.setPlannedRegularTime(employee.getPlannedRegularTime());
         return result;
     }
 

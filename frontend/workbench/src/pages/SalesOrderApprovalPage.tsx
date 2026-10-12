@@ -34,10 +34,9 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const requestedTaskId = searchParams.get('taskId') || undefined
   const requestedConfirmationId = Number(searchParams.get('confirmationId')) || undefined
   const [workType, setWorkType] = useState<SalesOrderApprovalWorkType>(requestedWorkType || defaultWorkType || 'approval')
-  const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [], centers: [] })
+  const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [], centers: [], orderStates: [] })
   const [center, setCenter] = useState<'registration' | 'finance'>()
-  const [groupKey, setGroupKey] = useState<string>()
-  const [optionKey, setOptionKey] = useState('all')
+  const [orderState, setOrderState] = useState<string>()
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [tablePage, setTablePage] = useState(1)
@@ -80,7 +79,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         const next = await api.salesOrderApprovalFilterProfile()
         setProfile(next)
         setCenter(current => current && next.centers.some(item => item.key === current) ? current : next.centers[0]?.key)
-        setGroupKey(current => current && next.groups.some(group => group.key === current) ? current : next.groups[0]?.key)
+        if (!next.orderStates?.length) throw new Error('订单状态筛选暂不可用，请重试或联系管理员')
+        setOrderState(current => current && next.orderStates.some(state => state.key === current) ? current : next.orderStates[0]?.key)
       } catch (loadError) { setProfileError(loadError instanceof Error ? loadError.message : '审批筛选方案加载失败') }
       finally { setProfileLoading(false) }
     })()
@@ -90,15 +90,15 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   }, [canReview])
 
   const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean) => {
-    const requestKey = `${targetCursor || 'first'}:${center}:${groupKey}:${optionKey}:${keyword.trim()}:${JSON.stringify(advancedFilter)}`
-    if (inflightPages.current.has(requestKey)) return
+    const requestKey = `${targetCursor || 'first'}:${center}:${orderState}:${tablePage}:${tablePageSize}:${useTableLayout}:${keyword.trim()}:${JSON.stringify(advancedFilter)}`
+    if (!replace && inflightPages.current.has(requestKey)) return
     inflightPages.current.add(requestKey)
     const version = ++requestVersion.current
     setLoading(true); setError('')
     try {
       const result = useTableLayout
-        ? await api.salesOrderApprovalInbox({ pageNo: tablePage, pageSize: tablePageSize, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
-        : await api.salesOrderApprovalCursor({ cursor: targetCursor, limit: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
+        ? await api.salesOrderApprovalInbox({ pageNo: tablePage, pageSize: tablePageSize, center, orderState, keyword: keyword.trim() || undefined, advancedFilter })
+        : await api.salesOrderApprovalCursor({ cursor: targetCursor, limit: PAGE_SIZE, center, orderState, keyword: keyword.trim() || undefined, advancedFilter })
       if (version !== requestVersion.current) return
       setItems(current => replace || useTableLayout ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey));
       if ('total' in result) setTableTotal(result.total)
@@ -110,7 +110,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       inflightPages.current.delete(requestKey)
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [advancedFilter, center, groupKey, keyword, optionKey, tablePage, tablePageSize, useTableLayout])
+  }, [advancedFilter, center, keyword, orderState, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     if (workType === 'approval' && !canReview && canConfirmSupervisor) setWorkType('supervisor')
     if (workType === 'supervisor' && !canConfirmSupervisor && canReview) setWorkType('approval')
   }, [canConfirmSupervisor, canReview, workType])
-  useEffect(() => { if (!profileLoading && !profileError && groupKey && center) void loadPage(undefined, true) }, [center, groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
+  useEffect(() => { if (!profileLoading && !profileError && orderState && center) void loadPage(undefined, true) }, [center, orderState, keyword, profileLoading, profileError, loadPage])
 
   useEffect(() => {
     if (workType !== 'approval' || !requestedOrderId) return
@@ -156,6 +156,11 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     else if (!selectedItem) setDetail(undefined)
   }, [detail?.id, loadDetail, selectedItem])
 
+  const resetList = () => {
+    ++requestVersion.current; ++detailVersion.current
+    setTablePage(1); setItems([]); setTableTotal(0); setCursor(undefined); setHasMore(true)
+    setSelectedKey(undefined); setDetail(undefined); setDetailError(''); setDetailLoading(false); setDrawerOpen(false)
+  }
   const reload = () => { void loadProfile(); if (selectedItem) void loadDetail(selectedItem.id) }
   const exportFinanceOrders = () => Modal.confirm({
     title: '导出财务订单台账', content: '将导出符合当前关键字和高级筛选条件的全部记录。', okText: '加入导出队列',
@@ -223,7 +228,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         setLeadDetailModalLeadId(detail.leadId)
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'}
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={selectedItem?.taskEndTime ? 'approval-done' : 'approval-todo'}
           onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
           onRequestSupervisor={() => { resetIntent(); setReason(''); setSupervisorOpen(true) }}/></>
         : <Empty description="从左侧选择一条订单"/>
@@ -241,9 +246,9 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       <div className="business-inbox-scope-row">{workTypeSwitch}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button></div>
       <div className="business-inbox-scope-tabs">
         {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
-        {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.groups.length > 0 ? <>
-          {profile.centers.length > 1 && <Tabs className="lead-inbox-center-tabs" activeKey={center} onChange={key => { setCenter(key as 'registration' | 'finance'); setOptionKey('all') }} items={profile.centers.map(item => ({ key: item.key, label: item.label }))}/>}
-          <Tabs className="lead-inbox-group-tabs" activeKey={groupKey} onChange={key => { setGroupKey(key); setOptionKey('all') }} items={profile.groups.map(group => ({ key: group.key, label: group.label }))}/>
+        {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.orderStates?.length > 0 ? <>
+          {profile.centers.length > 1 && <Tabs className="lead-inbox-center-tabs" activeKey={center} onChange={key => { resetList(); setCenter(key as 'registration' | 'finance') }} items={profile.centers.map(item => ({ key: item.key, label: item.label }))}/>}
+          <Tabs className="lead-inbox-group-tabs" activeKey={orderState} onChange={key => { resetList(); setOrderState(key) }} items={profile.orderStates.map(state => ({ key: state.key, label: state.label }))}/>
         </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
       </div>
     </header>
@@ -252,7 +257,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       <div className="business-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'business-inbox-item active' : 'business-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
           <div className="business-inbox-item-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交审批'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
-          <div className="business-inbox-item-meta"><Badge status="processing"/><span>{formatTimestamp(groupKey === 'done' ? item.taskEndTime : item.taskCreateTime || item.submittedAt)}</span></div>
+          <div className="business-inbox-item-meta"><Badge status="processing"/><span>{formatTimestamp(item.taskCreateTime || item.submittedAt)}</span></div>
         </button>)}
         {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}
         {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="lead-list-end">已加载全部审批</Typography.Text>}

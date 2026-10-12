@@ -240,7 +240,7 @@ class LeadAppealServiceImplTest {
         DeptRespDTO dept = dept(100L, 10L, 30L);
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
         when(appealMapper.selectBySubmissionIdempotencyKey("key-1")).thenReturn(null);
-        when(appealMapper.selectLatestByLeadId(8L)).thenReturn(null);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
         when(adminUserApi.getUser(20L)).thenReturn(owner);
         when(adminUserApi.getUser(30L)).thenReturn(supervisor);
         when(deptApi.getDept(100L)).thenReturn(dept);
@@ -252,6 +252,7 @@ class LeadAppealServiceImplTest {
         }).when(appealMapper).insert(any(LeadAppealDO.class));
 
         LeadAppealSubmitReqVO request = new LeadAppealSubmitReqVO();
+        request.setInvalidEventId(0L);
         request.setReason("申诉原因");
         request.setIdempotencyKey("key-1");
 
@@ -276,11 +277,61 @@ class LeadAppealServiceImplTest {
     }
 
     @Test
+    void newCycleAfterOverturnStartsWithResponsibleSupervisor() {
+        LeadDO lead = invalidLead(20L);
+        lead.setInvalidReason("duplicate_lead");
+        lead.setInvalidReasonLabelSnapshot(null);
+        AdminUserRespDTO owner = user(20L, 100L);
+        AdminUserRespDTO supervisor = user(30L, 10L);
+        DeptRespDTO dept = dept(100L, 10L, 30L);
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
+        when(appealMapper.selectBySubmissionIdempotencyKey("key-1")).thenReturn(null);
+        var old = new LeadAppealDO(); old.setInvalidEventId(10L); old.setRoundNo(3); old.setStatus("overturned");
+        when(eventMapper.selectLatestInvalidId(8L)).thenReturn(20L);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of(old));
+        when(adminUserApi.getUser(20L)).thenReturn(owner);
+        when(adminUserApi.getUser(30L)).thenReturn(supervisor);
+        when(deptApi.getDept(100L)).thenReturn(dept);
+        when(permissionApi.hasAnyPermissions(30L, LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER)).thenReturn(true);
+        when(processInstanceApi.createProcessInstance(eq(7L), any())).thenReturn("process-1");
+        doAnswer(invocation -> {
+            ((LeadAppealDO) invocation.getArgument(0)).setId(55L);
+            return 1;
+        }).when(appealMapper).insert(any(LeadAppealDO.class));
+
+        LeadAppealSubmitReqVO request = new LeadAppealSubmitReqVO();
+        request.setInvalidEventId(20L);
+        request.setReason("申诉原因");
+        request.setIdempotencyKey("key-1");
+
+        assertEquals(55L, service.submit(8L, 7L, request));
+
+        ArgumentCaptor<LeadAppealDO> captor = ArgumentCaptor.forClass(LeadAppealDO.class);
+        verify(appealMapper).insert(captor.capture());
+        LeadAppealDO appeal = captor.getValue();
+        assertEquals(20L, appeal.getInvalidEventId());
+        assertEquals(1, appeal.getRoundNo());
+        assertEquals(20L, appeal.getOwnerUserIdSnapshot());
+        assertEquals(100L, appeal.getOwnerDeptIdSnapshot());
+        assertEquals(100L, appeal.getReviewerDeptIdSnapshot());
+        assertEquals("[30]", appeal.getReviewerUserIdsSnapshot());
+        verify(leadMapper).touchActivity(8L, appeal.getSubmittedAt());
+        assertNull(appeal.getInvalidReasonSnapshot());
+        ArgumentCaptor<BpmProcessInstanceCreateReqDTO> processCaptor = ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
+        verify(processInstanceApi).createProcessInstance(eq(7L), processCaptor.capture());
+        BpmProcessInstanceCreateReqDTO processRequest = processCaptor.getValue();
+        assertEquals("validated-definition-2", processRequest.getProcessDefinitionId());
+        assertEquals(List.of(30L), processRequest.getStartUserSelectAssignees().get("appealReview"));
+        assertEquals("KZ202608160000000008", processRequest.getVariables().get("leadNo"));
+        assertDoesNotThrow(() -> processRequest.getVariables().remove("appealId"));
+    }
+
+    @Test
     void submitWalksToNearestEnabledSupervisorWhenDirectLeaderUnavailable() {
         LeadDO lead = invalidLead(20L);
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
         when(appealMapper.selectBySubmissionIdempotencyKey("key-2")).thenReturn(null);
-        when(appealMapper.selectLatestByLeadId(8L)).thenReturn(null);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 100L));
         when(adminUserApi.getUser(30L)).thenReturn(user(30L, 100L));
         when(adminUserApi.getUser(40L)).thenReturn(user(40L, 10L));
@@ -295,6 +346,7 @@ class LeadAppealServiceImplTest {
         }).when(appealMapper).insert(any(LeadAppealDO.class));
 
         LeadAppealSubmitReqVO request = new LeadAppealSubmitReqVO();
+        request.setInvalidEventId(0L);
         request.setReason("申诉原因");
         request.setIdempotencyKey("key-2");
 
@@ -348,7 +400,7 @@ class LeadAppealServiceImplTest {
         LeadDO lead = invalidLead(20L);
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
         when(appealMapper.selectBySubmissionIdempotencyKey("key-cycle")).thenReturn(null);
-        when(appealMapper.selectLatestByLeadId(8L)).thenReturn(null);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 100L));
         when(deptApi.getDept(100L)).thenReturn(dept(100L, 10L, null));
         when(deptApi.getDept(10L)).thenReturn(dept(10L, 100L, null));
@@ -379,7 +431,8 @@ class LeadAppealServiceImplTest {
         verify(appealMapper).insert(any(LeadAppealDO.class));
         verify(appealMapper, never()).updateById(any(LeadAppealDO.class));
         verify(leadMapper, never()).touchActivity(anyLong(), any());
-        verifyNoInteractions(eventMapper, notifyEventPublisher);
+        verify(eventMapper, never()).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO.class));
+        verifyNoInteractions(notifyEventPublisher);
     }
 
     @Test
@@ -387,6 +440,7 @@ class LeadAppealServiceImplTest {
         LeadAppealDO appeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
         appeal.setStatus(LeadConstants.APPEAL_STATUS_SALES_MANAGER_REVIEWING);
         appeal.setProcessInstanceId("process-1");
+        when(appealMapper.selectById(1L)).thenReturn(appeal);
         when(appealMapper.selectByIdForUpdate(1L, 1L)).thenReturn(appeal);
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
         when(permissionApi.hasAnyPermissions(40L,
@@ -439,6 +493,8 @@ class LeadAppealServiceImplTest {
     void decisionRejectsStatusThatDoesNotMatchAppealRound() {
         LeadAppealDO appeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
         appeal.setStatus(LeadConstants.APPEAL_STATUS_QUALITY_REVIEWING);
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
+        when(appealMapper.selectById(1L)).thenReturn(appeal);
         when(appealMapper.selectByIdForUpdate(1L, 1L)).thenReturn(appeal);
         LeadAppealDecisionReqVO request = new LeadAppealDecisionReqVO();
         request.setTaskId("task-1"); request.setReason("审批意见"); request.setIdempotencyKey("decision-1");
@@ -448,7 +504,7 @@ class LeadAppealServiceImplTest {
 
         assertEquals(1_900_003_041, error.getCode());
         verifyNoInteractions(processTaskApi);
-        verify(leadMapper, never()).selectByIdForUpdate(anyLong(), anyLong());
+        verify(leadMapper).selectByIdForUpdate(8L, 1L);
     }
 
     @Test
@@ -489,7 +545,8 @@ class LeadAppealServiceImplTest {
             assertEquals(1_900_003_043, failure.getCode());
         }
         verify(appealMapper, never()).insert(any(LeadAppealDO.class));
-        verifyNoInteractions(processInstanceApi, eventMapper, notifyEventPublisher, attachmentService);
+        verifyNoInteractions(processInstanceApi, notifyEventPublisher, attachmentService);
+        verify(eventMapper, never()).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO.class));
     }
 
     @Test
@@ -533,6 +590,47 @@ class LeadAppealServiceImplTest {
         verifyNoInteractions(adminUserApi);
     }
 
+    @Test
+    void staleCycleRequestCannotCreateAppealForNewDecision() {
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
+        when(eventMapper.selectLatestInvalidId(8L)).thenReturn(20L);
+        var request = submitRequest("stale"); request.setInvalidEventId(10L);
+        assertThrows(ServiceException.class, () -> service.submit(8L, 7L, request));
+        verify(appealMapper, never()).insert(any(LeadAppealDO.class));
+        verifyNoInteractions(processInstanceApi, notifyEventPublisher);
+    }
+
+    @Test
+    void partnerContextAllowsNewCycleButRetainsOldHistory() {
+        var lead = invalidLead(20L); lead.setProviderOwnerType("partner"); lead.setProviderOwnerId(70L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        var old = appeal(1L, 8L, 3, LeadConstants.APPEAL_STAGE_CHAIRMAN, "[40]");
+        old.setStatus("overturned"); old.setInvalidEventId(10L);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of(old));
+        when(eventMapper.selectLatestInvalidId(8L)).thenReturn(20L);
+        var context = service.getPartnerAppealContext(8L, 70L);
+        assertTrue(context.getCanSubmit()); assertEquals(1, context.getNextRoundNo());
+        assertEquals(20L, context.getInvalidEventId());
+        assertFalse(context.getRecords().getFirst().getCurrentCycle());
+        assertFalse(context.getRecords().getFirst().getCanSubmitNextRound());
+        assertThrows(ServiceException.class, () -> service.getPartnerAppealContext(8L, 71L));
+    }
+
+    @Test
+    void oldCycleDecisionCannotChangeCurrentInvalidDecision() {
+        var old = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
+        old.setStatus(LeadConstants.APPEAL_STATUS_SALES_MANAGER_REVIEWING); old.setInvalidEventId(10L);
+        when(appealMapper.selectById(1L)).thenReturn(old);
+        when(appealMapper.selectByIdForUpdate(1L, 1L)).thenReturn(old);
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
+        when(eventMapper.selectLatestInvalidId(8L)).thenReturn(20L);
+        var request = new LeadAppealDecisionReqVO(); request.setTaskId("old-task");
+        request.setReason("旧周期裁决"); request.setIdempotencyKey("stale-decision");
+        assertThrows(ServiceException.class, () -> service.overturn(1L, 40L, request));
+        verifyNoInteractions(processTaskApi, cashbackService, notifyEventPublisher);
+        verify(appealMapper, never()).updateById(any(LeadAppealDO.class));
+    }
+
     private BpmProcessDefinitionMetadataRespDTO validDefinition() {
         return new BpmProcessDefinitionMetadataRespDTO().setId("validated-definition-2")
                 .setKey(LeadConstants.APPEAL_PROCESS_DEFINITION_KEY).setSuspended(false)
@@ -543,7 +641,7 @@ class LeadAppealServiceImplTest {
     private void prepareFirstRoundSubmit(LeadDO lead, String idempotencyKey) {
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
         when(appealMapper.selectBySubmissionIdempotencyKey(idempotencyKey)).thenReturn(null);
-        when(appealMapper.selectLatestByLeadId(8L)).thenReturn(null);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
         doAnswer(invocation -> {
             ((LeadAppealDO) invocation.getArgument(0)).setId(55L);
             return 1;
@@ -552,6 +650,7 @@ class LeadAppealServiceImplTest {
 
     private LeadAppealSubmitReqVO submitRequest(String idempotencyKey) {
         LeadAppealSubmitReqVO request = new LeadAppealSubmitReqVO();
+        request.setInvalidEventId(0L);
         request.setReason("申诉原因");
         request.setIdempotencyKey(idempotencyKey);
         return request;

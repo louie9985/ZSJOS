@@ -6,11 +6,15 @@ import { createIdempotencyKey } from '../services/idempotency'
 import { formatTimestamp } from '../services/time'
 import { ApiError } from '../services/api'
 import { bpmStatusColor, bpmStatusLabel } from './bpm/bpmStatus'
+import FeedbackApprovalActions from './FeedbackApprovalActions'
 
-export default function FeedbackApprovalPanel({ id, approver = false, readOnly, canUrge, renderValues, onUrged }: {
+export default function FeedbackApprovalPanel({ id, approver = false, readOnly, canUrge, renderValues, onUrged,
+  contentHeader, contentFooter, canApprove = false, onActionSuccess }: {
   id: number; approver?: boolean; readOnly: boolean; canUrge: boolean
   renderValues: (fields: FeedbackField[], values: Record<string, unknown>) => ReactNode
   onUrged: () => void
+  contentHeader?: ReactNode; contentFooter?: ReactNode
+  canApprove?: boolean; onActionSuccess?: () => void
 }) {
   const { message } = App.useApp()
   const [roundNo, setRoundNo] = useState<number>()
@@ -50,7 +54,18 @@ export default function FeedbackApprovalPanel({ id, approver = false, readOnly, 
       await load()
     } finally { setSaving(false) }
   }
-  return <section className="feedback-detail-section feedback-approval-panel">
+  return <section className="feedback-approval-panel">
+    <div className="feedback-approval-layout">
+    <main className="feedback-approval-content">
+      {contentHeader}
+      {loading ? <Skeleton active paragraph={{ rows: 4 }}/> : data && <section className="feedback-submitted-content">
+        <Typography.Title level={5}>第 {data.roundNo} 轮提交内容</Typography.Title>
+        {data.roundNo !== data.latestRoundNo && <Alert type="info" showIcon message="历史轮次 · 只读"/>}
+        {renderValues(data.fields, data.values)}
+      </section>}
+      {contentFooter}
+    </main>
+    <aside className="feedback-approval-sidebar" aria-label="需求审批流程">
     <Space wrap className="feedback-approval-heading">
       <Typography.Title level={5}>审批流程</Typography.Title>
       {data && <Select aria-label="审批轮次" value={data.roundNo} disabled={saving} onChange={value => { command.current = undefined; setRoundNo(value) }}
@@ -82,8 +97,13 @@ export default function FeedbackApprovalPanel({ id, approver = false, readOnly, 
         {data.lastUrgedAt && <Typography.Text type="secondary">上次催办：{formatTimestamp(data.lastUrgedAt)}</Typography.Text>}
         {cooling && <Typography.Text type="secondary">可再次催办：{formatTimestamp(data.nextUrgeAt)}</Typography.Text>}
       </Space>
-      <Typography.Title level={5}>第 {data.roundNo} 轮提交内容</Typography.Title>
-      {renderValues(data.fields, data.values)}
+      {data.availability === 'AVAILABLE' && data.roundNo === data.latestRoundNo && data.progress?.status === 1 && (
+        canApprove ? <FeedbackApprovalActions key={`${data.roundNo}:${data.version}`} tasks={data.progress.currentTasks}
+          onSuccess={() => { void load(); onActionSuccess?.() }}/>
+          : <Typography.Paragraph type="secondary">当前为只读查看，审批操作仅向有权限的当前审批人开放。</Typography.Paragraph>
+      )}
     </>}
+    </aside>
+    </div>
   </section>
 }

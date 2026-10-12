@@ -1,0 +1,70 @@
+# -*- coding: utf-8 -*-
+"""Real approval page with isolated API responses; never modifies live orders."""
+import os,re,json
+from pathlib import Path
+from playwright.sync_api import sync_playwright,expect
+url='http://127.0.0.1:5249/test/order-approval-status.html'
+out=Path(os.environ['TEMP'])/'order-approval-status-browser';out.mkdir(exist_ok=True)
+with sync_playwright() as p:
+    browser=p.chromium.launch(channel='chrome',headless=True)
+    for width in (1440,390):
+        page=browser.new_page(viewport={'width':width,'height':960})
+        print('browser width',width,flush=True)
+        page.goto(url,wait_until='domcontentloaded')
+        tabs=page.locator('.lead-inbox-group-tabs')
+        expect(tabs.get_by_role('tab')).to_have_count(6)
+        assert [t.strip() for t in tabs.get_by_role('tab').all_text_contents()]==['全部','待审核','待重提','已通过','已终止','历史旧单（已重提）']
+        for label,key in [('待重提','revision_required'),('已通过','effective'),('已终止','terminated'),('历史旧单（已重提）','superseded'),('待审核','pending_approval')]:
+            tab=tabs.get_by_role('tab',name=label,exact=True)
+            tab.evaluate('(el)=>el.click()')
+            page.wait_for_function('(key)=>window.approvalRequests.at(-1)?.orderState===key',arg=key)
+            expect(page.locator('.business-inbox-item').first).to_be_visible()
+            if key!='pending_approval':
+                expect(page.locator('.business-inbox-item')).to_have_count(1)
+                expect(page.locator('.business-inbox-item').first).to_contain_text('OD-'+key)
+            else: expect(page.locator('.business-inbox-item').first).to_contain_text('OD-EXAMPLE-1')
+        page.locator('.business-inbox-item').nth(1).click()
+        pane=page.get_by_role('dialog') if width==390 else page.locator('.business-inbox-detail-pane')
+        expect(pane.get_by_role('button',name=re.compile('通过$'))).to_have_count(0)
+        if width==390: page.locator('.ant-drawer-close').click()
+        page.locator('.business-inbox-item').first.click()
+        expect(pane.get_by_role('button',name=re.compile('通过$'))).to_be_visible()
+        if width==390:
+            page.locator('.ant-drawer-close').click()
+            tabs.locator('.ant-tabs-nav-more').hover()
+            page.get_by_role('option',name='历史旧单（已重提）',exact=True).click()
+            expect(page.locator('.business-inbox-item').first).to_contain_text('OD-superseded')
+        # Resolved request order survives rapid state changes.
+        page.goto(url+'?state=slow')
+        expect(tabs.get_by_role('tab',name='全部',exact=True)).to_be_visible()
+        tabs.get_by_role('tab',name='待重提',exact=True).evaluate('(el)=>el.click()')
+        tabs.get_by_role('tab',name='已通过',exact=True).evaluate('(el)=>el.click()')
+        expect(page.locator('.business-inbox-item').first).to_contain_text('OD-effective')
+        page.wait_for_timeout(400)
+        expect(page.locator('.business-inbox-item')).to_have_count(1)
+        page.screenshot(path=str(out/f'approval-{width}.png'),full_page=True)
+        assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
+        page.close()
+    page=browser.new_page(viewport={'width':1440,'height':960})
+    page.add_init_script("localStorage.setItem('crm-theme', JSON.stringify({inboxLayoutMode:'table'}))")
+    page.goto(url)
+    page.wait_for_function('window.approvalRequests.at(-1)?.pageNo===1')
+    page.locator('.ant-pagination-item-2').click()
+    page.wait_for_function('window.approvalRequests.at(-1)?.pageNo===2')
+    page.locator('.lead-inbox-group-tabs').get_by_role('tab',name='待重提',exact=True).click()
+    page.wait_for_function("window.approvalRequests.at(-1)?.pageNo===1 && window.approvalRequests.at(-1)?.orderState==='revision_required'")
+    expect(page.locator('.ant-table-tbody')).to_contain_text('OD-revision_required')
+    page.get_by_role('tab',name='财务中心',exact=True).click()
+    page.wait_for_function("window.approvalRequests.at(-1)?.center==='finance' && window.approvalRequests.at(-1)?.pageNo===1")
+    page.screenshot(path=str(out/'approval-table.png'),full_page=True)
+    page.close()
+    for state,text in [('denied','无权访问成交订单审批'),('empty','暂无审批任务'),('profile-error','筛选方案暂不可用'),('error','审批列表暂不可用')]:
+        page=browser.new_page();page.goto(url+'?state='+state)
+        if state=='empty': expect(page.locator('.business-inbox-scroll .ant-empty')).to_be_visible()
+        else: expect(page.get_by_text(text,exact=True)).to_be_visible()
+        if state in ('profile-error','error'):
+            page.get_by_role('button',name=re.compile('重.*试')).first.click()
+            expect(page.locator('.business-inbox-item').first).to_be_visible()
+        page.close()
+    browser.close()
+print('PASS desktop/mobile tabs, overflow history, table pagination/center reset, task action gating, stale responses, empty/error/retry/denied; screenshots '+str(out))

@@ -57,4 +57,18 @@ public class HrmEmployeeConvertToFullTimeReqVO {
     @Size(max = 500, message = "备注不能超过 500 个字符")
     private String remark;
 
+
+    private Long version;
+    @jakarta.validation.constraints.NotBlank
+    @Size(max = 64)
+    private String operationKey;
+    @jakarta.validation.constraints.Pattern(regexp = "BUSINESS|PLAN")
+    private String changeMode = "BUSINESS";
+
+
+    @NotNull(message = "请选择转全职后的员工状态")
+    private Integer status;
+    private LocalDateTime regularTime;
+    private LocalDateTime plannedRegularTime;
+
 }

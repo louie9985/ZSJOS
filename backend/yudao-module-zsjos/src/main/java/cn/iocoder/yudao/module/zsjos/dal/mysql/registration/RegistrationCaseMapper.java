@@ -10,6 +10,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.*;
+
 @Mapper
 public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> {
     default RegistrationCaseDO selectByOrderId(Long orderId) {
@@ -24,6 +26,11 @@ public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> 
                                                            java.util.List<Long> caseIds) {
         LambdaQueryWrapperX<RegistrationCaseDO> query = new LambdaQueryWrapperX<RegistrationCaseDO>()
                 .eqIfPresent(RegistrationCaseDO::getStatus, pageParam.getStatus());
+        if ("pending".equals(pageParam.getStatusGroup())) {
+            query.in(RegistrationCaseDO::getStatus, STATUS_PENDING, STATUS_PROCESSING);
+        } else if ("processed".equals(pageParam.getStatusGroup())) {
+            query.in(RegistrationCaseDO::getStatus, STATUS_COMPLETED, STATUS_CANCELLED);
+        }
         if (orderIds != null) {
             if (orderIds.isEmpty()) query.eq(RegistrationCaseDO::getOrderId, -1L);
             else query.in(RegistrationCaseDO::getOrderId, orderIds);

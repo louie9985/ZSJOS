@@ -86,6 +86,13 @@
 .exam-month button:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
 
 @media (max-width: 768px) {
+  .exam-schedule-record.ant-list-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--crm-gap);
+  }
+  .exam-schedule-record > .ant-list-item-meta { width: 100%; }
+  .exam-schedule-record > .exam-schedule-actions { width: 100%; }
   .exam-calendar-page { height: auto; min-height: 100%; }
   .exam-calendar-page .page-heading,
   .exam-calendar-toolbar { align-items: stretch; flex-direction: column; }

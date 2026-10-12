@@ -372,7 +372,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         LeadDO lead = leadMapper.selectByIdempotencyKey(key);
         if (lead != null) {
             requireSamePartnerIdentity(lead.getPartnerId(), identity);
-            requireSameEducationSource(lead.getSourceType(), identity);
+            requireSameEducationSource(lead.getSubmissionSourceType() == null
+                    ? lead.getSourceType() : lead.getSubmissionSourceType(), identity);
             return response(lead, "created");
         }
         LeadActivationDO activation = activationMapper.selectByIdempotencyKey(key);
@@ -503,7 +504,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setLeadNo(leadNumberService.next(submittedAt));
         lead.setPersonId(person.getId()); lead.setSubmittedName(reqVO.getName().trim());
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
-        lead.setSourceType(sourceType(identity));
+        lead.setSubmissionSourceType(sourceType(identity));
+        lead.setSourceType(isSelfSourced(sourceType(identity)) && reqVO.getNewMediaProviderUserId() != null
+                ? SOURCE_INTERNAL_NEW_MEDIA : sourceType(identity));
         lead.setSourceUserId(sourceUserId); lead.setPartnerId(identity.partnerId());
         if (identity.partnerId() != null) {
             var ownership = partnerOwnershipService.getByPartnerId(identity.partnerId());
@@ -516,7 +519,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             lead.setSourceProviderUserId(reqVO.getNewMediaProviderUserId());
             lead.setSourceProviderRecorded(true);
         }
-        AdminUserRespDTO submitter = sourceUserId == null ? null : adminUserApi.getUser(sourceUserId);
+        // Partner source IDs belong to PartnerAccount, not System users; equal IDs do not establish identity.
+        Long sourceEmployeeId = identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER
+                ? lead.getPartnerOwnerUserIdSnapshot() : sourceUserId;
+        AdminUserRespDTO submitter = sourceEmployeeId == null ? null : adminUserApi.getUser(sourceEmployeeId);
         lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
         lead.setSourceChannelLabelSnapshot(sourceChannelLabel);
@@ -529,6 +535,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         }
         lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(submittedAt);
         providerAttributionService.apply(lead, identity.identity(), reqVO.getNewMediaProviderUserId(), submittedAt);
+        if (!LeadSourceInterpretation.hasConsistentWriteAttribution(lead)) {
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.LeadSourceErrorCodes.LEAD_SOURCE_ATTRIBUTION_INVALID);
+        }
         LeadSalesStageSnapshot.initialize(lead, dictDataApi);
         lead.setVersion(0); leadMapper.insert(lead);
         return lead;
@@ -600,7 +609,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         context.put("submitterUserId", lead.getSourceUserId());
         context.put("ownerUserId", lead.getOwnerUserId());
         context.put("pendingSalesUserId", lead.getPendingAssigneeUserId());
-        if (cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
+        context.put("submissionSourceType", sourceType(identity));
+        if (isSelfSourced(sourceType(identity))
                 && !Objects.equals(lead.getSourceUserId(), actorUserId)) {
             context.put("newMediaProviderUserId", lead.getSourceUserId());
         }
@@ -655,7 +665,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         response.setLeadNo(lead.getLeadNo());
         response.setQualificationStatus(LeadStateProjection.qualification(lead));
         response.setAutomaticQualificationApplied(false);
-        if ("created".equals(outcome) && isSelfSourced(lead.getSourceType()) && lead.getSourceProviderUserId() == null) {
+        if ("created".equals(outcome) && LeadSourceInterpretation.resolve(lead).unlinked()) {
             var event = eventMapper.selectByIdempotencyKey(LeadAutomaticGeneration.qualificationEventKey(lead.getId(), lead.getSourceType()));
             response.setAutomaticQualificationApplied(event != null && LeadAutomaticGeneration.isAutomatic(event.getRelatedObjectRefs()));
         }

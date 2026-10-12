@@ -75,20 +75,30 @@ onBeforeUnmount(() => generation++)
   </main>
 </template>
 <style scoped>
-.notice-public { box-sizing: border-box; max-width: 800px; min-height: 100vh; margin: 0 auto; padding: 24px 20px 48px; background: var(--h5-glass-surface-strong, #fff); color: var(--h5-text-primary, #20242b); overflow-wrap: anywhere; }
-.notice-public-brand { border-bottom: 1px solid var(--h5-glass-border, #ddd); padding-bottom: 20px; margin-bottom: 28px; font-size: 18px; font-weight: 600; }
-.notice-public-brand span { margin-left: 10px; font-size: 14px; font-weight: normal; }
-.notice-public h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.4; }
-.notice-public-date, .notice-public-note { color: var(--h5-text-secondary, #666); font-size: 13px; }
-.notice-public-body { font-size: 16px; line-height: 1.85; margin-top: 28px; }
-.notice-public-body :deep(img), .notice-public-body :deep(video) { max-width: 100%; height: auto; }
-.notice-public-body :deep(table), .notice-public-body :deep(pre) { display: block; overflow-x: auto; max-width: 100%; }
-.notice-public-files { margin-top: 32px; border-top: 1px solid var(--h5-glass-border, #ddd); }
-.notice-public-files h2 { font-size: 20px; }
-.notice-public-file { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--h5-glass-border, #ddd); }
-.notice-public-file strong { flex: 1 1 100%; font-size: 15px; }
-.notice-public-file p { flex-basis: 100%; color: #b42318; }
-.notice-public-file a { color: var(--van-primary-color); text-decoration: underline; font-size: 14px; }
-.notice-public-state { text-align: center; padding: 48px 0; }
-@media (max-width: 480px) { .notice-public { padding: 20px 16px 36px; } .notice-public h1 { font-size: 23px; } }
+/* Public documents use viewport space; the partner app keeps its mobile width elsewhere.
+   Every document selector includes .norem to opt out of the H5 px-to-rem transform. */
+:global(#app:has(.notice-public.norem)) { max-width: none; background: #f3f5f7; }
+.notice-public.norem { box-sizing: border-box; width: 100%; max-width: 1120px; min-height: 100vh; margin: 0 auto; padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 48px) 48px; background: #fff; color: #20242b; font: 16px/1.85 system-ui, sans-serif; overflow-wrap: anywhere; }
+.notice-public.norem .notice-public-brand { border-bottom: 1px solid #ddd; padding-bottom: 20px; margin-bottom: 28px; font-size: 18px; font-weight: 600; }
+.notice-public.norem .notice-public-brand span { margin-left: 10px; font-size: 14px; font-weight: normal; }
+.notice-public.norem h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.4; }
+.notice-public.norem .notice-public-date, .notice-public.norem .notice-public-note { color: var(--h5-text-secondary, #666); font-size: 13px; }
+.notice-public.norem .notice-public-body { font-size: 16px; line-height: 1.85; margin-top: 28px; }
+.notice-public.norem .notice-public-body :deep(img), .notice-public.norem .notice-public-body :deep(video) { max-width: 100%; height: auto; }
+.notice-public.norem .notice-public-body :deep(pre) { display: block; overflow-x: auto; max-width: 100%; }
+.notice-public.norem .notice-public-body :deep(.notice-table-scroll) { width: 100%; max-width: 100%; overflow-x: auto; margin: 12px 0; }
+.notice-public.norem .notice-public-body :deep(.notice-table-scroll:focus-visible) { outline: 2px solid var(--van-primary-color); outline-offset: 2px; }
+.notice-public.norem .notice-public-body :deep(table) { width: 100%; border-collapse: collapse; }
+/* Public document grids need visible lines on white, unlike the translucent card border. */
+.notice-public.norem .notice-public-body :deep(td), .notice-public.norem .notice-public-body :deep(th) { box-sizing: border-box; border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; vertical-align: top; }
+.notice-public.norem .notice-public-body :deep(th) { background-color: #f7f7f7; }
+.notice-public.norem .notice-public-files { margin-top: 32px; border-top: 1px solid #ddd; }
+.notice-public.norem .notice-public-files h2 { font-size: 20px; }
+.notice-public.norem .notice-public-file { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid #ddd; }
+.notice-public.norem .notice-public-file strong { flex: 1 1 100%; font-size: 15px; }
+.notice-public.norem .notice-public-file p { flex-basis: 100%; color: #b42318; }
+.notice-public.norem .notice-public-file a { color: var(--van-primary-color); text-decoration: underline; font-size: 14px; }
+.notice-public.norem .notice-public-state { text-align: center; padding: 48px 0; }
+@media (max-width: 480px) { .notice-public.norem h1 { font-size: 23px; } }
+@media (min-width: 768px) { .notice-public.norem h1 { font-size: 32px; } }
 </style>

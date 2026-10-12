@@ -24,7 +24,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { APP_ROUTES } from '../constants'
+import { APP_ROUTES, FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 import DateTimeText from '../components/DateTimeText'
 import BpmApprovalDetail from '../components/bpm/BpmApprovalDetail'
 import { feedbackApi } from '../services/feedbackApi'
@@ -40,6 +40,7 @@ import {
 import { useInboxTableLayout } from '../services/inboxLayout'
 
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
+import ResizableDrawer from '../components/ResizableDrawer'
 
 type BpmTaskView = 'todo' | 'done'
 
@@ -388,7 +389,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     </section>
   }
 
-  const detail = <BpmApprovalDetail
+  const detail = <BpmApprovalDetail key={selectedTask?.id}
     task={selectedTask}
     view={view}
     canUpdate={canUpdate && selectedTask?.processDefinitionKey !== 'zsjos_partner_withdrawal'}
@@ -539,7 +540,10 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         <main className="business-inbox-detail-pane">{detail}</main>
       </div>}
 
-    <ResizableDetailDrawer
+    {selectedTask && briefs[selectedTask.id]?.bizType === 'feedback' ? <ResizableDrawer
+      title="需求审批" open={drawerOpen} onClose={() => setDrawerOpen(false)} width="100vw"
+      defaultSize="min(1400px, 92vw)" minSize={1000} storageKey={FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY}
+    >{detail}</ResizableDrawer> : <ResizableDetailDrawer
       desktopResizable={useTableLayout}
       title="审批任务"
       open={drawerOpen}
@@ -548,6 +552,6 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       placement="right"
     >
       {detail}
-    </ResizableDetailDrawer>
+    </ResizableDetailDrawer>}
   </section>
 }

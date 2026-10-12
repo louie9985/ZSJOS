@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 public class LeadAppealDO extends TenantBaseDO {
     @TableId private Long id;
     private Long leadId;
+    /** Invalid-decision event identity; zero retains uncorrelated legacy history. */
+    private Long invalidEventId;
     private Integer roundNo;
     private String reviewStage;
     private String status;

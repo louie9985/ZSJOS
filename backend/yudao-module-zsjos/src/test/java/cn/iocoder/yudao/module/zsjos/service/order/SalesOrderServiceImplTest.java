@@ -90,6 +90,7 @@ import static org.mockito.Mockito.*;
 class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
     @Mock private RepurchaseDuplicateGuard repurchaseDuplicateGuard;
+    @Mock private OrderContactCompletionService contactCompletionService;
     @Mock private RepurchaseCustomerService repurchaseCustomers;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService submissionIdentityService;
     @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
@@ -249,7 +250,7 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
 
-        var req = request(BigDecimal.ZERO, "13800138000", null);
+        var req = request(BigDecimal.ZERO, "13800138000", "test-wechat");
         if (courseCount == 2) {
             var second = new SalesOrderSubmitReqVO.Item();
             second.setSpuRef("spu-1"); second.setSkuRef("sku-2"); second.setActualAmount(new BigDecimal(totalAmount));
@@ -335,12 +336,13 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
 
-        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         assertEquals(100L, id);
         ArgumentCaptor<SalesOrderDO> orderCaptor = ArgumentCaptor.forClass(SalesOrderDO.class);
         verify(orderMapper).insert(orderCaptor.capture());
         assertEquals("education", orderCaptor.getValue().getFormalOwnerIdentity());
+        verify(contactCompletionService).complete(orderCaptor.getValue(), 1L, 20L);
         assertEquals(20L, orderCaptor.getValue().getFormalSalesUserId());
         assertEquals("测试学员", orderCaptor.getValue().getBuyerName());
         assertEquals("天津市", orderCaptor.getValue().getProvinceName());
@@ -370,7 +372,7 @@ class SalesOrderServiceImplTest {
                 .when(orderMapper).insert(any(SalesOrderDO.class));
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_APPROVAL_CONFIG_INVALID.getCode(), error.getCode());
         verify(processInstanceApi, never()).createProcessInstance(anyLong(), any());
@@ -380,7 +382,7 @@ class SalesOrderServiceImplTest {
     void createRejectsAnyAmountWithoutVoucher() {
         mockEligibleLeadAndOpportunity();
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
-        SalesOrderSubmitReqVO request = request(new BigDecimal("10.00"), "13800138000", null);
+        SalesOrderSubmitReqVO request = request(new BigDecimal("10.00"), "13800138000", "test-wechat");
         request.setPaymentVouchers(List.of());
 
         ServiceException error = assertThrows(ServiceException.class,
@@ -393,12 +395,13 @@ class SalesOrderServiceImplTest {
     @Test
     void createRejectsMissingContact() {
         mockEligibleLeadAndOpportunity();
-
-        ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, null, null)));
-
-        assertEquals(SALES_ORDER_CONTACT_REQUIRED.getCode(), error.getCode());
+        for (String[] contacts : new String[][] { {null, null}, {"13800138000", null}, {null, "wx"}, {"13800138000", "  "} }) {
+            ServiceException error = assertThrows(ServiceException.class,
+                    () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, contacts[0], contacts[1])));
+            assertEquals(SALES_ORDER_CONTACT_REQUIRED.getCode(), error.getCode());
+        }
         verifyNoInteractions(skuService);
+        verifyNoInteractions(contactCompletionService);
     }
 
     @Test
@@ -407,7 +410,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectActiveByLeadId(1L, ACTIVE_ORDER_STATUSES)).thenReturn(new SalesOrderDO());
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
         verifyNoInteractions(skuService);
@@ -421,7 +424,7 @@ class SalesOrderServiceImplTest {
         when(leadAppealMapper.selectLatestByLeadId(1L)).thenReturn(appeal);
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ENTRY_FORBIDDEN.getCode(), error.getCode());
         verifyNoInteractions(skuService);
@@ -436,7 +439,7 @@ class SalesOrderServiceImplTest {
         when(opportunityMapper.selectByLeadIdForUpdate(1L, 1L)).thenReturn(mismatched);
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ENTRY_FORBIDDEN.getCode(), error.getCode());
         verify(orderMapper, never()).insert(any(SalesOrderDO.class));
@@ -523,7 +526,7 @@ class SalesOrderServiceImplTest {
         existing.setId(100L); existing.setLeadId(1L); existing.setSubmitterUserId(20L);
         when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(existing);
 
-        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         assertEquals(100L, id);
         verifyNoInteractions(leadMapper, opportunityMapper, skuService, processInstanceApi);
@@ -561,7 +564,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(null, existing);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
 
-        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         assertEquals(100L, id);
         verify(orderMapper, times(2)).selectByIdempotencyKey("key-1");
@@ -841,6 +844,83 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void approvalProfilePublishesOrderedLifecycleStatesSeparatelyFromLegacyGroups() {
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        var config = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO();
+        config.setGroups(List.of());
+        when(inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER)).thenReturn(config);
+        var result = service.getApprovalFilterProfile(20L);
+        assertEquals(List.of("all", STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
+                STATUS_TERMINATED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
+        assertEquals(List.of("全部", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
+                result.getOrderStates().stream().map(it -> it.getLabel()).toList());
+        assertEquals(List.of(CENTER_REGISTRATION), result.getCenters().stream().map(it -> it.getKey()).toList());
+        assertTrue(result.getGroups().isEmpty());
+    }
+
+    @Test
+    void orderStateFiltersBothPendingAndHandledBeforeBpmPagination() {
+        TenantContextHolder.setTenantId(1L);
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO();
+        request.setOrderState(STATUS_PENDING_APPROVAL); request.setCenter(CENTER_REGISTRATION);
+        request.setPageNo(2); request.setPageSize(1); request.setKeyword("test-order");
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        when(roundMapper.selectApprovalProcessIds(1L, STATUS_PENDING_APPROVAL, "test-order", null))
+                .thenReturn(List.of("p1", "p2"));
+        BpmTaskRespDTO pending = new BpmTaskRespDTO();
+        pending.setId("t2"); pending.setCreateTime(LocalDateTime.of(2026, 10, 9, 12, 0));
+        pending.setBusinessKey("sales-order:102"); pending.setProcessInstanceId("p2");
+        BpmTaskRespDTO handled = new BpmTaskRespDTO();
+        handled.setId("t1"); handled.setCreateTime(LocalDateTime.of(2026, 10, 9, 11, 0));
+        handled.setEndTime(LocalDateTime.of(2026, 10, 9, 11, 30));
+        handled.setBusinessKey("sales-order:101"); handled.setProcessInstanceId("p1");
+        when(processTaskApi.getTodoTaskPage(eq(20L), any())).thenReturn(new PageResult<>(List.of(pending), 1L));
+        when(processTaskApi.getDoneTaskPage(eq(20L), any())).thenReturn(new PageResult<>(List.of(handled), 1L));
+        SalesOrderDO order = new SalesOrderDO(); order.setId(101L); order.setStatus(STATUS_PENDING_APPROVAL);
+        when(orderMapper.selectById(101L)).thenReturn(order);
+        when(permissionService.canRead(order, 20L)).thenReturn(true);
+        var result = service.getInboxPage(request, 20L);
+        assertEquals(2L, result.getTotal());
+        assertEquals(List.of(101L), result.getList().stream().map(it -> it.getId()).toList());
+        ArgumentCaptor<BpmTaskPageReqDTO> captor = ArgumentCaptor.forClass(BpmTaskPageReqDTO.class);
+        verify(processTaskApi, atLeastOnce()).getDoneTaskPage(eq(20L), captor.capture());
+        assertTrue(captor.getAllValues().stream().allMatch(it -> it.getProcessInstanceIds().equals(List.of("p1", "p2"))
+                && TASK_REGISTRATION.equals(it.getTaskDefinitionKey())));
+    }
+
+    @Test
+    void orderStateAndAdvancedFilterAreIntersectedAndEmptyMatchNeverBroadens() {
+        TenantContextHolder.setTenantId(1L);
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO();
+        request.setOrderState(STATUS_REVISION_REQUIRED); request.setKeyword("example");
+        request.setAdvancedFilter(new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO());
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        when(advancedFilterService.hasConditions(request.getAdvancedFilter())).thenReturn(true);
+        when(advancedFilterService.matchOrderIds(request.getAdvancedFilter())).thenReturn(List.of(11L));
+        when(roundMapper.selectApprovalProcessIds(1L, STATUS_REVISION_REQUIRED, "example", List.of(11L)))
+                .thenReturn(List.of());
+        assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
+        verify(roundMapper).selectApprovalProcessIds(1L, STATUS_REVISION_REQUIRED, "example", List.of(11L));
+        when(advancedFilterService.matchOrderIds(request.getAdvancedFilter())).thenReturn(List.of());
+        assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
+        verifyNoInteractions(processTaskApi);
+    }
+
+    @Test
+    void orderStateRejectsInvalidStateAndCursorReuseAcrossStates() {
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO(); request.setOrderState("unknown");
+        assertThrows(ServiceException.class, () -> service.getInboxPage(request, 20L));
+        request.setOrderState(STATUS_PENDING_APPROVAL);
+        var item = new cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderListItemRespVO();
+        item.setTaskId("cursor-task"); item.setTaskCreateTime(LocalDateTime.of(2026, 10, 9, 11, 0));
+        String cursor = ReflectionTestUtils.invokeMethod(service, "encodeApprovalCursor", item, request, 20L);
+        request.setOrderState(STATUS_SUPERSEDED); request.setCursor(cursor);
+        assertThrows(IllegalArgumentException.class, () -> service.getInboxCursor(request, 20L));
+        verifyNoInteractions(processTaskApi);
+    }
+
+    @Test
     void approvalInboxRestrictsSingleCenterUserToRegistrationTasks() {
         SalesOrderPageReqVO reqVO = new SalesOrderPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setHandled(false); reqVO.setCenter(CENTER_REGISTRATION);
@@ -914,7 +994,7 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
                 .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
 
-        var revision = request(new BigDecimal(amount), "13800138000", null);
+        var revision = request(new BigDecimal(amount), "13800138000", "test-wechat");
         revision.setGiftItems(List.of("old")); revision.setGiftShippingAddress("历史地址");
         Long successorId = service.reviseAndResubmit(100L, 20L, revision);
         assertEquals(oldGifts, order.getGiftItems());
@@ -968,8 +1048,9 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; })
                 .when(orderMapper).insert(any(SalesOrderDO.class));
 
-        service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
+        verify(contactCompletionService).complete(argThat(created -> Objects.equals(created.getId(), 101L)), eq(order.getLeadId()), eq(20L));
         // uk_tenant_source_payment_order spans (tenant_id, source_payment_order_id), so the superseded
         // row must release the key before the successor carries it, or the insert fails.
         assertNull(order.getSourcePaymentOrderId());
@@ -996,7 +1077,7 @@ class SalesOrderServiceImplTest {
         PurchaseIntentDO intent = purchaseIntent("offline_paid");
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
         when(purchaseIntentMapper.reviseOfflineSnapshot(eq(intent), anyString(), eq(new BigDecimal("800")))).thenReturn(1);
-        var req = request(new BigDecimal("800"), "13800138000", null);
+        var req = request(new BigDecimal("800"), "13800138000", "test-wechat");
         req.setPurchaseIntentId(800L);
         assertNull(ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("800"), 10L, 100L));
         verifyNoInteractions(paymentIntentMapper, paymentTransactionMapper);
@@ -1006,7 +1087,7 @@ class SalesOrderServiceImplTest {
     @Test
     void onlineRevisionRejectsSkuChangeWithAccurateError() {
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("online_link"));
-        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        var req = request(new BigDecimal("500"), "13800138000", "test-wechat"); req.setPurchaseIntentId(800L);
         ServiceException error = assertThrows(ServiceException.class, () ->
                 ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
         assertEquals(PAYMENT_TRANSACTION_LOCKED.getCode(), error.getCode());
@@ -1018,7 +1099,7 @@ class SalesOrderServiceImplTest {
         PurchaseIntentDO intent = purchaseIntent("online_link");
         intent.setItemSnapshotJson("[{\"spuRef\":\"spu-1\",\"skuRef\":\"sku-1\",\"actualAmount\":500}]");
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
-        var req = request(new BigDecimal("800"), "13800138000", null); req.setPurchaseIntentId(800L);
+        var req = request(new BigDecimal("800"), "13800138000", "test-wechat"); req.setPurchaseIntentId(800L);
         ServiceException error = assertThrows(ServiceException.class, () ->
                 ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("800"), 10L, 100L));
         assertEquals(PAYMENT_TRANSACTION_LOCKED.getCode(), error.getCode());
@@ -1040,7 +1121,7 @@ class SalesOrderServiceImplTest {
     void initialOfflineSubmissionStillChecksSnapshot() {
         PurchaseIntentDO intent = purchaseIntent("offline_paid").setStatus("draft").setCurrentOrderId(null);
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(intent);
-        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        var req = request(new BigDecimal("500"), "13800138000", "test-wechat"); req.setPurchaseIntentId(800L);
         ServiceException error = assertThrows(ServiceException.class, () ->
                 ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, null));
         assertEquals(PURCHASE_INTENT_ITEMS_MISMATCH.getCode(), error.getCode());
@@ -1049,7 +1130,7 @@ class SalesOrderServiceImplTest {
     @Test
     void offlineRevisionRejectsDifferentPersonAndCurrentOrder() {
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("offline_paid"));
-        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        var req = request(new BigDecimal("500"), "13800138000", "test-wechat"); req.setPurchaseIntentId(800L);
         for (Long[] binding : List.of(new Long[]{11L, 100L}, new Long[]{10L, 101L})) {
             ServiceException error = assertThrows(ServiceException.class, () ->
                     ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), binding[0], binding[1]));
@@ -1061,7 +1142,7 @@ class SalesOrderServiceImplTest {
     @Test
     void offlineRevisionRejectsSnapshotVersionConflict() {
         when(purchaseIntentMapper.selectByIdForUpdate(800L)).thenReturn(purchaseIntent("offline_paid"));
-        var req = request(new BigDecimal("500"), "13800138000", null); req.setPurchaseIntentId(800L);
+        var req = request(new BigDecimal("500"), "13800138000", "test-wechat"); req.setPurchaseIntentId(800L);
         ServiceException error = assertThrows(ServiceException.class, () ->
                 ReflectionTestUtils.invokeMethod(service, "validatePurchaseIntent", req, new BigDecimal("500"), 10L, 100L));
         assertEquals(PURCHASE_INTENT_VERSION_CONFLICT.getCode(), error.getCode());
@@ -1080,7 +1161,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectById(101L)).thenReturn(successor);
 
         Long successorId = service.reviseAndResubmit(100L, 20L,
-                request(BigDecimal.ZERO, "13800138000", null));
+                request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         assertEquals(101L, successorId);
         verify(orderMapper, never()).updateById(any(SalesOrderDO.class));
@@ -1127,7 +1208,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectOtherActiveByLeadId(1L, 100L, ACTIVE_ORDER_STATUSES)).thenReturn(replacement);
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
         assertEquals(STATUS_TERMINATED, order.getStatus());
@@ -1145,7 +1226,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectOtherActiveByPersonId(10L, 100L, ACTIVE_ORDER_STATUSES)).thenReturn(replacement);
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
         assertEquals(STATUS_TERMINATED, order.getStatus());
@@ -1168,11 +1249,12 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
         SalesOrderRepurchaseReqVO req = new SalesOrderRepurchaseReqVO(); req.setRepurchaseReason("继续学习");
-        req.setOrder(request(BigDecimal.ZERO, "13800138000", null));
+        req.setOrder(request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         Long id = service.createSystemRepurchase(1L, 20L, req);
 
         assertEquals(101L, id);
+        verify(contactCompletionService).complete(argThat(order -> Objects.equals(order.getId(), 101L)), eq(1L), eq(20L));
         verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(order -> ORDER_TYPE_REPURCHASE.equals(order.getOrderType())
                 && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)
                 && Objects.equals(order.getFormalSalesUserId(), 20L)));
@@ -1197,7 +1279,7 @@ class SalesOrderServiceImplTest {
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
         SalesOrderRepurchaseReqVO req = new SalesOrderRepurchaseReqVO(); req.setRepurchaseReason("继续学习");
-        req.setOrder(request(BigDecimal.ZERO, "13800138000", null));
+        req.setOrder(request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         req.setCustomerName(req.getOrder().getStudentName()); req.setCustomerMobile(req.getOrder().getStudentMobile()); req.setCustomerWechatId(req.getOrder().getStudentWechatId());
         String originalRequest = JsonUtils.toJsonString(req);
@@ -1212,6 +1294,7 @@ class SalesOrderServiceImplTest {
         verifyNoInteractions(opportunityMapper, lifecycleTaskService);
         verify(leadMapper, never()).updateById(any(LeadDO.class));
         assertEquals(77L,lead.getOwnerUserId());
+        verify(contactCompletionService).complete(any(SalesOrderDO.class), isNull(), eq(20L));
         verify(orderMapper, never()).hasEffectiveOrder(anyLong());
         var created = ArgumentCaptor.forClass(SalesOrderDO.class);
         verify(orderMapper).insert(created.capture());

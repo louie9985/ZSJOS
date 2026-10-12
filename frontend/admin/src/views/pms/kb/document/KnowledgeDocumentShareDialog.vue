@@ -1,15 +1,21 @@
 <template>
-  <Dialog v-model="dialogVisible" title="分享文档" width="600px">
-    <el-form label-width="100px">
+  <Dialog v-model="dialogVisible" title="分享文档" width="min(600px, calc(100vw - 24px))">
+    <el-alert v-if="loadError" type="error" :closable="false" title="分享配置加载失败">
+      <el-button :loading="formLoading" @click="open(documentId!)">重试</el-button>
+    </el-alert>
+    <el-form v-loading="formLoading" label-width="100px">
       <el-form-item label="公开链接">
-        <div v-if="share" class="flex w-full gap-8px">
+        <div v-if="shareUrl" class="flex w-full gap-8px">
           <el-input :model-value="shareUrl" readonly />
           <el-button @click="copyShareUrl">复制链接</el-button>
         </div>
+        <el-text v-else-if="share" type="warning"
+          >公开分享地址暂不可用，请联系管理员检查配置；仍可关闭分享。</el-text
+        >
         <el-text v-else type="info">开启后，任何获得链接的人都可以查看当前文档。</el-text>
       </el-form-item>
-      <el-form-item v-if="share" label="二维码">
-        <div class="flex items-center gap-12px">
+      <el-form-item v-if="shareUrl" label="二维码">
+        <div class="flex flex-wrap items-center gap-12px">
           <Qrcode
             :text="shareUrl"
             :width="160"
@@ -37,7 +43,7 @@
           <el-button :disabled="formLoading" type="danger">关闭分享</el-button>
         </template>
       </el-popconfirm>
-      <el-button :disabled="formLoading" type="primary" @click="submitShare">
+      <el-button :disabled="formLoading || loadError" type="primary" @click="submitShare">
         {{ share ? '保存成员' : '开启分享' }}
       </el-button>
       <el-button @click="dialogVisible = false">取 消</el-button>
@@ -56,6 +62,7 @@ defineOptions({ name: 'PmsKnowledgeDocumentShareDialog' })
 const message = useMessage() // 消息弹窗
 const dialogVisible = ref(false) // 弹窗是否显示
 const formLoading = ref(false) // 表单提交中
+const loadError = ref(false)
 const documentId = ref<number>() // 文档编号
 const share = ref<KnowledgeDocumentShareApi.PmsKnowledgeDocumentShareVO>() // 文档分享信息
 const shareUserIds = ref<number[]>([]) // 分享成员用户编号
@@ -65,20 +72,22 @@ const qrCodeOptions = {
   color: { dark: '#1f2937', light: '#ffffff' }
 }
 
-const shareUrl = computed(() => {
-  if (!share.value) return ''
-  return `${window.location.origin}/pms/kb/document/share/${share.value.token}`
-}) // 文档分享地址
+const shareUrl = computed(() => share.value?.url || '')
 
 /** 打开弹窗 */
 async function open(id: number) {
   dialogVisible.value = true
   documentId.value = id
+  share.value = undefined
+  shareUserIds.value = []
   qrCodeDataUrl.value = ''
   formLoading.value = true
+  loadError.value = false
   try {
     share.value = await KnowledgeDocumentShareApi.getKnowledgeDocumentShare(id)
     shareUserIds.value = share.value?.shareUserIds || []
+  } catch {
+    loadError.value = true
   } finally {
     formLoading.value = false
   }

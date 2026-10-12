@@ -15,7 +15,7 @@ import { isExamVisible, reeditCountdown } from '../services/examReedit'
 import { createIdempotencyKey } from '../services/idempotency'
 import { calendarWindow, coversExamDay, schedulesForRecordStatus } from './examCalendarLayout'
 import {
-  CalendarOutlined, EditOutlined, EyeOutlined, PlusOutlined,
+  CalendarOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined,
   ReloadOutlined, SendOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
@@ -37,6 +37,12 @@ type EditorValues = {
   remark?: string
   backgroundColor?: string
 }
+
+const EXAM_COLOR_SHORTCUTS = [
+  { label: '报名开始时间', color: '#00D0FF' },
+  { label: '考试时间', color: '#6ABF6D' },
+  { label: '截止时间', color: '#FF8F8F' }
+] as const
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
   DRAFT: { label: '草稿', color: 'default' },
@@ -68,13 +74,19 @@ export const scheduleInput = (values: EditorValues): ExamScheduleInput => {
 
 export function ExamCalendarLegend() {
   return <div className="exam-calendar-legend" aria-label="考期颜色和类型说明">
+    {EXAM_COLOR_SHORTCUTS.map(({ label, color }) =>
+      <span className="exam-calendar-legend-item" key={color}>
+        <span aria-hidden="true" className="exam-calendar-swatch" style={examBackgroundStyle(color)} />
+        {label}
+      </span>)}
+    <span>新增或编辑时可快捷选择以上颜色。</span>
     {['PUBLISHED', 'REVOKED', 'DRAFT'].map(status =>
       <span className="exam-calendar-legend-item" key={status}>
         <span aria-hidden="true" className={'exam-calendar-swatch exam-status-tone tone-' + status.toLowerCase()} />
         {STATUS_META[status].label}
       </span>)}
     <span className="exam-calendar-legend-item"><span aria-hidden="true" className="exam-calendar-swatch is-multi-day" />多日考试</span>
-    <span>以上为默认底色，可在新增或编辑考期时自选。发布状态请查看考期安排；连续日期条包含开始日和结束日。</span>
+    <span>未自选颜色时使用发布状态默认底色。发布状态请查看考期安排；连续日期条包含开始日和结束日。</span>
   </div>
 }
 
@@ -93,6 +105,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const [notifyTarget, setNotifyTarget] = useState<ExamSchedule>()
   const [anchor, setAnchor] = useState(() => dayjs(examToday()))
   const [schedules, setSchedules] = useState<ExamSchedule[]>([])
+  const [noteRefreshVersion, setNoteRefreshVersion] = useState(0)
   const [dayDetail, setDayDetail] = useState<Dayjs>()
   const [recordStatus, setRecordStatus] = useState<ExamSchedule['recordStatus']>()
   const [loading, setLoading] = useState(false), [error, setError] = useState('')
@@ -117,12 +130,16 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }, [editorOpen])
   const [now, setNow] = useState(() => performance.now())
   const [claimedIds, setClaimedIds] = useState<Set<number>>(() => new Set())
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(() => new Set())
+  const [deletingId, setDeletingId] = useState<number>()
+  const deleteLock = useRef(false)
   const [reediting, setReediting] = useState(false)
   const [claiming, setClaiming] = useState(false)
   const [claimError, setClaimError] = useState('')
   const pendingClaim = useRef<{ id: number; key: string } | undefined>(undefined)
   const claimLock = useRef(false), saveLock = useRef(false)
   const savedEditorId = useRef<number | undefined>(undefined)
+  const pendingCreate = useRef<{ request?: ExamScheduleInput; idempotencyKey: string } | undefined>(undefined)
   const [savingAction, setSavingAction] = useState<'DRAFT' | 'PUBLISH'>('DRAFT')
   const [highlightedId, setHighlightedId] = useState<number>()
   const locatingDay = useRef<Dayjs | undefined>(undefined)
@@ -132,7 +149,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   const scheduleType = Form.useWatch('scheduleType', form)
   const backgroundColor = Form.useWatch('backgroundColor', form)
   const range = useMemo(() => calendarWindow(anchor), [anchor])
-  const isVisible = (row: ExamSchedule) => !claimedIds.has(row.id) && isExamVisible(row, now)
+  const isVisible = (row: ExamSchedule) => !claimedIds.has(row.id) && !deletedIds.has(row.id) && isExamVisible(row, now)
   const visibleSchedules = schedulesForRecordStatus(schedules.filter(isVisible), recordStatus)
   const visibleDrawerRows = multiDayRows.filter(isVisible)
   const visibleMultiDay = showMultiDay ? schedulesForRecordStatus(calendarMultiDayRows.filter(isVisible), recordStatus) : []
@@ -216,6 +233,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
   }, [loadCalendarMultiDay, showMultiDay])
 
   const openCreate = (date = anchor, type: ExamScheduleType = 'EXACT') => {
+    pendingCreate.current = undefined
     savedEditorId.current = undefined
     setReediting(false)
     setEditing(undefined)
@@ -259,9 +277,30 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
       const uploaded = await uploadDeferredFiles(attachments, examScheduleAttachments.upload, setAttachments)
       if (uploaded.failed) { message.error('有附件上传失败，请移除失败项或再次保存重试'); return }
       const request = { ...input, attachmentIds: uploaded.items.map(item => item.uploaded!.fileId) }
-      const savedId = savedEditorId.current != null
-        ? (await api.examCalendar.update(savedEditorId.current, request), savedEditorId.current)
-        : await api.examCalendar.create(request)
+      let savedId = savedEditorId.current
+      if (savedId != null) {
+        await api.examCalendar.update(savedId, request)
+      } else {
+        // A lost response may already have committed. Recover that exact request before applying edits.
+        pendingCreate.current ??= { request, idempotencyKey: createIdempotencyKey() }
+        const pending = pendingCreate.current
+        pending.request ??= request
+        const originalRequest = pending.request
+        try {
+          savedId = await api.examCalendar.create({ ...originalRequest, idempotencyKey: pending.idempotencyKey })
+        } catch (cause) {
+          // These validation failures reject creation. Keep the key, but accept the user's correction.
+          if (cause instanceof ApiError && [400, 1900018002, 1900018003, 1900018014, 1900018030, 1900018031, 1900018032].includes(cause.code)) {
+            pending.request = undefined
+          }
+          throw cause
+        }
+        savedEditorId.current = savedId
+        pendingCreate.current = undefined
+        if (JSON.stringify(originalRequest) !== JSON.stringify(request)) {
+          await api.examCalendar.update(savedId, request)
+        }
+      }
       // The committed draft must survive a failed subsequent publish request.
       savedEditorId.current = savedId
       draftSaved = true
@@ -293,7 +332,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     try {
       const content = await api.examCalendar.reedit(id, pendingClaim.current.key)
       setClaimedIds(previous => new Set([...previous, id]))
-      setEditing(undefined); savedEditorId.current = undefined; setReediting(true)
+      setEditing(undefined); savedEditorId.current = undefined; pendingCreate.current = undefined; setReediting(true)
       form.resetFields()
       form.setFieldsValue({ scheduleType: content.scheduleType, scheduleName: content.scheduleName,
         exactDate: content.exactDate ? dayjs(content.exactDate) : undefined,
@@ -332,14 +371,39 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
     }
   }
 
-  const actions = (schedule: ExamSchedule) => <Space wrap>
+  const deleteDraft = async (schedule: ExamSchedule) => {
+    if (deleteLock.current) return
+    deleteLock.current = true
+    setDeletingId(schedule.id)
+    try {
+      await api.examCalendar.deleteDraft(schedule.id)
+      // Keep late calendar responses from restoring a successfully deleted draft.
+      setDeletedIds(previous => new Set([...previous, schedule.id]))
+      message.success('考期草稿已删除')
+      await reloadVisible()
+    } catch (cause) {
+      message.error(cause instanceof Error ? cause.message : '删除草稿失败，请重试')
+    } finally {
+      deleteLock.current = false
+      setDeletingId(undefined)
+    }
+  }
+
+  const actions = (schedule: ExamSchedule) => <Space wrap className="exam-schedule-actions">
     {canManage && schedule.canReedit && schedule.recordStatus === 'REVOKED' && isVisible(schedule) &&
       <Button icon={<EditOutlined />} loading={claiming && pendingClaim.current?.id === schedule.id}
         disabled={claiming || Boolean(claimError)} onClick={() => void reedit(schedule.id)}>重新编辑</Button>}
     {canManage && schedule.recordStatus === 'DRAFT' &&
-      <Button icon={<EditOutlined />} onClick={() => openEdit(schedule)}>编辑</Button>}
+      <Button disabled={deletingId === schedule.id} icon={<EditOutlined />} onClick={() => openEdit(schedule)}>编辑</Button>}
     {canManage && schedule.recordStatus === 'DRAFT' &&
-      <Button type="primary" disabled={examHasEnded(schedule)} icon={<SendOutlined />} onClick={() => void transition(schedule, 'publish')}>发布</Button>}
+      <Button type="primary" disabled={examHasEnded(schedule) || deletingId === schedule.id} icon={<SendOutlined />} onClick={() => void transition(schedule, 'publish')}>发布</Button>}
+    {canManage && schedule.recordStatus === 'DRAFT' &&
+      <Popconfirm title="确认删除这条考期草稿？" description="删除后将从日历移除，无法在页面恢复。"
+        okText="删除" cancelText="取消" okButtonProps={{ danger: true }}
+        disabled={deletingId != null} onConfirm={() => deleteDraft(schedule)}>
+        <Button danger icon={<DeleteOutlined />} loading={deletingId === schedule.id}
+          disabled={deletingId != null && deletingId !== schedule.id}>删除草稿</Button>
+      </Popconfirm>}
     {canManage && schedule.recordStatus === 'DRAFT' && examHasEnded(schedule) &&
       <span>考期已过期，请先编辑日期</span>}
     {canNotify && schedule.recordStatus === 'PUBLISHED' &&
@@ -365,7 +429,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
             setHighlightedId(row.id); locatingDay.current = date; setAnchor(date); setDayDetail(date)
             if (row.scheduleType === 'MULTI_DAY') { setShowMultiDay(true); setCalendarMultiDayRows(fresh.accumulated) } else setSchedules(fresh.accumulated)
           }} />
-        <Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void reloadVisible()} />
+        <Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => { setNoteRefreshVersion(version => version + 1); void reloadVisible() }} />
         <Button icon={<EyeOutlined />} onClick={() => setMultiDayOpen(true)}>多日考试安排</Button>
         {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>新增考期</Button>}
       </Space>
@@ -395,11 +459,11 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
           && !visibleSchedules.length && !visibleMultiDay.length && <Empty description="当前日历范围暂无符合条件的考期" />}
       </Spin>}
     </CalendarSideNavigation>
-    </div><ExamCalendarNotePanel canRead={hasPermission(permissions, 'zsjos:exam-calendar:query')} canManage={canManage} /></div>
+    </div><ExamCalendarNotePanel canRead={hasPermission(permissions, 'zsjos:exam-calendar:query')} canManage={canManage} refreshVersion={noteRefreshVersion} /></div>
 
     <Drawer title="多日考试安排" width={520} open={multiDayOpen} onClose={() => setMultiDayOpen(false)} extra={canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(anchor, 'MULTI_DAY')}>新增多日考期</Button>}>
       {multiDayError && <Alert type="error" showIcon message={multiDayError} action={<Button onClick={() => void loadMultiDay()}>重试</Button>} />}
-      <Spin spinning={multiDayLoading}>{!multiDayError && (visibleDrawerRows.length ? <List dataSource={visibleDrawerRows} footer={multiDayTotal > multiDayRows.length ? `当前展示前 ${visibleDrawerRows.length} 条，共 ${multiDayTotal - (multiDayRows.length - visibleDrawerRows.length)} 条` : undefined} renderItem={item => <List.Item className={item.attachments?.length ? "exam-schedule-attachment-record" : undefined} extra={actions(item)}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong>{renderStatus(item)}</Space>} description={<><div>{item.startDate} 至 {item.endDate}</div><div><LinkedText text={item.remark || '无备注'} mode="remark" /></div><ExamScheduleAttachments scheduleId={item.id} files={item.attachments} /></>} /></List.Item>} /> : <Empty description="暂无多日考试安排" />)}</Spin>
+      <Spin spinning={multiDayLoading}>{!multiDayError && (visibleDrawerRows.length ? <List dataSource={visibleDrawerRows} footer={multiDayTotal > multiDayRows.length ? `当前展示前 ${visibleDrawerRows.length} 条，共 ${multiDayTotal - (multiDayRows.length - visibleDrawerRows.length)} 条` : undefined} renderItem={item => <List.Item className={item.attachments?.length ? "exam-schedule-record exam-schedule-attachment-record" : "exam-schedule-record"} extra={actions(item)}><List.Item.Meta title={<Space wrap><strong>{item.scheduleName || '未命名考期'}</strong>{renderStatus(item)}</Space>} description={<><div>{item.startDate} 至 {item.endDate}</div><div><LinkedText text={item.remark || '无备注'} mode="remark" /></div><ExamScheduleAttachments scheduleId={item.id} files={item.attachments} /></>} /></List.Item>} /> : <Empty description="暂无多日考试安排" />)}</Spin>
     </Drawer>
 
     <Modal title={`${dayDetail?.format('YYYY年M月D日')} 考期安排`} open={Boolean(dayDetail)} onCancel={() => setDayDetail(undefined)} footer={null} width="min(720px, calc(100vw - 32px))" destroyOnHidden>
@@ -407,7 +471,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
         <Typography.Title level={5}>当天单日考试</Typography.Title>
         {(() => {
           const rows = visibleSchedules.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
-          return rows.length ? <List dataSource={rows} renderItem={row => <List.Item data-calendar-located={row.id === highlightedId} className={row.attachments?.length ? "exam-schedule-attachment-record" : undefined} extra={actions(row)}>
+          return rows.length ? <List dataSource={rows} renderItem={row => <List.Item data-calendar-located={row.id === highlightedId} className={row.attachments?.length ? "exam-schedule-record exam-schedule-attachment-record" : "exam-schedule-record"} extra={actions(row)}>
             <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong>{renderStatus(row)}</Space>}
               description={<><div>时间：{row.exactDate}</div><div>备注：<LinkedText text={row.remark || "无"} mode="remark" /></div><ExamScheduleAttachments scheduleId={row.id} files={row.attachments} /></>} />
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无单日考试" />
@@ -419,7 +483,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
             action={<Button onClick={() => void loadCalendarMultiDay()}>重试多日考期</Button>} />
             : <Spin spinning={calendarMultiDayLoading}>{!calendarMultiDayLoading && (() => {
               const rows = visibleMultiDay.filter(row => coversExamDay(row, dayDetail.format('YYYY-MM-DD')))
-              return rows.length ? <List dataSource={rows} renderItem={row => <List.Item data-calendar-located={row.id === highlightedId} className={row.attachments?.length ? "exam-schedule-attachment-record" : undefined} extra={actions(row)}>
+              return rows.length ? <List dataSource={rows} renderItem={row => <List.Item data-calendar-located={row.id === highlightedId} className={row.attachments?.length ? "exam-schedule-record exam-schedule-attachment-record" : "exam-schedule-record"} extra={actions(row)}>
                 <List.Item.Meta title={<Space wrap><strong>{row.scheduleName || '未命名考期'}</strong><Tag>多日</Tag>{renderStatus(row)}</Space>}
                   description={<><div>时间：{row.startDate} 至 {row.endDate}</div><div>备注：<LinkedText text={row.remark || "无"} mode="remark" /></div><ExamScheduleAttachments scheduleId={row.id} files={row.attachments} /></>} />
               </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当天暂无多日考期" />
@@ -441,7 +505,16 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
             const error = examDateError(value?.format('YYYY-MM-DD'))
             return error ? Promise.reject(new Error(error)) : Promise.resolve()
           } }]}><DatePicker disabledDate={date => date.format('YYYY-MM-DD') < examToday()} style={{ width: '100%' }} /></Form.Item>}
-        <Form.Item name="backgroundColor" label="考期底色" extra="单日和多日考试条使用相同底色；清除后恢复默认配色。"
+        <Form.Item name="backgroundColor" label="考期底色" extra={<Space orientation="vertical">
+          <Space wrap aria-label="考期底色快捷选择">
+            {EXAM_COLOR_SHORTCUTS.map(({ label, color }) => <Button key={color}
+              aria-pressed={backgroundColor?.toUpperCase() === color}
+              style={examBackgroundStyle(color)} onClick={() => form.setFieldValue('backgroundColor', color)}>
+              {label}
+            </Button>)}
+          </Space>
+          <span>单日和多日考试条使用相同底色；清除后恢复默认配色。</span>
+        </Space>}
           getValueProps={(value: string) => ({ value: value || null })}
           getValueFromEvent={(color: { cleared: boolean; toHexString: () => string }) => color.cleared ? '' : color.toHexString()}>
           <ColorPicker format="hex" disabledFormat disabledAlpha allowClear>

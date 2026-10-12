@@ -20,8 +20,7 @@ public class ConfigApiImpl implements ConfigApi {
 
     @Override
     public String getConfigValueByKey(String key) {
-        ConfigDO config = configService.getConfigByKey(key);
-        return config != null ? config.getValue() : null;
+        return configService.getRuntimeValue(key);
     }
 
     @Override

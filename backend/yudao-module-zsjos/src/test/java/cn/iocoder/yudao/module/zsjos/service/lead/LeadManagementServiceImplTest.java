@@ -106,16 +106,23 @@ class LeadManagementServiceImplTest {
     @Mock
     private BusinessTaskMapper businessTaskMapper;
 
-    @Test
-    void educationRestoreProjectionNeedsPermissionAndManagedOwner() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"education_self_sourced,self", "partner,specified"})
+    void educationRestoreProjectionNeedsPermissionAndManagedOwner(String source, String dispatchMode) {
         LeadDO lead = actionLead("suspended", "owned", true);
-        lead.setOwnerIdentity("education"); lead.setSourceType("education_self_sourced");
+        lead.setOwnerIdentity("education"); lead.setSourceType(source); lead.setDispatchMode(dispatchMode);
         assertActions(lead, null);
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
-        when(restoreOwnerPolicy.isEligible(lead)).thenReturn(true);
+        LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
+        LeadSubmissionIdentityService identityService = org.mockito.Mockito.mock(LeadSubmissionIdentityService.class);
+        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "restoreOwnerPolicy", policy);
         assertActions(lead, null);
         when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-restore")).thenReturn(true);
         assertActions(lead, null, "SUPERVISOR_RESTORE");
+        when(identityService.isEligibleEducationOwner(20L)).thenReturn(false);
+        assertActions(lead, null);
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of());
         assertActions(lead, null);
     }
@@ -197,6 +204,7 @@ class LeadManagementServiceImplTest {
     }
 
     @Mock private LeadRemarkHistoryService remarkHistoryService;
+    @Mock private LeadAppealSummaryService appealSummaryService;
 
     @BeforeEach
     void setUp() {
@@ -231,6 +239,7 @@ class LeadManagementServiceImplTest {
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
 
         PageResult<LeadManagementRespVO> result = service.getLeadPage(reqVO, 10L);
+        verify(appealSummaryService).populate(result.getList(), 10L, false);
 
         assertEquals(1L, result.getTotal());
         assertEquals(List.of("submitter"), result.getList().getFirst().getRelationTypes());
@@ -281,6 +290,7 @@ class LeadManagementServiceImplTest {
         when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
+        verify(appealSummaryService).populate(List.of(result), 10L, true);
 
         assertEquals(List.of("submitter", "owner"), result.getRelationTypes());
         assertEquals("销售一号", result.getOwnerUserName());

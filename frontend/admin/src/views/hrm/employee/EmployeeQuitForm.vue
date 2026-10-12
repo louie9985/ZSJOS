@@ -16,6 +16,15 @@
       :rules="formRules"
       label-width="112px"
     >
+      <el-form-item label="处理方式"
+        ><el-radio-group v-model="formData.changeMode"
+          ><el-radio value="BUSINESS">记录实际离职</el-radio
+          ><el-radio value="PLAN">保存离职计划</el-radio></el-radio-group
+        ></el-form-item
+      >
+      <el-form-item v-if="formData.changeMode === 'BUSINESS'" label="实际离职日期" required
+        ><el-date-picker v-model="formData.actualTime" type="date" value-format="x"
+      /></el-form-item>
       <el-row :gutter="18">
         <el-col :span="12">
           <el-form-item label="计划离职时间" prop="planQuitTime">
@@ -184,6 +193,7 @@ async function open(row: HrmEmployeeVO) {
         formData.value = {
           ...formData.value,
           ...quitInfo,
+          planQuitTime: row.plannedLeaveTime ?? quitInfo.planQuitTime,
           employeeId: row.id
         }
       }
@@ -224,6 +234,11 @@ async function submitForm() {
 function resetForm(employeeId?: number) {
   formData.value = {
     employeeId,
+    version: employee.value?.version,
+    operationKey: crypto.randomUUID(),
+    changeMode: 'BUSINESS',
+    actualTime: employee.value?.leaveTime,
+    planQuitTime: employee.value?.plannedLeaveTime,
     applyQuitTime: dayjs().startOf('day').valueOf(),
     type: HrmEmployeeQuitType.VOLUNTARY,
     reason: HrmEmployeeQuitReason.FAMILY

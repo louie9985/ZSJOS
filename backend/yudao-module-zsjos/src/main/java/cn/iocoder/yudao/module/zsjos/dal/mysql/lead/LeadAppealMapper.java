@@ -12,14 +12,20 @@ import java.util.List;
 @Mapper
 public interface LeadAppealMapper extends BaseMapperX<LeadAppealDO> {
 
+    default List<LeadAppealDO> selectListByLeadIds(List<Long> leadIds) {
+        if (leadIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadAppealDO>()
+                .in(LeadAppealDO::getLeadId, leadIds).orderByAsc(LeadAppealDO::getInvalidEventId).orderByAsc(LeadAppealDO::getRoundNo));
+    }
+
     default List<LeadAppealDO> selectListByLeadId(Long leadId) {
         return selectList(new LambdaQueryWrapperX<LeadAppealDO>().eq(LeadAppealDO::getLeadId, leadId)
-                .orderByAsc(LeadAppealDO::getRoundNo));
+                .orderByAsc(LeadAppealDO::getInvalidEventId).orderByAsc(LeadAppealDO::getRoundNo));
     }
 
     default LeadAppealDO selectLatestByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<LeadAppealDO>().eq(LeadAppealDO::getLeadId, leadId)
-                .orderByDesc(LeadAppealDO::getRoundNo).last("LIMIT 1"));
+                .orderByDesc(LeadAppealDO::getInvalidEventId).orderByDesc(LeadAppealDO::getRoundNo).last("LIMIT 1"));
     }
 
     default LeadAppealDO selectBySubmissionIdempotencyKey(String key) {

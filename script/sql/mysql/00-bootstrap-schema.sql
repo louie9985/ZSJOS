@@ -2308,6 +2308,7 @@ CREATE TABLE IF NOT EXISTS `infra_config` (
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `sensitive` bit(1) NOT NULL DEFAULT b'0' COMMENT '敏感配置加密存储且不回显',
   PRIMARY KEY (`id`) USING BTREE,
   KEY `idx_config_key` (`config_key`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='参数配置表';
@@ -4014,6 +4015,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `submitted_mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '表单原始手机号',
   `submitted_wechat_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '表单原始微信号',
   `source_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资来源类型',
+  `submission_source_type` varchar(32) DEFAULT NULL COMMENT '录单入口身份来源，与业务引流来源分离',
   `source_user_id` bigint DEFAULT NULL COMMENT '内部提交员工用户编号',
   `source_provider_user_id` bigint DEFAULT NULL COMMENT '销售自拓时关联的新媒体提供方用户编号',
   `source_provider_recorded` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否按销售自拓提供方规则记录',
@@ -4772,6 +4774,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `customer_paid_at` datetime DEFAULT NULL COMMENT '客户实际付款时间',
   `fee_mode` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '缴费方式字典值',
   `payment_method` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '支付方式字典值',
+  `fee_mode_label_snapshot` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '缴费方式历史标签快照',
+  `payment_method_label_snapshot` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '支付方式历史标签快照',
   `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '订单备注',
   `student_special_requirements` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生特殊要求',
   `material_delivery_contact` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '教材邮递联系',
@@ -5395,7 +5399,10 @@ CREATE TABLE IF NOT EXISTS `zsjos_exam_schedule` (
   `updater` varchar(64) DEFAULT '',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `create_request_key` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL COMMENT '创建操作人及请求标识摘要',
+  `create_request_hash` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL COMMENT '首次创建内容摘要',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_exam_create_request` (`tenant_id`,`create_request_key`),
   KEY `idx_exam_schedule_exact` (`tenant_id`,`schedule_type`,`exact_date`,`record_status`,`deleted`),
   KEY `idx_exam_schedule_multi_day` (`tenant_id`,`schedule_type`,`start_date`,`end_date`,`record_status`,`deleted`),
   KEY `idx_exam_schedule_category` (`tenant_id`,`category_id`,`deleted`),
@@ -5582,9 +5589,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `collaboration_group_id` bigint DEFAULT NULL COMMENT '编导运营协作组',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '学生服务关系编号',
   `person_id` bigint NOT NULL COMMENT '被服务 Person 编号',
-  `order_id` bigint NOT NULL COMMENT '来源有效订单编号',
-  `order_item_id` bigint NOT NULL COMMENT '来源订单项编号',
-  `registration_case_id` bigint NOT NULL COMMENT '激活报名服务单编号',
+  `order_id` bigint DEFAULT NULL COMMENT '来源有效订单编号',
+  `order_item_id` bigint DEFAULT NULL COMMENT '来源订单项编号',
+  `registration_case_id` bigint DEFAULT NULL COMMENT '激活报名服务单编号',
   `class_id` bigint DEFAULT NULL COMMENT '交付班级编号',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '服务关系状态',
   `owner_user_id` bigint DEFAULT NULL COMMENT '学生服务负责人用户编号',
@@ -8099,3 +8106,36 @@ CREATE TABLE IF NOT EXISTS `zsjos_exam_calendar_note_image` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_exam_note_image` (`tenant_id`,`file_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考期说明图片归属';
+
+CREATE TABLE IF NOT EXISTS `zsjos_points_package` (
+    id bigint NOT NULL AUTO_INCREMENT, name varchar(100) NOT NULL, credits_amount int NOT NULL,
+    valid_days int DEFAULT NULL, enabled bit(1) NOT NULL,
+    creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY(id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分兑换套餐';
+
+CREATE TABLE IF NOT EXISTS `zsjos_points_request` (
+    id bigint NOT NULL AUTO_INCREMENT, request_no varchar(40) NOT NULL,
+    submission_key varchar(64) NOT NULL, applicant_user_id bigint NOT NULL, applicant_name varchar(100) DEFAULT NULL,
+    package_id bigint NOT NULL, package_name varchar(100) NOT NULL, credits_amount int NOT NULL,
+    valid_days int DEFAULT NULL, reason varchar(2000) NOT NULL, attachments_json text NOT NULL,
+    approval_status varchar(32) NOT NULL, issue_status varchar(32) NOT NULL,
+    process_instance_id varchar(64) DEFAULT NULL, process_definition_id varchar(128) DEFAULT NULL,
+    task_keys_json text NOT NULL, approver_ids_json text NOT NULL, order_id varchar(128) NOT NULL,
+    expires_at datetime DEFAULT NULL, platform_url varchar(500) DEFAULT NULL,
+    batch_id varchar(64) DEFAULT NULL, external_code_id varchar(64) DEFAULT NULL,
+    code_ciphertext varchar(500) DEFAULT NULL, code_status varchar(32) DEFAULT NULL,
+    redeemed_at datetime DEFAULT NULL, synced_at datetime DEFAULT NULL, attempts int NOT NULL DEFAULT 0,
+    next_attempt_at datetime DEFAULT NULL, last_error varchar(300) DEFAULT NULL,
+    notified bit(1) NOT NULL DEFAULT b'0', submitted_at datetime NOT NULL,
+    creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY(id), UNIQUE KEY uk_order(order_id),
+    UNIQUE KEY uk_submission(tenant_id,applicant_user_id,submission_key),
+    UNIQUE KEY uk_process(process_instance_id), UNIQUE KEY uk_code(external_code_id),
+    KEY idx_due(tenant_id,approval_status,issue_status,notified,next_attempt_at),
+    KEY idx_applicant(tenant_id,applicant_user_id,id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分兑换码申请';

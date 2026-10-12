@@ -152,6 +152,10 @@ def validate_simple_asset(asset, data):
         allowed = {35, 60}
         if asset.get("requiresTenantRoleConfiguration") is True:
             allowed.add(10)
+        if asset.get("requiresUserConfiguration") is True:
+            allowed.update({30, 37})
+            if strategy == 30 and task.get("candidateParam") not in {None, ""}:
+                fail(f"portable user template must leave user selection empty in {asset['path']}")
         if not task.get("name") or strategy not in allowed:
             fail(f"invalid SIMPLE candidate expression for task {task_id} in {asset['path']}")
         if strategy == 60 and not task.get("candidateParam"):

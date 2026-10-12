@@ -1,19 +1,14 @@
-import { Button, Descriptions, Tabs, Typography } from 'antd'
-import { useState } from 'react'
-import NoticeShareDialog from './NoticeShareDialog'
-import { noticePermission, noticeAudienceText } from '../services/noticeManagement'
+import { Descriptions, Tabs, Typography } from 'antd'
+import { noticeAudienceText } from '../services/noticeManagement'
 import NoticeReadStatistics from './NoticeReadStatistics'
 import { NOTICE_STATUSES, noticeManagement, type ManagedNotice } from '../services/noticeManagement'
 import NoticeAttachments from './NoticeAttachments'
 import DateTimeText from './DateTimeText'
 import SafeRichText from './SafeRichText'
 
-export default function NoticeManagementDetail({ notice, preview = false, permissions = [] }: { notice: ManagedNotice; preview?: boolean; permissions?: string[] }) {
-  const [sharing, setSharing] = useState(false)
+export default function NoticeManagementDetail({ notice, preview = false }: { notice: ManagedNotice; preview?: boolean }) {
   const content = <article className="announcement-detail">
     <Typography.Title level={3}>{notice.title}</Typography.Title>
-    {!preview && notice.publishStatus === 'PUBLISHED' && noticePermission(permissions, 'query') && noticePermission(permissions, 'share') && <Button onClick={() => setSharing(true)}>对外分享</Button>}
-    {sharing && <NoticeShareDialog notice={notice} onClose={() => setSharing(false)} />}
     <Descriptions column={1} size="small" items={[
       { key: 'status', label: '发布状态', children: NOTICE_STATUSES[notice.publishStatus] },
       { key: 'source', label: '文章来源', children: notice.sourceDeptName || '未记录' },

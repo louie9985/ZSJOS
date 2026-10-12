@@ -21,8 +21,10 @@ public class LeadDO extends TenantBaseDO {
     private String submittedMobile;
     private String submittedWechatId;
     private String sourceType;
+    /** Original submission entry, independent of the business acquisition source and later ownership. */
+    private String submissionSourceType;
     private Long sourceUserId;
-    /** 销售自拓时明确关联的新媒体提供方；为空表示未关联。 */
+    /** 销售/教务录单时关联的新媒体提供方；只有明确记录标记为 true 才能解释空值。 */
     private Long sourceProviderUserId;
     private Boolean sourceProviderRecorded;
     private Long sourceDeptId;

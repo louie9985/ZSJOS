@@ -9,6 +9,18 @@ import java.util.List;
 @Data
 public class LeadManagementRespVO {
 
+    private AppealSummaryVO appealSummary;
+
+    @Data
+    public static class AppealSummaryVO {
+        private Long id;
+        private Integer roundNo;
+        private String status;
+        private String reviewStage;
+        private LocalDateTime submittedAt;
+        private boolean canHandle;
+    }
+
     private Long id;
     private Integer version;
     private String leadNo;
@@ -20,12 +32,15 @@ public class LeadManagementRespVO {
     private String sourceLabel;
     private String ownerIdentity;
     private String ownerIdentityLabel;
+    /** Business source subject; media-assisted entry does not identify the actual operator. */
     private Long sourceUserId;
     private String sourceUserName;
     private String partnerOwnerNameSnapshot;
     private String providerOwnerType;
     private Long providerOwnerId;
     private String providerOwnerNameSnapshot;
+    /** Recorded provider relationship, not the employee's current post or role. */
+    private String providerIdentityLabel;
     private Long contributionUserIdSnapshot;
     private String contributionUserNameSnapshot;
     private Long contributionSupervisorUserIdSnapshot;

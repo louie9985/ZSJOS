@@ -19,7 +19,7 @@ public final class PerformanceDetailSql {
     private static String equal(String expression) {
         return "CAST(" + expression + " AS BINARY)=CAST(#{groupKey} AS BINARY)";
     }
-    private static String orderDefinitions(PerformanceDetailQuery q) {
+    static String orderDefinitions(PerformanceDetailQuery q) {
         String result = "orders_base AS (" + scoped(PerformanceFactSql.ORDERS) + ")";
         if (q.getGroupKey() == null || q.getDimension() == null) return result + ", orders AS (SELECT * FROM orders_base)";
         return result + switch (q.getDimension()) {
@@ -29,7 +29,7 @@ public final class PerformanceDetailSql {
             case "contributor" -> ", orders AS (SELECT * FROM orders_base WHERE " + equal("COALESCE(CAST(user_id AS CHAR),'')") + ")";
             case "product" -> ", products AS (" + scoped(PerformanceFactSql.PRODUCTS) + "), product_amounts AS ("
                     + "SELECT lead_id,SUM(amount) amount FROM products WHERE " + equal("CONCAT(COALESCE(CAST(group_key AS CHAR),'unknown'),'|',COALESCE(label,'历史产品名称缺失'))")
-                    + " GROUP BY lead_id), orders AS (SELECT o.id,o.number,o.lead_id,o.source_type,o.source_provider_user_id,o.user_id,o.user_name,"
+                    + " GROUP BY lead_id), orders AS (SELECT o.id,o.number,o.lead_id,o.source_type,o.source_provider_user_id,o.submission_source_type,o.source_provider_recorded,o.provider_owner_type,o.provider_owner_id,o.user_id,o.user_name,"
                     + "o.occurred_at,p.amount,o.order_type,o.received_at,o.assignment_id,o.group_key,o.label,o.channel_code,o.dept_id,o.center_id "
                     + "FROM orders_base o JOIN product_amounts p ON p.lead_id=o.id)";
             default -> ", orders AS (SELECT * FROM orders_base)";

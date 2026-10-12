@@ -45,10 +45,22 @@ class SalesOrderSubmitReqVOValidationTest {
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().contains("paymentVouchers[0].infraFileId")));
     }
 
+    @Test void bothContactsAreRequiredAndWhitespaceIsMissing() {
+        for (String missing : new String[] { null, "", "  " }) {
+            var request=validRequest(); request.setStudentMobile(missing);
+            assertTrue(validator.validate(request).stream().anyMatch(v -> v.getPropertyPath().toString().equals("studentMobile")));
+            request=validRequest(); request.setStudentWechatId(missing);
+            assertTrue(validator.validate(request).stream().anyMatch(v -> v.getPropertyPath().toString().equals("studentWechatId")));
+        }
+        assertTrue(validator.validate(validRequest()).isEmpty());
+    }
+
     private static SalesOrderSubmitReqVO validRequest() {
         SalesOrderSubmitReqVO request = new SalesOrderSubmitReqVO();
         request.setStudentName("测试学员");
         request.setStudentNature("new_student");
+        request.setStudentMobile("13800138000");
+        request.setStudentWechatId("test-wechat");
         request.setProvinceCode("820000");
         request.setProvinceName("澳门特别行政区");
         request.setCityCode("OTHER");

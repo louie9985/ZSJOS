@@ -1,5 +1,11 @@
 # Data and Permission Flow
 
+## Infra 敏感配置与中世健积分兑换码
+
+`infra_config.sensitive` 区分普通参数和加密参数；敏感值使用既有框架加密主密钥保存。仅后端 `ConfigApi` 的运行时读取可以解密，浏览器列表、详情、按键读取及导出不得暴露密钥或密文。修改敏感参数累计要求原有配置写权限和 `infra:config:secret-update`，留空保留旧值，禁止把已有敏感参数改为普通值或改名。Vue 配置管理消费服务端敏感标记，工作台不另建密钥能力。
+
+中世健积分兑换码在租户 1 使用 BPM 公共定义/实例/状态边界，业务记录归 ZSJOS。套餐和操作权限由管理员维护；申请人、审批参与关系及管理权限决定对象范围，管理员读取申请不授予查看他人兑换码明文。见[接口与启用说明](../api/points-redemption.md)。
+
 ## Media student full reads
 
 Media student lists default to the full current-tenant media population when System
@@ -646,7 +652,7 @@ otherwise
        AND lead.owner_user_id is the current user or a currently managed employee
 ```
 
-- `source_user_id` is the original Lead submitter. A later `LeadActivation` submitter
+- `source_user_id` is the business source subject; for media-assisted sales/education entry it is the selected media employee, not the actual recording operator. The original operator comes from recorded events/audit. A later `LeadActivation` submitter
   does not inherit visibility to the existing Lead from the activation alone.
 - A user who is both submitter and owner receives the Lead once, with both relation
   types in the response.
@@ -682,7 +688,7 @@ otherwise
   they currently lead, including child departments.
 - V078 将 V007 的两个固定入口收拢为单一“客资管理”页面，原权限节点保留为隐藏范围能力；不根据角色名、岗位名或前端标签推断数据范围。
 - V121 退役独立“异常客资”页面菜单；挂起与回收待处理客资仍通过统一“客资管理”读取，恢复、转派、回收、释放动作由详情 `availableActions` 返回并在 `lead-action-toolbar` 中展示。后端异常处置 API 与权限标识保留。
-- 教务自拓挂起恢复沿用配置的 `zsjos:subordinate-sales:lead-restore` 权限与原负责人部门管理关系；原负责人资格由教务自拓入口同源校验，恢复不改变负责人及 education 身份。该操作权限不授予全量查询；销售主管跨部门可见性必须检查 `zsjos:lead:query-all` 等实际授权。
+- 教务自拓及教务已接收的兼职指定客资挂起恢复，沿用配置的 `zsjos:subordinate-sales:lead-restore` 权限与原负责人部门管理关系；原负责人账号、部门和人员有效性由教务自拓入口同源校验，恢复不改变负责人及 education 身份。以持久归属为准，不重查当前兼职指定关系，也不要求原负责人仍有接单或自拓创建权限；后续操作仍检查各自权限。该操作权限不授予全量查询；销售主管跨部门可见性必须检查 `zsjos:lead:query-all` 等实际授权。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
 - V195 将“我的订单”和“团队订单”合并为“订单管理”。统一查询使用 `zsjos:sales-order:query-management`，订单提交人集合由 System 数据权限（本人、部门、部门及下属、指定部门或全部）动态解析，多角色范围取并集；旧菜单、角色授权和订单筛选模板迁移后逻辑删除，订单业务记录不改写。
 
@@ -1009,7 +1015,7 @@ Media student partner status reads use the existing media-student query permissi
 
 ## Exact-identity cross-owner repurchase (2026-09-30)
 
-The approved sales/education cross-owner purchase command uses existing sales-order:create and enabled internal personnel checks. Its exact name/contact preflight reveals only the matched customer and masked contact, never a tenant customer listing or other owners’ details. A dedicated repurchase-customer object boundary verifies tenant membership; command execution revalidates the exact supplied identity under the Person lock. The new order belongs to the current submitter; Lead ownership and student service relations remain unchanged. Existing student-repurchase-only access remains scoped to its original entry. See [the order API contract](../api/zsjos-sales-order.md).
+The approved sales/education cross-owner purchase command uses existing sales-order:create and enabled internal personnel checks. Its name/contact preflight reveals only the matched customer and masked contact, never a tenant customer listing or other owners’ details. A dedicated repurchase-customer object boundary verifies tenant membership; execution revalidates identity under the Person lock. Since 2026-10-10, formal order submissions require both contacts: a known matching contact plus the correct name may authorize proposing an unoccupied value for an empty contact. The order transaction fills only empty Person contacts and the explicitly authorized Lead context, using existing identity reservations; preflight and existing-customer drafts do not fill master data. Person-only repurchase never discovers or changes other Leads. This is a constrained order side effect, not a general identity-edit grant. The new order belongs to the current submitter; Lead ownership and student service relations remain unchanged. Existing student-repurchase-only access remains scoped to its original entry. See [the order API contract](../api/zsjos-sales-order.md).
 
 ## 公告对外分享（2026-10-08）
 
@@ -1023,3 +1029,18 @@ System 独立持有公告分享，不依赖 PMS。管理操作同时要求 syste
 ## 主管直接改判有效（2026-10-08）
 
 主管详情支持独立的 `SUPERVISOR_OVERTURN_VALID` 服务端动作，新增 `zsjos:subordinate-sales:lead-overturn-valid` 按钮权限；范围沿用主管部门及子部门，不由全量读取或申诉审批权限扩大。仅无申诉或首轮维持无效的已归属无效客资可处理，事务内重查申诉及判定 token。主管详情其他操作仍按各自权限控制，不因改判变为普通销售编辑入口。见 [接口、数据与验证契约](../api/supervisor-lead-overturn.md)。
+
+
+### Lead source interpretation and conversion (2026-10-10)
+
+The server interprets entry, business source, explicit provider selection and typed formal provider together. No current-role or equal-ID inference is allowed. Confirmed unassisted sales and education Leads are excluded from conversion; unresolved qualifying source facts suspend only their authorized period/scope. Financial metrics remain available. This interpretation is not a replacement for object authorization. Repairing provider relationships can change existing object visibility/assistance and requires scoped verification; no role-menu assignments are changed. See [source repair](../operations/lead-source-conversion-repair.md).
+
+
+## 独立申诉周期（2026-10-12）
+
+本节替代上文按全部历史阻断及全客资最多三轮的旧规则。每次实际判无效事件形成独立周期，
+周期内仍按主管、质控、董事长三轮处理。改判有效后再次判无效从新周期首轮开始；
+旧周期已结束记录不阻断新周期，进行中或无法关联的历史不能被绕过。
+V311 增加申诉周期键及周期内唯一约束；新后端、工作台、H5 必须协调上线，旧提交请求缺少
+判定标识会被拒绝。历史只按已有业务事件关联，原流程及记录不删除。
+完整接口、兼容和验证约定见 [申诉周期契约](../api/zsjos-lead-appeal.md#每次无效判定的独立申诉周期2026-10-12)。

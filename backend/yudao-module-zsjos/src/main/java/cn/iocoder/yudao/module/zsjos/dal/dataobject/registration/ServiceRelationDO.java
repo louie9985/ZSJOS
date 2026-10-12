@@ -19,6 +19,7 @@ public class ServiceRelationDO extends TenantBaseDO {
     /** Explicit collaboration-group boundary; legacy rows are backfilled by V218. */
     private Long collaborationGroupId;
     private Long personId;
+    /** Historical enrollment can own a service without a sale; never create a placeholder order. */
     private Long orderId;
     private Long orderItemId;
     private Long registrationCaseId;

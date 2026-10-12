@@ -39,9 +39,11 @@ public class LeadProviderAttributionService {
     }
 
     private void applySystemUser(LeadDO lead, Long userId) {
-        if (userId == null) return;
+        if (userId == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                cn.iocoder.yudao.module.zsjos.enums.LeadSourceErrorCodes.LEAD_SOURCE_ATTRIBUTION_INVALID);
         AdminUserRespDTO user = adminUserApi.getUser(userId);
-        if (user == null) return;
+        if (user == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                cn.iocoder.yudao.module.zsjos.enums.LeadSourceErrorCodes.LEAD_SOURCE_ATTRIBUTION_INVALID);
         lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER);
         lead.setProviderOwnerId(userId);
         lead.setProviderOwnerNameSnapshot(user.getNickname());

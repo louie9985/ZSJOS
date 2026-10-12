@@ -75,4 +75,15 @@ public class HrmEmployeeChangeRecordRespVO {
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 
+
+    private String state;
+    private Long version;
+    private String operationKey;
+    private String changeMode;
+    private LocalDateTime plannedTime;
+    private LocalDateTime actualTime;
+    private String beforeSnapshot;
+    private String afterSnapshot;
+    private String requestHash;
+
 }

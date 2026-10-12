@@ -12,6 +12,12 @@
       :rules="formRules"
       label-width="112px"
     >
+      <el-form-item label="处理方式"
+        ><el-radio-group v-model="formData.changeMode"
+          ><el-radio value="BUSINESS">记录实际变更</el-radio
+          ><el-radio value="PLAN">保存计划，仅提醒</el-radio></el-radio-group
+        ></el-form-item
+      >
       <el-row :gutter="18">
         <el-col :span="12">
           <el-form-item label="异动原因" prop="reason">
@@ -26,7 +32,10 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="生效日期" prop="effectTime">
+          <el-form-item
+            :label="formData.changeMode === 'PLAN' ? '计划日期' : '实际发生日期'"
+            prop="effectTime"
+          >
             <el-date-picker
               v-model="formData.effectTime"
               class="!w-1/1"
@@ -157,6 +166,9 @@ async function submitForm() {
 function resetForm(row: HrmEmployeeVO) {
   formData.value = {
     employeeId: row.id,
+    version: row.version,
+    operationKey: crypto.randomUUID(),
+    changeMode: 'BUSINESS',
     reason: HrmEmployeeChangeReason.ORGANIZATION_ADJUSTMENT,
     newDeptId: row.deptId,
     newPostName: row.postName,

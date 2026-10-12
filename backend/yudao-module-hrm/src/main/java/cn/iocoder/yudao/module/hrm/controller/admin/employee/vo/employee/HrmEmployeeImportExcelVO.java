@@ -126,12 +126,12 @@ public class HrmEmployeeImportExcelVO {
     @Schema(description = "试用期（月）")
     private Integer probation;
 
-    @ExcelProperty("转正时间")
-    @Schema(description = "转正时间")
+    @ExcelProperty("实际转正日期")
+    @Schema(description = "实际转正日期")
     private LocalDateTime regularTime;
 
-    @ExcelProperty("离职时间")
-    @Schema(description = "离职时间")
+    @ExcelProperty("实际离职日期")
+    @Schema(description = "实际离职日期")
     private LocalDateTime leaveTime;
 
     @ExcelProperty("工作城市")
@@ -207,4 +207,8 @@ public class HrmEmployeeImportExcelVO {
     @Schema(description = "备注")
     private String remark;
 
+    @ExcelProperty("计划转正日期")
+    private LocalDateTime plannedRegularTime;
+    @ExcelProperty("计划离职日期")
+    private LocalDateTime plannedLeaveTime;
 }

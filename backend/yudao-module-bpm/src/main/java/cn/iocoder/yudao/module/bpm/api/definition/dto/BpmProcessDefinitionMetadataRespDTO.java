@@ -15,6 +15,9 @@ public class BpmProcessDefinitionMetadataRespDTO {
     private String category;
     private Long formId;
     private String description;
+    /** Strict unconditional chain including the Simple submission task. */
+    private Boolean mandatoryHumanChain;
+    private List<String> orderedUserTaskKeys;
     private Boolean simpleSequentialApproval;
     private List<BpmUserTaskMetadataRespDTO> userTasks;
 }

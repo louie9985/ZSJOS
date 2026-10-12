@@ -58,6 +58,7 @@
         <el-table-column label="操作" fixed="right" width="350" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="detailRef?.open(scope.row.id)" v-hasPermi="['system:notice:query']">查看</el-button>
+            <el-button v-if="scope.row.publishStatus === 'PUBLISHED' && canShare" link type="primary" :loading="sharingId === scope.row.id" :disabled="sharingId != null" @click="openShare(scope.row)">对外分享</el-button>
             <el-button v-if="scope.row.publishStatus === 'DRAFT'" link type="primary" @click="openEditor(scope.row.id)" v-hasPermi="['system:notice:update']">编辑</el-button>
             <el-button v-if="scope.row.publishStatus === 'DRAFT'" link type="primary" @click="publish(scope.row)" v-hasPermi="['system:notice:publish']">发布</el-button>
             <el-button v-if="scope.row.publishStatus === 'PUBLISHED'" link type="warning" @click="offline(scope.row)" v-hasPermi="['system:notice:offline']">下线</el-button>
@@ -70,6 +71,7 @@
     </ContentWrap>
   </template>
   <NoticeDetail ref="detailRef" />
+  <NoticeShareDialog v-if="sharing && canShare" :notice="sharing" @close="sharing = undefined" />
 </template>
 
 <script lang="ts" setup>
@@ -78,12 +80,17 @@ import { dateFormatter } from '@/utils/formatTime'
 import * as NoticeApi from '@/api/system/notice'
 import NoticeEditor from './NoticeEditor.vue'
 import NoticeDetail from './NoticeDetail.vue'
+import NoticeShareDialog from './NoticeShareDialog.vue'
+import { checkPermi } from '@/utils/permission'
 
 defineOptions({ name: 'SystemNotice' })
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const detailRef = ref<InstanceType<typeof NoticeDetail>>()
+const sharing = ref<NoticeApi.NoticeVO>()
+const sharingId = ref<number>()
+const canShare = computed(() => checkPermi(['system:notice:query']) && checkPermi(['system:notice:share']))
 const loading = ref(false)
 const list = ref<NoticeApi.NoticeVO[]>([])
 const total = ref(0)
@@ -109,6 +116,16 @@ const getList = async () => {
   } finally { loading.value = false }
 }
 const handleQuery = () => { queryParams.pageNo = 1; getList() }
+const openShare = async (row: NoticeApi.NoticeVO) => {
+  if (sharingId.value != null || !canShare.value || row.publishStatus !== 'PUBLISHED') return
+  sharingId.value = row.id
+  try {
+    const notice = await NoticeApi.getNotice(row.id!)
+    if (notice.publishStatus !== 'PUBLISHED') { void getList(); throw new Error('公告状态已变化，只有已发布公告可以对外分享') }
+    sharing.value = notice
+  } catch (cause) { message.error(cause instanceof Error ? cause.message : '公告加载失败，请重试') }
+  finally { sharingId.value = undefined }
+}
 const resetQuery = () => { queryFormRef.value?.resetFields(); handleQuery() }
 const openEditor = (id?: number) => router.push({ query: { ...route.query, action: 'edit', id: id ? String(id) : undefined } })
 const closeEditor = async () => { await router.push({ query: {} }); await getList() }

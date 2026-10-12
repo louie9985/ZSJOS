@@ -96,7 +96,20 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="试用期/状态" min-width="150">
+        <el-table-column label="员工状态" min-width="140"
+          ><template #default="{ row }"
+            ><el-select v-model="row.status" placeholder="请选择员工状态"
+              ><el-option
+                v-for="item in getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
+                  row.type === HrmEmployeeType.FORMAL
+                    ? [1, 2].includes(Number(item.value))
+                    : [3, 4, 5, 6, 7, 8].includes(Number(item.value))
+                )"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value" /></el-select></template
+        ></el-table-column>
+        <el-table-column label="试用期（月）" min-width="150">
           <template #default="{ row }">
             <el-input-number
               v-if="row.type === HrmEmployeeType.FORMAL"
@@ -106,18 +119,6 @@
               controls-position="right"
               class="!w-1/1"
             />
-            <el-select v-else v-model="row.status" class="!w-1/1" placeholder="请选择状态">
-              <el-option
-                v-for="item in getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
-                  (HRM_EMPLOYEE_NON_FORMAL_STATUSES as readonly number[]).includes(
-                    Number(item.value)
-                  )
-                )"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="70" fixed="right">
@@ -144,11 +145,7 @@ import type { HrmEmployeeCreateFromUserReqVO } from '@/api/hrm/employee'
 import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
 import DeptSelect from '@/views/system/dept/components/DeptSelect.vue'
 import HrmEmployeeSelect from './components/HrmEmployeeSelect.vue'
-import {
-  HRM_EMPLOYEE_NON_FORMAL_STATUSES,
-  HrmEmployeeStatus,
-  HrmEmployeeType
-} from '@/views/hrm/utils/constants'
+import { HrmEmployeeType } from '@/views/hrm/utils/constants'
 
 defineOptions({ name: 'HrmEmployeeCreateFromUserForm' })
 
@@ -224,7 +221,7 @@ function handleTypeChange(row: EmployeeRow) {
     row.probation = row.probation ?? 0
   } else {
     row.probation = undefined
-    row.status = row.status ?? HrmEmployeeStatus.INTERN
+    row.status = undefined
   }
 }
 

@@ -8,7 +8,8 @@
 
 | 场景 | 普通 GET | 高级筛选 POST |
 | --- | --- | --- |
-| 我的学员 | `/zsjos/student/my-page` | `/zsjos/student/my/search-page` |
+| 我的学员（`/zsjos/my-students`） | `/zsjos/student/my-page` | `/zsjos/student/my/search-page` |
+| 我的学员（`/zsjos/media-students`） | `/zsjos/media-students/page` | `/zsjos/media-students/search-page` |
 | 订单管理分页 | `/zsjos/sales-order/management-page` | `/zsjos/sales-order/management-search-page` |
 | 订单管理卡片 | `/zsjos/sales-order/management-cursor` | `/zsjos/sales-order/management-search-cursor` |
 | 返现管理 | `/zsjos/cashback/page` | `/zsjos/cashback/search-page` |
@@ -19,6 +20,7 @@
 ## 字段与比较规则
 
 - 学员：`name`、`leadNo`、`mobile`、`wechatId`、`className`、`courses`、`serviceStatus`、`orderNos`、`activatedAt`。
+- 媒体学员（2026-10-09 补齐）：`name`（学员姓名）、`personNo`（学员编号）、`operators`（当前运营）、`accounts`（账号名称）、`platforms`（平台）、`activatedAt`（激活时间）。运营按卡片顺序按用户去重后拼接姓名；账号按完整卡片顺序拼接，同平台同名或未命名账号包含显示的业务账号编号；平台使用账号历史标签快照。无运营/无可见账号为空值，排最后。账号授权投影先于排序，隐藏账号不参与比较。
 - 订单：共享订单表格所有 `dataIndex` 业务字段；地区渲染列使用 `orderRegion`、`leadRegion`。包括审批轮次、当前审批节点/结果、主管确认、人员快照、学员资料、产品、金额、备注、时间及审批意见；操作列不排序。实际白名单由 `OrderListSort` 明确声明，不能通过任意响应属性访问或 SQL 拼接扩展。
 - 返现：`cashbackNo`、`beneficiaryName`、`partnerName`、`type`、`customer`、`source`、`productNameSnapshot`、`baseAmount`、`rateSnapshot`、`amount`、`status`、`generatedAt`、`availableAt`。
 - 提现：`withdrawalNo`、`applicantName`、`partnerName`、`cashbackCount`、`applicationAmount`、`status`、`accountNameSnapshot`、`cardNumber`、`bankNameSnapshot`、`submittedAt`、`reviewedAt`。
@@ -40,5 +42,7 @@
 ## 工作台交互与验证
 
 列头循环升序、降序、取消排序；学员与订单的表格/卡片共用排序状态和排序菜单。排序变化回到第一页、清理已加载卡片和跨页勾选，旧请求不能覆盖新选择；翻页/筛选/刷新保留排序，切换展示方式也保留。刷新浏览器或重新进入页面恢复默认排序。
+
+`/zsjos/media-students` 的排序按钮位于页面顶部、刷新按钮左侧，列表收起时仍可操作；此页面是独立媒体卡片列表，不是 `/zsjos/my-students` 的表格模式。排序遵守既有编辑离开检查，回到第一批并清空已加载卡片；无限滚动、服务期/运营/高级筛选及刷新均保留排序。既有 Vue Admin 调用不传排序参数时仍走原路径、返回原响应与默认顺序。媒体页面专项验证：`test/media-student-sorting.html`、`test/media-student-sorting-browser.py`、`MediaStudentListSortTest` 与 `MediaStudentServiceTest`。
 
 验证入口：后端 `service/sorting/*Test`，前端 `src/services/businessListSort.test.ts`，真实页面浏览器夹具 `test/business-list-sorting.html` 与 `test/business-list-sorting-browser.py`。浏览器通过 `SORT_TEST_BASE` 指向任务自有 Vite 实例，数据仅为隔离测试数据，不写业务库。另验证既有 Admin 请求模块不传新增参数时仍使用原路径和响应。

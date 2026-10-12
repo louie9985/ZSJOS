@@ -85,17 +85,18 @@ public class HrmEmployeeCreateFromUserReqVO {
         return ObjUtil.notEqual(HrmEmployeeTypeEnum.FORMAL.getType(), type) || probation != null;
     }
 
-    @AssertTrue(message = "非正式员工状态不能为空")
+    @AssertTrue(message = "员工状态不能为空")
     @JsonIgnore
     public boolean isStatusRequired() {
-        return ObjUtil.notEqual(HrmEmployeeTypeEnum.INFORMAL.getType(), type) || status != null;
+        return status != null;
     }
 
     @AssertTrue(message = "员工状态与聘用形式不匹配")
     @JsonIgnore
     public boolean isStatusValid() {
-        return ObjUtil.notEqual(HrmEmployeeTypeEnum.INFORMAL.getType(), type)
-                || status == null || HrmEmployeeStatusEnum.INFORMAL_STATUSES.contains(status);
+        return status == null || (HrmEmployeeTypeEnum.FORMAL.getType().equals(type)
+                ? HrmEmployeeStatusEnum.FULL_TIME_STATUSES.contains(status)
+                : HrmEmployeeStatusEnum.INFORMAL_STATUSES.contains(status));
     }
 
 }

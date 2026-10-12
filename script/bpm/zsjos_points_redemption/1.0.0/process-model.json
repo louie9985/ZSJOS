@@ -1,0 +1,145 @@
+{
+  "key": "zsjos_points_redemption",
+  "name": "积分兑换码审批",
+  "category": "general-module",
+  "description": "每次申请一个兑换码，部门上级与董事长人工审批。导入后必须在终审节点选择董事长。",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/zsjos/points-redemption",
+  "formCustomViewPath": "/zsjos/points-redemption",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "supervisorReview",
+      "type": 11,
+      "name": "上级审批",
+      "showText": "发起人部门负责人",
+      "candidateStrategy": 37,
+      "approveType": 1,
+      "approveMethod": 1,
+      "fieldsPermission": [],
+      "buttonsSetting": [
+        {
+          "id": 1,
+          "displayName": "通过",
+          "enable": true
+        },
+        {
+          "id": 2,
+          "displayName": "拒绝",
+          "enable": true
+        },
+        {
+          "id": 3,
+          "displayName": "转办",
+          "enable": false
+        },
+        {
+          "id": 4,
+          "displayName": "委派",
+          "enable": false
+        },
+        {
+          "id": 5,
+          "displayName": "加签",
+          "enable": false
+        },
+        {
+          "id": 6,
+          "displayName": "退回",
+          "enable": false
+        }
+      ],
+      "signEnable": false,
+      "reasonRequire": true,
+      "rejectHandler": {
+        "type": 1
+      },
+      "assignEmptyHandler": {
+        "type": 2
+      },
+      "assignStartUserHandlerType": 1,
+      "childNode": {
+        "id": "chairmanReview",
+        "type": 11,
+        "name": "董事长终审",
+        "showText": "请配置董事长用户",
+        "candidateStrategy": 30,
+        "approveType": 1,
+        "approveMethod": 1,
+        "fieldsPermission": [],
+        "buttonsSetting": [
+          {
+            "id": 1,
+            "displayName": "通过",
+            "enable": true
+          },
+          {
+            "id": 2,
+            "displayName": "拒绝",
+            "enable": true
+          },
+          {
+            "id": 3,
+            "displayName": "转办",
+            "enable": false
+          },
+          {
+            "id": 4,
+            "displayName": "委派",
+            "enable": false
+          },
+          {
+            "id": 5,
+            "displayName": "加签",
+            "enable": false
+          },
+          {
+            "id": 6,
+            "displayName": "退回",
+            "enable": false
+          }
+        ],
+        "signEnable": false,
+        "reasonRequire": true,
+        "rejectHandler": {
+          "type": 1
+        },
+        "assignEmptyHandler": {
+          "type": 2
+        },
+        "assignStartUserHandlerType": 1,
+        "childNode": {
+          "id": "EndEvent",
+          "type": 1,
+          "name": "结束"
+        },
+        "candidateParam": ""
+      },
+      "candidateParam": "1"
+    }
+  }
+}

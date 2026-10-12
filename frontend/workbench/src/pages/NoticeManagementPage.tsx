@@ -5,6 +5,7 @@ import BusinessTable from '../components/BusinessTable'
 import DateTimeText from '../components/DateTimeText'
 import NoticeEditorDialog from '../components/NoticeEditorDialog'
 import NoticeManagementDetail from '../components/NoticeManagementDetail'
+import NoticeShareDialog from '../components/NoticeShareDialog'
 import { ApiError } from '../services/api'
 import { noticeActions, noticeManagement, noticePermission, NOTICE_STATUSES, type ManagedNotice, type NoticeStatus } from '../services/noticeManagement'
 
@@ -21,11 +22,13 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
   const [detailError, setDetailError] = useState('')
   const [detailLoading, setDetailLoading] = useState(false)
   const [editor, setEditor] = useState<{ initial?: ManagedNotice }>()
+  const [sharing, setSharing] = useState<ManagedNotice>()
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
   const generation = useRef(0)
   const detailGeneration = useRef(0)
   const allowed = noticePermission(permissions, 'query')
+  const canShare = allowed && noticePermission(permissions, 'share')
   const load = useCallback(async () => {
     const request = ++generation.current
     if (!allowed) { setRows([]); setLoading(false); setUnauthorized(true); return }
@@ -41,6 +44,16 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
     try { const item = await noticeManagement.get(id); if (request === detailGeneration.current) setDetail(item) }
     catch (cause) { if (request === detailGeneration.current) setDetailError(cause instanceof Error ? cause.message : '公告详情加载失败') }
     finally { if (request === detailGeneration.current) setDetailLoading(false) }
+  }
+  const openShare = async (row: ManagedNotice) => {
+    if (busyRef.current || !canShare || row.publishStatus !== 'PUBLISHED') return
+    busyRef.current = true; setBusy(true)
+    try {
+      const item = await noticeManagement.get(row.id)
+      if (item.publishStatus !== 'PUBLISHED') { void load(); throw new Error('公告状态已变化，只有已发布公告可以对外分享') }
+      setSharing(item)
+    } catch (cause) { void message.error(cause instanceof Error ? cause.message : '公告加载失败，请重试') }
+    finally { busyRef.current = false; setBusy(false) }
   }
   const act = async (row: ManagedNotice, action: 'edit' | 'publish' | 'offline' | 'copy' | 'delete') => {
     if (busyRef.current || !noticeActions(permissions, row.publishStatus)[action]) return
@@ -76,6 +89,7 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
         { title: '高亮截止时间', dataIndex: 'highlightUntil', render: (_, row) => <DateTimeText value={row.highlightUntil} /> },
         { title: '操作', key: 'action', width: 300, fixed: 'right', hideInSetting: true, render: (_, row) => { const actions = noticeActions(permissions, row.publishStatus); return <Space wrap size={0}>
           <Button type="link" onClick={() => void view(row.id)}>查看</Button>
+          {canShare && row.publishStatus === 'PUBLISHED' && <Button type="link" disabled={busy} onClick={() => void openShare(row)}>对外分享</Button>}
           {actions.edit && <Button type="link" disabled={busy} onClick={() => void act(row, 'edit')}>编辑</Button>}
           {actions.publish && <Button type="link" disabled={busy} onClick={() => void act(row, 'publish')}>发布</Button>}
           {actions.offline && <Button type="link" disabled={busy} onClick={() => void act(row, 'offline')}>下线</Button>}
@@ -84,8 +98,9 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
         </Space> } }
       ]} />
     <Modal open={detailId != null} title="公告详情" width={800} footer={null} onCancel={() => { detailGeneration.current++; setDetailId(undefined); setDetail(undefined) }}>
-      {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId != null && void view(detailId)}>重试</Button>} /> : detail && <NoticeManagementDetail notice={detail} permissions={permissions} />}
+      {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId != null && void view(detailId)}>重试</Button>} /> : detail && <NoticeManagementDetail notice={detail} />}
     </Modal>
+    {sharing && canShare && <NoticeShareDialog notice={sharing} onClose={() => setSharing(undefined)} />}
     {editor && <NoticeEditorDialog initial={editor.initial} permissions={permissions} onClose={() => setEditor(undefined)} onChanged={() => void load()} />}
   </>
 }

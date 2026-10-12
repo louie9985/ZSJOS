@@ -210,4 +210,17 @@ public class HrmEmployeeDO extends BaseDO {
      */
     private String remark;
 
+
+    private LocalDateTime plannedRegularTime;
+    private LocalDateTime plannedLeaveTime;
+    private Long version;
+    private String typeLabel;
+    private String statusLabel;
+    private String entryStatusLabel;
+    private String legacyDateSource;
+
+
+    private LocalDateTime legacyRegularTime;
+    private LocalDateTime legacyLeaveTime;
+
 }

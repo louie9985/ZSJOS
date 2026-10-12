@@ -12,20 +12,24 @@ type Props = {
 }
 
 export default function ExamCalendarMonth({ anchor, exactRows, multiDayRows, onDay, statusLabel }: Props) {
-  const { start } = calendarWindow(anchor)
+  const range = calendarWindow(anchor)
+  const start = range.start.startOf('week')
+  const weekCount = Math.ceil((range.end.diff(start, 'day') + 1) / 7)
   const today = dayjs().format('YYYY-MM-DD')
   const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' })
   return <div className="exam-month" aria-label={anchor.format('YYYY年M月') + '考期月历'}>
     <div className="exam-month-weekdays" aria-hidden="true">{Array.from({ length: 7 }, (_, i) =>
       <span key={i}>{weekday.format(start.add(i, 'day').toDate())}</span>)}</div>
-    {Array.from({ length: 6 }, (_, week) => {
+    {Array.from({ length: weekCount }, (_, week) => {
       const weekStart = start.add(week * 7, 'day')
-      const { segments, laneCount } = layoutMultiDayWeek(multiDayRows, weekStart)
+      const { segments, laneCount } = layoutMultiDayWeek(multiDayRows, weekStart, range)
       return <div key={week} className="exam-month-week" style={{ gridTemplateRows: '36px ' + (laneCount ? 'repeat(' + laneCount + ', minmax(30px, auto)) ' : '') + 'minmax(74px, auto)' }}>
         {Array.from({ length: 7 }, (_, column) => {
           const date = weekStart.add(column, 'day'), key = date.format('YYYY-MM-DD')
+          // Empty grid positions preserve weekday alignment without exposing adjacent months.
+          if (!date.isSame(anchor, 'month')) return null
           const rows = exactRows.filter(row => coversExamDay(row, key))
-          return <div key={key} className={'exam-month-day' + (date.isSame(anchor, 'month') ? '' : ' is-adjacent') + (key === today ? ' is-today' : '')}
+          return <div key={key} className={'exam-month-day' + (key === today ? ' is-today' : '')}
             data-date={key} onClick={() => onDay(date)} style={{ gridColumn: column + 1, gridRow: '1 / ' + (laneCount + 3) }}>
             <button type="button" className="exam-month-date" aria-label={date.format('YYYY年M月D日') + '考期安排'}
               aria-current={key === today ? 'date' : undefined} onClick={event => { event.stopPropagation(); onDay(date) }}>{date.date()}</button>

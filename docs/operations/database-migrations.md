@@ -344,19 +344,98 @@ bash deploy/production/zsjos-db migrate production
 bash deploy/production/zsjos-db verify production
 ```
 
-`plan` is read-only. `migrate` obtains the migration lock, creates a timestamped
-logical backup, validates applied checksums, executes pending migrations in module
+`plan` is read-only and exits nonzero with `Status: BLOCKED` for checksum,
+schema, or known private-evidence prerequisites. `migrate` validates the batch
+before writing, obtains the migration lock, rechecks prerequisites, creates a timestamped
+logical backup, executes pending migrations in module
 order, records each successful version, and runs verification. Any unexplained
 schema drift, checksum mismatch, SQL failure, or verification failure blocks the
 application release.
 
-The authoritative `checksum` value is the SHA-256 of the migration file's bytes. Many
-older migrations self-register `SHA2(file name)` or a literal, and the runner corrects
-those on the next apply; rows seeded by the bootstrap with release `legacy`/`baseline`
-are exempt and keep their seeded values, which the verifiers assert against. To audit a
-database against the convention without changing it, run `zsjos-db reconcile <env>`;
-add `--apply` to correct the runner-written rows. See
+The authoritative runner `checksum` value is the SHA-256 of the migration file's bytes.
+After a pending migration succeeds, the runner records that file hash. It does not
+automatically rewrite previously applied checksums before validation. Rows seeded
+with release `legacy`/`baseline` retain the established compatibility exemption;
+that exemption is not proof that a later development revision was applied. To audit a
+database against the convention without changing it, run `zsjos-db reconcile <env>`.
+Using `--apply` requires separate review of the exact changed artifacts and target
+ledger rows; never use it merely to bypass a failed migration guard. See
 `script/sql/mysql/migrations/README.md` for the full rule.
+
+### Replaying V296–V310 from a GUI client
+
+Do not select all historical SQL files as a database synchronization operation.
+Use `./zsjos-db.ps1 plan <environment>` and then `./zsjos-db.ps1 migrate <environment>`
+with the reviewed connection/module configuration (Unix: `./zsjos-db`). The runner
+discovers migrations in order, skips installed versions for normal upgrades, and
+stops on the first SQL error. A blocked plan must be resolved before migration.
+The Windows subprocess input/output and the MySQL connection explicitly use UTF-8.
+
+The local-development replay correction on 2026-10-11 distinguishes verified
+completion from data recovery. V298/V301/V303 after V309 require complete version
+records and validate their business postconditions before returning without writes.
+V298 accepts education-owned media sources only when V309's recorded result supports
+that source and subject. V299 validates the V300 historical label mapping and its
+per-order evidence, so it no longer clears 18 completed payment values for V300 to
+refill. No dictionary choices are added or re-resolved from current labels.
+
+V304/V306 first retain their target/relationship/ownership checks, require complete
+repair evidence, and compare the fields each migration owns. When those fields
+already match, unrelated version/audit/remark or other snapshot changes are preserved
+by a zero-write return. A changed owned field still enters the original strict
+before/after recovery checks; partial recovery never gets the looser completion path.
+
+V305 with both success ledgers verifies its persisted private-plan receipt, operation
+counts, paired update images, inserted rows, target identity and actual stored fields.
+It reconstructs the recorded V306/V307/V308/V309 changes in order, requiring complete
+later ledgers, paired evidence and matching predecessor values. Nested JSON and arrays
+are compared exactly. Only audit/version fields and schema fields added after the
+original V305 snapshot are outside the original business comparison. It never executes
+those later changes again. Missing evidence or an unexplained current change fails.
+The finalizer independently rechecks preparation prerequisites and completion;
+continuing after a failed prepare cannot register success on an empty target.
+
+First-time V305 on a database with target orders still requires the reviewed private
+plan and its dedicated executor: see [order history repair](order-history-repair.md).
+Old private plans remain evidence, not permission to overwrite later changes; a
+changed SQL fingerprint requires reviewed recovery, not editing the saved plan hash.
+If V305 is pending, the runner
+detects this known requirement before executing earlier pending migrations. The SQL
+still enforces the final check; do not manually set its executor/verification variables.
+
+Normal upgrade skipping does not verify an interrupted repair. After a failed GUI
+batch, inspect both version ledgers, actual affected structures and business state,
+and the repair evidence. Later migrations may already have committed even if an
+earlier file failed. A partial repair or revised development script requires its
+scoped recovery/revision procedure; do not delete ledger rows to force replay.
+The seven revised development SQL files are V298/V299/V301/V303/V304/V305/V306.
+`tools/generate_repair_replay_guards.py` reproducibly embeds the guards so each file
+can execute directly without a new prerequisite procedure, SOURCE include or Python
+runtime. V299's guard is generated from V300's already-reviewed historical mapping.
+Original first-application paths remain; no new numbered migration is added. This
+development correction does not authorize rewriting deployed checksums or replaying
+against production. Keep both ledgers and original private evidence. Reverting the
+source restores old rejection behavior, with no business-data rollback required.
+
+Use ascending version order for new installations. The exact out-of-order GUI sequence
+in the incident is supported only as a verified replay of an already-completed database;
+it is not a new installation order. A real conflict still requires stopping the batch.
+
+Verification: `python -m unittest discover -s script/sql/mysql/tools -p test_migration_execution.py`
+and `python script/sql/mysql/tools/test_migration_execution.py --mysql`. The latter
+uses the existing local MySQL container, retains an isolated fixture schema, and checks
+initial execution, first-error stop, missing success records, recovery, replay, checksum
+preservation, V305 evidence rejection and Chinese UTF-8 HEX. It is scoped runner
+verification, not full fresh/upgrade-chain release acceptance.
+
+The SQL replay suite is `python -B script/sql/mysql/tools/test_repair_replay.py`.
+It retains scoped MySQL copies, preserves DEFAULT_GENERATED timestamps when copying,
+replays the incident's 15 files twice with continue-on-error enabled, and compares full
+business/evidence/ledger SHA-256 values. It also injects missing evidence/ledgers and
+business conflicts, verifies no writes after rejection, and covers V305 empty first/repeat
+and failed-prepare registration plus V306 first application, second-ledger failure,
+recovery and later-version preservation. V304's first/repeat/recovery/concurrency and
+failure matrix remains `python -B script/sql/mysql/tools/test_legacy_lead_deal_reconcile.py`.
 
 Database DDL is not automatically rolled back. If application startup fails after
 a compatible migration, roll back the application image and keep the schema.

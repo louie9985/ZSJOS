@@ -20,5 +20,8 @@ public class HrmEmployeeRespDTO {
     private Integer status;
     private LocalDateTime entryTime;
     private LocalDateTime leaveTime;
+    private LocalDateTime plannedLeaveTime;
+    private LocalDateTime regularTime;
+    private LocalDateTime plannedRegularTime;
 
 }

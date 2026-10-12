@@ -8,7 +8,7 @@ import '../styles/pages/exam-calendar-note.css'
 
 const RichTextEditor = lazy(() => import('./ConfigurableRichTextEditor'))
 const NOTE_TITLE = '日历说明'
-export default function ExamCalendarNotePanel({ canRead, canManage }: { canRead: boolean; canManage: boolean }) {
+export default function ExamCalendarNotePanel({ canRead, canManage, refreshVersion = 0 }: { canRead: boolean; canManage: boolean; refreshVersion?: number }) {
   const [note, setNote] = useState<ExamCalendarNote>()
   const [loading, setLoading] = useState(false), [loadError, setLoadError] = useState('')
   const [viewing, setViewing] = useState(false), [editing, setEditing] = useState(false), [preview, setPreview] = useState(false)
@@ -26,7 +26,7 @@ export default function ExamCalendarNotePanel({ canRead, canManage }: { canRead:
     catch (cause) { if (request === requests.current) setLoadError(cause instanceof Error ? cause.message : '说明加载失败') }
     finally { if (request === requests.current) setLoading(false) }
   }, [canRead])
-  useEffect(() => { void load(); return () => { requests.current++ } }, [load])
+  useEffect(() => { void load(); return () => { requests.current++ } }, [load, refreshVersion])
   const openEditor = () => {
     if (!note) return
     imageRegistry.current = [...note.images]

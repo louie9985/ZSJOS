@@ -622,4 +622,18 @@ class LeadDispatchServiceImplTest {
                 "education".equals(history.getOwnerIdentitySnapshot()) && history.getReason().contains("教务")));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"sales_self_sourced,sales", "education_self_sourced,education"})
+    void assistedMediaKeepsEntryOwnerAndNormalTasks(String entry,String owner) {
+        var lead=new LeadDO().setId(1L).setSourceType("internal_new_media").setSubmissionSourceType(entry)
+                .setSourceUserId(20L).setDispatchMode("self").setStatus("submitted");
+        doAnswer(call->{call.getArgument(0,LeadAssignmentHistoryDO.class).setId(91L);return 1;})
+                .when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+        service.start(lead,10L,10L);
+        assertEquals(owner,lead.getOwnerIdentity()); assertEquals(10L,lead.getOwnerUserId());
+        assertEquals(20L,lead.getSourceUserId()); assertEquals("owned",lead.getAssignmentStatus());
+        verify(lifecycleTaskService).createQualificationTask(eq(lead),eq(10L),any());
+        verify(assignmentService,never()).getEligibleSalesUsers();
+    }
+
 }

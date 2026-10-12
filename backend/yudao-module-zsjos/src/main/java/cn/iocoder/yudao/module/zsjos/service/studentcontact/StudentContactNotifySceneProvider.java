@@ -49,7 +49,7 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
     @Override
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         ServiceRelationDO relation = relationMapper.selectById(event.getBizId());
-        SalesOrderDO order = relation == null ? null : orderMapper.selectById(relation.getOrderId());
+        SalesOrderDO order = relation == null || relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
         LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Map<String, Object> variables = new LinkedHashMap<>();

@@ -79,6 +79,7 @@ def run(command: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = No
         env=env,
         input=input_text,
         text=True,
+        encoding="utf-8",
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
         check=False,
@@ -544,6 +545,33 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
     return pending
 
 
+def migration_preflight(
+    client: MysqlClient, manifests: dict[str, dict],
+) -> tuple[list[Migration], list[str]]:
+    """Read-only batch checks; never repair a ledger to make a plan executable."""
+    installed = installed_versions(client)
+    blockers: list[str] = []
+    try:
+        pending = pending_migrations(manifests, installed)
+    except CommandError as error:
+        blockers.append(str(error))
+        pending = _migrations_not_installed(manifests, installed)
+    if any(item.module == "core" and item.version == "V305" for item in pending):
+        # V305's SQL owns the final guard. Check its evidence requirement before
+        # earlier migrations can commit; empty installations still use normal SQL.
+        if client.table_exists("zsjos_order") and client.query(
+            "SELECT EXISTS(SELECT 1 FROM zsjos_order WHERE tenant_id=1 AND deleted=0 "
+            "AND status='effective' AND COALESCE(creator,'') NOT IN "
+            "('seed-liudandan','seed-students','seed-llyilin','seed-batch4'))"
+        ).strip() == "1":
+            blockers.append(
+                "V305 requires reviewed private evidence: use order_history_repair.py "
+                "following docs/operations/order-history-repair.md, then rerun plan. "
+                "Do not set executor/verification variables manually."
+            )
+    return pending, blockers
+
+
 def fk_rules_equivalent(
     expected: tuple[tuple[str, ...], str, tuple[str, ...], str, str],
     actual: tuple[tuple[str, ...], str, tuple[str, ...], str, str],
@@ -879,13 +907,7 @@ def print_plan(environment: str, *, allow_pending_drift: bool = True) -> tuple[M
     manifests = enabled_manifests(environment)
     client = MysqlClient(db_config(environment))
     installed = installed_versions(client)
-    try:
-        pending = pending_migrations(manifests, installed)
-    except CommandError as error:
-        # A checksum mismatch is reported by the caller (migrate/verify) as a hard
-        # failure; `plan` stays readable so an operator can see the full picture.
-        info(f"Checksum guard: {error}")
-        pending = _migrations_not_installed(manifests, installed)
+    pending, blockers = migration_preflight(client, manifests)
     info("Current module versions:")
     for code in module_order(manifests):
         versions = sorted(version for module, version in installed if module == code)
@@ -903,14 +925,21 @@ def print_plan(environment: str, *, allow_pending_drift: bool = True) -> tuple[M
     if unexplained:
         for item in unexplained:
             info(f"  {item}")
-        info("Status: BLOCKED")
     else:
         info("  None")
+    info("Migration preflight blockers:")
+    for item in blockers:
+        info(f"  {item}")
+    if not blockers:
+        info("  None")
+    if unexplained or blockers:
+        info("Status: BLOCKED")
+    else:
         if empty_database:
             info("Status: FRESH BOOTSTRAP REQUIRED")
         else:
             info("Status: READY" if not pending else "Status: MIGRATIONS PENDING")
-    return client, pending, unexplained
+    return client, pending, unexplained + blockers
 
 
 def record_migration(client: MysqlClient, migration: Migration) -> None:
@@ -1069,21 +1098,21 @@ def migrate_database(environment: str) -> None:
     manifests = enabled_manifests(environment)
     client, pending, unexplained = print_plan(environment)
     if unexplained:
-        fail("Migration is blocked by unexpected schema drift")
+        fail("Migration is blocked by unexpected schema drift or migration preflight")
     with MigrationLock(client):
+        pending, blockers = migration_preflight(client, manifests)
+        if blockers:
+            fail("Migration preflight failed before backup or execution:\n" + "\n".join(blockers))
         backup = client.backup()
         info(f"Backup created: {backup}")
         if client.table_count() == 0:
             info("Empty database detected; applying the reviewed fresh bootstrap.")
             client.execute_file(SQL_ROOT / "bootstrap.sql")
-        # The bootstrap seed and older migrations register their own checksum rows
-        # (filename hash or literal). Rewrite every row to the file-bytes hash before
-        # the guard runs, so the ledger always carries one authoritative value and a
-        # genuine edit to an applied migration is still caught by pending_migrations.
-        fixed = reconcile_checksums(client, manifests, apply=True)
-        if fixed:
-            info(f"Normalized {len(fixed)} recorded checksum(s) to the file-bytes hash.")
-        pending = pending_migrations(manifests, installed_versions(client))
+        # Recheck after bootstrap. Existing checksums are evidence, not values to
+        # normalize automatically; explicit reconciliation needs separate review.
+        pending, blockers = migration_preflight(client, manifests)
+        if blockers:
+            fail("Migration preflight failed:\n" + "\n".join(blockers))
         for migration in pending:
             info(f"Applying {migration.module}/{migration.path.name}")
             client.execute_file(migration.path)

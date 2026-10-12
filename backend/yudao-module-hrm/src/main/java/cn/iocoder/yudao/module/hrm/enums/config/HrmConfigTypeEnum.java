@@ -21,7 +21,8 @@ public enum HrmConfigTypeEnum implements ArrayValuable<Integer> {
     EMPLOYEE_CREATE_PENDING_FIELD(3, "新建待入职员工字段"),
     EMPLOYEE_ARCHIVE_FIELD(4, "员工档案字段"),
     BIRTHDAY_CARE(5, "员工生日关怀"),
-    EMPLOYEE_REMINDER(6, "员工提醒");
+    EMPLOYEE_REMINDER(6, "员工提醒"),
+    LIFECYCLE_REMINDER(7, "人事到期提醒");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(HrmConfigTypeEnum::getType).toArray(Integer[]::new);

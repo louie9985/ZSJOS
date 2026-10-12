@@ -34,6 +34,23 @@ api.courseCalendar.page = async q => {
   await request(q.rangeStart!, q.rangeEnd!)
   return scenario === 'empty' ? [] : [{ id: 1, courseName: '验证课程 ' + q.rangeStart?.slice(0, 10), startTime: dayjs(q.rangeStart).add(10, 'day').hour(9).format('YYYY-MM-DDTHH:mm:ss'), endTime: dayjs(q.rangeStart).add(10, 'day').hour(10).format('YYYY-MM-DDTHH:mm:ss'), courseFormLabelSnapshot: '验证课程形式' }] as Awaited<ReturnType<typeof api.courseCalendar.page>>
 }
+// Dense same-day fixtures exercise complete titles and content-driven month rows.
+if (scenario === 'dense' || scenario === 'single') {
+  const count = scenario === 'dense' ? 8 : 1
+  const title = '完整日程标题：宁波人社职业技能等级公共营养师考试安排与准备事项ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  api.personalCalendar.list = async q => {
+    await request(q.rangeStart, q.rangeEnd)
+    return Array.from({ length: count }, (_, i) => ({ id: i + 1, title: `${title} ${i + 1}`,
+      startTime: dayjs(q.rangeStart).add(10, 'day').hour(9).format('YYYY-MM-DDTHH:mm:ss'),
+      endTime: dayjs(q.rangeStart).add(10, 'day').hour(10).format('YYYY-MM-DDTHH:mm:ss'), allDay: false })) as Awaited<ReturnType<typeof api.personalCalendar.list>>
+  }
+  api.courseCalendar.page = async q => {
+    await request(q.rangeStart!, q.rangeEnd!)
+    return Array.from({ length: count }, (_, i) => ({ id: i + 1, courseName: `${title} ${i + 1}`,
+      startTime: dayjs(q.rangeStart).add(10, 'day').hour(9).format('YYYY-MM-DDTHH:mm:ss'),
+      endTime: dayjs(q.rangeStart).add(10, 'day').hour(10).format('YYYY-MM-DDTHH:mm:ss'), courseFormLabelSnapshot: '验证课程形式' })) as Awaited<ReturnType<typeof api.courseCalendar.page>>
+  }
+}
 api.examCalendar.exactPage = async q => {
   await request(q.rangeStart!, q.rangeEnd!)
   return { list: scenario === 'empty' ? [] : [{ id: 1, scheduleName: '验证考期', scheduleType: 'EXACT', exactDate: dayjs(q.rangeStart).add(10, 'day').format('YYYY-MM-DD'), recordStatus: 'PUBLISHED', displayStatus: 'UPCOMING' }], total: scenario === 'empty' ? 0 : 1 } as Awaited<ReturnType<typeof api.examCalendar.exactPage>>
@@ -70,7 +87,7 @@ function Diagnostics() {
 }
 function Inner() {
   const Page = pages[(params.get('scene') || 'exam') as keyof typeof pages] || ExamCalendarPage
-  const permissions = scenario === 'denied' ? [] : ['zsjos:personal-calendar:query', 'zsjos:lead-follow-up-calendar:query', 'zsjos:lead:query']
+  const permissions = scenario === 'denied' ? [] : [...(params.has('actions') ? ['zsjos:personal-calendar:update', 'zsjos:personal-calendar:delete', 'zsjos:course-calendar:manage', 'zsjos:course-calendar:notify'] : []), 'zsjos:personal-calendar:query', 'zsjos:lead-follow-up-calendar:query', 'zsjos:lead:query']
   return <BrowserRouter><ThemeProvider><App><div style={{ height: innerWidth <= 768 ? 'auto' : 750 }}><Page permissions={permissions} /></div><Diagnostics /></App></ThemeProvider></BrowserRouter>
 }
 function Host() {

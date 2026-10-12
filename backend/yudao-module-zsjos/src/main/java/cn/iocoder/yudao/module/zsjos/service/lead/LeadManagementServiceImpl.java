@@ -104,6 +104,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private PartnerMapper partnerMapper;
     @Resource private BusinessTaskMapper businessTaskMapper;
     @Resource private LeadRemarkHistoryService remarkHistoryService;
+    @Resource private LeadAppealSummaryService appealSummaryService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -247,7 +248,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
         List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
-        return convert(lead, userId, users, products, attachments, resolveAttachmentUrls(attachments), true);
+        var result = convert(lead, userId, users, products, attachments, resolveAttachmentUrls(attachments), true);
+        appealSummaryService.populate(List.of(result), userId, true);
+        return result;
     }
 
     @Override
@@ -365,6 +368,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                           Map<Long, OpportunityDO> opportunities,
                                           Map<Long, PartnerDO> partners) {
         LeadManagementRespVO result = BeanUtils.toBean(lead, LeadManagementRespVO.class);
+        result.setProviderIdentityLabel(LeadProviderDisplay.identityLabel(lead));
         result.setSourceChannel(lead.getSourceChannelId());
         LeadIdentityMaskingService.LeadIdentityViewContext identityContext =
                 leadIdentityMaskingService.resolve(currentUserId, lead);
@@ -462,6 +466,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private void populatePageTimestamps(List<LeadDO> leads, List<LeadManagementRespVO> rows, Long userId) {
+        appealSummaryService.populate(rows, userId, false);
         // Match detail projection and its follow-up visibility; stale Lead.nextFollowUpAt
         // must not resurrect a completed or cancelled reminder in the table.
         List<Long> followUpLeadIds = leads.stream()

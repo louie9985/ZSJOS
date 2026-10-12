@@ -101,18 +101,50 @@ public class ExamScheduleService {
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long create(ExamScheduleSaveReqVO req, Long userId) {
         requireManage(userId);
+        cn.iocoder.yudao.framework.common.util.validation.ValidationUtils.validate(req);
+        if (req.getIdempotencyKey() == null || !req.getIdempotencyKey().matches("[A-Za-z0-9_-]{16,64}"))
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ExamCreateErrorCodes.KEY_INVALID);
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        String requestKey = cn.hutool.crypto.digest.DigestUtil.sha256Hex(userId + ":" + req.getIdempotencyKey());
+        String requestHash = createFingerprint(req);
+        ExamScheduleDO existing = mapper.selectCreatedRequest(tenantId, requestKey);
+        if (existing != null) return replayCreate(existing, requestHash);
+        // Replays precede mutable date/attachment checks: a committed request remains replayable later.
         validateSchedule(req);
         ExamScheduleDO schedule = BeanUtils.toBean(req, ExamScheduleDO.class)
+                .setCreateRequestKey(requestKey).setCreateRequestHash(requestHash)
                 .setScheduleType(req.getScheduleType().toUpperCase(Locale.ROOT))
                 .setRecordStatus("DRAFT").setCalendarVersion(1);
+        schedule.setTenantId(tenantId);
         applyFreeName(schedule, req);
         schedule.setBackgroundColor(normalizeBackgroundColor(req.getBackgroundColor()));
         if (req.getAttachmentIds() != null)
             schedule.setAttachmentIdsJson(attachmentService.validate(req.getAttachmentIds(), null, userId));
         normalizeDates(schedule);
-        mapper.insert(schedule);
+        try {
+            mapper.insert(schedule);
+        } catch (org.springframework.dao.DuplicateKeyException conflict) {
+            // InnoDB waits for the winning transaction; READ_COMMITTED sees its committed result.
+            existing = mapper.selectCreatedRequest(tenantId, requestKey);
+            if (existing == null) throw conflict;
+            return replayCreate(existing, requestHash);
+        }
         notificationSnapshots.captureExam(schedule, "CREATED");
         return schedule.getId();
+    }
+
+    private String createFingerprint(ExamScheduleSaveReqVO req) {
+        return cn.hutool.crypto.digest.DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(
+                req.getScheduleName().trim(), req.getScheduleType().toUpperCase(Locale.ROOT),
+                req.getExactDate(), req.getStartDate(), req.getEndDate(),
+                normalizeBackgroundColor(req.getBackgroundColor()), req.getRemark(),
+                req.getAttachmentIds() == null ? List.of() : req.getAttachmentIds())));
+    }
+
+    private Long replayCreate(ExamScheduleDO existing, String requestHash) {
+        if (!Objects.equals(existing.getCreateRequestHash(), requestHash))
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ExamCreateErrorCodes.KEY_CONFLICT);
+        return existing.getId();
     }
 
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -152,6 +184,16 @@ public class ExamScheduleService {
                 .set(ExamScheduleDO::getRemark, update.getRemark()));
         update.setRecordStatus(current.getRecordStatus());
         notificationSnapshots.captureExam(update, "UPDATED");
+    }
+
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "delete")
+    public void deleteDraft(Long id, Long userId) {
+        requireManage(userId);
+        // Share the publication row lock so a draft cannot be deleted after publication wins the race.
+        ExamScheduleDO current = requireExists(id);
+        if (!"DRAFT".equals(current.getRecordStatus())) throw exception(EXAM_SCHEDULE_STATE_INVALID);
+        mapper.deleteById(id);
     }
 
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)

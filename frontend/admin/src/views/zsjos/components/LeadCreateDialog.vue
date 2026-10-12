@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="educationSelfSourced ? '新增教务自拓客资' : selfSourced ? '新增销售自拓客资' : '提交客资'"
+    :title="educationSelfSourced ? '教务录入客资' : selfSourced ? '销售录入客资' : '提交客资'"
     width="min(760px, 96vw)"
     destroy-on-close
   >
@@ -70,8 +70,11 @@
                 :label="skuLabel(item)"
                 :value="item.skuRef" /></el-select></el-form-item></el-col
       ></el-row>
+      <el-alert v-if="selfSourced" :closable="false" type="info"
+        :title="form.newMediaProviderUserId ? '业务来源：新媒体引流，由本人代录' : '业务来源：本人自拓，无新媒体引流'"
+        description="由新媒体引流、本人先收到信息时，请选择对应新媒体人员。录入人和客资提供方分别记录。" />
       <el-form-item v-if="selfSourced" label="新媒体提供方">
-        <el-select v-model="form.newMediaProviderUserId" clearable filterable placeholder="可选，不选则本人自拓">
+        <el-select v-model="form.newMediaProviderUserId" clearable filterable placeholder="本人自拓不选；新媒体引流请选择人员">
           <el-option v-for="item in providers" :key="item.id" :label="item.nickname" :value="item.id" />
         </el-select>
       </el-form-item>

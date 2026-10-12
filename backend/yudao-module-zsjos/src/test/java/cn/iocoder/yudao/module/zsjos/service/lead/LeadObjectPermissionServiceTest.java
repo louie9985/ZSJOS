@@ -524,6 +524,17 @@ class LeadObjectPermissionServiceTest {
         assertFalse(service.canReadDetail(owned, 30L));
     }
 
+    @Test
+    void clearingErroneousProviderPreservesOwnerAccessWithoutGrantingSubmitterAccess() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-submitted")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-owned")).thenReturn(true);
+        var lead=lead(10L,20L);
+        assertTrue(service.canRead(lead,10L));assertTrue(service.canRead(lead,20L));
+        lead.setProviderOwnerType(null);lead.setProviderOwnerId(null);
+        lead.setSourceProviderRecorded(true);lead.setSourceProviderUserId(null);
+        assertFalse(service.canRead(lead,10L));assertTrue(service.canRead(lead,20L));
+    }
+
     private void assertActionAllowed(Long userId, String action) {
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);

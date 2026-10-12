@@ -350,6 +350,8 @@ export interface LeadAppealEvidence {
 }
 
 export interface LeadAppealItem {
+  invalidEventId?: number
+  currentCycle?: boolean
   id: number
   leadId: number
   leadNo?: string | null
@@ -508,6 +510,10 @@ export function getMyComplaints(params: { pageNo: number; pageSize: number; stat
 }
 
 /** 查询客资申诉记录 */
+export function getLeadAppealContext(leadId: number) {
+  return request.get<never, { invalidEventId: number; nextRoundNo: number | null; canSubmit: boolean; records: LeadAppealItem[] }>(`/zsjos/lead/appeal/lead/${leadId}/context`)
+}
+
 export function getLeadAppeals(leadId: number) {
   return request.get<never, LeadAppealItem[]>(`/zsjos/lead/appeal/lead/${leadId}/list`)
 }
@@ -522,6 +528,6 @@ export function uploadAppealAttachment(file: File) {
 }
 
 /** 提交申诉 */
-export function submitAppeal(leadId: number, data: { reason: string; idempotencyKey: string; attachments?: { infraFileId: number }[] }) {
+export function submitAppeal(leadId: number, data: { invalidEventId: number; reason: string; idempotencyKey: string; attachments?: { infraFileId: number }[] }) {
   return request.post<never, void>(`/zsjos/lead/appeal/lead/${leadId}/submit`, data)
 }

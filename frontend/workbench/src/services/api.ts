@@ -1419,6 +1419,7 @@ export type ManagedLeadAttachment = {
 export type ManagedLeadRemarkAttachment = Omit<ManagedLeadAttachment, 'id'> & { infraFileId: number };
 export type ManagedLeadRemark = { id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: ManagedLeadRemarkAttachment[] };
 export type ManagedLead = {
+  appealSummary?: Pick<LeadAppeal, "id" | "roundNo" | "status" | "reviewStage" | "submittedAt"> & { canHandle: boolean };
   ownerIdentity?: string;
   ownerIdentityLabel?: string;
   version?: number;
@@ -1438,6 +1439,7 @@ export type ManagedLead = {
   providerOwnerType?: "system_user" | "partner";
   providerOwnerId?: number;
   providerOwnerNameSnapshot?: string;
+  providerIdentityLabel?: string;
   contributionUserIdSnapshot?: number;
   contributionUserNameSnapshot?: string;
   contributionSupervisorUserIdSnapshot?: number;
@@ -1760,12 +1762,16 @@ export type LeadAppealEvidence = {
   fileSize: number;
   sort?: number;
 };
+export type LeadAppealContext = { invalidEventId: number; nextRoundNo: number | null; canSubmit: boolean; records: LeadAppeal[] };
+export type LeadAppealReviewDetail = { lead: ManagedLead; context: LeadAppealContext };
 export type LeadAppeal = {
   id: number;
   leadId: number;
   leadNo: string;
   leadName: string;
   roundNo: number;
+  invalidEventId?: number;
+  currentCycle?: boolean;
   reviewStage: "sales_manager" | "quality" | "chairman";
   status:
     | "sales_manager_reviewing"
@@ -1798,8 +1804,8 @@ export type SalesOrderSubmitRequest = {
   buyerName?: string;
   studentName: string;
   studentNature: string;
-  studentMobile?: string;
-  studentWechatId?: string;
+  studentMobile: string;
+  studentWechatId: string;
   provinceCode: string;
   provinceName: string;
   cityCode: string;
@@ -2127,6 +2133,7 @@ export type SalesOrderApprovalCenter = {
 export type SalesOrderApprovalFilterProfile = {
   groups: SalesOrderApprovalFilterGroup[];
   centers: SalesOrderApprovalCenter[];
+  orderStates: { key: string; label: string; count?: number }[];
 };
 export type SalesOrderApprovalTaskTarget = {
   workType: "approval" | "supervisor";
@@ -3677,11 +3684,14 @@ export const api = {
     categoryOptions: async () => unwrap<ExamCategoryOption[]>(
       await http.get('/zsjos/exam-calendar/category-options'),
     ),
-    create: async (data: ExamScheduleInput) => unwrap<number>(
+    create: async (data: ExamScheduleInput & { idempotencyKey: string }) => unwrap<number>(
       await http.post('/zsjos/exam-calendar/create', data),
     ),
     update: async (id: number, data: ExamScheduleInput) => unwrap<boolean>(
       await http.put(`/zsjos/exam-calendar/update/${id}`, data),
+    ),
+    deleteDraft: async (id: number) => unwrap<boolean>(
+      await http.delete(`/zsjos/exam-calendar/delete/${id}`),
     ),
     publish: async (id: number) => unwrap<boolean>(
       await http.post(`/zsjos/exam-calendar/publish/${id}`),
@@ -4612,6 +4622,12 @@ export const api = {
       await http.post(`/zsjos/lead/${leadId}/follow-up-image/upload`, data),
     );
   },
+  leadAppealContext: async (leadId: number) =>
+    unwrap<{ invalidEventId: number; nextRoundNo: number | null; canSubmit: boolean; records: LeadAppeal[] }>(
+      await http.get(`/zsjos/lead/appeal/lead/${leadId}/context`),
+    ),
+  leadAppealReviewDetail: async (appealId: number, taskId: string) =>
+    unwrap<LeadAppealReviewDetail>(await http.get(`/zsjos/lead/appeal/${appealId}/review-detail`, { params: { taskId } })),
   leadAppeals: async (leadId: number) =>
     unwrap<LeadAppeal[]>(
       await http.get(`/zsjos/lead/appeal/lead/${leadId}/list`),
@@ -4619,6 +4635,7 @@ export const api = {
   submitLeadAppeal: async (
     leadId: number,
     data: {
+      invalidEventId: number;
       reason: string;
       attachments: Array<{ infraFileId: number }>;
       idempotencyKey: string;
@@ -4900,6 +4917,7 @@ export const api = {
       }),
     ),
   salesOrderApprovalInbox: async (params: {
+    orderState?: string;
     pageNo: number;
     pageSize: number;
     center?: "registration" | "finance";
@@ -4917,6 +4935,7 @@ export const api = {
           await http.get("/zsjos/sales-order/approval/inbox-page", { params }),
         ),
   salesOrderApprovalCursor: async (params: {
+    orderState?: string;
     cursor?: string;
     limit?: number;
     center?: "registration" | "finance";
@@ -5796,6 +5815,7 @@ export const api = {
     pageNo: number;
     pageSize: number;
     status?: string;
+    statusGroup?: 'pending' | 'processed' | 'all';
     keyword?: string;
     advancedFilter?: AdvancedFilterGroup;
   }) =>

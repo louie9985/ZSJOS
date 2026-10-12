@@ -19,4 +19,10 @@ public class HrmEmployeeCancelQuitReqVO {
     @Size(max = 500, message = "取消原因不能超过 500 个字符")
     private String reason;
 
+
+    private Long version;
+    @jakarta.validation.constraints.NotBlank
+    @jakarta.validation.constraints.Size(max = 64)
+    private String operationKey;
+
 }

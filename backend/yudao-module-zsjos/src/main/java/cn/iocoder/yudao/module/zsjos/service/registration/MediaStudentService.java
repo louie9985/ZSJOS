@@ -40,8 +40,17 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_
 @Service
 public class MediaStudentService {
     @Resource private MediaStudentServicePeriodService servicePeriodService;
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<MediaStudentListRespVO> getPage(
             Long userId, MyStudentPageReqVO request) {
+        var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.MediaStudentListSort.create();
+        if (sorting.requested(request.getSortField(), request.getSortOrder())) {
+            return sorting.page(request.getSortField(), request.getSortOrder(), request.getPageNo(), request.getPageSize(), (pageNo, pageSize) -> {
+                var batch = BeanUtils.toBean(request, MyStudentPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(pageNo); batch.setPageSize(pageSize);
+                return getPage(userId, batch);
+            });
+        }
         var page = myStudentService.getMediaPage(userId, request);
         var personIds = page.getList().stream().map(MyStudentRespVO::getPersonId).toList();
         var accounts = personIds.isEmpty() ? List.<MediaAccountDO>of()

@@ -38,6 +38,20 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('opts into information tables while retaining snapshot text and default consumers', () => {
+    const data = order({ status: 'effective', classType: '旧班种', paymentMethodLabelSnapshot: '历史支付标签' })
+    const table = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" informationLayout="table" order={data}/>)
+    const original = renderToStaticMarkup(<SalesOrderDetailCards mode="team" order={data}/>)
+    expect(table).toContain('sales-order-information-table')
+    expect(table).toContain('ant-tag-green')
+    expect(table).toContain('ant-tag-purple')
+    expect(table).toContain('历史支付标签')
+    expect(table).toContain('历史未记录')
+    expect(table).not.toContain('detail-field-grid')
+    expect(original).toContain('detail-field-grid')
+    expect(original).not.toContain('sales-order-information-table')
+    expect(table.split('<aside')[1]).toBe(original.split('<aside')[1])
+  })
   it('renders restored actor names supplied by the shared historical projection', () => {
     const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
       currentApprovalRoundId: undefined,

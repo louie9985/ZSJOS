@@ -48,6 +48,9 @@ Lead 身份投影规则：自动/普通派单且已归属、提交人与负责�
 | `remark` | 来源记录保存的说明或备注；提交、有效性判定和跟进记录按已有持久化事实映射 |
 | `attachments` | 来源事件保存的证据引用 |
 
+客资或分配状态变化仅记录一侧状态时，缺失的一侧保持为空，已知的一侧正常返回中文名称；
+不会补造缺失状态，也不会因空状态导致整份流转历史查询失败。两侧状态相同或均为空时不展示状态变化。
+
 `attachments` 包含 `infraFileId`、`originalName`、`contentType`、`previewUrl`、
 `previewable` 和 `available`。只有图片和 PDF 会签发 10 分钟预览地址；接口不提供下载动作。
 无法签名的引用返回 `available=false`，其他文件返回 `previewable=false`，前端分别显示

@@ -45,6 +45,7 @@ public class ConfigDO extends BaseDO {
     /**
      * 参数键值
      */
+    @ToString.Exclude
     private String value;
     /**
      * 参数类型
@@ -58,6 +59,10 @@ public class ConfigDO extends BaseDO {
      * 不可见的参数，一般是敏感参数，前端不可获取
      */
     private Boolean visible;
+
+    /** Encrypted at rest and never returned through HTTP or exports. */
+    @com.baomidou.mybatisplus.annotation.TableField("`sensitive`")
+    private Boolean sensitive;
     /**
      * 备注
      */

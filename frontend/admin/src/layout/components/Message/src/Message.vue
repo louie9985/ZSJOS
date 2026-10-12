@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { formatDate } from '@/utils/formatTime'
+import * as HrmEmployeeApi from '@/api/hrm/employee'
 import * as NotifyMessageApi from '@/api/system/notify/message'
 import { useUserStoreWithOut } from '@/store/modules/user'
 import { propTypes } from '@/utils/propTypes'
@@ -10,7 +11,10 @@ import { NOTIFY_MESSAGE_CHANGED_EVENT } from '@/utils/notifyMessage'
 import { ElNotification } from 'element-plus'
 import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as FeedbackApi from '@/api/zsjos/feedback'
-import { feedbackUrgeTaskTarget, isFeedbackUrgeNotification } from '@/utils/feedbackUrgeNotification'
+import {
+  feedbackUrgeTaskTarget,
+  isFeedbackUrgeNotification
+} from '@/utils/feedbackUrgeNotification'
 
 defineOptions({ name: 'Message' })
 
@@ -96,22 +100,47 @@ const showPersistedNotification = async (messageId: number) => {
             await router.push(await feedbackUrgeTaskTarget(detail))
           } catch {
             message.warning('审批任务已结束、已转交或暂时无法访问，已打开消息详情')
-            await router.push({ path: '/user/notify-message', query: { messageId: String(detail.id) } })
+            await router.push({
+              path: '/user/notify-message',
+              query: { messageId: String(detail.id) }
+            })
           }
           return
         }
-        if (detail.actionType === 'business_detail' && detail.bizType === 'withdrawal' && detail.bizId) {
+        if (
+          detail.actionType === 'business_detail' &&
+          detail.bizType === 'hrm_employee' &&
+          detail.bizId
+        ) {
+          try {
+            await HrmEmployeeApi.getEmployee(detail.bizId)
+            await router.push({ name: 'HrmEmployeeDetail', params: { id: detail.bizId } })
+            return
+          } catch {
+            message.warning('员工档案不可访问，已打开消息详情')
+          }
+        }
+        if (
+          detail.actionType === 'business_detail' &&
+          detail.bizType === 'withdrawal' &&
+          detail.bizId
+        ) {
           await router.push({ path: '/zsjos/withdrawal', query: { withdrawalId: detail.bizId } })
           return
         }
-        if (detail.actionType === 'business_detail' && detail.bizType === 'feedback' && detail.bizId) {
+        if (
+          detail.actionType === 'business_detail' &&
+          detail.bizType === 'feedback' &&
+          detail.bizId
+        ) {
           try {
             const feedback = await FeedbackApi.getFeedback(detail.bizId)
-            const path = feedback.feedbackType === 'REQUIREMENT'
-              ? '/zsjos/feedback/requirement'
-              : feedback.feedbackType === 'BUG'
-                ? '/zsjos/feedback/bug'
-                : '/zsjos/feedback/support'
+            const path =
+              feedback.feedbackType === 'REQUIREMENT'
+                ? '/zsjos/feedback/requirement'
+                : feedback.feedbackType === 'BUG'
+                  ? '/zsjos/feedback/bug'
+                  : '/zsjos/feedback/support'
             await router.push({ path, query: { feedbackId: String(detail.bizId) } })
             return
           } catch {
@@ -135,7 +164,10 @@ const showPersistedNotification = async (messageId: number) => {
         if (detail.actionType !== 'none') {
           // Admin 的“我的站内信”实际挂载在 /user/notify-message；旧的
           // /messages/all 不存在，导致 WebSocket 弹窗点击后无法进入消息详情。
-          await router.push({ path: '/user/notify-message', query: { messageId: String(detail.id) } })
+          await router.push({
+            path: '/user/notify-message',
+            query: { messageId: String(detail.id) }
+          })
         }
       }
     })

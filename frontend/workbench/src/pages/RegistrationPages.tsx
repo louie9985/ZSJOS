@@ -135,6 +135,8 @@ function withCompletionState(value: RegistrationCase): RegistrationCase {
 export function RegistrationPoolPage({ permissions = [] }: { permissions?: string[] }) {
   const location = useLocation();
   const routeState = location.state as { registrationCaseId?: number } | null;
+  const [statusGroup, setStatusGroup] = useState<'pending' | 'processed' | 'all'>('pending');
+  const handledLocation = useRef<string | undefined>(undefined);
   const [rows, setRows] = useState<RegistrationCase[]>([]);
   const [total, setTotal] = useState(0);
   const [pageNo, setPageNo] = useState(1);
@@ -192,7 +194,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   );
   const load = useCallback(
     async (targetPage = pageNo, preferredId?: number) => {
-      const requestKey = `${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
+      const requestKey = `${statusGroup}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
       if (inflightLists.current.has(requestKey)) return;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
@@ -200,6 +202,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       setError("");
       try {
         const page = await api.registrationPoolPage({
+            statusGroup,
             pageNo: targetPage,
             pageSize: PAGE_SIZE,
             keyword: keyword || undefined,
@@ -209,7 +212,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         setRows(page.list);
         setTotal(page.total);
         setPageNo(targetPage);
-        const targetId = preferredId ?? selected?.id ?? page.list[0]?.id;
+        const targetId = preferredId ?? page.list.find(row => row.id === selected?.id)?.id ?? page.list[0]?.id;
         if (targetId) await loadCase(targetId);
         else setSelected(undefined);
       } catch (requestError) {
@@ -219,12 +222,14 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, keyword, loadCase, pageNo, selected?.id],
+    [advancedFilter, keyword, loadCase, pageNo, selected?.id, statusGroup],
   );
 
   useEffect(() => {
-    void load(1, routeState?.registrationCaseId);
-  }, [advancedFilter, keyword, location.key, routeState?.registrationCaseId]);
+    const preferredId = handledLocation.current !== location.key ? routeState?.registrationCaseId : undefined;
+    handledLocation.current = location.key;
+    void load(1, preferredId);
+  }, [advancedFilter, keyword, location.key, routeState?.registrationCaseId, statusGroup]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const caseId = Number(
@@ -382,7 +387,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         idempotencyKey: key(),
       });
       message.success("报名履约已完成");
-      await load(pageNo);
+      await load(1);
     } catch (requestError) {
       message.error(errorMessage(requestError));
     } finally {
@@ -401,7 +406,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       message.success("报名履约已关闭");
       setCloseOpen(false);
       closeForm.resetFields();
-      await load(pageNo);
+      await load(1);
     } catch (requestError) {
       message.error(errorMessage(requestError));
     } finally {
@@ -592,6 +597,27 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => void load(1)}>刷新</Button>
       </header>
+      <Tabs
+        className="lead-inbox-group-tabs"
+        activeKey={statusGroup}
+        items={[
+          { key: 'pending', label: '待处理' },
+          { key: 'processed', label: '已处理' },
+          { key: 'all', label: '全部' },
+        ]}
+        onChange={(value) => {
+          ++listGeneration.current;
+          ++detailGeneration.current;
+          inflightLists.current.clear();
+          setDetailLoading(false);
+          setDetailError('');
+          setSelected(undefined);
+          setRows([]);
+          setTotal(0);
+          setPageNo(1);
+          setStatusGroup(value as typeof statusGroup);
+        }}
+      />
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
@@ -924,7 +950,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       contactContext={studentContactContext}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
-      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${productSpecText(service)} · ${service.orderNo || service.orderId}` }))}/></div>}
+      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${productSpecText(service)} · ${service.orderNo || (service.orderId ? `订单 ${service.orderId}` : '独立服务')}` }))}/></div>}
       overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
@@ -969,7 +995,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
                     : "课程分类暂未记录"}
                 </span>
                 <ProductSpecs product={service} />
-                <span>{service.orderNo || `订单 ${service.orderId}`}</span>
+                <span>{service.orderNo || (service.orderId ? `订单 ${service.orderId}` : '独立服务')}</span>
               </div>
               <Tag color={service.status === "active" ? "success" : undefined}>
                 {serviceStatusLabel(service.status)}
@@ -990,7 +1016,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     { title: "班级", key: "className", width: 180, render: (_, row) => row.services?.find(service => service.className)?.className || "未分班" },
     { title: "课程服务", key: "courses", width: 240, render: (_, row) => row.services?.map(service => service.courseName || service.skuName || "课程服务").join("、") || "-" },
     { title: "服务状态", key: "serviceStatus", width: 140, render: (_, row) => <Space wrap>{row.services?.map(service => <Tag key={service.serviceRelationId} color={service.status === "active" ? "success" : undefined}>{serviceStatusLabel(service.status)}</Tag>) || "-"}</Space> },
-    { title: "订单号", key: "orderNos", width: 170, render: (_, row) => row.services?.map(service => service.orderNo || `订单 ${service.orderId}`).join("、") || "-" },
+    { title: "订单号", key: "orderNos", width: 170, render: (_, row) => row.services?.map(service => service.orderNo || (service.orderId ? `订单 ${service.orderId}` : '独立服务')).join("、") || "-" },
     { title: "激活时间", key: "activatedAt", width: 180, sorter: true, render: (_, row) => formatTimestamp(row.activatedAt) }
   ];
   const studentTableColumns = sortableColumns(studentTableColumnSource, studentSort);

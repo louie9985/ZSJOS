@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showToast } from 'vant'
-import { getLeadAppeals, submitAppeal, uploadAppealAttachment, type LeadAppealItem } from '@/api/lead'
+import { getLeadAppealContext, submitAppeal, uploadAppealAttachment, type LeadAppealItem } from '@/api/lead'
 import { formatDateTime } from '@/utils/format'
 import { createIdempotencyKey } from '@/utils/idempotency'
 
@@ -17,6 +17,7 @@ const submitting = ref(false)
 const loading = ref(true)
 const loadError = ref('')
 const appeals = ref<LeadAppealItem[]>([])
+const context = ref<Awaited<ReturnType<typeof getLeadAppealContext>>>()
 
 // 图片上传状态
 const fileList = ref<{ id: string; url: string; status: string; infraFileId?: number }[]>([])
@@ -25,7 +26,8 @@ const uploading = ref(false)
 onMounted(async () => {
   loadError.value = ''
   try {
-    appeals.value = await getLeadAppeals(leadId)
+    context.value = await getLeadAppealContext(leadId)
+    appeals.value = context.value.records
   } catch (cause) {
     appeals.value = []
     loadError.value = cause instanceof Error ? cause.message : '申诉记录加载失败'
@@ -38,7 +40,8 @@ async function loadAppeals() {
   loading.value = true
   loadError.value = ''
   try {
-    appeals.value = await getLeadAppeals(leadId)
+    context.value = await getLeadAppealContext(leadId)
+    appeals.value = context.value.records
   } catch (cause) {
     appeals.value = []
     loadError.value = cause instanceof Error ? cause.message : '申诉记录加载失败'
@@ -47,8 +50,8 @@ async function loadAppeals() {
   }
 }
 
-const lastAppeal = () => appeals.value[appeals.value.length - 1]
-const canAppeal = () => appeals.value.length === 0 || lastAppeal()?.canSubmitNextRound === true
+const lastAppeal = () => appeals.value.filter(item => item.currentCycle).at(-1)
+const canAppeal = () => context.value?.canSubmit === true
 
 const stageMap: Record<string, string> = {
   sales_manager: '销售主管复核', quality: '质控仲裁', chairman: '最终裁定',
@@ -93,6 +96,7 @@ function removeFile(id: string) {
 }
 
 async function handleSubmit() {
+  if (!canAppeal()) { showToast('当前不可申诉，请刷新后重试'); return }
   if (!reason.value.trim()) { showToast('请输入申诉理由'); return }
   if (fileList.value.some(f => f.status === 'uploading')) { showToast('图片还在上传中'); return }
 
@@ -103,6 +107,7 @@ async function handleSubmit() {
       .map(f => ({ infraFileId: f.infraFileId! }))
 
     await submitAppeal(leadId, {
+      invalidEventId: context.value!.invalidEventId,
       reason: reason.value.trim(),
       idempotencyKey: createIdempotencyKey(),
       attachments
@@ -130,7 +135,7 @@ async function handleSubmit() {
         <div class="section-title">申诉记录（{{ appeals.length }}）</div>
         <div v-for="appeal in appeals" :key="appeal.id" class="appeal-record">
           <div class="appeal-record__header">
-            <span class="appeal-record__round">第 {{ appeal.roundNo }} 次<span v-if="appeal.reviewStage"> · {{ stageMap[appeal.reviewStage] || appeal.reviewStage }}</span></span>
+            <span class="appeal-record__round">{{ appeal.currentCycle ? '当前判定' : '历史判定' }} · 第 {{ appeal.roundNo }} 轮<span v-if="appeal.reviewStage"> · {{ stageMap[appeal.reviewStage] || appeal.reviewStage }}</span></span>
             <span
               class="appeal-record__status"
               :style="{ color: statusMap[appeal.status]?.color }"
@@ -150,9 +155,9 @@ async function handleSubmit() {
       </div>
 
       <!-- 提交新申诉 -->
-      <div v-else-if="canAppeal()" class="card">
+      <div v-if="!loadError && canAppeal()" class="card">
         <div class="section-title">
-          发起第 {{ (lastAppeal()?.roundNo || 0) + 1 }} 次申诉
+          发起第 {{ context?.nextRoundNo || 1 }} 次申诉
         </div>
 
         <van-field
@@ -192,7 +197,7 @@ async function handleSubmit() {
       </div>
 
       <!-- 已用完申诉次数 -->
-      <div v-if="!canAppeal() && !loading" class="card" style="text-align: center; padding: 32px;">
+      <div v-if="!loadError && !canAppeal() && !loading" class="card" style="text-align: center; padding: 32px;">
         <van-icon name="info-o" size="40" color="var(--h5-text-placeholder)" />
         <p style="margin-top: 8px; color: var(--h5-text-secondary);">当前没有可提交的下一轮申诉</p>
       </div>

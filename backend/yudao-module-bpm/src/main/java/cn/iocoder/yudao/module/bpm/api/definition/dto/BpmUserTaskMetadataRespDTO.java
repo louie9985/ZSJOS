@@ -8,6 +8,9 @@ import java.util.List;
 @Data
 public class BpmUserTaskMetadataRespDTO {
 
+    private Integer candidateStrategy;
+    private String candidateParam;
+    private Boolean mandatoryHumanApproval;
     private String key;
     private String name;
     private String executionMode;

@@ -9,11 +9,12 @@ import LeadManagementPage from '../src/pages/LeadManagementPage'
 import { api, http, type ManagedLead } from '../src/services/api'
 import '../src/styles/index.css'
 const params=new URLSearchParams(location.search)
+const partner=params.has('partner')
 const state={ valid:false, denied:params.has('denied'), fail:params.has('error')?'负责人状态已变化，请刷新后重试':'', posts:[] as Record<string, unknown>[], reads:0 }
 Object.assign(window,{restoreFixture:state})
 const lead=():ManagedLead => ({id:1,leadNo:'KZ-RESTORE-TEST',submittedName:'恢复测试客资',status:state.valid?'submitted':'suspended',
-  assignmentStatus:'owned',qualificationStatus:'pending',ownerUserId:20,ownerUserName:'测试学习规划师',ownerIdentity:'education',sourceType:'education_self_sourced',operationalStatus:state.valid?'active':'suspended',
-  sourceLabel:'教务自拓录',visibleTabs:['overview'],overviewVisible:true,
+  assignmentStatus:'owned',qualificationStatus:'pending',ownerUserId:20,ownerUserName:'测试学习规划师',ownerIdentity:'education',sourceType:partner?'partner':'education_self_sourced',dispatchMode:partner?'specified':'self',operationalStatus:state.valid?'active':'suspended',
+  sourceLabel:partner?'兼职指定客资':'教务自拓录',visibleTabs:['overview'],overviewVisible:true,
   availableActions:state.valid||state.denied?[]:[{code:'SUPERVISOR_RESTORE',enabled:true}],
   attachments:[],intendedProducts:[]} as ManagedLead)
 api.dictDataByType=async()=>[]

@@ -56,4 +56,12 @@ public class HrmEmployeePromoteReqVO {
         return reason == null || HrmEmployeeChangeReasonEnum.TRANSFER_AND_PROMOTION_REASONS.contains(reason);
     }
 
+
+    private Long version;
+    @jakarta.validation.constraints.NotBlank
+    @Size(max = 64)
+    private String operationKey;
+    @jakarta.validation.constraints.Pattern(regexp = "BUSINESS|PLAN")
+    private String changeMode = "BUSINESS";
+
 }

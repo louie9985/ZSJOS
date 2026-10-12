@@ -18,6 +18,7 @@ with sync_playwright() as p:
         page.goto(BASE)
         cards = page.locator('.material-library-item')
         expect(cards).to_have_count(20)
+        assert json.loads(page.locator('html').get_attribute('data-request'))['sortBy'] == 'createTime'
         for index in range(3):
             image = cards.nth(index).locator('img')
             image.scroll_into_view_if_needed()
@@ -51,6 +52,7 @@ with sync_playwright() as p:
         expect(page.locator('.ant-drawer')).to_have_count(0)
         request = json.loads(page.locator('html').get_attribute('data-request'))
         assert request['keyword'] == '摄影' and request['pageNo'] == 1
+        assert request['sortBy'] == 'createTime'
         search = page.get_by_role('searchbox', name='搜索素材')
         search.fill('独立命中'); search.press('Enter')
         hit = cards.first.locator('.material-search-hits button').filter(has_text='作品 / 第2项 / 说明')
@@ -74,9 +76,14 @@ with sync_playwright() as p:
         expect(cards).to_have_count(20)
         page.locator('.material-library-load-more').scroll_into_view_if_needed()
         expect(cards).to_have_count(23)
+        request = json.loads(page.locator('html').get_attribute('data-request'))
+        assert request['pageNo'] == 2 and request['sortBy'] == 'createTime'
         expect(page.get_by_text('已加载全部 23 条素材')).to_be_visible()
         page.get_by_role('tab', name='我的素材', exact=True).click()
         expect(page.locator('.material-library-mine')).to_be_visible()
+        page.wait_for_function('JSON.parse(document.documentElement.dataset.request).mine === true')
+        request = json.loads(page.locator('html').get_attribute('data-request'))
+        assert request['sortBy'] == 'createTime' and request['pageNo'] == 1
         expect(cards.first.locator('img')).to_be_visible()
         assert cards.first.locator('img').evaluate('(img) => img.clientWidth > 250')
         page.get_by_role('tab', name='收藏', exact=True).click()
@@ -84,6 +91,7 @@ with sync_playwright() as p:
         cards.first.get_by_role('button', name='查找：摄影', exact=True).click()
         page.wait_for_function('JSON.parse(document.documentElement.dataset.request).keyword === "摄影"')
         assert json.loads(page.locator('html').get_attribute('data-request'))['favorite'] is True
+        assert 'sortBy' not in json.loads(page.locator('html').get_attribute('data-request'))
     page.goto(BASE)
     expect(page.get_by_role('tab')).to_have_count(3)
     expect(page.get_by_role('tab', name='推荐', exact=True)).to_have_count(0)

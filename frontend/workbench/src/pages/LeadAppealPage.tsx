@@ -2,34 +2,24 @@ import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
-  Avatar,
   Button,
   Empty,
-  Form,
-  Image,
-  Input,
-  Modal,
   Segmented,
   Skeleton,
-  Space,
   Spin,
   Tag,
   Typography,
   message
 } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import { api, type AdvancedFilterGroup, type LeadAppeal, type LeadAppealEvidence } from '../services/api'
+import { api, type AdvancedFilterGroup, type LeadAppeal } from '../services/api'
 import SubjectAvatar from '../components/SubjectAvatar'
 import { formatTimestamp } from '../services/time'
-import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
-import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
-import { useSubmissionGuard } from '../services/submissionGuard'
 import { invalidReasonSnapshotLabel } from '../services/leadManagement'
-import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
-import DetailFieldGrid from '../components/DetailFieldGrid'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import { useInboxTableLayout } from '../services/inboxLayout'
 
+import LeadAppealReviewDetail from '../components/LeadAppealReviewDetail'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const statusLabel: Record<string, string> = {
@@ -46,52 +36,6 @@ type LeadAppealLocationState = {
   appealId?: number
   leadId?: number
   handled?: boolean
-}
-
-function Detail({ item, onDecision }: { item: LeadAppeal; onDecision: (type: 'overturn' | 'uphold') => void }) {
-  const evidence = (items: LeadAppealEvidence[]) => items.length
-    ? <Image.PreviewGroup><div className="appeal-evidence-grid">{items.map(file => <Image key={file.infraFileId} src={file.fileUrl} alt={file.originalName}/>)}</div></Image.PreviewGroup>
-    : null
-  return <article className="message-inbox-detail">
-    <div className="message-detail-hero">
-      <SubjectAvatar seed={item.leadNo} label="" />
-      <div className="message-detail-heading">
-        <Typography.Title level={4}>{item.leadNo} · {item.leadName}</Typography.Title>
-        <Space wrap>
-          <Tag>第 {item.roundNo} 次申诉</Tag>
-          <Tag color="processing">{stageLabel[item.reviewStage]}</Tag>
-          <Tag color={item.status === 'upheld' ? 'error' : 'processing'}>{statusLabel[item.status]}</Tag>
-        </Space>
-      </div>
-    </div>
-    <div className="message-detail-section">
-      <Typography.Text type="secondary">申诉理由</Typography.Text>
-      <Typography.Paragraph>{item.reason}</Typography.Paragraph>
-      {evidence(item.evidence)}
-    </div>
-    <div className="message-detail-section">
-      <Typography.Text type="secondary">原无效结论</Typography.Text>
-      <Typography.Paragraph>{[invalidReasonSnapshotLabel(item.invalidReasonSnapshot), item.invalidDescriptionSnapshot].filter(Boolean).join('：') || '-'}</Typography.Paragraph>
-      {evidence(item.invalidEvidenceSnapshot)}
-    </div>
-    {item.decisionReason && <div className="message-detail-section">
-      <Typography.Text type="secondary">裁决意见</Typography.Text>
-      <Typography.Paragraph>{item.decisionReason}</Typography.Paragraph>
-      {evidence(item.decisionEvidence)}
-    </div>}
-    <DetailFieldGrid
-      className="message-detail-meta"
-      items={[
-        { key: 'submittedAt', label: '提交时间', value: formatTimestamp(item.submittedAt) },
-        { key: 'reviewer', label: '处理人', value: item.reviewerUserName },
-        { key: 'decidedAt', label: '处理时间', value: formatTimestamp(item.decidedAt) }
-      ]}
-    />
-    {item.taskId && item.status.endsWith('reviewing') && <Space className="appeal-decision-actions">
-      <Button type="primary" onClick={() => onDecision('overturn')}>改判有效</Button>
-      <Button danger onClick={() => onDecision('uphold')}>维持无效</Button>
-    </Space>}
-  </article>
 }
 
 function parseOptionalBoolean(value: string | null) {
@@ -121,11 +65,27 @@ export default function LeadAppealPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cursor, setCursor] = useState<string>()
+  const cursorRef = useRef<string>(undefined)
+  const [dirty, setDirty] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const dirtyRef = useRef(false)
+  const preserveSelection = useRef(false)
+  const selectionRef = useRef<LeadAppeal | undefined>(undefined)
+  selectionRef.current = selected
+  const targetLocated = useRef(false)
+  const requestVersion = useRef(0)
+  dirtyRef.current = dirty
+  const allowLeave = () => {
+    if (busy) { message.warning('正在提交，请稍候'); return false }
+    return !dirtyRef.current || window.confirm('放弃尚未提交的处理内容？')
+  }
+  const openItem = (item: LeadAppeal) => {
+    if (item.id === selectionRef.current?.id) { setDrawerOpen(true); return }
+    if (item.id !== selectionRef.current?.id && !allowLeave()) return
+    setDirty(false); setSelected(item); setDrawerOpen(true)
+  }
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
-  const [decision, setDecisionState] = useState<'overturn' | 'uphold'>()
-  const [reason, setReason] = useState('')
-  const [evidence, setEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
@@ -134,9 +94,11 @@ export default function LeadAppealPage() {
   const [tableTotal, setTableTotal] = useState(0)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const { submitting: saving, run: runDecision, resetIntent } = useSubmissionGuard()
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const { useTableLayout } = useInboxTableLayout()
+  const { useTableLayout, isDesktop } = useInboxTableLayout()
+
+  useEffect(() => {
+    targetLocated.current = false
+  }, [targetAppealId, targetLeadId, targetHandled])
 
   useEffect(() => {
     if (targetHandled !== undefined) setHandled(targetHandled)
@@ -149,7 +111,7 @@ export default function LeadAppealPage() {
   }, [targetAppealId, targetLeadId])
 
   const locateTarget = useCallback(async () => {
-    if (!hasTarget) return false
+    if (!hasTarget || targetLocated.current) return false
     let nextCursor: string | undefined
     do {
       const result = await api.leadAppealInboxCursor(targetHandled ?? handled, {
@@ -161,46 +123,52 @@ export default function LeadAppealPage() {
       const target = result.list.find(isTargetItem)
       if (target) {
         setItems(current => [target, ...current.filter(item => item.id !== target.id)])
+        targetLocated.current = true
         setSelected(target)
         if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
         return true
       }
       nextCursor = result.nextCursor
     } while (nextCursor)
+    targetLocated.current = true
     setSelected(undefined)
     setDrawerOpen(false)
     message.warning('未找到定位的申诉记录')
     return false
-  }, [advancedFilter, handled, hasTarget, isTargetItem, keyword, targetHandled])
+  }, [advancedFilter, handled, hasTarget, isTargetItem, keyword, targetHandled, useTableLayout])
 
   const load = useCallback(async (append = false) => {
+    const version = ++requestVersion.current
     if (append) setLoadingMore(true)
     else setLoading(true)
     setError('')
     try {
       const result = useTableLayout
         ? await api.leadAppealInboxPage(handled, { pageNo: tablePage, pageSize: tablePageSize, keyword: keyword || undefined, advancedFilter })
-        : await api.leadAppealInboxCursor(handled, { cursor: append ? cursor : undefined, limit: 20, keyword: keyword || undefined, advancedFilter })
+        : await api.leadAppealInboxCursor(handled, { cursor: append ? cursorRef.current : undefined, limit: 20, keyword: keyword || undefined, advancedFilter })
+      if (version !== requestVersion.current) return
       setTableTotal('total' in result ? result.total : 0)
       setItems(current => useTableLayout || !append
         ? result.list
         : append
         ? [...current, ...result.list.filter(item => !current.some(existing => existing.id === item.id))]
         : result.list)
-      if ('nextCursor' in result) { setCursor(result.nextCursor); setHasMore(result.hasMore) }
-      if (!append) {
-        const target = result.list.find(isTargetItem)
-        const nextSelected = target || result.list[0]
-        setSelected(nextSelected)
-        if (hasTarget && !target) void locateTarget()
+      if ('nextCursor' in result) { cursorRef.current = result.nextCursor; setCursor(result.nextCursor); setHasMore(result.hasMore) }
+      if (!append && !preserveSelection.current && !dirtyRef.current) {
+        const target = !targetLocated.current ? result.list.find(isTargetItem) : undefined
+        const existing = result.list.find(item => item.id === selectionRef.current?.id)
+        setSelected(target || existing || (useTableLayout ? undefined : result.list[0]))
+        if (target) { targetLocated.current = true; setDrawerOpen(true) }
+        else if (hasTarget && !targetLocated.current) void locateTarget()
       }
+
     } catch (e) {
+      if (version !== requestVersion.current) return
       setError(e instanceof Error ? e.message : '申诉处理列表加载失败')
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (version === requestVersion.current) { setLoading(false); setLoadingMore(false) }
     }
-  }, [advancedFilter, cursor, handled, hasTarget, isTargetItem, keyword, locateTarget, tablePage, tablePageSize, useTableLayout])
+  }, [advancedFilter, handled, hasTarget, isTargetItem, keyword, locateTarget, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void load() }, [advancedFilter, handled, keyword, load])
   useEffect(() => {
@@ -225,72 +193,46 @@ export default function LeadAppealPage() {
     return () => node.removeEventListener('scroll', onScroll)
   }, [cursor, hasMore, load, loading, loadingMore, useTableLayout])
 
-  const setDecision = (next: 'overturn' | 'uphold' | undefined) => {
-    setConfirmOpen(false)
-    if (next) resetIntent()
-    setDecisionState(next)
+  const refreshList = () => {
+    preserveSelection.current = true
+    void load().finally(() => { preserveSelection.current = false })
   }
-
-  const submitDecision = async () => {
-    setConfirmOpen(false)
-    if (!selected?.taskId || !decision) return
-    const appeal = selected
-    const nextDecision = decision
-    await runDecision(async ({ idempotencyKey, complete }) => {
-      const uploadResult = await uploadDeferredFiles(evidence, api.uploadLeadAppealImage, setEvidence)
-      if (uploadResult.failed) {
-        message.error('有裁决图片上传失败，请重试失败项')
-        return
-      }
-      await api.decideLeadAppeal(appeal.id, nextDecision, {
-        taskId: appeal.taskId!,
-        reason: reason.trim(),
-        attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })),
-        idempotencyKey
-      })
-      complete()
-      message.success(nextDecision === 'overturn' ? '已改判有效' : '已维持无效')
-      setDecisionState(undefined)
-      setReason('')
-      setEvidence([])
-      await load()
-    }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '申诉裁决失败'))
+  const detail = selected ? <LeadAppealReviewDetail key={selected.id} item={selected} onDirtyChange={setDirty} onBusyChange={setBusy} onChanged={refreshList} /> : <Empty description="选择一条申诉查看客资详情" />
+  const changeScope = (change: () => void) => {
+    if (!allowLeave()) return
+    setDirty(false); setSelected(undefined); setDrawerOpen(false); targetLocated.current = true; change()
   }
-
-  const prepareDecision = () => {
-    if (!selected?.taskId || !reason.trim() || !decision) {
-      message.warning('裁决理由为必填项')
-      return
-    }
-    setConfirmOpen(true)
-  }
-
-  const detail = selected ? <Detail item={selected} onDecision={setDecision}/> : <Empty description="从左侧选择一条申诉"/>
+  useEffect(() => {
+    if (!dirty) return
+    const prevent = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', prevent)
+    return () => window.removeEventListener('beforeunload', prevent)
+  }, [dirty])
 
   return <section className={`workspace-page business-inbox-page lead-appeal-inbox-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar">
       <div className="business-inbox-scope-row">
         <Segmented
           value={handled ? 'done' : 'todo'}
-          onChange={value => setHandled(value === 'done')}
+          onChange={value => changeScope(() => { setHandled(value === 'done'); setTablePage(1) })}
           options={[{ value: 'todo', label: '待处理' }, { value: 'done', label: '已处理' }]}
         />
       </div>
     </header>
-    {useTableLayout ? <><BusinessTable<LeadAppeal> filters={<><AdvancedFilterToolbar scene="lead_appeal" pageKey="lead_appeal" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="lead-appeal-page-1" error={error} onReload={() => void load()}
+    {useTableLayout ? <><BusinessTable<LeadAppeal> filters={<><AdvancedFilterToolbar scene="lead_appeal" pageKey="lead_appeal" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => changeScope(() => { setKeyword(value); setTablePage(1) })} onChange={value => changeScope(() => { setAdvancedFilter(value); setTablePage(1) })}/></>} tableKey="lead-appeal-page-1" error={error} onReload={() => void load()}
       className="business-inbox-table"
       rowKey="id"
 
       columnsState={{ persistenceKey: 'crm-lead-appeal-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
-      pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
+      pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => changeScope(() => { setTablePage(page); setTablePageSize(size) }) }}
       scroll={{ x: 2800 }}
       locale={{ emptyText: <Empty description="暂无申诉" /> }}
       columns={[
         { title: '客资编号', dataIndex: 'leadNo', width: 150 },
         { title: '姓名', dataIndex: 'leadName', width: 140 },
-        { title: '申诉轮次', dataIndex: 'roundNo', width: 100, render: value => `第 ${value} 次` },
+        { title: '申诉轮次', dataIndex: 'roundNo', width: 100, render: (_, item) => `第 ${item.roundNo} 轮` },
         { title: '处理阶段', render: (_, item) => stageLabel[item.reviewStage] || (item.reviewStage ? '未知阶段' : '—') },
         { title: '状态', render: (_, item) => <Tag color={item.status === 'upheld' ? 'error' : 'processing'}>{statusLabel[item.status] || (item.status ? '未知状态' : '—')}</Tag> },
         { title: '申请人', dataIndex: 'applicantUserName', width: 130, render: value => value || '-' },
@@ -305,7 +247,7 @@ export default function LeadAppealPage() {
         { title: '可再次申诉', dataIndex: 'canSubmitNextRound', width: 110, render: value => value ? '是' : '否' },
         { title: '提交时间', dataIndex: 'submittedAt', render: (_, item) => formatTimestamp(item.submittedAt), width: 170 },
         { title: '处理时间', dataIndex: 'decidedAt', render: (_, item) => formatTimestamp(item.decidedAt), width: 170 },
-        { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelected(item); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
+        { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => openItem(item)}>详细</Button> }
       ]}
     /></> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
@@ -316,8 +258,8 @@ export default function LeadAppealPage() {
             placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号"
             keyword={keyword}
             value={advancedFilter}
-            onKeyword={setKeyword}
-            onChange={setAdvancedFilter}
+            onKeyword={value => changeScope(() => setKeyword(value))}
+            onChange={value => changeScope(() => setAdvancedFilter(value))}
           />
         </div>
         {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
@@ -329,10 +271,7 @@ export default function LeadAppealPage() {
                 type="button"
                 key={item.id}
                 className={`business-inbox-item${selected?.id === item.id ? ' active' : ''}`}
-                onClick={() => {
-                  setSelected(item)
-                  if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
-                }}
+                onClick={() => openItem(item)}
               >
                 <div className="business-inbox-item-main">
                   <SubjectAvatar seed={item.leadNo} label="" />
@@ -358,36 +297,10 @@ export default function LeadAppealPage() {
           </div>}
         </div>
       </aside>
-      <main className="business-inbox-detail-pane">{detail}</main>
+      <main className="business-inbox-detail-pane">{isDesktop && detail}</main>
     </div>}
-    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="申诉详情" placement="right" width="100%">
-      {detail}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer" open={drawerOpen && (useTableLayout || !isDesktop)} onClose={() => { if (allowLeave()) { setDrawerOpen(false); setDirty(false); setSelected(undefined) } }} title="客资详情" placement="right" width="100%">
+      {(useTableLayout || !isDesktop) && drawerOpen && detail}
     </ResizableDetailDrawer>
-    <Modal
-      title={decision === 'overturn' ? '改判有效' : '维持无效'}
-      open={Boolean(decision)}
-      onCancel={() => setDecision(undefined)}
-      footer={<Space>
-        <Button onClick={() => setDecision(undefined)}>取消</Button>
-        <IrreversiblePopconfirm
-          action={decision === 'overturn' ? `将客资「${selected?.leadName || ''}」改判为有效` : `维持客资「${selected?.leadName || ''}」的无效结论`}
-          danger={decision === 'uphold'}
-          open={confirmOpen}
-          onOpenChange={setConfirmOpen}
-          onConfirm={submitDecision}
-        >
-          <Button type="primary" danger={decision === 'uphold'} loading={saving} onClick={prepareDecision}>提交裁决</Button>
-        </IrreversiblePopconfirm>
-      </Space>}
-    >
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <Form.Item label="裁决理由" required>
-          <Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={e => setReason(e.target.value)} placeholder="填写裁决理由"/>
-        </Form.Item>
-        <Form.Item label={`裁决附件${evidence.some(item => item.status === 'uploading') ? '（上传中）' : ''}`}>
-          <LeadAppealEvidenceUpload value={evidence} onChange={setEvidence} disabled={saving}/>
-        </Form.Item>
-      </Space>
-    </Modal>
   </section>
 }

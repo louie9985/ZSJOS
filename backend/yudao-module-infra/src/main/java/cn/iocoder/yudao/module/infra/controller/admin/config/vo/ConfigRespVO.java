@@ -45,6 +45,9 @@ public class ConfigRespVO {
     @DictFormat(DictTypeConstants.BOOLEAN_STRING)
     private Boolean visible;
 
+    private Boolean sensitive;
+    private Boolean configured;
+
     @Schema(description = "备注", example = "备注一下很帅气！")
     @ExcelProperty("备注")
     private String remark;

@@ -181,10 +181,7 @@ const changeActionOptions = computed(() => {
       icon: 'ep:circle-check'
     })
   }
-  if (
-    employee.value.status === HrmEmployeeStatus.INTERN ||
-    employee.value.status === HrmEmployeeStatus.PART_TIME
-  ) {
+  if ([3, 4, 5, 6, 7, 8].includes(employee.value.status || 0)) {
     actions.push({
       label: '转为全职',
       changeType: HrmEmployeeChangeType.FULL_TIME,
@@ -319,7 +316,12 @@ async function handleCancelQuit() {
         }
       }
     )
-    await EmployeeApi.cancelEmployeeQuit({ employeeId, reason: value })
+    await EmployeeApi.cancelEmployeeQuit({
+      employeeId,
+      reason: value,
+      version: employee.value.version,
+      operationKey: crypto.randomUUID()
+    })
     message.success('已取消离职')
     await handleEmployeeQuitSuccess()
   } catch {}

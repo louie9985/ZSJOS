@@ -35,10 +35,23 @@ export function validateSalesOrderSubmission(
   totalAmount: number,
   voucherCount: number
 ) {
-  if (!mobile?.trim() && !wechatId?.trim()) return '请填写手机号或微信号'
+  if (!mobile?.trim()) return '请填写手机号'
+  if (!wechatId?.trim()) return '请填写微信号'
   if (voucherCount === 0) return '所有订单必须上传至少一份缴费凭证'
   if (voucherCount > 6) return '缴费凭证最多上传 6 份'
   return undefined
+}
+
+export function resolveSalesOrderContacts(
+  draft: { mobile?: string; wechatId?: string; studentMobile?: string; studentWechatId?: string } | undefined,
+  order: { studentMobile?: string; studentWechatId?: string; leadProfile?: { submittedMobile?: string; submittedWechatId?: string } } | undefined,
+  lead: { submittedMobile?: string; submittedWechatId?: string },
+) {
+  const first = (...values: (string | undefined)[]) => values.find(value => value?.trim())?.trim()
+  return {
+    mobile: first(draft?.mobile, draft?.studentMobile, order?.studentMobile, lead.submittedMobile, order?.leadProfile?.submittedMobile),
+    wechatId: first(draft?.wechatId, draft?.studentWechatId, order?.studentWechatId, lead.submittedWechatId, order?.leadProfile?.submittedWechatId),
+  }
 }
 
 export function salesOrderTaskKey(item: SalesOrderListItem) {

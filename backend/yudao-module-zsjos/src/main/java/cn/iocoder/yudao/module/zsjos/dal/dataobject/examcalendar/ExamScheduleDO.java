@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class ExamScheduleDO extends TenantBaseDO {
     @TableId private Long id;
+    private String createRequestKey;
+    private String createRequestHash;
     private String scheduleType;
     private String scheduleName;
     private String backgroundColor;

@@ -25,7 +25,7 @@ import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.*;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@Import(ConfigServiceImpl.class)
+@Import({ConfigServiceImpl.class, ConfigSecretSupport.class})
 public class ConfigServiceImplTest extends BaseDbUnitTest {
 
     @Resource
@@ -34,10 +34,13 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
     @Resource
     private ConfigMapper configMapper;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService security;
+
     @Test
     public void testCreateConfig_success() {
         // 准备参数
-        ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class)
+        ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class).setSensitive(false)
                 .setId(null); // 防止 id 被赋值，导致唯一性校验失败
 
         // 调用
@@ -57,6 +60,7 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
         configMapper.insert(dbConfig);// @Sql: 先插入出一条存在的数据
         // 准备参数
         ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class, o -> {
+            o.setSensitive(false);
             o.setId(dbConfig.getId()); // 设置更新的 ID
         });
 
@@ -301,6 +305,7 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
     @SafeVarargs
     private static ConfigDO randomConfigDO(Consumer<ConfigDO>... consumers) {
         Consumer<ConfigDO> consumer = (o) -> {
+            o.setSensitive(false);
             o.setType(randomEle(ConfigTypeEnum.values()).getType()); // 保证 key 的范围
         };
         return RandomUtils.randomPojo(ConfigDO.class, ArrayUtils.append(consumer, consumers));

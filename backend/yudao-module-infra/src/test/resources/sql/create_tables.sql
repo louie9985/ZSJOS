@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS "infra_config" (
     "updater" varchar(64) DEFAULT '',
     "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deleted" bit NOT NULL DEFAULT FALSE,
+    "sensitive" bit NOT NULL DEFAULT 0,
     PRIMARY KEY ("id")
 ) COMMENT '参数配置表';
 

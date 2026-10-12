@@ -164,6 +164,13 @@ public class HrmEmployeeSaveReqVO {
     @Size(max = 500, message = "备注不能超过 500 个字符")
     private String remark;
 
+    @AssertTrue(message = "实际转正、离职日期不能在未来，请填写计划日期")
+    @JsonIgnore
+    public boolean isActualDatesValid() {
+        LocalDateTime now = LocalDateTime.now();
+        return (regularTime == null || !regularTime.isAfter(now)) && (leaveTime == null || !leaveTime.isAfter(now));
+    }
+
     @AssertTrue(message = "身份证号码格式不正确")
     @JsonIgnore
     public boolean isIdNumberValid() {
@@ -174,14 +181,15 @@ public class HrmEmployeeSaveReqVO {
     @AssertTrue(message = "员工状态与聘用形式不匹配")
     @JsonIgnore
     public boolean isStatusValid() {
-        return ObjUtil.notEqual(HrmEmployeeTypeEnum.INFORMAL.getType(), type)
-                || status == null || HrmEmployeeStatusEnum.INFORMAL_STATUSES.contains(status);
+        return status == null || (HrmEmployeeTypeEnum.FORMAL.getType().equals(type)
+                ? HrmEmployeeStatusEnum.FULL_TIME_STATUSES.contains(status)
+                : HrmEmployeeStatusEnum.INFORMAL_STATUSES.contains(status));
     }
 
-    @AssertTrue(message = "非正式员工状态不能为空")
+    @AssertTrue(message = "员工状态不能为空")
     @JsonIgnore
     public boolean isStatusRequired() {
-        return ObjUtil.notEqual(HrmEmployeeTypeEnum.INFORMAL.getType(), type) || status != null;
+        return status != null;
     }
 
     @AssertTrue(message = "在职员工工号不能为空")
@@ -204,4 +212,22 @@ public class HrmEmployeeSaveReqVO {
                 || isBeforeOrEqual(companyAgeStartTime, entryTime);
     }
 
+
+    private LocalDateTime plannedRegularTime;
+    private LocalDateTime plannedLeaveTime;
+    private Long version;
+    @Size(max = 64)
+    private String operationKey;
+    @jakarta.validation.constraints.Pattern(regexp = "CORRECTION|BUSINESS|PLAN")
+    private String changeMode = "CORRECTION";
+    private Integer changeType;
+    private LocalDateTime actualTime;
+    private LocalDateTime plannedTime;
+    @Size(max = 500)
+    private String changeReason;
+    private Long planId;
+    private Long planVersion;
+
+    @JsonIgnore
+    private String commandRequestHash;
 }

@@ -32,6 +32,7 @@ import {
 } from '../../services/api'
 import BpmApprovalActions from './BpmApprovalActions'
 import BusinessContentCard from './BusinessContentCard'
+import FeedbackBusinessContent from '../FeedbackBusinessContent'
 import BpmDynamicForm, {
   formatBpmVariable,
   isBlank,
@@ -420,6 +421,54 @@ export default function BpmApprovalDetail({
     navigate(params.toString() ? `${route}?${params.toString()}` : route, { state: businessRoute.query })
   }
   const showBusinessButton = !!businessEntry || !!businessRoute?.route
+
+  // 需求审批直接在任务详情完成；业务卡由服务端按任务所属轮次提供，不能换成最新需求。
+  if (task.processDefinitionKey === 'zsjos_feedback_requirement_approval'
+    || businessBrief?.bizType === 'feedback' || businessCard?.bizType === 'feedback') {
+    return <article className="business-inbox-detail bpm-approval-detail feedback-task-detail">
+      <header className="feedback-detail-title">
+        <div><Typography.Title level={4}>{businessCard?.title || businessBrief?.title || subject}</Typography.Title>
+          <Typography.Text type="secondary">{task.name} · 发起人：{startUser} · 到达时间：<DateTimeText value={task.createTime}/></Typography.Text></div>
+        {processInstance?.status != null && <Tag color={bpmStatusColor(processInstance.status)}>{bpmStatusLabel(processInstance.status)}</Tag>}
+      </header>
+      <section className="feedback-approval-panel">
+        <div className="feedback-approval-layout">
+          <main className="feedback-approval-content">
+            {view === 'done' && <Alert type="info" showIcon message="已办任务 · 本轮内容只读"/>}
+            {businessCardLoading ? <Skeleton active paragraph={{ rows: 5 }}/> : businessCard?.message
+              ? <Typography.Text type="secondary">{businessCard.message}</Typography.Text>
+              : businessCard && <FeedbackBusinessContent fields={(businessCard.groups || [])
+                // FeedbackContentProvider 的展示分组：流程及重复摘要已由标题与右侧面板承载。
+                .filter(group => group.title !== '反馈信息' && group.title !== '审批')
+                .flatMap((group, groupIndex) => (group.fields || []).map((field, index) => ({
+                  key: `${groupIndex}:${index}`, label: field.label || group.title || '内容', value: field.value,
+                  wide: field.span === 2 || (field.value?.length || 0) > 60,
+                  attachments: field.attachments?.length ? field.attachments.map(file => ({
+                    name: file.name || '附件', url: file.url, type: file.contentType
+                  })) : undefined
+                })))}/>}
+            {!businessCardLoading && !businessCard && <Alert type="error" showIcon message="需求内容加载失败，请重试"
+              action={<Button onClick={() => void loadBusinessCard()}>重试</Button>}/>}
+          </main>
+          <aside className="feedback-approval-sidebar" aria-label="需求审批流程">
+            <Space className="feedback-approval-heading" wrap><Typography.Title level={5}>审批流程</Typography.Title>
+              <Button size="small" loading={detailLoading} onClick={refresh}>刷新流程</Button></Space>
+            {detailError && <Alert type="error" showIcon message={detailError} action={<Button onClick={refresh}>重试</Button>}/>}
+            <Tabs activeKey={activeTab === 'form' ? 'timeline' : activeTab} onChange={setActiveTab} items={[
+              { key: 'timeline', label: '流程', children: detailLoading ? <Skeleton active/> : <ApprovalTimeline detail={detail}/> },
+              { key: 'record', label: '流转记录', children: <TaskRecords tasks={records} loading={recordsLoading}/> },
+              { key: 'comment', label: '评论', children: <CommentList comments={comments} loading={commentsLoading}
+                canComment={canUpdate && todoTask?.id === task.id} taskId={todoTask?.id} onRefresh={loadComments}/> }
+            ]}/>
+            {view === 'todo' && !detailLoading && !detailError && !businessCardLoading && !!businessCard?.groups?.length && (
+              todoTask?.id === task.id ? <BpmApprovalActions task={todoTask} canUpdate={canUpdate} users={users} onSuccess={refresh}/>
+                : <Alert type="info" showIcon message="当前任务已处理、已转办或不在你的待办范围内"/>
+            )}
+          </aside>
+        </div>
+      </section>
+    </article>
+  }
 
   return <article className="business-inbox-detail bpm-approval-detail">
     <header className="business-inbox-detail-hero bpm-approval-detail-hero">

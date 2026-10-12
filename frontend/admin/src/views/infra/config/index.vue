@@ -95,7 +95,9 @@
       <el-table-column label="参数分类" align="center" prop="category" />
       <el-table-column label="参数名称" align="center" prop="name" :show-overflow-tooltip="true" />
       <el-table-column label="参数键名" align="center" prop="key" :show-overflow-tooltip="true" />
-      <el-table-column label="参数键值" align="center" prop="value" />
+      <el-table-column label="参数键值" align="center" prop="value">
+        <template #default="scope">{{ scope.row.sensitive ? (scope.row.configured ? '已配置（保密）' : '待配置') : scope.row.value }}</template>
+      </el-table-column>
       <el-table-column label="是否可见" align="center" prop="visible">
         <template #default="scope">
           <dict-tag :type="DICT_TYPE.INFRA_BOOLEAN_STRING" :value="scope.row.visible" />
@@ -119,7 +121,8 @@
           <el-button
             link
             type="primary"
-            @click="openForm('update', scope.row.id)"
+              @click="openForm('update', scope.row.id)"
+              v-if="!scope.row.sensitive || checkPermi(['infra:config:secret-update'])"
             v-hasPermi="['infra:config:update']"
           >
             编辑
@@ -153,6 +156,7 @@ import { dateFormatter } from '@/utils/formatTime'
 import download from '@/utils/download'
 import * as ConfigApi from '@/api/infra/config'
 import ConfigForm from './ConfigForm.vue'
+import { checkPermi } from '@/utils/permission'
 
 defineOptions({ name: 'InfraConfig' })
 

@@ -87,18 +87,12 @@ public class HrmEmployeeRespVO {
     @Schema(description = "直属上级员工姓名", example = "李四")
     private String leaderEmployeeName;
 
-    @ExcelProperty(value = "入职状态", index = 8, converter = DictConvert.class)
-    @DictFormat(DictTypeConstants.HRM_EMPLOYEE_ENTRY_STATUS)
     @Schema(description = "入职状态", example = "1")
     private Integer entryStatus;
 
-    @ExcelProperty(value = "员工状态", index = 9, converter = DictConvert.class)
-    @DictFormat(DictTypeConstants.HRM_EMPLOYEE_STATUS)
     @Schema(description = "员工状态", example = "1")
     private Integer status;
 
-    @ExcelProperty(value = "聘用形式", index = 10, converter = DictConvert.class)
-    @DictFormat(DictTypeConstants.HRM_EMPLOYEE_TYPE)
     @Schema(description = "聘用形式", example = "1")
     private Integer type;
 
@@ -109,12 +103,12 @@ public class HrmEmployeeRespVO {
     @Schema(description = "试用期，单位月；0 表示无试用期", example = "3")
     private Integer probation;
 
-    @ExcelProperty(value = "转正时间", index = 12)
-    @Schema(description = "转正时间")
+    @ExcelProperty(value = "实际转正日期", index = 12)
+    @Schema(description = "实际转正日期")
     private LocalDateTime regularTime;
 
-    @ExcelProperty(value = "离职时间", index = 13)
-    @Schema(description = "离职时间")
+    @ExcelProperty(value = "实际离职日期", index = 13)
+    @Schema(description = "实际离职日期")
     private LocalDateTime leaveTime;
 
     @ExcelProperty(value = "岗位", index = 5)
@@ -182,5 +176,19 @@ public class HrmEmployeeRespVO {
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
+
+
+    @ExcelProperty("计划转正日期")
+    private LocalDateTime plannedRegularTime;
+    @ExcelProperty("计划离职日期")
+    private LocalDateTime plannedLeaveTime;
+    private Long version;
+    @ExcelProperty("聘用形式")
+    private String typeLabel;
+    @ExcelProperty("员工状态")
+    private String statusLabel;
+    @ExcelProperty("入职状态")
+    private String entryStatusLabel;
+    private String legacyDateSource;
 
 }

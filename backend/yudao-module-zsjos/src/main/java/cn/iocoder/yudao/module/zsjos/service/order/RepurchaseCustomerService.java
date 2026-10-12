@@ -58,9 +58,11 @@ public class RepurchaseCustomerService implements ZsjosObjectPermissionProvider 
         return person;
     }
     private boolean matches(PersonDO p, String name, String mobile, String wechat) {
-        return name != null && name.equals(StrUtil.trim(p.getName())) && (mobile != null || wechat != null)
-                && (mobile == null || mobile.equals(StrUtil.trim(p.getMobile())))
-                && (wechat == null || wechat.equalsIgnoreCase(StrUtil.trim(p.getWechatId())));
+        String storedMobile = StrUtil.trimToNull(p.getMobile()), storedWechat = StrUtil.trimToNull(p.getWechatId());
+        boolean knownContact = mobile != null && mobile.equals(storedMobile) || wechat != null && wechat.equals(storedWechat);
+        return name != null && name.equals(StrUtil.trim(p.getName())) && knownContact
+                && (mobile == null || storedMobile == null || mobile.equals(storedMobile))
+                && (wechat == null || storedWechat == null || wechat.equals(storedWechat));
     }
     private RepurchaseCustomerCheckRespVO result(String status, boolean allowed, String reason) {
         RepurchaseCustomerCheckRespVO r = new RepurchaseCustomerCheckRespVO();

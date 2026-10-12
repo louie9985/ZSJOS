@@ -1,5 +1,10 @@
 # 报名履约与学员 API
 
+历史学员可保留独立服务关系，`orderId`、`orderItemId`、`registrationCaseId` 允许为空，
+不以虚拟成交单补足关联。身份、服务负责人、班级和协作者授权仍由现有 Person／服务关系决定。
+无订单商品时课程信息读取服务自身快照。V310 放开三个来源列；先部署空关联可读的后端，
+再按核准清单清理历史虚拟来源，保留服务编号、协作组、联系记录和已有交付资料。
+
 All endpoints are tenant-scoped Admin APIs and use the standard `CommonResult` wrapper. User-visible Lead values are always `leadNo`; internal IDs remain relationship and route identifiers.
 
 ## Checklist configuration
@@ -19,6 +24,8 @@ disabled, or renamed. New cases snapshot the published version and never follow 
 
 - `GET /zsjos/registration/pool-page?keyword=`：按订单号、学员姓名或手机号分页查询公共池。
 - `POST /zsjos/registration/pool/search-page`：在报名履约公共池固定权限范围内组合关键词与 `advancedFilter`，先筛选再分页。
+- 两种公共池查询均支持可选 `statusGroup`：`pending` 包含 `pending/processing`，`processed` 包含 `completed/cancelled`，`all` 或省略参数不限制状态。非法值校验失败；分类与原 `status`、关键词、高级筛选取交集后分页，权限范围不变。
+- Workbench 顶部提供“待处理、已处理、全部”，默认待处理；切换分类重置分页和选择，完成或关闭后刷新第一页。卡片仍展示具体履约状态。管理端未传分类参数时保留原查询行为。
 - `GET /zsjos/registration/{id}`
 - `GET /zsjos/registration/study-planner-candidates`
 - `GET /zsjos/registration/{id}/routes/{routeId}/candidates`

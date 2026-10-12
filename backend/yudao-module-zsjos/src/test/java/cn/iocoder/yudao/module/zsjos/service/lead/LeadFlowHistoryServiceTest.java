@@ -19,6 +19,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -65,6 +67,56 @@ class LeadFlowHistoryServiceTest {
         when(followUpMapper.selectListByLeadId(7L)).thenReturn(List.of());
         when(agingEventMapper.selectByLeadId(7L)).thenReturn(List.of());
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            ", valid, , 有效",
+            "valid, , 有效, ",
+            ", , , ",
+            "valid, valid, , ",
+            "legacy_unknown, valid, , 有效",
+            "valid, legacy_unknown, 有效, "
+    })
+    void preservesKnownLeadStatusWhenOtherSideIsMissing(String before, String after,
+                                                      String expectedBefore, String expectedAfter) {
+        BusinessEventDO event = event(91L, "lead_qualified_valid", submittedAt.plusHours(1), before, after);
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(event));
+
+        var history = service.getHistory(7L, 99L);
+
+        assertEquals(List.of("event:91", "lead:7"), history.stream().map(LeadFlowHistoryRespVO::getId).toList());
+        var row = history.getFirst();
+        assertEquals(expectedBefore, row.getLeadStatusBefore());
+        assertEquals(expectedAfter, row.getLeadStatusAfter());
+        assertNull(row.getAssignmentStatusBefore());
+        assertNull(row.getAssignmentStatusAfter());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "lead_assignment_accepted, , owned, , 已归属",
+            "lead_assignment_accepted, pending_acceptance, , 待接单, ",
+            "lead_claimed, , owned, , 已归属",
+            "lead_claimed, public_pool, , 抢单池, ",
+            "lead_assignment_accepted, , , , ",
+            "lead_assignment_accepted, owned, owned, , ",
+            "lead_assignment_accepted, legacy_unknown, owned, , 已归属",
+            "lead_assignment_accepted, owned, legacy_unknown, 已归属, "
+    })
+    void preservesKnownAssignmentStatusWhenOtherSideIsMissing(String type, String before, String after,
+                                                            String expectedBefore, String expectedAfter) {
+        BusinessEventDO event = event(92L, type, submittedAt.plusHours(1), before, after);
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(event));
+
+        var history = service.getHistory(7L, 99L);
+
+        assertEquals(List.of("event:92", "lead:7"), history.stream().map(LeadFlowHistoryRespVO::getId).toList());
+        var row = history.getFirst();
+        assertEquals(expectedBefore, row.getAssignmentStatusBefore());
+        assertEquals(expectedAfter, row.getAssignmentStatusAfter());
+        assertNull(row.getLeadStatusBefore());
+        assertNull(row.getLeadStatusAfter());
     }
 
     @Test

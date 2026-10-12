@@ -28,7 +28,7 @@ class ExamAttachmentLifecycleTest {
     }
     @BeforeEach void setup() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }
-    ExamScheduleSaveReqVO request() { return new ExamScheduleSaveReqVO().setScheduleName("考试通知").setScheduleType("EXACT")
+    ExamScheduleSaveReqVO request() { return new ExamScheduleSaveReqVO().setIdempotencyKey(java.util.UUID.randomUUID().toString()).setScheduleName("考试通知").setScheduleType("EXACT")
             .setExactDate(LocalDate.of(2099,1,1)).setRemark("原备注"); }
     ExamScheduleDO row() { return new ExamScheduleDO().setId(5L).setScheduleName("考试通知").setScheduleType("EXACT")
             .setExactDate(LocalDate.of(2099,1,1)).setRecordStatus("DRAFT").setCalendarVersion(2).setRemark("原备注").setAttachmentIdsJson("[11]"); }

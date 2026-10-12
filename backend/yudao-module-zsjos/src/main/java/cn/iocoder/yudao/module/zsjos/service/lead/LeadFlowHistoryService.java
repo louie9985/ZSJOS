@@ -273,7 +273,7 @@ public class LeadFlowHistoryService {
     private static boolean isLeadStatus(String status) {
         return status != null && Set.of("submitted", "suspended", "valid", "converted", "invalid", "won", "closed").contains(status);
     }
-    private static String leadStatusLabel(String status) { return Map.ofEntries(
+    private static String leadStatusLabel(String status) { if (status == null) return null; return Map.ofEntries(
             Map.entry("submitted", "已提交"), Map.entry("suspended", "已挂起"),
             Map.entry("valid", "有效"), Map.entry("converted", "有效"), Map.entry("invalid", "无效"),
             Map.entry("won", "已成交"), Map.entry("closed", "已关闭")
@@ -300,7 +300,7 @@ public class LeadFlowHistoryService {
             default -> null;
         };
     }
-    private static String assignmentStatusLabel(String status) { return Map.ofEntries(
+    private static String assignmentStatusLabel(String status) { if (status == null) return null; return Map.ofEntries(
             Map.entry("unassigned", "未分配"), Map.entry("pending_acceptance", "待接单"),
             Map.entry("owned", "已归属"), Map.entry("public_pool", "抢单池"),
             Map.entry("recycle_pending", "回收待处理"), Map.entry("closed", "已关闭")

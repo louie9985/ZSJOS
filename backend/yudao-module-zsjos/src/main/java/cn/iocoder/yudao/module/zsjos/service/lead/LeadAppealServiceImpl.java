@@ -79,6 +79,42 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
+    public boolean canReviewAppeal(Long appealId, Long userId) {
+        LeadAppealDO appeal = appealMapper.selectById(appealId);
+        return userId != null && appeal != null && reviewPermission(appeal) != null
+                && permissionApi.hasAnyPermissions(userId, reviewPermission(appeal)) && canReview(appeal, userId);
+    }
+
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(
+            bizType = "lead-appeal-review", bizId = "#appealId", action = "read")
+    @Transactional(readOnly = true)
+    public LeadAppealContextRespVO getReviewContext(Long appealId, String taskId, Long userId) {
+        if (taskId == null || taskId.isBlank() || !canReviewAppeal(appealId, userId)) {
+            throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        }
+        LeadAppealDO appeal = appealMapper.selectById(appealId);
+        BpmTaskRespDTO task = processTaskApi.getDoneTask(userId, taskId);
+        boolean pending = task == null;
+        if (task == null) task = processTaskApi.getTodoTask(userId, taskId);
+        // The inbox task grants only this Lead's appeal context, never general Lead visibility.
+        if (task == null || !Objects.equals(task.getTaskDefinitionKey(), APPEAL_TASK_DEFINITION_KEY)
+                || !Objects.equals(task.getBusinessKey(), APPEAL_BUSINESS_KEY_PREFIX + appealId)
+                || !Objects.equals(task.getProcessInstanceId(), appeal.getProcessInstanceId())) {
+            throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        }
+        LeadDO lead = requireLead(appeal.getLeadId());
+        List<LeadAppealDO> rows = appealMapper.selectListByLeadId(lead.getId());
+        var identity = identityMaskingService.resolve(userId, lead);
+        var users = identityUsers(rows);
+        boolean actionable = pending && canHandleAppeal(appealId, userId)
+                && LeadAppealCycles.key(appeal) == eventMapper.selectLatestInvalidId(lead.getId());
+        List<LeadAppealRespVO> records = rows.stream().map(row -> convert(row, lead,
+                actionable && Objects.equals(row.getId(), appealId) ? taskId : null, users, identity)).toList();
+        return context(lead, records, false);
+    }
+
+    @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
         if (!leadObjectPermissionService.canReadDetail(lead, userId) || !canReadAppealRecords(lead, userId)) {
@@ -88,6 +124,37 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         LeadIdentityMaskingService.LeadIdentityViewContext context = identityMaskingService.resolve(userId, lead);
         Map<Long, AdminUserRespDTO> users = identityUsers(rows);
         return rows.stream().map(item -> convert(item, lead, null, users, context)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public LeadAppealContextRespVO getAppealContext(Long leadId, Long userId) {
+        var records = getLeadAppeals(leadId, userId);
+        LeadDO lead = requireLead(leadId);
+        boolean submitter = PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(lead.getProviderOwnerId(), userId)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:lead:appeal:create");
+        return context(lead, records, submitter);
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public LeadAppealContextRespVO getPartnerAppealContext(Long leadId, Long partnerId) {
+        var records = getPartnerLeadAppeals(leadId, partnerId);
+        LeadDO lead = requireLead(leadId);
+        return context(lead, records, PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                && Objects.equals(lead.getProviderOwnerId(), partnerId));
+    }
+
+    private LeadAppealContextRespVO context(LeadDO lead, List<LeadAppealRespVO> records, boolean submitter) {
+        long cycle = eventMapper.selectLatestInvalidId(lead.getId());
+        Integer next = LeadAppealCycles.nextRound(appealMapper.selectListByLeadId(lead.getId()), cycle);
+        var result = new LeadAppealContextRespVO();
+        result.setInvalidEventId(cycle);
+        result.setNextRoundNo(next);
+        result.setCanSubmit(submitter && STATUS_INVALID.equals(lead.getStatus()) && next != null);
+        result.setRecords(records);
+        return result;
     }
 
     /** Submitters may read the appeal history of their own Lead; other readers need appeal capability. */
@@ -131,11 +198,13 @@ public class LeadAppealServiceImpl implements LeadAppealService {
                     || !Objects.equals(lead.getProviderOwnerId(), userId))) {
             throw exception(LEAD_APPEAL_STATE_INVALID);
         }
-        LeadAppealDO previous = appealMapper.selectLatestByLeadId(leadId);
-        int roundNo = previous == null ? 1 : previous.getRoundNo() + 1;
-        if (roundNo > 3 || previous != null && !APPEAL_STATUS_UPHELD.equals(previous.getStatus())) {
+        long cycle = eventMapper.selectLatestInvalidId(leadId);
+        Integer nextRound = LeadAppealCycles.nextRound(appealMapper.selectListByLeadId(leadId), cycle);
+        if (!Objects.equals(reqVO.getInvalidEventId(), cycle)) throw exception(LeadAppealCycles.STALE);
+        if (nextRound == null) {
             throw exception(LEAD_APPEAL_STATE_INVALID);
         }
+        int roundNo = nextRound;
         ReviewerResolution resolution = resolveReviewers(roundNo, lead);
         List<Long> reviewers = resolution.reviewerUserIds();
         String processDefinitionId = requireAppealProcessDefinition();
@@ -144,6 +213,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         LocalDateTime now = LocalDateTime.now();
         LeadAppealDO appeal = new LeadAppealDO();
         appeal.setLeadId(leadId);
+        appeal.setInvalidEventId(cycle);
         appeal.setRoundNo(roundNo);
         appeal.setReviewStage(stage(roundNo));
         appeal.setStatus(reviewingStatus(roundNo));
@@ -171,6 +241,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             processVariables.put("leadId", leadId);
             processVariables.put("leadNo", lead.getLeadNo());
             processVariables.put("roundNo", roundNo);
+            processVariables.put("invalidEventId", cycle);
             processVariables.put("reviewStage", appeal.getReviewStage());
             processReq.setVariables(processVariables);
             processReq.setStartUserSelectAssignees(Map.of(APPEAL_TASK_DEFINITION_KEY, reviewers));
@@ -358,6 +429,9 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     private void decide(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO, boolean overturn) {
+        LeadAppealDO observed = appealMapper.selectById(appealId);
+        if (observed == null) throw exception(LEAD_APPEAL_NOT_EXISTS);
+        LeadDO lead = requireLeadForUpdate(observed.getLeadId());
         LeadAppealDO appeal = appealMapper.selectByIdForUpdate(appealId, TenantContextHolder.getRequiredTenantId());
         if (appeal == null) throw exception(LEAD_APPEAL_NOT_EXISTS);
         LeadAppealDO duplicate = appealMapper.selectByDecisionIdempotencyKey(reqVO.getIdempotencyKey());
@@ -370,7 +444,9 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         if (!Objects.equals(appeal.getStatus(), reviewingStatus(appeal.getRoundNo()))) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
-        LeadDO lead = requireLeadForUpdate(appeal.getLeadId());
+        if (!STATUS_INVALID.equals(lead.getStatus()) || LeadAppealCycles.key(appeal) != eventMapper.selectLatestInvalidId(lead.getId())) {
+            throw exception(LEAD_APPEAL_STATE_INVALID);
+        }
         if (!permissionApi.hasAnyPermissions(userId, reviewPermission)) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
@@ -483,6 +559,26 @@ public class LeadAppealServiceImpl implements LeadAppealService {
                 .map(AdminUserRespDTO::getId).distinct().sorted().toList();
     }
 
+    @Override
+    public boolean canHandleAppeal(Long appealId, Long userId) {
+        if (userId == null) return false;
+        LeadAppealDO appeal = appealMapper.selectById(appealId);
+        if (appeal == null || appeal.getStatus() == null || !appeal.getStatus().endsWith("_reviewing")
+                || appeal.getProcessInstanceId() == null) return false;
+        String permission = reviewPermission(appeal);
+        if (permission == null || !permissionApi.hasAnyPermissions(userId, permission)
+                || !canReview(appeal, userId)) return false;
+        // A role grant alone cannot prove assignment to the live workflow task.
+        return processTaskApi.getPendingTasks(appeal.getProcessInstanceId()).stream()
+                .filter(task -> Objects.equals(task.assigneeUserId(), userId)
+                        && APPEAL_TASK_DEFINITION_KEY.equals(task.taskDefinitionKey()))
+                .anyMatch(pending -> {
+                    BpmTaskRespDTO task = processTaskApi.getTodoTask(userId, pending.id());
+                    return task != null && Objects.equals(task.getProcessInstanceId(), appeal.getProcessInstanceId())
+                            && Objects.equals(task.getBusinessKey(), APPEAL_BUSINESS_KEY_PREFIX + appealId);
+                });
+    }
+
     private boolean canReview(LeadAppealDO appeal, Long userId) {
         return canReview(appeal, userId, adminUserApi.getUser(userId));
     }
@@ -551,6 +647,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         LeadAppealRespVO result = new LeadAppealRespVO();
         result.setId(source.getId()); result.setLeadId(source.getLeadId()); result.setLeadNo(lead.getLeadNo());
         result.setLeadName(lead.getSubmittedName());
+        result.setInvalidEventId(LeadAppealCycles.key(source));
+        result.setCurrentCycle(LeadAppealCycles.key(source) == eventMapper.selectLatestInvalidId(lead.getId()));
         result.setRoundNo(source.getRoundNo()); result.setReviewStage(source.getReviewStage()); result.setStatus(source.getStatus());
         result.setApplicantUserId(source.getApplicantUserId());
         result.setApplicantUserName(source.getApplicantUserId() == null ? null
@@ -565,7 +663,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
                 : userNames == null ? userName(source.getReviewerUserId()) : userNames.get(source.getReviewerUserId()));
         result.setDecisionReason(source.getDecisionReason()); result.setDecisionEvidence(toEvidenceVO(source.getDecisionEvidenceRefs()));
         result.setSubmittedAt(source.getSubmittedAt()); result.setDecidedAt(source.getDecidedAt());
-        result.setCanSubmitNextRound(APPEAL_STATUS_UPHELD.equals(source.getStatus()) && source.getRoundNo() < 3);
+        result.setCanSubmitNextRound(Boolean.TRUE.equals(result.getCurrentCycle()) && STATUS_INVALID.equals(lead.getStatus()) && APPEAL_STATUS_UPHELD.equals(source.getStatus()) && source.getRoundNo() < 3);
         return result;
     }
 

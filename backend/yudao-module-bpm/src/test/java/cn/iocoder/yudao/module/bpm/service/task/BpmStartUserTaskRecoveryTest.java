@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelSaveReqVO;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmActivityBehaviorFactory;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.strategy.dept.BpmTaskCandidateStartUserSelectStrategy;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.strategy.other.BpmTaskCandidateExpressionStrategy;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
@@ -17,6 +18,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.flowable.engine.delegate.DelegateExecution;
 import org.junit.jupiter.api.*;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -110,6 +112,49 @@ class BpmStartUserTaskRecoveryTest {
     }
 
     @Test
+    void correctedModelAdvancesStarterToSelectedReviewerWithoutLegacyVariable() throws Exception {
+        var instances = mock(BpmProcessInstanceService.class);
+        when(instances.getProcessInstance(anyString())).thenAnswer(call -> engine.getRuntimeService()
+                .createProcessInstanceQuery().processInstanceId(call.getArgument(0))
+                .includeProcessVariables().singleResult());
+        var selected = new BpmTaskCandidateStartUserSelectStrategy();
+        ReflectionTestUtils.setField(selected, "processInstanceService", instances);
+        doAnswer(call -> {
+            DelegateExecution execution = call.getArgument(0);
+            if ("StartUserNode".equals(execution.getCurrentActivityId())) return Set.of(40L);
+            assertEquals(35, cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils
+                    .parseCandidateStrategy(execution.getCurrentFlowElement()));
+            return selected.calculateUsersByTask(execution, null);
+        }).when(invoker).calculateUsersByTask(any());
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.exists(root.resolve("script/bpm/manifest.json"))) root = root.getParent();
+        var asset = JsonUtils.parseObject(Files.readString(Objects.requireNonNull(root).resolve(
+                "script/bpm/zsjos_lead_appeal_review/2.0.0/process-model.json")), BpmModelSaveReqVO.class);
+        var deployment = engine.getRepositoryService().createDeployment().tenantId("1")
+                .addBpmnModel(asset.getKey() + ".bpmn20.xml", SimpleModelUtils.buildBpmnModel(
+                        asset.getKey(), asset.getName(), asset.getSimpleModel())).deploy();
+        var definition = engine.getRepositoryService().createProcessDefinitionQuery()
+                .deploymentId(deployment.getId()).singleResult();
+        var instance = engine.getRuntimeService().createProcessInstanceBuilder().processDefinitionId(definition.getId())
+                .businessKey("lead-appeal:corrected-fixture").variables(Map.of(
+                        PROCESS_INSTANCE_VARIABLE_START_USER_SELECT_ASSIGNEES, Map.of("appealReview", List.of(21L)),
+                        PROCESS_INSTANCE_VARIABLE_START_USER_ID, 40L)).start();
+        var starter = engine.getTaskService().createTaskQuery().processInstanceId(instance.getId()).singleResult();
+        assertEquals("StartUserNode", starter.getTaskDefinitionKey());
+        // The automatic starter handler completes this same engine task; the real
+        // selection strategy must consume the business-supplied map at the next node.
+        engine.getTaskService().complete(starter.getId());
+        var task = engine.getTaskService().createTaskQuery().processInstanceId(instance.getId()).singleResult();
+        assertEquals("appealReview", task.getTaskDefinitionKey());
+        assertEquals("21", task.getAssignee());
+        assertFalse(engine.getRuntimeService().hasVariable(instance.getId(), "coll_userList"));
+        assertNotNull(engine.getHistoryService().createHistoricTaskInstanceQuery()
+                .taskId(starter.getId()).singleResult().getEndTime());
+        assertNotNull(engine.getTaskService().createTaskQuery().taskId(request.startTaskId()).singleResult(),
+                "Publishing a corrected model must not silently change an old instance");
+    }
+
+    @Test
     void rejectsTenantPermissionAndChangedSnapshotWithoutWrites() {
         TenantContextHolder.setTenantId(2L);
         assertThrows(IllegalStateException.class, () -> recovery.recover(request));
@@ -130,6 +175,22 @@ class BpmStartUserTaskRecoveryTest {
         assertThrows(RuntimeException.class, () -> recovery.recover(request));
         assertFalse(engine.getRuntimeService().hasVariable(request.instanceId(), "coll_userList"));
         assertFalse(engine.getRuntimeService().hasVariable(request.instanceId(), "bpm_start_task_recovery"));
+        assertNotNull(engine.getTaskService().createTaskQuery().taskId(request.startTaskId()).singleResult());
+        assertEquals(1, engine.getTaskService().getProcessInstanceComments(request.instanceId()).size());
+    }
+
+    @Test
+    void businessRecheckSharesEngineTransactionAndCanAbortBeforeMutation() {
+        var called = new java.util.concurrent.atomic.AtomicBoolean();
+        var failure = assertThrows(RuntimeException.class, () -> recovery.recover(request, () -> {
+            assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+            called.set(true);
+            throw new IllegalStateException("Business snapshot changed");
+        }));
+        assertInstanceOf(IllegalStateException.class, failure.getCause());
+        assertEquals("Business snapshot changed", failure.getCause().getMessage());
+        assertTrue(called.get());
+        assertFalse(engine.getRuntimeService().hasVariable(request.instanceId(), "coll_userList"));
         assertNotNull(engine.getTaskService().createTaskQuery().taskId(request.startTaskId()).singleResult());
         assertEquals(1, engine.getTaskService().getProcessInstanceComments(request.instanceId()).size());
     }

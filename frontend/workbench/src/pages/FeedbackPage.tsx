@@ -24,6 +24,7 @@ import {
 } from '../services/feedbackApi'
 import { formatTimestamp } from '../services/time'
 import FeedbackApprovalPanel from '../components/FeedbackApprovalPanel'
+import FeedbackBusinessContent from '../components/FeedbackBusinessContent'
 import { useSearchParams } from 'react-router-dom'
 import ResizableDrawer from '../components/ResizableDrawer'
 import { FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
@@ -312,6 +313,34 @@ export default function FeedbackPage({ permissions, tenantReadAll = false }: { p
 
   const visibleEntries = useMemo(() => portal?.entries.filter(entry => hasPermission(permissions, TYPE_META[entry.feedbackType].permission)) || [], [permissions, portal])
 
+  const detailSummary = detail && <>
+    {approverView && <Alert
+      className="feedback-detail-alert"
+      type="info"
+      showIcon
+      message="审批人视角"
+      description={`这是 ${detail.submitterName || '员工'} 提交的需求，需求内容只读；当前待办可在右侧完成审批。`}
+    />}
+    <Descriptions bordered size="small" column={1} items={[
+      { key: 'type', label: '类型', children: TYPE_META[detail.feedbackType].label },
+      { key: 'submitter', label: '提交人', children: detail.submitterName || '-' },
+      ...(detail.approvalRoundNo ? [{ key: 'round', label: '审批轮次', children: `第 ${detail.approvalRoundNo} 轮` }] : []),
+      { key: 'assignee', label: '当前处理人', children: detail.assigneeName || '待分派' },
+      { key: 'activity', label: '最后更新', children: formatTimestamp(detail.lastActivityAt) }
+    ]}/>
+    {detail.rejectReason && <Alert className="feedback-detail-alert" type="error" showIcon message="审批驳回" description={detail.rejectReason}/>}
+  </>
+  const detailFollowUp = detail && <>
+    {detail.completedResult && <section className="feedback-detail-section"><Typography.Title level={5}>处理结果</Typography.Title><p>{detail.completedResult}</p><AttachmentLinks items={detail.resultAttachments}/></section>}
+    <section className="feedback-detail-section"><Typography.Title level={5}>沟通记录</Typography.Title>{detail.replies?.length ? <Timeline items={detail.replies.map(reply => ({ children: <div><div><strong>{reply.authorName || '未知用户'}</strong><Tag className="feedback-author-tag">{reply.authorType === 'EMPLOYEE' ? '员工' : '处理人员'}</Tag></div><p>{reply.content}</p><AttachmentLinks items={reply.attachments}/><Typography.Text type="secondary">{formatTimestamp(reply.createTime)}</Typography.Text></div> }))}/> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无沟通记录"/>}</section>
+    {detail.survey && <section className="feedback-detail-section"><Typography.Title level={5}>满意度</Typography.Title>{detail.survey.status === 'PENDING' ? <Alert type="info" showIcon message="等待评价"/> : <ValueDescriptions fields={detail.survey.fields} values={detail.survey.values}/>}</section>}
+    <div className="feedback-detail-actions">
+      {!readOnly && detail.canResubmit && hasPermission(permissions, 'zsjos:feedback:requirement:create') && <Button onClick={() => void openResubmit()}>修改并重提</Button>}
+      {!readOnly && detail.canReply && hasPermission(permissions, 'zsjos:feedback:reply-self') && <Button icon={<MessageOutlined/>} onClick={() => setReplyOpen(true)}>回复</Button>}
+      {!readOnly && detail.canSubmitSurvey && hasPermission(permissions, 'zsjos:feedback:survey:submit') && <Button type="primary" onClick={() => { surveyForm.resetFields(); setSurveyOpen(true) }}>满意度评价</Button>}
+    </div>
+  </>
+
   return <section className="workspace-page feedback-page">
     <header className="feedback-page-header">
       <div>
@@ -371,38 +400,25 @@ export default function FeedbackPage({ permissions, tenantReadAll = false }: { p
       {editor && <FeedbackDynamicForm form={editorForm} fields={editor.form.fields}/>}
     </Modal>
 
-    <ResizableDrawer open={detailOpen} onClose={() => setDetailOpen(false)} width="min(720px, 100vw)" defaultSize={720} minSize={560} storageKey={FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY} title={detail?.feedbackNo || '反馈详情'}>
+    <ResizableDrawer key={detail?.feedbackType === 'REQUIREMENT' ? 'requirement' : 'feedback'} open={detailOpen} onClose={() => setDetailOpen(false)} width="100vw" defaultSize={detail?.feedbackType === 'REQUIREMENT' ? 'min(1400px, 92vw)' : 720} minSize={detail?.feedbackType === 'REQUIREMENT' ? 1000 : 560} storageKey={FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY} title={detail?.feedbackNo || '反馈详情'}>
       {detailError && <Alert type="error" showIcon message={detailError} action={<Button onClick={() => detailId && void loadDetail(detailId)}>重试</Button>}/>}
       {detailLoading ? <Skeleton active paragraph={{ rows: 8 }}/> : detail && <div className="feedback-detail">
         <div className="feedback-detail-title"><div><Typography.Title level={4}>{detail.title}</Typography.Title><Typography.Text type="secondary">{formatTimestamp(detail.createTime)}</Typography.Text></div><Tag color={STATUS_META[detail.status].color}>{STATUS_META[detail.status].label}</Tag></div>
-        {approverView && <Alert
-          className="feedback-detail-alert"
-          type="info"
-          showIcon
-          message="审批人视角"
-          description={`这是 ${detail.submitterName || '员工'} 提交的需求，你以审批人身份查看，不能在此修改或回复。`}
-        />}
-        <Descriptions bordered size="small" column={1} items={[
-          { key: 'type', label: '类型', children: TYPE_META[detail.feedbackType].label },
-          { key: 'submitter', label: '提交人', children: detail.submitterName || '-' },
-          ...(detail.approvalRoundNo ? [{ key: 'round', label: '审批轮次', children: `第 ${detail.approvalRoundNo} 轮` }] : []),
-          { key: 'assignee', label: '当前处理人', children: detail.assigneeName || '待分派' },
-          { key: 'activity', label: '最后更新', children: formatTimestamp(detail.lastActivityAt) }
-        ]}/>
-        {detail.rejectReason && <Alert className="feedback-detail-alert" type="error" showIcon message="审批驳回" description={detail.rejectReason}/>}
         {detail.feedbackType === 'REQUIREMENT' ? <FeedbackApprovalPanel key={`${detail.id}:${approverView}:${readOnly}`} id={detail.id} approver={approverView}
+          contentFooter={detail.completedResult || detail.replies?.length || detail.survey || detail.canReply || detail.canResubmit || detail.canSubmitSurvey ? detailFollowUp : undefined}
           readOnly={readOnly || approverView} canUrge={hasPermission(permissions, 'zsjos:feedback:requirement:urge')}
-          renderValues={(fields, values) => <ValueDescriptions fields={fields} values={values}/>}
-          onUrged={() => { void refreshAll() }}/>
-          : <><Typography.Title level={5}>提交内容</Typography.Title><ValueDescriptions fields={detail.fields} values={detail.values}/></>}
-        {detail.completedResult && <section className="feedback-detail-section"><Typography.Title level={5}>处理结果</Typography.Title><p>{detail.completedResult}</p><AttachmentLinks items={detail.resultAttachments}/></section>}
-        <section className="feedback-detail-section"><Typography.Title level={5}>沟通记录</Typography.Title>{detail.replies?.length ? <Timeline items={detail.replies.map(reply => ({ children: <div><div><strong>{reply.authorName || '未知用户'}</strong><Tag className="feedback-author-tag">{reply.authorType === 'EMPLOYEE' ? '员工' : '处理人员'}</Tag></div><p>{reply.content}</p><AttachmentLinks items={reply.attachments}/><Typography.Text type="secondary">{formatTimestamp(reply.createTime)}</Typography.Text></div> }))}/> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无沟通记录"/>}</section>
-        {detail.survey && <section className="feedback-detail-section"><Typography.Title level={5}>满意度</Typography.Title>{detail.survey.status === 'PENDING' ? <Alert type="info" showIcon message="等待评价"/> : <ValueDescriptions fields={detail.survey.fields} values={detail.survey.values}/>}</section>}
-        <div className="feedback-detail-actions">
-          {!readOnly && detail.canResubmit && hasPermission(permissions, 'zsjos:feedback:requirement:create') && <Button onClick={() => void openResubmit()}>修改并重提</Button>}
-          {!readOnly && detail.canReply && hasPermission(permissions, 'zsjos:feedback:reply-self') && <Button icon={<MessageOutlined/>} onClick={() => setReplyOpen(true)}>回复</Button>}
-          {!readOnly && detail.canSubmitSurvey && hasPermission(permissions, 'zsjos:feedback:survey:submit') && <Button type="primary" onClick={() => { surveyForm.resetFields(); setSurveyOpen(true) }}>满意度评价</Button>}
-        </div>
+          canApprove={!readOnly && hasPermission(permissions, 'bpm:task:query') && hasPermission(permissions, 'bpm:task:update')}
+          renderValues={(fields, values) => <FeedbackBusinessContent fields={fields.map(field => ({
+            key: field.key, label: field.label, value: displayValue(values[field.key]),
+            wide: field.type === 'textarea' || displayValue(values[field.key]).length > 60,
+            attachments: ['upload', 'image'].includes(field.type) ? fileValues(values[field.key]).map(file => ({
+              name: file.name || '附件', url: file.url, type: file.type, size: file.size
+            })) : undefined
+          }))}/>}
+          onUrged={() => { void refreshAll() }}
+          onActionSuccess={() => { void Promise.all([loadDetail(detail.id), refreshAll()]) }}/>
+          : <>{detailSummary}<Typography.Title level={5}>提交内容</Typography.Title><ValueDescriptions fields={detail.fields} values={detail.values}/>{detailFollowUp}</>}
+
       </div>}
     </ResizableDrawer>
 

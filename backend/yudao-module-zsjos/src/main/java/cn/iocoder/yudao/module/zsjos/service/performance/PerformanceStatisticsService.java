@@ -20,6 +20,8 @@ public class PerformanceStatisticsService {
  @Resource private PerformanceDetailMapper detailQueries;
  @Resource private PerformanceTargetService targets;
  @Resource private PerformanceReportMapper reports;
+ @Resource private ConversionSnapshotMapper conversionSnapshots;
+ @Resource private OrderDetailsService orderDetailsService;
  private Clock clock=Clock.system(ZONE);
  private Long tenant(){return TenantContextHolder.getRequiredTenantId();}
  private LocalDateTime now(){return LocalDateTime.now(clock);}
@@ -43,7 +45,7 @@ public class PerformanceStatisticsService {
  private PerformanceAggregate amount(Map<String,PerformanceAggregate> data,Window w,String group){return data.getOrDefault(w.key()+"/"+group,new PerformanceAggregate());}
  private Metric metric(Window w,PerformanceAggregate a,PerformanceConversion.Population population){
   var people=population.at(w);long converted=people.values().stream().filter(x->x.order()!=null).count();
-  return new Metric(w.key(),w.label(),w.start(),w.end(),a.getAmount(),a.getCount(),converted,people.size(),ratio(BigDecimal.valueOf(converted),BigDecimal.valueOf(people.size())),ratio(a.getAverageAmount(),BigDecimal.valueOf(a.getAverageOrders())),a.getAverageAmount(),a.getAverageOrders());
+  return new Metric(w.key(),w.label(),w.start(),w.end(),a.getAmount(),a.getCount(),converted,people.size(),ratio(BigDecimal.valueOf(converted),BigDecimal.valueOf(people.size())),ratio(a.getAverageAmount(),BigDecimal.valueOf(a.getAverageOrders())),a.getAverageAmount(),a.getAverageOrders()).withSourceReview(population.assessment(w).sourceReviewCount());
  }
  private List<PerformanceFact> conversionReceipts(PerformanceReportQuery r,List<PerformanceFact> orders){
   r.setConversionLeadIds(orders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(Collectors.toSet()));return detailQueries.conversionReceipts(r);
@@ -52,10 +54,11 @@ public class PerformanceStatisticsService {
   var selected=orders.stream().filter(x->w.contains(x.getOccurredAt())).toList();
   BigDecimal amount=selected.stream().map(PerformanceFact::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
   var avg=selected.stream().filter(x->eligibleAverage(x.getAmount())).toList();
-  var population=PerformanceConversion.population(w,orders,receipts);
+  var assessment=new PerformanceConversion.Population(orders,receipts).assessment(w);
+  var population=assessment.eligible();
   long won=population.values().stream().filter(x->x.order()!=null).count();
   BigDecimal averageAmount=avg.stream().map(PerformanceFact::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
-  return new Metric(w.key(),w.label(),w.start(),w.end(),amount,selected.size(),won,population.size(),ratio(BigDecimal.valueOf(won),BigDecimal.valueOf(population.size())),ratio(averageAmount,BigDecimal.valueOf(avg.size())),averageAmount,avg.size());
+  return new Metric(w.key(),w.label(),w.start(),w.end(),amount,selected.size(),won,population.size(),ratio(BigDecimal.valueOf(won),BigDecimal.valueOf(population.size())),ratio(averageAmount,BigDecimal.valueOf(avg.size())),averageAmount,avg.size()).withSourceReview(assessment.sourceReviewCount());
  }
  public Overview overview(Query q) {
   var n=now();var r=request(q,n);
@@ -180,6 +183,12 @@ public class PerformanceStatisticsService {
   return new Detail(x.getId(),x.getNumber(),"task",label,x.getOccurredAt(),null,state,x.getLeadId(),names.computeIfAbsent(x.getOwnerUserId(),this::userName),names.computeIfAbsent(x.getUserId(),this::userName),x.getReceivedAt(),x.getDueAt(),x.getCategory(),x.getStage(),(pending(x)||Boolean.TRUE.equals(x.getCurrentQualification())&&"overdue".equals(x.getOutcome()))&&x.getDueAt()!=null&&x.getDueAt().isBefore(n)?Duration.between(x.getDueAt(),n).toMinutes():null);
  }
  public List<MissingTarget> missingTargets(Query q){access.authorize(q,false);if(!access.has("zsjos:sales-performance-target:query"))throw PerformanceAccess.denied();return targets.missing(q.getScopeType(),q.getScopeId(),now().toLocalDate().withDayOfMonth(1));}
+ public cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.OrderDetailVO.Response orderDetails(
+   cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.OrderDetailVO.Query q) {
+  if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
+  var n=now();var r=request(q,n);var w=reportRange(q,r,n);
+  return orderDetailsService.read(q,r,w,n);
+ }
  public PageResult<Detail> details(Query q){
   if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
   access.authorize(q,false);
@@ -208,11 +217,43 @@ public class PerformanceStatisticsService {
   }).toList();
   return new PageResult<>(rows,total);
  }
+ public cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.ConversionDetailVO.Response conversionDetails(
+   cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.ConversionDetailVO.Query query) {
+  if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
+  var n=now();var request=request(query,n);var window=reportRange(query,request,n);
+  var orders=detailQueries.conversionOrders(request);
+  var receipts=conversionReceipts(request,orders);
+  var assessment=new PerformanceConversion.Population(orders,receipts).assessment(window);
+  if(!assessment.ready())return ConversionDetails.reviewRequired(window,n,assessment.sourceReviewCount());
+  var population=assessment.eligible();
+  var leads=new ArrayList<ConversionSnapshotMapper.Lead>();var products=new ArrayList<ConversionSnapshotMapper.Product>();
+  var leadIds=new ArrayList<>(population.keySet());
+  var orderIds=population.values().stream().map(PerformanceConversion.Row::order).filter(Objects::nonNull).map(PerformanceFact::getId).distinct().toList();
+  // Bound SQL IN lists while retaining the same authorized, unique-lead population for every facet.
+  for(int i=0;i<leadIds.size();i+=500)leads.addAll(conversionSnapshots.leads(request.getTenant(),leadIds.subList(i,Math.min(i+500,leadIds.size()))));
+  for(int i=0;i<orderIds.size();i+=500)products.addAll(conversionSnapshots.products(request.getTenant(),orderIds.subList(i,Math.min(i+500,orderIds.size()))));
+  return ConversionDetails.assemble(query,window,n,population,leads,products);
+ }
  private PageResult<Detail> conversionDetails(PerformanceDetailQuery request,Window window){
+  // A legacy dimension filter cannot hide an unresolved source in the authorized headline population.
+  if(request.getDimension()!=null || request.getGroupKey()!=null){
+   var dimension=request.getDimension();var group=request.getGroupKey();
+   try {
+    request.setDimension(null);request.setGroupKey(null);
+    var allOrders=detailQueries.conversionOrders(request);
+    request.setConversionLeadIds(allOrders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(Collectors.toSet()));
+    var allReceipts=detailQueries.conversionReceipts(request);
+    if(!new PerformanceConversion.Population(allOrders,allReceipts).assessment(window).ready())
+     throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.LeadSourceErrorCodes.CONVERSION_SOURCE_REVIEW_REQUIRED);
+   } finally {request.setDimension(dimension);request.setGroupKey(group);}
+  }
   var orders=detailQueries.conversionOrders(request);
   request.setConversionLeadIds(orders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(Collectors.toSet()));
   var receipts=detailQueries.conversionReceipts(request);
-  var population=PerformanceConversion.population(window,orders,receipts);
+  var assessment=new PerformanceConversion.Population(orders,receipts).assessment(window);
+  if(!assessment.ready())throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+    cn.iocoder.yudao.module.zsjos.enums.LeadSourceErrorCodes.CONVERSION_SOURCE_REVIEW_REQUIRED);
+  var population=assessment.eligible();
   Map<Long,String> numbers=new HashMap<>();
   receipts.stream().filter(x->x.getNumber()!=null).forEach(x->numbers.putIfAbsent(x.getLeadId(),x.getNumber()));
   var page=population.entrySet().stream().skip(request.getOffset()).limit(request.getSize()).map(e->{

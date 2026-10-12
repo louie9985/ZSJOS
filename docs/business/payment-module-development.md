@@ -61,6 +61,12 @@ Lead / Person 跟进 -> PurchaseIntent 草稿
 
 签名规则：排除 `sign`、`null`、空字符串；字段名按 ASCII 升序；以 `key=value&...` 连接；UTF-8 编码；`SHA1withRSA`、PKCS#1 v1.5；标准 Base64。
 
+### 录单联系方式与支付草稿（2026-10-10）
+
+订单正式提交和补正要求手机号、微信号均非空；暂存购买草稿和生成支付链接继续沿用原条件。已有客户资料的空项补齐仅在订单正式提交事务内执行，草稿及身份预检不补写资料。
+
+支付锁定草稿恢复时，空联系方式仍可补填；已存非空学员姓名、手机号和微信号不得修改，`mobile`/`studentMobile` 与 `wechatId`/`studentWechatId` 别名必须一致。补填不解除商品、金额及客户关联锁定，沿用草稿版本和幂等检查。
+
 ### 微信 unionorder
 
 浏览器向 ZSJOS 提交后，后端生成并 HTML 转义自动提交 FORM：

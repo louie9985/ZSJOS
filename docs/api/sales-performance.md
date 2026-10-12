@@ -47,11 +47,12 @@ Vue Admin 过滤两个无法在 Vue 渲染的组件，仍维护服务端菜单�
 - 客单价分子、分母同时排除整单0和0.01，其他金额/订单指标保留它们。
   `Metric.averageAmount/averageOrders` 是实际参与除法的金额和笔数，不能用未剔除的 `amount/orders` 代替；零分母返回 null。
 - 产品按明细 `payableAmount` 汇总；单产品内订单去重；产品下钻金额仅为所选产品金额。
-- 成交率专用排除规则：客资 source_type=sales_self_sourced 且 source_provider_user_id IS NULL 时，
-  从所有周期的成交率分子、分母及成交率下钻同时排除；即使已有生效订单也不能补入。
-  以客资明确关联的提供方字段为准，不以来源分组、提交人、员工当前部门或 source_provider_recorded 推断关联。
-  已关联提供方的销售自拓仍按原时间、有效性和权限规则参与；新媒体提交、兼职及未知来源保留原规则。
-  本规则不影响成交金额、订单数、客单价、目标完成率、来源分析、订单明细或客资量/漏斗统计；不修改业务数据或历史快照。
+- 成交率按统一来源解释：明确无新媒体引流的销售、教务自拓均从所有周期分子、分母和明细排除。
+  新媒体引流由销售/教务代录仍归新媒体；关联必须明确记录且正式提供方一致，不依据相等编号或当前岗位猜测。
+  原生新媒体、兼职的 recorded=0 不属自拓关联异常。历史未确认或字段冲突仅在满足原有周期候选条件时阻断相关范围。
+  Metric 和成交率 Summary 新增 sourceStatus=ready|review_required、sourceReviewCount；后者发生时 converted/denominator/rate 为 null，明细返回空名单和明确状态。
+  旧 details 成交率入口报稳定错误码 1900093002；产品/渠道/搜索不得掩盖整体来源异常。财务金额、订单数、客单价继续显示。
+  这些状态是业务事实解析结果，不是可编辑字典，也不新增静态权限。历史数据纠正另见 [修复流程](../operations/lead-source-conversion-repair.md)。
 - 成交率的成交判定新增单笔首购订单总金额 total_amount >= 1280（元，含1280）；金额为空或不足1280不计成交，不跨订单累计。
   期间新接有效客资仍计入分母；往期接收客资只有满足金额及原有效期条件，才补入月度分子和分母。
   卡片、各周期及成交率下钻共用此规则；成交金额、订单笔数和客单价保持原口径。
@@ -63,7 +64,8 @@ Vue Admin 过滤两个无法在 Vue 渲染的组件，仍维护服务端菜单�
   有效分母沿用客资当前 valid/converted/won 状态，未构造历史有效性快照。卡片和明细共用人口集合。
 - 复购仍计业绩、订单数和客单价，在本页统一归入非引流（含来源汇总、来源下钻及客单价）。
   客单价仅整体、线上引流、非引流三项；不改订单本身的复购类型，也不重写历史归属快照。
-  提交客资来源 `internal_new_media/partner` 为引流，`sales_self_sourced` 为非引流；
+  提交客资来源 `internal_new_media/partner` 为引流，`sales_self_sourced` 与 `education_self_sourced` 为非引流；
+  V302 把导入时分错来源的员工提交客资订正为 `internal_new_media`，两者同属引流，分组不变。
   其他来源单列未知，不能从名字推断。渠道/产品/分类名称使用业务快照。
 - 周目标和月目标独立；季度/年累加3/12个月目标。部门累加个人，中心累加部门。
   人工值与实时自动汇总分开展示；恢复自动汇总不删除修订历史。
@@ -71,6 +73,17 @@ Vue Admin 过滤两个无法在 Vue 渲染的组件，仍维护服务端菜单�
 - 跟进按计划到期时间统计，跟单记录按发生时间，漏接来自明确 `timeout` 派单事件，
   不把拒绝或一般任务取消算作漏接。
 - 漏斗按所选月接收批次观察截至当前状态；不能混入往期接收本月成交客资。
+
+### 引流/非引流分组的重算范围
+
+`zsjos_performance_attribution.source_group` 在业务事实发生时按当时的 `lead.source_type` 写入。
+2026-09-29 之前的历史回填写入时，教务自拓客资仍读作 `internal_new_media`，因此把 331 行归入了
+引流。V301 按同一口径用客资当前值重算了这些行，范围有两条硬边界：
+
+- `org_source='frozen'` 的行是事实发生当时的组织快照，属于契约保护的证据，**不重算**；
+- 客资已不存在或已软删的行无法判定来源，**不匹配**，不凭猜测补值。
+
+重算只改 `source_group`，不动 `dept_id`/`center_id`、人员、金额与事实时间。
 
 ## 历史与快照
 
@@ -248,3 +261,153 @@ V276依赖V275及唯一工作台根菜单，创建空表并缺失式添加8条�
 - 订单/事件明细按发生时间倒序，接收客资按接收事实发生时间倒序，同时间用 ID 稳定排序；任务保留截止时间升序及 ID 次序，转化保留期间接收队列优先、期间补入成交随后。页边界增加稳定次序，不赋予任何额外权限。
 - 权限的冻结部门范围每次请求解析一次，再用于 count/page SQL。没有新增权限标识、索引、数据库写入或持久缓存。Vue Admin 不消费这些统计接口。
 - PerformanceDetailMySqlTest 可在设置 PERFORMANCE_TEST_MYSQL_URL/USER/PASSWORD 后运行，只读比较旧实现与所有新分页结果，并清空 MyBatis 会话缓存测量相同 20 条单页的 P50/P95；未设置环境变量时该 MySQL 测试明确跳过。凭据只能由私有环境提供。它使用受控开发数据与模拟权限 API，不代表认证接口或生产延迟。
+
+
+## 成交率专用明细（2026-10-10）
+
+`GET /admin-api/zsjos/sales-performance/conversion-details` 为 Workbench 多周期成交率卡片提供专用明细。
+返回 `CommonResult<Response>`；既有 `/details` 参数、返回结构、其他指标及旧成交明细保持兼容。
+Vue Admin 不消费新接口，无需同步页面改造。无新增数据库字段、迁移、依赖或权限分配。
+
+### 请求与筛选
+
+沿用 `scopeType/scopeId`、`periodKey` 或 `start/end`、`cumulative`，以及 `pageNo`（默认1）、
+`pageSize`（默认20，1–100）。固定周期优先于日期，沿用现有 Asia/Shanghai 左闭右开窗口。
+统计查询权限、明细权限、本人/人员/部门/中心的数据范围与租户隔离累计校验。
+
+| 参数 | 含义 |
+| --- | --- |
+| conversionStatus | `converted` / `unconverted`；省略表示全部 |
+| populationKind | `current` 期间新接 / `previous` 往期补入；省略表示全部 |
+| categoryKey | `options.categories` 返回的分类标签快照键 |
+| channelKey | `options.channels` 返回的来源渠道标签快照键 |
+| productKey | `options.products` 返回的关联成交订单商品键 |
+| keyword | 客资编号 `leadNo` 或本周期合格订单编号包含匹配，去除首尾空白，忽略大小写，最长100字符 |
+
+各维度单选，可清空，不同维度之间为 AND。选项键由服务端生成，客户端原样回传，不能推导或拼接。
+未知键匹配空集合；关键词按普通文本匹配，不执行正则或 SQL 通配符解释。
+分类、渠道均使用客资业务记录现存的选择时标签快照，不重新查询当前字典标签，
+不声称重建每次接收时的历史快照。缺失或空白标签单独返回缺失选项；不填造历史名称。
+产品键区分商品引用与名称快照的组合，同商品改名后的快照可分别定位；完整商品快照也随行返回。
+状态与统计归类是统计业务契约，分类、渠道、商品选项完全来自本次授权统计人口。
+
+先通过原 `PerformanceConversion` 构建完整、按客资去重的人口，再补齐快照、应用全部筛选，最后分页。
+保持单笔生效首购总金额 ≥1280 元、不跨订单累计、来源排除、月度60日有效期与滚动接收批次规则。
+每位客资只关联原算法选中的最早合格订单；不能先按商品过滤订单再选择成交，否则会改变成交判定。
+未成交客资 `order=null`，商品筛选不会命中。一个订单多个商品不会重复计入客资人数。
+新接口按接收时间倒序、客资内部 ID 倒序稳定排序，缺失接收时间排末尾；内部 ID 只用于技术关系。
+该接口仍需在内存中形成完整授权人口，不宣称为全量数据库分页。快照补充查询每批最多500个已授权 ID，
+显式限定租户与逻辑删除，避免逐行查询或将用户传入的筛选键用于扩大数据范围。
+
+### 返回结构与数量口径
+
+- `list`：当前页客资行；`total`：全部筛选后的客资数。超出末页返回空列表并保留真实总数。
+- `asOf/start/end`：本次查询时间及实际窗口；遵循本模块既有日期序列化和工作台日期归一化约定。
+- `summary`：完整未筛选人口的 `converted/denominator/rate`；零分母时 `rate=null`。
+- `options`：`conversionStatus/populationKind/categories/channels/products`，每项为 `{key,label,count}`。
+  选项与分组数量始终基于本次完整未筛选的授权人口，不随当前选中的其他筛选条件收窄。
+  同一客资含多个商品时，在各商品分组各计一次，因此商品组数量之和可能大于成交人数。
+- 行字段：`leadId`（仅技术关联）、`leadNo`、`categoryKey/categoryLabel`、`channelKey/channelLabel`、
+  `populationKind`、`receivedAt`、`converted`、`order`。
+- `order`：`id/number/submittedAt/amount/products`。金额是整笔合格订单总金额，商品过滤不将其改成单商品金额。
+  `products`：`key/ref/label/snapshot`；`snapshot` 为已存 JSON 文本。订单无商品快照时保留空列表，不能填造商品。
+
+### 同抽屉详情与数据时效
+
+点击成交率卡片打开专用抽屉，顶部固定显示原卡片的周期、比率、完整分子和分母；筛选只改变列表。
+明细每次请求实时查询。原卡片可能来自十分钟页面缓存：若当前完整人口人数与卡片不同，明确提示差异，
+关闭并刷新统计页可同步；不将实时查询结果伪装为原卡片时刻的数据库快照。并发业务更新仍可能改变跨请求人口。
+
+有 `zsjos:lead:query` 时显示客资详情入口，有 `zsjos:sales-order:query-management` 且有关联合格订单时
+显示订单详情入口。分别通过现有 `managedLead` 与 `managementSalesOrder` API 加载，由业务 API 独立校验对象权限。
+权限不足、请求失败时展示业务错误与重试入口，不替换为统计接口绕过业务查询权限。
+
+列表、客资档案和完整订单详情在同一抽屉内切换，保留列表 DOM、筛选、页码及横纵滚动位置；
+返回按钮始终可用。客资视图按 `visibleTabs` 展示授权的概览、跟进、申诉、投诉及流转记录，禁用业务写操作；
+订单复用现有完整详情卡片的只读团队视图，不注入审批、修改或终止回调。
+离开路由、切换保留页、切换统计范围/页签或权限变化时清理统计抽屉；窄屏抽屉占满屏宽。
+非订单类指标继续使用原通用明细，路由离开时同样关闭，避免抽屉遮挡目标页面。订单类入口采用下述订单专用明细。
+
+回归入口：`ConversionDetailsTest`、`ConversionDetailAccessTest`、`ConversionSnapshotMapperTest`、
+既有 `PerformanceConversion*` 与 `PerformanceAccessTest`；Workbench `conversionDetails.test.ts`、
+`test/conversion-details-browser.py`（真实 Chromium + 隔离合成 API；不代表部署后的认证接口验收）。
+
+## 订单专用明细（2026-10-10）
+
+`GET /admin-api/zsjos/sales-performance/order-details` 返回 `CommonResult<OrderDetailVO.Response>`。
+工作台十周期业绩、经营分析来源/产品项目、个人期间订单及销售个人贡献金额入口统一调用。
+历史业绩图与趋势图未新增点击行为；非订单明细和成交率接口保持兼容。Vue Admin 不消费本接口。
+无需数据库字段、迁移、依赖或角色授权变更。
+
+### 范围与筛选
+
+沿用 `scopeType/scopeId`、`periodKey` 或 `start/end`、`cumulative`、`pageNo/pageSize`。
+`dimension/groupKey` 必须同时提供或同时省略，订单入口仅接受 `source/product/contributor`；
+保留原接口的来源键、商品引用与名称快照组合键、贡献人员内部 ID 键。
+这些参数是入口的基础限制，附加筛选与其取交集；前端重置筛选不得清除基础限制。
+日期优先级、业务时区及左闭右开边界沿用本页契约。
+
+| 附加参数 | 含义 |
+| --- | --- |
+| sourceKey | 服务端 `options.sources` 中的业绩来源键；复购始终归非引流 |
+| orderTypeKey | `options.orderTypes` 中的订单业务类型键，首购/复购沿用订单业务契约 |
+| categoryKey | 客资现存选择时分类标签快照键，不声明重建订单发生时的分类 |
+| channelKey | ORDER 业绩归属中冻结的渠道标签快照键，不替换为客资当前渠道 |
+| productKey | 订单商品引用与名称快照组合键；同引用不同历史名称分别匹配 |
+| keyword | 客资 `leadNo` 或订单编号包含匹配，去首尾空白、忽略大小写，最长100字符 |
+
+五个选项维度均为单选可清空，关键词与选项之间为 AND。选项键为服务端不透明键（最长4096字符），
+客户端原样回传；未知键得到空结果，不解释为放宽范围。关键词的 `%`、`_` 作为普通字符处理。
+历史快照为空的分类、渠道及已有商品行的空名称均单列缺失标签；无商品行的订单保留空商品列表。
+所有选项和各选项订单数均来自未附加筛选的完整授权入口范围，不随页码或附加筛选变化。
+一个订单多个商品可分别计入多个商品选项，同商品重复明细只计一笔订单。
+
+### 金额、分页与授权
+
+订单范围复用 `PerformanceFactSql.ORDERS` 及原 `PerformanceDetailSql` 的入口下钻条件：仅生效订单、
+按提交时间、保留冻结部门/中心授权和历史归属缺失例外。包含首购、复购、0及0.01元订单，
+不应用成交率的最低金额、客资来源排除或有效期规则。
+
+普通入口行 `amount=totalAmount`，商品筛选只筛选包含商品的订单，不改变整单金额。
+`dimension=product` 时 `amount` 继续为入口原选定产品的 `payableAmount` 合计；`totalAmount` 保留整单金额。
+此时追加其他商品筛选只缩小订单集合，不替换原先产品的金额口径。工作台明确显示“所选产品金额”。
+
+数据库完成入口限制、全部附加筛选、总数/金额汇总和分页；商品通过 EXISTS 匹配，避免连接放大金额。
+当前页商品批量读取，无逐订单请求。提交时间倒序、订单内部 ID 倒序稳定分页，默认20条、最大100条；
+超过末页返回空列表，保留筛选总数和金额。多次查询处于统计 Service 的只读事务内。
+
+Controller 继续要求 `zsjos:sales-performance:query`；Service 累计校验 `:detail` 与本人/人员/部门/中心范围。
+所有数据及补充关联查询保留当前租户与逻辑删除限制；租户1是当前业务环境，不移除租户谓词。
+分类/渠道/商品选项不会突破授权范围。不存在或已删除的关联客资返回 `leadId/leadNo=null`，不显示详情入口。
+
+### 返回与交互
+
+- `list`：`id/number/leadId/leadNo/sourceLabel/orderTypeLabel/categoryLabel/channelLabel/submittedAt/amount/totalAmount/products`。
+  内部 ID 只用于技术关联；客资编号缺失不以 ID 替代。商品返回 `key/ref/label`。
+- `total`：附加筛选后的订单数；`filteredSummary={orders,amount}`：整个筛选集合的笔数和金额，不是当前页小计。
+- `summary={orders,amount}`：本次查询完整入口范围的汇总。
+- `options={sources,orderTypes,categories,channels,products}`：各项为 `{key,label,count}`。
+- `asOf/start/end`：实时查询时刻与实际窗口；`amountKind=order|product` 指明金额口径。
+
+顶部始终保留点击入口的原统计金额及订单数，筛选汇总另行展示。完整入口实时汇总与原缓存统计不同时提示刷新，
+不承诺跨请求的固定数据库快照；原统计页十分钟缓存机制不变。
+入口标题显示原周期或来源/商品/贡献人员，实际范围时间由服务端返回。
+
+订单和客资详情复用成交率的只读渲染器，在同一抽屉切换。入口分别要求订单管理查询权限、客资查询权限，
+并经原业务 API 校验对象权限；统计可见不意味着完整业务对象可见。失败提供错误与重试，不跳转或绕过权限。
+返回保留列表DOM、筛选、页码和横纵滚动位置；新筛选回到第一页。桌面宽度沿用成交率抽屉，手机占满视口。
+路由离开、保留页失活、组织/人员范围切换、页签或权限变化时清理抽屉。
+
+回归入口：`OrderDetailTest`（H2查询、筛选/汇总/授权范围及生产SQL解析器）、`OrderDetailAccessTest`、
+`OrderDetailMySqlTest`（已有MySQL数据只读对照，需 `PERFORMANCE_TEST_MYSQL_URL/USER/PASSWORD` 环境变量）；
+工作台 `orderDetails.test.ts`、`test/order-details-browser.py` 及成交率浏览器回归。
+浏览器脚本使用隔离合成 GET 适配器，不代表部署后认证接口验收。
+
+
+### 新媒体代录来源订正（2026-10-10）
+
+销售/教务录单关联新媒体后，正式客资 source_type 为 internal_new_media，后续事实按现有规则
+写入 inbound。submission_source_type 仅记录录单入口，不用于业绩来源分组。
+V309 经用户明确确认，限定 17 条客资订正 36 条历史 self 分类为 inbound，其中包括 frozen 行；
+这是此前不重算历史快照约束的本次明确例外，只修改错误来源组及修复审计，冻结人员、部门、
+事实时间和金额不变。复购规则不变。其余历史不扩围，原成交率有效性/时间/金额条件不变。

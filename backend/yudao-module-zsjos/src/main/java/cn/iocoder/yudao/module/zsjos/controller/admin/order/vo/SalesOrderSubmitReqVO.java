@@ -15,8 +15,8 @@ public class SalesOrderSubmitReqVO {
     @Size(max = 100) private String buyerName;
     @NotBlank @Size(max = 100) private String studentName;
     @NotBlank @Size(max = 64) private String studentNature;
-    @Size(max = 32) private String studentMobile;
-    @Size(max = 64) private String studentWechatId;
+    @NotBlank(message = "请填写手机号") @Size(max = 32) private String studentMobile;
+    @NotBlank(message = "请填写微信号") @Size(max = 64) private String studentWechatId;
     @NotBlank @Size(max = 32) private String provinceCode;
     @NotBlank @Size(max = 100) private String provinceName;
     @NotBlank @Size(max = 32) private String cityCode;

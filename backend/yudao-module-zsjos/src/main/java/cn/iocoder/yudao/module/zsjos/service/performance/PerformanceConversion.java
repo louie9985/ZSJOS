@@ -4,7 +4,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact;
 import java.util.*;
 import java.math.BigDecimal;
 import static cn.iocoder.yudao.module.zsjos.service.performance.PerformancePeriods.*;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_SALES_SELF;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadSourceInterpretation;
 
 /** One population for both the displayed ratio and its lead-level drilldown. */
 public final class PerformanceConversion {
@@ -16,19 +16,37 @@ public final class PerformanceConversion {
         private final List<PerformanceFact> orders;
         private final List<PerformanceFact> receipts;
         private final Map<ReceiptKey, PerformanceFact> byReceipt = new HashMap<>();
-        private final Map<Window, Map<Long, Row>> windows = new HashMap<>();
+        private final Map<Window, Assessment> windows = new HashMap<>();
         public Population(List<PerformanceFact> orders, List<PerformanceFact> receipts) {
             this.orders = orders; this.receipts = receipts;
             for (var r : receipts) byReceipt.putIfAbsent(new ReceiptKey(r.getLeadId(), r.getUserId(), r.getReceivedAt()), r);
         }
         public Map<Long, Row> at(Window window) {
-            return windows.computeIfAbsent(window, w -> calculate(w, orders, receipts, byReceipt));
+            return assessment(window).eligible();
+        }
+        public Assessment assessment(Window window) {
+            return windows.computeIfAbsent(window, w -> classify(calculate(w, orders, receipts, byReceipt)));
         }
     }
 
-    // Provider linkage limits conversion only; monetary and order metrics retain these facts.
-    private static boolean eligible(PerformanceFact fact) {
-        return !SOURCE_SALES_SELF.equals(fact.getSourceType()) || fact.getSourceProviderUserId() != null;
+    public record Assessment(Map<Long, Row> eligible, Map<Long, Row> review) {
+        public boolean ready() { return review.isEmpty(); }
+        public String sourceStatus() { return ready() ? "ready" : "review_required"; }
+        public long sourceReviewCount() { return review.size(); }
+    }
+    private static LeadSourceInterpretation.Result source(PerformanceFact fact) {
+        return LeadSourceInterpretation.resolve(fact.getSourceType(), fact.getSubmissionSourceType(),
+                fact.getSourceProviderRecorded(), fact.getSourceProviderUserId(), fact.getProviderOwnerType(), fact.getProviderOwnerId());
+    }
+    // Classify only after period/cohort/amount eligibility: unrelated historical defects must not block a period.
+    private static Assessment classify(Map<Long, Row> candidates) {
+        Map<Long, Row> eligible = new LinkedHashMap<>(), review = new LinkedHashMap<>();
+        candidates.forEach((id, row) -> {
+            var facts = java.util.stream.Stream.of(row.receipt(), row.order()).filter(Objects::nonNull).map(PerformanceConversion::source).toList();
+            if (facts.stream().anyMatch(LeadSourceInterpretation.Result::needsReview)) review.put(id, row);
+            else if (facts.stream().noneMatch(LeadSourceInterpretation.Result::unlinked)) eligible.put(id, row);
+        });
+        return new Assessment(Collections.unmodifiableMap(eligible), Collections.unmodifiableMap(review));
     }
 
     public static boolean rolling(String key) {
@@ -43,13 +61,13 @@ public final class PerformanceConversion {
                                            List<PerformanceFact> receipts, Map<ReceiptKey, PerformanceFact> byReceipt) {
         Map<Long, Row> result = new LinkedHashMap<>();
         for (var receipt : receipts) {
-            if (eligible(receipt) && receipt.getLeadId() != null && window.contains(receipt.getReceivedAt())
+            if (receipt.getLeadId() != null && window.contains(receipt.getReceivedAt())
                     && Set.of("valid", "converted", "won").contains(Objects.toString(receipt.getStatus(), ""))) {
                 result.putIfAbsent(receipt.getLeadId(), new Row(receipt, null, false));
             }
         }
         for (var order : orders) {
-            if (!eligible(order) || !"first_purchase".equals(order.getOrderType()) || order.getLeadId() == null
+            if (!"first_purchase".equals(order.getOrderType()) || order.getLeadId() == null
                     || order.getAmount() == null || order.getAmount().compareTo(MINIMUM_ORDER_AMOUNT) < 0
                     || !window.contains(order.getOccurredAt()) || order.getReceivedAt() == null) continue;
             boolean cohort = rolling(window.key());

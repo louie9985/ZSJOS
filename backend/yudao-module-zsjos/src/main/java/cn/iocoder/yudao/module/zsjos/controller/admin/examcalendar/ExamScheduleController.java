@@ -76,6 +76,14 @@ public class ExamScheduleController {
         return success(true);
     }
 
+    @DeleteMapping("/delete/{id}")
+    @Operation(summary = "删除考期草稿")
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")
+    public CommonResult<Boolean> deleteDraft(@PathVariable Long id) {
+        service.deleteDraft(id, getLoginUserId());
+        return success(true);
+    }
+
     @PostMapping("/publish/{id}")
     @Operation(summary = "发布考期")
     @PreAuthorize("@ss.hasPermission('zsjos:exam-calendar:manage')")

@@ -18,6 +18,8 @@ public class MaterialPageReqVO extends PageParam {
     private Boolean mine;
     private Boolean favorite;
     private Boolean recommendation;
+    @jakarta.validation.constraints.Pattern(regexp = "createTime")
+    private String sortBy;
     private String accountType;
     private String profession;
     private String accountStage;

@@ -1,0 +1,41 @@
+# Order history repair — local-order-history-repair-20261010
+
+- Environment: local (ZSJOS_AGENT_ENV unset; /etc/zsjos/agent-environment absent).
+- Owner: current Codex chat; one writer, no delegated work.
+- Branch/worktree/base: main; D:\ZSJ-OS; c82c8605d86aef5c8f4cd328600bc7c3efc2bf90.
+- Goal: implement the user-approved order history plan: 392 eligible effective orders, explicit 38-order personnel map, eight Leads/one existing Opportunity, legacy rounds/snapshots, two missing and three duplicate items, 38 current-organization attribution records.
+- Non-goals: no production execution, API/UI redesign, permission/account changes, event/BPM replay, new service relationships, changes to excluded seed batches or unrelated local work.
+- Owned files: script/sql/mysql/migrations/V305__order_history_repair.sql; script/sql/mysql/tools/order_history_repair*.py; script/sql/mysql/tools/test_order_history_repair.py; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/order/OrderHistoryRepairContractTest.java; docs/operations/order-history-repair.md; this record. Private artifacts under ignored backups/mysql/order-history-v305-*.
+- Dependencies: applied V304; confirmed per-order mapping from this chat; local ruoyi-vue-pro and read-only ptml; original Desktop parttimecrm-cst+0800-20260920-222103.sql.gz with recorded digest. No branch integration; target branch/integration order: None.
+- Verification: read-only preflight; original-source manifest; MySQL 8 isolated clone initial/repeat/partial/failure/rollback/conflict/empty checks; actual Java snapshot readers; scoped before/after invariants and UTF-8 HEX; current Admin/Workbench existing read surfaces where runtime permits; local apply only after controlled checks pass.
+- Authorization: user explicitly approved full plan, local repair/isolated testing, three duplicate item logical deletions, eight Lead actor corrections and opportunity owners. Production requires separate authorization.
+- Status: registered before implementation. V305 unoccupied at registration. Existing V296–V304 and all unrelated dirty files preserved.
+
+## Delivery — 2026-10-10
+
+- Implemented V305 and private-plan builder/executor, read-only acceptance tool, isolated MySQL tests, actual Java snapshot reader test, operations documentation. No product API/UI changes.
+- Local apply authorized by the approved plan completed: 686 operations; replay 0. Updates: Lead 8, Opportunity 1, order 280, round 49, item 37 (3 logical deletions + 34 snapshot repairs). Inserts: rounds 271, items 2, attributions 38. Order actor changes exactly submitter 9 / formal sales 35; formal owner identity 36 from confirmed sales or already stored education identity.
+- Final private package: backups/mysql/order-history-v305-20261010/plan-final.json, sha256 3622738b3c15ed7c2c5a7c355ad8c16c5daabde0703a1272377394174e799970. Earlier packages are superseded, retained for audit; never apply them. Original dump digest checked directly; no dependence on live ptml during apply. Private source full dump and row-level before images retained. No personal records added to tracked files.
+- Final isolated schema v305_20261010154454 passed initial/repeat, prerequisite failure, injected business failure, second-ledger failure with rollback, direct SQL missing evidence rejection, full postimages, unrelated-table and unrelated-row preservation, partial recovery with ledgers present, rollback rehearsal, tenant guard, lock conflict, empty target repeat. Earlier schemas retained, no cleanup authorized/executed.
+- Java reactor 13 tests passed, zero failures/skips; OrderHistoryRepairContractTest reads all 320 affected round snapshots and 36 active repaired/new item snapshots through actual production readers. Final log backups/mysql/order-history-v305-20261010/java-accepted.log. zsjos_db.py check PASS. Python compile/UTF-8/scoped whitespace PASS.
+- Local acceptance: 392 effective orders all V2; current/latest approved round agrees; all item sums match; confirmed 38 actors and 8 Leads correct; 38 current attributions added; excluded 107 seed orders preserved; all original non-target rows in the six tables preserved. Both ledgers V305. Backup 1062 rows, max 76500 chars. Protected cashback/service/BPM/business-event/permission table checksums unchanged. Read-only verify and recovery-check report zero mismatches.
+- Bugs found before local apply: malformed initial Python comprehension fixed; PowerShell Maven argument split corrected; full-table Python binary hashing replaced by MySQL CHECKSUM TABLE plus complete per-row images; rollback now restores only changed columns to avoid generated-column writes; user dependency checks narrowed to actual account/name/status/department inputs so login timestamps do not cause false conflicts. Final tests rerun on stable final package.
+- Remaining: Admin/Workbench authenticated browser acceptance blocked by unavailable login session (Workbench) and saved credentials rejected (Admin); no credentials guessed or changed. No production execution, restart, commit, push, branch/worktree operation. Three departed salesperson records retain missing personnel/attribution; existing unknown attribution provenance and genuinely absent historical fields remain as approved.
+- Ownership released for delivered files. Private artifacts retained for audit and guarded rollback.
+
+## Registration update — order identity completion, 2026-10-10
+
+- Same local main worktree/base and owner; user requests completion of missing formal_owner_identity.
+- Explicit user decision: OD202609212049560024 (528) and OD202609221356340006 (400) education; the other reviewed 284 effective orders sales. Preserve the three departed-sales orders and 107 excluded seed orders. Current IDs/names, Lead ownership, money, performance, BPM/events and unrelated snapshots remain unchanged.
+- Scope: V306__order_owner_identity_completion.sql; tools/order_owner_identity_completion.py; docs/operations/order-owner-identity-completion.md; this handoff. No V305 rewrite, no Java/frontend production change. V306 verified unoccupied before registration.
+- Verification: fixed order/user manifest; isolated MySQL first/repeat/prerequisite/ledger failure/partial recovery/empty checks; guarded before/after images and rollback rehearsal; local apply and read-only postcheck; latest/current round equality and actual snapshot JSON readability using existing readers where applicable.
+- Local database write authorized by user's repair request and explicit 286-order identity decision; no production operations. Ownership active for these files.
+
+## Identity completion delivery — 2026-10-10
+
+- V306 created and applied locally. Explicit user-confirmed manifest: two education orders, 284 sales. Updated 286 order identities and286 current-round snapshots, including existing formalSales.identity. No Lead/personnel IDs/names, money, performance, BPM or page edits.
+- Isolated MySQL v306_20261010164810 plus empty database passed prerequisite rejection, second-ledger failure rollback, initial/repeat, before-image partial recovery with ledgers, later-change rejection, rollback rehearsal, empty repeat. Complete row diff limited to identity fields/allowed JSON paths and modification audit. SQL fixtures use explicit charset/collation.
+- Local audit: 286/2/284, order/snapshot mismatch0, actor mismatch0, both ledgers1. Immediate repeat checksum unchanged. Remaining non-seed empty identities exactly the three excluded departed-sales orders. Private complete source rows and verification saved under backups/mysql/order-identity-v306-*.
+- Errors corrected before local apply: executor line parser needed separate top-level SQL statements; rollback test now uses transaction-safe SELECT row digests rather than CHECKSUM inside transaction and preserves update_time in injected version edits; empty-schema collation explicitly set on temporary tables. Final full suite passed after fixes.
+- V305 postimage verification will now detect authorized V306 follow-on changes; documented reverse-order guarded rollback. No claim of live browser validation (login state unavailable earlier); no production/restart/commit/push.
+- Ownership released after delivery of V306, companion tool and operations doc.

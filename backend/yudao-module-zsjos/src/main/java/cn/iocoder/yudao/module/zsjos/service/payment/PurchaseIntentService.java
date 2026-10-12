@@ -97,6 +97,14 @@ public class PurchaseIntentService {
         if (!userId.equals(intent.getInitiatorUserId()) && !userId.equals(intent.getOwnerUserId())) throw exception(PURCHASE_INTENT_PERMISSION_DENIED);
         if (request.getIdempotencyKey().equals(intent.getLastIdempotencyKey())) return convert(intent);
         if (Boolean.TRUE.equals(intent.getSnapshotLocked())) {
+            // Known identity values stay locked; empty contacts in legacy payment drafts may be completed.
+            var previousDraft = JsonUtils.parseObject(intent.getDraftJson(), Map.class);
+            for (String field : List.of("studentName", "mobile", "wechatId")) {
+                String alias = "mobile".equals(field) ? "studentMobile" : "wechatId".equals(field) ? "studentWechatId" : field;
+                String before = draftContact(previousDraft, field, alias);
+                String after = draftContact(request.getDraft(), field, alias);
+                if (before != null && !before.equals(after)) throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+            }
             PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
             boolean switchingMode = !java.util.Objects.equals(intent.getCollectionMode(), request.getCollectionMode());
             if (switchingMode) {
@@ -465,6 +473,16 @@ public class PurchaseIntentService {
         }
         if (request.getPersonId() != null && !request.getPersonId().equals(personId)) throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
         request.setPersonId(personId);
+    }
+
+    private static String draftContact(Map<?, ?> draft, String field, String alias) {
+        if (draft == null) return null;
+        Object value = draft.get(field);
+        String text = value instanceof String s ? StrUtil.trimToNull(s) : null;
+        value = draft.get(alias);
+        String aliasText = value instanceof String s ? StrUtil.trimToNull(s) : null;
+        if (text != null && aliasText != null && !text.equals(aliasText)) throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        return text != null ? text : aliasText;
     }
 
     private void resolvePerson(PurchaseIntentSaveDraftReqVO request, boolean createExternal) {

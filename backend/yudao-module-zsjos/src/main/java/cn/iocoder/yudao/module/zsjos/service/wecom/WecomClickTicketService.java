@@ -117,6 +117,9 @@ public class WecomClickTicketService {
             return null;
         }
         if (AUDIENCE_ADMIN.equals(payload.getAudience())) {
+            if ("hrm_employee".equals(payload.getBizType())) {
+                return "/hrm/employee/list?employeeId=" + payload.getBizId();
+            }
             if ("lead".equals(payload.getBizType())) {
                 if (payload.getAssignmentHistoryId() != null
                         && ("zsjos.lead.assigned".equals(payload.getSceneCode())

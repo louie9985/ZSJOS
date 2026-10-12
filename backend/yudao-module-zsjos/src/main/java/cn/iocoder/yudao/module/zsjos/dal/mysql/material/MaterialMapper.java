@@ -68,8 +68,13 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                             + "AND mt.tenant_id=zsjos_material.tenant_id AND mt.status=0 "
                             + "AND mt.recommendation_enabled=b'1' AND mt.deleted=b'0')");
         }
-        query.orderByDesc(MaterialDO::getPinned).orderByDesc(MaterialDO::getPriority)
-                .orderByDesc(MaterialDO::getUpdateTime).orderByDesc(MaterialDO::getId);
+        if ("createTime".equals(req.getSortBy())) {
+            // Upload order must remain stable when revisions or interactions update the material.
+            query.orderByDesc(MaterialDO::getCreateTime).orderByDesc(MaterialDO::getId);
+        } else {
+            query.orderByDesc(MaterialDO::getPinned).orderByDesc(MaterialDO::getPriority)
+                    .orderByDesc(MaterialDO::getUpdateTime).orderByDesc(MaterialDO::getId);
+        }
         return selectPage(req, query);
     }
 

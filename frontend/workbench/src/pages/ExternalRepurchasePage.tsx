@@ -3,6 +3,7 @@ import { hasPermission } from '../services/managementAccess'
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/SalesOrderEntryModal'
 import { api, type RepurchaseCustomerIdentity, type RepurchaseCustomerCheck } from '../services/api'
+import { PHONE_PATTERN } from '../constants'
 
 export default function ExternalRepurchasePage({ permissions }: { permissions: string[] }) {
   const [form] = Form.useForm<RepurchaseCustomerIdentity>()
@@ -14,7 +15,8 @@ export default function ExternalRepurchasePage({ permissions }: { permissions: s
   const invalidate = () => { sequence.current++; setChecking(false); setChecked(undefined); setError(''); setCustomer(undefined) }
   const check = async (values: RepurchaseCustomerIdentity) => {
     const identity = { customerName: values.customerName.trim(), customerMobile: values.customerMobile?.trim() || undefined, customerWechatId: values.customerWechatId?.trim() || undefined }
-    if (!identity.customerName || !identity.customerMobile && !identity.customerWechatId) { setError('请填写姓名及手机号或微信号'); return }
+    if (!identity.customerName || !identity.customerMobile && !identity.customerWechatId) { setError('请填写姓名及至少一项联系方式进行核验；正式录单需手机号和微信号'); return }
+    if (identity.customerMobile && !PHONE_PATTERN.test(identity.customerMobile)) { setError('手机号格式不正确'); return }
     const current = ++sequence.current
     setChecking(true); setError(''); setChecked(undefined)
     try {
@@ -38,7 +40,8 @@ export default function ExternalRepurchasePage({ permissions }: { permissions: s
       {error && <Alert style={{ marginTop: 16 }} type="error" showIcon message={error} action={<Button onClick={() => form.submit()}>重试</Button>}/>}
       {checked && <Alert style={{ marginTop: 16 }} type={checked.result.canRepurchase ? 'success' : 'warning'} showIcon message={checked.result.reason}
         description={checked.result.customerName ? [checked.result.customerName, checked.result.maskedMobile].filter(Boolean).join(' · ') : undefined}/>}
-      {checked?.result.canRepurchase && <Button style={{ marginTop: 16 }} type="primary" onClick={() => setCustomer({ id: 0, personId: checked.result.personId,
+      {checked?.result.canRepurchase && (!checked.identity.customerMobile || !checked.identity.customerWechatId) && <Alert type="info" showIcon message="请补齐手机号和微信号后重新校验，再填写复购订单"/>}
+      {checked?.result.canRepurchase && checked.identity.customerMobile && checked.identity.customerWechatId && <Button style={{ marginTop: 16 }} type="primary" onClick={() => setCustomer({ id: 0, personId: checked.result.personId,
         submittedName: checked.identity.customerName, submittedMobile: checked.identity.customerMobile, submittedWechatId: checked.identity.customerWechatId })}>确认客户，填写复购订单</Button>}
     </Card>
     {customer && <SalesOrderEntryModal lead={customer} repurchase customerRepurchase externalCustomer={{ customerName: customer.submittedName,

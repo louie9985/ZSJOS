@@ -64,8 +64,23 @@ class RepurchaseCustomerServiceTest {
         assertEquals("IDENTITY_CONFLICT",result.getMatchStatus());assertNull(result.getPersonId());
     }
     @Test void addedWrongWechatIsRejected() {
-        when(personMapper.selectDuplicateCandidates("13800138000","wrong")).thenReturn(List.of(person()));
+        when(personMapper.selectDuplicateCandidates("13800138000","wrong")).thenReturn(List.of(person().setWechatId("existing")));
         var r=req();r.setCustomerWechatId("wrong");assertFalse(service.checkCustomer(20L,r).isCanRepurchase());
+    }
+    @Test void missingWechatMayBeProposedWithoutWritingPerson() {
+        var p=person();when(personMapper.selectDuplicateCandidates("13800138000","new-wechat")).thenReturn(List.of(p));
+        var r=req();r.setCustomerWechatId("new-wechat");
+        assertTrue(service.checkCustomer(20L,r).isCanRepurchase());assertNull(p.getWechatId());
+        verify(personMapper,never()).updateById(any(PersonDO.class));
+    }
+    @Test void proposedContactOwnedByAnotherPersonIsRejected() {
+        when(personMapper.selectDuplicateCandidates("13800138000","occupied")).thenReturn(List.of(person(),person().setId(11L)));
+        var r=req();r.setCustomerWechatId("occupied");
+        assertEquals("MULTIPLE_MATCH",service.checkCustomer(20L,r).getMatchStatus());
+    }
+    @Test void wechatIdentityIsCaseSensitive() {
+        when(personMapper.selectDuplicateCandidates("13800138000","WX")).thenReturn(List.of(person().setWechatId("wx")));
+        var r=req();r.setCustomerWechatId("WX");assertFalse(service.checkCustomer(20L,r).isCanRepurchase());
     }
     @Test void foreignTenantIsNeitherDisclosedNorAuthorized() {
         var p=person();p.setTenantId(2L);when(personMapper.selectDuplicateCandidates("13800138000",null)).thenReturn(List.of(p));

@@ -1,3 +1,6 @@
+import PointsRedemptionPage from '../pages/PointsRedemptionPage'
+import PointsPackagePage from '../pages/PointsPackagePage'
+import { POINTS_ROUTE, POINTS_PACKAGE_ROUTE } from '../services/pointsRedemptionApi'
 import { Card, Result, Typography } from 'antd'
 import { APP_ROUTES, type AuthPlatform } from '../constants'
 import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from '../services/menuComponentRegistry'
@@ -150,6 +153,8 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
   if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
+  if (menu?.path === POINTS_ROUTE) return <PointsRedemptionPage permissions={permissions}/>
+  if (menu?.path === POINTS_PACKAGE_ROUTE) return <PointsPackagePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage tenantReadAll={tenantReadAll} permissions={permissions}/>
   if (menu && [APP_ROUTES.WORK_ORDER_CREATE, APP_ROUTES.WORK_ORDER_AVAILABLE, APP_ROUTES.WORK_ORDER_MINE].some(path => path === menu.path)) return <WorkOrderCenterPage tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>

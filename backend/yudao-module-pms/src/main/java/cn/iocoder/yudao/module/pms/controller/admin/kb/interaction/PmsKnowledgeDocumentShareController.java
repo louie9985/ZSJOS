@@ -12,6 +12,8 @@ import cn.iocoder.yudao.module.pms.dal.dataobject.kb.content.PmsKnowledgeDocumen
 import cn.iocoder.yudao.module.pms.dal.dataobject.kb.interaction.PmsKnowledgeDocumentShareDO;
 import cn.iocoder.yudao.module.pms.enums.kb.content.PmsKnowledgeDocumentTypeEnum;
 import cn.iocoder.yudao.module.pms.service.kb.interaction.PmsKnowledgeDocumentShareService;
+import cn.iocoder.yudao.module.pms.service.kb.interaction.PmsKnowledgeShareUrl;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +45,8 @@ public class PmsKnowledgeDocumentShareController {
 
     @Resource
     private FileApi fileApi;
+    @Resource
+    private PmsKnowledgeShareUrl shareUrl;
 
     @PostMapping("/open")
     @Operation(summary = "开启文档分享")
@@ -51,7 +55,7 @@ public class PmsKnowledgeDocumentShareController {
             @Valid @RequestBody PmsKnowledgeDocumentShareSaveReqVO reqVO) {
         PmsKnowledgeDocumentShareDO share = documentShareService.openShare(reqVO.getDocumentId(),
                 reqVO.getShareUserIds(), getLoginUserId());
-        return success(BeanUtils.toBean(share, PmsKnowledgeDocumentShareRespVO.class));
+        return success(shareResponse(share));
     }
 
     @PutMapping("/update-member-list")
@@ -78,7 +82,20 @@ public class PmsKnowledgeDocumentShareController {
     @PreAuthorize("@ss.hasPermission('pms:kb:library:query')")
     public CommonResult<PmsKnowledgeDocumentShareRespVO> getDocumentShare(@RequestParam("documentId") Long documentId) {
         PmsKnowledgeDocumentShareDO share = documentShareService.getActiveDocumentShare(documentId, getLoginUserId());
-        return success(BeanUtils.toBean(share, PmsKnowledgeDocumentShareRespVO.class));
+        return success(shareResponse(share));
+    }
+
+    private PmsKnowledgeDocumentShareRespVO shareResponse(PmsKnowledgeDocumentShareDO share) {
+        if (share == null) return null;
+        var response = BeanUtils.toBean(share, PmsKnowledgeDocumentShareRespVO.class);
+        try {
+            response.setUrl(shareUrl.build(share.getToken()));
+        } catch (ServiceException ex) {
+            // Losing deployment configuration must not hide the revoke action.
+            if (!cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.KNOWLEDGE_DOCUMENT_SHARE_CONFIG_INVALID
+                    .getCode().equals(ex.getCode())) throw ex;
+        }
+        return response;
     }
 
     @GetMapping("/get-by-token")

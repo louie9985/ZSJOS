@@ -18,6 +18,23 @@ function nodes(node: ReactNode): Array<{ type: unknown; props: Record<string, un
 }
 
 describe('full-name exam month', () => {
+  it.each(['2026-02-01', '2028-02-01', '2026-08-01', '2026-12-01', '2027-01-01'])(
+    'renders only dates in %s with necessary weeks and weekday alignment', month => {
+      const anchor = dayjs(month)
+      const elements = nodes(ExamCalendarMonth({ anchor,
+        exactRows: [{ ...exact(1), exactDate: anchor.subtract(1, 'day').format('YYYY-MM-DD') }],
+        multiDayRows: [{ ...multi(2), startDate: anchor.subtract(3, 'day').format('YYYY-MM-DD'),
+          endDate: anchor.add(1, 'month').format('YYYY-MM-DD') }], onDay: () => {}, statusLabel: scheduleStatusLabel }))
+      const days = elements.filter(node => String(node.props.className).split(' ').includes('exam-month-day'))
+      expect(days).toHaveLength(anchor.daysInMonth())
+      expect((days[0].props.style as { gridColumn: number }).gridColumn).toBe(anchor.day() + 1)
+      expect(elements.filter(node => node.props.className === 'exam-month-week')).toHaveLength(
+        Math.ceil((anchor.day() + anchor.daysInMonth()) / 7))
+      expect(elements.filter(node => node.props['data-date']).every(node =>
+        String(node.props['data-date']).startsWith(anchor.format('YYYY-MM-')))).toBe(true)
+      expect(elements.some(node => String(node.props.className).startsWith('exam-calendar-event '))).toBe(false)
+    })
+
   it('applies saved colors to single-day and every cross-week multi-day segment', () => {
     const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
       exactRows={[{ ...exact(1), backgroundColor: '#ffcc00' }]}

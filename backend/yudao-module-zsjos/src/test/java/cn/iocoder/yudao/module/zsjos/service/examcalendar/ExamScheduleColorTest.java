@@ -20,6 +20,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ExamScheduleColorTest {
+    @org.junit.jupiter.api.BeforeEach void createTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L); }
+    @org.junit.jupiter.api.AfterEach void clearCreateTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
     @InjectMocks ExamScheduleService service;
     @Mock ExamScheduleMapper mapper;
     @Mock PermissionApi permissionApi;
@@ -30,7 +32,7 @@ class ExamScheduleColorTest {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), "exam-color"), ExamScheduleDO.class);
     }
     ExamScheduleSaveReqVO request(String color) {
-        return new ExamScheduleSaveReqVO().setScheduleName("自选颜色考试").setScheduleType("EXACT")
+        return new ExamScheduleSaveReqVO().setIdempotencyKey(java.util.UUID.randomUUID().toString()).setScheduleName("自选颜色考试").setScheduleType("EXACT")
             .setExactDate(LocalDate.of(2099, 10, 10)).setBackgroundColor(color);
     }
     @Test void createPersistsNormalizedColorAndQueriesExposeIt() {

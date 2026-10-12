@@ -1,4 +1,6 @@
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import BusinessSortMenu from '../components/BusinessSortMenu'
+import type { BusinessSort } from '../services/businessListSort'
 import type { AdvancedFilterGroup } from '../services/api'
 import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
 import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
@@ -247,6 +249,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   const [keyword, setKeyword] = useState(''), [pageNo, setPageNo] = useState(1)
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [operatorFilter, setOperatorFilter] = useState<StudentOperator>()
+  const [studentSort, setStudentSort] = useState<BusinessSort>({})
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
   const [interviewId, setInterviewId] = useState<number>()
@@ -413,7 +416,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
     try {
       const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined,
-        inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter, operatorUserId: operatorFilter?.id })
+        inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter, operatorUserId: operatorFilter?.id, ...studentSort })
       if (run !== listRun.current) return
       firstListLoad.current = false
       if (!append) loadedKeyword.current = keyword
@@ -447,7 +450,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         else { setRows([]); if (!keepDetail) setDetail(undefined); setError(errorText(cause)) }
       }
     } finally { if (run === listRun.current) { listBusy.current = false; setLoading(false) } }
-  }, [keyword, loadDetail, params, servicePeriodTab, advancedFilter, operatorFilter])
+  }, [keyword, loadDetail, params, servicePeriodTab, advancedFilter, operatorFilter, studentSort])
   const cancelPendingList = () => {
     ++searchIntent.current; ++listRun.current; listBusy.current = false; setLoading(false)
   }
@@ -501,6 +504,17 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     setRows([]); setPageNo(1); setHasMore(false); setLoading(true)
     setServicePeriodTab(next)
   }
+  const changeStudentSort = async (next: BusinessSort) => {
+    if (servicePeriodBusy.current || next.sortField === studentSort.sortField && next.sortOrder === studentSort.sortOrder) return
+    const intent = ++searchIntent.current
+    const allowed = await workspaceNavigation?.validate(APP_ROUTES.MEDIA_STUDENTS) ?? !dialog
+    if (!allowed || intent !== searchIntent.current) return
+    cancelPendingList()
+    firstListLoad.current = false
+    ++detailRun.current; setDetailLoading(false)
+    setRows([]); setPageNo(1); setHasMore(false); setLoading(true)
+    setStudentSort(next)
+  }
   const updateServicePeriod = async (checked: boolean) => {
     if (!detail || servicePeriodBusy.current) return
     const personId = detail.student.personId
@@ -524,7 +538,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
   useEffect(() => {
     const initialLink = firstListLoad.current
     void loadPage(1, undefined, false, false, initialLink)
-  }, [keyword, servicePeriodTab, advancedFilter, operatorFilter])
+  }, [keyword, servicePeriodTab, advancedFilter, operatorFilter, studentSort])
   useEffect(() => () => { ++listRun.current; ++detailRun.current }, [])
   useEffect(() => {
     if (location.key === initialLocationKey.current) return
@@ -1191,6 +1205,10 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         { key: 'in', label: '服务期', disabled: servicePeriodSaving },
         { key: 'out', label: '非服务期', disabled: servicePeriodSaving },
         { key: 'all', label: '全部', disabled: servicePeriodSaving },
+      ]} /><BusinessSortMenu label="学员" value={studentSort} onChange={next => void changeStudentSort(next)} fields={[
+        { field: 'name', label: '学员姓名' }, { field: 'personNo', label: '学员编号' },
+        { field: 'operators', label: '当前运营' }, { field: 'accounts', label: '账号名称' },
+        { field: 'platforms', label: '平台' }, { field: 'activatedAt', label: '激活时间' },
       ]} /><Tooltip title="刷新"><Button aria-label="刷新学员" disabled={servicePeriodSaving} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
     <div className={`media-students-inbox-layout${listCollapsed ? ' is-list-collapsed' : ''}`}>
       <aside className="media-students-list-pane" aria-label="学员列表">

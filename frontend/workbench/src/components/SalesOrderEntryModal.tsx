@@ -6,7 +6,7 @@ import { api, type AreaNode, type CollectionMode, type DictData, type LeadCatalo
 import { createIdempotencyKey } from '../services/idempotency'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
-import { validateSalesOrderAmounts, validateSalesOrderSubmission } from '../services/salesOrder'
+import { resolveSalesOrderContacts, validateSalesOrderAmounts, validateSalesOrderSubmission } from '../services/salesOrder'
 import { readOrderGifts, giftOptions } from '../services/orderGifts'
 import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
@@ -17,7 +17,7 @@ import PaymentQrCard from './PaymentQrCardModal'
 
 type Values = {
   repurchaseReason?: string
-  buyerName?: string; studentName: string; studentNature: string; mobile?: string; wechatId?: string; regionPath: string[]
+  buyerName?: string; studentName: string; studentNature: string; mobile: string; wechatId: string; regionPath: string[]
   agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
   customerPaidAt: Dayjs; feeMode: string; paymentMethod: string; remark?: string
   specialRequirements?: string; materialDeliveryContact?: string
@@ -74,8 +74,6 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
-  const mobile = Form.useWatch('mobile', form)
-  const wechatId = Form.useWatch('wechatId', form)
   const [historicalItems, setHistoricalItems] = useState<SalesOrder['items']>([])
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [catalog, setCatalog] = useState<LeadCatalog>(emptyCatalog)
@@ -144,8 +142,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       const hasPrimary = primary && (catalogResult as LeadCatalog).skus.some(sku => `${sku.spuRef}::${sku.skuRef}` === primary)
       form.setFieldsValue({
         buyerName: order?.buyerName, studentName: order?.studentName || lead.submittedName,
-        studentNature: order?.studentNatureLabelSnapshot ? order.studentNature : undefined, mobile: order?.studentMobile || lead.submittedMobile,
-        wechatId: order?.studentWechatId || lead.submittedWechatId, regionPath: regionPath.length ? regionPath : undefined,
+        studentNature: order?.studentNatureLabelSnapshot ? order.studentNature : undefined,
+        ...resolveSalesOrderContacts(undefined, order, lead), regionPath: regionPath.length ? regionPath : undefined,
         agreedExamTime: order?.agreedExamTime, classType: order?.classType, servicePeriod: order?.servicePeriodLabelSnapshot ? order.servicePeriod : undefined,
         studentSource: order?.studentSourceLabelSnapshot ? order.studentSource : undefined, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
         feeMode: order?.feeModeLabelSnapshot ? order.feeMode : undefined, paymentMethod: order?.paymentMethodLabelSnapshot ? order.paymentMethod : undefined, remark: order?.remark,
@@ -161,7 +159,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         setPurchaseIntent(current); setCollectionMode(current?.collectionMode || 'offline_paid')
         if (current?.draft) {
           const draft = current.draft as Partial<Values> & { customerPaidAt?: number }
-          form.setFieldsValue({ ...draft, customerPaidAt: draft.customerPaidAt ? dayjs(draft.customerPaidAt) : undefined } as Partial<Values>)
+          form.setFieldsValue({ ...draft, ...resolveSalesOrderContacts(draft, order, lead),
+            customerPaidAt: draft.customerPaidAt ? dayjs(draft.customerPaidAt) : undefined } as Partial<Values>)
         }
       } else {
         setPurchaseIntent(undefined)
@@ -181,7 +180,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     resetIntent(); submittedDraft.current = undefined
     setConfirmOpen(false); setPendingValues(undefined)
     form.resetFields(); setVouchers([]); void load()
-  }, [open, lead.id, lead.submittedName, lead.submittedMobile, lead.submittedWechatId, orderId, resetIntent])
+  }, [open, lead.id, orderId, resetIntent])
 
   const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
 
@@ -224,8 +223,6 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       try { setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id)) } catch { /* 刷新失败不影响锁定状态 */ }
     } finally { setDraftSaving(false) }
   }
-  const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
-    ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const prepareSubmit = async () => {
     if (loading || loadError || (orderId && !revisionOrder)) return
     const amountError = validateSalesOrderAmounts(form.getFieldValue('items'), collectionMode)
@@ -251,7 +248,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const request: SalesOrderSubmitRequest = {
         refreshedDictionaryFields, buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
-        studentMobile: values.mobile?.trim() || undefined, studentWechatId: values.wechatId?.trim() || undefined,
+        studentMobile: values.mobile.trim(), studentWechatId: values.wechatId.trim(),
         provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
         agreedExamTime: values.agreedExamTime?.trim() || undefined, classType: values.classType?.trim() || undefined,
         servicePeriod: values.servicePeriod, studentSource: values.studentSource, customerPaidAt: values.customerPaidAt.valueOf(),
@@ -332,8 +329,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" rules={[{ required: true, whitespace: true, message: '请填写手机号' }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked && resolveSalesOrderContacts(purchaseIntent.draft, undefined, {}).mobile)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" rules={[{ required: true, whitespace: true, message: '请填写微信号' }, { max: 64, message: '微信号最多64个字符' }]}><Input maxLength={64} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked && resolveSalesOrderContacts(purchaseIntent.draft, undefined, {}).wechatId)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>
@@ -365,7 +362,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={8}><Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_PAYMENT_METHOD)}/></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="remark" label="订单备注"><Input.TextArea rows={3} maxLength={1000} showCount/></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="specialRequirements" label="学生特殊要求"><Input.TextArea rows={3} maxLength={1000} showCount/></Form.Item></Col>
-          <Col xs={24}><Form.Item name="materialDeliveryContact" label="教材邮递联系"><Input.TextArea rows={3} maxLength={1000} showCount placeholder="收件人、联系电话和邮寄地址"/></Form.Item></Col>
+          <Col xs={24}><Form.Item name="materialDeliveryContact" label="教材邮递地址"><Input.TextArea rows={3} maxLength={1000} showCount placeholder="收件人、联系电话和邮寄地址"/></Form.Item></Col>
           <Col xs={24}><Form.Item label={`缴费凭证${vouchers.some(file => file.status === 'uploading') ? '（上传中）' : ''}`} required extra="确认提交后上传；所有订单至少一份，最多 6 个 JPG、PNG、WebP 或 PDF">
             <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false} maxCount={6}/>
           </Form.Item></Col>

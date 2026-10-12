@@ -61,13 +61,20 @@ public final class BpmStartUserTaskRecovery {
     }
 
     public String recover(Request request) {
+        return recover(request, () -> {});
+    }
+
+    /** The maintenance caller locks and rechecks its business rows in this engine transaction. */
+    public String recover(Request request, Runnable lockedBusinessValidation) {
         // afterCompletion can still expose the committed transaction's resources. Recovery must
         // start at an independent operator invocation, never inside that callback or a caller TX.
         require(!TransactionSynchronizationManager.isActualTransactionActive()
                 && !TransactionSynchronizationManager.isSynchronizationActive(), "Fresh invocation required");
+        Objects.requireNonNull(lockedBusinessValidation, "Business validation required");
         validateOperator(request);
         return FlowableUtils.executeAuthenticatedUserId(request.operatorUserId(), () ->
                 transaction.execute(status -> {
+                    lockedBusinessValidation.run();
                     String state = check(request);
                     if ("ALREADY_RECOVERED".equals(state)) return state;
                     var runtime = engine.getRuntimeService();

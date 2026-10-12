@@ -15,6 +15,11 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
 
+    // Creation replay must survive logical deletion; only the original tenant/operator digest matches.
+    @Select("SELECT id, create_request_hash FROM zsjos_exam_schedule "
+            + "WHERE tenant_id=#{tenantId} AND create_request_key=#{requestKey}")
+    ExamScheduleDO selectCreatedRequest(@Param("tenantId") Long tenantId, @Param("requestKey") String requestKey);
+
     // MyBatis-Plus default methods propagate their interceptor strategy to nested mapper calls.
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", dataPermission = "true")
     default PageResult<ExamScheduleDO> selectSearch(

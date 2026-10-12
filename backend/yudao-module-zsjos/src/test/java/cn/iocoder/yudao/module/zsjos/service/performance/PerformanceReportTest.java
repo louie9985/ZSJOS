@@ -104,9 +104,9 @@ class PerformanceReportTest {
 
  @Test void conversionDetailsExcludeUnlinkedSelfWhileOrderDetailsKeepThem() {
   var received=LocalDateTime.now(PerformancePeriods.ZONE).minusHours(3);
-  var excluded=order(1,"self","first_purchase","1280");excluded.setLeadId(1L);excluded.setReceivedAt(received);excluded.setSourceType("sales_self_sourced");
-  var included=order(2,"self","first_purchase","1280");included.setLeadId(2L);included.setReceivedAt(received);included.setSourceType("sales_self_sourced");included.setSourceProviderUserId(99L);
-  var unconverted=new PerformanceFact();unconverted.setLeadId(3L);unconverted.setReceivedAt(received);unconverted.setStatus("valid");unconverted.setSourceType("sales_self_sourced");
+  var excluded=order(1,"self","first_purchase","1280");excluded.setLeadId(1L);excluded.setReceivedAt(received);excluded.setSourceType("sales_self_sourced");excluded.setSourceProviderRecorded(true);
+  var included=order(2,"self","first_purchase","1280");included.setLeadId(2L);included.setReceivedAt(received);included.setSourceType("sales_self_sourced");included.setSourceProviderUserId(99L);included.setSourceProviderRecorded(true);included.setProviderOwnerType("system_user");included.setProviderOwnerId(99L);
+  var unconverted=new PerformanceFact();unconverted.setLeadId(3L);unconverted.setReceivedAt(received);unconverted.setStatus("valid");unconverted.setSourceType("sales_self_sourced");unconverted.setSourceProviderRecorded(true);
   when(facts.orders(991L,"USER",1L)).thenReturn(List.of(excluded,included));
   when(facts.receipts(991L,"USER",1L)).thenReturn(List.of(unconverted));
   query.setStart(received.toLocalDate());query.setEnd(received.toLocalDate().plusDays(1));query.setMetric("conversion");

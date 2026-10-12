@@ -114,4 +114,13 @@ public class HrmPortalEmployeeRespVO {
     @Schema(description = "司龄，单位年", example = "2")
     private Integer companyAge;
 
+
+    private LocalDateTime plannedRegularTime;
+    private LocalDateTime plannedLeaveTime;
+    private Long version;
+    private String typeLabel;
+    private String statusLabel;
+    private String entryStatusLabel;
+    private String legacyDateSource;
+
 }

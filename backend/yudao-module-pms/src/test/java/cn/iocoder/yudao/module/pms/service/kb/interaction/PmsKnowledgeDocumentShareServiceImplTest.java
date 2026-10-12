@@ -40,11 +40,35 @@ import static org.mockito.Mockito.when;
  *
  * @author 芋道源码
  */
-@Import(PmsKnowledgeDocumentShareServiceImpl.class)
+@Import({PmsKnowledgeDocumentShareServiceImpl.class, PmsKnowledgeShareUrl.class})
+@org.springframework.test.context.TestPropertySource(properties = "pms.knowledge-share.public-base-url=https://public.example.com")
 public class PmsKnowledgeDocumentShareServiceImplTest extends BaseDbUnitTest {
 
     @Resource
     private PmsKnowledgeDocumentShareServiceImpl documentShareService;
+
+    @Resource
+    private PmsKnowledgeShareUrl shareUrl;
+
+    @Test
+    public void invalidConfigurationDoesNotCreateAShare() {
+        long sharesBefore = documentShareMapper.selectCount();
+        org.springframework.test.util.ReflectionTestUtils.setField(shareUrl, "publicBaseUrl", "");
+        try {
+            assertServiceException(() -> documentShareService.openShare(1L, null, 1L),
+                    cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.KNOWLEDGE_DOCUMENT_SHARE_CONFIG_INVALID);
+            assertEquals(sharesBefore, documentShareMapper.selectCount());
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(shareUrl, "publicBaseUrl", "https://public.example.com");
+        }
+    }
+
+    @Test
+    public void emptyAndOversizedTokensAreRejected() {
+        for (String token : new String[]{null, "", " ", "a".repeat(65)}) {
+            assertServiceException(() -> documentShareService.getDocumentByShareToken(token), KNOWLEDGE_DOCUMENT_SHARE_INVALID);
+        }
+    }
 
     @Resource
     private PmsKnowledgeDocumentShareMapper documentShareMapper;

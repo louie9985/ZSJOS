@@ -7,7 +7,7 @@
       </el-button>
     </div>
     <el-descriptions :column="3" border>
-      <el-descriptions-item label="计划离职时间">
+      <el-descriptions-item label="离职登记中的计划日期">
         {{ formatHrmDateTime(quitInfo.planQuitTime) }}
       </el-descriptions-item>
       <el-descriptions-item label="申请离职">

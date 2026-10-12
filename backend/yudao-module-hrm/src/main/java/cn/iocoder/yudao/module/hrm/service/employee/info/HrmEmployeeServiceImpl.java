@@ -200,39 +200,15 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     private TransactionTemplate transactionTemplate;
     @Resource
     private HrmEmployeeLifecycleEventPublisher lifecycleEventPublisher;
+    @Resource
+    private HrmEmployeeManualLifecycle manualLifecycle;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_CONFIRM_ENTRY_SUB_TYPE,
             bizNo = "{{#reqVO.id}}", success = HRM_EMPLOYEE_CONFIRM_ENTRY_SUCCESS)
     public void confirmEmployeeEntry(HrmEmployeeConfirmEntryReqVO reqVO) {
-        // 1. 校验员工状态和完整固定字段
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getId());
-        if (ObjUtil.notEqual(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus(), employee.getEntryStatus())) {
-            throw exception(EMPLOYEE_CONFIRM_ENTRY_STATUS_INVALID);
-        }
-        reqVO.setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus());
-        ValidationUtils.validate(reqVO);
-        employeeFieldConfigService.validateEmployeeCreateFields(
-                reqVO, HrmEmployeeEntryStatusEnum.ACTIVE.getStatus());
-        validateEmployeeForCreateOrUpdate(employee.getId(), reqVO);
-
-        // 2. 保存完整员工固定字段并确认入职
-        HrmEmployeeDO updateObj = buildEmployee(reqVO).setId(employee.getId())
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus()).setLeaveTime(null);
-        employeeMapper.updateForEntryById(updateObj);
-
-        // 3. 同步招聘候选人状态
-        if (employee.getCandidateId() != null) {
-            recruitCandidateService.confirmRecruitCandidateEntry(
-                    employee.getCandidateId(), updateObj.getEntryTime());
-        }
-
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ENTRY_CONFIRMED,
-                employee.getId(), employee, employee.getId());
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getId(), reqVO, 10);
     }
 
     @Override
@@ -240,60 +216,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_REHIRE_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_REHIRE_SUCCESS)
     public void rehireEmployee(HrmEmployeeRehireReqVO reqVO) {
-        // 1. 校验员工和再入职信息
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        if (ObjUtil.notEqual(HrmEmployeeEntryStatusEnum.LEFT.getStatus(), employee.getEntryStatus())) {
-            throw exception(EMPLOYEE_REHIRE_STATUS_INVALID);
-        }
-        reqVO.setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus());
-        ValidationUtils.validate(reqVO);
-        employeeFieldConfigService.validateEmployeeCreateFields(
-                reqVO, HrmEmployeeEntryStatusEnum.ACTIVE.getStatus());
-        validateEmployeeForCreateOrUpdate(employee.getId(), reqVO);
-
-        // 2.1 计算试用期和转正日期
-        int probation = defaultIfNull(reqVO.getProbation(), 0);
-        Integer status = reqVO.getStatus();
-        LocalDateTime regularTime = null;
-        if (HrmEmployeeTypeEnum.FORMAL.getType().equals(reqVO.getType())) {
-            regularTime = reqVO.getEntryTime().plusMonths(probation);
-            status = probation > 0 && regularTime.isAfter(LocalDateTime.now())
-                    ? HrmEmployeeStatusEnum.PROBATION.getStatus() : HrmEmployeeStatusEnum.REGULAR.getStatus();
-        } else {
-            probation = 0;
-        }
-        LocalDateTime companyAgeStartTime = defaultIfNull(
-                reqVO.getCompanyAgeStartTime(), reqVO.getEntryTime());
-        // 2.2 保存再入职异动记录
-        HrmEmployeeChangeRecordDO rehireRecord = createEmployeeChangeRecord(BeanUtils.toBean(
-                reqVO, HrmEmployeeChangeRecordCreateReqVO.class)
-                .setNewDeptId(reqVO.getDeptId()).setNewPostName(reqVO.getPostName())
-                .setNewPostLevel(reqVO.getPostLevel()).setNewWorkAddress(reqVO.getWorkAddress())
-                .setNewLeaderEmployeeId(reqVO.getLeaderEmployeeId())
-                .setProbation(probation).setEffectTime(reqVO.getEntryTime()),
-                employee, HrmEmployeeChangeTypeEnum.REHIRE.getType());
-        // 2.3 清理原离职信息
-        employeeQuitInfoService.deleteEmployeeQuitInfo(employee.getId());
-
-        // 3. 更新员工档案
-        HrmEmployeeDO updateObj = BeanUtils.toBean(reqVO, HrmEmployeeDO.class);
-        normalizeEmployeePersonalInfo(updateObj);
-        updateObj.setId(employee.getId())
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus()).setEntryTime(reqVO.getEntryTime())
-                .setCompanyAgeStartTime(companyAgeStartTime)
-                .setCompanyAge(getYearsBetween(companyAgeStartTime.toLocalDate(), LocalDate.now()))
-                .setType(reqVO.getType()).setStatus(status).setProbation(probation).setRegularTime(regularTime)
-                .setDeptId(reqVO.getDeptId()).setLeaderEmployeeId(reqVO.getLeaderEmployeeId())
-                .setPostName(reqVO.getPostName()).setPostLevel(reqVO.getPostLevel())
-                .setWorkCity(reqVO.getWorkCity()).setWorkAddress(reqVO.getWorkAddress())
-                .setWorkDetailAddress(reqVO.getWorkDetailAddress()).setLeaveTime(null);
-        employeeMapper.updateForEntryById(updateObj);
-
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.REHIRED,
-                rehireRecord.getId(), employee, employee.getId());
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 9);
     }
 
     @Override
@@ -301,30 +224,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_REGULAR_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_REGULAR_SUCCESS)
     public void regularEmployee(HrmEmployeeRegularReqVO reqVO) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        validateEmployeeInService(employee, HrmEmployeeChangeTypeEnum.REGULAR);
-        if (ObjUtil.notEqual(HrmEmployeeStatusEnum.PROBATION.getStatus(), employee.getStatus())) {
-            throw exception(EMPLOYEE_CHANGE_STATUS_INVALID, HrmEmployeeChangeTypeEnum.REGULAR.getName());
-        }
-        HrmEmployeeChangeRecordCreateReqVO changeRecord = fillUnchangedPositionFields(
-                BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordCreateReqVO.class), employee);
-        validatePositionChange(employee, HrmEmployeeChangeTypeEnum.REGULAR,
-                changeRecord.getNewDeptId(), changeRecord.getNewLeaderEmployeeId());
-
-        // 2. 创建转正记录
-        HrmEmployeeChangeRecordDO savedChangeRecord = createEmployeeChangeRecord(
-                changeRecord, employee, HrmEmployeeChangeTypeEnum.REGULAR.getType());
-
-        // 3. 同步预约转正时间，并立即应用已到期的转正
-        employeeMapper.updateById(new HrmEmployeeDO().setId(employee.getId())
-                .setRegularTime(savedChangeRecord.getEffectTime()));
-        if (beforeOrEqualNow(savedChangeRecord.getEffectTime())) {
-            applyEmployeeChange(savedChangeRecord);
-        }
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 4);
     }
 
     @Override
@@ -332,23 +232,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_TRANSFER_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_TRANSFER_SUCCESS)
     public void transferEmployee(HrmEmployeeTransferReqVO reqVO) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        validatePositionChange(employee, HrmEmployeeChangeTypeEnum.TRANSFER,
-                reqVO.getNewDeptId(), reqVO.getNewLeaderEmployeeId());
-
-        // 2. 创建调岗记录
-        HrmEmployeeChangeRecordDO changeRecord = createEmployeeChangeRecord(
-                BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordCreateReqVO.class),
-                employee, HrmEmployeeChangeTypeEnum.TRANSFER.getType());
-
-        // 3. 立即应用已生效的调岗
-        if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            applyEmployeeChange(changeRecord);
-        }
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 5);
     }
 
     @Override
@@ -356,23 +240,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_PROMOTE_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_PROMOTE_SUCCESS)
     public void promoteEmployee(HrmEmployeePromoteReqVO reqVO) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        validatePositionChange(employee, HrmEmployeeChangeTypeEnum.PROMOTION,
-                reqVO.getNewDeptId(), reqVO.getNewLeaderEmployeeId());
-
-        // 2. 创建晋升记录
-        HrmEmployeeChangeRecordDO changeRecord = createEmployeeChangeRecord(
-                BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordCreateReqVO.class),
-                employee, HrmEmployeeChangeTypeEnum.PROMOTION.getType());
-
-        // 3. 立即应用已生效的晋升
-        if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            applyEmployeeChange(changeRecord);
-        }
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 6);
     }
 
     @Override
@@ -380,23 +248,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_DEMOTE_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_DEMOTE_SUCCESS)
     public void demoteEmployee(HrmEmployeeDemoteReqVO reqVO) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        validatePositionChange(employee, HrmEmployeeChangeTypeEnum.DEMOTION,
-                reqVO.getNewDeptId(), reqVO.getNewLeaderEmployeeId());
-
-        // 2. 创建降级记录
-        HrmEmployeeChangeRecordDO changeRecord = createEmployeeChangeRecord(
-                BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordCreateReqVO.class),
-                employee, HrmEmployeeChangeTypeEnum.DEMOTION.getType());
-
-        // 3. 立即应用已生效的降级
-        if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            applyEmployeeChange(changeRecord);
-        }
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 7);
     }
 
     @Override
@@ -404,93 +256,14 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_FULL_TIME_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_FULL_TIME_SUCCESS)
     public void convertEmployeeToFullTime(HrmEmployeeConvertToFullTimeReqVO reqVO) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        validateEmployeeInService(employee, HrmEmployeeChangeTypeEnum.FULL_TIME);
-        if (!HrmEmployeeStatusEnum.CONVERTIBLE_TO_FULL_TIME_STATUSES.contains(employee.getStatus())) {
-            throw exception(EMPLOYEE_CHANGE_STATUS_INVALID, HrmEmployeeChangeTypeEnum.FULL_TIME.getName());
-        }
-        HrmEmployeeChangeRecordCreateReqVO changeRecord = fillUnchangedPositionFields(
-                BeanUtils.toBean(reqVO, HrmEmployeeChangeRecordCreateReqVO.class), employee);
-        validatePositionChange(employee, HrmEmployeeChangeTypeEnum.FULL_TIME,
-                changeRecord.getNewDeptId(), changeRecord.getNewLeaderEmployeeId());
-
-        // 2. 创建转为全职记录
-        HrmEmployeeChangeRecordDO savedChangeRecord = createEmployeeChangeRecord(
-                changeRecord, employee, HrmEmployeeChangeTypeEnum.FULL_TIME.getType());
-
-        // 3. 立即应用已生效的转为全职
-        if (beforeOrEqualNow(savedChangeRecord.getEffectTime())) {
-            applyEmployeeChange(savedChangeRecord);
-        }
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 8);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean applyEmployeeChange(HrmEmployeeChangeRecordDO changeRecord) {
-        // 1. 校验异动类型
-        if (ObjectUtils.notEqualsAny(changeRecord.getType(), HrmEmployeeChangeTypeEnum.REGULAR.getType(),
-                HrmEmployeeChangeTypeEnum.TRANSFER.getType(), HrmEmployeeChangeTypeEnum.PROMOTION.getType(),
-                HrmEmployeeChangeTypeEnum.DEMOTION.getType(), HrmEmployeeChangeTypeEnum.FULL_TIME.getType())) {
-            throw exception(EMPLOYEE_CHANGE_TYPE_INVALID, changeRecord.getType());
-        }
-
-        // 2. 已生效记录、未到期记录和非在职员工不再重复处理
-        if (changeRecord.getAppliedTime() != null || afterNow(changeRecord.getEffectTime())) {
-            return false;
-        }
-        HrmEmployeeDO employee = employeeMapper.selectById(changeRecord.getEmployeeId());
-        if (employee == null || !HrmEmployeeEntryStatusEnum.ACTIVE_STATUSES.contains(employee.getEntryStatus())) {
-            employeeChangeRecordService.updateEmployeeChangeRecordAppliedTime(changeRecord.getId(), LocalDateTime.now());
-            return false;
-        }
-
-        // 3. 按异动类型更新员工主档
-        if (HrmEmployeeChangeTypeEnum.REGULAR.getType().equals(changeRecord.getType())) {
-            if (ObjUtil.notEqual(employee.getStatus(), HrmEmployeeStatusEnum.PROBATION.getStatus())) {
-                employeeChangeRecordService.updateEmployeeChangeRecordAppliedTime(
-                        changeRecord.getId(), LocalDateTime.now());
-                return false;
-            }
-            fillUnchangedPositionFields(changeRecord, employee);
-            employeeMapper.updateById(new HrmEmployeeDO().setId(changeRecord.getEmployeeId())
-                    .setRegularTime(changeRecord.getEffectTime())
-                    .setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()));
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
-        } else if (ObjectUtils.equalsAny(changeRecord.getType(), HrmEmployeeChangeTypeEnum.TRANSFER.getType(),
-                HrmEmployeeChangeTypeEnum.PROMOTION.getType(), HrmEmployeeChangeTypeEnum.DEMOTION.getType())) {
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
-        } else if (HrmEmployeeChangeTypeEnum.FULL_TIME.getType().equals(changeRecord.getType())) {
-            if (!HrmEmployeeStatusEnum.CONVERTIBLE_TO_FULL_TIME_STATUSES.contains(employee.getStatus())) {
-                employeeChangeRecordService.updateEmployeeChangeRecordAppliedTime(
-                        changeRecord.getId(), LocalDateTime.now());
-                return false;
-            }
-            fillUnchangedPositionFields(changeRecord, employee);
-            int probation = defaultIfNull(changeRecord.getProbation(), 0);
-            LocalDateTime regularTime = changeRecord.getEffectTime().plusMonths(probation);
-            employeeMapper.updateById(new HrmEmployeeDO().setId(changeRecord.getEmployeeId())
-                    .setType(HrmEmployeeTypeEnum.FORMAL.getType())
-                    .setStatus(probation == 0 ? HrmEmployeeStatusEnum.REGULAR.getStatus()
-                            : HrmEmployeeStatusEnum.PROBATION.getStatus())
-                    .setProbation(probation).setRegularTime(regularTime));
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
-        }
-
-        // 4. 标记异动记录已实际生效
-        employeeChangeRecordService.updateEmployeeChangeRecordAppliedTime(changeRecord.getId(), LocalDateTime.now());
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.CHANGE_EFFECTIVE,
-                changeRecord.getId(), employee, employee.getId());
-        return true;
+        // Legacy scheduler callers are deliberately unable to change employee facts.
+        return false;
     }
 
     @Override
@@ -501,42 +274,15 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean applyEmployeeRegular(Long employeeId) {
-        // 1. 只处理仍在职、处于试用期且转正时间已到的员工
-        HrmEmployeeDO employee = employeeMapper.selectById(employeeId);
-        if (employee == null || !HrmEmployeeEntryStatusEnum.ACTIVE_STATUSES.contains(employee.getEntryStatus())
-                || ObjUtil.notEqual(employee.getStatus(), HrmEmployeeStatusEnum.PROBATION.getStatus())
-                || employee.getRegularTime() == null || afterNow(employee.getRegularTime())) {
-            return false;
-        }
-        // 2. 将员工状态更新为正式
-        employeeMapper.updateById(new HrmEmployeeDO().setId(employeeId)
-                .setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()));
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.CHANGE_EFFECTIVE,
-                employeeId, employee, employeeId);
-        return true;
+        // Legacy scheduler callers are deliberately unable to change employee facts.
+        return false;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean applyEmployeeQuit(HrmEmployeeQuitInfoDO quitInfo) {
-        // 1. 校验员工
-        HrmEmployeeDO employee = employeeMapper.selectById(quitInfo.getEmployeeId());
-        if (employee == null
-                || ObjUtil.notEqual(employee.getEntryStatus(), HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus())
-                || quitInfo.getPlanQuitTime() == null || afterNow(quitInfo.getPlanQuitTime())) {
-            return false;
-        }
-
-        // 2. 更新员工离职状态
-        LocalDate companyAgeStartDate = employee.getCompanyAgeStartTime() == null
-                ? null : employee.getCompanyAgeStartTime().toLocalDate();
-        employeeMapper.updateById(new HrmEmployeeDO().setId(employee.getId())
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
-                .setLeaveTime(quitInfo.getPlanQuitTime())
-                .setCompanyAge(getYearsBetween(companyAgeStartDate, quitInfo.getPlanQuitTime().toLocalDate())));
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.LEFT,
-                quitInfo.getId(), employee, employee.getId());
-        return true;
+        // Legacy scheduler callers are deliberately unable to change employee facts.
+        return false;
     }
 
     @Override
@@ -544,47 +290,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_QUIT_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_QUIT_SUCCESS)
     public void quitEmployee(HrmEmployeeQuitReqVO reqVO) {
-        // 1. 校验员工状态和离职信息
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        if (ObjectUtils.notEqualsAny(employee.getEntryStatus(), HrmEmployeeEntryStatusEnum.ACTIVE.getStatus(),
-                HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus(),
-                HrmEmployeeEntryStatusEnum.LEFT.getStatus())) {
-            throw exception(EMPLOYEE_QUIT_STATUS_INVALID);
-        }
-        boolean alreadyLeft = HrmEmployeeEntryStatusEnum.LEFT.getStatus().equals(employee.getEntryStatus());
-        if (alreadyLeft && afterNow(reqVO.getPlanQuitTime())) {
-            throw exception(EMPLOYEE_QUIT_TIME_INVALID);
-        }
-
-        // 2. 保存离职信息
-        if (HrmEmployeeQuitTypeEnum.RETIREMENT.getType().equals(reqVO.getType())) {
-            reqVO.setReason(null);
-        }
-        HrmEmployeeQuitInfoSaveReqVO quitInfo = BeanUtils.toBean(reqVO, HrmEmployeeQuitInfoSaveReqVO.class)
-                .setApplyQuitTime(getDayBeginTime(reqVO.getApplyQuitTime()))
-                .setSalarySettlementTime(getDayBeginTime(reqVO.getSalarySettlementTime()))
-                .setOldEmployeeStatus(employee.getStatus());
-        Long quitInfoId = employeeQuitInfoService.saveEmployeeQuitInfo(quitInfo);
-
-        // 3. 更新员工离职状态
-        boolean effectiveImmediately = beforeOrEqualNow(reqVO.getPlanQuitTime());
-        Integer entryStatus = alreadyLeft ? HrmEmployeeEntryStatusEnum.LEFT.getStatus()
-                : HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus();
-        Integer companyAge = null;
-        if (alreadyLeft || effectiveImmediately) {
-            entryStatus = HrmEmployeeEntryStatusEnum.LEFT.getStatus();
-            companyAge = getYearsBetween(employee.getCompanyAgeStartTime() != null
-                    ? employee.getCompanyAgeStartTime().toLocalDate() : null, reqVO.getPlanQuitTime().toLocalDate());
-        }
-        employeeMapper.updateById(new HrmEmployeeDO().setId(reqVO.getEmployeeId())
-                .setEntryStatus(entryStatus).setLeaveTime(reqVO.getPlanQuitTime()).setCompanyAge(companyAge));
-
-        lifecycleEventPublisher.publish(effectiveImmediately
-                        ? HrmEmployeeLifecycleEventType.LEFT : HrmEmployeeLifecycleEventType.QUIT_PLANNED,
-                quitInfoId, employee, employee.getId());
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 11);
     }
 
     @Override
@@ -592,26 +298,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_CANCEL_QUIT_SUB_TYPE,
             bizNo = "{{#reqVO.employeeId}}", success = HRM_EMPLOYEE_CANCEL_QUIT_SUCCESS)
     public void cancelEmployeeQuit(HrmEmployeeCancelQuitReqVO reqVO) {
-        // 1. 校验员工和离职信息
-        HrmEmployeeDO employee = validateEmployeeExists(reqVO.getEmployeeId());
-        if (ObjUtil.notEqual(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus(), employee.getEntryStatus())) {
-            throw exception(EMPLOYEE_QUIT_CANCEL_STATUS_INVALID);
-        }
-        HrmEmployeeQuitInfoDO quitInfo = employeeQuitInfoService.validateQuitInfoByEmployeeId(reqVO.getEmployeeId());
-
-        // 2. 删除离职信息
-        employeeQuitInfoService.deleteEmployeeQuitInfo(reqVO.getEmployeeId());
-
-        // 3. 恢复员工在职状态
-        employeeMapper.updateById(new HrmEmployeeDO().setId(reqVO.getEmployeeId())
-                .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus()));
-        employeeMapper.updateLeaveTimeById(reqVO.getEmployeeId(), null);
-
-        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.QUIT_CANCELLED,
-                quitInfo.getId(), employee, employee.getId());
-
-        // 4. 记录操作日志上下文
-        LogRecordContext.putVariable("employee", employee);
+        executeManualCommand(reqVO.getEmployeeId(), reqVO, 13);
     }
 
     @Override
@@ -620,17 +307,17 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
             bizNo = "{{#employee.id}}", success = HRM_EMPLOYEE_CREATE_SUCCESS)
     public Long createEmployee(HrmEmployeeSaveReqVO createReqVO) {
         // 1. 校验员工档案及其关联数据
-        employeeFieldConfigService.validateEmployeeCreateFields(createReqVO, createReqVO.getEntryStatus());
+        employeeFieldConfigService.validateEmployeeCreateFields(createReqVO,
+                HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus().equals(createReqVO.getEntryStatus())
+                        ? HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus() : HrmEmployeeEntryStatusEnum.ACTIVE.getStatus());
         validateEmployeeForCreateOrUpdate(null, createReqVO);
 
         // 2. 插入员工档案
         HrmEmployeeDO employee = buildEmployee(createReqVO);
+        manualLifecycle.snapshotLabels(null, employee);
         employeeMapper.insert(employee);
+        manualLifecycle.syncPlanDates(employee);
 
-        if (employee.getUserId() != null) {
-            lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ACCOUNT_BOUND,
-                    employee.getId(), null, employee.getId());
-        }
 
         // 3. 事务提交后发送员工端开通通知
         sendEmployeeOpenedMessage(Collections.singletonList(employee));
@@ -680,12 +367,14 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         }
 
         // 2. 批量插入员工档案
-        List<HrmEmployeeDO> employees = convertList(saveReqVOList, this::buildEmployee);
+        List<HrmEmployeeDO> employees = convertList(saveReqVOList, req -> {
+            HrmEmployeeDO employee = buildEmployee(req);
+            manualLifecycle.snapshotLabels(null, employee);
+            return employee;
+        });
         employeeMapper.insertBatch(employees);
+        employees.forEach(manualLifecycle::syncPlanDates);
 
-        employees.stream().filter(employee -> employee.getUserId() != null)
-                .forEach(employee -> lifecycleEventPublisher.publish(
-                        HrmEmployeeLifecycleEventType.ACCOUNT_BOUND, employee.getId(), null, employee.getId()));
 
         // 3. 事务提交后发送员工端开通通知，并按员工档案分别记录操作日志
         sendEmployeeOpenedMessage(employees);
@@ -739,19 +428,12 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     @LogRecord(type = HRM_EMPLOYEE_TYPE, subType = HRM_EMPLOYEE_UPDATE_SUB_TYPE,
             bizNo = "{{#updateReqVO.id}}", success = HRM_EMPLOYEE_UPDATE_SUCCESS)
     public void updateEmployee(HrmEmployeeSaveReqVO updateReqVO) {
-        // 1. 校验员工档案及其关联数据
-        HrmEmployeeDO employee = validateEmployeeForCreateOrUpdate(updateReqVO.getId(), updateReqVO);
-
-        // 2. 更新员工档案
+        HrmEmployeeDO employee = employeeMapper.selectByIdForUpdate(updateReqVO.getId());
+        if (employee == null) throw exception(EMPLOYEE_NOT_EXISTS);
+        if (manualLifecycle.replay(updateReqVO)) return;
+        validateEmployeeForCreateOrUpdate(updateReqVO.getId(), updateReqVO);
         HrmEmployeeDO updateObj = buildEmployeeForUpdate(updateReqVO, employee);
-        employeeMapper.updateById(updateObj);
-
-        if (employee.getUserId() == null && updateObj.getUserId() != null) {
-            lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ACCOUNT_BOUND,
-                    employee.getId(), employee, employee.getId());
-        }
-
-        // 3. 记录操作日志上下文
+        manualLifecycle.write(updateReqVO, employee, updateObj);
         LogRecordContext.putVariable(DiffParseFunction.OLD_OBJECT,
                 BeanUtils.toBean(employee, HrmEmployeeSaveReqVO.class));
     }
@@ -977,8 +659,14 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
                             : buildEmployeeForUpdate(saveReqVO, existEmployee);
                     if (existEmployee == null) {
                         employeeMapper.insert(importedEmployee);
+                        manualLifecycle.syncPlanDates(importedEmployee);
                     } else {
-                        employeeMapper.updateById(importedEmployee);
+                        HrmEmployeeDO locked = employeeMapper.selectByIdForUpdate(existEmployee.getId());
+                        saveReqVO.setId(locked.getId()).setVersion(locked.getVersion())
+                                .setChangeMode("CORRECTION").setChangeReason("导入档案纠错")
+                                .setOperationKey(java.util.UUID.randomUUID().toString());
+                        importedEmployee.setId(locked.getId());
+                        manualLifecycle.write(saveReqVO, locked, importedEmployee);
                     }
                     saveImportedEmployeeResources(importedEmployee.getId(), importEmployee, schemeId);
                 });
@@ -1276,49 +964,79 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     }
 
     /**
-     * 构建员工档案，并补充由业务规则计算的状态、日期和司龄
+     * 构建人工维护的员工档案，仅派生司龄
      *
      * @param reqVO 员工档案保存请求对象
      * @return 构建后的员工档案对象
      */
+    private void executeManualCommand(Long employeeId, Object command, int type) {
+        HrmEmployeeDO employee = employeeMapper.selectByIdForUpdate(employeeId);
+        if (employee == null) throw exception(EMPLOYEE_NOT_EXISTS);
+        HrmEmployeeSaveReqVO metadata = BeanUtils.toBean(command, HrmEmployeeSaveReqVO.class);
+        HrmEmployeeSaveReqVO req = BeanUtils.toBean(employee, HrmEmployeeSaveReqVO.class);
+        if (command instanceof HrmEmployeeSaveReqVO full) req = BeanUtils.toBean(full, HrmEmployeeSaveReqVO.class);
+        req.setId(employeeId).setVersion(metadata.getVersion()).setOperationKey(metadata.getOperationKey())
+                .setChangeType(type).setChangeMode("PLAN".equals(metadata.getChangeMode()) ? "PLAN" : "BUSINESS")
+                .setChangeReason(StrUtil.isNotBlank(metadata.getChangeReason()) ? metadata.getChangeReason()
+                        : StrUtil.isNotBlank(metadata.getRemark()) ? metadata.getRemark() : HrmEmployeeChangeTypeEnum.valueOf(type).getName())
+                .setCommandRequestHash(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(command));
+        HrmEmployeeChangeRecordCreateReqVO change = type == 13 ? new HrmEmployeeChangeRecordCreateReqVO() : BeanUtils.toBean(command, HrmEmployeeChangeRecordCreateReqVO.class);
+        if (change.getNewDeptId() != null) req.setDeptId(change.getNewDeptId());
+        if (change.getNewPostName() != null) req.setPostName(change.getNewPostName());
+        if (change.getNewPostLevel() != null) req.setPostLevel(change.getNewPostLevel());
+        if (change.getNewWorkAddress() != null) req.setWorkAddress(change.getNewWorkAddress());
+        if (change.getNewLeaderEmployeeId() != null) req.setLeaderEmployeeId(change.getNewLeaderEmployeeId());
+        LocalDateTime date = change.getEffectTime();
+        if (type == 9 || type == 10) date = req.getEntryTime();
+        if (command instanceof HrmEmployeeQuitReqVO quit) date = "PLAN".equals(req.getChangeMode()) ? quit.getPlanQuitTime() : quit.getActualTime();
+        if (type == 13) date = LocalDateTime.now();
+        if ("PLAN".equals(req.getChangeMode())) req.setPlannedTime(date).setActualTime(null);
+        else req.setActualTime(date);
+        if (type == 11 && java.util.Objects.equals(employee.getEntryStatus(), 4) && !"PLAN".equals(req.getChangeMode())) {
+            req.setChangeMode("CORRECTION");
+            req.setLeaveTime(date);
+        }
+        if (type == 4) { req.setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()); if ("PLAN".equals(req.getChangeMode())) req.setPlannedRegularTime(date); }
+        if (type == 8) {
+            HrmEmployeeConvertToFullTimeReqVO fullTime = (HrmEmployeeConvertToFullTimeReqVO) command;
+            req.setType(1).setStatus(fullTime.getStatus()).setProbation(fullTime.getProbation())
+                    .setRegularTime(fullTime.getRegularTime()).setPlannedRegularTime(fullTime.getPlannedRegularTime());
+        }
+        if (type == 9 || type == 10 || type == 13) req.setEntryStatus(1).setLeaveTime(null);
+        if (type == 11) { req.setEntryStatus(4); if ("PLAN".equals(req.getChangeMode())) req.setPlannedLeaveTime(date); }
+        if (manualLifecycle.replay(req)) return;
+        ValidationUtils.validate(req);
+        validateEmployeeForCreateOrUpdate(employeeId, req);
+        manualLifecycle.write(req, employee, buildEmployeeForUpdate(req, employee));
+        if (command instanceof HrmEmployeeQuitReqVO quit) {
+            HrmEmployeeQuitInfoSaveReqVO info = BeanUtils.toBean(quit, HrmEmployeeQuitInfoSaveReqVO.class)
+                    .setOldEmployeeStatus(employee.getStatus());
+            employeeQuitInfoService.saveEmployeeQuitInfo(info);
+        }
+        LogRecordContext.putVariable("employee", employee);
+    }
+
     private HrmEmployeeDO buildEmployee(HrmEmployeeSaveReqVO reqVO) {
+        if (!reqVO.isActualDatesValid()) throw exception(HrmEmployeeManualLifecycle.INVALID, "实际日期不能在未来");
         HrmEmployeeDO employee = BeanUtils.toBean(reqVO, HrmEmployeeDO.class);
         normalizeEmployeePersonalInfo(employee);
-        LocalDate today = LocalDate.now();
-        // 正式员工根据入职日期和试用期计算员工状态、转正日期
-        if (HrmEmployeeTypeEnum.FORMAL.getType().equals(employee.getType())) {
-            int probation = employee.getProbation() != null ? employee.getProbation() : 0;
-            LocalDateTime regularTime = employee.getEntryTime().plusMonths(probation);
-            employee.setProbation(probation).setRegularTime(regularTime)
-                    .setStatus(probation > 0 && regularTime.isAfter(LocalDateTime.now())
-                            ? HrmEmployeeStatusEnum.PROBATION.getStatus()
-                            : HrmEmployeeStatusEnum.REGULAR.getStatus());
-        } else {
-            employee.setProbation(0).setRegularTime(null);
-        }
-        // 根据司龄开始日期计算司龄
-        if (employee.getCompanyAgeStartTime() == null) {
-            employee.setCompanyAgeStartTime(employee.getEntryTime());
-        }
-        employee.setCompanyAge(getYearsBetween(employee.getCompanyAgeStartTime().toLocalDate(), today));
+        employee.setVersion(0L).setLegacyDateSource("人工维护");
+        if (employee.getCompanyAgeStartTime() == null) employee.setCompanyAgeStartTime(employee.getEntryTime());
+        employee.setCompanyAge(getYearsBetween(employee.getCompanyAgeStartTime().toLocalDate(),
+                employee.getLeaveTime() == null ? LocalDate.now() : employee.getLeaveTime().toLocalDate()));
         return employee;
     }
 
     /**
-     * 构建员工档案更新对象，并保留只能通过专用流程修改的生命周期字段
+     * 构建员工档案更新对象，生命周期字段以人工提交为准
      *
      * @param reqVO 员工档案保存请求对象
      * @param employee 原员工档案
      * @return 构建后的员工档案更新对象
      */
     private HrmEmployeeDO buildEmployeeForUpdate(HrmEmployeeSaveReqVO reqVO, HrmEmployeeDO employee) {
-        HrmEmployeeSaveReqVO normalizedReqVO = BeanUtils.toBean(reqVO, HrmEmployeeSaveReqVO.class)
-                .setEntryStatus(employee.getEntryStatus()).setType(employee.getType())
-                .setStatus(employee.getStatus()).setProbation(employee.getProbation());
-        return buildEmployee(normalizedReqVO).setId(employee.getId())
-                .setEntryStatus(employee.getEntryStatus()).setType(employee.getType())
-                .setStatus(employee.getStatus()).setProbation(employee.getProbation())
-                .setRegularTime(employee.getRegularTime()).setLeaveTime(employee.getLeaveTime());
+        return buildEmployee(reqVO).setId(employee.getId()).setVersion(employee.getVersion())
+                .setLegacyDateSource(employee.getLegacyDateSource());
     }
 
     /**
@@ -1329,12 +1047,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
      */
     private HrmEmployeeDO buildImportedEmployee(HrmEmployeeSaveReqVO reqVO) {
         HrmEmployeeDO employee = buildEmployee(reqVO);
-        if (HrmEmployeeTypeEnum.FORMAL.getType().equals(employee.getType()) && reqVO.getRegularTime() != null) {
-            employee.setRegularTime(reqVO.getRegularTime())
-                    .setStatus(employee.getProbation() > 0 && reqVO.getRegularTime().isAfter(LocalDateTime.now())
-                            ? HrmEmployeeStatusEnum.PROBATION.getStatus()
-                            : HrmEmployeeStatusEnum.REGULAR.getStatus());
-        }
+        manualLifecycle.snapshotLabels(null, employee);
         return employee;
     }
 

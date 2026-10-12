@@ -1,3 +1,5 @@
+import { hrmEmployeeNotificationTarget } from './hrmNotification'
+import { POINTS_ROUTE, pointsApi } from './pointsRedemptionApi'
 import { contentReviewApi } from './materialApi'
 import { workOrderApi } from './workOrderApi'
 import type { NavigateFunction } from 'react-router-dom'
@@ -104,7 +106,9 @@ const legacyMediaRoute = (detail: NotifyMessage) => {
 
 export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
   detail.actionType === 'business_detail' && (
-    detail.sceneCode === 'zsjos.feedback.approval_urged'
+    (detail.bizType === 'hrm_employee' && isPositiveId(detail.bizId))
+    || (detail.bizType === 'points-redemption' && isPositiveId(detail.bizId))
+    || detail.sceneCode === 'zsjos.feedback.approval_urged'
     ||
     isNotifyLeadActionCandidate(detail)
     || detail.sceneCode === 'zsjos.registration.task_created'
@@ -168,6 +172,16 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
       deps.warn('该审批已处理、已转办或当前账号无权处理，已打开消息详情')
       deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
     }
+    return
+  }
+  if (detail.bizType === 'hrm_employee' && isPositiveId(detail.bizId)) {
+    try { deps.navigate(await hrmEmployeeNotificationTarget(detail.bizId)) }
+    catch { deps.warn('员工档案不可访问或暂时加载失败'); deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`) }
+    return
+  }
+  if (detail.bizType === 'points-redemption' && isPositiveId(detail.bizId)) {
+    try { await pointsApi.get(detail.bizId); deps.navigate(`${POINTS_ROUTE}?id=${detail.bizId}`) }
+    catch { deps.warn('申请不可访问或暂时加载失败'); deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`) }
     return
   }
   if (detail.bizType === 'withdrawal' && isPositiveId(detail.bizId)) {

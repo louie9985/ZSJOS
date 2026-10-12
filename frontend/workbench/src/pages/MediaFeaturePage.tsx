@@ -38,15 +38,12 @@ import {
 } from "../services/api";
 import { hasPermission } from "../services/managementAccess";
 import { formatTimestamp, type Timestamp } from "../services/time";
-import { DICT_TYPE } from "../constants";
 
 export type MediaFeature =
-  | "accounts"
   | "content"
   | "tickets"
   | "positioning";
 type Row = (
-  | MediaAccount
   | MediaContent
   | ProductionTicket
   | PositioningCard
@@ -78,17 +75,11 @@ const labels: Record<string, string> = {
   approved: "审核通过",
 };
 const titles: Record<MediaFeature, string> = {
-  accounts: "第三方账号",
   content: "内容生产",
   tickets: "拍剪工单",
   positioning: "账号定位",
 };
 const actionLabels: Record<string, string> = {
-  BIND_STUDENT: "绑定学员",
-  UNBIND_STUDENT: "解除绑定",
-  EDIT_ACCOUNT: "编辑账号",
-  RESCUE_ACCOUNT: "挽救处理",
-  REQUEST_ACCOUNT_REBIND: "申请换绑",
   COMPLETE_TOPIC: "完成选题",
   SUBMIT_PRODUCTION: "提交制作",
   SUBMIT_ACCEPTANCE: "提交验收",
@@ -117,8 +108,6 @@ const actionLabels: Record<string, string> = {
 const actionText = (action: string) => actionLabels[action] || action;
 const statusText = (status?: string) =>
   status ? labels[status] || status : "未记录";
-const profileText = (primary?: string, secondary?: string) =>
-  [primary, secondary].filter(Boolean).join(" / ") || "未配置";
 const errorText = (error: unknown) =>
   error instanceof ApiError && error.code === 403
     ? "无权访问该页面"
@@ -126,7 +115,6 @@ const errorText = (error: unknown) =>
       ? error.message
       : "数据加载失败，请重试";
 const detailQuery: Partial<Record<MediaFeature, string>> = {
-  accounts: 'accountId',
   content: 'contentId',
   tickets: 'ticketId',
   positioning: 'positioningCardId',
@@ -137,11 +125,6 @@ async function loadRows(
   pageNo: number,
   keyword?: string,
 ): Promise<{ list: Row[]; total: number }> {
-  if (feature === "accounts")
-    return api.mediaAccount.page({ pageNo, pageSize: 20, keyword }) as Promise<{
-      list: Row[];
-      total: number;
-    }>;
   if (feature === "content")
     return api.mediaContent.page({ pageNo, pageSize: 20, keyword }) as Promise<{
       list: Row[];
@@ -160,7 +143,6 @@ async function loadRows(
   return { list: [], total: 0 };
 }
 async function loadDetail(feature: MediaFeature, preferredId: number) {
-  if (feature === "accounts") return api.mediaAccount.get(preferredId);
   if (feature === "content") return api.mediaContent.get(preferredId);
   if (feature === "tickets") return api.productionTicket.get(preferredId);
   if (feature === "positioning") return api.positioningCard.get(preferredId);
@@ -173,7 +155,6 @@ async function runAction(
   action: string,
   reason?: string,
 ) {
-  if (feature === "accounts") return undefined;
   if (feature === "content") {
     const f: Record<string, () => Promise<boolean>> = {
       COMPLETE_TOPIC: () => api.mediaContent.completeTopic(row.id, row.version),
@@ -254,24 +235,16 @@ export default function MediaFeaturePage({
   const [students, setStudents] = useState<
     Array<{ personId: number; name?: string }>
   >([]);
-  const [platforms, setPlatforms] = useState<DictData[]>([]);
   const [contentClasses, setContentClasses] = useState<DictData[]>([]);
-  const [accountTypes, setAccountTypes] = useState<DictData[]>([]);
-  const [professions, setProfessions] = useState<DictData[]>([]);
   const [createForm] = Form.useForm<Record<string, unknown>>();
-  const [accountAction, setAccountAction] = useState<string>();
-  const [accountActionLoading, setAccountActionLoading] = useState(false);
-  const [accountActionForm] = Form.useForm<Record<string, unknown>>();
   const createPermission =
-    feature === "accounts"
-      ? "zsjos:media-account:create"
-      : feature === "content"
-        ? "zsjos:content:create"
-        : feature === "tickets"
-          ? "zsjos:production-ticket:create"
-          : feature === "positioning"
-            ? "zsjos:positioning-card:create"
-            : "";
+    feature === "content"
+      ? "zsjos:content:create"
+      : feature === "tickets"
+        ? "zsjos:production-ticket:create"
+        : feature === "positioning"
+          ? "zsjos:positioning-card:create"
+          : "";
   const canCreate =
     Boolean(createPermission) && hasPermission(permissions, createPermission);
   const load = useCallback(
@@ -326,24 +299,16 @@ export default function MediaFeaturePage({
       api.mediaAccount.page({ pageNo: 1, pageSize: 100 }),
       api.simpleUsers(),
       api.mediaStudents.page({ pageNo: 1, pageSize: 100 }),
-      api.dictDataByType("zsjos_account_platform"),
       api.dictDataByType("zsjos_content_class"),
-      api.dictDataByType(DICT_TYPE.PERSONA_TYPE),
-      api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
     ]);
-    const [a, u, s, p, c, accountTypeResult, professionResult] = results;
+    const [a, u, s, c] = results;
     if (a.status === "fulfilled") setAccounts(a.value.list);
     if (u.status === "fulfilled") setUsers(u.value);
     if (s.status === "fulfilled")
       setStudents(
         s.value.list.map((x) => ({ personId: x.personId, name: x.name })),
       );
-    if (p.status === "fulfilled") setPlatforms(p.value);
     if (c.status === "fulfilled") setContentClasses(c.value);
-    if (accountTypeResult.status === "fulfilled")
-      setAccountTypes(accountTypeResult.value);
-    if (professionResult.status === "fulfilled")
-      setProfessions(professionResult.value);
     if (
       results.some(
         (x) =>
@@ -362,13 +327,6 @@ export default function MediaFeaturePage({
         return;
       }
       setCreateLoading(true);
-      if (feature === "accounts")
-        await api.mediaAccount.create({
-          ...values,
-          platformLabelSnapshot:
-            platforms.find((x) => x.value === values.platformValue)?.label ||
-            "",
-        } as never);
       if (feature === "content")
         await api.mediaContent.create({
           ...values,
@@ -393,119 +351,8 @@ export default function MediaFeaturePage({
       setCreateLoading(false);
     }
   };
-  const openAccountAction = async (action: string) => {
-    if (!selected || feature !== "accounts") return;
-    accountActionForm.resetFields();
-    const account = selected as MediaAccount;
-    if (action === "EDIT_ACCOUNT")
-      accountActionForm.setFieldsValue({
-        nickname: account.nickname,
-        platformAccountId: account.platformAccountId,
-        leadDirection: account.leadDirection,
-        directorUserId: account.directorUserId,
-        accountTypePrimaryValue: account.accountTypePrimaryValue,
-        accountTypeSecondaryValue: account.accountTypeSecondaryValue,
-        trackPrimaryValue: account.trackPrimaryValue,
-        trackSecondaryValue: account.trackSecondaryValue,
-      });
-    if (action === "RESCUE_ACCOUNT")
-      accountActionForm.setFieldValue(
-        "status",
-        account.rescueStatus === "in_progress" ? "recovered" : "in_progress",
-      );
-    setAccountAction(action);
-    if (!students.length || !users.length) {
-      const results = await Promise.allSettled([
-        api.mediaAccount.studentCandidates(),
-        api.simpleUsers(),
-      ]);
-      if (results[0].status === "fulfilled")
-        setStudents(results[0].value);
-      if (results[1].status === "fulfilled") setUsers(results[1].value);
-    }
-    if (
-      action === "EDIT_ACCOUNT" &&
-      (!accountTypes.length || !professions.length)
-    ) {
-      const results = await Promise.allSettled([
-        api.dictDataByType(DICT_TYPE.PERSONA_TYPE),
-        api.dictDataByType(DICT_TYPE.MATERIAL_PROFESSION),
-      ]);
-      if (results[0].status === "fulfilled") setAccountTypes(results[0].value);
-      if (results[1].status === "fulfilled") setProfessions(results[1].value);
-      if (results.some((result) => result.status === "rejected"))
-        message.error("账号画像字典加载失败，请重试");
-    }
-  };
-  const submitAccountAction = async () => {
-    if (!selected || !accountAction) return;
-    try {
-      const values = await accountActionForm.validateFields();
-      const account = selected as MediaAccount;
-      setAccountActionLoading(true);
-      if (accountAction === "BIND_STUDENT")
-        await api.mediaAccount.bindStudent(
-          account.id,
-          Number(values.studentPersonId),
-          String(values.reason || ""),
-        );
-      else if (accountAction === "UNBIND_STUDENT")
-        await api.mediaAccount.unbindStudent(
-          account.id,
-          String(values.reason || ""),
-        );
-      else if (accountAction === "EDIT_ACCOUNT")
-        await api.mediaAccount.update(account.id, {
-          version: account.version,
-          nickname: String(values.nickname),
-          platformAccountId: values.platformAccountId as string | undefined,
-          leadDirection: values.leadDirection as string | undefined,
-          directorUserId: values.directorUserId as number | undefined,
-          accountGradeValue: account.accountGradeValue,
-          accountGradeLabelSnapshot: account.accountGradeLabelSnapshot,
-          healthStatusValue: account.healthStatusValue,
-          healthStatusLabelSnapshot: account.healthStatusLabelSnapshot,
-          riskLevelValue: account.riskLevelValue,
-          riskLevelLabelSnapshot: account.riskLevelLabelSnapshot,
-          healthJson: account.healthJson,
-          ...recommendationProfilePatch(account, values),
-        });
-      else if (accountAction === "RESCUE_ACCOUNT")
-        await api.mediaAccount.rescue(
-          account.id,
-          account.version,
-          String(values.status),
-        );
-      else if (accountAction === "REQUEST_ACCOUNT_REBIND")
-        await api.mediaAccount.requestRebind(
-          account.id,
-          Number(values.targetStudentId),
-          account.version,
-        );
-      message.success(
-        accountAction === "REQUEST_ACCOUNT_REBIND"
-          ? "换绑审批已发起"
-          : "操作成功",
-      );
-      setAccountAction(undefined);
-      await load(page, account.id);
-    } catch (cause) {
-      if (!(cause as { errorFields?: unknown }).errorFields)
-        message.error(
-          cause instanceof ApiError && cause.code === 409
-            ? "记录已被修改，请刷新后重试"
-            : errorText(cause),
-        );
-    } finally {
-      setAccountActionLoading(false);
-    }
-  };
   const doAction = async (action: string) => {
     if (!selected) return;
-    if (feature === "accounts") {
-      await openAccountAction(action);
-      return;
-    }
     let reason: string | undefined;
     if (
       action === "REJECT_CONTENT" ||
@@ -534,76 +381,40 @@ export default function MediaFeaturePage({
   };
   const columns = useMemo(
     () =>
-      feature === "accounts"
+      feature === "content"
         ? [
             {
-              label: "账号编号",
-              value: (r: Row) => (r as MediaAccount).accountNo,
+              label: "内容编号",
+              value: (r: Row) => (r as MediaContent).contentNo,
             },
-            { label: "昵称", value: (r: Row) => (r as MediaAccount).nickname },
-            {
-              label: "平台",
-              value: (r: Row) => (r as MediaAccount).platformLabelSnapshot,
-            },
-            {
-              label: "阶段",
-              value: (r: Row) => (r as MediaAccount).sStageLabelSnapshot || (r as MediaAccount).sStage || "未记录",
-            },
-            {
-              label: "账号类型",
-              value: (r: Row) => {
-                const account = r as MediaAccount;
-                return profileText(
-                  account.accountTypePrimaryLabelSnapshot,
-                  account.accountTypeSecondaryLabelSnapshot,
-                );
-              },
-            },
-            {
-              label: "专业方向",
-              value: (r: Row) => {
-                const account = r as MediaAccount;
-                return profileText(
-                  account.trackPrimaryLabelSnapshot,
-                  account.trackSecondaryLabelSnapshot,
-                );
-              },
-            },
+            { label: "标题", value: (r: Row) => (r as MediaContent).title },
+            { label: "状态", value: (r: Row) => statusText(r.status) },
           ]
-        : feature === "content"
+        : feature === "tickets"
           ? [
               {
-                label: "内容编号",
-                value: (r: Row) => (r as MediaContent).contentNo,
+                label: "工单编号",
+                value: (r: Row) => (r as ProductionTicket).ticketNo,
               },
-              { label: "标题", value: (r: Row) => (r as MediaContent).title },
               { label: "状态", value: (r: Row) => statusText(r.status) },
+              {
+                label: "截止时间",
+                value: (r: Row) =>
+                  formatTimestamp(
+                    (r as ProductionTicket).deadlineAt ||
+                      (r as ProductionTicket).expectedDeliveredAt,
+                  ),
+              },
             ]
-          : feature === "tickets"
+          : feature === "positioning"
             ? [
                 {
-                  label: "工单编号",
-                  value: (r: Row) => (r as ProductionTicket).ticketNo,
+                  label: "定位编号",
+                  value: (r: Row) => (r as PositioningCard).cardNo,
                 },
                 { label: "状态", value: (r: Row) => statusText(r.status) },
-                {
-                  label: "截止时间",
-                  value: (r: Row) =>
-                    formatTimestamp(
-                      (r as ProductionTicket).deadlineAt ||
-                        (r as ProductionTicket).expectedDeliveredAt,
-                    ),
-                },
               ]
-            : feature === "positioning"
-              ? [
-                  {
-                    label: "定位编号",
-                    value: (r: Row) => (r as PositioningCard).cardNo,
-                  },
-                  { label: "状态", value: (r: Row) => statusText(r.status) },
-                ]
-              : [],
+            : [],
     [feature],
   );
   return (
@@ -778,162 +589,12 @@ export default function MediaFeaturePage({
         accounts={accounts}
         users={users}
         students={students}
-        platforms={platforms}
         contentClasses={contentClasses}
-        accountTypes={accountTypes}
-        professions={professions}
         onDeadlineChange={setCreateDeadlineAt}
         onCancel={() => setCreateOpen(false)}
         onSubmit={() => void submitCreate()}
       />
-      {feature === "accounts" && selected && (
-        <AccountActionModal
-          action={accountAction}
-          account={selected as MediaAccount}
-          loading={accountActionLoading}
-          form={accountActionForm}
-          users={users}
-          students={students}
-          accountTypes={accountTypes}
-          professions={professions}
-          onCancel={() => setAccountAction(undefined)}
-          onSubmit={() => void submitAccountAction()}
-        />
-      )}
     </section>
-  );
-}
-
-function AccountActionModal({
-  action,
-  account,
-  loading,
-  form,
-  users,
-  students,
-  accountTypes,
-  professions,
-  onCancel,
-  onSubmit,
-}: {
-  action?: string;
-  account: MediaAccount;
-  loading: boolean;
-  form: FormInstance<Record<string, unknown>>;
-  users: SimpleUser[];
-  students: Array<{ personId: number; name?: string }>;
-  accountTypes: DictData[];
-  professions: DictData[];
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  const studentOptions = students
-    .filter((item) => item.personId !== account.studentPersonId)
-    .map((item) => ({
-      value: item.personId,
-      label: item.name || `学员 ${item.personId}`,
-    }));
-  const userOptions = users
-    .filter((item) => item.status === undefined || item.status === 0)
-    .map((item) => ({ value: item.id, label: item.nickname }));
-  return (
-    <Modal
-      title={action ? actionText(action) : ""}
-      open={Boolean(action)}
-      confirmLoading={loading}
-      okText="确认"
-      cancelText="取消"
-      onCancel={onCancel}
-      onOk={onSubmit}
-      destroyOnClose
-    >
-      <Form form={form} layout="vertical">
-        {action === "BIND_STUDENT" && (
-          <>
-            <Form.Item
-              name="studentPersonId"
-              label="学员"
-              rules={[{ required: true, message: "请选择学员" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                options={studentOptions}
-              />
-            </Form.Item>
-            <Form.Item name="reason" label="绑定原因">
-              <Input.TextArea rows={3} maxLength={300} />
-            </Form.Item>
-          </>
-        )}
-        {action === "UNBIND_STUDENT" && (
-          <Form.Item
-            name="reason"
-            label="解绑原因"
-            rules={[{ required: true, message: "请填写解绑原因" }]}
-          >
-            <Input.TextArea rows={3} maxLength={300} />
-          </Form.Item>
-        )}
-        {action === "EDIT_ACCOUNT" && (
-          <>
-            <Form.Item
-              name="nickname"
-              label="账号昵称"
-              rules={[{ required: true, max: 100 }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item name="platformAccountId" label="平台账号标识">
-              <Input />
-            </Form.Item>
-            <Form.Item name="leadDirection" label="内容方向">
-              <Input />
-            </Form.Item>
-            <RecommendationProfileFields
-              accountTypes={accountTypes}
-              professions={professions}
-            />
-            <Form.Item name="directorUserId" label="编导">
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={userOptions}
-              />
-            </Form.Item>
-          </>
-        )}
-        {action === "RESCUE_ACCOUNT" && (
-          <Form.Item
-            name="status"
-            label="挽救状态"
-            rules={[{ required: true }]}
-          >
-            <Select
-              options={[
-                { value: "in_progress", label: "挽救中" },
-                { value: "recovered", label: "已恢复" },
-                { value: "failed", label: "挽救失败" },
-              ]}
-            />
-          </Form.Item>
-        )}
-        {action === "REQUEST_ACCOUNT_REBIND" && (
-          <Form.Item
-            name="targetStudentId"
-            label="换绑至学员"
-            rules={[{ required: true, message: "请选择目标学员" }]}
-          >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              options={studentOptions}
-            />
-          </Form.Item>
-        )}
-      </Form>
-    </Modal>
   );
 }
 
@@ -976,10 +637,7 @@ function CreateMediaModal({
   accounts,
   users,
   students,
-  platforms,
   contentClasses,
-  accountTypes,
-  professions,
   onDeadlineChange,
   onCancel,
   onSubmit,
@@ -991,10 +649,7 @@ function CreateMediaModal({
   accounts: MediaAccount[];
   users: SimpleUser[];
   students: Array<{ personId: number; name?: string }>;
-  platforms: DictData[];
   contentClasses: DictData[];
-  accountTypes: DictData[];
-  professions: DictData[];
   onDeadlineChange: (value?: Timestamp) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -1020,48 +675,6 @@ function CreateMediaModal({
       destroyOnClose
     >
       <Form form={form} layout="vertical">
-        {feature === "accounts" && (
-          <>
-            <Form.Item
-              name="platformValue"
-              label="平台"
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={platforms.map((item) => ({
-                  value: item.value,
-                  label: item.label,
-                }))}
-                disabled={!platforms.length}
-                placeholder={platforms.length ? "选择平台" : "暂无可用平台字典"}
-              />
-            </Form.Item>
-            <Form.Item
-              name="nickname"
-              label="账号昵称"
-              rules={[{ required: true, max: 100 }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item name="platformAccountId" label="平台账号标识">
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="studentPersonId"
-              label="绑定学员"
-              rules={[{ required: true, message: "请选择学员" }]}
-            >
-              <Select allowClear options={studentOptions} />
-            </Form.Item>
-            <Form.Item name="directorUserId" label="编导（可选）">
-              <Select allowClear options={userOptions} />
-            </Form.Item>
-            <RecommendationProfileFields
-              accountTypes={accountTypes}
-              professions={professions}
-            />
-          </>
-        )}
         {feature === "content" && (
           <>
             <Form.Item
@@ -1168,83 +781,6 @@ function CreateMediaModal({
   );
 }
 
-function RecommendationProfileFields({
-  accountTypes,
-  professions,
-}: {
-  accountTypes: DictData[];
-  professions: DictData[];
-}) {
-  const options = (items: DictData[]) =>
-    items.map((item) => ({ value: item.value, label: item.label }));
-  return (
-    <>
-      <Form.Item name="accountTypePrimaryValue" label="账号类型（主）">
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={options(accountTypes)}
-          disabled={!accountTypes.length}
-          placeholder={accountTypes.length ? "选择主账号类型" : "暂无可用账号类型"}
-        />
-      </Form.Item>
-      <Form.Item name="accountTypeSecondaryValue" label="账号类型（次）">
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={options(accountTypes)}
-          disabled={!accountTypes.length}
-          placeholder={accountTypes.length ? "选择次账号类型" : "暂无可用账号类型"}
-        />
-      </Form.Item>
-      <Form.Item name="trackPrimaryValue" label="专业方向（主）">
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={options(professions)}
-          disabled={!professions.length}
-          placeholder={professions.length ? "选择主专业方向" : "暂无可用专业方向"}
-        />
-      </Form.Item>
-      <Form.Item name="trackSecondaryValue" label="专业方向（次）">
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={options(professions)}
-          disabled={!professions.length}
-          placeholder={professions.length ? "选择次专业方向" : "暂无可用专业方向"}
-        />
-      </Form.Item>
-    </>
-  );
-}
-
-function recommendationProfilePatch(
-  account: MediaAccount,
-  values: Record<string, unknown>,
-) {
-  const patch: Partial<MediaAccount> = {};
-  const keys = [
-    "accountTypePrimaryValue",
-    "accountTypeSecondaryValue",
-    "trackPrimaryValue",
-    "trackSecondaryValue",
-  ] as const;
-  for (const key of keys) {
-    const current = account[key] || undefined;
-    const next = typeof values[key] === "string" ? values[key] : undefined;
-    if (next !== current) patch[key] = next || "";
-  }
-  return patch;
-}
-
-export function AccountsPage({ permissions = [] }: { permissions?: string[] }) {
-  return <MediaFeaturePage feature="accounts" permissions={permissions} />;
-}
 export function ContentPage({ permissions = [] }: { permissions?: string[] }) {
   return <MediaFeaturePage feature="content" permissions={permissions} />;
 }

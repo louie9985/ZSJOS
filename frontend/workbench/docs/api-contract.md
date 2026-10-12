@@ -219,7 +219,7 @@ The Workbench overview reuses `studentInfoApi.detail` with `selectedService.lead
 
 ### 新媒体学员收件箱账号摘要
 
-`GET /zsjos/media-students/page` 在原分页字段上增加必返 `accounts` 数组，元素为 `id/accountNo/nickname/platformValue/platformLabel`。媒体列表使用独立 `MediaStudentListItem`，普通 `MyStudent` 不变。后端先取得可见学员分页，再批量读取账号及授权所需服务关系；账号范围与详情现有对象读取权限一致，按更新时间及 ID 倒序，不按平台合并或截断。平台标签保留 `platformLabelSnapshot`；详情账号同步返回 `platformValue`，用于刷新左侧摘要。
+`GET /zsjos/media-students/page` 在原分页字段上增加必返 `accounts` 数组，元素为 `id/accountNo/nickname/platformValue/platformLabel`。媒体列表使用独立 `MediaStudentListItem`，普通 `MyStudent` 不变。默认查询先取得可见学员分页，再批量读取账号及授权所需服务关系；显式 `sortField` / `sortOrder` 查询按批次加载完整授权投影、全局排序后返回目标页，高级筛选 POST 同样支持。详见[业务列表排序](../../../docs/api/business-list-sorting.md)。账号范围与详情现有对象读取权限一致，单个学员的账号仍按更新时间及 ID 倒序，不按平台合并或截断。平台标签保留 `platformLabelSnapshot`；详情账号同步返回 `platformValue`，用于刷新左侧摘要。
 
 左侧账号链接复用 `/zsjos/media-students?personId=…&accountId=…` 和受控导航，不访问外部平台主页。缺少 `zsjos:media-account:query` 时不提供链接；目标详情仍独立验证。成功的详情刷新同时更新已加载卡片账号，不清空搜索和滚动位置。旧后端缺少 accounts 时显示未加载提示，不伪装为空账号。平台字典失败仅降级颜色并支持重试，快照标签及已有账号入口保留。
 
@@ -231,3 +231,8 @@ Workbench 使用 `GET /admin-api/zsjos/media-students/{personId}/partner-context
 仅同时拥有 `zsjos:partner-invitation:create-student` 且为该学员 active/accepted 服务的当前编导时，返回 `canInviteStudent=true` 及原邀请上下文。页面以服务端资格显示创建/查看邀请码入口；加载、失败和重试独立保留，失败不视为未开通，也不开放绑定/邀请操作。切换学员和恢复焦点重新读取状态。
 
 既有 `/zsjos/partner-invitation/student/context`、创建接口及 Admin 绑定状态接口权限与响应保持不变。Admin 不消费新增接口；不授予角色权限、不修改数据或历史邀请。上线顺序为后端后 Workbench。
+
+
+### 客资来源关系文案（2026-10-11）
+
+客资概览与订单的客资投影将 sourceLabel/sourceUserName 显示为业务来源/来源人员。providerIdentityLabel 的“新媒体提供方”表示历史来源关系，不表示当前岗位；字段名称、类型及身份遮蔽保持不变。不能用 sourceUserId 冒充销售代录的实际操作人；旧响应没有身份标签时继续显示身份待核实。

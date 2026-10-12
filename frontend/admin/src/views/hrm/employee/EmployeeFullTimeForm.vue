@@ -12,6 +12,12 @@
       :rules="formRules"
       label-width="112px"
     >
+      <el-form-item label="处理方式"
+        ><el-radio-group v-model="formData.changeMode"
+          ><el-radio value="BUSINESS">记录实际变更</el-radio
+          ><el-radio value="PLAN">保存计划，仅提醒</el-radio></el-radio-group
+        ></el-form-item
+      >
       <el-row :gutter="18">
         <el-col :span="12">
           <el-form-item label="异动原因" prop="reason">
@@ -26,7 +32,10 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="生效日期" prop="effectTime">
+          <el-form-item
+            :label="formData.changeMode === 'PLAN' ? '计划日期' : '实际发生日期'"
+            prop="effectTime"
+          >
             <el-date-picker
               v-model="formData.effectTime"
               class="!w-1/1"
@@ -36,6 +45,20 @@
           </el-form-item>
         </el-col>
       </el-row>
+      <el-form-item label="员工状态" required
+        ><el-select v-model="formData.status"
+          ><el-option
+            v-for="item in formalStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value" /></el-select
+      ></el-form-item>
+      <el-form-item label="计划转正日期"
+        ><el-date-picker v-model="formData.plannedRegularTime" type="date" value-format="x"
+      /></el-form-item>
+      <el-form-item label="实际转正日期"
+        ><el-date-picker v-model="formData.regularTime" type="date" value-format="x"
+      /></el-form-item>
       <el-form-item label="试用期（月）" prop="probation">
         <el-input-number v-model="formData.probation" :min="0" :max="6" class="!w-240px" />
       </el-form-item>
@@ -103,6 +126,12 @@
 <script lang="ts" setup>
 import type { FormInstance, FormRules } from 'element-plus'
 import dayjs from 'dayjs'
+import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
+const formalStatusOptions = computed(() =>
+  getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
+    [1, 2].includes(Number(item.value))
+  )
+)
 import type { HrmEmployeeConvertToFullTimeReqVO, HrmEmployeeVO } from '@/api/hrm/employee'
 import * as EmployeeApi from '@/api/hrm/employee'
 import DeptSelect from '@/views/system/dept/components/DeptSelect.vue'
@@ -162,6 +191,9 @@ async function submitForm() {
 function resetForm(row: HrmEmployeeVO) {
   formData.value = {
     employeeId: row.id,
+    version: row.version,
+    operationKey: crypto.randomUUID(),
+    changeMode: 'BUSINESS',
     reason: HrmEmployeeChangeReason.ORGANIZATION_ADJUSTMENT,
     probation: HRM_EMPLOYEE_NO_PROBATION_MONTHS,
     newDeptId: row.deptId,

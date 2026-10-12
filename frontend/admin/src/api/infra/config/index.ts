@@ -7,6 +7,8 @@ export interface ConfigVO {
   key: string
   value: string
   type: number
+  sensitive?: boolean
+  configured?: boolean
   visible: boolean
   remark: string
   createTime: Date

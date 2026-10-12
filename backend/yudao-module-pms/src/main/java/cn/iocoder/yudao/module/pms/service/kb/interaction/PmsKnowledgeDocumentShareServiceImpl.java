@@ -56,10 +56,14 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
     private NotifyMessageSendApi notifyMessageSendApi;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private PmsKnowledgeShareUrl shareUrl;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PmsKnowledgeDocumentShareDO openShare(Long documentId, List<Long> shareUserIds, Long userId) {
+        // Do not persist an active share that cannot produce a usable public address.
+        shareUrl.requireBaseUrl();
         // 1.1 校验文档存在
         PmsKnowledgeDocumentDO document = validateDocumentExists(documentId);
         // 1.2 校验文档内容编辑权限
@@ -153,6 +157,9 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
 
     @Override
     public PmsKnowledgeDocumentDO getDocumentByShareToken(String token) {
+        if (token == null || token.isBlank() || token.length() > 64) {
+            throw exception(KNOWLEDGE_DOCUMENT_SHARE_INVALID);
+        }
         // 1. 校验分享令牌处于开启状态
         PmsKnowledgeDocumentShareDO share = documentShareMapper.selectByToken(token);
         if (share == null || CommonStatusEnum.isDisable(share.getStatus())) {

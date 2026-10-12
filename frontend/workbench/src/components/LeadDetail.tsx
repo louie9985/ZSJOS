@@ -9,7 +9,8 @@ import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferr
 import { useSubmissionGuard } from '../services/submissionGuard'
 import LeadDetailOverview, { type LeadProfileVariant } from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
-import LeadAppealPanel from './LeadAppealPanel'
+import LeadAppealPanel, { type AppealReviewContext } from './LeadAppealPanel'
+import { isLeadAppealPending } from '../services/leadAppealSummary'
 import SupervisorLeadOverturnModal from './SupervisorLeadOverturnModal'
 import LeadFlowHistoryPanel from './LeadFlowHistoryPanel'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
@@ -35,7 +36,7 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant }: {
+export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview }: {
   lead: ManagedLead
   refreshVersion?: number
   categories: DictData[]
@@ -58,6 +59,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   overviewContent?: ReactNode
   profileVariant?: LeadProfileVariant
   hideProviderOwner?: boolean
+  appealReview?: AppealReviewContext
 }) {
   const readOnly = mode === 'student-readonly'
   const managerMode = mode === 'manager-readonly'
@@ -89,6 +91,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
   const [basicInfoDirty, setBasicInfoDirty] = useState(false)
   const [feedbackDirty, setFeedbackDirty] = useState(false)
+  const [appealDirty, setAppealDirty] = useState(false)
   const [validOpen, setValidOpen] = useState(false)
   const [validCategory, setValidCategory] = useState<string | undefined>(lead.leadCategory)
   const [validRemark, setValidRemark] = useState('')
@@ -124,8 +127,8 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
       || item.code.startsWith('SUPERVISOR_') || item.code === 'REQUEST_SUBMITTER_ASSIST')
       .map(item => [item.code, item]))
 
-  useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty || feedbackDirty) },
-    [basicInfoDirty, feedbackDirty, followUpFormDirty, onDirtyChange, readOnly])
+  useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty || feedbackDirty || appealDirty) },
+    [basicInfoDirty, feedbackDirty, followUpFormDirty, appealDirty, onDirtyChange, readOnly])
 
   const judgeValid = async () => {
     if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
@@ -298,9 +301,9 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     if (tab === 'student-info') return { key: tab, label: '学员信息', children: <StudentInfoPanel key={lead.id} leadId={lead.id}/> }
     if (tab === 'submitter-feedback') return { key: tab, label: '销售反馈', children: <LeadSubmitterFeedbackPanel key={lead.id} lead={lead} canCreate={!readOnly && actions.has('REPLY_SUBMITTER')} onChanged={onChanged} onDirtyChange={setFeedbackDirty}/> }
     if (tab === 'assist-history') return { key: tab, label: '协助历史', children: <LeadSubmitterAssistHistoryPanel key={lead.id} lead={lead} canReply={!readOnly && actions.has('SUBMITTER_ASSIST_REPLY')} onChanged={onChanged}/> }
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview followUpRefreshVersion={refreshVersion + followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview onViewAppeal={visibleTabs.includes('appeals') ? () => { setInternalActiveTab('appeals'); onTabChange?.('appeals') } : undefined} followUpRefreshVersion={refreshVersion + followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={refreshVersion + followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={handleStandaloneFollowUpSuccess} onTotalChange={setFollowUpTotal}/></div> }
-    if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
+    if (tab === 'appeals') return { key: tab, label: isLeadAppealPending(lead) ? '申诉记录 · 处理中' : '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged} readOnly={readOnly} review={appealReview} onDirtyChange={setAppealDirty}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
     if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }

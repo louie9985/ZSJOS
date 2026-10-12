@@ -49,7 +49,8 @@ public class ExamScheduleObjectPermissionProvider implements ZsjosObjectPermissi
                     && row.getRevokedAt().plusMinutes(5).isAfter(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))));
         }
         return permissionApi.hasAnyPermissions(userId, ExamScheduleService.PERMISSION_MANAGE)
-                && ("update".equals(action) || "publish".equals(action) || "revoke".equals(action) || "maintain".equals(action));
+                && ("update".equals(action) || "publish".equals(action) || "revoke".equals(action)
+                    || "delete".equals(action) || "maintain".equals(action));
     }
 
     @Override

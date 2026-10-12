@@ -63,6 +63,8 @@ V208 以确认的 V2 字段内容发布不可变 V3：36 个一级字段按账�
 
 Workbench 浏览页采用响应式封面卡片；“我的素材”采用紧凑摘要卡，展示当前修订版本状态、当前审核人、最近提交时间和驳回原因。主页、最火作品及重复组中的 HTTPS 链接统一使用 ResourceLink 展示、复制与安全打开。
 
+“全部”和“我的素材”请求 `GET /admin-api/zsjos/material/page` 时携带 `sortBy=createTime`，服务端分页前按素材首次保存（上传）时间 `create_time DESC, id DESC` 排序，最新上传在前；同一时间以 ID 倒序保持分页顺序稳定。编辑、审核和互动引起的更新时间变化以及置顶、优先级均不影响这两个页签的上传顺序。筛选、翻页沿用该排序。`sortBy` 是可选参数，仅接受 `createTime`；省略时保留 `pinned DESC, priority DESC, update_time DESC, id DESC`，因此收藏、推荐及未传此参数的 Admin 管理列表排序不变。
+
 `GET /admin-api/zsjos/material/page?mine=true&versionStatus=IN_APPROVAL` 按当前草稿版本（不存在时按生效版本）筛选，保留本人、租户、逻辑删除限制。`versionStatus` 可取 DRAFT、IN_APPROVAL、EFFECTIVE、REJECTED，仅在 mine=true 时生效；原有 status 仍筛选素材主状态，两者不互相替代。主记录为 EFFECTIVE 的在审修订也能进入个人审批中列表。流程没有独立的“已读／开始处理”状态，因此 IN_APPROVAL 展示为“待审核／审批中”。
 
 版本响应新增 `pendingApproverNames: string[]`，仅审批中通过 BPM 公共任务 API 获取实际当前指派人（含加签），姓名通过 System 公共 API 解析；不按部门名称、角色或管理权限推断。未分配／已不可用人员明确显示占位信息，已结束版本为空数组；此字段不构成审批权限或历史审核人快照。原有素材和版本读取授权继续适用。

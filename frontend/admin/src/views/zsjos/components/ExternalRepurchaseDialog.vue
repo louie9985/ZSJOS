@@ -15,21 +15,22 @@
           ><el-form-item label="客户姓名" prop="customerName"
             ><el-input v-model="form.customerName" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
-          ><el-form-item label="手机号" prop="customerMobile" :required="!form.customerWechatId.trim()"
+          ><el-form-item label="手机号" prop="customerMobile" required
             ><el-input v-model="form.customerMobile" /></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
-          ><el-form-item label="微信号" :required="!form.customerMobile.trim()"
+          ><el-form-item label="微信号" prop="customerWechatId" required
             ><el-input v-model="form.customerWechatId" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
-           v-if="checked?.canRepurchase"><el-form-item label="学员姓名" prop="studentName"
+           v-if="readyForOrder"><el-form-item label="学员姓名" prop="studentName"
             ><el-input v-model="form.studentName" disabled /></el-form-item></el-col
       ></el-row>
       <el-button :loading="checking" @click="checkCustomer">校验客户</el-button>
       <el-alert v-if="identityError" :title="identityError" type="error" show-icon class="mt-12px" />
       <el-alert v-if="checked" :title="checked.reason" :description="[checked.customerName, checked.maskedMobile].filter(Boolean).join(' · ')" :type="checked.canRepurchase ? 'success' : 'warning'" show-icon class="mt-12px" />
-      <template v-if="checked?.canRepurchase">
+      <el-alert v-if="checked?.canRepurchase && !readyForOrder" type="info" title="请补齐手机号和微信号后重新校验，再填写复购订单" show-icon />
+      <template v-if="readyForOrder">
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="学员性质" prop="studentNature"
@@ -163,7 +164,7 @@
     </el-form>
     <template #footer
       ><el-button @click="visible = false">取消</el-button
-      ><el-button type="primary" :loading="saving" :disabled="!checked?.canRepurchase || checking || !!optionError || hasUploading" @click="submit"
+      ><el-button type="primary" :loading="saving" :disabled="!readyForOrder || checking || !!optionError || hasUploading" @click="submit"
         >提交复购</el-button
       ></template
     >
@@ -189,8 +190,9 @@ const checkCustomer = async () => {
   const current = ++identitySequence
   checked.value = undefined; identityError.value = ''
   if (!form.customerName.trim() || !form.customerMobile.trim() && !form.customerWechatId.trim()) {
-    identityError.value = '请填写姓名及手机号或微信号'; return
+    identityError.value = '请填写姓名及至少一项联系方式进行核验；正式录单需手机号和微信号'; return
   }
+  if (form.customerMobile.trim() && !/^1\d{10}$/.test(form.customerMobile.trim())) { identityError.value = '手机号格式不正确'; return }
   checking.value = true
   try {
     const result = await MenuApi.checkRepurchaseCustomer({ customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim() || undefined, customerWechatId: form.customerWechatId.trim() || undefined })
@@ -237,17 +239,18 @@ const empty = () => ({
   repurchaseReason: ''
 })
 const form = reactive(empty())
+const readyForOrder = computed(() => Boolean(checked.value?.canRepurchase && form.customerMobile.trim() && form.customerWechatId.trim()))
 watch(() => [form.customerName, form.customerMobile, form.customerWechatId], () => {
   identitySequence++; checked.value = undefined; identityError.value = ''; checking.value = false; submissionKey = crypto.randomUUID()
 }, { flush: 'sync' })
 const rules: FormRules = {
   customerName: [{ required: true }],
   customerMobile: [
-    {
-      validator: (_r, v, cb) =>
-        v || form.customerWechatId ? cb() : cb(new Error('手机号和微信号至少填写一个'))
-    }
+    { required: true, whitespace: true, message: '请填写手机号' },
+    { pattern: /^1\d{10}$/, message: '手机号格式不正确', transform: (value: string) => value?.trim() },
+    { max: 32, message: '手机号最多32个字符' }
   ],
+  customerWechatId: [{ required: true, whitespace: true, message: '请填写微信号' }, { max: 64, message: '微信号最多64个字符' }],
   studentName: [{ required: true }],
   studentNature: [{ required: true }],
   region: [{ required: true }],
@@ -332,7 +335,7 @@ const handleVoucherSelect = (file: UploadFile) => {
   if (item.status === 'uploading') void uploadVoucher(item)
 }
 const submit = async () => {
-  if (!checked.value?.canRepurchase || checking.value) { message.warning('请先校验客户身份'); return }
+  if (!checked.value || !readyForOrder.value || checking.value) { message.warning('请补齐手机号和微信号并重新校验客户身份'); return }
   await formRef.value?.validate()
   if (hasUploading.value) {
     message.warning('请等待缴费凭证上传完成')
@@ -361,8 +364,8 @@ const submit = async () => {
         buyerName: form.customerName.trim(),
         studentName: form.studentName.trim(),
         studentNature: form.studentNature,
-        studentMobile: form.customerMobile.trim() || undefined,
-        studentWechatId: form.customerWechatId.trim() || undefined,
+        studentMobile: form.customerMobile.trim(),
+        studentWechatId: form.customerWechatId.trim(),
         provinceCode,
         provinceName: province?.name || '',
         cityCode,

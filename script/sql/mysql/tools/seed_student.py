@@ -3,7 +3,7 @@
 
 对齐应用侧的真实生成口径：
   person_no  = XY + yyyyMMddHHmmss + 4 位当日日序（zsjos_person_no_daily_counter）
-  order_no   = OD + yyyyMMddHHmmss + 4 位当日日序（zsjos_order_no_daily_counter）
+  学员补录直接创建独立服务关系，不创建订单、商品明细或报名单。
   partner_no = PT + yyyyMMddHHmmss + 4 位随机数（PartnerInvitationServiceImpl）
   password   = BCrypt，强度 4（SecurityProperties.passwordEncoderLength 默认值）
 
@@ -21,7 +21,7 @@ import pymysql
 
 # 系统自身的「未明确课程」快照，等价于 LeadProductSnapshot.unknown()
 UNKNOWN_COURSE_SNAPSHOT = (
-    '{"name": "未明确课程", "price": 880.0, "specs": [], "skuRef": null, '
+    '{"name": "未明确课程", "price": null, "specs": [], "skuRef": null, '
     '"skuName": "未明确具体班次/方案", "categoryId": null, "productRef": null, '
     '"skuUnknown": true, "spuUnknown": true, "productName": "未明确课程", '
     '"categoryName": null, "categoryPath": [], "level1CategoryId": null, '
@@ -163,7 +163,7 @@ def ensure_claim(cur, person_id, mobile, tenant_id, now):
 
 
 def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_id, now, seq_ts) -> int:
-    """建订单链路与服务关系；若已有 active 关系则只补齐编导/运营，不重复建单。"""
+    """创建独立学员服务；已有 active 关系时只补齐编导/运营。"""
     if rel := active_relation(cur, person_id, tenant_id):
         if rel["operator_user_id"] is None and operator_id:
             cur.execute(
@@ -177,36 +177,8 @@ def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_
             )
         return rel["id"]
 
-    oseq = next_daily_number(cur, tenant_id, "zsjos_order_no_daily_counter", now)
-    order_no = f"OD{seq_ts}{oseq:04d}"
-    cur.execute(
-        "INSERT INTO zsjos_order (order_no,person_id,order_type,status,submitter_user_id,"
-        "formal_sales_user_id,formal_owner_identity,buyer_name,student_name,student_mobile,"
-        "total_amount,discount_amount,payable_amount,customer_paid_at,student_source,"
-        "submitted_at,effective_at,version,creator,create_time,updater,update_time,deleted,tenant_id) "
-        "VALUES (%s,%s,'first_purchase','effective',%s,%s,'content_director',%s,%s,%s,"
-        "880.00,0.00,880.00,%s,'direct_enrollment',%s,%s,0,'seed-student',%s,'seed-student',%s,b'0',%s)",
-        (order_no, person_id, director_id, director_id, name, name, mobile,
-         now, now, now, now, now, tenant_id),
-    )
-    order_id = cur.lastrowid
-
-    cur.execute(
-        "INSERT INTO zsjos_order_item (order_id,product_ref,sku_ref,quantity,unit_price,"
-        "discount_amount,payable_amount,product_snapshot,creator,create_time,updater,update_time,deleted,tenant_id) "
-        "VALUES (%s,NULL,NULL,1.0000,880.00,0.00,880.00,CAST(%s AS JSON),'seed-student',%s,'seed-student',%s,b'0',%s)",
-        (order_id, UNKNOWN_COURSE_SNAPSHOT, now, now, tenant_id),
-    )
-    item_id = cur.lastrowid
-
-    cur.execute(
-        "INSERT INTO zsjos_registration_case (order_id,status,assignment_mode,study_planner_user_id,"
-        "registration_approved_at,completed_by_user_id,owner_user_id,started_at,completed_at,"
-        "version,creator,create_time,updater,update_time,deleted,tenant_id) "
-        "VALUES (%s,'completed','legacy_planner',%s,%s,%s,%s,%s,%s,0,'seed-student',%s,'seed-student',%s,b'0',%s)",
-        (order_id, director_id, now, director_id, director_id, now, now, now, now, tenant_id),
-    )
-    case_id = cur.lastrowid
+    # Historical service enrollment is not a sale. Keep its optional order chain empty.
+    order_id = item_id = case_id = None
 
     cur.execute(
         "INSERT INTO zsjos_service_relation (person_id,order_id,order_item_id,registration_case_id,"

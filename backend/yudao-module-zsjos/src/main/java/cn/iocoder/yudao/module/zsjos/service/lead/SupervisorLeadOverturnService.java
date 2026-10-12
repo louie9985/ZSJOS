@@ -41,7 +41,7 @@ public class SupervisorLeadOverturnService {
     public LeadManagementRespVO.ActionVO action(LeadDO lead, Long userId) {
         if (!STATUS_INVALID.equals(lead.getStatus()) || !securityFrameworkService.hasPermission(PERMISSION)
                 || lead.getOwnerUserId() == null || !permissionService.getManagedUserIds(userId).contains(lead.getOwnerUserId())) return null;
-        if (rejection(lead, appealMapper.selectListByLeadId(lead.getId()), opportunityMapper.selectByLeadId(lead.getId())) != null) return null;
+        if (rejection(lead, appealMapper.selectListByLeadId(lead.getId()), opportunityMapper.selectByLeadId(lead.getId()), eventMapper.selectLatestInvalidId(lead.getId())) != null) return null;
         var action = new LeadManagementRespVO.ActionVO(ACTION, true);
         action.setQualificationToken(currentToken(lead));
         return action;
@@ -69,7 +69,7 @@ public class SupervisorLeadOverturnService {
         }
         if (!Objects.equals(currentToken(lead), request.getQualificationToken())) throw exception(STALE);
         // Appeal submission takes this same Lead lock before reading or creating any appeal round.
-        var denied = rejection(lead, appealMapper.selectListByLeadId(leadId), opportunityMapper.selectByLeadId(leadId));
+        var denied = rejection(lead, appealMapper.selectListByLeadId(leadId), opportunityMapper.selectByLeadId(leadId), eventMapper.selectLatestInvalidId(leadId));
         if (denied != null) throw exception(denied);
         var files = attachmentService.validateReferences(request.getAttachments(), userId);
         List<Map<String, Object>> evidence = new ArrayList<>();

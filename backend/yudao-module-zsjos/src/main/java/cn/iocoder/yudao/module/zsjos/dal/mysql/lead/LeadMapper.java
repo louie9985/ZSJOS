@@ -59,6 +59,13 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FOLLOW
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
 
+    /** Caller holds the Lead lock; persist the transition and SQL NULL together. */
+    default int updateClearingSuspension(LeadDO lead) {
+        lead.setSuspendedAt(null);
+        return update(lead, new LambdaUpdateWrapper<LeadDO>()
+                .eq(LeadDO::getId, lead.getId()).set(LeadDO::getSuspendedAt, null));
+    }
+
     /** 待办分桶使用北京时间自然日，与下属销售与业绩统计口径一致。 */
     ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
     @Select("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id=#{partnerId} AND status IN ('valid','converted','won') AND submitted_at >= #{from} AND submitted_at < #{to}")

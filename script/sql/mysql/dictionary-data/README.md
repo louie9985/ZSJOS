@@ -7,6 +7,15 @@ dictionary tables and `zsjos_schema_version`, establishes UTF-8, and records
 administrator choices. It does not assign role permissions. The sales-stage upgrade
 V275 invokes it before bounded Lead initialization.
 
+Order payment: `order-payment-legacy-labels.sql` is the separately approved four-option seed for
+`zsjos_order_payment_method` (小鹅通线上支付 / 中世健网校微信小店（视频号小店） / 复训 /
+畅学卡扣款（用于畅学卡学员开课）). Those four values are the legacy `orders_order.payment_channel`
+labels that 18 imported orders recorded and that had no enabled entry; V299 stored the labels on the
+orders and left the value NULL, and V300 sources this file and backfills the 18 orders. It records the
+one-time marker `order_payment_legacy_labels_v1`, establishes UTF-8, and does not assign role
+permissions. Replays skip a value that already exists and never restore a renamed, disabled or
+deleted administrator choice.
+
 The bootstrap creates dictionary types and system-owned dictionary data, but it
 intentionally creates no `zsjos_lead_category` or `zsjos_lead_source_channel`
 data. Business dictionary data belongs in a separately reviewed, versioned SQL

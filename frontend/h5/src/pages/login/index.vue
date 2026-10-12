@@ -127,7 +127,7 @@ async function handleWecomLogin() {
       <div class="login-header__logo">
         <van-icon name="shop-o" size="48" color="var(--h5-primary)" />
       </div>
-      <div class="login-header__title">中世健兼职</div>
+      <div class="login-header__title">中世健教育</div>
       <div class="login-header__subtitle">登录您的账号开始工作</div>
     </div>
 

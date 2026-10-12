@@ -1,0 +1,7 @@
+.notice-rich-text-editor [data-w-e-textarea] { position: relative; }
+.notice-rich-text-editor .row-resizer { display: none; }
+.notice-rich-text-editor .w-e-hover-bar { max-width: calc(100% - 16px); flex-wrap: wrap; }
+/* Invisible upstream tooltip boxes still contribute to mobile scroll width. */
+.notice-rich-text-editor .w-e-menu-tooltip-v5:not(:hover)::before, .notice-rich-text-editor .w-e-menu-tooltip-v5:not(:hover)::after { display: none; }
+.notice-rich-text-editor .notice-table-row-hover, .notice-rich-text-editor .notice-table-row-hover * { cursor: row-resize !important; }
+.notice-table-row-guide { position: absolute; z-index: 2; height: 0; border-top: 2px solid var(--crm-color-primary); pointer-events: none; }

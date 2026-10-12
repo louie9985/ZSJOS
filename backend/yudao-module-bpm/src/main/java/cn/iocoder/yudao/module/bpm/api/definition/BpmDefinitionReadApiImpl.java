@@ -86,8 +86,18 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
         result.setFormId(info == null ? null : info.getFormId());
         result.setDescription(info == null ? null : info.getDescription());
         result.setSimpleSequentialApproval(isSimpleSequentialApproval(model, userTasks));
+        List<String> chain = strictChain(model, userTasks);
+        result.setOrderedUserTaskKeys(chain);
+        result.setMandatoryHumanChain(!chain.isEmpty() && info != null
+                && Objects.equals(info.getAutoApprovalType(), 0));
         result.setUserTasks(userTasks.stream().map(task -> {
                     BpmUserTaskMetadataRespDTO userTask = new BpmUserTaskMetadataRespDTO();
+                    userTask.setCandidateStrategy(BpmnModelUtils.parseCandidateStrategy(task));
+                    userTask.setCandidateParam(BpmnModelUtils.parseCandidateParam(task));
+                    userTask.setMandatoryHumanApproval(Objects.equals(BpmnModelUtils.parseApproveType(task), 1)
+                            && Objects.equals(BpmnModelUtils.parseAssignEmptyHandlerType(task), 2)
+                            && Objects.equals(BpmnModelUtils.parseAssignStartUserHandlerType(task), 1)
+                            && (task.getSkipExpression() == null || task.getSkipExpression().isBlank()));
                     userTask.setKey(task.getId());
                     userTask.setName(task.getName());
                     userTask.setStartUserSelectAssignees(Objects.equals(
@@ -138,6 +148,31 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
                 .equals(java.util.Set.of(firstTask, secondTask))
                 && Objects.equals(end, ends.getFirst().getId())
                 && !outgoing.containsKey(end);
+    }
+
+    private List<String> strictChain(BpmnModel model, List<UserTask> tasks) {
+        if (model == null || model.getMainProcess() == null) return List.of();
+        var elements = model.getMainProcess().getFlowElements();
+        if (elements.stream().anyMatch(e -> !(e instanceof StartEvent) && !(e instanceof EndEvent)
+                && !(e instanceof UserTask) && !(e instanceof SequenceFlow))) return List.of();
+        var starts = elements.stream().filter(StartEvent.class::isInstance).map(StartEvent.class::cast).toList();
+        var ends = elements.stream().filter(EndEvent.class::isInstance).map(EndEvent.class::cast).toList();
+        if (starts.size() != 1 || ends.size() != 1) return List.of();
+        Map<String, List<String>> outgoing = new LinkedHashMap<>();
+        for (var element : elements) if (element instanceof SequenceFlow flow) {
+            if (flow.getConditionExpression() != null && !flow.getConditionExpression().isBlank()) return List.of();
+            outgoing.computeIfAbsent(flow.getSourceRef(), k -> new ArrayList<>()).add(flow.getTargetRef());
+        }
+        List<String> result = new ArrayList<>();
+        String cursor = onlyTarget(outgoing, starts.getFirst().getId());
+        while (cursor != null && !Objects.equals(cursor, ends.getFirst().getId())) {
+            if (result.contains(cursor)) return List.of();
+            String current = cursor;
+            if (tasks.stream().noneMatch(t -> t.getId().equals(current))) return List.of();
+            result.add(cursor); cursor = onlyTarget(outgoing, cursor);
+        }
+        return cursor != null && result.size() == tasks.size() && outgoing.size() == tasks.size() + 1
+                ? result : List.of();
     }
 
     private String onlyTarget(Map<String, List<String>> outgoing, String source) {

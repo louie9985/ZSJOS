@@ -528,6 +528,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
         materialTypeId,
         favorite: view === 'favorite' || undefined,
         mine: view === 'mine' || undefined,
+        sortBy: view === 'all' || view === 'mine' ? 'createTime' : undefined,
         versionStatus: view === 'mine' ? versionStatus : undefined
       })
       if (requestId !== listRequestRef.current) return

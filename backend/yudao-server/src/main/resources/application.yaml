@@ -267,7 +267,7 @@ zsjos:
     partner-h5-base-url: ${ZSJOS_WECOM_PARTNER_H5_BASE_URL:${ZSJOS_PUBLIC_H5_BASE_URL:}}
     ticket-ttl-minutes: ${ZSJOS_WECOM_TICKET_TTL_MINUTES:30}
   positioning:
-    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:http://127.0.0.1:10086}
     confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}
   payment:
     allinpay:

@@ -11,10 +11,14 @@ type Props = {
   onError: (text: string) => void
   onFailureChange?: (count: number) => void
   noteMode?: boolean
+  tableAdapter?: {
+    normalizeHtml: (html: string) => string
+    install: (editor: IDomEditor, root: HTMLElement) => () => void
+  }
 }
 type FailedUpload = { id: number; file: File; retry: () => Promise<void>; error: string }
 
-export default function ConfigurableRichTextEditor({ value = '', onChange, uploadFile, onUploadChange, onError, onFailureChange, noteMode = false }: Props) {
+export default function ConfigurableRichTextEditor({ value = '', onChange, uploadFile, onUploadChange, onError, onFailureChange, noteMode = false, tableAdapter }: Props) {
   const toolbar = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const editor = useRef<IDomEditor | undefined>(undefined)
@@ -45,10 +49,11 @@ export default function ConfigurableRichTextEditor({ value = '', onChange, uploa
       } finally { if (!disposed) callbacks.current.onUploadChange(-1) }
     }
     let instance: IDomEditor | undefined
+    let disposeAdapter: (() => void) | undefined
     // StrictMode replays effects before the editor's asynchronous toolbar initialization.
     queueMicrotask(() => {
       if (disposed || !body.current || !toolbar.current) return
-      instance = createEditor({ selector: body.current, html: initial.current, config: {
+      instance = createEditor({ selector: body.current, html: tableAdapter?.normalizeHtml(initial.current) ?? initial.current, config: {
         autoFocus: false,
         onChange: next => { emitted.current = next.getHtml(); callbacks.current.onChange?.(emitted.current) },
         customAlert: text => callbacks.current.onError(text),
@@ -58,6 +63,16 @@ export default function ConfigurableRichTextEditor({ value = '', onChange, uploa
           // Route clipboard files through the same upload/ownership pipeline as the toolbar.
           next.insertData(data)
           return false
+        } : tableAdapter ? (next, event) => {
+          const data = event.clipboardData
+          const html = data?.getData('text/html')
+          if (!data || !html || !/<table[\s>]/i.test(html)) return true
+          const normalized = new DataTransfer()
+          for (const type of data.types) normalized.setData(type, data.getData(type))
+          for (const file of Array.from(data.files)) normalized.items.add(file)
+          normalized.setData('text/html', tableAdapter.normalizeHtml(html))
+          next.insertData(normalized)
+          return false
         } : undefined,
         MENU_CONF: {
           uploadImage: { allowedFileTypes: noteMode ? ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] : ['image/*'], customUpload: (file: File, insert: (url: string, alt: string, href: string) => void) => upload(file, 'image', url => insert(url, file.name, noteMode ? '' : url)) },
@@ -65,15 +80,16 @@ export default function ConfigurableRichTextEditor({ value = '', onChange, uploa
         }
       } })
       editor.current = instance
-      createToolbar({ editor: instance, selector: toolbar.current, ...(noteMode ? { config: { toolbarKeys: ['headerSelect', 'bold', 'italic', 'underline', 'color', 'bgColor', 'bulletedList', 'numberedList', 'insertLink', 'insertTable', 'uploadImage', 'undo', 'redo'] } } : {}) })
+      disposeAdapter = tableAdapter?.install(instance, body.current)
+      createToolbar({ editor: instance, selector: toolbar.current, ...(noteMode ? { config: { toolbarKeys: ['headerSelect', 'bold', 'italic', 'underline', 'color', 'bgColor', 'justifyLeft', 'justifyCenter', 'bulletedList', 'numberedList', 'insertLink', 'insertTable', 'uploadImage', 'undo', 'redo'] } } : {}) })
     })
-    return () => { disposed = true; instance?.destroy(); editor.current = undefined }
-  }, [noteMode])
+    return () => { disposed = true; disposeAdapter?.(); instance?.destroy(); editor.current = undefined }
+  }, [noteMode, tableAdapter])
   useEffect(() => {
     // Note drafts reset by remounting. Echoing HTML during a table edit replaces Slate nodes
     // while its selection still references them. Only the announcement adapter accepts external resets.
-    if (!noteMode && editor.current && value !== emitted.current && editor.current.getHtml() !== value) editor.current.setHtml(value)
-  }, [value, noteMode])
+    if (!noteMode && editor.current && value !== emitted.current && editor.current.getHtml() !== value) editor.current.setHtml(tableAdapter?.normalizeHtml(value) ?? value)
+  }, [value, noteMode, tableAdapter])
   return <div className={noteMode ? 'exam-note-editor' : undefined} style={{ border: '1px solid var(--crm-border)' }}>
     <div ref={toolbar} /><div ref={body} style={{ height: 360 }} />
     {failures.map(item => <Alert key={item.id} type="error" showIcon title={`${item.file.name}：${item.error}`} action={<Space wrap>

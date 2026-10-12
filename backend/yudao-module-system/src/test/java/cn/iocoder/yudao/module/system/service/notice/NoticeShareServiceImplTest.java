@@ -85,6 +85,8 @@ class NoticeShareServiceImplTest extends BaseDbUnitTest {
         NoticeDO n = notice("PUBLISHED", "TARGET");
         assertFalse(service.get(n.getId()).isActive());
         var first = service.open(openRequest(n.getId()), 7L);
+        assertEquals("https://h5.example.com/public-api/system/notice-share/page?token=" + token(first), first.getUrl());
+        assertEquals(first.getUrl(), service.get(n.getId()).getUrl());
         assertEquals(43, token(first).length());
         assertTrue(service.publicNotice(token(first)).getAttachments().isEmpty());
         assertEquals(0L, reads.selectCount());
@@ -115,6 +117,17 @@ class NoticeShareServiceImplTest extends BaseDbUnitTest {
             assertServiceException(() -> service.open(openRequest(n.getId()), 7L), NOTICE_SHARE_CONFIG_INVALID);
         }
         assertEquals(0L, shares.selectCount());
+    }
+    @Test void activeLegacySharesGetPreviewUrlsWithoutRotatingTokensOrVersions() {
+        var n = notice("PUBLISHED", "ALL");
+        var first = service.open(openRequest(n.getId()), 7L);
+        var persisted = shares.selectByNoticeId(n.getId());
+        ReflectionTestUtils.setField(service, "publicBaseUrl", "https://h5.example.com/education/");
+        var current = service.get(n.getId());
+        assertEquals("https://h5.example.com/education/public-api/system/notice-share/page?token=" + persisted.getToken(), current.getUrl());
+        assertEquals(first.getVersion(), current.getVersion());
+        assertEquals(persisted.getToken(), shares.selectByNoticeId(n.getId()).getToken());
+        assertEquals(n.getTitle(), service.publicNotice(persisted.getToken()).getTitle());
     }
     @Test void missingConfigurationNeverPreventsClosingExistingShare() {
         var n = notice("PUBLISHED", "ALL");

@@ -1,6 +1,15 @@
 <template>
-  <Dialog v-model="dialogVisible" :title="dialogTitle" width="1040px" align-center>
+  <Dialog
+    v-model="dialogVisible"
+    :title="dialogTitle"
+    width="min(1040px, calc(100vw - 24px))"
+    align-center
+  >
+    <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon
+      ><el-button link type="primary" @click="retryLoad">重试</el-button></el-alert
+    >
     <el-form
+      class="employee-archive-form"
       ref="formRef"
       v-loading="formLoading"
       :model="formData"
@@ -157,7 +166,6 @@
               <el-form-item label="入职状态" prop="entryStatus">
                 <el-select
                   v-model="formData.entryStatus"
-                  :disabled="!['create', 'candidate'].includes(formType)"
                   placeholder="请选择入职状态"
                   class="!w-1/1"
                 >
@@ -219,7 +227,6 @@
               <el-form-item label="聘用形式" prop="type">
                 <el-select
                   v-model="formData.type"
-                  :disabled="formType === 'update'"
                   placeholder="请选择聘用形式"
                   class="!w-1/1"
                   @change="handleTypeChange"
@@ -235,24 +242,12 @@
             </el-col>
             <el-col v-if="isFieldVisible('status')" :span="12">
               <el-form-item label="员工状态" prop="status">
-                <el-input
-                  v-if="formData.type === HrmEmployeeType.FORMAL"
-                  :model-value="getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, formData.status) || '-'"
-                  disabled
-                  placeholder="保存后自动计算"
-                />
-                <el-select
-                  v-else
-                  v-model="formData.status"
-                  :disabled="formType === 'update'"
-                  placeholder="请选择员工状态"
-                  class="!w-1/1"
-                >
+                <el-select v-model="formData.status" placeholder="请选择员工状态" class="!w-1/1">
                   <el-option
-                    v-for="dict in nonFormalStatusOptions"
-                    :key="dict.value"
-                    :label="dict.label"
-                    :value="dict.value"
+                    v-for="item in statusOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
                   />
                 </el-select>
               </el-form-item>
@@ -276,41 +271,55 @@
             <el-col v-if="isFieldVisible('probation')" :span="12">
               <el-form-item label="试用期（月）" prop="probation">
                 <div class="w-full">
-                  <el-input-number
-                    v-model="formData.probation"
-                    :min="0"
-                    :max="6"
-                    :disabled="formType === 'update' || formData.type !== HrmEmployeeType.FORMAL"
-                    class="!w-1/1"
-                  />
+                  <el-input-number v-model="formData.probation" :min="0" :max="6" class="!w-1/1" />
                   <div class="mt-4px text-12px text-[var(--el-text-color-secondary)]">
-                    0 表示无试用期；转正时间按入职时间 + 试用期月数计算。
+                    0 表示无试用期；状态和实际日期由人工维护。
                   </div>
                 </div>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
+            <el-col :span="12"
+              ><el-form-item label="计划转正日期"
+                ><el-date-picker
+                  v-model="formData.plannedRegularTime"
+                  type="date"
+                  value-format="x"
+                  class="!w-1/1"
+                  clearable
+                /><el-button link type="primary" @click="calculatePlannedRegular"
+                  >按试用期计算</el-button
+                ></el-form-item
+              ></el-col
+            >
+            <el-col :span="12"
+              ><el-form-item label="计划离职日期"
+                ><el-date-picker
+                  v-model="formData.plannedLeaveTime"
+                  type="date"
+                  value-format="x"
+                  class="!w-1/1"
+                  clearable /></el-form-item
+            ></el-col>
             <el-col v-if="isFieldVisible('regularTime')" :span="12">
-              <el-form-item label="转正时间" prop="regularTime">
+              <el-form-item label="实际转正日期" prop="regularTime">
                 <el-date-picker
                   v-model="formData.regularTime"
                   type="datetime"
                   value-format="x"
-                  disabled
-                  placeholder="保存后自动计算"
+                  placeholder="请选择实际转正日期"
                   class="!w-1/1"
                 />
               </el-form-item>
             </el-col>
             <el-col v-if="isFieldVisible('leaveTime')" :span="12">
-              <el-form-item label="离职时间" prop="leaveTime">
+              <el-form-item label="实际离职日期" prop="leaveTime">
                 <el-date-picker
                   v-model="formData.leaveTime"
                   type="datetime"
                   value-format="x"
-                  disabled
-                  placeholder="由离职流程维护"
+                  placeholder="请选择实际离职日期"
                   class="!w-1/1"
                 />
               </el-form-item>
@@ -382,9 +391,60 @@
           </el-form-item>
         </el-tab-pane>
       </el-tabs>
+      <el-card v-if="showChangeMeta" shadow="never" class="mt-16px">
+        <el-form-item label="修改性质">
+          <el-radio-group v-model="formData.changeMode">
+            <el-radio-button value="CORRECTION" :disabled="!!formData.planId"
+              >档案纠错</el-radio-button
+            >
+            <el-radio-button value="BUSINESS">实际人事变更</el-radio-button>
+            <el-radio-button value="PLAN">保存人事计划</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-alert
+          :closable="false"
+          :title="
+            formData.changeMode === 'CORRECTION'
+              ? '仅修正档案并保留审计，不触发薪资异动或资产事项。'
+              : formData.changeMode === 'PLAN'
+                ? '保存计划只用于提醒，不改变当前员工状态和岗位。'
+                : '记录实际人事变更并触发对应的招聘、资产联动；不要求审批完成。'
+          "
+          type="info"
+          class="mb-12px"
+        />
+        <template v-if="formData.changeMode !== 'CORRECTION'">
+          <el-form-item label="变更类别"
+            ><el-select v-model="formData.changeType" :disabled="!!formData.planId"
+              ><el-option
+                v-for="item in commandOptions"
+                :key="item.value"
+                :value="item.value"
+                :label="item.label" /></el-select
+          ></el-form-item>
+          <el-form-item
+            :label="formData.changeMode === 'PLAN' ? '计划发生日期' : '实际发生日期'"
+            v-if="formData.changeMode !== 'PLAN' || ![4, 11].includes(formData.changeType || 0)"
+            ><el-date-picker
+              v-model="changeDate"
+              type="date"
+              value-format="x"
+              :disabled-date="formData.changeMode === 'BUSINESS' ? disableFutureDate : undefined"
+          /></el-form-item>
+        </template>
+        <el-form-item label="修改原因" required
+          ><el-input
+            v-model="formData.changeReason"
+            type="textarea"
+            maxlength="500"
+            show-word-limit
+        /></el-form-item>
+      </el-card>
     </el-form>
     <template #footer>
-      <el-button type="primary" :loading="formLoading" @click="submitForm">确 定</el-button>
+      <el-button type="primary" :loading="formLoading" :disabled="!!loadError" @click="submitForm"
+        >确 定</el-button
+      >
       <el-button @click="dialogVisible = false">取 消</el-button>
     </template>
   </Dialog>
@@ -392,8 +452,10 @@
 
 <script lang="ts" setup>
 import type { FormInstance, FormRules } from 'element-plus'
+import dayjs from 'dayjs'
+import { getCommandOptions } from '@/api/hrm/employee/change-record'
 
-import { DICT_TYPE, getDictLabel, getIntDictOptions } from '@/utils/dict'
+import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import * as EmployeeApi from '@/api/hrm/employee'
 import * as EmployeeConfigApi from '@/api/hrm/employee/config'
 import * as RecruitCandidateApi from '@/api/hrm/recruit/candidate'
@@ -407,7 +469,6 @@ import {
   HrmEmployeeEntryStatus,
   HrmEmployeeIdType,
   HrmEmployeeStatus,
-  HRM_EMPLOYEE_CREATE_ENTRY_STATUSES,
   HRM_EMPLOYEE_NO_PROBATION_MONTHS,
   HRM_EMPLOYEE_NON_FORMAL_STATUSES
 } from '@/views/hrm/utils/constants'
@@ -420,6 +481,8 @@ const message = useMessage() // 消息弹窗
 const dialogVisible = ref(false) // 弹窗的是否展示
 const dialogTitle = ref('') // 弹窗的标题
 const formLoading = ref(false) // 表单的加载中：1）修改时的数据加载；2）提交的按钮禁用
+const loadError = ref('')
+let retryLoad = () => Promise.resolve()
 const formType = ref('') // 表单的类型：create - 新增；update - 修改；candidate - 候选人转员工
 const formData = ref<EmployeeApi.HrmEmployeeVO>(createDefaultFormData()) // 表单数据
 const formRules: FormRules = {
@@ -459,7 +522,7 @@ const formRules: FormRules = {
   status: [
     {
       validator: (_rule, value, callback) => {
-        if (formData.value.type === HrmEmployeeType.INFORMAL && value == null) {
+        if (value == null) {
           callback(new Error('请选择员工状态'))
           return
         }
@@ -472,20 +535,64 @@ const formRules: FormRules = {
 const formRef = ref<FormInstance>() // 表单 Ref
 const activeTab = ref('personal') // 当前选中的页签
 const createFieldVisibleMap = ref<Record<number, Set<string>>>({}) // 新建员工字段配置
-const entryStatusOptions = computed(() => {
-  const options = getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS)
-  if (formType.value === 'update') {
-    return options
-  }
-  return options.filter((item) =>
-    (HRM_EMPLOYEE_CREATE_ENTRY_STATUSES as readonly number[]).includes(Number(item.value))
-  )
-})
+const entryStatusOptions = computed(() => getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS))
+
 const nonFormalStatusOptions = computed(() =>
   getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
     (HRM_EMPLOYEE_NON_FORMAL_STATUSES as readonly number[]).includes(Number(item.value))
   )
 )
+
+const statusOptions = computed(() =>
+  getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
+    formData.value.type === HrmEmployeeType.FORMAL
+      ? ([HrmEmployeeStatus.REGULAR, HrmEmployeeStatus.PROBATION] as number[]).includes(
+          Number(item.value)
+        )
+      : (HRM_EMPLOYEE_NON_FORMAL_STATUSES as readonly number[]).includes(Number(item.value))
+  )
+)
+const commandOptions = ref<Array<{ value: number; label: string }>>([])
+const original = ref('')
+const lifecycleKeys = [
+  'type',
+  'status',
+  'entryStatus',
+  'probation',
+  'entryTime',
+  'regularTime',
+  'leaveTime',
+  'plannedRegularTime',
+  'plannedLeaveTime',
+  'deptId',
+  'postName',
+  'postLevel',
+  'leaderEmployeeId',
+  'workAddress'
+] as const
+const lifecycleValue = () => JSON.stringify(lifecycleKeys.map((key) => formData.value[key] ?? null))
+const showChangeMeta = computed(
+  () =>
+    formType.value === 'update' &&
+    (original.value !== lifecycleValue() ||
+      formData.value.changeMode !== 'CORRECTION' ||
+      !!formData.value.planId)
+)
+const calculatePlannedRegular = () => {
+  if (formData.value.entryTime)
+    formData.value.plannedRegularTime = dayjs(Number(formData.value.entryTime))
+      .add(formData.value.probation || 0, 'month')
+      .valueOf()
+}
+const changeDate = computed({
+  get: () =>
+    formData.value.changeMode === 'PLAN' ? formData.value.plannedTime : formData.value.actualTime,
+  set: (value) => {
+    if (formData.value.changeMode === 'PLAN') formData.value.plannedTime = value
+    else formData.value.actualTime = value
+  }
+})
+let submittedBody = ''
 
 /** 创建默认表单数据 */
 function createDefaultFormData(): EmployeeApi.HrmEmployeeVO {
@@ -510,6 +617,8 @@ function createDefaultFormData(): EmployeeApi.HrmEmployeeVO {
     leaderEmployeeId: undefined,
     entryStatus: HrmEmployeeEntryStatus.ACTIVE,
     status: undefined,
+    operationKey: crypto.randomUUID(),
+    changeMode: 'CORRECTION',
     type: HrmEmployeeType.FORMAL,
     entryTime: undefined,
     probation: HRM_EMPLOYEE_NO_PROBATION_MONTHS,
@@ -533,7 +642,10 @@ function isFieldVisible(name: string) {
   if (formType.value === 'update') {
     return true
   }
-  const entryStatus = formData.value.entryStatus || HrmEmployeeEntryStatus.ACTIVE
+  const entryStatus =
+    formData.value.entryStatus === HrmEmployeeEntryStatus.PENDING_ENTRY
+      ? HrmEmployeeEntryStatus.PENDING_ENTRY
+      : HrmEmployeeEntryStatus.ACTIVE
   const visibleFields = createFieldVisibleMap.value[entryStatus]
   return !visibleFields || visibleFields.has(name)
 }
@@ -557,6 +669,8 @@ async function loadCreateFieldConfig() {
 /** 打开弹窗 */
 async function open(type: string, id?: number, defaultData?: Partial<EmployeeApi.HrmEmployeeVO>) {
   dialogVisible.value = true
+  loadError.value = ''
+  retryLoad = () => open(type, id, defaultData)
   dialogTitle.value =
     type === 'confirm'
       ? '确认入职'
@@ -570,12 +684,16 @@ async function open(type: string, id?: number, defaultData?: Partial<EmployeeApi
   resetForm()
   formLoading.value = true
   try {
+    commandOptions.value = type === 'update' ? await getCommandOptions() : []
+    submittedBody = ''
     const [employee] = await Promise.all([
       id ? EmployeeApi.getEmployee(id) : Promise.resolve(undefined),
       type !== 'update' ? loadCreateFieldConfig() : Promise.resolve()
     ])
     if (employee) {
-      formData.value = employee
+      formData.value = { ...employee, operationKey: crypto.randomUUID(), changeMode: 'CORRECTION' }
+      original.value = lifecycleValue()
+      if (type === 'update' && defaultData) Object.assign(formData.value, defaultData)
       if (type === 'confirm') {
         formData.value.entryStatus = HrmEmployeeEntryStatus.ACTIVE
         if (!formData.value.entryTime || Number(formData.value.entryTime) > Date.now()) {
@@ -609,6 +727,8 @@ async function open(type: string, id?: number, defaultData?: Partial<EmployeeApi
       }
       handleTypeChange(formData.value.type)
     }
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '员工档案加载失败，请重试'
   } finally {
     formLoading.value = false
   }
@@ -634,10 +754,8 @@ function handleTypeChange(type?: number) {
     }
     return
   }
-  formData.value.probation = undefined
-  formData.value.regularTime = undefined
   if (!nonFormalStatusOptions.value.some((item) => Number(item.value) === formData.value.status)) {
-    formData.value.status = HrmEmployeeStatus.INTERN
+    formData.value.status = undefined
   }
 }
 
@@ -651,6 +769,20 @@ async function submitForm() {
   formLoading.value = true
   try {
     const submitData = buildSubmitData()
+    if (showChangeMeta.value && !submitData.changeReason?.trim()) {
+      message.warning('请填写修改原因')
+      return
+    }
+    for (const key of [
+      'plannedRegularTime',
+      'plannedLeaveTime',
+      'regularTime',
+      'leaveTime'
+    ] as const)
+      submitData[key] ??= null as unknown as number
+    const body = JSON.stringify({ ...submitData, operationKey: undefined })
+    if (submittedBody && body !== submittedBody) submitData.operationKey = crypto.randomUUID()
+    submittedBody = body
     if (formType.value === 'create') {
       await EmployeeApi.createEmployee(submitData)
       message.success(t('common.createSuccess'))
@@ -669,7 +801,7 @@ async function submitForm() {
       })
       message.success('再入职办理成功')
     } else {
-      await EmployeeApi.updateEmployee(formData.value)
+      await EmployeeApi.updateEmployee(submitData)
       message.success(t('common.updateSuccess'))
     }
     dialogVisible.value = false
@@ -682,17 +814,31 @@ async function submitForm() {
 
 /** 按当前字段配置构造提交数据，避免隐藏字段旧值随请求提交 */
 function buildSubmitData() {
-  if (formType.value === 'update') {
+  if (['update', 'confirm', 'rehire'].includes(formType.value)) {
     return formData.value
   }
-  const entryStatus = formData.value.entryStatus || HrmEmployeeEntryStatus.ACTIVE
+  const entryStatus =
+    formData.value.entryStatus === HrmEmployeeEntryStatus.PENDING_ENTRY
+      ? HrmEmployeeEntryStatus.PENDING_ENTRY
+      : HrmEmployeeEntryStatus.ACTIVE
   const visibleFields = createFieldVisibleMap.value[entryStatus]
   if (!visibleFields) {
     return formData.value
   }
   const submitData: Partial<EmployeeApi.HrmEmployeeVO> = {}
   Object.entries(formData.value).forEach(([name, value]) => {
-    if (visibleFields.has(name)) {
+    if (
+      visibleFields.has(name) ||
+      [
+        'status',
+        'plannedRegularTime',
+        'plannedLeaveTime',
+        'regularTime',
+        'leaveTime',
+        'operationKey',
+        'changeMode'
+      ].includes(name)
+    ) {
       submitData[name] = value
     }
   })
@@ -712,9 +858,30 @@ function resetForm() {
 </script>
 
 <style scoped>
-.employee-form-tabs :deep(.el-tabs__content) {
-  max-height: calc(100vh - 270px);
-  padding-right: 8px;
+.employee-archive-form {
+  max-height: calc(100dvh - 180px);
   overflow-y: auto;
+  padding-right: 8px;
+}
+@media (max-width: 600px) {
+  .employee-archive-form :deep(.el-col-12) {
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
+  .employee-archive-form :deep(.el-form-item) {
+    display: block;
+  }
+  .employee-archive-form :deep(.el-form-item__label) {
+    width: auto !important;
+    justify-content: flex-start;
+  }
+  .employee-archive-form :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
+  .employee-archive-form :deep(.el-input-number),
+  .employee-archive-form :deep(.el-date-editor),
+  .employee-archive-form :deep(.el-select) {
+    width: 100%;
+  }
 }
 </style>

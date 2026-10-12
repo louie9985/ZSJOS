@@ -3,22 +3,22 @@ import { validateSalesOrderAmounts, validateSalesOrderDecisionReason, buildDicti
 import type { SalesOrder, SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
-  it('requires mobile or WeChat', () => {
-    expect(validateSalesOrderSubmission(' ', undefined, 0, 0)).toBe('请填写手机号或微信号')
+  it('requires mobile and WeChat', () => {
+    expect(validateSalesOrderSubmission(' ', undefined, 0, 0)).toBe('请填写手机号')
   })
 
   it('rejects zero vouchers for every order amount', () => {
-    expect(validateSalesOrderSubmission('13800138000', undefined, 0.01, 0))
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 0.01, 0))
       .toBe('所有订单必须上传至少一份缴费凭证')
-    expect(validateSalesOrderSubmission('13800138000', undefined, 0, 0))
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 0, 0))
       .toBe('所有订单必须上传至少一份缴费凭证')
   })
 
   it('accepts one through six vouchers and rejects seven', () => {
-    expect(validateSalesOrderSubmission(undefined, 'student-wechat', 0, 1)).toBeUndefined()
-    expect(validateSalesOrderSubmission('13800138000', undefined, 100, 1)).toBeUndefined()
-    expect(validateSalesOrderSubmission('13800138000', undefined, 100, 6)).toBeUndefined()
-    expect(validateSalesOrderSubmission('13800138000', undefined, 100, 7))
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 0, 1)).toBeUndefined()
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 100, 1)).toBeUndefined()
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 100, 6)).toBeUndefined()
+    expect(validateSalesOrderSubmission('13800138000', 'student-wechat', 100, 7))
       .toBe('缴费凭证最多上传 6 份')
   })
 })

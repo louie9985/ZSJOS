@@ -132,6 +132,38 @@ class PurchaseIntentDraftTest {
         assertServiceException(() -> service.saveDraft(req, 20L), PURCHASE_INTENT_VERSION_CONFLICT);
     }
 
+    private PurchaseIntentSaveDraftReqVO lockedContactDraft() {
+        var req=request("online_link","100");req.setId(9L);
+        var draft=Map.of("studentName","测试学员","mobile","13800138000");req.setDraft(new HashMap<>(draft));
+        var persisted=new PurchaseIntentDO().setId(9L).setPersonId(10L).setPurchaseType("first_purchase")
+                .setInitiatorUserId(20L).setCollectionMode("online_link").setSnapshotLocked(true).setVersion(1)
+                .setTotalAmount(req.getTotalAmount()).setDraftJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(draft))
+                .setItemSnapshotJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(req.getItems()));
+        when(drafts.selectByIdForUpdate(9L)).thenReturn(persisted);
+        when(drafts.updateDraft(eq(9L),eq(1),eq("online_link"),anyString(),anyString(),any(),anyString())).thenReturn(1);
+        return req;
+    }
+
+    @Test void paidDraftCanCompleteMissingContactWithoutUnlockingAmount() {
+        var req=lockedContactDraft();req.getDraft().put("wechatId","new-wx");
+        var result=service.saveDraft(req,20L);
+        assertEquals("new-wx",result.getDraft().get("wechatId"));assertTrue(result.getPaymentLocked());
+        assertEquals(new BigDecimal("100.00"),result.getTotalAmount());
+    }
+
+    @Test void lockedDraftRejectsKnownContactChangesAndConflictingAliases() {
+        var req=lockedContactDraft();req.getDraft().put("mobile","13900139000");
+        assertServiceException(()->service.saveDraft(req,20L),PURCHASE_INTENT_PAYMENT_CONFLICT);
+        req.getDraft().put("mobile","13800138000");req.getDraft().put("studentMobile","13900139000");
+        assertServiceException(()->service.saveDraft(req,20L),PURCHASE_INTENT_PAYMENT_CONFLICT);
+    }
+
+    @Test void contactCompletionCannotChangeLockedPrice() {
+        var req=lockedContactDraft();req.getDraft().put("wechatId","new-wx");
+        req.getItems().getFirst().setActualAmount(BigDecimal.TEN);req.setTotalAmount(BigDecimal.TEN);
+        assertServiceException(()->service.saveDraft(req,20L),PURCHASE_INTENT_PAYMENT_CONFLICT);
+    }
+
     @Test void beanValidationCascadesIntoEveryItemAndAllowsZeroTotal() {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             var validator = factory.getValidator();

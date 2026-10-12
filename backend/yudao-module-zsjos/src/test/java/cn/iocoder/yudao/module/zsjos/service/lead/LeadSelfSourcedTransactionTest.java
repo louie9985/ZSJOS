@@ -105,6 +105,11 @@ class LeadSelfSourcedTransactionTest {
         var qualification=new LeadQualificationServiceImpl();beans.put(LeadQualificationService.class,proxy(qualification));
         var autoTarget=new LeadSelfSourcedAutomationService();automation=proxy(autoTarget);beans.put(LeadSelfSourcedAutomationService.class,automation);
         var submissionTarget=new LeadSubmissionServiceImpl();submission=proxy(submissionTarget);
+        doAnswer(call -> {
+            LeadDO lead=call.getArgument(0); Long selected=call.getArgument(2);
+            if(selected!=null){lead.setProviderOwnerType("system_user");lead.setProviderOwnerId(selected);}
+            return null;
+        }).when(get(LeadProviderAttributionService.class)).apply(any(),any(),any(),any());
         for(Object target:List.of(taskTarget,lifecycle,dispatch,followTarget,qualification,autoTarget,submissionTarget))wire(target);
         login();
         when(get(PermissionApi.class).hasAnyPermissions(eq(1L),any(String.class))).thenAnswer(call -> !education || !"zsjos:lead:self-sourced:create".equals(call.getArgument(1)));
@@ -177,6 +182,12 @@ class LeadSelfSourcedTransactionTest {
     void linkedProviderCreatesDoNotAutomaticallyQualify(boolean education) {
         this.education=education;
         var req=request();req.setNewMediaProviderUserId(2L);var result=create(req,1L);assertFalse(result.getAutomaticQualificationApplied());assertEquals("pending",result.getQualificationStatus());assertEquals(0,count("zsjos_lead_follow_up_record"));assertEquals(0,count("zsjos_opportunity"));
+        var persisted=get(LeadMapper.class).selectById(result.getLeadId());
+        assertEquals(SOURCE_INTERNAL_NEW_MEDIA,persisted.getSourceType());
+        assertEquals(education ? SOURCE_EDUCATION_SELF : SOURCE_SALES_SELF,persisted.getSubmissionSourceType());
+        assertEquals(education ? OWNER_EDUCATION : OWNER_SALES,persisted.getOwnerIdentity());
+        assertEquals(1L,persisted.getOwnerUserId());assertEquals(2L,persisted.getSourceUserId());
+        assertEquals(result.getLeadId(),create(req,1L).getLeadId());
         var linkedEducation=request();linkedEducation.setIdempotencyKey("education-test");linkedEducation.setNewMediaProviderUserId(2L);var result2=submission.createEducationSelfSourced(linkedEducation,1L);assertFalse(result2.getAutomaticQualificationApplied());assertEquals(0,count("zsjos_opportunity"));
     }
 

@@ -76,7 +76,8 @@ export const decideSalesOrder = (
 ) => request.put({ url: `/zsjos/sales-order/${id}/${decision}`, data })
 export const terminateSalesOrder = (id: number, data: Record<string, unknown>) =>
   request.put({ url: `/zsjos/sales-order/${id}/terminate`, data })
-export const resubmitSalesOrder = (id: number, data: Record<string, unknown>) =>
+export type SalesOrderSubmission = Record<string, unknown> & { studentMobile: string; studentWechatId: string }
+export const resubmitSalesOrder = (id: number, data: SalesOrderSubmission) =>
   request.put({ url: `/zsjos/sales-order/${id}/resubmit`, data })
 export const bpmTodoPage = (params: Record<string, unknown>): Promise<WorkbenchListResult> =>
   request.get({ url: '/bpm/task/todo-page', params })
@@ -103,5 +104,5 @@ export interface RepurchaseCustomerCheck {
 }
 export const checkRepurchaseCustomer = (data: RepurchaseCustomerIdentity): Promise<RepurchaseCustomerCheck> =>
   request.post({ url: '/zsjos/sales-order/repurchase/check-customer', data, preserveBusinessError: true })
-export const createCustomerRepurchase = (data: Record<string, unknown>) =>
+export const createCustomerRepurchase = (data: Record<string, unknown> & { order: SalesOrderSubmission }) =>
   request.post({ url: '/zsjos/sales-order/repurchase', data, preserveBusinessError: true })

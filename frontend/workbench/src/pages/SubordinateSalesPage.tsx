@@ -1,3 +1,4 @@
+import { LeadAppealPendingTag } from '../components/LeadAppealSummary'
 import SubordinateSalesCard from "../components/SubordinateSalesCard";
 import SubordinateSalesStatusFilter from "../components/SubordinateSalesStatusFilter";
 import { createIdempotencyKey } from '../services/idempotency'
@@ -373,7 +374,7 @@ function SalesDetail({
       title: "客资状态",
       dataIndex: "status",
       width: 110,
-      render: (value) => <Tag>{value ? protocolDisplayLabel(LEAD_STATUS_LABELS, value, '未知状态') : '—'}</Tag>,
+      render: (value, row) => <Space wrap><Tag>{value ? protocolDisplayLabel(LEAD_STATUS_LABELS, value, '未知状态') : '—'}</Tag><LeadAppealPendingTag lead={row} /></Space>,
     },
     {
       title: "分配状态",
