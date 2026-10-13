@@ -1,3 +1,5 @@
+import { useMediaStudentReview } from './MediaStudentReviewContext'
+import { contentReviewStudentApi } from '../services/contentReviewStudent'
 import AccountPositioningSummary from './AccountPositioningSummary'
 import AccountPositioningHistory from './AccountPositioningHistory'
 import { Alert, App, Button, Empty, Radio, Skeleton, Space, Tag, Typography } from 'antd'
@@ -13,6 +15,7 @@ export { default as CardSnapshot } from './PositioningSnapshot'
 
 export default function AccountPositioningCard({ accountId, canQuery, studentName, studentContact, serviceRelationId, canReadInterview = false, refresh = 0, onApplied, hideHistory = false, statusTarget }: { accountId: number; canQuery: boolean; studentName?: string; studentContact?: string; serviceRelationId?: number; canReadInterview?: boolean; refresh?: number; onApplied?: () => void; hideHistory?: boolean; statusTarget?: HTMLElement | null }) {
   const { modal, message } = App.useApp()
+  const review = useMediaStudentReview()
   const [options, setOptions] = useState<Awaited<ReturnType<typeof api.positioningCard.applicationOptions>>>()
   const [selectOpen, setSelectOpen] = useState(false), [selected, setSelected] = useState<number>(), [busy, setBusy] = useState(false)
   const [requestKey, setRequestKey] = useState(createIdempotencyKey)
@@ -21,11 +24,12 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
   useEffect(() => {
     let active = true
     setData(undefined); setError(''); setLoading(canQuery)
-    if (canQuery) Promise.all([api.positioningCard.accountOverview(accountId), api.positioningCard.applicationOptions(accountId)]).then(([result, available]) => { if (active) { setData(result); setOptions(available) } })
+    setOptions(undefined)
+    if (canQuery) (review ? contentReviewStudentApi.positioningOverview(review.batchId,accountId).then(value => [value.account, undefined] as const) : Promise.all([api.positioningCard.accountOverview(accountId), api.positioningCard.applicationOptions(accountId)])).then(([result, available]) => { if (active) { setData(result); setOptions(available) } })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : '定位卡加载失败') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [accountId, canQuery, retry, refresh])
+  }, [accountId, canQuery, retry, refresh, review?.batchId])
   const statusArea = (content: React.ReactNode) => statusTarget ? createPortal(content, statusTarget) : content
   if (!canQuery) return statusArea(<Typography.Text type="secondary">暂无查看定位卡权限</Typography.Text>)
   if (loading) return <><Skeleton active />{statusTarget && statusArea(<Skeleton active title={false} paragraph={{ rows: 2 }} />)}</>
@@ -48,7 +52,7 @@ export default function AccountPositioningCard({ accountId, canQuery, studentNam
     {statusArea(<div className="account-positioning-status">
       <div className="account-positioning-status-version"><Typography.Text type="secondary">当前应用</Typography.Text><Tag color={data?.effective ? 'success' : 'default'}>{data?.effective ? `第 ${data.effective.submissionNo} 次提交` : '尚未应用'}</Tag></div>
       {options?.newerAvailable && <Typography.Text className="account-positioning-status-hint">有新版定位卡可用，当前账号仍使用原版本</Typography.Text>}
-      {!data?.effective && <Typography.Text type="secondary">请选择本课程服务下的已确认版本</Typography.Text>}
+      {!data?.effective && <Typography.Text type="secondary">{review ? '尚未应用定位卡' : '请选择本课程服务下的已确认版本'}</Typography.Text>}
       {options?.canApply && <Button block type="primary" icon={<SwapOutlined />} onClick={choose}>{data?.effective ? '更换应用版本' : '选择应用定位卡'}</Button>}
     </div>)}
     <AccountPositioningSummary card={data?.effective} studentName={studentName} studentContact={studentContact}

@@ -36,6 +36,9 @@ export function AttachmentTypeIcon({ kind, extension }: { kind: ReturnType<typeo
 // The caller owns authorization and signed-URL retrieval; this component owns
 // presentation only and never knows a business endpoint or guesses access.
 export default function AttachmentCard({ name, load }: { name: string; load: () => Promise<AttachmentResource> }) {
+  const blobUrl = useRef<string | undefined>(undefined)
+  const releaseBlob = () => { if (blobUrl.current) URL.revokeObjectURL(blobUrl.current); blobUrl.current = undefined }
+  useEffect(() => () => releaseBlob(), [])
   const [file, setFile] = useState<AttachmentResource>(), [error, setError] = useState(''), [busy, setBusy] = useState(false), [preview, setPreview] = useState(false)
   const request = useRef(0)
   const [previewRevision, setPreviewRevision] = useState(0)
@@ -43,10 +46,11 @@ export default function AttachmentCard({ name, load }: { name: string; load: () 
     const version = ++request.current; setBusy(true); setError('')
     try {
       const result = await load()
-      if (!result.url || !['http:', 'https:'].includes(new URL(result.url).protocol)) throw new Error('附件地址不可用')
-      if (version === request.current) { setFile(result); setPreviewRevision(version) }
+      if (!result.url || !['http:', 'https:', 'blob:'].includes(new URL(result.url).protocol)) throw new Error('附件地址不可用')
+      if (version === request.current) { releaseBlob(); if (result.url.startsWith('blob:')) blobUrl.current = result.url; setFile(result); setPreviewRevision(version) }
+      else if (result.url.startsWith('blob:')) URL.revokeObjectURL(result.url)
       return version === request.current ? result : undefined
-    } catch (cause) { if (version === request.current) { setFile(undefined); setError(cause instanceof Error ? cause.message : '附件读取失败') } }
+    } catch (cause) { if (version === request.current) { releaseBlob(); setFile(undefined); setError(cause instanceof Error ? cause.message : '附件读取失败') } }
     finally { if (version === request.current) setBusy(false) }
   }
   useEffect(() => { void fetchFile(); return () => { request.current++ } }, [])

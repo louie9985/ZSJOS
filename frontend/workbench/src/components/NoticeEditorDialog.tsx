@@ -2,7 +2,7 @@ import { Alert, App, Button, DatePicker, Empty, Form, Input, Modal, Progress, Ra
 import dayjs from 'dayjs'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { AnnouncementAttachment, DictData } from '../services/api'
-import { noticeManagement, noticePermission, noticeRecipientTree, type ManagedNotice, type NoticeInput, type NoticeRecipients } from '../services/noticeManagement'
+import { noticeManagement, noticePermission, noticeRecipientTree, noticeSelectedUserIds, type ManagedNotice, type NoticeInput, type NoticeRecipients } from '../services/noticeManagement'
 import NoticeManagementDetail from './NoticeManagementDetail'
 import NoticeAttachments from './NoticeAttachments'
 import { ClipboardUploadButtons } from './ClipboardPasteTarget'
@@ -38,6 +38,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
   const audienceType = Form.useWatch('audienceType', form)
   const deptIds = Form.useWatch('targetDeptIds', form) || []
   const userIds = Form.useWatch('targetUserIds', form) || []
+  const selectedUserIds = recipients ? noticeSelectedUserIds(recipients, deptIds, userIds) : userIds
   const canSave = !stateChanged && noticePermission(permissions, id ? 'update' : 'create')
   const uploading = uploads.some(task => !task.error) || contentUploads > 0
   const blocked = busy || uploading
@@ -92,17 +93,17 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
   }, [])
   const payload = (values: Values): NoticeInput => ({
     ...values, id, highlightUntil: values.highlightUntil?.valueOf() ?? null,
-    targetDeptIds: values.audienceType === 'TARGET' ? values.targetDeptIds || [] : [],
-    targetUserIds: values.audienceType === 'TARGET' ? values.targetUserIds || [] : [],
+    targetDeptIds: [],
+    targetUserIds: values.audienceType === 'TARGET' && recipients ? noticeSelectedUserIds(recipients, values.targetDeptIds || [], values.targetUserIds || []) : [],
     attachments: attachments.map((file, sort) => ({ ...file, sort }))
   })
   const showPreview = () => {
     const values = form.getFieldsValue(true)
-    const selectedDepartments = recipients?.departments.filter(dept => values.targetDeptIds?.includes(dept.id)) || []
+    const data = payload(values)
     const audienceSummary = values.audienceType === 'TARGET'
-      ? [...selectedDepartments.map(dept => `${dept.name}（含子部门）`), ...(values.targetUserIds?.length ? [`指定用户 ${values.targetUserIds.length} 人`] : [])].join('、')
+      ? `指定用户 ${data.targetUserIds.length} 人`
       : '全体员工'
-    setPreview({ ...payload(values), id: id || 0, publishStatus: 'DRAFT',
+    setPreview({ ...data, id: id || 0, publishStatus: 'DRAFT',
       sourceDeptName: recipients?.departments.find(dept => dept.id === values.sourceDeptId)?.name,
       audienceSummary, highlightUntil: values.highlightUntil?.valueOf() })
   }
@@ -111,13 +112,14 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
     if (publish && !noticePermission(permissions, 'publish')) return
     let values: Values
     try { values = await form.validateFields() } catch { return }
-    if (values.audienceType === 'TARGET' && !values.targetDeptIds?.length && !values.targetUserIds?.length) { setError('请选择接收部门或用户'); return }
+    if (values.audienceType === 'TARGET' && !payload(values).targetUserIds.length) { setError('请选择接收员工'); return }
     busyRef.current = true; setBusy(true); setError('')
     try {
       if (publish && !await modal.confirm({ title: '确认发布公告？', content: '发布后内容不可直接修改。', okText: '发布', cancelText: '取消' })) return
       const data = payload(values)
       const savedId = id || await noticeManagement.create(data)
       if (id) await noticeManagement.update(data)
+      form.setFieldsValue({ targetDeptIds: data.targetDeptIds, targetUserIds: data.targetUserIds })
       setId(savedId); setDirty(false); onChanged()
       if (publish) { await noticeManagement.publish(savedId); onChanged(); void message.success('公告已发布'); onClose() }
       else void message.success('草稿已保存')
@@ -168,13 +170,13 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
           </Form.Item>
           <Form.Item name="audienceType" label="发送范围"><Radio.Group options={[{ value: 'ALL', label: '全体员工' }, { value: 'TARGET', label: '指定部门/用户' }]} /></Form.Item>
           <Form.Item name="targetDeptIds" hidden><Input /></Form.Item><Form.Item name="targetUserIds" hidden><Input /></Form.Item>
-          {audienceType === 'TARGET' && <Form.Item label="指定部门/用户" help="勾选部门将发送给该部门及全部子部门成员；部门与用户独立勾选，发布时合并去重。">
+          {audienceType === 'TARGET' && <Form.Item label="指定部门/用户" help={`勾选部门可选择其下全部可接收员工，可取消部分部门或员工；已选 ${selectedUserIds.length} 人。`}>
             <Input.Search value={filter} onChange={event => setFilter(event.target.value)} placeholder="搜索部门或用户（匹配项高亮）" allowClear />
             {recipients && !recipients.departments.length && !recipients.users.length && <Empty description="暂无可选部门或用户" />}
-            {recipients && <Tree checkable checkStrictly disabled={busy || !canSave} defaultExpandAll treeData={noticeRecipientTree(recipients)}
-              checkedKeys={[...deptIds.map((id: number) => `d:${id}`), ...userIds.map((id: number) => `u:${id}`)]}
+            {recipients && <Tree checkable disabled={busy || !canSave || optionsLoading || !!optionsError} defaultExpandAll treeData={noticeRecipientTree(recipients)}
+              checkedKeys={selectedUserIds.map((id: number) => `u:${id}`)}
               filterTreeNode={node => !!filter && String(node.title).toLowerCase().includes(filter.toLowerCase())}
-              onCheck={keys => { const checked = Array.isArray(keys) ? keys : keys.checked; form.setFieldsValue({ targetDeptIds: checked.filter(key => String(key).startsWith('d:')).map(key => Number(String(key).slice(2))), targetUserIds: checked.filter(key => String(key).startsWith('u:')).map(key => Number(String(key).slice(2))) }); setDirty(true) }} />}
+              onCheck={keys => { const checked = Array.isArray(keys) ? keys : keys.checked; form.setFieldsValue({ targetDeptIds: [], targetUserIds: checked.filter(key => String(key).startsWith('u:')).map(key => Number(String(key).slice(2))) }); setDirty(true) }} />}
           </Form.Item>}
           <Form.Item name="highlightUntil" label="高亮提醒截止时间"><DatePicker showTime style={{ width: '100%' }} placeholder="不设置则不高亮" /></Form.Item>
           <div inert={busy || !canSave ? true : undefined}><Suspense fallback={<Spin />}><Form.Item name="content" label="正文" rules={[{ required: true, message: '请输入公告正文' }]}><RichTextEditor onUploadChange={delta => setContentUploads(current => current + delta)} onError={setError} /></Form.Item></Suspense></div>

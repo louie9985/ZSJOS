@@ -106,6 +106,7 @@ const legacyMediaRoute = (detail: NotifyMessage) => {
 
 export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
   detail.actionType === 'business_detail' && (
+    (detail.bizType === 'calendar' && detail.sceneCode === 'zsjos.calendar.course' && Number.isSafeInteger(detail.bizId) && isPositiveId(detail.bizId)) ||
     (detail.bizType === 'hrm_employee' && isPositiveId(detail.bizId))
     || (detail.bizType === 'points-redemption' && isPositiveId(detail.bizId))
     || detail.sceneCode === 'zsjos.feedback.approval_urged'
@@ -160,6 +161,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
   if (detail.actionType === 'none') return
   if (detail.actionType !== 'business_detail') {
     deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    return
+  }
+  if (detail.bizType === 'calendar' && detail.sceneCode === 'zsjos.calendar.course' && Number.isSafeInteger(detail.bizId) && isPositiveId(detail.bizId)) {
+    deps.navigate(`${APP_ROUTES.COURSE_CALENDAR}?courseId=${detail.bizId}`)
     return
   }
   if (detail.sceneCode === 'zsjos.feedback.approval_urged') {

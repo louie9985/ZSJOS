@@ -38,7 +38,19 @@ class CalendarPalettePermissionTest {
  }
  @Test void coursePresetsComeFromServerAndOtherTypesAreDenied() {
   when(grants.hasAnyPermissions(7L,"zsjos:course-calendar:query")).thenReturn(true);
-  assertEquals(List.of("#6ABF6D","#00D0FF","#B695E8","#FFBE73"),proxy.get("COURSE",7L).presets().stream().map(c->c.color()).toList());
+  assertThrows(ServiceException.class,()->proxy.get("COURSE",7L));
+  when(mapper.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(
+    new cn.iocoder.yudao.module.zsjos.dal.dataobject.calendar.CalendarPaletteDO().setColorsJson("[]"));
+  assertTrue(proxy.get("COURSE",7L).colors().isEmpty());
+  assertTrue(proxy.get("COURSE",7L).presets().isEmpty());
   assertThrows(ServiceException.class,()->proxy.get("EXAM",7L));
+ }
+ @Test void courseCreationPermissionAllowsSharedPaletteEditing() {
+  when(grants.hasAnyPermissions(7L,"zsjos:course-calendar:manage")).thenReturn(true);
+  when(mapper.lock(1L,0L,"COURSE_SHARED")).thenReturn(
+    new cn.iocoder.yudao.module.zsjos.dal.dataobject.calendar.CalendarPaletteDO().setId(2L).setColorsJson("[]"));
+  assertEquals(1,proxy.mutate("COURSE",7L,null,new CalendarColorSaveReqVO().setName("共享").setColor("#112233"),false).colors().size());
+  verify(mapper,never()).ensure(anyLong(),anyLong(),anyString());
+  verify(grants,never()).hasAnyPermissions(7L,"zsjos:course-calendar:color-manage");
  }
 }

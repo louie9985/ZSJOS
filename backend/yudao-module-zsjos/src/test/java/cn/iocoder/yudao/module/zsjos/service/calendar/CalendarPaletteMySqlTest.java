@@ -48,7 +48,7 @@ class CalendarPaletteMySqlTest {
   var added=service.mutate("PERSONAL",user,null,req("会议"),false).colors().get(0);
   assertEquals("#AABBCC",service.get("PERSONAL",user).colors().get(0).color());
   assertTrue(service.get("PERSONAL",user+1000).colors().isEmpty());
-  assertTrue(service.get("COURSE",user).colors().isEmpty());
+  assertTrue(service.get("COURSE",user).colors().stream().noneMatch(c -> c.id().equals(added.id())));
   assertThrows(ServiceException.class,()->service.mutate("COURSE",user,added.id(),null,true));
   service.mutate("PERSONAL",user,added.id(),req("培训"),false);
   assertEquals("培训",service.get("PERSONAL",user).colors().get(0).name());
@@ -63,5 +63,15 @@ class CalendarPaletteMySqlTest {
    var a=pool.submit(task);var b=pool.submit(task);start.countDown();assertNotEquals(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS));
   }
   assertEquals(20,service.get("PERSONAL",user).colors().size());
+ }
+ @Test void sharedEntriesCanBeEditedByAnotherUserAndEmptyDoesNotReseed() {
+  for(var item:service.get("COURSE",user).colors()) service.mutate("COURSE",user,item.id(),null,true);
+  assertTrue(service.get("COURSE",user+1).colors().isEmpty());
+  assertTrue(service.get("COURSE",user+1).presets().isEmpty());
+  var added=service.mutate("COURSE",user,null,req("公共颜色"),false).colors().get(0);
+  service.mutate("COURSE",user+1,added.id(),req("修改共享颜色"),false);
+  assertEquals("修改共享颜色",service.get("COURSE",user).colors().get(0).name());
+  service.mutate("COURSE",user+1,added.id(),null,true);
+  assertTrue(service.get("COURSE",user).colors().isEmpty());
  }
 }

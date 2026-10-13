@@ -17,6 +17,8 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface FileApi {
+    /** Internal business-authorized read through the original storage configuration. */
+    byte[] getFileContent(Long fileId) throws Exception;
 
     /** 初始化由服务端绑定主体和存储坐标的浏览器直传。 */
     FileDirectUploadInitRespDTO initDirectUpload(@Valid @NotNull FileDirectUploadInitReqDTO request);

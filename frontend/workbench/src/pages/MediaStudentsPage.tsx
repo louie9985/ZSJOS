@@ -2,7 +2,9 @@ import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import BusinessSortMenu from '../components/BusinessSortMenu'
 import type { BusinessSort } from '../services/businessListSort'
 import type { AdvancedFilterGroup } from '../services/api'
-import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
+import { locateContentError, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
+import { useContentReviewSubmit } from '../components/ContentReviewReviewerSelect'
+import ContentReviewStudentDetail from '../components/ContentReviewStudentDetail'
 import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
 import StudentContentDraftPicker from '../components/StudentContentDraftPicker'
 import { restoreDraftWorks } from '../services/contentReviewDraft'
@@ -188,6 +190,15 @@ const positioningFormValues = (values: Record<string, unknown>, fields: Director
   }),
 )
 export default function MediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+  const reviewLocation = useLocation()
+  const query = new URLSearchParams(reviewLocation.search)
+  if (query.has('contentReviewBatchId')) return <ContentReviewStudentDetail key={reviewLocation.search}
+    batchId={Number(query.get('contentReviewBatchId'))} personId={Number(query.get('personId'))} initialAccountId={Number(query.get('accountId'))} />
+  return <OwnedMediaStudentsPage permissions={permissions} />
+}
+
+function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+  const submitContentReview = useContentReviewSubmit()
   // The student inbox deliberately remains master-detail for every global inbox layout setting.
   const location = useLocation()
   const workspaceNavigation = useWorkbenchPageNavigation()
@@ -937,7 +948,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         contentSaved = true
         if (submitContent) {
           contentPhase = 'submit'
-          await submitContentReview(contentDraft.current!.id, contentDraft.current!.version!)
+          if (!await submitContentReview(contentDraft.current!.id, contentDraft.current!.version!)) { message.info('草稿已保存，尚未提交审批'); return }
         } else {
           message.success('草稿已保存，可继续填写；下次从发起内容审批入口选择此草稿')
           return

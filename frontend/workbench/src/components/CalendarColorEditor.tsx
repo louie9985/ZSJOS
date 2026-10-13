@@ -11,6 +11,11 @@ export function useCalendarPalette(type: CalendarColorType) {
   const [revision, setRevision] = useState(0)
   const reload = useCallback(() => setRevision(v => v + 1), [])
   useEffect(() => {
+    const refresh = () => reload()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [reload])
+  useEffect(() => {
     let active = true
     setLoading(true); setError(''); setPalette({ presets: [], colors: [] })
     calendarColors.get(type).then(data => { if (active) setPalette(data) })
@@ -22,9 +27,9 @@ export function useCalendarPalette(type: CalendarColorType) {
 }
 
 export function CalendarColorLegend({ state }: { state: ReturnType<typeof useCalendarPalette> }) {
-  return <div className="calendar-color-legend"><Space wrap>{state.palette.presets.map(c =>
+  return <div className="calendar-color-legend"><Space wrap>{[...state.palette.presets, ...state.palette.colors].map(c =>
     <span key={c.id}><span className="calendar-color-swatch" style={examBackgroundStyle(c.color)} />{c.name}</span>
-  )}</Space><Typography.Text type="secondary">统一颜色为建议标注，课程可自选底色。</Typography.Text>
+  )}</Space>
     {state.error && <Alert type="error" title={state.error} action={<Button onClick={state.reload}>重试颜色加载</Button>} />}
   </div>
 }
@@ -54,14 +59,13 @@ export default function CalendarColorEditor({ value, onChange, type, canManage, 
     catch (e) { setError(e instanceof Error ? e.message : '删除失败，请重试') }
     finally { setBusy(false) }
   }
-  const buttons = (colors: CalendarColor[]) => <Space wrap>{colors.map(c => <Button key={c.id} style={examBackgroundStyle(c.color)}
+  const buttons = (colors: CalendarColor[]) => <Space className="calendar-color-swatches" wrap>{colors.map(c => <Button key={c.id} style={examBackgroundStyle(c.color)}
     aria-pressed={value?.toUpperCase() === c.color} onClick={() => onChange?.(c.color)}>{c.name}</Button>)}</Space>
   return <div className="calendar-color-editor">
-    {state.loading ? <Spin size="small" /> : state.error ? <Alert type="error" title={state.error} action={<Button onClick={state.reload}>重试</Button>} /> : <>
-      {state.palette.presets.length > 0 && <div><Typography.Text>统一快捷色</Typography.Text>{buttons(state.palette.presets)}</div>}
-      <div><Typography.Text>我的快捷色</Typography.Text>{state.palette.colors.length ? buttons(state.palette.colors) : <Typography.Text type="secondary">暂无快捷色</Typography.Text>}</div>
-    </>}
-    <Space wrap><ColorPicker value={value || undefined} format="hex" disabledFormat disabledAlpha allowClear
+    {state.loading ? <Spin size="small" /> : state.error ? <Alert type="error" title={state.error} action={<Button onClick={state.reload}>重试</Button>} />
+      : state.palette.presets.length + state.palette.colors.length > 0
+        ? buttons([...state.palette.presets, ...state.palette.colors]) : null}
+    <Space className="calendar-color-actions" wrap><ColorPicker value={value || undefined} format="hex" disabledFormat disabledAlpha allowClear
       onChange={c => onChange?.(c.cleared ? '' : c.toHexString().toUpperCase())}>
       <Button style={examBackgroundStyle(value)} aria-label="自选颜色">{value || '自选颜色'}</Button>
     </ColorPicker><Button onClick={() => onChange?.('')}>恢复默认底色</Button>
@@ -71,7 +75,7 @@ export default function CalendarColorEditor({ value, onChange, type, canManage, 
     <div className="calendar-color-preview" data-calendar-colored={!!value} style={examBackgroundStyle(value)}>{title || '日程预览'}</div>
     <Modal title={editing ? '编辑快捷色' : '保存为快捷色'} open={dialog === 'save'} onCancel={() => !busy && setDialog(undefined)}
       onOk={() => void save()} confirmLoading={busy} closable={!busy} maskClosable={!busy}>
-      <Space orientation="vertical" style={{ width: '100%' }}><Typography.Text type="secondary">独立保存到当前账号；取消新建日程也会保留此快捷色。</Typography.Text>
+      <Space orientation="vertical" style={{ width: '100%' }}><Typography.Text type="secondary">{type === 'COURSE' ? '保存到课程共享色板，所有人均可使用；取消新建课程仍保留。' : '独立保存到当前账号；取消新建日程也会保留此快捷色。'}</Typography.Text>
         <Input aria-label="快捷色名称" value={name} onChange={e => setName(e.target.value)} placeholder="快捷色名称，1至20字" disabled={busy} />
         <ColorPicker value={color || undefined} format="hex" disabledFormat disabledAlpha disabled={busy} onChange={c => setColor(c.toHexString().toUpperCase())} showText />
         {error && <Alert type="error" title={error} />}</Space>

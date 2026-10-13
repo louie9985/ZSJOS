@@ -79,6 +79,8 @@ class ContentReviewBatchServiceTest {
 
     @InjectMocks private ContentReviewBatchService service;
     @Mock private ContentReviewNotifyPublisher notifyPublisher;
+    @Mock private ContentReviewSelectionService selectionService;
+    @Mock private ContentReviewStudentAccess studentReviewAccess;
     @Mock private ContentReviewBatchMapper batchMapper;
     @Mock private ContentReviewBatchItemMapper itemMapper;
     @Mock private ContentReviewRelationMapper relationMapper;
@@ -104,6 +106,64 @@ class ContentReviewBatchServiceTest {
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(TENANT_ID);
+    }
+
+    @Test
+    void submitUsesSelectedNonOwnerAndFreezesSelectionWithoutRelationLookup() {
+        var batch = reviewBatch("DRAFT", "DRAFT"); batch.setAccountId(90L);batch.setAccountIdsJson("[90]");batch.setStudentPersonId(77L);
+        var item = new ContentReviewBatchItemDO().setId(1L).setContentId(101L).setContentVersionId(201L);
+        var content = reviewableContent(101L,90L,1,0);
+        var version = completeVersion(201L,101L);version.setVersionNo(1);
+        var account = new MediaAccountDO().setId(90L).setStudentPersonId(77L).setOwnerOperatorUserId(OPERATOR_ID).setDirectorUserId(5L);
+        when(batchMapper.selectByIdForUpdate(batch.getId(),TENANT_ID)).thenReturn(batch);
+        when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(item));
+        when(contentMapper.selectByIdForUpdate(101L,TENANT_ID)).thenReturn(content);
+        when(contentVersionMapper.selectByIdForUpdate(201L,TENANT_ID)).thenReturn(version);
+        when(contentPermissionProvider.hasPermission(101L,"read",OPERATOR_ID)).thenReturn(true);
+        when(accountMapper.selectById(90L)).thenReturn(account);
+        when(accountMapper.selectByIdForUpdate(90L,TENANT_ID)).thenReturn(account);
+        var selection = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO();
+        selection.setProcessDefinitionId("def2");selection.setRoleIds(List.of(7L));selection.setCandidates(List.of(
+                new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO.Candidate(22L,"自选编导")));
+        when(selectionService.context(batch.getId(),OPERATOR_ID)).thenReturn(selection);
+        when(adminUserApi.getUser(22L)).thenReturn(new AdminUserRespDTO().setId(22L).setStatus(0).setNickname("自选编导"));
+        when(adminUserApi.getUser(OPERATOR_ID)).thenReturn(new AdminUserRespDTO().setId(OPERATOR_ID).setStatus(0).setNickname("运营"));
+        var config=new cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewConfigDO();config.setVersion(1);
+        when(configService.requireReadyConfig(OPERATOR_ID)).thenReturn(config);
+        var definition=new cn.iocoder.yudao.module.bpm.api.definition.dto.BpmProcessDefinitionMetadataRespDTO();definition.setId("def2");definition.setKey("content");definition.setVersion(2);
+        when(configService.requireCurrentDefinition(config)).thenReturn(definition);
+        when(configService.requireReviewTaskKeys(definition)).thenReturn(new ContentReviewConfigService.ReviewTaskKeys("opaque-director","opaque-final"));
+        var schema=new cn.iocoder.yudao.module.zsjos.dal.dataobject.material.MaterialSchemaVersionDO();schema.setId(1L);
+        when(configService.requireProductionMaterialSchema(config)).thenReturn(schema);
+        when(contentVersionMapper.freeze(eq(201L),any())).thenReturn(1);
+        when(batchMapper.markSubmitted(eq(batch),eq(0),anyString(),eq("def2"),eq("content"),eq(2),anyString(),eq(22L),anyString(),anyString(),any())).thenReturn(1);
+        when(processInstanceApi.createProcessInstance(eq(OPERATOR_ID),any())).thenAnswer(inv ->
+                ((cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO)inv.getArgument(1)).getPredefinedProcessInstanceId());
+        var request=new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewBatchSubmitReqVO();
+        request.setExpectedVersion(0);request.setDirectorUserId(22L);request.setProcessDefinitionId("def2");
+        batch.setContextSnapshotJson("{\"accountSnapshots\":[{\"id\":90,\"nickname\":\"本轮名称\",\"productGoal\":\"旧目标\",\"publishFrequency\":\"旧节奏\"}]}");
+        account.setDetailValuesJson("{\"product_goal\":\"提交时目标\",\"work_format\":\"产品形式\"}");
+        account.setPrimaryProblemCodeLabelSnapshot("当前诊断瓶颈");
+        service.submit(batch.getId(),request,OPERATOR_ID);
+        var submittedContext = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(batchMapper).markSubmitted(eq(batch),eq(0),anyString(),eq("def2"),eq("content"),eq(2),anyString(),eq(22L),anyString(),submittedContext.capture(),any());
+        Map<String,Object> frozen = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(submittedContext.getValue(), Map.class);
+        Map<?,?> profile = (Map<?,?>)((List<?>)frozen.get("accountSnapshots")).getFirst();
+        assertEquals("提交时目标", profile.get("productGoal"));
+        assertEquals("当前诊断瓶颈", profile.get("bottleneckLabel"));
+        assertEquals("本轮名称", profile.get("nickname"));
+        assertFalse(profile.containsKey("publishFrequency"));
+        var capture=org.mockito.ArgumentCaptor.forClass(cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO.class);
+        verify(processInstanceApi).createProcessInstance(eq(OPERATOR_ID),capture.capture());
+        assertEquals(Map.of("opaque-director",List.of(22L)),capture.getValue().getStartUserSelectAssignees());
+        assertEquals(5L,account.getDirectorUserId());verifyNoInteractions(relationMapper);
+        request.setProcessDefinitionId("old-definition");
+        assertServiceCode(ContentReviewSelectionErrors.DEFINITION_CHANGED,()->service.submit(batch.getId(),request,OPERATOR_ID));
+        request.setProcessDefinitionId("def2");request.setDirectorUserId(99L);
+        assertServiceCode(ContentReviewSelectionErrors.REVIEWER_UNAVAILABLE,()->service.submit(batch.getId(),request,OPERATOR_ID));
+        request.setDirectorUserId(null);
+        assertServiceCode(ContentReviewSelectionErrors.SELECTION_REQUIRED,()->service.submit(batch.getId(),request,OPERATOR_ID));
+        verify(contentVersionMapper,times(1)).freeze(eq(201L),any());
     }
 
     @AfterEach

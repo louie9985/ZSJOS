@@ -1,4 +1,5 @@
-import { locateContentError, submitContentReview, contentSaveError, contentResultUncertain, type ContentSavePhase } from '../services/contentReviewErrors'
+import { locateContentError, contentSaveError, contentResultUncertain, type ContentSavePhase } from '../services/contentReviewErrors'
+import { useContentReviewSubmit } from '../components/ContentReviewReviewerSelect'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
 import ContentReviewWorkDetail from '../components/ContentReviewWorkDetail'
 import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
@@ -179,6 +180,7 @@ function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
 }
 
 export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentReviewBatch; open: boolean; onClose: () => void; onSaved: (id: number) => void }) {
+  const submitContentReview = useContentReviewSubmit()
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -248,7 +250,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         form.setFieldValue(['works', index, 'sourceVersionId'], item.contentVersionId)
       })
       phase = 'submit'
-      if (submitAfterSave) await submitContentReview(id, savedBatch.version)
+      if (submitAfterSave && !await submitContentReview(id, savedBatch.version)) { message.info('草稿已保存，尚未提交审批'); return }
       message.success(submitAfterSave ? '已提交审批' : '修改已保存')
       onClose(); onSaved(id)
     } catch (cause) {
@@ -274,6 +276,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
 }
 
 export default function ContentReviewBatchPage({ permissions = [] }: { permissions?: string[] }) {
+  const submitContentReview = useContentReviewSubmit()
   const { message, modal } = App.useApp()
   const navigation = useWorkbenchPageNavigation()
   const [rows, setRows] = useState<ContentReviewBatch[]>([])
@@ -383,7 +386,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     if (!selected || submitLock.current) return
     submitLock.current = true; setSubmitting(true)
     try {
-      await submitContentReview(selected.id, selected.version)
+      if (!await submitContentReview(selected.id, selected.version)) return
       message.success('批次已提交')
       await load(page, selected.id)
     } catch (cause) { message.error(contentSaveError(cause, true)) }
@@ -528,7 +531,8 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const accountLink = (account: ContentReviewAccount) => {
     const name = account.accountName || '未记录账号名称'
     if (!selected?.studentPersonId || !account.accountId || !navigation?.canOpen(APP_ROUTES.MEDIA_STUDENTS)) return name
-    const href = `${APP_ROUTES.MEDIA_STUDENTS}?personId=${selected.studentPersonId}&accountId=${account.accountId}`
+    const reviewContext = selected.canReadStudentForReview ? `&contentReviewBatchId=${selected.id}` : ''
+    const href = `${APP_ROUTES.MEDIA_STUDENTS}?personId=${selected.studentPersonId}&accountId=${account.accountId}${reviewContext}`
     return <a className="content-review-account-link" href={href} onClick={event => { event.preventDefault(); void navigation.open(href) }}><span>{name}</span><LinkOutlined /></a>
   }
 
@@ -560,6 +564,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
             {historyOriginId && <Alert className="content-review-history-notice" type="info" showIcon message="历史轮次 · 只读" action={<Button onClick={() => confirmChange(() => void loadDetail(historyOriginId))}>返回原批次</Button>} />}
             <div className="content-review-heading"><div>
               <Typography.Title level={4}>{selected.studentName || '未记录学员姓名'} · 内容审核</Typography.Title>
+              {selected.directorName && <Typography.Text>本次审核编导：{selected.directorName}</Typography.Text>}
             </div><Tag color="processing">{statusText[selected.status] || selected.status}</Tag></div>
             <div className="content-review-meta">
               <span>当前阶段：{statusText[selected.status] || '未记录'}</span>

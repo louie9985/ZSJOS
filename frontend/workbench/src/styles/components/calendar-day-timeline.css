@@ -1,0 +1,25 @@
+.calendar-day-scroll { max-height: 70vh; overflow: auto; }
+.calendar-day-grid { display: grid; gap: 0 4px; isolation: isolate; padding-bottom: var(--crm-sp-2); }
+.calendar-day-hour { border-top: 1px solid var(--crm-border); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); pointer-events: none; }
+.calendar-day-hour > span { display: block; width: 52px; padding-top: 4px; }
+.calendar-day-event { min-width: 0; display: flex; padding: 2px 0; z-index: 1; }
+.calendar-day-card { width: 100%; height: 100%; display: flex; flex-direction: column; gap: var(--crm-sp-2); text-align: left; padding: var(--crm-sp-3); border: 0; border-left: 3px solid var(--crm-color-primary); border-radius: var(--crm-radius-sm); background: var(--crm-color-primary-bg); color: var(--crm-text); font: inherit; cursor: pointer; }
+.calendar-day-card strong, .calendar-day-card span { white-space: normal; overflow-wrap: anywhere; }
+.calendar-day-card span { font-size: var(--crm-font-sm); }
+.calendar-day-card:hover, .calendar-day-card[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--crm-color-primary); }
+.calendar-day-card:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
+.calendar-day-detail { width: min(480px, calc(100vw - 64px)); max-height: 65vh; overflow: auto; overflow-wrap: anywhere; }
+.calendar-day-detail header { display: flex; align-items: flex-start; gap: var(--crm-sp-2); }
+.calendar-day-detail h3 { flex: 1; min-width: 0; margin: 0; font-size: var(--crm-font-lg); white-space: normal; }
+.calendar-day-detail > p { color: var(--crm-text-secondary); }
+.calendar-day-detail dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--crm-sp-3); padding-block: var(--crm-sp-3); border-block: 1px solid var(--crm-border); }
+.calendar-day-detail dt { color: var(--crm-text-secondary); }
+.calendar-day-detail dd { margin: 0; min-width: 0; white-space: pre-wrap; }
+.calendar-day-detail .course-day-attachments { margin: var(--crm-sp-3) 0; }
+.calendar-day-actions { display: flex; flex-wrap: wrap; gap: var(--crm-sp-2); padding-top: var(--crm-sp-3); }
+@media (max-width: 768px) {
+  .calendar-day-grid { display: flex; flex-direction: column; gap: var(--crm-sp-3); }
+  .calendar-day-hour { display: none; }
+  .calendar-day-card { height: auto; }
+  .calendar-day-detail { width: 100%; }
+}

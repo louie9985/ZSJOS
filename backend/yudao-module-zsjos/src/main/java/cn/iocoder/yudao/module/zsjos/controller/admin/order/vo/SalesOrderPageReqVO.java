@@ -18,8 +18,8 @@ public class SalesOrderPageReqVO extends PageParam {
     private String center;
     private Boolean handled;
 
-    @Schema(description = "订单当前状态；all 表示全部，与审批任务处理状态独立")
-    @jakarta.validation.constraints.Pattern(regexp = "all|pending_approval|revision_required|effective|terminated|superseded")
+    @Schema(description = "订单筛选；center_pending 表示当前中心待审核，其余值按订单生命周期筛选")
+    @jakarta.validation.constraints.Pattern(regexp = "all|center_pending|pending_approval|revision_required|effective|terminated|superseded")
     private String orderState;
 
     @Size(max = 64)

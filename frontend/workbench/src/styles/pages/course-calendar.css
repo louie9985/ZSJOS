@@ -32,3 +32,6 @@
   .course-calendar-summary > .ant-space,
   .course-calendar-summary > .ant-btn { display: none; }
 }
+
+.course-day-attachments { margin-top: var(--crm-sp-4); display: grid; gap: var(--crm-sp-3); }
+.course-day-attachments > section { display: grid; gap: var(--crm-sp-2); min-width: 0; }

@@ -16,17 +16,15 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 public class CalendarPaletteService {
     @Resource private CalendarPaletteMapper mapper;
     @Resource private CalendarPalettePermissionProvider access;
-    private static final List<Color> COURSE = List.of(
-        new Color("public-nutrition", "公共营养师", "#6ABF6D"),
-        new Color("nutrition-guide", "营养指导员", "#00D0FF"),
-        new Color("registered-nutrition", "注册营养师", "#B695E8"),
-        new Color("pharmacist", "执业药师", "#FFBE73"));
+    // COURSE_SHARED/0 is a storage scope, never an employee identity. V315 initializes it once.
+    private static Long owner(String type, Long user) { return "COURSE".equals(type) ? 0L : user; }
+    private static String scope(String type) { return "COURSE".equals(type) ? "COURSE_SHARED" : type; }
     @ZsjosPermission(bizType="calendar-palette", bizId="#user", action="read")
     public CalendarPaletteRespVO get(String type, Long user) {
         access.check(user, type + ":read", user);
         var row = mapper.selectOne(new LambdaQueryWrapper<CalendarPaletteDO>()
             .eq(CalendarPaletteDO::getTenantId, TenantContextHolder.getRequiredTenantId())
-            .eq(CalendarPaletteDO::getUserId, user).eq(CalendarPaletteDO::getCalendarType, type));
+            .eq(CalendarPaletteDO::getUserId, owner(type,user)).eq(CalendarPaletteDO::getCalendarType, scope(type)));
         return response(type, row);
     }
     @Transactional(rollbackFor=Exception.class)
@@ -34,9 +32,9 @@ public class CalendarPaletteService {
     public CalendarPaletteRespVO mutate(String type, Long user, String id, CalendarColorSaveReqVO request, boolean delete) {
         access.check(user, type + ":write", user);
         Long tenant = TenantContextHolder.getRequiredTenantId();
-        mapper.ensure(tenant, user, type);
-        var row = mapper.lock(tenant, user, type);
-        if (row == null) throw exception(CalendarColors.DENIED);
+        if (!"COURSE".equals(type)) mapper.ensure(tenant, user, type);
+        var row = mapper.lock(tenant, owner(type,user), scope(type));
+        if (row == null) throw exception("COURSE".equals(type) ? CalendarColors.NOT_INITIALIZED : CalendarColors.DENIED);
         var colors = new ArrayList<>(response(type, row).colors());
         int index = -1;
         for (int i=0; i<colors.size(); i++) if (colors.get(i).id().equals(id)) index=i;
@@ -56,6 +54,7 @@ public class CalendarPaletteService {
         return response(type,row);
     }
     private CalendarPaletteRespVO response(String type, CalendarPaletteDO row) {
-        return new CalendarPaletteRespVO("COURSE".equals(type) ? COURSE : List.of(), row == null ? List.of() : JsonUtils.parseArray(row.getColorsJson(), Color.class));
+        if ("COURSE".equals(type) && row == null) throw exception(CalendarColors.NOT_INITIALIZED);
+        return new CalendarPaletteRespVO(List.of(), row == null ? List.of() : JsonUtils.parseArray(row.getColorsJson(), Color.class));
     }
 }

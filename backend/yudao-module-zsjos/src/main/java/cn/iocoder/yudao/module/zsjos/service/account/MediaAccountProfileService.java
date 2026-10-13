@@ -30,6 +30,14 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class MediaAccountProfileService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewStudentAccess reviewAccess;
+    private static final Set<String> REVIEW_EXCLUDED = Set.of("total_leads", "month_leads", "total_conversion", "month_conversion", "total_amount", "month_amount");
+
+    @ZsjosPermission(bizType="content-review-student",bizId="#batchId",action="read")
+    public MediaAccountProfileVO getForReview(Long batchId, Long id, Long userId) {
+        reviewAccess.requireAccount(batchId, id, userId);
+        return project(id, userId, true);
+    }
     @Resource private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService businessTaskCommandService;
     @Resource private MediaAccountMapper mapper;
@@ -52,16 +60,21 @@ public class MediaAccountProfileService {
 
     @ZsjosPermission(bizType="media-account",bizId="#id",action="read")
     public MediaAccountProfileVO get(Long id, Long userId) {
+        return project(id, userId, false);
+    }
+
+    private MediaAccountProfileVO project(Long id, Long userId, boolean reviewOnly) {
         MediaAccountDO a=accounts.require(id);
         var config=configs.getPublished();
+        if (reviewOnly) config=cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(config, MediaAccountFieldConfigRespVO.VersionVO.class);
         MediaAccountProfileVO result=new MediaAccountProfileVO();
-        result.setAccount(accounts.get(id,userId)); result.setConfig(config);
+        result.setAccount(reviewOnly ? cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(a, MediaAccountRespVO.class) : accounts.get(id,userId)); result.setConfig(config);
         Map<String,Object> values=readValues(a);
         Map<String,String> notes=new LinkedHashMap<>();
         var person=a.getStudentPersonId()==null?null:people.selectById(a.getStudentPersonId());
         result.setStudentName(person==null?null:person.getName()); result.setCurrentUserName(userName(userId));
         result.setDirectorName(userName(a.getDirectorUserId())); result.setOperatorName(userName(a.getOwnerOperatorUserId()));
-        var metrics = partnerMetrics(a.getStudentPersonId());
+        var metrics = reviewOnly ? new PartnerMetrics() : partnerMetrics(a.getStudentPersonId());
         result.setPartnerMetrics(metrics);
         for(var f:config.getFields()) {
             if(!"AUTO".equals(f.getOwnerType()) && !Set.of("account_position", "professional_position", "content_format").contains(f.getKey())) continue;
@@ -127,7 +140,7 @@ public class MediaAccountProfileService {
         result.setPositioningRequirements(requirements);
         result.setDiagnosisContext(cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSource.parse(values.get("_diagnosisContext") instanceof String json ? json : null));
         result.setValues(values);result.setSourceNotes(notes);result.setSnapshots(snapshots);
-        boolean write=canMaintain(a,userId);
+        boolean write=!reviewOnly && canMaintain(a,userId);
         boolean director = write && Objects.equals(a.getDirectorUserId(), userId);
         result.setCanSubmitDiagnosis(director && started);
         result.setCanStartDiagnosis(director && !started && appliedPositioning(a).submission() != null);
@@ -152,7 +165,17 @@ public class MediaAccountProfileService {
             var latestEntry = entries.latestField(id, field.getKey());
             if (latestEntry != null) latestRecords.put(field.getKey(), historyEntry(latestEntry, id));
         }
-        result.setLatestRecords(latestRecords); return result;
+        result.setLatestRecords(latestRecords);
+        if (reviewOnly) {
+            result.setPartnerMetrics(null); result.setCanViewHistory(false);
+            result.getAccount().setAvailableActions(List.of());
+            result.setLatestRecords(Map.of());
+            result.getConfig().setFields(config.getFields().stream().filter(f -> !REVIEW_EXCLUDED.contains(f.getKey())).toList());
+            REVIEW_EXCLUDED.forEach(values::remove); REVIEW_EXCLUDED.forEach(notes::remove);
+            result.setSnapshots(snapshots.stream().filter(s -> !REVIEW_EXCLUDED.contains(s.getKey())).toList());
+            result.getFiles().values().forEach(f -> f.setPreviewUrl(null));
+        }
+        return result;
     }
 
     @Transactional(rollbackFor=Exception.class)

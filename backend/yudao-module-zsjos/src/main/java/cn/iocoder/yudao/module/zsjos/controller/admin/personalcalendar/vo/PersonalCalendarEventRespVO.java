@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class PersonalCalendarEventRespVO {
+    private String creatorName;
     private String backgroundColor;
     private Long id;
     private Long ownerUserId;

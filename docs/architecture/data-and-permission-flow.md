@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Production content reviewer student reads
+
+New production-content rounds use the published BPM starter-select role scope, System role membership and configured feature permissions. A frozen selected reviewer gains only the batch-scoped media student GET projections while that round and exact BPM instance remain active. Account/service/group/owner associations are frozen and revalidated; the normal student lists and object write permissions do not expand. File bytes are read through authenticated batch endpoints and Infra's storage API, without returning signed storage URLs. See [the contract](../api/content-review-self-selection.md).
+
 ## Infra 敏感配置与中世健积分兑换码
 
 `infra_config.sensitive` 区分普通参数和加密参数；敏感值使用既有框架加密主密钥保存。仅后端 `ConfigApi` 的运行时读取可以解密，浏览器列表、详情、按键读取及导出不得暴露密钥或密文。修改敏感参数累计要求原有配置写权限和 `infra:config:secret-update`，留空保留旧值，禁止把已有敏感参数改为普通值或改名。Vue 配置管理消费服务端敏感标记，工作台不另建密钥能力。

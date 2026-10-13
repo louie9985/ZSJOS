@@ -1569,3 +1569,8 @@ business conversion is otherwise unchanged. Historical handoff entries keep the 
 wording. If any development database ran that old-numbered copy, inspect schema, data and both ledger
 checksums and use a separately authorized correction; never silently rewrite V285/V286 markers or
 replace the deployed order-snapshot V285.
+
+
+## V316 — Content review account profile
+
+After Core V315, enrich missing tenant-1 approval profile fields from stored current account values/labels, with per-field provenance. Preserve nonempty snapshots and all workflow state. DML and both ledgers are transactional; replay is missing-only. Back up batches and ledgers; see [scope, recovery and verification](../../../../docs/operations/content-review-account-profile.md). No schema or permission changes.

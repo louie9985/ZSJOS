@@ -850,12 +850,70 @@ class SalesOrderServiceImplTest {
         config.setGroups(List.of());
         when(inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER)).thenReturn(config);
         var result = service.getApprovalFilterProfile(20L);
-        assertEquals(List.of("all", STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
+        assertEquals(List.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
                 STATUS_TERMINATED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
-        assertEquals(List.of("全部", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
+        assertEquals(List.of("全部", "当前中心待审核", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
                 result.getOrderStates().stream().map(it -> it.getLabel()).toList());
         assertEquals(List.of(CENTER_REGISTRATION), result.getCenters().stream().map(it -> it.getKey()).toList());
         assertTrue(result.getGroups().isEmpty());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"finance,financeReview", "registration,registrationReview"})
+    void centerPendingExcludesApprovedParentsAndSignChildrenBeforePaging(String center, String taskKey) {
+        TenantContextHolder.setTenantId(1L);
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO();
+        request.setOrderState(FILTER_CENTER_PENDING); request.setCenter(center);
+        request.setKeyword("example"); request.setPageNo(2); request.setPageSize(1);
+        request.setAdvancedFilter(new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO());
+        when(advancedFilterService.hasConditions(request.getAdvancedFilter())).thenReturn(true);
+        when(advancedFilterService.matchOrderIds(request.getAdvancedFilter())).thenReturn(List.of(101L, 102L));
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION, TASK_FINANCE));
+        when(roundMapper.selectCurrentPendingProcessIds(1L, "example", List.of(101L, 102L)))
+                .thenReturn(List.of("p1", "p2"));
+        var waiting = new BpmTaskRespDTO(); waiting.setId("waiting-supervisor"); waiting.setStatus(7);
+        var child = new BpmTaskRespDTO(); child.setId("supervisor"); child.setStatus(1); child.setSignTask(true);
+        var first = new BpmTaskRespDTO(); first.setId("t2"); first.setStatus(1);
+        first.setCreateTime(LocalDateTime.of(2026, 10, 13, 12, 0));
+        first.setBusinessKey("sales-order:102"); first.setProcessInstanceId("p2");
+        var second = new BpmTaskRespDTO(); second.setId("t1"); second.setStatus(1);
+        second.setCreateTime(LocalDateTime.of(2026, 10, 13, 11, 0));
+        second.setBusinessKey("sales-order:101"); second.setProcessInstanceId("p1");
+        when(processTaskApi.getTodoTaskPage(eq(20L), any())).thenAnswer(call -> {
+            BpmTaskPageReqDTO query = call.getArgument(1);
+            assertEquals(taskKey, query.getTaskDefinitionKey());
+            assertEquals(List.of("p1", "p2"), query.getProcessInstanceIds());
+            return query.getPageNo() == 1 ? new PageResult<>(List.of(waiting, child), 4L)
+                    : new PageResult<>(List.of(first, second), 4L);
+        });
+        var order = new SalesOrderDO(); order.setId(101L); order.setStatus(STATUS_PENDING_APPROVAL);
+        when(orderMapper.selectById(101L)).thenReturn(order);
+        when(permissionService.canRead(order, 20L)).thenReturn(true);
+        var result = service.getInboxPage(request, 20L);
+        assertEquals(2L, result.getTotal());
+        assertEquals(List.of(101L), result.getList().stream().map(it -> it.getId()).toList());
+        request.setCursorTaskTime(first.getCreateTime()); request.setCursorTaskId(first.getId()); request.setPageNo(1);
+        assertEquals(List.of(101L), service.getInboxPage(request, 20L).getList().stream().map(it -> it.getId()).toList());
+        verify(processTaskApi, never()).getDoneTaskPage(anyLong(), any());
+        when(advancedFilterService.matchOrderIds(request.getAdvancedFilter())).thenReturn(List.of());
+        clearInvocations(processTaskApi);
+        assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
+        verifyNoInteractions(processTaskApi);
+    }
+
+    @Test
+    void centerPendingRejectsUnauthorizedCenterAndCrossScopeCursor() {
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        var request = new SalesOrderPageReqVO(); request.setOrderState(FILTER_CENTER_PENDING);
+        request.setCenter(CENTER_FINANCE);
+        assertThrows(ServiceException.class, () -> service.getInboxPage(request, 20L));
+        request.setCenter(CENTER_REGISTRATION);
+        var item = new cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderListItemRespVO();
+        item.setTaskId("cursor-task"); item.setTaskCreateTime(LocalDateTime.of(2026, 10, 13, 11, 0));
+        String cursor = ReflectionTestUtils.invokeMethod(service, "encodeApprovalCursor", item, request, 20L);
+        request.setOrderState(STATUS_PENDING_APPROVAL); request.setCursor(cursor);
+        assertThrows(IllegalArgumentException.class, () -> service.getInboxCursor(request, 20L));
+        verifyNoInteractions(processTaskApi);
     }
 
     @Test

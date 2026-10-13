@@ -1,3 +1,5 @@
+import { useMediaStudentReview } from './MediaStudentReviewContext'
+import { contentReviewStudentApi } from '../services/contentReviewStudent'
 import PositioningFeedback from './PositioningFeedback'
 import { Alert, App, Button, Collapse, Empty, Input, Modal, Skeleton, Space, Steps, Tag, Typography } from 'antd'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -8,13 +10,14 @@ import { positioningStatus } from '../services/positioningStatus'
 
 export default function ServicePositioningCard({ serviceRelationId, canQuery, refresh, onEdit, statusContent, profileContent, interviewContent }: { serviceRelationId: number; canQuery: boolean; refresh: number; onEdit: (id?: number) => void; statusContent?: ReactNode; profileContent?: ReactNode; interviewContent?: ReactNode }) {
   const { modal, message } = App.useApp()
+  const review = useMediaStudentReview()
   const [data, setData] = useState<PositioningServiceOverview>(), [error, setError] = useState(''), [loading, setLoading] = useState(true), [retry, setRetry] = useState(0), [busy, setBusy] = useState(false)
   const [reject, setReject] = useState(false), [reason, setReason] = useState(''), [link, setLink] = useState('')
   useEffect(() => {
     let active = true; setData(undefined); setError(''); setLoading(canQuery)
-    if (canQuery) api.positioningCard.serviceOverview(serviceRelationId).then(value => { if(active)setData(value) }).catch(cause => { if(active)setError(cause.message) }).finally(() => {if(active)setLoading(false)})
+    if (canQuery) (review ? contentReviewStudentApi.positioningOverview(review.batchId,review.accountId).then(value=>value.service) : api.positioningCard.serviceOverview(serviceRelationId)).then(value => { if(active)setData(value) }).catch(cause => { if(active)setError(cause.message) }).finally(() => {if(active)setLoading(false)})
     return () => {active=false}
-  }, [serviceRelationId, canQuery, refresh, retry])
+  }, [serviceRelationId, canQuery, refresh, retry, review?.batchId, review?.accountId])
   const lock = useRef(false)
   const run = async (action: () => Promise<unknown>) => { if(lock.current)return; lock.current=true; setBusy(true); try {await action();setRetry(v=>v+1)} catch(cause){message.error(cause instanceof Error?cause.message:'操作失败')}finally{lock.current=false;setBusy(false)} }
   const current = data?.current

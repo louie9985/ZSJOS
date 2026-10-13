@@ -5,11 +5,15 @@ import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { positioningInterviewApi, interviewMissingFields, type InterviewContext, type InterviewItem, type InterviewCommand } from '../services/positioningInterviewApi'
 import { createIdempotencyKey } from '../services/idempotency'
+import { useMediaStudentReview, reviewFile } from './MediaStudentReviewContext'
+import { contentReviewStudentApi } from '../services/contentReviewStudent'
+import AttachmentCard from './AttachmentCard'
 
 export default function PositioningInterviewDialog({ relationId, onClose, onChanged, forceReadOnly = false }: {
   relationId: number; onClose: () => void; onChanged: () => void; forceReadOnly?: boolean
 }) {
   const { message } = App.useApp()
+  const review = useMediaStudentReview()
   const [context, setContext] = useState<InterviewContext>()
   const [items, setItems] = useState<InterviewItem[]>([])
   const [date, setDate] = useState<string>()
@@ -22,12 +26,12 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
   const apply = (value: InterviewContext) => { setContext(value); setItems(value.items); setDate(value.collectedAt) }
   const load = async () => {
     const run = ++generation.current; setLoading(true); setError('')
-    try { const value = await positioningInterviewApi.context(relationId); if (run === generation.current) apply(value) }
+    try { const value = review ? await contentReviewStudentApi.interview(review.batchId,relationId) : await positioningInterviewApi.context(relationId); if (run === generation.current) apply(value) }
     catch (cause) { if (run === generation.current) setError(cause instanceof Error ? cause.message : '加载失败，请重试') }
     finally { if (run === generation.current) setLoading(false) }
   }
-  useEffect(() => { void load(); return () => { generation.current++ } }, [relationId])
-  const readOnly = forceReadOnly || context?.status === 'completed'
+  useEffect(() => { void load(); return () => { generation.current++ } }, [relationId, review?.batchId])
+  const readOnly = Boolean(review) || forceReadOnly || context?.status === 'completed'
     || !context?.availableActions.some(action => ['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW', 'COMPLETE_POSITIONING_INTERVIEW'].includes(action))
   const canSave = !readOnly && context?.availableActions.some(action => ['START_POSITIONING_INTERVIEW', 'CONTINUE_POSITIONING_INTERVIEW'].includes(action))
   const canComplete = !readOnly && context?.availableActions.includes('COMPLETE_POSITIONING_INTERVIEW')
@@ -121,13 +125,13 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
         ]} />
       <section className="positioning-interview-files"><Typography.Title level={5}>本次访谈稿</Typography.Title>
         <Typography.Paragraph type="secondary">支持文档、图片、音频、视频，每份不超过 100MB。完成前至少上传一份。</Typography.Paragraph>
-        <PositioningAttachmentPicker items={attachmentItems} accept={POSITIONING_ATTACHMENT_ACCEPT} disabled={!canSave} busy={busy}
+        {review ? <div className="positioning-file-grid">{context.attachments.map(file => <AttachmentCard key={file.fileId} name={file.fileName} load={() => reviewFile(review,'interview',file.fileId)} />)}</div> : <PositioningAttachmentPicker items={attachmentItems} accept={POSITIONING_ATTACHMENT_ACCEPT} disabled={!canSave} busy={busy}
           hint="选择后立即上传" onChange={() => undefined} onUpload={files => void upload(files)}
           onRemove={item => { if (item.uploaded) void remove(item.uploaded.id) }}
           onDownload={async item => {
             try { return await openFile(item.uploaded!.id) }
             catch (cause) { setError(cause instanceof Error ? cause.message : '文件读取失败'); throw cause }
-          }} />
+          }} />}
         {uploading && <Typography.Text type="secondary">访谈稿上传中…</Typography.Text>}
         {failedFiles.length > 0 && <Button disabled={busy} onClick={() => void upload(failedFiles)}>重试上传：{failedFiles.map(file => file.name).join('、')}</Button>}
       </section>

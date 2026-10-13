@@ -41,14 +41,14 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentVersionDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewBatchDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewBatchItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewConfigDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentRelationDO;
+
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentVersionFileMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentVersionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewBatchItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewBatchMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewRelationMapper;
+
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.content.ContentObjectPermissionProvider;
 import cn.iocoder.yudao.module.zsjos.service.content.ContentPackageValidator;
@@ -91,6 +91,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ContentReviewBatchService {
+    @Resource private ContentReviewSelectionService selectionService;
+    @Resource private ContentReviewStudentAccess studentReviewAccess;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper personMapper;
 
     private static final org.slf4j.Logger log =
@@ -108,7 +110,7 @@ public class ContentReviewBatchService {
     @Resource private ContentReviewBatchMapper batchMapper;
     @Resource private ContentReviewObjectPermissionProvider reviewPermissionProvider;
     @Resource private ContentReviewBatchItemMapper itemMapper;
-    @Resource private ContentReviewRelationMapper relationMapper;
+
     @Resource private ContentMapper contentMapper;
     @Resource private ContentVersionMapper contentVersionMapper;
     @Resource private ContentVersionFileMapper contentVersionFileMapper;
@@ -286,7 +288,7 @@ public class ContentReviewBatchService {
         if (accountIds.isEmpty() || accountIds.size() > 20) throw field(CONTENT_ACCOUNT_SELECTION_INVALID, "accountIds");
         if (works.isEmpty() || works.size() > 20) throw field(CONTENT_WORK_COUNT_INVALID, "works");
         // Keep account selection within the student and current operator's data scope.  The director
-        // is frozen later by submit(), after resolving the current enabled operator relation.
+        // is selected explicitly and frozen only when the operator submits the round.
         List<MediaAccountDO> accounts = accountIds.stream().map(id ->
                 accountMapper.selectByIdForUpdate(id, tenantId())).toList();
         if (accounts.stream().anyMatch(Objects::isNull)
@@ -527,6 +529,7 @@ public class ContentReviewBatchService {
         applyText(snapshot, overrides, "publishFrequency");
         applyText(snapshot, overrides, "bottleneckLabel");
         applyText(snapshot, overrides, "nickname");
+        snapshot.putAll(ContentReviewAccountProfile.read(account));
         // 字典字段只接受 value，label 一律由服务端按字典解析后写入，避免客户端伪造展示文案。
         applyDictionary(snapshot, overrides, "platformValue", "platformLabel", DICT_ACCOUNT_PLATFORM,
                 account.getPlatformValue());
@@ -602,22 +605,54 @@ public class ContentReviewBatchService {
                 versions.stream().map(ContentVersionDO::getId).toList(), batchId) > 0) {
             throw exception(CONTENT_VERSION_OCCUPIED);
         }
-        RelationContext relation = requireDirector(userId);
-        validateSelectedAccountsAtSubmit(batch, relation.director().getId(), userId);
+        if (request.getDirectorUserId() == null || request.getProcessDefinitionId() == null)
+            throw exception(ContentReviewSelectionErrors.SELECTION_REQUIRED);
+        var selection = selectionService.context(batchId, userId);
+        if (!Objects.equals(selection.getProcessDefinitionId(), request.getProcessDefinitionId()))
+            throw exception(ContentReviewSelectionErrors.DEFINITION_CHANGED);
+        if (selection.getCandidates().stream().noneMatch(c -> Objects.equals(c.id(), request.getDirectorUserId())))
+            throw exception(ContentReviewSelectionErrors.REVIEWER_UNAVAILABLE);
+        var director = adminUserApi.getUser(request.getDirectorUserId());
+        var operator = adminUserApi.getUser(userId);
+        if (Objects.equals(request.getDirectorUserId(), userId) || director == null || operator == null
+                || !CommonStatusEnum.isEnable(director.getStatus()) || !CommonStatusEnum.isEnable(operator.getStatus()))
+            throw exception(ContentReviewSelectionErrors.REVIEWER_UNAVAILABLE);
+        List<MediaAccountDO> submitAccounts = validateSelectedAccountsAtSubmit(batch, userId);
         ContentReviewConfigDO config = configService.requireReadyConfig(userId);
         BpmProcessDefinitionMetadataRespDTO definition = configService.requireCurrentDefinition(config);
+        if (!Objects.equals(definition.getId(), request.getProcessDefinitionId()))
+            throw exception(ContentReviewSelectionErrors.DEFINITION_CHANGED);
         var taskKeys = configService.requireReviewTaskKeys(definition);
         var materialSchema = configService.requireProductionMaterialSchema(config);
-        String relationSnapshotJson = JsonUtils.toJsonString(relationSnapshot(relation, userId));
+        Map<String, Object> reviewerSnapshot = new LinkedHashMap<>();
+        reviewerSnapshot.put("source", ContentReviewSelectionService.SOURCE);
+        reviewerSnapshot.put("directorUserId", director.getId());
+        reviewerSnapshot.put("directorName", director.getNickname());
+        reviewerSnapshot.put("operatorUserId", userId);
+        reviewerSnapshot.put("operatorName", operator.getNickname());
+        reviewerSnapshot.put("roleIds", selection.getRoleIds());
+        reviewerSnapshot.put("processDefinitionId", definition.getId());
+        String relationSnapshotJson = JsonUtils.toJsonString(reviewerSnapshot);
         Map<String, Object> frozenContext = contextSnapshot(config, subjects.account(), materialSchema);
         frozenContext.put("directorTaskKey", taskKeys.director());
         frozenContext.put("finalTaskKey", taskKeys.finalReview());
-        // Preserve the student and multi-account draft snapshot when submit freezes the
-        // configuration context. Re-resolving account data here would rewrite history.
+        List<Long> reviewAccounts = parseLongList(batch.getAccountIdsJson());
+        frozenContext.put("reviewAccountScopes", studentReviewAccess.freeze(
+                reviewAccounts.isEmpty() ? List.of(batch.getAccountId()) : reviewAccounts));
+        // Preserve draft identity and student scope; profile fields are refreshed below
+        // only for this new submission, never by the historical detail reader.
         Map<String, Object> draftContext = parseMap(batch.getContextSnapshotJson());
         if (draftContext.containsKey("studentPersonId")) frozenContext.put("studentPersonId", draftContext.get("studentPersonId"));
         if (draftContext.containsKey("accountIds")) frozenContext.put("accountIds", draftContext.get("accountIds"));
-        if (draftContext.containsKey("accountSnapshots")) frozenContext.put("accountSnapshots", draftContext.get("accountSnapshots"));
+        // Each new round freezes the current profile; existing rounds remain immutable.
+        List<Map<String, Object>> draftAccounts = objectMapList(draftContext.get("accountSnapshots"));
+        frozenContext.put("accountSnapshots", submitAccounts.stream().map(account -> {
+            Map<String, Object> snapshot = new LinkedHashMap<>(draftAccounts.stream()
+                    .filter(row -> Objects.equals(longValue(row.get("id")), account.getId()))
+                    .findFirst().orElseGet(() -> draftAccountSnapshot(account, null)));
+            ContentReviewAccountProfile.refresh(snapshot, account);
+            return snapshot;
+        }).toList());
         String contextSnapshotJson = JsonUtils.toJsonString(frozenContext);
         LocalDateTime now = LocalDateTime.now();
         Map<Long, ContentVersionDO> lockedVersionMap = versions.stream()
@@ -635,7 +670,7 @@ public class ContentReviewBatchService {
         String businessKey = BUSINESS_KEY_PREFIX + batchId;
         String processInstanceId = UUID.randomUUID().toString().replace("-", "");
         Map<String, List<Long>> assignees = Map.of(taskKeys.director(),
-                List.of(relation.director().getId()));
+                List.of(director.getId()));
         BpmProcessInstanceCreateReqDTO processRequest = new BpmProcessInstanceCreateReqDTO();
         processRequest.setProcessDefinitionId(definition.getId());
         processRequest.setProcessDefinitionKey(definition.getKey());
@@ -645,10 +680,10 @@ public class ContentReviewBatchService {
         processRequest.setVariables(Map.of("contentReviewBatchId", batchId,
                 "contentReviewBatchNo", batch.getBatchNo(), "accountId", batch.getAccountId(),
                 "accountIds", parseLongList(batch.getAccountIdsJson()),
-                "operatorUserId", batch.getOperatorUserId(), "directorUserId", relation.director().getId()));
+                "operatorUserId", batch.getOperatorUserId(), "directorUserId", director.getId()));
         if (batchMapper.markSubmitted(batch, request.getExpectedVersion(), processInstanceId,
                 definition.getId(), definition.getKey(), definition.getVersion(), businessKey,
-                relation.director().getId(), relationSnapshotJson, contextSnapshotJson, now) != 1) {
+                director.getId(), relationSnapshotJson, contextSnapshotJson, now) != 1) {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
         try {
@@ -1099,17 +1134,18 @@ public class ContentReviewBatchService {
         return new BatchSubjects(account);
     }
 
-    private void validateSelectedAccountsAtSubmit(ContentReviewBatchDO batch, Long directorUserId, Long userId) {
+    private List<MediaAccountDO> validateSelectedAccountsAtSubmit(ContentReviewBatchDO batch, Long userId) {
         List<Long> selected = parseLongList(batch.getAccountIdsJson());
         if (selected.isEmpty()) selected = List.of(batch.getAccountId());
+        List<MediaAccountDO> accounts = new ArrayList<>();
         for (Long accountId : selected) {
             MediaAccountDO account = accountMapper.selectByIdForUpdate(accountId, tenantId());
             if (account == null || !Objects.equals(account.getOwnerOperatorUserId(), userId)
                     || batch.getStudentPersonId() != null && !Objects.equals(account.getStudentPersonId(), batch.getStudentPersonId()))
                 throw field(CONTENT_ACCOUNT_SCOPE_CHANGED, "accountIds");
-            if (!Objects.equals(account.getDirectorUserId(), directorUserId))
-                throw field(CONTENT_ACCOUNT_DIRECTOR_MISMATCH, "accountIds");
+            accounts.add(account);
         }
+        return accounts;
     }
 
     private List<ContentVersionDO> lockVersions(List<ContentReviewBatchItemDO> items) {
@@ -1133,22 +1169,6 @@ public class ContentReviewBatchService {
             contents.put(contentId, content);
         }
         return contents;
-    }
-
-    private RelationContext requireDirector(Long operatorUserId) {
-        List<LeadAssignmentRelationDO> relations = relationMapper.selectEnabledDirectorsForOperator(
-                RELATION_DIRECTOR_OPERATOR, operatorUserId, tenantId());
-        if (relations.isEmpty()) throw exception(CONTENT_DIRECTOR_MISSING);
-        if (relations.size() > 1) throw exception(CONTENT_DIRECTOR_MULTIPLE);
-        if (relations.getFirst().getSourceUserId() == null) throw exception(CONTENT_DIRECTOR_MISSING);
-        AdminUserRespDTO director = adminUserApi.getUser(relations.getFirst().getSourceUserId());
-        AdminUserRespDTO operator = adminUserApi.getUser(operatorUserId);
-        if (director == null || operator == null
-                || !CommonStatusEnum.ENABLE.getStatus().equals(director.getStatus())
-                || !CommonStatusEnum.ENABLE.getStatus().equals(operator.getStatus())) {
-            throw exception(CONTENT_REVIEW_USER_DISABLED);
-        }
-        return new RelationContext(relations.getFirst(), director, operator);
     }
 
     private void requireStageAndTask(ContentReviewBatchDO batch, String status, String stage,
@@ -1303,6 +1323,9 @@ public class ContentReviewBatchService {
         ContentReviewBatchRespVO response = BeanUtils.toBean(batch, ContentReviewBatchRespVO.class);
         response.setStudentName(studentName);
         response.setRelationSnapshot(parseMap(batch.getRelationSnapshotJson()));
+        response.setCanReadStudentForReview(ContentReviewSelectionService.SOURCE.equals(response.getRelationSnapshot().get("source"))
+                && Objects.equals(batch.getDirectorUserId(), userId)
+                && studentReviewAccess.hasPermission(batch.getId(), "read", userId));
         Map<String, Object> context = new LinkedHashMap<>(parseMap(batch.getContextSnapshotJson()));
         response.setAccountIds(parseLongList(batch.getAccountIdsJson()));
         // 账号快照里存的是用户编号，姓名按编号解析后回填，避免页面退化成展示内部 ID。
@@ -1447,17 +1470,6 @@ public class ContentReviewBatchService {
         Map<String, Object> context = new LinkedHashMap<>(parseMap(batch.getContextSnapshotJson()));
         return STAGE_DIRECTOR.equals(batch.getCurrentStage()) ? text(context.get("directorTaskKey"))
                 : STAGE_FINAL.equals(batch.getCurrentStage()) ? text(context.get("finalTaskKey")) : null;
-    }
-
-    private Map<String, Object> relationSnapshot(RelationContext relation, Long operatorUserId) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("scene", RELATION_DIRECTOR_OPERATOR);
-        snapshot.put("relationId", relation.relation().getId());
-        snapshot.put("directorUserId", relation.director().getId());
-        snapshot.put("directorName", relation.director().getNickname());
-        snapshot.put("operatorUserId", operatorUserId);
-        snapshot.put("operatorName", relation.operator().getNickname());
-        return snapshot;
     }
 
     private Map<String, Object> contextSnapshot(ContentReviewConfigDO config, MediaAccountDO account,
@@ -1661,8 +1673,7 @@ public class ContentReviewBatchService {
     }
 
     private record BatchSubjects(MediaAccountDO account) {}
-    private record RelationContext(LeadAssignmentRelationDO relation, AdminUserRespDTO director,
-                                   AdminUserRespDTO operator) {}
+
     private record FrozenContext(String materialTypeCode, Long schemaVersionId, String schemaHash,
                                  Map<String, String> mapping,
                                  Map<String, Object> defaults, Map<String, Object> accountSnapshot) {}

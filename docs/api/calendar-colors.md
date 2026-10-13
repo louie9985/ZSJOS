@@ -1,31 +1,28 @@
-# 日历颜色与个人快捷色
+# 日历颜色与共享课程色板
 
-工作台我的日历、课程日历支持新建/编辑选色、自选不透明颜色、即时预览及恢复默认。月历、当天详情和移动卡片使用记录自身颜色并按亮度选择黑/白文字。历史空颜色保持原默认；考期日历不变。
+## 使用与存储
+我的日历快捷色按登录员工独立保存；课程日历色板在租户1内共享。表单只显示底色栏目及一组色块，操作横排并自然换行。课程左上角图例使用与表单相同的完整共享色板，不再显示两段冗余说明。
 
-## 日程接口
+课程四个初始项：公共营养师 #6ABF6D、营养指导员 #00D0FF、注册营养师 #B695E8、执业药师 #FFBE73，均为普通可编辑、可删除的快捷项，不作为业务分类、不按课程名称自动匹配。删除后刷新或重新登录不会补回，允许删空。
 
-个人与课程保存、列表、详情（课程）、搜索响应增加可选 backgroundColor。仅接受 #RRGGBB，规范为大写。新增省略或空串为默认；更新省略/null保留、空串清除。服务端显式写 NULL，避免 MyBatis 忽略清除。管理端旧表单不提交此字段，因此编辑保留原色；本期不增加管理端颜色界面。课程颜色不参与通知内容版本和快照哈希，不自动发送通知。
+每份色板最多20项（共享课程含四个初始项），名称去首尾空白后1–20个Unicode码点，同色板不区分大小写重名检查。颜色相同但名称不同允许。个人色板唯一键按租户/员工/PERSONAL，课程使用租户/0/COURSE_SHARED；0仅是共享存储范围标识，不是员工或授权身份。写入通过行锁串行化，保留登录操作者审计。
 
-## 快捷色接口
+保存快捷色独立提交，取消日程仍保留；失败保留输入并允许重试。新建不自动沿用上次颜色。打开编辑器、页面刷新或窗口重新获得焦点时重新读取色板，自己保存后立即同步图例。共享色板缺失时报升级错误，不在请求中重新生成默认项。
 
-ADMIN 路径前缀保持现有契约。/zsjos/calendar-colors/{type} 支持 GET、POST；/{type}/{id} 支持 PUT、DELETE。type 仅 PERSONAL、COURSE；POST/PUT 请求为 name、color，响应为 presets、colors 数组，元素为 id、name、color。POST生成不透明字符串ID；返回顺序即创建顺序。DELETE只移除当前员工色板中的一项，不删除日程。
+## API 与权限
+ADMIN API /zsjos/calendar-colors/{type} 支持 GET、POST；/{type}/{id} 支持 PUT、DELETE。type 仍仅 PERSONAL、COURSE，公开接口不接受用户身份或内部共享范围。POST/PUT 为 name、color；响应保持 presets、colors，其中 presets 为空，所有可维护项放在 colors。元素为 id、name、color，创建顺序展示。
 
-读取使用对应 zsjos:personal-calendar:query / zsjos:course-calendar:query；维护使用对应 color-manage 按钮权限。服务端从登录身份取得用户，AOP校验本人色板，服务再检查对应日历权限；不接收他人的 userId。租户由现有框架上下文取得，本系统租户为1。两类色板独立。
+读权限分别为 zsjos:personal-calendar:query、zsjos:course-calendar:query；个人维护沿用 zsjos:personal-calendar:color-manage，课程维护改为 zsjos:course-calendar:manage，与新增课程一致。旧 course-calendar:color-manage 不再参与授权；迁移不撤销、重新分配或更改角色授权。AOP验证调用主体，服务验证实际日历功能权限，课程存储范围与操作者身份分开。
 
-每人每类最多20项，名称去首尾空白后1–20个Unicode码点，同一色板名称不区分大小写去重。颜色相同但名称不同允许。每个员工/日历持久化一个JSON色板，唯一键及行锁串行化首次创建和后续改动，保证并发限额/重名约束。修改、删除快捷色不改变已有日程颜色。
+个人与课程日程保存、列表、详情及搜索的 backgroundColor 契约保持不变：#RRGGBB保存为大写，更新省略/null保留，空串清除。每条日程保存实际色值，修改或删除快捷项不改变历史记录。课程颜色不参与通知内容版本和哈希；管理端旧请求兼容保留。
 
-课程固定预设由服务返回：公共营养师 #6ABF6D、营养指导员 #00D0FF、注册营养师 #B695E8、执业药师 #FFBE73。它们是明确批准的展示快捷标注，不作为课程业务分类，不匹配课程名称，不能由个人覆盖。个人日历无固定业务预设。
+## V315 升级与恢复
+先完成 V314，再执行 V315__shared_course_palette.sql。本次用户明确授权清理租户1的旧个人 COURSE 色板，不导入共享项；旧行逻辑删除并保留JSON恢复证据，PERSONAL及所有日程不变。共享色板初始化一次；重放保留已修改或删空的内容。数据变更、后置校验及双账本在同一事务内。已存在成功记录却丢失共享行时拒绝重建，需审查并恢复备份。
 
-保存快捷色独立提交；取消日程仍保留。加载失败显示重试，仍可自选颜色并保存日程；快捷色保存失败保留输入。无色板管理权限时隐藏维护入口，可使用已有快捷项。新建不自动带入上次颜色。修改旧记录回显记录颜色。
+升级前备份色板与双账本，停用旧版本写入后执行迁移并部署新后端。旧客户端不能用于共享色板维护。回退需保留或备份共享色板，按批准范围恢复旧COURSE配置；没有自动数据回滚。V315无DDL，不修改历史编号迁移、基线或角色授权。共享/生产目标执行仍须另行授权。
 
-## 升级与验证
-
-V314__calendar_colors.sql 在Core V313后、后端发布前执行；新增两列、空色板表和菜单按钮元数据，不修改角色授权、不回填历史。管理员通过角色管理分配两个color-manage权限。既有禁用配置不被恢复。
-
-DDL隐式提交，无法以事务回滚结构；失败不写成功账本，修正前置/结构后重放。回退应用时保留字段、表及颜色数据。升级前备份两张日程表、菜单和版本账本。两份基线结构清单同步最终定义；新环境仍执行bootstrap后有序迁移，历史编号迁移不变。
-
-验证入口：
-- python -B script/sql/mysql/tools/test_calendar_colors.py：保留隔离MySQL库，验证首次、重复、前置失败、账本失败、部分应用、错误字段及索引恢复；--apply-dev备份后应用本地开发库，核对原日程数据、角色授权和中文HEX。
-- 后端 CalendarPaletteServiceTest、CalendarPalettePermissionTest、CourseCalendarVersionTest、PersonalCalendarEventServiceTest。上述数据库脚本加 --java 验证真实 MySQL 持久化和第20项并发限额；加 --fresh-core 验证完整Core初始化链及本地结构比对。
-- 工作台 npm run typecheck；相关日历Vitest；python -B frontend/workbench/test/calendar-colors-browser.py（使用已有5174 Vite及隔离合成数据，不写真实API）。
-- 管理端旧请求兼容由源码请求形状审查和后端省略颜色测试覆盖；真实认证HTTP、跨设备登录同步和共享环境上线仍需运行时验收。
+## 验证
+- test_shared_course_palette.py：隔离MySQL首次/重复/前置失败/账本失败/后置失败及已有空共享色板；--java验证真实持久化、跨用户共享、编辑删除、个人隔离和并发限额；--apply-dev按授权备份并清理本地。
+- CalendarPalettePermissionTest及CalendarPaletteServiceTest：查询/维护拒绝、课程manage授权、输入约束。
+- calendar-views-browser.py、course-shared-palette-browser.py：真实组件日/周/月及初始色可编辑/删除、图例同步、空色板不补回；测试为隔离传输，实际跨设备登录仍需部署后验收。
+- 日程视图详见 [日／周／月视图](calendar-views.md)。

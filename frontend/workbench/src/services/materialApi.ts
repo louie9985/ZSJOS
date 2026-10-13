@@ -265,6 +265,7 @@ export type ContentReviewBatch = {
   directorUserId?: number
   directorName?: string
   relationSnapshot: Record<string, unknown>
+  canReadStudentForReview?: boolean
   contextSnapshot: Record<string, unknown>
   status: string
   currentStage: string
@@ -354,7 +355,14 @@ export const materialApi = {
     )
 }
 
+export type ContentReviewSelection = { directorUserId: number; processDefinitionId: string }
+export type ContentReviewSubmitContext = {
+  processDefinitionId: string; processDefinitionVersion: number; directorTaskKey: string; roleIds: number[]
+  candidates: Array<{ id: number; nickname: string }>; previousDirectorUserId?: number
+}
 export const contentReviewApi = {
+  submitContext: async (id: number) => unwrap<ContentReviewSubmitContext>(
+    await http.get(`/zsjos/content-review/batch/${id}/submit-context`)),
   candidates: async (params: { pageNo: number; pageSize: number; keyword?: string }) =>
     unwrap<PageResult<ContentReviewCandidate>>(await http.get('/zsjos/content-review/candidate/page', { params })),
   page: async (params: ContentReviewPageParams) =>
@@ -414,8 +422,8 @@ export const contentReviewApi = {
   create: async (contentVersionIds: number[]) => unwrap<number>(
     await http.post('/zsjos/content-review/batch/create', { contentVersionIds })
   ),
-  submit: async (batchId: number, expectedVersion: number) => unwrap<boolean>(
-    await http.post(`/zsjos/content-review/batch/${batchId}/submit`, { expectedVersion })
+  submit: async (batchId: number, expectedVersion: number, selection?: ContentReviewSelection) => unwrap<boolean>(
+    await http.post(`/zsjos/content-review/batch/${batchId}/submit`, { expectedVersion, ...selection })
   ),
   cancel: async (batchId: number, expectedVersion: number) => unwrap<boolean>(
     await http.post(`/zsjos/content-review/batch/${batchId}/cancel`, { expectedVersion })

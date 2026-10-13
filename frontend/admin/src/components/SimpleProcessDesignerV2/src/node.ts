@@ -353,6 +353,9 @@ export function useNodeForm(nodeType: NodeType) {
       case CandidateStrategy.USER:
         candidateParam = configForm.value.userIds!.join(',')
         break
+      case CandidateStrategy.START_USER_SELECT:
+        candidateParam = configForm.value.roleIds?.join(',') || undefined
+        break
       case CandidateStrategy.ROLE:
         candidateParam = configForm.value.roleIds!.join(',')
         break
@@ -403,6 +406,8 @@ export function useNodeForm(nodeType: NodeType) {
     candidateStrategy: CandidateStrategy,
     candidateParam: string | undefined
   ) => {
+    // Opening an unrestricted node after a scoped one must not inherit the previous role selection.
+    if (configForm.value && candidateStrategy === CandidateStrategy.START_USER_SELECT) configForm.value.roleIds = []
     if (!configForm.value || !candidateParam) {
       return
     }
@@ -411,6 +416,7 @@ export function useNodeForm(nodeType: NodeType) {
         configForm.value.userIds = candidateParam.split(',').map((item) => +item)
         break
       }
+      case CandidateStrategy.START_USER_SELECT:
       case CandidateStrategy.ROLE:
         configForm.value.roleIds = candidateParam.split(',').map((item) => +item)
         break

@@ -1,6 +1,6 @@
 import { noticeAudienceText } from '../services/noticeManagement'
 import { Alert, App, Button, Input, Modal, Select, Space, Spin } from 'antd'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import BusinessTable from '../components/BusinessTable'
 import DateTimeText from '../components/DateTimeText'
 import NoticeEditorDialog from '../components/NoticeEditorDialog'
@@ -9,8 +9,20 @@ import NoticeShareDialog from '../components/NoticeShareDialog'
 import { ApiError } from '../services/api'
 import { noticeActions, noticeManagement, noticePermission, NOTICE_STATUSES, type ManagedNotice, type NoticeStatus } from '../services/noticeManagement'
 
+const ROW_ACTIONS = [
+  { key: 'view', label: '查看' },
+  { key: 'share', label: '对外分享' },
+  { key: 'edit', label: '编辑' },
+  { key: 'publish', label: '发布' },
+  { key: 'offline', label: '下线' },
+  { key: 'copy', label: '复制草稿' },
+  { key: 'delete', label: '删除' },
+] as const
+
 export default function NoticeManagementPage({ permissions }: { permissions: string[] }) {
   const { message, modal } = App.useApp()
+  const [actionWidth, setActionWidth] = useState(80)
+  const actionGroups = useRef(new Map<number, HTMLSpanElement>())
   const [rows, setRows] = useState<ManagedNotice[]>([])
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState<{ pageNo: number; pageSize: number; title?: string; publishStatus?: NoticeStatus }>({ pageNo: 1, pageSize: 20 })
@@ -29,6 +41,30 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
   const detailGeneration = useRef(0)
   const allowed = noticePermission(permissions, 'query')
   const canShare = allowed && noticePermission(permissions, 'share')
+  const rowActions = (row: ManagedNotice) => {
+    const available = { ...noticeActions(permissions, row.publishStatus), view: allowed, share: canShare && row.publishStatus === 'PUBLISHED' }
+    return ROW_ACTIONS.filter(action => available[action.key])
+  }
+  useLayoutEffect(() => {
+    // Intrinsic group widths include themed button padding/borders; cell width must not constrain them.
+    const measure = () => {
+      const widths = [...actionGroups.current.values()].map(group => {
+        const cell = group.closest('td')
+        if (!cell) return 0
+        const style = getComputedStyle(cell)
+        return Math.ceil(group.getBoundingClientRect().width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight))
+      })
+      setActionWidth(Math.max(80, ...widths))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    actionGroups.current.forEach(group => {
+      observer.observe(group)
+      const cell = group.closest('td')
+      if (cell) observer.observe(cell)
+    })
+    return () => observer.disconnect()
+  })
   const load = useCallback(async () => {
     const request = ++generation.current
     if (!allowed) { setRows([]); setLoading(false); setUnauthorized(true); return }
@@ -87,15 +123,12 @@ export default function NoticeManagementPage({ permissions }: { permissions: str
         { title: '附件数量', key: 'attachments', render: (_, row) => row.attachments?.length || 0 },
         { title: '发布时间', dataIndex: 'publishTime', render: (_, row) => <DateTimeText value={row.publishTime} /> },
         { title: '高亮截止时间', dataIndex: 'highlightUntil', render: (_, row) => <DateTimeText value={row.highlightUntil} /> },
-        { title: '操作', key: 'action', width: 300, fixed: 'right', hideInSetting: true, render: (_, row) => { const actions = noticeActions(permissions, row.publishStatus); return <Space wrap size={0}>
-          <Button type="link" onClick={() => void view(row.id)}>查看</Button>
-          {canShare && row.publishStatus === 'PUBLISHED' && <Button type="link" disabled={busy} onClick={() => void openShare(row)}>对外分享</Button>}
-          {actions.edit && <Button type="link" disabled={busy} onClick={() => void act(row, 'edit')}>编辑</Button>}
-          {actions.publish && <Button type="link" disabled={busy} onClick={() => void act(row, 'publish')}>发布</Button>}
-          {actions.offline && <Button type="link" disabled={busy} onClick={() => void act(row, 'offline')}>下线</Button>}
-          {actions.copy && <Button type="link" disabled={busy} onClick={() => void act(row, 'copy')}>复制草稿</Button>}
-          {actions.delete && <Button type="link" danger disabled={busy} onClick={() => void act(row, 'delete')}>删除</Button>}
-        </Space> } }
+        { title: '操作', key: 'action', width: actionWidth, fixed: 'right', hideInSetting: true, render: (_, row) => <span
+          ref={element => { if (element) actionGroups.current.set(row.id, element); else actionGroups.current.delete(row.id) }}
+          style={{ display: 'inline-block', width: 'max-content' }}><Space wrap={false} size={0}>
+          {rowActions(row).map(({ key, label }) => <Button key={key} type="link" danger={key === 'delete'} disabled={key !== 'view' && busy}
+            onClick={() => { if (key === 'view') void view(row.id); else if (key === 'share') void openShare(row); else void act(row, key) }}>{label}</Button>)}
+        </Space></span> }
       ]} />
     <Modal open={detailId != null} title="公告详情" width={800} footer={null} onCancel={() => { detailGeneration.current++; setDetailId(undefined); setDetail(undefined) }}>
       {detailLoading ? <Spin /> : detailError ? <Alert type="error" title={detailError} action={<Button onClick={() => detailId != null && void view(detailId)}>重试</Button>} /> : detail && <NoticeManagementDetail notice={detail} />}

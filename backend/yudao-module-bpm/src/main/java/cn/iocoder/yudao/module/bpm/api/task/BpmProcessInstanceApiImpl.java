@@ -19,6 +19,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class BpmProcessInstanceApiImpl implements BpmProcessInstanceApi {
 
+    @Override
+    public boolean isRunning(String processInstanceId, String businessKey) {
+        var instance = processInstanceService.getProcessInstance(processInstanceId);
+        return instance != null && !instance.isEnded() && !instance.isSuspended()
+                && java.util.Objects.equals(instance.getBusinessKey(), businessKey)
+                && java.util.Objects.equals(instance.getTenantId(), String.valueOf(
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+    }
+
     @Resource
     private BpmProcessInstanceService processInstanceService;
 

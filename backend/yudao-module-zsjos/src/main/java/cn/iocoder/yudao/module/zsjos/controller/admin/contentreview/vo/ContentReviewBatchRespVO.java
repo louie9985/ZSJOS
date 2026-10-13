@@ -20,6 +20,7 @@ public class ContentReviewBatchRespVO {
     private String operatorName;
     private Long directorUserId;
     private String directorName;
+    private Boolean canReadStudentForReview;
     private Map<String, Object> relationSnapshot;
     private Map<String, Object> contextSnapshot;
     private String status;

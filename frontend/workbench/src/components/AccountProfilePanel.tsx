@@ -49,11 +49,14 @@ import {
 } from "../services/mediaAccountProfile";
 import { formatTimestamp } from "../services/time";
 import AccountPositioningCard from './AccountPositioningCard';
+import { useMediaStudentReview, reviewFile } from './MediaStudentReviewContext'
+import { contentReviewStudentApi } from '../services/contentReviewStudent'
+import AttachmentCard from './AttachmentCard'
 import AccountProfileTextInput from './AccountProfileTextInput';
 import ResourceLink from './ResourceLink';
 const MemoAccountPositioningCard = memo(AccountPositioningCard);
 
-type Account = MediaStudentDetail["accounts"][number];
+type Account = Pick<MediaStudentDetail["accounts"][number], 'id' | 'availableActions'> & Partial<MediaStudentDetail["accounts"][number]>;
 const owners = {
   AUTO: "自动生成",
   DIRECTOR: "编导填写",
@@ -126,6 +129,7 @@ export default function AccountProfilePanel({
   onMissingChange?: (id: number, count: number) => void;
 }) {
   const { message, modal } = App.useApp();
+  const review = useMediaStudentReview();
   const [deleteOpen, setDeleteOpen] = useState(false), [deleteReason, setDeleteReason] = useState(''), [deleteSaving, setDeleteSaving] = useState(false);
   const [positioningRefresh, setPositioningRefresh] = useState(0);
   const [positioningStatusTarget, setPositioningStatusTarget] = useState<HTMLDivElement | null>(null);
@@ -194,7 +198,7 @@ export default function AccountProfilePanel({
   const flushText = useCallback(() => publishValues(latestValues.current), []);
   const refreshPositioning = useCallback(() => setPositioningRefresh(value => value + 1), []);
   const fields = useMemo(() => profile?.config.fields.filter((f) => f.enabled && f.group !== 'POSITIONING' && !f.key.startsWith('pc_') && !['positioning_history', 'positioning_snapshot'].includes(f.key)) || [], [profile?.config.fields]),
-    editable = profile?.editableFields || [];
+    editable = review ? [] : profile?.editableFields || [];
   const missing = profileMissing(fields, open ? values : profile?.values || {});
   const required = fields.filter(
     (f) =>
@@ -212,7 +216,8 @@ export default function AccountProfilePanel({
     setLoading(true);
     setError("");
     try {
-      const r = await accountProfileApi.get(account.id);
+      const r = review ? await contentReviewStudentApi.profile(review.batchId, account.id) : await accountProfileApi.get(account.id);
+      if (review) { r.editableFields = []; r.canStartDiagnosis = false; r.canSubmitDiagnosis = false; r.canViewHistory = false; r.account.availableActions = []; }
       if (gen === generation.current) {
         setProfile(r);
         setValues(r.values);
@@ -309,7 +314,7 @@ export default function AccountProfilePanel({
     };
     // Identity changes invalidate in-flight requests and account-specific drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account?.id, canQuery]);
+  }, [account?.id, canQuery, review?.batchId]);
   useEffect(() => {
     if (!profile) return;
     void loadHistory();
@@ -823,7 +828,7 @@ export default function AccountProfilePanel({
         {tag(f)}
       </div>
       <div>
-        {f.type === "record" ? control(f) : f.type === "image" && files[f.key] ? (
+        {review && (f.type === 'image' || f.type === 'attachment') ? <div className="positioning-file-grid">{Object.values(files).filter(file => file.id === Number(profile.values[f.key]) || Array.isArray(profile.values[f.key]) && (profile.values[f.key] as unknown[]).includes(file.id)).map(file => <AttachmentCard key={file.id} name={file.name} load={() => reviewFile(review, 'profile', file.id)} />)}</div> : f.type === "record" ? control(f) : f.type === "image" && files[f.key] ? (
           <Image width={64} src={safeLink(files[f.key].previewUrl)} />
         ) : f.type === 'url' && !fieldEmpty(profile.values[f.key]) ? (
           <ResourceLink href={String(profile.values[f.key])} />
@@ -878,7 +883,7 @@ export default function AccountProfilePanel({
       <div className="account-profile-grid">
         <aside className="account-profile-aside">
           <div className="account-profile-cover">
-            {files.cover && safeLink(files.cover.previewUrl) ? (
+            {review && files.cover ? <AttachmentCard name={files.cover.name} load={() => reviewFile(review,'profile',files.cover.id)} /> : files.cover && safeLink(files.cover.previewUrl) ? (
               <Image src={safeLink(files.cover.previewUrl)} />
             ) : (
               <>
@@ -1090,7 +1095,7 @@ export default function AccountProfilePanel({
           <aside className="account-profile-editor-aside">
             <div className="account-profile-editor-cover" data-profile-key="cover">
               <div className="account-profile-cover">
-                {files.cover && safeLink(files.cover.previewUrl) ? (
+                {review && files.cover ? <AttachmentCard name={files.cover.name} load={() => reviewFile(review,'profile',files.cover.id)} /> : files.cover && safeLink(files.cover.previewUrl) ? (
                   <Image src={safeLink(files.cover.previewUrl)} />
                 ) : (
                   <>

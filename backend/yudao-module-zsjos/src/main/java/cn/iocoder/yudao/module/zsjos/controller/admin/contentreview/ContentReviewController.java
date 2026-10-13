@@ -40,6 +40,14 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/content-review")
 @Validated
 public class ContentReviewController {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewSelectionService selectionService;
+
+    @GetMapping("/batch/{batchId}/submit-context")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO> submitContext(
+            @PathVariable Long batchId) {
+        return success(selectionService.context(batchId, getLoginUserId()));
+    }
 
     @Resource private ContentReviewBatchService batchService;
 

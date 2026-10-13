@@ -21,6 +21,7 @@ class CourseCalendarVersionTest {
     @Mock private CourseCalendarEventMapper mapper;
     @Mock private DictDataApi dictionaries;
     @Mock private FileApi files;
+    @Mock private CourseAttachmentService attachments;
     @Mock private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarNotificationSnapshotService notificationSnapshots;
 
     @BeforeAll static void metadata() {
@@ -97,6 +98,18 @@ class CourseCalendarVersionTest {
         assertEquals(4, changed.getCalendarVersion());
         req.setBackgroundColor("");
         assertNull(service.previewSave(1L, req).getBackgroundColor());
+    }
+
+    @Test void omittedAttachmentsRetainExistingAndExplicitEmptyClearsWithoutVersionChange() {
+        var original = current().setAttachmentIdsJson("[11]");
+        when(mapper.selectById(1L)).thenReturn(original);
+        when(attachments.validate(null, "[11]", null)).thenReturn("[11]");
+        var omitted = request(); omitted.setAttachmentIds(null);
+        assertEquals("[11]", service.previewSave(1L, omitted).getAttachmentIdsJson());
+        when(attachments.validate(List.of(), "[11]", null)).thenReturn("[]");
+        var cleared = service.previewSave(1L, request());
+        assertEquals("[]", cleared.getAttachmentIdsJson());
+        assertEquals(4, cleared.getCalendarVersion());
     }
 
     private CourseCalendarEventDO current() {

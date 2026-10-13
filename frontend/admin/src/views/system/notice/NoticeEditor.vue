@@ -56,14 +56,13 @@
             :data="audienceTree"
             node-key="key"
             show-checkbox
-            check-strictly
             default-expand-all
             :filter-node-method="filterAudienceNode"
             :props="{ label: 'label', children: 'children' }"
             @check="syncAudienceSelection"
           />
           <el-empty v-if="!audienceLoadError && !audienceLoading && !audienceTree.length" description="暂无可选部门或用户" />
-          <div class="el-form-item__tip">勾选部门将发送给该部门及全部子部门成员；可同时多选用户。</div>
+          <div class="el-form-item__tip">勾选部门可选择其下全部可接收员工，可取消部分部门或员工；已选 {{ selectedUserIds.length }} 人。</div>
         </el-form-item>
         <el-form-item label="高亮提醒截止时间" prop="highlightUntil">
           <el-date-picker v-model="formData.highlightUntil" type="datetime" value-format="x" clearable placeholder="不设置则不高亮" :disabled-date="disabledHighlightDate" />
@@ -144,6 +143,7 @@ import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { getFileIcon } from '@/utils/file'
 import * as NoticeApi from '@/api/system/notice'
 import { handleTree } from '@/utils/tree'
+import { noticeSelectedUserIds } from './noticeAudience'
 
 const props = defineProps<{ id?: number }>()
 const emit = defineEmits<{ back: []; saved: [id: number] }>()
@@ -167,10 +167,9 @@ const formData = reactive({
   attachments: [] as NoticeApi.NoticeAttachmentVO[]
 })
 const sourceDepartments = ref<NoticeApi.NoticeRecipientOptionsVO['departments']>([])
-const previewAudience = computed(() => formData.audienceType === 'ALL' ? '全体员工' : [
-  ...sourceDepartments.value.filter(dept => formData.targetDeptIds.includes(dept.id)).map(dept => `${dept.name}（含子部门）`),
-  ...(formData.targetUserIds.length ? [`指定用户 ${formData.targetUserIds.length} 人`] : [])
-].join('、'))
+const recipientOptions = ref<NoticeApi.NoticeRecipientOptionsVO>({ departments: [], users: [] })
+const selectedUserIds = computed(() => noticeSelectedUserIds(recipientOptions.value, formData.targetDeptIds, formData.targetUserIds))
+const previewAudience = computed(() => formData.audienceType === 'ALL' ? '全体员工' : `指定用户 ${selectedUserIds.value.length} 人`)
 const audienceTreeRef = ref()
 const audienceTree = ref<any[]>([])
 const audienceLoading = ref(false)
@@ -182,7 +181,7 @@ const rules: FormRules = {
   type: [{ required: true, message: '公告类型不能为空', trigger: 'change' }],
   content: [{ required: true, message: '公告正文不能为空', trigger: 'blur' }],
   targetUserIds: [{ validator: (_rule, _value, callback) => {
-    if (formData.audienceType === 'TARGET' && !formData.targetDeptIds.length && !formData.targetUserIds.length) callback(new Error('请至少选择一个部门或用户'))
+    if (formData.audienceType === 'TARGET' && !selectedUserIds.value.length) callback(new Error('请至少选择一名接收员工'))
     else callback()
   }, trigger: 'change' }]
 }
@@ -213,10 +212,7 @@ const load = async () => {
     formData.targetUserIds = data.targetUserIds || []
     formData.attachments = data.attachments || []
     await nextTick()
-    audienceTreeRef.value?.setCheckedKeys([
-      ...formData.targetDeptIds.map((id) => `d:${id}`),
-      ...formData.targetUserIds.map((id) => `u:${id}`)
-    ])
+    audienceTreeRef.value?.setCheckedKeys(selectedUserIds.value.map(id => `u:${id}`))
   } finally {
     loading.value = false
   }
@@ -224,12 +220,16 @@ const load = async () => {
 
 const saveDraft = async () => {
   if (audienceLoading.value || audienceLoadError.value) { message.error(audienceLoadError.value || '部门加载中，请稍后重试'); return }
-  await formRef.value?.validate()
+  if (!await formRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
     const payload = { ...formData, id: noticeId.value } as NoticeApi.NoticeVO
+    payload.targetDeptIds = []
+    payload.targetUserIds = formData.audienceType === 'TARGET' ? selectedUserIds.value : []
     if (noticeId.value) await NoticeApi.updateNotice(payload)
     else noticeId.value = await NoticeApi.createNotice(payload)
+    formData.targetDeptIds = []
+    formData.targetUserIds = payload.targetUserIds || []
     message.success('草稿已保存')
     emit('saved', noticeId.value!)
     return noticeId.value
@@ -268,6 +268,7 @@ const loadAudienceTree = async () => {
   audienceLoadError.value = ''
   try {
     const options = await NoticeApi.getNoticeRecipientOptions()
+    recipientOptions.value = options
     sourceDepartments.value = options.departments
     if (formData.sourceDeptId == null) formData.sourceDeptId = options.defaultSourceDeptId
   const depts = options.departments
@@ -277,19 +278,20 @@ const loadAudienceTree = async () => {
     if (user.deptId != null) usersByDept.set(user.deptId, [...(usersByDept.get(user.deptId) || []), user])
   })
   const represented = new Set<number>()
-  const deptTree = handleTree(depts).map((dept: any) => addUsers(dept, usersByDept, represented))
-  const unassigned = users.filter((user) => !represented.has(user.id)).map((user) => ({
+  const deptTree = handleTree(depts).map((dept: any) => addUsers(dept, usersByDept, represented)).filter(Boolean)
+  const unassigned = users.filter((user) => user.selectable && !represented.has(user.id)).map((user) => ({
     key: `u:${user.id}`,
-    label: user.selectable ? user.nickname : `${user.nickname}（不可接收）`,
-    disabled: !user.selectable,
+    label: user.nickname,
     leaf: true
   }))
   audienceTree.value = unassigned.length ? [...deptTree, { key: 'g:unassigned', label: '未分配部门', children: unassigned }] : deptTree
+  // Element Plus counts disabled children in parent half-check state. Keep them outside selectable departments.
+  const unavailable = users.filter(user => !user.selectable).map(user => ({
+    key: `u:${user.id}`, label: `${user.nickname}（不可接收）`, disabled: true, leaf: true
+  }))
+  if (unavailable.length) audienceTree.value.push({ key: 'g:unavailable', label: '不可接收员工', disabled: true, children: unavailable })
   await nextTick()
-  audienceTreeRef.value?.setCheckedKeys([
-    ...formData.targetDeptIds.map((id) => `d:${id}`),
-    ...formData.targetUserIds.map((id) => `u:${id}`)
-  ])
+  audienceTreeRef.value?.setCheckedKeys(selectedUserIds.value.map(id => `u:${id}`))
   } catch (error) {
     audienceLoadError.value = error instanceof Error ? error.message : '发送范围加载失败，请稍后重试'
   } finally {
@@ -297,13 +299,14 @@ const loadAudienceTree = async () => {
   }
 }
 const addUsers = (dept: any, usersByDept: Map<number, NoticeApi.NoticeRecipientOptionsVO['users']>, represented: Set<number>): any => {
-  const children = (dept.children || []).map((child: any) => addUsers(child, usersByDept, represented))
-  const members = (usersByDept.get(dept.id) || []).map((user) => { represented.add(user.id); return { key: `u:${user.id}`, label: user.selectable ? user.nickname : `${user.nickname}（不可接收）`, disabled: !user.selectable, leaf: true } })
+  const children = (dept.children || []).map((child: any) => addUsers(child, usersByDept, represented)).filter(Boolean)
+  const members = (usersByDept.get(dept.id) || []).filter(user => user.selectable).map((user) => { represented.add(user.id); return { key: `u:${user.id}`, label: user.nickname, leaf: true } })
+  if (!children.length && !members.length) return null
   return { ...dept, key: `d:${dept.id}`, label: dept.name, children: [...children, ...members] }
 }
 const syncAudienceSelection = () => {
   const keys = audienceTreeRef.value?.getCheckedKeys?.() || []
-  formData.targetDeptIds = keys.filter((key: string) => key.startsWith('d:')).map((key: string) => Number(key.slice(2)))
+  formData.targetDeptIds = []
   formData.targetUserIds = keys.filter((key: string) => key.startsWith('u:')).map((key: string) => Number(key.slice(2)))
 }
 const filterAudienceNode = (value: string, data: any) => {

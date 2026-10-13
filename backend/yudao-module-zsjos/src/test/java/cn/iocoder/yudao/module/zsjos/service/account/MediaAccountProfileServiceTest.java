@@ -25,6 +25,22 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaAccountProfileServiceTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewStudentAccess reviewAccess;
+
+    @Test void approvalProjectionDropsFinanceAndEveryWriteCapabilityWithoutChangingNormalConfig() {
+        when(accounts.require(1L)).thenReturn(account);when(configs.getPublished()).thenReturn(config);
+        var amount=field("total_amount","AUTO","number");
+        config.setFields(new ArrayList<>(config.getFields()));config.getFields().add(amount);
+        account.setDetailValuesJson("{\"total_amount\":9999,\"goal\":\"review scope\"}");
+        var result=service.getForReview(10L,1L,30L);
+        verify(reviewAccess).requireAccount(10L,1L,30L);
+        assertNull(result.getPartnerMetrics());assertFalse(result.getValues().containsKey("total_amount"));
+        assertTrue(result.getEditableFields().isEmpty());assertFalse(result.isCanStartDiagnosis());
+        assertFalse(result.isCanSubmitDiagnosis());assertFalse(result.isCanViewHistory());
+        assertTrue(result.getConfig().getFields().stream().noneMatch(f->f.getKey().equals("total_amount")));
+        assertTrue(config.getFields().stream().anyMatch(f->f.getKey().equals("total_amount")));
+        verify(accounts,never()).get(anyLong(),anyLong());
+    }
     @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
     @Test void retiredPositioningCannotBeEditedThroughProfileEvenIfConfiguredEnabled() {
         var legacy = field("pc_account_name", "DIRECTOR", "text");

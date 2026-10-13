@@ -301,3 +301,15 @@ describe('notify message business actions', () => {
     expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
   })
 })
+
+it('routes only configured course notifications and preserves none/exam behavior', async () => {
+ const navigate=vi.fn(),warn=vi.fn(),refreshUnreadCount=vi.fn()
+ const course=message({bizType:'calendar',sceneCode:'zsjos.calendar.course',bizId:42})
+ expect(isNotifyBusinessActionCandidate(course)).toBe(true)
+ await executeNotifyMessageAction(course,{navigate,warn,refreshUnreadCount})
+ expect(navigate).toHaveBeenCalledWith('/calendar/course-calendar?courseId=42')
+ navigate.mockClear()
+ await executeNotifyMessageAction({...course,actionType:'none'},{navigate,warn,refreshUnreadCount})
+ expect(navigate).not.toHaveBeenCalled()
+ expect(isNotifyBusinessActionCandidate({...course,sceneCode:'zsjos.calendar.exam'})).toBe(false)
+})

@@ -98,6 +98,20 @@ Workbench 的日历单元格和当天详情现通过共用 `CalendarNotification
 
 考期、课程共用通知面板的指定员工改为部门／员工树多选。部门层级来自 /system/dept/simple-list，员工来自有对应发送权限的日历候选分页接口；完整加载所有候选页后才开放勾选，避免只选到第一页。支持搜索部门或员工、跨部门多选、勾选部门及下属部门、移除和清空已选人员；未分配或部门不可用的员工保留为根层员工，不推断部门。搜索和折叠不清除已选人员，提交仅包含员工 ID，修改选人须重新预览。加载失败或候选分页发生变化时阻止预览并提供重试，发送仍由后端复核有效性及租户。全员权限与人数确认不变。Admin 兼容新增 deptId 字段，保留原有交互，本次只调整截图所示 Workbench 选择器。
 
+## 工作台课程附件
+
+工作台使用现有延迟上传组件：选择文件不立即上传，保存课程时先上传新增文件，再提交附件 ID。每个文件最大 100MB，最多20个，支持 PNG/JPG/JPEG/GIF/WebP、PDF、Word、Excel、PPT；前端检查后缀和大小，后端检查真实文件类型、名称与大小。上传失败保留表单和成功文件，再次保存仅重试失败项；上传成功但课程保存失败时保留文件 ID 供重试。取消未保存课程不绑定文件，移除已关联附件只解除关系，不物理删除 Infra 文件。未关联的已上传文件不新增清理任务。
+
+- `POST /zsjos/course-calendar/attachment/upload`：multipart `file`；沿用 `zsjos:course-calendar:manage`，返回 `fileId/name/type/size/url`。保存到 Infra 的当前租户/员工课程附件目录。
+- `GET /zsjos/course-calendar/attachment/{courseId}/{fileId}`：沿用 `zsjos:course-calendar:query`，同时校验课程对象、租户、逻辑删除、文件关联和课程附件目录；返回新签名链接。不能用任意文件 ID 绕过课程访问。
+- 课程查询新增 `attachments` 元数据数组，同时保留 `attachmentIds`。列表不返回签名链接；当天详情中的附件卡片通过授权读取接口加载、预览和下载。附件区独立于固定高度时间轴，避免附件被裁切。
+- 保存请求 `attachmentIds` 省略或 null 时保留已有关系；显式空数组清除。非空数组最多20项且不允许重复，新引用只能使用本人上传文件；已经关联的文件可保留。不可用或旧目录的历史引用不自动删除，显示“附件已不可用”，不能借旧引用获取跨租户链接。
+- 管理端课程表单尚无附件编辑器，因此保存时省略 `attachmentIds`，不再发送空数组；本期不新增管理端上传界面。旧版仍发送空数组的客户端须与后端协调更新，因为空数组仍表示明确清除。
+
+附件修改不参与通知正文、内容版本或自动通知；课程通知语义保持不变。使用现有 JSON 列和权限，无数据库迁移或新增角色授权。
+
+验证入口：CourseAttachmentServiceTest、CourseAttachmentPermissionTest、CourseCalendarVersionTest；工作台 typecheck、deferredUpload/AttachmentCard/course-calendar 测试；`WORKBENCH_TEST_URL` 指定已运行 Vite 后执行 `python -B frontend/workbench/test/course-attachments-browser.py`。浏览器使用合成传输验证，不代表已部署后端或真实存储端到端验收。
+
 ## 跨月份搜索
 
 工作台新增独立分页搜索与定位入口；`GET /zsjos/course-calendar/search` 按课程名称、备注查询，原 `/page` 日期列表契约保持不变。详见[日历跨月份搜索](calendar-search.md)。
@@ -105,3 +119,8 @@ Workbench 的日历单元格和当天详情现通过共用 `CalendarNotification
 ## 日程颜色与个人快捷色
 
 工作台课程底色、四个统一快捷色、个人命名色板及 V314 升级契约见 [日历颜色](calendar-colors.md)。颜色独立于课程形式和通知内容版本。
+
+
+### 单日课程详情（2026-10-13）
+
+工作台当天课程完整展示课程名称和实际起止时间，点击课程展开创建人、课程形式、备注及通用附件/链接。编辑、删除、发送通知只在展开的详情面板操作。响应新增可空 `creatorName`，既有字段和授权不变；详见[单日详情契约](calendar-day-details.md)。

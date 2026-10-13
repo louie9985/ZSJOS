@@ -1,17 +1,19 @@
 # UTF-8. Isolated browser context and synthetic transport; no business writes.
 import os
 import re
+import base64
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
 OUT = Path(os.environ.get('TEMP', '.')) / 'zsjos-order-detail-layout'
 OUT.mkdir(parents=True, exist_ok=True)
-URL = 'http://127.0.0.1:5174/test/order-detail-layout.html'
+URL = os.environ.get('ORDER_FIXTURE_URL', 'http://127.0.0.1:5174') + '/test/order-detail-layout.html'
 with sync_playwright() as p:
     browser = p.chromium.launch()
     page = browser.new_page(viewport={'width': 1600, 'height': 1100})
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
+    page.route('**/test/fixture-voucher.png*', lambda route: route.fulfill(content_type='image/png', body=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ahtcAAAAASUVORK5CYII=')))
     page.goto(URL)
     main = page.locator('.sales-order-detail-pane .information-table')
     expect(main.locator('.sales-order-information-table')).to_have_count(4)
@@ -22,8 +24,8 @@ with sync_playwright() as p:
     assert len(groups.first.evaluate('e=>getComputedStyle(e).gridTemplateColumns').split()) == 2
     assert page.locator('.sales-order-approval-sidebar').bounding_box()['x'] > main.bounding_box()['x']
     page.screenshot(path=str(OUT / 'desktop.png'), full_page=True)
-    page.locator('.sales-order-vouchers .ant-image').click()
-    expect(page.locator('.ant-image-preview')).to_be_visible()
+    page.get_by_role('button', name='预览图片：测试凭证.png').click()
+    expect(page.locator('.ant-modal')).to_be_visible()
     page.keyboard.press('Escape')
     page.locator('.sales-order-list-item').nth(1).click()
     expect(main.get_by_text('LD-LAYOUT-1', exact=True)).to_be_visible()

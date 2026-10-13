@@ -28,6 +28,8 @@ public class PersonalCalendarEventService {
         var page = mapper.selectSearch(req, ownerId);
         var result = BeanUtils.toBean(page.getList(), PersonalCalendarEventRespVO.class);
         if (!result.isEmpty()) {
+            var creators = creatorNames.resolve(page.getList());
+            for (int i = 0; i < result.size(); i++) result.get(i).setCreatorName(creators.get(page.getList().get(i).getCreator()));
             var users = userApi.getUserMap(page.getList().stream().map(PersonalCalendarEventDO::getOwnerUserId).distinct().toList());
             result.forEach(row -> { var owner = users.get(row.getOwnerUserId()); row.setOwnerName(owner == null ? "未知账号" : owner.getNickname()); });
         }
@@ -40,6 +42,7 @@ public class PersonalCalendarEventService {
     @Resource private PersonalCalendarEventMapper mapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Resource private cn.iocoder.yudao.module.system.api.user.AdminUserApi userApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.calendar.CalendarCreatorNames creatorNames;
 
     public List<PersonalCalendarEventRespVO> list(PersonalCalendarEventListReqVO req, Long userId) {
         validateRange(req.getRangeStart(), req.getRangeEnd());
@@ -49,6 +52,8 @@ public class PersonalCalendarEventService {
                 : mapper.selectMyRange(ownerId, req.getRangeStart(), req.getRangeEnd());
         var result = BeanUtils.toBean(rows, PersonalCalendarEventRespVO.class);
         if (!rows.isEmpty()) {
+            var creators = creatorNames.resolve(rows);
+            for (int i = 0; i < result.size(); i++) result.get(i).setCreatorName(creators.get(rows.get(i).getCreator()));
             var users = userApi.getUserMap(rows.stream().map(PersonalCalendarEventDO::getOwnerUserId).distinct().toList());
             result.forEach(row -> {
                 var owner = users.get(row.getOwnerUserId());

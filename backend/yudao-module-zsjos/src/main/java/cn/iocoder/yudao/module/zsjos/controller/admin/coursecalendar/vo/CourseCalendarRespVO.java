@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 @Data
 public class CourseCalendarRespVO {
+    private String creatorName;
+    private List<CourseAttachmentRespVO> attachments;
     private String backgroundColor;
     private Long id; private String courseName; private String courseFormValue; private String courseFormLabelSnapshot;
     private LocalDateTime startTime; private LocalDateTime endTime; private String remark; private List<Long> attachmentIds;

@@ -11,6 +11,7 @@ public final class CalendarColors {
     public static final ErrorCode NAME = new ErrorCode(1_900_096_003, "快捷色名称须为1至20字且不能重名");
     public static final ErrorCode LIMIT = new ErrorCode(1_900_096_004, "每类日历最多保存20个快捷色");
     public static final ErrorCode MISSING = new ErrorCode(1_900_096_005, "快捷色已不存在，请刷新后重试");
+    public static final ErrorCode NOT_INITIALIZED = new ErrorCode(1_900_096_006, "课程共享色板尚未初始化，请联系管理员完成升级");
 
     // Null is an old-client omission; empty is an explicit clear.
     public static String resolve(String value, String previous) {

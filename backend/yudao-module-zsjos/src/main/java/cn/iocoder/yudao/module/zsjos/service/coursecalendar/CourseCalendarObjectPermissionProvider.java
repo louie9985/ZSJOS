@@ -27,13 +27,13 @@ public class CourseCalendarObjectPermissionProvider implements ZsjosObjectPermis
     }
     @Override public void check(Long id, String action, Long userId) {
         if (userId == null || id == null || id <= 0 || action == null
-                || !Set.of("notify", "maintain").contains(action)) throw exception(CALENDAR_NOTIFY_PERMISSION_DENIED);
+                || !Set.of("notify", "maintain", "read-attachment").contains(action)) throw exception(CALENDAR_NOTIFY_PERMISSION_DENIED);
         var row = mapper.selectById(id);
         if (row == null || Boolean.TRUE.equals(row.getDeleted())
                 || !Objects.equals(row.getTenantId(), TenantContextHolder.getRequiredTenantId()))
             throw exception(COURSE_CALENDAR_NOT_EXISTS);
         if ("notify".equals(action)) notificationAccess.checkForUser("COURSE", false, userId);
-        else if (!permissionApi.hasAnyPermissions(userId, "zsjos:course-calendar:manage"))
+        else if (!permissionApi.hasAnyPermissions(userId, "read-attachment".equals(action) ? "zsjos:course-calendar:query" : "zsjos:course-calendar:manage"))
             throw exception(CALENDAR_NOTIFY_MANAGE_PERMISSION_DENIED);
     }
 }

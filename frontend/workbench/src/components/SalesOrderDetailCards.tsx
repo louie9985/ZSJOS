@@ -9,6 +9,7 @@ import { formatTimestamp } from '../services/time'
 import { canReviewSalesOrderTask, orderPartnerOwnerText } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 import SalesOrderInformationTable from './SalesOrderInformationTable'
+import SalesOrderVoucherAttachments from './SalesOrderVoucherAttachments'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
   pending_approval: '待审核', revision_required: '待重提', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止'
@@ -113,11 +114,12 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
   </section>
 }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
   informationLayout?: 'cards' | 'table'
+  reloadVouchers?: () => Promise<SalesOrder['paymentVouchers']>
   onApprove?: () => void
   onReject?: () => void
   onRequestSupervisor?: () => void
@@ -280,7 +282,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
           </section>
           <section className="sales-order-content-section">
             <div className="sales-order-section-heading"><Typography.Text strong>缴费凭证</Typography.Text></div>
-            {order.paymentVouchers.length ? <Image.PreviewGroup><div className="sales-order-vouchers">{order.paymentVouchers.map(file => !file.fileUrl ? <Typography.Text key={file.infraFileId} type="warning">{file.originalName}（凭证暂不可用）</Typography.Text> : file.contentType === 'application/pdf'
+            {reloadVouchers ? <SalesOrderVoucherAttachments orderId={order.id} items={order.paymentVouchers} reload={reloadVouchers}/> : order.paymentVouchers.length ? <Image.PreviewGroup><div className="sales-order-vouchers">{order.paymentVouchers.map(file => !file.fileUrl ? <Typography.Text key={file.infraFileId} type="warning">{file.originalName}（凭证暂不可用）</Typography.Text> : file.contentType === 'application/pdf'
               ? <Button key={file.infraFileId} href={file.fileUrl} target="_blank">{file.originalName}</Button>
               : <Image key={file.infraFileId} width={88} height={88} src={file.fileUrl} alt={file.originalName}/>)}</div></Image.PreviewGroup>
               : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无缴费凭证"/>}

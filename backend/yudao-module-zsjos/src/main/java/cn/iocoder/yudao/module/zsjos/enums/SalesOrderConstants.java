@@ -16,6 +16,9 @@ public interface SalesOrderConstants {
     String TASK_ACTION_REVISION = "OPEN_SALES_ORDER_REVISION";
     String TASK_REVISION_KEY_PREFIX = "sales-order-revision:";
 
+    // Approval-list scope, not a persisted order lifecycle status.
+    String FILTER_CENTER_PENDING = "center_pending";
+
     String STATUS_PENDING_APPROVAL = "pending_approval";
     String STATUS_REVISION_REQUIRED = "revision_required";
     String STATUS_EFFECTIVE = "effective";

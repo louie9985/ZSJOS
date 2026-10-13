@@ -1,3 +1,4 @@
+import { useMediaStudentReview, reviewFile } from './MediaStudentReviewContext'
 import { Alert, App, Button, Space, Typography, Upload } from 'antd'
 import { useRef, useState } from 'react'
 import { api, type PositioningCard } from '../services/api'
@@ -6,6 +7,7 @@ import { PositioningFileView } from './PositioningSnapshot'
 
 export default function PositioningEvidence({ card, onChanged, mode = 'all' }: { card: PositioningCard; onChanged: () => void; mode?: 'all' | 'files' | 'actions' }) {
   const { message } = App.useApp()
+  const review = useMediaStudentReview()
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false)
   const [files, setFiles] = useState<Array<{ uid: string; name: string; file: File; id?: number }>>([])
   const lock = useRef(false)
@@ -27,10 +29,10 @@ export default function PositioningEvidence({ card, onChanged, mode = 'all' }: {
     {mode !== 'actions' && <section className="positioning-evidence" aria-label="学员确认凭证（运营上传）"><strong>学员确认凭证（运营上传）：</strong>
     {card.evidence?.length ? <div className="positioning-file-grid">{card.evidence.map(file => <div key={file.id}>
       <Typography.Text type="secondary">上传于 {file.uploadedAt ? new Date(file.uploadedAt).toLocaleString() : '历史未记录'}</Typography.Text>
-      <PositioningFileView name={file.name} load={() => api.positioningCard.evidenceFile(card.id, card.submissionId!, file.id)} />
+      <PositioningFileView name={file.name} load={() => review ? reviewFile(review,'evidence',file.id,card.submissionId) : api.positioningCard.evidenceFile(card.id, card.submissionId!, file.id)} />
     </div>)}</div> : <Typography.Text type="secondary">暂无确认凭证</Typography.Text>}
     </section>}
-    {mode !== 'files' && card.canUploadEvidence && <Button onClick={() => setOpen(true)}>{card.evidence?.length ? '追加确认凭证' : '上传确认凭证'}</Button>}
+    {mode !== 'files' && !review && card.canUploadEvidence && <Button onClick={() => setOpen(true)}>{card.evidence?.length ? '追加确认凭证' : '上传确认凭证'}</Button>}
     <PositioningDialog title="上传学员确认凭证" open={open} mask={{ closable: false }} keyboard={false} onCancel={() => { if (!busy) setOpen(false) }}
       onOk={() => void submit()} okText="提交确认凭证" confirmLoading={busy} okButtonProps={{ disabled: !files.length }}>
       <Alert type="info" message="请上传与学员确认本版定位卡的聊天记录、音频等凭证。至少一份，每份不超过 100 MB；提交成功后该版本才可应用。" />

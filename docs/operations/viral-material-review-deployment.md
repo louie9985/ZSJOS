@@ -1,5 +1,7 @@
 # 爆款账号/内容拆解审核部署
 
+生产内容批审使用独立的 `zsjos_production_content_review` 流程，其自选编导配置见 [生产内容自选编导上线](content-review-self-selection.md)。本页爆款拆解规则不适用于生产内容批审。
+
 爆款账号（`viral_account`）与爆款内容（`viral_content`）走素材库通用审批链路 `MaterialService.submit`，服务端按素材类型固定映射流程 Key，不再读取或维护素材类型上的 `bpmProcessDefinitionKey`。两套可导入的 SIMPLE 资产会创建 BPM 自定义表单；导入后仅需在 BPM 节点选择当前租户有效的审核角色。多人匹配同一角色时或签——任一人通过即通过，任一人驳回即驳回。
 
 本流程审核节点直接在 BPM 设计器里指定角色（`ROLE` 候选策略），候选人由引擎按角色解析，后端零改动。两个模型由管理员在 BPM 后台人工创建、发布并启用，不使用全局自动部署。由于角色在模型内按角色 ID 绑定，新环境、新租户需在目标环境的 BPM 后台绑定本环境的角色。

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { noticeActions, noticeManagement, noticeReadStatistics, noticeRecipientTree, noticeView, type NoticeInput } from './noticeManagement'
+import { noticeActions, noticeManagement, noticeReadStatistics, noticeRecipientTree, noticeSelectedUserIds, noticeView, type NoticeInput } from './noticeManagement'
 import { http } from './api'
 
 vi.mock('./api', () => ({
@@ -33,6 +33,26 @@ describe('announcement authorization and lifecycle', () => {
     expect(tree[1]).toMatchObject({ checkable: false, children: [{ key: 'u:4', disabled: false }] })
   })
 })
+describe('notice recipient selection', () => {
+  const options = {
+    departments: [{ id: 10, parentId: 0, name: '中心' }, { id: 20, parentId: 10, name: '部门' }, { id: 30, parentId: 20, name: '小组' }],
+    users: [{ id: 1, deptId: 10, nickname: '中心员工', selectable: true },
+      { id: 2, deptId: 30, nickname: '下级员工', selectable: true },
+      { id: 3, deptId: 20, nickname: '不可接收', selectable: false },
+      { id: 4, nickname: '未分配员工', selectable: true }]
+  }
+  it('expands an old department draft through all levels and deduplicates explicit employees', () => {
+    expect(noticeSelectedUserIds(options, [10, 20], [2, 4])).toEqual([2, 4, 1])
+  })
+  it('does not restore excluded employees from parent groups after saving explicit selection', () => {
+    expect(noticeSelectedUserIds(options, [], [1, 4])).toEqual([1, 4])
+    expect(noticeSelectedUserIds(options, [], [])).toEqual([])
+  })
+  it('keeps unavailable explicit selections for server validation and tolerates department cycles', () => {
+    expect(noticeSelectedUserIds({ ...options, departments: [{ id: 10, parentId: 30, name: '中心' }, ...options.departments.slice(1)] }, [99], [404])).toEqual([404])
+  })
+})
+
 describe('management API contract', () => {
   beforeEach(() => { vi.clearAllMocks(); for (const method of [http.get, http.post, http.put, http.delete]) vi.mocked(method).mockResolvedValue({ data: true }) })
   it('queries reading summary and paged people without changing read status', async () => {

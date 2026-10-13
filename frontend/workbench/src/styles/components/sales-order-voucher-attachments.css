@@ -1,0 +1,6 @@
+.sales-order-voucher-attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--crm-sp-4);
+  min-width: 0;
+}

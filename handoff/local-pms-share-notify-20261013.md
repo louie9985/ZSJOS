@@ -50,3 +50,17 @@
 - Verification: 12 MySQL cases, 25 Java tests, Workbench typecheck, 38 common-link and 9 PMS-link tests passed. Both frontend browser fixtures passed at 1440/390 widths and link clicks; mobile screenshot inspected. Screenshots C:/Users/EDY/AppData/Local/Temp/pms-share-notification-xz9n1gry. Scoped diff check passed.
 - Limitation: Admin full typecheck blocked only by 12 pre-existing duplicate-field errors in src/api/zsjos/withdrawal/index.ts; notification errors resolved.
 - Remaining: deploy backend/frontends and verify actual member delivery. Existing template cache refreshes on backend restart or System template save. No remote writes, actual messages, historical backfill, service restart, dependencies or Git operations. Ownership released.
+
+## Registration update - 2026-10-13 public link only
+- Owner Codex /root; environment local; main D:/ZSJ-OS; HEAD 45f1edbe24b316b5f5924416c4fc18977658ff5f.
+- User explicitly removes internal knowledge navigation, retaining only public share link.
+- Ownership: Workbench PmsShareMessageLinks.tsx/test, Admin PmsShareMessageLinks.vue, docs/api/pms-knowledge-public-share.md, existing notification fixtures and this record. Preserve unrelated work.
+- Scope: remove internal entry and dependency on documentRoute; retain backend historical/compatibility parameters, no database or permission changes. Verification: focused tests/typechecks and both browser fixtures.
+
+## Delivery - 2026-10-13 16:08 Beijing
+- Context: local/main/D:/ZSJ-OS; HEAD 45f1edbe24b316b5f5924416c4fc18977658ff5f; owner Codex /root.
+- User goal/result: remove internal knowledge navigation; both clients now show exactly one public share link with existing common components. No dependency on documentRoute. Backend compatibility fields/history preserved, no database or permission change.
+- Changed files: frontend/workbench/src/components/PmsShareMessageLinks.tsx and test; frontend/admin/src/views/system/notify/my/PmsShareMessageLinks.vue; docs/api/pms-knowledge-public-share.md; this record.
+- Verification: Workbench typecheck and 9 focused tests passed. Both browser fixtures at 1440/390 verify exactly one anchor, no internal entry, correct public URL and new-tab opening; mobile screenshot inspected. Evidence C:/Users/EDY/AppData/Local/Temp/pms-public-only-sf15z1hf. Initial browser attempt hit stopped fixture servers; restarted isolated Vite instances and checks passed.
+- Limits: Admin full typecheck blocked by unrelated withdrawal duplicate identifiers and NoticeEditor NoticeVO mismatch, no errors in changed files. No authenticated runtime/deployed acceptance claimed. Frontend refresh/deployment required; no backend restart needed for this change.
+- Integration/dependencies: None. Other work preserved; no commit/push or shared service changes. Ownership released.

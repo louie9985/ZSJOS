@@ -37,6 +37,23 @@ export type NoticeRecipients = {
   departments: { id: number; parentId: number; name: string }[]
   users: { id: number; nickname: string; deptId?: number; selectable: boolean; disabledReason?: string }[]
 }
+// Old drafts store department scopes. Expand them only in the editor; published rosters stay frozen.
+export function noticeSelectedUserIds(options: NoticeRecipients, deptIds: number[], userIds: number[]): number[] {
+  const selected = new Set(userIds)
+  const departments = new Map(options.departments.map(dept => [dept.id, dept.parentId]))
+  const scopes = new Set(deptIds)
+  for (const user of options.users) {
+    if (!user.selectable) continue
+    let deptId = user.deptId
+    const visited = new Set<number>()
+    while (deptId != null && !visited.has(deptId)) {
+      if (scopes.has(deptId)) { selected.add(user.id); break }
+      visited.add(deptId)
+      deptId = departments.get(deptId)
+    }
+  }
+  return [...selected]
+}
 export function noticeAudienceText(notice: { audienceType?: string; audienceSummary?: string }) {
   if (notice.audienceSummary) return notice.audienceSummary
   return notice.audienceType === 'TARGET' ? '指定部门/用户（历史名称未记录）' : '全体员工'

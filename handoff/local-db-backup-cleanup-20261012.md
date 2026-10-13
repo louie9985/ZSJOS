@@ -39,3 +39,18 @@
 - All 35 pre-existing backup files remain (3,650,794,989 bytes). Retained recovery.sql.gz (450,491,742 bytes) plus manifest, backup verification, execution preflight, per-schema journal and cleanup result in backups/mysql/cleanup-20261012/.
 - Recovery archive hash, full gzip integrity and exact schema sections were verified; restoration rehearsal was not performed. Windows Docker virtual-disk file shrinkage is not claimed.
 - Authorized scope complete. No application or migration source changes, no business/permission changes, no unrelated cleanup. Ownership released.
+
+## Second cleanup registration update — 2026-10-13 Asia/Shanghai
+- User confirmed execution of the reviewed 364-schema cleanup. Owner Codex /root resumes this workstream; environment local; branch main; worktree D:/ZSJ-OS; current base 45f1edbe24b316b5f5924416c4fc18977658ff5f. Target branch/integration: None.
+- Scope: this record; backups/mysql/cleanup-20261012-round2/ artifacts; only the 364 previously reviewed schemas. Preserve 20 unresolved schemas, ruoyi-vue-pro, ptml, four system schemas, existing backup files and binary logs. Newly created schemas are outside approval.
+- Reconstruct the approved set from the original inventory, minus the first 172 deleted schemas, plus the four explicitly reviewed order_actors_v312 schemas, minus the 20 unresolved schemas. Freeze exact names before backup.
+- Verification: export data/schema/routines/triggers/events; verify gzip, SHA-256 and exact database sections; compare archived/current table definitions; recheck activity and dependencies; journal exact deletion and verify all unapproved schemas and business evidence. No service, code, permission, branch or migration changes.
+
+## Second cleanup delivery — 2026-10-13 Asia/Shanghai
+- Deleted exactly the approved 364 schemas, verified against frozen manifest SHA-256 b17630a29c9bbe3655f8631b015c11b2a435ad47033e2b866a9fc30b4a712d92 and the per-schema journal. Snapshot contained 435 schemas because 45 new schemas had appeared after review; those were preserved.
+- Remaining 71 schemas: 20 unresolved, 45 newly created/unapproved, ruoyi-vue-pro, ptml and four system schemas. No unapproved schema is missing and no approved schema remains.
+- Recovery archive: backups/mysql/cleanup-20261012-round2/recovery.sql.gz; 19,975,550 bytes compressed / 146,072,017 uncompressed. SHA-256 a8e00caf4d93d29fe21cba4298a18216b0221c48ffa59f8680e3f9318f93b72a. Full gzip integrity, completion marker and exact 364 database sections verified; no restore rehearsal.
+- Initial preflight stopped before deletion because the object count included nine synthetic failure-test views. Corrected the local verifier to parse and compare view definitions as well as tables; all 15,594 tables and nine views matched the archive before execution.
+- Activity, newer table writes, cross-schema foreign keys/views/stored objects, enabled events and configured datasource references checked. Protected evidence/version checksums and business table inventory were unchanged afterward.
+- Data directory decreased from 17,835,728 KiB to 15,013,480 KiB, approximately 2.69 GiB. Existing backup files preserved; archive SHA rechecked after deletion. No binary-log purge, runtime change, permissions change, Git operation or Docker disk compaction.
+- Exact manifest, preflight, deletion journal, backup verification, result and restoration instructions retained in the round2 directory. Approved cleanup complete; ownership released.

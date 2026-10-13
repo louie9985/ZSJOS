@@ -666,12 +666,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
         LeadInboxFilterQuery filter;
         if (reqVO.getOrderState() != null) {
-            if (!Set.of("all", STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
+            if (!Set.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
                     STATUS_TERMINATED, STATUS_SUPERSEDED).contains(reqVO.getOrderState())) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
-            // Order progress includes both the user's pending and completed BPM tasks.
-            filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of());
+            // Only the center-pending scope excludes completed work; lifecycle tabs retain both.
+            filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false,
+                    FILTER_CENTER_PENDING.equals(reqVO.getOrderState())
+                            ? Map.of(INBOX_FILTER_FIELD_HANDLED, Set.of("todo")) : Map.of());
         } else if (advanced) {
             filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of());
         } else if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
@@ -689,7 +691,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (reqVO.getOrderState() != null) {
             List<Long> orderIds = advanced ? advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter()) : null;
             if (orderIds != null && orderIds.isEmpty()) return PageResult.empty();
-            processIds = roundMapper.selectApprovalProcessIds(TenantContextHolder.getRequiredTenantId(),
+            processIds = FILTER_CENTER_PENDING.equals(reqVO.getOrderState())
+                    ? roundMapper.selectCurrentPendingProcessIds(TenantContextHolder.getRequiredTenantId(),
+                            StrUtil.blankToDefault(reqVO.getKeyword(), null), orderIds)
+                    : roundMapper.selectApprovalProcessIds(TenantContextHolder.getRequiredTenantId(),
                     "all".equals(reqVO.getOrderState()) ? null : reqVO.getOrderState(),
                     StrUtil.blankToDefault(reqVO.getKeyword(), null), orderIds);
         } else {
@@ -713,7 +718,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<SalesOrderListItemRespVO> result = contexts.stream().map(context -> convertListItem(
                 context.order(), context.round(), context.task(),
                 items.getOrDefault(context.order().getId(), List.of()))).toList();
-        long total = countApprovalTasks(userId, filter, processIds);
+        long total = countApprovalTasks(userId, filter, processIds, FILTER_CENTER_PENDING.equals(reqVO.getOrderState()));
         return new PageResult<>(result, total);
     }
 
@@ -789,6 +794,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (allowedTaskKeys.contains(TASK_FINANCE)) centers.add(new SalesOrderApprovalFilterProfileRespVO.CenterVO(CENTER_FINANCE, "财务中心"));
         return new SalesOrderApprovalFilterProfileRespVO(groups, centers, List.of(
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO("all", "全部", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(FILTER_CENTER_PENDING, "当前中心待审核", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_PENDING_APPROVAL, "待审核", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_REVISION_REQUIRED, "待重提", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_EFFECTIVE, "已通过", null),
@@ -834,7 +840,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         for (String handledValue : handledValues) {
             for (String taskKey : taskValues) {
                 tasks.addAll(loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds,
-                        requiredOrdinaryTasks == Integer.MAX_VALUE ? null : requiredOrdinaryTasks));
+                        requiredOrdinaryTasks == Integer.MAX_VALUE ? null : requiredOrdinaryTasks,
+                        FILTER_CENTER_PENDING.equals(reqVO.getOrderState())));
             }
         }
         boolean done = isDoneApproval(reqVO);
@@ -854,6 +861,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private long countApprovalTasks(Long userId, LeadInboxFilterQuery filter, List<String> processIds) {
+        return countApprovalTasks(userId, filter, processIds, false);
+    }
+
+    private long countApprovalTasks(Long userId, LeadInboxFilterQuery filter, List<String> processIds, boolean centerPending) {
         SalesOrderPageReqVO countReq = new SalesOrderPageReqVO();
         countReq.setPageNo(1); countReq.setPageSize(1);
         countReq.setGroupKey("all"); countReq.setOptionKey("all");
@@ -863,7 +874,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
         long total = 0;
         for (String handledValue : handledValues) for (String taskKey : taskValues) {
-            total += loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds, null).size();
+            total += loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds, null, centerPending).size();
         }
         return total;
     }
@@ -873,7 +884,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
      * ordinary-review pagination slots and totals stay exact even when a review pool exceeds one API page.
      */
     private List<BpmTaskRespDTO> loadOrdinaryApprovalTasks(Long userId, String handledValue, String taskKey,
-                                                            List<String> processIds, Integer limit) {
+                                                            List<String> processIds, Integer limit, boolean centerPending) {
         final int bpmPageSize = 100;
         List<BpmTaskRespDTO> result = new ArrayList<>();
         int pageNo = 1;
@@ -885,7 +896,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             taskReq.setProcessInstanceIds(processIds);
             PageResult<BpmTaskRespDTO> page = "done".equals(handledValue)
                     ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-            result.addAll(page.getList().stream().filter(task -> !Boolean.TRUE.equals(task.getSignTask())).toList());
+            // Parallel-sign parents stay in the runtime inbox after approving; they are not pending center work.
+            result.addAll(page.getList().stream().filter(task -> !Boolean.TRUE.equals(task.getSignTask()))
+                    .filter(task -> !centerPending || cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum.RUNNING
+                            .getStatus().equals(task.getStatus())).toList());
             loaded += page.getList().size();
             if (limit != null && result.size() >= limit) break;
             if (page.getList().isEmpty() || loaded >= page.getTotal()) break;

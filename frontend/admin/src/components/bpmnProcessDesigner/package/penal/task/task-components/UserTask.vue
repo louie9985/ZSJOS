@@ -16,8 +16,8 @@
       </el-select>
     </el-form-item>
     <el-form-item
-      v-if="userTaskForm.candidateStrategy == CandidateStrategy.ROLE"
-      label="指定角色"
+      v-if="userTaskForm.candidateStrategy == CandidateStrategy.ROLE || userTaskForm.candidateStrategy == CandidateStrategy.START_USER_SELECT"
+      :label="userTaskForm.candidateStrategy == CandidateStrategy.START_USER_SELECT ? '自选角色范围' : '指定角色'"
       prop="candidateParam"
     >
       <el-select

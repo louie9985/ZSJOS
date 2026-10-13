@@ -10,7 +10,7 @@ import SubjectAvatar from './SubjectAvatar'
 
 export default function StudentDetail({ student, service, contactContext, contactRecords = [], toolbar, overviewSlots, overviewContent, contextHeader, extraTabs = [], activeTab: controlledActiveTab, onTabChange, overviewOnly = false }: {
   student: MyStudent
-  service: MyStudent['services'][number]
+  service?: MyStudent['services'][number]
   contactContext?: StudentContactContext
   contactRecords?: StudentOverviewContext['contactRecords']
   toolbar?: ReactNode
@@ -23,8 +23,8 @@ export default function StudentDetail({ student, service, contactContext, contac
   overviewOnly?: boolean
 }) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview')
-  const studentContext = contactContext ? { service, contactContext, contactRecords } : undefined
-  const collectionLeadId = service.leadId ?? student.leadId
+  const studentContext = contactContext && service ? { service, contactContext, contactRecords } : undefined
+  const collectionLeadId = service?.leadId ?? student.leadId
   const items: LeadDetailExtraTab[] = [{
     key: 'overview',
     label: '概览',

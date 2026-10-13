@@ -75,6 +75,14 @@ describe('content review error guidance', () => {
     expect(get).toHaveBeenCalledWith(8)
   })
 
+  it('passes the confirmed reviewer and exact definition through lost-response recovery', async () => {
+    const submit = vi.fn().mockRejectedValue(new ApiError(0, 'timeout'))
+    const get = vi.fn().mockResolvedValue({ status:'DIRECTOR_REVIEW', processInstanceId:'p' })
+    const selection = { directorUserId:22, processDefinitionId:'d2' }
+    await submitContentReview(8,2,{submit,get},selection)
+    expect(submit).toHaveBeenCalledExactlyOnceWith(8,2,selection)
+  })
+
   it('keeps a confirmed business rejection actionable', async () => {
     const submit = vi.fn().mockRejectedValue(new ApiError(1_900_012_100, '链接格式不正确'))
     const get = vi.fn()

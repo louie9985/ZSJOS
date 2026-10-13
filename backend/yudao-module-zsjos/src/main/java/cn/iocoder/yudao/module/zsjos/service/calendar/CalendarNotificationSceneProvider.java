@@ -33,6 +33,7 @@ public class CalendarNotificationSceneProvider implements NotifySceneProvider {
                         new NotifySceneVariableRespDTO("calendar.type", "日历类型", false),
                         new NotifySceneVariableRespDTO("calendar.eventType", "通知事件", false)),
                 List.of(new NotifySceneRoleRespDTO("recipient", "通知接收人")),
-                List.of(NotifyActionType.NONE), false);
+                COURSE.equals(code) ? List.of(NotifyActionType.NONE, NotifyActionType.BUSINESS_DETAIL)
+                        : List.of(NotifyActionType.NONE), false);
     }
 }

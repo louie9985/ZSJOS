@@ -34,7 +34,7 @@
 - Workbench `/zsjos/sales-orders` consumes the management cursor/search/count contracts.
   It uses the normal order detail contract in read-only `team` mode and never exposes update, terminate,
   approval, or export commands from the team-query permission.
-- `GET /zsjos/sales-order/approval/filter-profile`：保留当前租户已发布的待处理/已处理方案 `groups`，另返回订单状态页签 `orderStates`（全部、待审核、待重提、已通过、已终止、历史旧单（已重提）），以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。
+- `GET /zsjos/sales-order/approval/filter-profile`：保留当前租户已发布的待处理/已处理方案 `groups`，另返回订单状态页签 `orderStates`（全部、当前中心待审核、待审核、待重提、已通过、已终止、历史旧单（已重提）），以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。
 - `GET /zsjos/sales-order/approval/task-target?taskId=&view=todo|done`：成交订单专用的历史兼容定位接口，校验当前用户对 BPM 普通任务或主管加签任务的关系后，返回 `workType`、`orderId`、`taskId`、`taskDefinitionKey`、`center`、`confirmationId` 和处理状态，用于成交订单审批页的精确跳转。审批中心改用统一的 `/zsjos/bpm/business-task-target`。
 - `GET /zsjos/sales-order/approval/notification-target?orderId=&sceneCode=&sourceEventKey=`：仅接受主管申请和主管决定两个通知场景，分别要求当前用户是指定主管或加签申请人；服务端使用消息既有的事件幂等键精确恢复确认记录和固化任务定位，并执行订单对象权限检查。兼容缺少事件键的旧消息时才回退该订单最新确认记录；前端不得提交用户 ID 或任意目标 URL。
 - `GET /zsjos/sales-order/approval/inbox-page?center=registration|finance&groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和中心分页查询订单列表，支持订单号、学员姓名和手机号搜索，并返回与本人/团队订单表格一致的可见业务字段及当前任务上下文；`handled` 仍可作为兼容参数。服务端将筛选条件与当前用户允许的 BPM 任务节点取交集，伪造无权中心返回权限错误，前端隐藏筛选项不是授权边界。
@@ -70,9 +70,11 @@
 
 ## 审批状态页签（2026-10-09）
 
-工作台按服务端 `orderStates` 的顺序和名称显示页签，不把旧的待办/已办标签改名冒充订单状态。分页、游标及高级搜索共用可选 `orderState`：`all`、`pending_approval`、`revision_required`、`effective`、`terminated`、`superseded`。状态取订单当前值，先与关键词、高级筛选相交，再交给 BPM 分页和计数；无匹配不回退全量。状态不会扩大当前用户、审批中心和本人 BPM 待办/已办的既有可见范围，历史导入但没有 BPM 任务的订单不会因此进入审批列表。
+工作台按服务端 `orderStates` 的顺序和名称显示页签，不把旧的待办/已办标签改名冒充订单状态。分页、游标及高级搜索共用可选 `orderState`：`all`、`pending_approval`、`center_pending`、`revision_required`、`effective`、`terminated`、`superseded`。除 `center_pending` 使用下述中心待办口径外，状态取订单当前值，先与关键词、高级筛选相交，再交给 BPM 分页和计数；无匹配不回退全量。状态不会扩大当前用户、审批中心和本人 BPM 待办/已办的既有可见范围，历史导入但没有 BPM 任务的订单不会因此进入审批列表。
 
-待审核包括本中心已处理但另一中心尚未完成的订单，动作仍由当前 BPM 任务和节点状态决定。已完成任务以只读方式展示。待重提对应 `revision_required`（包括既有流程取消兼容状态）；已终止单列，虽然符合条件时也可重提。重提创建新订单，旧单转为 `superseded`，新单从待审核开始，二者不是同一记录。最后一项“历史旧单（已重提）”用于查历史；全部包含历史旧单。订单状态不表示“我是否已处理”。
+新增“当前中心待审核”（`center_pending`），放在“待审核”之前：仅查询整体仍为 `pending_approval` 的订单当前审批轮次，按所选中心及原有本人 BPM 任务权限取普通待办，要求 BPM 任务状态为 `RUNNING`。本中心已通过、仅等待另一中心或主管加签的任务不进入此分类；主管子任务也不进入。筛选在分页和计数前执行，分页、游标、关键词和高级筛选共用；空匹配不扩大范围。无需数据迁移，工作台直接渲染后端新增分类；Vue 原 `handled=false` 请求语义保持不变。
+
+原“待审核”包括本中心已处理但另一中心尚未完成的订单，动作仍由当前 BPM 任务和节点状态决定。已完成任务以只读方式展示。待重提对应 `revision_required`（包括既有流程取消兼容状态）；已终止单列，虽然符合条件时也可重提。重提创建新订单，旧单转为 `superseded`，新单从待审核开始，二者不是同一记录。最后一项“历史旧单（已重提）”用于查历史；全部包含历史旧单。订单状态不表示“我是否已处理”。
 
 切换状态或中心会重置分页、游标和详情选择。状态查询沿用任务创建时间及任务 ID 的稳定排序，游标绑定状态、中心、用户与筛选条件。旧 `groups`、`groupKey`、`handled` 契约保留，Vue 管理端继续提交 `handled=false`；本次不改变其待办流程，也不改主管确认分类。无需修改数据库筛选方案或发布配置；先部署支持 `orderStates/orderState` 的后端，再部署工作台。
 

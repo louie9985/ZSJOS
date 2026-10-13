@@ -53,6 +53,36 @@ import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 
 @Service
 public class PositioningCardService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewStudentAccess reviewAccess;
+
+    public record ReviewOverview(cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO account,
+            cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO service) { }
+
+    @ZsjosPermission(bizType="content-review-student",bizId="#batchId",action="read")
+    public ReviewOverview overviewForReview(Long batchId, Long accountId, Long userId) {
+        var account = reviewAccess.requireAccount(batchId, accountId, userId);
+        var history = accountForReview(batchId, accountId, userId);
+        var applied = submissionMapper.selectCurrentConfirmedByAccount(accountId);
+        var effective = applied == null ? null : history.stream()
+                .filter(s -> Objects.equals(s.getSubmissionId(), applied.getId())).findFirst().orElse(null);
+        var current = history.isEmpty() ? null : history.getFirst();
+        return new ReviewOverview(new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO(
+                current, effective, history), new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO(
+                account.getCreateServiceRelationId(), current == null ? null : current.getId(), false, false, false,
+                List.of(), current, effective, history));
+    }
+
+    @ZsjosPermission(bizType="content-review-student",bizId="#batchId",action="read")
+    public List<PositioningCardRespVO> accountForReview(Long batchId, Long accountId, Long userId) {
+        var account = reviewAccess.requireAccount(batchId, accountId, userId);
+        return submissionMapper.selectByStudentAndAccountIds(account.getStudentPersonId(), List.of(accountId)).stream()
+                .filter(s -> Objects.equals(s.getServiceRelationId(), account.getCreateServiceRelationId()))
+                .map(s -> {
+                    var result = projectSubmission(s, userId);
+                    result.setAvailableActions(List.of()); result.setCanUploadEvidence(false);
+                    return result;
+                }).toList();
+    }
     @jakarta.annotation.Resource private cn.iocoder.yudao.module.infra.api.file.FileApi positioningFileApi;
 
     public record CardFile(Long id, String name, String type, Long size, String url) {}
@@ -801,6 +831,10 @@ public class PositioningCardService {
 
     public PositioningCardRespVO submissionResponse(PositioningCardSubmissionDO row, Long userId) {
         objectPermissionProvider.check(row.getCardId(), "read", userId);
+        return projectSubmission(row, userId);
+    }
+
+    private PositioningCardRespVO projectSubmission(PositioningCardSubmissionDO row, Long userId) {
         var response = BeanUtils.toBean(row, PositioningCardRespVO.class);
         response.setId(row.getCardId()); response.setSubmissionId(row.getId());
         var sourceCard = mapper.selectById(row.getCardId());

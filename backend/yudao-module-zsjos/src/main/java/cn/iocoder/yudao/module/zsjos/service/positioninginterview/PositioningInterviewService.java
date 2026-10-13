@@ -32,6 +32,16 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PositioningInterviewService {
+ @Resource private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewStudentAccess reviewAccess;
+ @ZsjosPermission(bizType="content-review-student",bizId="#batchId",action="read")
+ public Context contextForReview(Long batchId, Long relationId, Long userId) {
+  reviewAccess.requireService(batchId,relationId,userId);
+  var relation=relationMapper.selectById(relationId);
+  var result=project(relation,current(relationId,relation.getPersonId()),userId);
+  result.setAvailableActions(List.of());
+  result.getAttachments().forEach(f->f.setUrl(null));
+  return result;
+ }
  public static final String QUERY="zsjos:student:positioning-interview-query";
  public static final String EDIT="zsjos:student:positioning-interview";
  public static final String COMPLETE="zsjos:student:positioning-interview-complete";

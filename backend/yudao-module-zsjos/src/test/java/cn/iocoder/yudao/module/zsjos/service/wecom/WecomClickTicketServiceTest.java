@@ -44,6 +44,17 @@ class WecomClickTicketServiceTest {
         lenient().when(values.getAndDelete(anyString())).thenAnswer(call -> tickets.remove(call.getArgument(0)));
     }
 
+    @Test void courseTicketTargetsAuthenticatedCalendarAndKeepsExamUnchanged() {
+        var context = NotifyDeliveryContext.builder().tenantId(1L).userType(2).userId(15L)
+                .bizType("calendar").bizId(42L).sceneCode("zsjos.calendar.course").actionType("business_detail").build();
+        String token = ticket(service.createClickUrl(context));
+        assertEquals("/calendar/course-calendar?courseId=42",service.resolve(token).getTargetPath());
+        assertThrows(ServiceException.class, () -> service.resolve(token));
+        context = context.toBuilder().sceneCode("zsjos.calendar.exam").build();
+        assertNull(service.resolve(ticket(service.createClickUrl(context))).getTargetPath());
+        verifyNoInteractions(leadMapper,orderMapper,partnerAccountMapper);
+    }
+
     @Test void partnerOrderTargetsOwnedLeadWithoutQueryingBusinessDuringPublicResolve() {
         when(orderMapper.selectById(42L)).thenReturn(new SalesOrderDO().setId(42L).setLeadId(73L));
         when(leadMapper.selectById(73L)).thenReturn(new LeadDO().setId(73L).setPartnerId(8L));

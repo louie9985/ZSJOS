@@ -190,6 +190,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
             result.setReasonRequire(readReasonRequire(task, models));
+            result.setStatus(task.getTaskLocalVariables() == null ? null
+                    : (Integer) task.getTaskLocalVariables().get(BpmnVariableConstants.TASK_VARIABLE_STATUS));
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             return result;
         }).toList();

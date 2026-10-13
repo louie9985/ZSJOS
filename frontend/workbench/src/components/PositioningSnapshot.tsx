@@ -1,3 +1,4 @@
+import { useMediaStudentReview, reviewFile } from './MediaStudentReviewContext'
 import { LinkedText } from './ResourceLink'
 import AttachmentCard from './AttachmentCard'
 import { Alert, Button, Image, Spin, Typography } from 'antd'
@@ -47,12 +48,14 @@ export function MaterialReference({ card, id, title }: { card: PositioningCard; 
 }
 
 export default function PositioningSnapshot({ card, reading = false }: { card: PositioningCard; reading?: boolean }) {
+  const review = useMediaStudentReview()
   const Fields = reading ? PositioningReadingFields : PositioningCardFields
   const wideKeys = (card.fieldsSnapshot || []).filter(field => formatPositioningSnapshotValue(card.valuesSnapshot?.[field.key], card.dictSnapshot?.[field.key]).length > 120).map(field => field.key)
   return <Fields fields={card.fieldsSnapshot || []} {...(reading ? { wideKeys } : {})} render={field => {
     const value = card.valuesSnapshot?.[field.key], snapshot = card.dictSnapshot?.[field.key]
     if (field.type === 'attachment' && Array.isArray(snapshot)) return <div className="positioning-file-grid">{snapshot.map((item: PositioningFile) =>
-      <PositioningFileView key={`${card.id}-${card.submissionId}-${item.id}`} name={item.name} load={() => api.positioningCard.snapshotAttachment(card.id, item.id, card.status === 'co_creating' ? undefined : card.submissionId)} />)}</div>
+      <PositioningFileView key={`${card.id}-${card.submissionId}-${item.id}`} name={item.name} load={() => review ? reviewFile(review,'positioning',item.id,card.submissionId) : api.positioningCard.snapshotAttachment(card.id, item.id, card.status === 'co_creating' ? undefined : card.submissionId)} />)}</div>
+    if (review && field.type === 'material_picker' && Array.isArray(snapshot)) return <Typography.Text>{snapshot.map((item: {titleSnapshot?:string})=>item.titleSnapshot || '历史参考素材').join('、') || '未选择参考素材'}</Typography.Text>
     if (field.type === 'material_picker' && Array.isArray(snapshot)) return snapshot.length ? <div className="positioning-material-grid">{snapshot.map((item: { materialVersionId: number; titleSnapshot: string }) =>
       <MaterialReference key={`${card.id}-${card.submissionId}-${item.materialVersionId}`} card={card} id={item.materialVersionId} title={item.titleSnapshot || '历史参考素材'} />)}</div> : <Typography.Text type="secondary">未选择参考素材</Typography.Text>
     if (field.type === 'system_history') return <Typography.Text type="secondary">历史提交保留在课程服务定位卡记录中；定位访谈稿可在学员概览查看。</Typography.Text>

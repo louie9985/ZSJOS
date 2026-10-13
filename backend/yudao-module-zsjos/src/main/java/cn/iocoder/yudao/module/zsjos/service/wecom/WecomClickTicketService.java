@@ -117,6 +117,10 @@ public class WecomClickTicketService {
             return null;
         }
         if (AUDIENCE_ADMIN.equals(payload.getAudience())) {
+            if ("calendar".equals(payload.getBizType()) && "zsjos.calendar.course".equals(payload.getSceneCode())
+                    && payload.getBizId() > 0) {
+                return "/calendar/course-calendar?courseId=" + payload.getBizId();
+            }
             if ("hrm_employee".equals(payload.getBizType())) {
                 return "/hrm/employee/list?employeeId=" + payload.getBizId();
             }

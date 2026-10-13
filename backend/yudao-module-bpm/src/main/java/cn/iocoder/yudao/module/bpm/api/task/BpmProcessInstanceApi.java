@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
  * @author 芋道源码
  */
 public interface BpmProcessInstanceApi {
+    /** Business callers must authorize their own object before checking its exact instance. */
+    boolean isRunning(String processInstanceId, String businessKey);
 
     /**
      * 创建流程实例（提供给内部）

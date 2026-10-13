@@ -37,6 +37,21 @@ import java.util.Objects;
 @Service
 public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
 
+    @Resource private cn.iocoder.yudao.module.bpm.service.task.BpmStarterSelectionPolicy starterSelectionPolicy;
+
+    @Override
+    public cn.iocoder.yudao.module.bpm.api.definition.dto.BpmStarterSelectionScopeRespDTO getStarterSelectionScope(
+            String definitionId, String taskKey) {
+        var model = processDefinitionService.getProcessDefinitionBpmnModel(definitionId);
+        var task = model == null ? null : model.getMainProcess().getFlowElement(taskKey, true);
+        if (!(task instanceof org.flowable.bpmn.model.UserTask userTask)
+                || !java.util.Objects.equals(BpmnModelUtils.parseCandidateStrategy(userTask),
+                cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmTaskCandidateStrategyEnum.START_USER_SELECT.getStrategy()))
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.bpm.service.task.BpmStarterSelectionPolicy.INVALID_SCOPE);
+        return starterSelectionPolicy.resolve(BpmnModelUtils.parseCandidateParam(userTask));
+    }
+
     @Resource
     private BpmFormService formService;
     @Resource

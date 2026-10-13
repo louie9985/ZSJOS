@@ -110,6 +110,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
     @Resource private BpmModelService modelService;
+    @Resource private BpmStarterSelectionPolicy starterSelectionPolicy;
     @org.springframework.beans.factory.annotation.Autowired private List<BpmExternalStartUserProvider> externalStartUserProviders;
     @Resource
     @Lazy // 避免循环依赖
@@ -883,6 +884,8 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         }
         for (UserTask task : startUserSelectTasks.values()) {
             List<Long> assignees = startUserSelectAssignees == null ? null : startUserSelectAssignees.get(task.getId());
+            if (StrUtil.isNotBlank(BpmnModelUtils.parseCandidateParam(task)))
+                starterSelectionPolicy.validate(BpmnModelUtils.parseCandidateParam(task), assignees);
             if (CollUtil.isEmpty(assignees)) {
                 throw exception(PROCESS_INSTANCE_START_USER_SELECT_ASSIGNEES_NOT_CONFIG, task.getName());
             }
@@ -989,6 +992,10 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         // 2.2 流程发起时要先获取当前流程的预测走向节点，发起时只校验预测的节点发起人自选审批人的审批人和抄送人是否都配置了
         activityNodes.forEach(task -> {
             List<Long> assignees = startUserSelectAssignees != null ? startUserSelectAssignees.get(task.getId()) : null;
+            var node = modelService.getBpmnModelByDefinitionId(definition.getId()).getMainProcess()
+                    .getFlowElement(task.getId(), true);
+            if (node instanceof UserTask userTask && StrUtil.isNotBlank(BpmnModelUtils.parseCandidateParam(userTask)))
+                starterSelectionPolicy.validate(BpmnModelUtils.parseCandidateParam(userTask), assignees);
             if (CollUtil.isEmpty(assignees)) {
                 throw exception(PROCESS_INSTANCE_START_USER_SELECT_ASSIGNEES_NOT_CONFIG, task.getName());
             }

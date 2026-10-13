@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import type { FormInstance } from 'antd'
 import { ApiError } from './api'
-import { contentReviewApi, type ContentReviewBatch } from './materialApi'
+import { contentReviewApi, type ContentReviewBatch, type ContentReviewSelection } from './materialApi'
 
 export function httpsLinkError(value: unknown): string | undefined {
   if (value == null || String(value).trim() === '') return
@@ -42,8 +42,8 @@ export const approvalHasStarted = (batch: ContentReviewBatch) => Boolean(batch.p
 
 /** A lost submit response is resolved using the authorized batch query, never by creating a new round. */
 export async function submitContentReview(id: number, version: number,
-  transport = { submit: contentReviewApi.submit, get: contentReviewApi.get }): Promise<void> {
-  try { await transport.submit(id, version) }
+  transport = { submit: contentReviewApi.submit, get: contentReviewApi.get }, selection?: ContentReviewSelection): Promise<void> {
+  try { await transport.submit(id, version, selection) }
   catch (error) {
     if (!requestMayHaveSucceeded(error)) throw error
     let current: ContentReviewBatch

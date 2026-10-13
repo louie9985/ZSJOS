@@ -175,6 +175,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         TaskQuery taskQuery = taskService.createTaskQuery()
                 .taskAssignee(String.valueOf(userId)) // 分配给自己
                 .active()
+                .includeTaskLocalVariables()
                 .includeProcessVariables()
                 .taskTenantId(FlowableUtils.getTenantId())
                 .orderByTaskCreateTime().desc(); // 创建时间倒序

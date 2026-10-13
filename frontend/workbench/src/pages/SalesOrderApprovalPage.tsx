@@ -228,7 +228,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         setLeadDetailModalLeadId(detail.leadId)
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={selectedItem?.taskEndTime ? 'approval-done' : 'approval-todo'}
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} informationLayout="table" mode={selectedItem?.taskEndTime ? 'approval-done' : 'approval-todo'}
+          reloadVouchers={async () => (await api.salesOrder(detail.id)).paymentVouchers}
           onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
           onRequestSupervisor={() => { resetIntent(); setReason(''); setSupervisorOpen(true) }}/></>
         : <Empty description="从左侧选择一条订单"/>

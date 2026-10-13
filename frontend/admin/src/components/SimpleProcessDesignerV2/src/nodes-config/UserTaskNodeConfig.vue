@@ -57,9 +57,9 @@
               </el-radio-group>
             </el-form-item>
             <el-form-item
-              v-if="configForm.candidateStrategy == CandidateStrategy.ROLE"
-              label="指定角色"
-              prop="roleIds"
+              v-if="configForm.candidateStrategy == CandidateStrategy.ROLE || configForm.candidateStrategy == CandidateStrategy.START_USER_SELECT"
+              :label="configForm.candidateStrategy == CandidateStrategy.START_USER_SELECT ? '自选角色范围' : '指定角色'"
+              :prop="configForm.candidateStrategy == CandidateStrategy.ROLE ? 'roleIds' : undefined"
             >
               <el-select
                 filterable

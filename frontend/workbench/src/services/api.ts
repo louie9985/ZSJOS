@@ -578,7 +578,7 @@ export type AssignmentLog = {
   createTime: Timestamp;
 };
 export type PageResult<T> = { list: T[]; total: number };
-export type CourseCalendarEvent = { backgroundColor?: string | null; id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
+export type CourseCalendarEvent = { creatorName?: string; attachments?: import("./courseAttachments").CourseAttachment[]; backgroundColor?: string | null; id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
 export type CourseCalendarInput = { backgroundColor?: string | null; courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] };
 export type CalendarNotifyInput = { calendarId: number; calendarType: 'EXAM' | 'COURSE'; scope: 'ALL' | 'SPECIFIED'; userIds?: number[]; resend?: boolean; calendarVersion?: number; eventType?: string; idempotencyKey?: string; previewToken?: string; title?: string; time?: string; remark?: string };
 export type CalendarNotifyResult = { batchId: number; acceptedCount: number; skippedCount: number; status: string; resend: boolean; sourceEventKey: string };
@@ -3015,7 +3015,7 @@ export const normalizeRequestError = (error: unknown): unknown => {
   }
   return error;
 };
-export type PersonalCalendarEvent = { backgroundColor?: string | null;
+export type PersonalCalendarEvent = { creatorName?: string; backgroundColor?: string | null;
   ownerUserId?: number;
   ownerName?: string;
   id: number;

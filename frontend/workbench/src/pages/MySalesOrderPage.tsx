@@ -125,6 +125,7 @@ export default function MySalesOrderPage() {
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
         <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" informationLayout="table"
+          reloadVouchers={async () => (await api.managementSalesOrder(detail.id)).paymentVouchers}
           onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
           onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
         : <Empty description="从左侧选择一条订单"/>

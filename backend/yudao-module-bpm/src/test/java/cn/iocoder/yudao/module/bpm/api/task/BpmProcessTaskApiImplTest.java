@@ -119,6 +119,7 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
         for (String definition : List.of("old", "new", "new")) {
             Task task = mock(Task.class);
             when(task.getProcessDefinitionId()).thenReturn(definition);
+            when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, "old".equals(definition) ? 7 : 1));
             when(task.getTaskDefinitionKey()).thenReturn("financeReview");
             tasks.add(task);
         }
@@ -126,6 +127,7 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(new PageResult<>(tasks, 3L));
         var result = processTaskApi.getTodoTaskPage(USER_ID, pageReq());
+        assertEquals(List.of(7, 1, 1), result.getList().stream().map(BpmTaskRespDTO::getStatus).toList());
         assertEquals(List.of(true, false, false), result.getList().stream().map(BpmTaskRespDTO::getReasonRequire).toList());
         verify(processDefinitionService, org.mockito.Mockito.times(1)).getProcessDefinitionBpmnModel("new");
     }

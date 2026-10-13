@@ -22,6 +22,12 @@ import java.util.Map;
 @Service
 @Validated
 public class FileApiImpl implements FileApi {
+    @Override
+    public byte[] getFileContent(Long fileId) throws Exception {
+        var file = fileService.getFile(fileId);
+        if (file == null) throw new IllegalArgumentException("File unavailable");
+        return fileService.getFileContent(file.getConfigId(),file.getPath());
+    }
 
     @Resource
     private FileService fileService;

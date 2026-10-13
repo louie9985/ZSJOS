@@ -12,6 +12,7 @@ public class CalendarPalettePermissionProvider implements ZsjosObjectPermissionP
     @Override public String getBizType() { return "calendar-palette"; }
     public static String permission(String type, boolean write) {
         if (!"PERSONAL".equals(type) && !"COURSE".equals(type)) throw exception(CalendarColors.DENIED);
+        if ("COURSE".equals(type) && write) return "zsjos:course-calendar:manage";
         return "zsjos:" + ("PERSONAL".equals(type) ? "personal" : "course") + "-calendar:" + (write ? "color-manage" : "query");
     }
     @Override public boolean hasPermission(Long id, String action, Long user) {

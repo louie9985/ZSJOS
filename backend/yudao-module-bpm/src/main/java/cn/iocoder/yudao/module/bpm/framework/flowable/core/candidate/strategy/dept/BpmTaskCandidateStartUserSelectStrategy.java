@@ -36,7 +36,11 @@ public class BpmTaskCandidateStartUserSelectStrategy extends AbstractBpmTaskCand
     }
 
     @Override
-    public void validateParam(String param) {}
+    public void validateParam(String param) {
+        if (param != null && !param.isBlank()) starterSelectionPolicy.resolve(param);
+    }
+
+    @Resource private cn.iocoder.yudao.module.bpm.service.task.BpmStarterSelectionPolicy starterSelectionPolicy;
 
     @Override
     public boolean isParamRequired() {

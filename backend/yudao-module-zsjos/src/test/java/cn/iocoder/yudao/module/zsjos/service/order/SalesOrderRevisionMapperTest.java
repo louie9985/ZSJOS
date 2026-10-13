@@ -30,12 +30,19 @@ class SalesOrderRevisionMapperTest {
             jdbc.execute("CREATE TABLE zsjos_order_approval_round(id BIGINT PRIMARY KEY, order_id BIGINT, tenant_id BIGINT, process_instance_id VARCHAR(64), deleted BOOLEAN DEFAULT FALSE)");
             jdbc.execute("INSERT INTO zsjos_order VALUES(1,1,'superseded','OLD-A','example','',FALSE),(2,1,'pending_approval','NEW-B','example','',FALSE),(3,1,'revision_required','REV-C','example','',FALSE),(4,2,'pending_approval','OTHER','example','',FALSE),(5,1,'effective','DELETED','example','',TRUE)");
             jdbc.execute("INSERT INTO zsjos_order_approval_round VALUES(1,1,1,'p-old',FALSE),(2,2,1,'p-new',FALSE),(3,3,1,'p-revise',FALSE),(4,4,2,'p-other',FALSE),(5,5,1,'p-deleted',FALSE),(6,2,2,'p-wrong-tenant',FALSE)");
+            jdbc.execute("ALTER TABLE zsjos_order ADD current_approval_round_id BIGINT");
+            jdbc.execute("UPDATE zsjos_order SET current_approval_round_id = id");
             var config = new MybatisConfiguration();
             config.setEnvironment(new Environment("test", new JdbcTransactionFactory(), source));
             config.addMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper.class);
             var factory = new MybatisSqlSessionFactoryBuilder().build(config);
             try (var session = factory.openSession()) {
                 var mapper = session.getMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper.class);
+                assertEquals(java.util.List.of("p-new"), mapper.selectCurrentPendingProcessIds(1L, "NEW", java.util.List.of(2L, 3L)));
+                assertTrue(mapper.selectCurrentPendingProcessIds(1L, "REV", null).isEmpty());
+                jdbc.execute("INSERT INTO zsjos_order_approval_round VALUES(7,2,1,'p-obsolete',FALSE)");
+                assertEquals(java.util.List.of("p-new"), mapper.selectCurrentPendingProcessIds(1L, null, null));
+                jdbc.execute("DELETE FROM zsjos_order_approval_round WHERE id = 7");
                 assertEquals(java.util.List.of("p-old"), mapper.selectApprovalProcessIds(1L, "superseded", null, null));
                 assertEquals(java.util.List.of("p-new"), mapper.selectApprovalProcessIds(1L, "pending_approval", "NEW", java.util.List.of(2L, 3L)));
                 assertTrue(mapper.selectApprovalProcessIds(1L, "revision_required", "NEW", null).isEmpty());
