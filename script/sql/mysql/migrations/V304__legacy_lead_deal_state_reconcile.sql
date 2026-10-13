@@ -78,7 +78,7 @@ apply_body: BEGIN
   CREATE TEMPORARY TABLE zsjos_v304_target (
     lead_id BIGINT PRIMARY KEY, person_id BIGINT, order_id BIGINT, effective_at DATETIME,
     opportunity_id BIGINT NULL, imported_batch VARCHAR(64), original_status VARCHAR(32)
-  ) ENGINE=InnoDB;
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   INSERT INTO zsjos_v304_target
 -- BEGIN V304 TARGET SELECT
   SELECT l.id AS lead_id,l.person_id,MIN(o.id) AS order_id,MIN(o.effective_at) AS effective_at,
@@ -117,7 +117,7 @@ apply_body: BEGIN
   opp_locks: LOOP FETCH c_opps INTO v_id; IF v_done THEN LEAVE opp_locks; END IF; END LOOP;
   CLOSE c_opps;
 
-  CREATE TEMPORARY TABLE zsjos_v304_conflicts (lead_id BIGINT,reason VARCHAR(80)) ENGINE=InnoDB;
+  CREATE TEMPORARY TABLE zsjos_v304_conflicts (lead_id BIGINT,reason VARCHAR(80)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   INSERT INTO zsjos_v304_conflicts
 -- BEGIN V304 CONFLICT SELECT
   SELECT t.lead_id,'lead_or_person_changed' reason FROM zsjos_v304_target t
@@ -202,7 +202,7 @@ apply_body: BEGIN
   CREATE TEMPORARY TABLE zsjos_v304_images (
     table_name VARCHAR(64),row_id BIGINT,before_image VARCHAR(512),after_image VARCHAR(512),
     PRIMARY KEY(table_name,row_id)
-  ) ENGINE=InnoDB;
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   INSERT INTO zsjos_v304_images
   SELECT 'zsjos_lead',l.id,
     JSON_OBJECT('status',l.status,'version',l.version,'updater',l.updater,'updateTime',l.update_time),

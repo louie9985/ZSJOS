@@ -848,7 +848,8 @@ SELECT 'lead_appeal_reviewer_snapshots' AS check_name,
        ), 'PASS', 'FAIL') AS result;
 SELECT 'lead_appeal_indexes' AS check_name,
        IF((SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema=DATABASE()
-           AND table_name='zsjos_lead_appeal' AND index_name IN ('uk_tenant_lead_round',
+           AND table_name='zsjos_lead_appeal' AND index_name IN (IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V311'),
+             'uk_tenant_lead_cycle_round','uk_tenant_lead_round'),
            'uk_tenant_appeal_submit_key','uk_tenant_appeal_decision_key','idx_tenant_process'))=4, 'PASS', 'FAIL') AS result;
 SELECT 'lead_appeal_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:lead:appeal:query' AND deleted=b'0'), 'PASS', 'FAIL') AS result;

@@ -90,6 +90,20 @@ database; applied deployed copies remain a separate rollout. Retain widened sche
 
 ## Core schema synchronization and numbering
 
+The V293 nullable JSON `zsjos_exam_schedule.attachment_ids_json` and V294 nullable
+datetime `zsjos_feedback_round.last_urged_at` must appear in both Core schema
+sources. Their omission caused post-migration verification to report these valid
+columns as unexpected. This source correction applies to fresh initialization
+and desired-schema comparison; existing installations retain their columns,
+attachment references, urging timestamps and applied migration checksums.
+V293/V294 remain the existing upgrade path, in normal migration order after their
+documented prerequisites. Repeated execution validates existing columns without
+resetting records; no additional numbered migration is needed. Rollback retains
+the additive schema and business history. Verify with `check`, isolated fresh/
+upgrade checks and read-only target `db-verify` after rebuilding the migrator.
+Data-grade FAIL/MISSING warnings are separate business-data audits and require
+individual assessment; structural verification passing does not clear them.
+
 `check` compares `schema/core.sql` and `00-bootstrap-schema.sql` byte for byte,
 before `migrate` connects to the target database. A mismatch is a source-file
 error, not evidence of database drift. When a reviewed numbered migration already
@@ -194,6 +208,33 @@ from current sources; a stale image still has the old manifest. A blocked `deplo
 may leave the backend stopped because it stops the service before building. Inspect
 service state, then separately authorize migration/deployment or service recovery
 as required by repository operations rules. Preserve the recovery tables.
+
+## Retained media-account/person backups (2026-10-08)
+
+The October 8 deployment at Core V287 was blocked by three additional tables.
+Read-only target metadata confirms that the two media-account tables retain
+account identity and creation/update timestamps (the second also has a person
+name), and the person table retains identity, name, mobile and update timestamp.
+The original repair script was not found during this correction; this evidence
+does not verify the original repair operation or its data correctness.
+
+`core.json` allows only these exact optional recovery table names:
+
+- `zsjos_media_account_bak_create_time_20261008`
+- `zsjos_media_account_bak_create_time_20261008_pt2`
+- `zsjos_person_bak_mobile_20261008`
+
+The exception preserves recovery data without creating, requiring or modifying
+these tables. Other dates, suffixes and unknown backup tables still block
+migration, and business schema checks remain enforced. This manifest correction
+changes no baseline, numbered SQL, applied checksum or version ledger. Rebuild
+the migrator and run the read-only `db-plan` using the same environment and Compose
+override as the failed deployment before resuming it. A READY plan confirms
+pre-migration checks only; it does not mean pending migrations have executed.
+Use the focused regression command above and `bash ./zsjos-db check` to verify
+the source. Reverting these three manifest entries restores the original block
+without changing recovery data. Service recovery/deployment remains a separate
+operation; a failed deployment may have left the backend stopped.
 
 ## V270 Media student full reads
 
@@ -971,3 +1012,41 @@ V195 将“我的订单”和“团队订单”菜单授权合并到“订单管
 ## V258 定位卡独立与账号应用
 
 `V258__positioning_service_application.sql`：前置 V257 表结构，新增主卡/账号应用/应用记录，允许提交账号为空，保留历史并仅回填缺失关系；无删除、无角色授权，重复运行不换版。先 SQL 后新后端，回退保留关系表，存在无账号提交后不能恢复 NOT NULL。验证工具：`script/sql/mysql/tools/test_positioning_application.py`，使用独立保留的验证库，覆盖历史回填和重复执行；正在使用的开发数据库尚未同步，待启用授权。
+
+
+## 2026-10-13 test merge and notice V313
+
+Remote Core V001–V312 and their file bytes remain authoritative and unchanged.
+The local notice-capacity migration moves from V295 to
+`V313__notice_content_capacity.sql`, requiring V312 in both ledgers. Its procedure,
+version writes, filename checksum and focused verifier use V313. Preserve the remote
+newcomer-pool V295. See [notice capacity](notice-content-capacity.md) for execution,
+repeatability, data scope and rollback limits. Historical handoffs retain old numbers.
+
+Read-only inspection confirms the shared test database already applied the old notice
+V295 and has MEDIUMTEXT content. Both V295 ledger entries still describe that notice
+change, not newcomer dispatch. No ledger/checksum or business database write occurred
+during this source merge. This target requires a separately reviewed recovery before
+upgrade; never relabel its rows or reconcile checksums to pretend remote V295 ran.
+
+Both Core schema sources retain local V293 attachment/V294 urging fields and notice
+MEDIUMTEXT. The bootstrap now also matches the remote V311 appeal-cycle column and
+unique index already present in desired schema, resolving the remote publication
+handoff's known mismatch. Fresh initialization uses bootstrap then ascending migrations;
+existing environments use the numbered upgrades, not bootstrap replay. This source
+synchronization changes no business rows, role grants or remote applied migrations.
+Rollback retains additive schema and recorded history. Full-chain verification results
+and any pre-existing blockers are recorded in `handoff/test_main.md`.
+
+
+## 2026-10-13 初始化兼容修订
+
+V298/V299/V302/V303 的历史字典、订单和账号前置条件仅对存在相关业务记录的数据库强制执行；
+严格空库不预造历史数据，有业务数据和部分修复状态仍保留原保护。V299 在空 Lead/Order 库中
+建立与既有修复工具一致的空证据表；有业务订单却缺少证据表仍拒绝执行。V303 重试前清理
+本连接临时映射表；V298/V304/V309 临时表显式使用 utf8mb4_unicode_ci，兼容 MySQL 8
+数据库默认 utf8mb4_0900_ai_ci。编号不变，已应用文件的 checksum 不自动改写。
+
+本次范围为隔离副本与源码修复，实际测试库保持只读。部署前必须审查已部署文件版本和
+对应 checksum；不能用批量 reconcile 冒充迁移完成。完整恢复边界、验证和清理规则见
+[测试库迁移恢复](test-migration-recovery-20261013.md)。

@@ -42,7 +42,10 @@ def main():
         q.execute("SELECT COUNT(*) n FROM zsjos_schema_version WHERE version='V309'");assert q.fetchone()['n']==0
         q.execute('DROP TRIGGER reject_source_review')
     run(c);after=rows(c);saved=evidence(c)
-    manifest=json.loads(MANIFEST_PATH.read_text(encoding='utf-8'));assert len(saved)==len(manifest['rows'])*3
+    manifest=json.loads(MANIFEST_PATH.read_text(encoding='utf-8'))
+    targets=[{'table':r['table_name'],'id':r['row_id']} for r in saved if r['column_name']=='__before__']
+    assert len(saved)==len(targets)*3
+    assert sum(r['table']=='zsjos_lead' for r in targets)==83
     leads={r['lead_no']:r for r in after['zsjos_lead'].values()}
     for decision in manifest['leads']:
         l=leads[decision['lead_no']];assert l['source_provider_recorded'] in (1,b'\x01')
@@ -74,7 +77,7 @@ def main():
         for r in q.fetchall():assert r['h']==r['n'].encode('utf-8').hex().upper()
     run(c);assert rows(c)==after and evidence(c)==saved
     # A revision on a previously successful V309 must also roll back if ledger UPDATE fails.
-    partial=next(r for r in manifest['rows'] if r['table']=='zsjos_lead')
+    partial=next(r for r in targets if r['table']=='zsjos_lead')
     restore_one(c,'zsjos_lead',partial['id']);partial_state=rows(c)
     with c.cursor() as q:q.execute("CREATE TRIGGER reject_source_review_update BEFORE UPDATE ON zsjos_module_schema_version FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected ledger update failure'")
     fail(c);assert rows(c)==partial_state and evidence(c)==saved
@@ -82,10 +85,10 @@ def main():
     run(c);assert rows(c)==after
     # Rehearse protected rollback in a transaction, preserving all evidence for replay.
     with c.cursor() as q:q.execute('START TRANSACTION')
-    for item in manifest['rows']:restore_one(c,item['table'],item['id'])
+    for item in targets:restore_one(c,item['table'],item['id'])
     c.rollback();assert rows(c)==after and evidence(c)==saved
     for table in allowed:
-        item=next(r for r in manifest['rows'] if r['table']==table)
+        item=next(r for r in targets if r['table']==table)
         restore_one(c,table,item['id'])
     run(c);assert rows(c)==after and evidence(c)==saved
     with c.cursor() as q:

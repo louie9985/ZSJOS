@@ -528,6 +528,15 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             record = installed.get((code, migration.version))
             if record:
                 recorded_checksum, release = record
+                # This test-only notice migration occupied the remote newcomer version.
+                # Baseline checksum exemptions must not turn that known identity collision
+                # into evidence that newcomer schema was installed.
+                if (code == "core" and migration.version == "V295"
+                        and migration.path.name == "V295__newcomer_priority_dispatch.sql"
+                        and recorded_checksum == hashlib.sha256(
+                            b"V295__notice_content_capacity.sql").hexdigest()):
+                    fail("Core V295 identifies the old notice expansion, not newcomer dispatch; "
+                         "use the reviewed notice-version recovery procedure before migration")
                 skip_checksum = os.environ.get("ZSJOS_DB_SKIP_CHECKSUM", "false").lower() in ("1", "true", "yes")
                 # `zsjos_module_schema_version` rows the runner wrote are validated against
                 # the file-bytes hash. Rows carrying release `legacy`/`baseline` are exempt:

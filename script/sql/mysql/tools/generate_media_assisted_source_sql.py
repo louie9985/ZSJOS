@@ -64,7 +64,7 @@ BEGIN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V309 reviewed provider evidence changed';
  END IF;
  DROP TEMPORARY TABLE IF EXISTS v309_images;
- CREATE TEMPORARY TABLE v309_images(table_name VARCHAR(64),row_id BIGINT,current_image JSON,before_image JSON,after_image JSON,PRIMARY KEY(table_name,row_id));
+ CREATE TEMPORARY TABLE v309_images(table_name VARCHAR(64),row_id BIGINT,current_image JSON,before_image JSON,after_image JSON,PRIMARY KEY(table_name,row_id)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 """]
     specs = [
       ('zsjos_lead','l', ['source_type','submission_source_type','source_user_id','source_dept_id','version','updater','update_time'],
@@ -103,7 +103,7 @@ BEGIN
     from source_review_revision import generate as revision
     parts.append(revision())
     from generate_provider_identity_sql import body as provider_identity_revision
-    parts.append(provider_identity_revision())
+    parts.append(provider_identity_revision(portable=True))
     parts.append("""
  INSERT INTO zsjos_schema_version(version,description,checksum) SELECT 'V309','Media assisted source classification',SHA2('V309__media_assisted_source.sql',256) WHERE NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V309');
  INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version) SELECT 'core','V309','Media assisted source classification',SHA2('V309__media_assisted_source.sql',256),'baseline' WHERE NOT EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V309');

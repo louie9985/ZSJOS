@@ -188,3 +188,16 @@ DELETE FROM zsjos_data_repair_backup
 
 Rolling back the data does not require reverting any code: the projection reads whatever the row and
 the frozen snapshot hold.
+
+
+## 2026-10-13 初始化兼容修订
+
+V298/V299/V302/V303 的历史字典、订单和账号前置条件仅对存在相关业务记录的数据库强制执行；
+严格空库不预造历史数据，有业务数据和部分修复状态仍保留原保护。V299 在空 Lead/Order 库中
+建立与既有修复工具一致的空证据表；有业务订单却缺少证据表仍拒绝执行。V303 重试前清理
+本连接临时映射表；V298/V304/V309 临时表显式使用 utf8mb4_unicode_ci，兼容 MySQL 8
+数据库默认 utf8mb4_0900_ai_ci。编号不变，已应用文件的 checksum 不自动改写。
+
+本次范围为隔离副本与源码修复，实际测试库保持只读。部署前必须审查已部署文件版本和
+对应 checksum；不能用批量 reconcile 冒充迁移完成。完整恢复边界、验证和清理规则见
+[测试库迁移恢复](test-migration-recovery-20261013.md)。

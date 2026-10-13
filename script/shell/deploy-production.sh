@@ -350,12 +350,11 @@ health() {
 }
 
 deploy() {
-  # Stop the old release before resource-intensive builds and migrations.
-  # Failing to stop must abort the deployment to avoid competing backends.
+  # Reject known database blockers while the current release is still serving traffic.
+  # Migration execution repeats these checks under its lock after the build.
+  db_plan
   stop_server
   build
-  # Temporarily skipped during deploy; run db-plan manually when needed.
-  # db_plan
   db_migrate
   # Temporarily skipped during deploy; run db-verify manually when needed.
   # db_verify

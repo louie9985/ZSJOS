@@ -17,7 +17,7 @@ def preflight(c):
         for m in manifest['orders']:
             q.execute("""SELECT o.submitter_user_id,o.formal_sales_user_id,o.status,CAST(o.deleted AS UNSIGNED) deleted,
                SHA2(CAST(o.imported_actor_snapshot AS CHAR),256) imported_sha,r.round_no,
-               SHA2(r.order_snapshot,256) snapshot_sha,r.submitted_by_user_id,
+               r.submitted_by_user_id,
                r.process_definition_key,r.process_instance_id FROM zsjos_order o
                LEFT JOIN zsjos_order_approval_round r ON r.id=o.current_approval_round_id AND r.order_id=o.id
                AND r.tenant_id=1 AND r.deleted=0 WHERE o.tenant_id=1 AND o.order_no=%s""",(m['order_no'],))

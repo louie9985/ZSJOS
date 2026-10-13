@@ -65,16 +65,31 @@ apply_body: BEGIN
         AND table_name='zsjos_order' AND engine='InnoDB') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V299 requires the zsjos_order table';
   END IF;
+  -- Fresh installs have no repair pre-images. Create the evidence facility before its first use;
+  -- a populated installation missing prior evidence remains blocked.
+  IF NOT EXISTS(SELECT 1 FROM zsjos_order) AND NOT EXISTS(SELECT 1 FROM zsjos_lead)
+     AND NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+                    AND table_name='zsjos_data_repair_backup') THEN
+    CREATE TABLE zsjos_data_repair_backup (
+      id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      repair_key varchar(100) NOT NULL, table_name varchar(64) NOT NULL,
+      row_id bigint NOT NULL, column_name varchar(64) NOT NULL,
+      old_value varchar(512) NULL, backed_up_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_mark_row (repair_key,table_name,row_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
   IF NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
         AND table_name='zsjos_data_repair_backup') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V299 requires zsjos_data_repair_backup for pre-images';
   END IF;
-  IF (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_order_fee_mode'
+  IF EXISTS(SELECT 1 FROM zsjos_order WHERE deleted=b'0') AND
+     (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_order_fee_mode'
         AND deleted=b'0' AND status=0
         AND value IN ('retail','floor_price','prepaid_deduction','nomoney')) <> 4 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V299 requires the four enabled fee-mode dictionary entries';
   END IF;
-  IF (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_order_payment_method'
+  IF EXISTS(SELECT 1 FROM zsjos_order WHERE deleted=b'0') AND
+     (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_order_payment_method'
         AND deleted=b'0' AND status=0
         AND value IN ('prepaid_recharge','balance_cash','course_exchange','company_alipay',
                       'finance_wechat','company_qr','learning_qr','80','nopay')) <> 9 THEN
@@ -449,7 +464,8 @@ apply_body: BEGIN
   IF v_map <> 326 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V299 order map must contain 326 target rows';
   END IF;
-  IF EXISTS(SELECT 1 FROM v299_order_map m LEFT JOIN zsjos_order o
+  IF EXISTS(SELECT 1 FROM zsjos_order) AND
+     EXISTS(SELECT 1 FROM v299_order_map m LEFT JOIN zsjos_order o
               ON o.order_no=m.order_no AND o.deleted=b'0'
             WHERE m.order_no<>'' AND o.id IS NULL) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V299 order map references an order that does not exist';

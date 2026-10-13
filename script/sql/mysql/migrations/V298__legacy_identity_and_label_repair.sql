@@ -106,13 +106,17 @@ apply_body: BEGIN
                             'source_channel_label_snapshot')) <> 6 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V298 requires the zsjos_lead repair columns';
   END IF;
-  IF (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_lead_invalid_reason'
+  -- An empty installation has no historical facts to normalize and must not seed business options.
+  -- Populated installations retain the reviewed dictionary preconditions without weakening them.
+  IF EXISTS(SELECT 1 FROM zsjos_lead WHERE deleted=b'0') AND
+     (SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_lead_invalid_reason'
         AND deleted=b'0' AND status=0
         AND value IN ('微信号添加不上','其他','重复客资','电话多次未接通','无相关需求',
                       '客户明确拒绝','空号/停机','非目标客户','信息虚假','年龄不符合报考条件')) <> 10 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V298 requires the ten enabled invalid-reason dictionary entries';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_source_channel'
+  IF EXISTS(SELECT 1 FROM zsjos_lead WHERE deleted=b'0') AND
+     NOT EXISTS(SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_source_channel'
         AND deleted=b'0' AND value='其他') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V298 requires the enabled 其他 source-channel entry';
   END IF;
@@ -135,7 +139,7 @@ apply_body: BEGIN
   CREATE TEMPORARY TABLE v298_invalid_map (
     legacy_code varchar(32) NOT NULL PRIMARY KEY,
     dict_value  varchar(64) NOT NULL
-  ) ENGINE=InnoDB;
+  ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   INSERT INTO v298_invalid_map(legacy_code, dict_value) VALUES
     ('wechat_add_failed','微信号添加不上'),
     ('other','其他'),

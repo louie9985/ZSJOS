@@ -98,7 +98,7 @@ apply_body: BEGIN
               AND l.updater='V303') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 rewrote a partner-provider Lead';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM zsjos_lead l WHERE l.deleted=b'0' AND l.provider_owner_type='partner'
+  IF EXISTS(SELECT 1 FROM zsjos_lead) AND NOT EXISTS(SELECT 1 FROM zsjos_lead l WHERE l.deleted=b'0' AND l.provider_owner_type='partner'
                  AND l.source_user_id=54) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 lost the partner-account source rows';
   END IF;
@@ -156,6 +156,8 @@ apply_body: BEGIN
         AND table_name='zsjos_data_repair_backup') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 requires zsjos_data_repair_backup for pre-images';
   END IF;
+  -- Empty installs have no retired-account history; populated/recovery paths keep every identity guard.
+  IF EXISTS(SELECT 1 FROM zsjos_lead) OR EXISTS(SELECT 1 FROM zsjos_order) OR EXISTS(SELECT 1 FROM zsjos_order_approval_round) OR EXISTS(SELECT 1 FROM zsjos_data_repair_backup WHERE repair_key='retired-submitter-repoint-20261010') THEN
   -- Every replacement must be a live employee account before anything is rewritten.
   IF EXISTS(SELECT 1 FROM (SELECT 20 AS id UNION ALL SELECT 19 UNION ALL SELECT 27
                             UNION ALL SELECT 51 UNION ALL SELECT 400 UNION ALL SELECT 30) t
@@ -175,6 +177,9 @@ apply_body: BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 partner-account collision check failed';
   END IF;
 
+  END IF;
+
+  DROP TEMPORARY TABLE IF EXISTS zsjos_v303_map;
   CREATE TEMPORARY TABLE zsjos_v303_map (old_id BIGINT PRIMARY KEY, new_id BIGINT NOT NULL);
   INSERT INTO zsjos_v303_map(old_id,new_id) VALUES
     (232,20),(259,19),(54,27),(415,51),(418,400),(524,30);
@@ -307,7 +312,7 @@ apply_body: BEGIN
               AND l.updater='V303') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 rewrote a partner-provider Lead';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM zsjos_lead l WHERE l.deleted=b'0' AND l.provider_owner_type='partner'
+  IF EXISTS(SELECT 1 FROM zsjos_lead) AND NOT EXISTS(SELECT 1 FROM zsjos_lead l WHERE l.deleted=b'0' AND l.provider_owner_type='partner'
                  AND l.source_user_id=54) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V303 lost the partner-account source rows';
   END IF;

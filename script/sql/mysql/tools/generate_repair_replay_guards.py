@@ -26,8 +26,9 @@ def current_image(table):
     for (t, column), (kind, _) in columns.items():
         if t != table:
             continue
-        # V309 adds this column after V305; it is not part of V305's original receipt.
-        if (t, column) == ('zsjos_lead', 'submission_source_type'):
+        # Later migrations add fields outside the original V305 receipt.
+        if (t, column) in {('zsjos_lead', 'submission_source_type'),
+                           ('zsjos_order', 'repaired_actor_snapshot')}:
             continue
         val = f'x.`{column}`'
         if kind.startswith(('datetime', 'timestamp')):

@@ -227,7 +227,8 @@ CREATE TABLE IF NOT EXISTS hrm_employee_change_record (
     update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted bit NOT NULL DEFAULT 0,
     tenant_id bigint NOT NULL DEFAULT 0,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_hrm_change_operation (operation_key)
 );
 
 CREATE TABLE IF NOT EXISTS hrm_employee_quit_info (

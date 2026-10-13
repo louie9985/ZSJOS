@@ -72,6 +72,21 @@ class MigrationExecutionTest(unittest.TestCase):
         self.assertEqual(['V003', 'V004'], [m.version for m in pending])
         self.assertEqual([], blockers)
 
+    def test_notice_v295_collision_is_blocked_even_for_baseline_and_checksum_bypass(self):
+        import hashlib
+        for number in range(1, 295):
+            self.migration(number)
+        path = self.root / 'migrations/V295__newcomer_priority_dispatch.sql'
+        path.write_text('SELECT 1;\n')
+        installed = {('core', 'V295'): (
+            hashlib.sha256(b'V295__notice_content_capacity.sql').hexdigest(), 'baseline')}
+        with self.plan_context(installed), patch.dict(os.environ, {'ZSJOS_DB_SKIP_CHECKSUM': 'true'}):
+            with self.assertRaisesRegex(db.CommandError, 'old notice expansion'):
+                db.pending_migrations(self.manifests, installed)
+            _, blockers = db.migration_preflight(self.client, self.manifests)
+            self.assertIn('old notice expansion', blockers[0])
+        self.client.execute_file.assert_not_called()
+
     def test_v305_evidence_requirement_is_checked_only_when_pending(self):
         migration = self.migration(305)
         self.client.table_exists.return_value = True

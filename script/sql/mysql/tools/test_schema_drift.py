@@ -20,6 +20,9 @@ REPAIR_BACKUPS = (
     'zsjos_order_bak_submit2_20260930015245',
     'zsjos_order_bak_submit_20260930013844',
     'zsjos_round_bak_approve_20260930031902',
+    'zsjos_media_account_bak_create_time_20261008',
+    'zsjos_media_account_bak_create_time_20261008_pt2',
+    'zsjos_person_bak_mobile_20261008',
 )
 
 
@@ -62,7 +65,7 @@ class SchemaDriftTest(unittest.TestCase):
     def drift(self):
         return db.schema_drift(self.client, self.manifests)
 
-    def test_all_twelve_exact_backups_are_optional(self):
+    def test_all_exact_backups_are_optional(self):
         self.assertEqual([], self.drift())
         for table in REPAIR_BACKUPS:
             self.assertIn(table, self.manifests['core']['allowedExtraTables'])
@@ -79,13 +82,17 @@ class SchemaDriftTest(unittest.TestCase):
     def test_similar_backup_names_remain_blocked(self):
         for table in ('zsjos_order_bak_20260930012654',
                       'zsjos_order_bak_20260930012653_extra',
-                      'zsjos_unknown_bak_20260930012653'):
+                      'zsjos_unknown_bak_20260930012653',
+                      'zsjos_media_account_bak_create_time_20261009',
+                      'zsjos_media_account_bak_create_time_20261008_pt3',
+                      'zsjos_person_bak_mobile_20261008_extra'):
             with self.subTest(table=table):
                 self.add_table(table)
                 self.assertIn(f'unexpected table {table}', self.drift())
 
     def test_allowed_backups_do_not_hide_missing_or_changed_business_columns(self):
-        self.add_table(REPAIR_BACKUPS[0])
+        for table in REPAIR_BACKUPS:
+            self.add_table(table)
         self.actual_columns[0] = ('zsjos_order', 'id', 'varchar(20)', 'YES')
         self.columns[('zsjos_order', 'required_value')] = ('bigint', 'YES')
         drift = self.drift()
@@ -143,7 +150,8 @@ class SchemaDriftTest(unittest.TestCase):
         self.client.execute_file.assert_not_called()
 
     def test_verify_accepts_exact_backups_but_rejects_unknown_table(self):
-        self.add_table(REPAIR_BACKUPS[0])
+        for table in REPAIR_BACKUPS:
+            self.add_table(table)
         with patch.object(db, 'enabled_manifests', return_value=self.manifests), \
                 patch.object(db, 'info'):
             db.verify_database('production', self.client)

@@ -10,10 +10,12 @@ ENV_FILE=/opt/zsjos-runtime/.env.production \
   bash script/shell/deploy-production.sh deploy
 ```
 
-`deploy` 当前顺序是：停止旧后端、校验环境和工具、构建后端及五份前端产物
-（Admin、admin-embed、Workbench、H5、media-screen）、用当前工作树的 SQL 重建
-`db-migrator` 镜像、执行数据库 migrate、安装 release、启动后端，健康检查通过后清理历史 release。
-当前脚本未自动调用 db-plan/db-verify，需要按发布要求单独执行。同一次完整发布只构建一次迁移镜像。
+`deploy` 先校验环境并用当前 SQL 重建一次 `db-migrator`，执行只读 db-plan；
+计划被阻止时立即退出，旧后端保持运行。通过后才停止旧后端、构建后端及五份前端产物
+（Admin、admin-embed、Workbench、H5、media-screen）、执行数据库 migrate、安装 release、
+启动后端，健康检查通过后清理历史 release。migrate 会在执行前和持锁后重新检查前置条件，
+并在末尾验证数据库；预检成功不能替代实际执行验证。独立 db-verify 仍可按发布要求执行。
+同一次完整发布只构建一次迁移镜像。构建或实际迁移失败后不会自动启动不兼容的新版本。
 
 Admin 与 admin-embed 共用 Vue 源码和一次 pnpm 依赖安装，分别生成 `dist-prod` 与
 `dist-embed`；嵌入包固定使用 `/admin-embed/` 资源路径。媒体大屏在

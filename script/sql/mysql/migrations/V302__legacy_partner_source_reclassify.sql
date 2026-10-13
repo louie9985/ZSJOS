@@ -64,7 +64,8 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V302 requires zsjos_data_repair_backup for pre-images';
   END IF;
   -- The genuine partner population must be intact before this migration runs.
-  IF NOT EXISTS(SELECT 1 FROM zsjos_lead WHERE deleted=b'0'
+  IF EXISTS(SELECT 1 FROM zsjos_lead WHERE deleted=b'0') AND
+     NOT EXISTS(SELECT 1 FROM zsjos_lead WHERE deleted=b'0'
         AND source_type='partner' AND provider_owner_type='partner' AND partner_id IS NOT NULL) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V302 requires the genuine partner population to be present';
   END IF;

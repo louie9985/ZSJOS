@@ -4,6 +4,7 @@ import copy
 import hashlib
 from pathlib import Path
 import unittest
+from unittest.mock import Mock
 from order_history_repair import execute,SQL_PATH
 from order_history_repair_model import VERSION,KEY
 
@@ -22,10 +23,23 @@ class OrderSourceGuardTest(unittest.TestCase):
         plan=self.plan();plan['operations'][0]['after'].update(source_provider_user_id=17,provider_owner_id=17,source_user_id=17,contribution_user_id_snapshot=17)
         with self.assertRaisesRegex(ValueError,'cannot change source attribution'):execute(None,plan,'fixture')
 
-    def test_unreviewed_historical_source_is_rejected_before_database_access(self):
+    def test_unchanged_unreviewed_source_allows_actor_plan_to_reach_database_guards(self):
         plan=self.plan()
         for side in ['before','after']:plan['operations'][0][side].update(source_type='sales_self_sourced',source_provider_recorded=0)
-        with self.assertRaisesRegex(ValueError,'explicit source review required'):execute(None,plan,'fixture')
+        plan['operations'][0]['after']['source_user_id']=17
+        conn=Mock()
+        conn.cursor.side_effect=RuntimeError('database guard reached')
+        with self.assertRaisesRegex(RuntimeError,'database guard reached'):execute(conn,plan,'fixture')
+        conn.cursor.assert_called_once_with()
+
+    def test_actor_repair_cannot_approve_or_reclassify_source(self):
+        for field,value in [('source_provider_recorded',0),('source_type','sales_self_sourced'),
+                            ('submission_source_type','education_self_sourced'),
+                            ('provider_owner_name_snapshot','changed'),
+                            ('contribution_dept_id_snapshot',99)]:
+            with self.subTest(field=field):
+                plan=self.plan();plan['operations'][0]['after'][field]=value
+                with self.assertRaisesRegex(ValueError,'cannot change source attribution'):execute(None,plan,'fixture')
 
     def test_old_generator_plan_is_rejected_before_database_access(self):
         plan=self.plan();plan['builderSha256']='old'

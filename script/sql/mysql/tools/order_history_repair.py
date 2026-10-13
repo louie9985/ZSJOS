@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 from decimal import Decimal
 
 import pymysql
@@ -23,8 +22,6 @@ from pymysql.cursors import DictCursor
 from order_history_repair_model import (VERSION,KEY,TABLES,READ_TABLES,EXCLUDED,canonical,digest,build,source_package)
 
 ROOT=Path(__file__).resolve().parents[4]
-sys.path.insert(0,str(ROOT/'script/sql/merge'))
-from lead_source_contract import validate as validate_source_contract
 SQL_PATH=ROOT/'script/sql/mysql/migrations/V305__order_history_repair.sql'
 DEFAULT_SOURCE=Path.home()/'Desktop/parttimecrm-cst+0800-20260920-222103.sql.gz'
 
@@ -113,6 +110,15 @@ def prepare_schema(conn):
         for statement in statements(text.split('-- BEGIN FINALIZE')[1].split('-- END FINALIZE')[0]):
             if statement.startswith('CALL ') or statement in ('DROP PROCEDURE zsjos_v305_finalize','START TRANSACTION','COMMIT'):continue
             cur.execute(statement)
+
+
+def cleanup_schema(conn):
+    # Call only after commit/rollback: DROP PROCEDURE implicitly commits in MySQL.
+    # These helpers are recreated by prepare_schema, not persistent application APIs.
+    # Leaving root-defined helpers behind also blocks the migrator's routine backup.
+    with conn.cursor() as cur:
+        for name in ('zsjos_v305_finalize','zsjos_v305_prepare','zsjos_v305_completed'):
+            cur.execute('DROP PROCEDURE IF EXISTS '+name)
 
 
 def encode(value,kind):
@@ -214,10 +220,11 @@ def execute(conn,plan,plan_sha,dry_run=False,fail_after=None,rollback_mode=False
         if op['table'] not in TABLES or op['after'].get('tenant_id')!=1:raise ValueError('Unapproved table/tenant')
         if 'before' in op and op['before'].get('tenant_id')!=1:raise ValueError('Cross-tenant before image')
         if op['table']=='zsjos_lead' and 'before' in op:
-            if not rollback_mode:
-                validate_source_contract(op['before'])
-                validate_source_contract(op['after'])
-            protected=('provider_owner_type','provider_owner_id','provider_owner_name_snapshot','source_provider_user_id','source_provider_recorded',
+            # V305 repairs confirmed actors, not acquisition decisions. Historical
+            # source inconsistencies must survive unchanged for their own review;
+            # enforcing the newer source contract here blocks the ordered upgrade.
+            protected=('source_type','submission_source_type',
+                       'provider_owner_type','provider_owner_id','provider_owner_name_snapshot','source_provider_user_id','source_provider_recorded',
                        'contribution_user_id_snapshot','contribution_user_name_snapshot','contribution_dept_id_snapshot','contribution_dept_name_snapshot',
                        'contribution_supervisor_user_id_snapshot','contribution_supervisor_name_snapshot')
             if any(op['before'].get(k)!=op['after'].get(k) for k in protected):
@@ -226,11 +233,13 @@ def execute(conn,plan,plan_sha,dry_run=False,fail_after=None,rollback_mode=False
     with conn.cursor() as cur:
         cur.execute("SELECT GET_LOCK(CONCAT('v305:',DATABASE()),10) locked")
         if cur.fetchone()['locked']!=1:raise ValueError('Repair lock unavailable')
+    preparation_started=False
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) n FROM zsjos_data_repair_backup WHERE repair_key='lead-source-confirmed-v309-r2'")
             if cur.fetchone()['n']:
                 raise ValueError('V305 actor repair cannot run after confirmed V309 source revision; review dependent changes first')
+        preparation_started=True
         prepare_schema(conn)
         with conn.cursor() as cur:
             cur.execute('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE')
@@ -315,7 +324,6 @@ def execute(conn,plan,plan_sha,dry_run=False,fail_after=None,rollback_mode=False
                 if fail_after is not None and count>=fail_after:raise ValueError('Injected failure for isolated test')
             for op in plan['operations']:
                 row=resolve(op['after'],ids);actual=fetch(cur,op['table'],row['id'],types)
-                if op['table']=='zsjos_lead':validate_source_contract(actual)
                 if 'before' in op:
                     if actual!=row:raise ValueError('Postimage mismatch: '+op['table'])
                 elif any(actual.get(k)!=v for k,v in row.items()):raise ValueError('Inserted postimage mismatch')
@@ -332,7 +340,10 @@ def execute(conn,plan,plan_sha,dry_run=False,fail_after=None,rollback_mode=False
     except Exception:
         conn.rollback();raise
     finally:
-        with conn.cursor() as cur:cur.execute("SELECT RELEASE_LOCK(CONCAT('v305:',DATABASE()))")
+        try:
+            if preparation_started:cleanup_schema(conn)
+        finally:
+            with conn.cursor() as cur:cur.execute("SELECT RELEASE_LOCK(CONCAT('v305:',DATABASE()))")
 
 
 def inspect_applied(conn,plan,plan_sha):

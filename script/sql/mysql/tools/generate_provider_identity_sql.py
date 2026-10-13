@@ -4,7 +4,7 @@ import json
 from provider_identity_repair import KEY, MANIFEST, SQL, FIELDS, image, literal, digest
 
 
-def body():
+def body(portable=False):
     m = json.loads(MANIFEST.read_text(encoding='utf-8'))
     manifest_sha = digest(m)
     inserts = ',\n'.join(f"('{r['table']}',{r['id']},'{r['sha']}',CAST({literal(r['patch'])} AS JSON),CAST({literal(r['provenance'])} AS JSON))" for r in m['rows'])
@@ -38,6 +38,34 @@ def body():
   WHERE r.tenant_id=1 AND r.deleted=0 AND o.deleted=0 AND o.lead_id IN ({lead_ids}) AND JSON_TYPE(JSON_EXTRACT(r.order_snapshot,'$.leadProfile'))='OBJECT'
   AND NOT EXISTS(SELECT 1 FROM pir_plan p WHERE p.table_name='zsjos_order_approval_round' AND p.row_id=r.id)) THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Provider repair approval scope changed'; END IF;
+"""
+    if portable:
+        # Business-number decisions survive target-local Lead/approval primary keys.
+        templates = {r['provenance']['leadNo']: r for r in m['rows'] if r['table']=='zsjos_order_approval_round'}
+        values = []
+        for r in m['rows']:
+            if r['table'] != 'zsjos_lead': continue
+            no = r['provenance']['leadNo']
+            values.append(f"('{no}',CAST({literal(r['patch'])} AS JSON),CAST({literal(templates[no]['patch'])} AS JSON),CAST({literal(r['provenance'])} AS JSON))")
+        start = text.index(' INSERT INTO pir_plan(table_name,row_id,expected_sha,patch,provenance) VALUES')
+        text = text[:start] + f"""
+ DROP TEMPORARY TABLE IF EXISTS pir_manifest;
+ CREATE TEMPORARY TABLE pir_manifest(lead_no VARCHAR(64) PRIMARY KEY,lead_patch JSON,round_patch JSON,provenance JSON) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ INSERT INTO pir_manifest VALUES {','.join(values)};
+ SELECT COUNT(*) INTO pir_count FROM zsjos_lead l JOIN pir_manifest m ON m.lead_no=l.lead_no WHERE l.tenant_id=1 FOR UPDATE;
+ SELECT COUNT(*) INTO pir_saved FROM zsjos_data_repair_backup WHERE repair_key='{KEY}';
+ IF pir_count=0 THEN
+  IF EXISTS(SELECT 1 FROM zsjos_lead WHERE tenant_id=1) OR pir_saved<>0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Provider repair targets missing'; END IF;
+  LEAVE provider_identity_block;
+ END IF;
+ IF pir_count<>16 OR EXISTS(SELECT 1 FROM zsjos_lead l JOIN pir_manifest m ON m.lead_no=l.lead_no WHERE l.tenant_id=1 AND l.deleted<>0) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Provider repair partial manifest'; END IF;
+ INSERT INTO pir_plan(table_name,row_id,patch,provenance)
+ SELECT 'zsjos_lead',l.id,m.lead_patch,m.provenance FROM zsjos_lead l JOIN pir_manifest m ON m.lead_no=l.lead_no WHERE l.tenant_id=1;
+ INSERT INTO pir_plan(table_name,row_id,patch,provenance)
+ SELECT 'zsjos_order_approval_round',r.id,m.round_patch,m.provenance
+ FROM zsjos_order_approval_round r JOIN zsjos_order o ON o.id=r.order_id AND o.tenant_id=r.tenant_id
+ JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id JOIN pir_manifest m ON m.lead_no=l.lead_no
+ WHERE l.tenant_id=1 AND r.deleted=0 AND o.deleted=0 AND JSON_TYPE(JSON_EXTRACT(r.order_snapshot,'$.leadProfile'))='OBJECT';
 """
     for table in FIELDS:
         text += f" SELECT COUNT(*) INTO pir_count FROM {table} x JOIN pir_plan p ON p.table_name='{table}' AND p.row_id=x.id WHERE x.tenant_id=1 FOR UPDATE;\n"
@@ -109,6 +137,17 @@ def body():
  DROP TEMPORARY TABLE pir_plan;
  END;
 """
+    if portable:
+        # MySQL cannot reference one temporary table twice in a single statement.
+        text = text.replace(' DECLARE pir_saved INT;', ' DECLARE pir_saved INT;\n DECLARE pir_expected_count INT;')
+        text = text.replace(' IF pir_saved=0 THEN', ' SELECT COUNT(*)*3+1 INTO pir_expected_count FROM pir_plan;\n IF pir_saved=0 THEN')
+        text = text.replace("  IF EXISTS(SELECT 1 FROM pir_plan WHERE SHA2(CAST(current_image AS CHAR CHARACTER SET utf8mb4),256)<>expected_sha) THEN\n   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Provider repair reviewed before image changed'; END IF;\n", '')
+        text = text.replace(f"pir_saved<>{len(m['rows'])*3+1}", "pir_saved<>pir_expected_count")
+        text = text.replace(" OR SHA2(CAST(p.before_image AS CHAR CHARACTER SET utf8mb4),256)<>p.expected_sha", '')
+        for r in m['rows']:
+            if r['table']=='zsjos_lead':
+                no=r['provenance']['leadNo']
+                text=text.replace(f"row_id={r['id']} AND column_name='__after__'", f"row_id=(SELECT id FROM zsjos_lead WHERE tenant_id=1 AND lead_no='{no}') AND column_name='__after__'")
     return text
 
 
