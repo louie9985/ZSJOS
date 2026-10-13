@@ -180,6 +180,18 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
     return
   }
   if (detail.bizType === 'points-redemption' && isPositiveId(detail.bizId)) {
+    if (detail.sceneCode === 'zsjos.points-redemption.approval_urged') {
+      const taskId = detail.templateParams?.taskId
+      try {
+        if (typeof taskId !== 'string' || !taskId) throw new Error('审批任务标识缺失')
+        await api.bpmBusinessTaskTarget(taskId, 'todo')
+        deps.navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(taskId)}`)
+      } catch {
+        deps.warn('该审批已处理、已转办或当前账号无权处理，已打开消息详情')
+        deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+      }
+      return
+    }
     try { await pointsApi.get(detail.bizId); deps.navigate(`${POINTS_ROUTE}?id=${detail.bizId}`) }
     catch { deps.warn('申请不可访问或暂时加载失败'); deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`) }
     return

@@ -51,6 +51,7 @@ public interface PersonalCalendarEventMapper extends BaseMapperX<PersonalCalenda
 
     default int updateOwned(PersonalCalendarEventDO event, Long ownerUserId) {
         return update(event, new LambdaUpdateWrapper<PersonalCalendarEventDO>()
+                .set(PersonalCalendarEventDO::getBackgroundColor, event.getBackgroundColor())
                 .eq(PersonalCalendarEventDO::getId, event.getId())
                 .eq(PersonalCalendarEventDO::getOwnerUserId, ownerUserId));
     }

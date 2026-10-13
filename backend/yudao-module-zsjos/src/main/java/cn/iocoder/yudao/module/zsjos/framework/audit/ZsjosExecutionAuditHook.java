@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.zsjos.framework.audit;
 
 import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.service.TenantFrameworkService;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.zsjos.service.audit.AuditActionCatalog;
 import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
@@ -9,12 +11,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 
 /** Persists non-HTTP execution events in the existing business audit stream. */
 @Component
 @RequiredArgsConstructor
 public class ZsjosExecutionAuditHook implements ExecutionAuditHook {
     private final BusinessAuditService auditService;
+    private final TenantFrameworkService tenantFrameworkService;
 
     @Override
     public void onSuccess(ExecutionAuditContext context, long durationMs) {
@@ -30,6 +34,16 @@ public class ZsjosExecutionAuditHook implements ExecutionAuditHook {
         if (c.tenantId() != null && !c.tenantId().isBlank()) {
             // Completion may run after the business tenant scope has already been restored.
             TenantUtils.execute(Long.valueOf(c.tenantId()), () -> persist(c, status, duration, error));
+        } else if ("SYSTEM_JOB".equals(c.executionType()) && TenantContextHolder.getTenantId() == null) {
+            // Quartz audits the whole invocation after @TenantJob has restored its scope.
+            // ZSJOS has one tenant; never guess ownership if the configured population differs.
+            List<Long> tenantIds = tenantFrameworkService.getTenantIds();
+            if (tenantIds == null || tenantIds.size() != 1 || tenantIds.getFirst() == null) {
+                throw new IllegalStateException("Quartz execution audit requires one configured tenant");
+            }
+            Long tenantId = tenantIds.getFirst();
+            tenantFrameworkService.validTenant(tenantId);
+            TenantUtils.execute(tenantId, () -> persist(c, status, duration, error));
         } else {
             persist(c, status, duration, error);
         }

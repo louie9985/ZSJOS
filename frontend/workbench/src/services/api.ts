@@ -578,8 +578,8 @@ export type AssignmentLog = {
   createTime: Timestamp;
 };
 export type PageResult<T> = { list: T[]; total: number };
-export type CourseCalendarEvent = { id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
-export type CourseCalendarInput = { courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] };
+export type CourseCalendarEvent = { backgroundColor?: string | null; id: number; courseName: string; courseFormValue: string; courseFormLabelSnapshot: string; startTime: string; endTime: string; remark?: string; attachmentIds: number[] };
+export type CourseCalendarInput = { backgroundColor?: string | null; courseName: string; courseFormValue: string; startTime: string; endTime: string; remark?: string; attachmentIds?: number[] };
 export type CalendarNotifyInput = { calendarId: number; calendarType: 'EXAM' | 'COURSE'; scope: 'ALL' | 'SPECIFIED'; userIds?: number[]; resend?: boolean; calendarVersion?: number; eventType?: string; idempotencyKey?: string; previewToken?: string; title?: string; time?: string; remark?: string };
 export type CalendarNotifyResult = { batchId: number; acceptedCount: number; skippedCount: number; status: string; resend: boolean; sourceEventKey: string };
 export type CalendarNotifyPreview = { calendarVersion: number; title: string; time?: string; remark?: string; recipientCount: number; notifiedCount: number; newRecipientCount: number; previewToken: string; contentHash: string };
@@ -1992,6 +1992,7 @@ export type SalesOrder = {
     sourceType?: string;
     sourceLabel?: string;
     sourceUserName?: string;
+    partnerOwnerSnapshot?: SalesOrderPartnerOwnerSnapshot | null;
     sourceChannel?: string;
     sourceChannelLabelSnapshot?: string;
     provinceName?: string;
@@ -2026,6 +2027,11 @@ export type SalesOrderApprovalStatus = {
   createTime?: Timestamp;
   endTime?: Timestamp;
 };
+export type SalesOrderPartnerOwnerSnapshot = {
+  employeeUserId?: number | null;
+  employeeName?: string | null;
+};
+
 export type SalesOrderListItem = Pick<
   SalesOrder,
   | "id"
@@ -2064,6 +2070,8 @@ export type SalesOrderListItem = Pick<
   productSummary?: string;
   leadNo?: string;
   leadSourceLabel?: string;
+  leadSourceType?: string;
+  partnerOwnerSnapshot?: SalesOrderPartnerOwnerSnapshot | null;
   leadSourceUserName?: string;
   leadOwnerUserName?: string;
   formalOwnerIdentity?: string;
@@ -3007,7 +3015,7 @@ export const normalizeRequestError = (error: unknown): unknown => {
   }
   return error;
 };
-export type PersonalCalendarEvent = {
+export type PersonalCalendarEvent = { backgroundColor?: string | null;
   ownerUserId?: number;
   ownerName?: string;
   id: number;
@@ -3021,7 +3029,7 @@ export type PersonalCalendarEvent = {
   createTime: Timestamp;
   updateTime: Timestamp;
 };
-export type PersonalCalendarEventInput = {
+export type PersonalCalendarEventInput = { backgroundColor?: string | null;
   title: string;
   description?: string;
   startTime: string;

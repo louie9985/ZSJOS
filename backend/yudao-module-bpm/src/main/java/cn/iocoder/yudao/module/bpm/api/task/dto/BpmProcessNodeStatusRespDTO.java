@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public class BpmProcessNodeStatusRespDTO {
     private Long actionUserId;
     private String actionUserNameSnapshot;
+    /** Proven system approval under this task's frozen consecutive-deduplication policy; never a human action. */
+    private Boolean consecutiveApprovalDeduplicated;
 
     private String taskDefinitionKey;
     private String status;

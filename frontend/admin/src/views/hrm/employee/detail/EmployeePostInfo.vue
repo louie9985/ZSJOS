@@ -9,20 +9,25 @@
         {{ employee.leaderEmployeeName || '-' }}
       </el-descriptions-item>
       <el-descriptions-item label="入职状态">
-        <span>{{
-          employee.entryStatusLabel ||
-          (employee.entryStatus == null ? '-' : `历史代码 ${employee.entryStatus}`)
-        }}</span>
+        <HrmEmployeeDictionaryLabel
+          :dict-type="DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS"
+          :value="employee.entryStatus"
+          :snapshot-label="employee.entryStatusLabel"
+        />
       </el-descriptions-item>
       <el-descriptions-item label="员工状态">
-        <span>{{
-          employee.statusLabel || (employee.status == null ? '-' : `历史代码 ${employee.status}`)
-        }}</span>
+        <HrmEmployeeDictionaryLabel
+          :dict-type="DICT_TYPE.HRM_EMPLOYEE_STATUS"
+          :value="employee.status"
+          :snapshot-label="employee.statusLabel"
+        />
       </el-descriptions-item>
       <el-descriptions-item label="聘用形式">
-        <span>{{
-          employee.typeLabel || (employee.type == null ? '-' : `历史代码 ${employee.type}`)
-        }}</span>
+        <HrmEmployeeDictionaryLabel
+          :dict-type="DICT_TYPE.HRM_EMPLOYEE_TYPE"
+          :value="employee.type"
+          :snapshot-label="employee.typeLabel"
+        />
       </el-descriptions-item>
       <el-descriptions-item label="入职时间">
         {{ formatHrmDateTime(employee.entryTime) }}
@@ -76,6 +81,8 @@
 </template>
 
 <script lang="ts" setup>
+import { DICT_TYPE } from '@/utils/dict'
+import HrmEmployeeDictionaryLabel from '@/views/hrm/employee/components/HrmEmployeeDictionaryLabel.vue'
 import type { HrmEmployeeVO } from '@/api/hrm/employee'
 import { formatHrmDateTime } from '@/views/hrm/utils/format'
 import EmployeeChangeRecordList from './EmployeeChangeRecordList.vue'

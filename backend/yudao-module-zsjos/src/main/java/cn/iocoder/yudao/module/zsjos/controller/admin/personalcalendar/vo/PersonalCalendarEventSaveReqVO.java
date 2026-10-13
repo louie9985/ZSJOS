@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class PersonalCalendarEventSaveReqVO {
+    private String backgroundColor;
     @NotBlank @Size(max = 100) private String title;
     @Size(max = 2000) private String description;
     @NotNull private LocalDateTime startTime;

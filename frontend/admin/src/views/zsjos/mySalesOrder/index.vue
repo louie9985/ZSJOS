@@ -32,7 +32,7 @@
       <el-button link type="primary" @click="showDetail(row, reload)">查看</el-button>
     </template>
   </WorkbenchListPage>
-  <el-drawer v-model="detailOpen" title="订单详情" size="560px">
+  <el-drawer v-model="detailOpen" title="订单详情" size="min(560px, 100vw)">
     <div v-loading="detailLoading">
       <el-alert v-if="detailError" :title="detailError" type="error" show-icon :closable="false"
         ><el-button link @click="loadDetail">重试</el-button></el-alert

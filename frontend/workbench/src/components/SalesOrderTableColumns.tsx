@@ -1,4 +1,5 @@
 import { Button, Tag } from 'antd'
+import { orderPartnerOwnerText } from '../services/salesOrder'
 import type { ProColumns } from '@ant-design/pro-components'
 import type { SalesOrder, SalesOrderListItem } from '../services/api'
 import DateTimeText from './DateTimeText'
@@ -60,6 +61,7 @@ export function buildSalesOrderTableColumns(onDetail: (item: SalesOrderListItem)
     textColumn('客资编号', 'leadNo', 160),
     textColumn('客资来源', 'leadSourceLabel', 140),
     textColumn('客资提交人', 'leadSourceUserName', 140),
+    { title: '兼职归属新媒体员工', key: 'partnerOwnerSnapshot', width: 190, ellipsis: true, render: (_, row) => orderPartnerOwnerText(row.leadSourceType, row.partnerOwnerSnapshot) },
     textColumn('负责人', 'leadOwnerUserName', 140),
     textColumn('成交归属身份', 'formalOwnerIdentityLabel', 120),
     textColumn('客资分类', 'leadCategoryLabelSnapshot', 140),

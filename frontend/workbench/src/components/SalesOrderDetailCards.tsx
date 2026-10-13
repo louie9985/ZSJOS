@@ -6,7 +6,7 @@ import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'a
 import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { canReviewSalesOrderTask } from '../services/salesOrder'
+import { canReviewSalesOrderTask, orderPartnerOwnerText } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 import SalesOrderInformationTable from './SalesOrderInformationTable'
 
@@ -206,6 +206,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
           <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">业务来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">来源人员</span><span className="lead-field-value">{leadProfile.sourceUserName || '历史未记录'}</span></div>
+          {leadProfile.sourceType === 'partner' && <div className="lead-profile-row sales-order-partner-owner"><span className="lead-field-label">兼职归属新媒体员工</span><span className="lead-field-value">{orderPartnerOwnerText(leadProfile.sourceType, leadProfile.partnerOwnerSnapshot)}</span></div>}
           <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '历史未记录'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>

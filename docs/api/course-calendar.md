@@ -101,3 +101,7 @@ Workbench 的日历单元格和当天详情现通过共用 `CalendarNotification
 ## 跨月份搜索
 
 工作台新增独立分页搜索与定位入口；`GET /zsjos/course-calendar/search` 按课程名称、备注查询，原 `/page` 日期列表契约保持不变。详见[日历跨月份搜索](calendar-search.md)。
+
+## 日程颜色与个人快捷色
+
+工作台课程底色、四个统一快捷色、个人命名色板及 V314 升级契约见 [日历颜色](calendar-colors.md)。颜色独立于课程形式和通知内容版本。

@@ -403,6 +403,19 @@ Using `--apply` requires separate review of the exact changed artifacts and targ
 ledger rows; never use it merely to bypass a failed migration guard. See
 `script/sql/mysql/migrations/README.md` for the full rule.
 
+Applied-version validation first compares the raw file hash. If it differs, the
+runner also accepts the recorded hash when it exactly matches the current bytes
+after replacing CRLF with LF. This supports Windows checkouts of migrations
+originally recorded with LF; it changes neither SQL files nor existing ledgers.
+No other whitespace, BOM, encoding or content normalization is allowed. The
+fallback is directional: a recorded CRLF hash does not match an LF-only file;
+restore the applied artifact in that case. Newly executed migrations still record
+their raw file hash. `reconcile` remains a raw-byte audit and may report these
+checkout differences even when `plan` accepts them; do not use `reconcile --apply`
+to eliminate an accepted line-ending difference. Historical repair guards remain
+unchanged, and manually replaying their SQL in a GUI bypasses installed-version
+selection.
+
 ### Replaying V296–V310 from a GUI client
 
 Do not select all historical SQL files as a database synchronization operation.

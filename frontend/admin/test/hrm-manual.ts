@@ -1,4 +1,4 @@
-import { createApp, h } from 'vue'
+import { createApp, h, ref } from 'vue'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
@@ -86,8 +86,10 @@ service.defaults.adapter = async (config) => {
     Object.assign(employee, value, { version: employee.version + 1 })
     data = true
   } else if (path.includes('/employee/config/create-field/list')) data = []
-  else if (path.includes('/system/dict-data/simple-list')) data = dictionaries
-  else if (path.includes('/system/dept/simple-list'))
+  else if (path.includes('/system/dict-data/simple-list')) {
+    if (mode === 'labels') await new Promise((resolve) => setTimeout(resolve, 250))
+    data = dictionaries
+  } else if (path.includes('/system/dept/simple-list'))
     data = [{ id: 10, name: '合成部门', parentId: 0 }]
   else if (path.includes('/system/user/simple-list'))
     data = [{ id: 7, nickname: '合成人事', deptId: 10 }]
@@ -106,7 +108,7 @@ service.defaults.adapter = async (config) => {
 const { useUserStore } = await import('../src/store/modules/user')
 useUserStore().permissions = new Set(['*:*:*'])
 const { useDictStore } = await import('../src/store/modules/dict')
-await useDictStore().setDictMap()
+if (mode !== 'labels') await useDictStore().setDictMap()
 const { default: EmployeeForm } = await import('../src/views/hrm/employee/EmployeeForm.vue')
 const { default: Plans } =
   await import('../src/views/hrm/employee/detail/EmployeeChangeRecordList.vue')
@@ -117,13 +119,38 @@ const { Icon } = await import('../src/components/Icon')
 const { default: Pagination } = await import('../src/components/Pagination/index.vue')
 const { DictTag } = await import('../src/components/DictTag')
 const { hasPermi } = await import('../src/directives/permission/hasPermi')
+const { default: EmployeeLabel } =
+  await import('../src/views/hrm/employee/components/HrmEmployeeDictionaryLabel.vue')
+const labelValue = ref(1)
+const labelCases = [
+  { id: 'type', dictType: 'hrm_employee_type', value: 1 },
+  { id: 'status', dictType: 'hrm_employee_status', value: 1 },
+  { id: 'entry', dictType: 'hrm_employee_entry_status', value: 1 },
+  { id: 'snapshot', dictType: 'hrm_employee_status', value: 1, snapshotLabel: '记录时的名称' },
+  { id: 'unknown', dictType: 'hrm_employee_status', value: 999 },
+  { id: 'empty', dictType: 'hrm_employee_status', value: null }
+]
+Object.assign(window, {
+  setLabelValue: (value: number) => {
+    labelValue.value = value
+  }
+})
 const app = createApp({
   render: () =>
-    mode === 'plans'
-      ? h(Plans, { employee, employeeId: 1 })
-      : mode === 'reminders'
-        ? h(Reminders)
-        : h(EmployeeForm, { ref: 'employee' })
+    mode === 'labels'
+      ? h('div', { style: 'display:grid;gap:20px;padding:24px' }, [
+          ...labelCases.map((item) =>
+            h('div', { 'data-testid': item.id }, [h(EmployeeLabel, item)])
+          ),
+          h('div', { 'data-testid': 'reactive' }, [
+            h(EmployeeLabel, { dictType: 'hrm_employee_status', value: labelValue.value })
+          ])
+        ])
+      : mode === 'plans'
+        ? h(Plans, { employee, employeeId: 1 })
+        : mode === 'reminders'
+          ? h(Reminders)
+          : h(EmployeeForm, { ref: 'employee' })
 })
 setupStore(app)
 await setupI18n(app)

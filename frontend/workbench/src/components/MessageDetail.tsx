@@ -5,6 +5,7 @@ import { notifyMessageSenderName } from '../services/notifyMessage'
 import { notifyMessageCategoryLabelOf } from '../services/notifyMessageCategory'
 import { formatTimestamp } from '../services/time'
 import MessageCategoryIcon from './MessageCategoryIcon'
+import PmsShareMessageLinks from './PmsShareMessageLinks'
 
 type MessageDetailProps = {
   layout?: 'pane' | 'drawer'
@@ -29,6 +30,7 @@ export function MessageBody({ message }: Pick<MessageDetailProps, 'message'>) {
       <Typography.Paragraph>{message.templateSummary || '暂无摘要'}</Typography.Paragraph>
       <Typography.Text type="secondary">完整正文</Typography.Text>
       <Typography.Paragraph>{message.templateContent || '暂无正文'}</Typography.Paragraph>
+      <PmsShareMessageLinks params={message.templateParams}/>
     </section>
   </article>
 }

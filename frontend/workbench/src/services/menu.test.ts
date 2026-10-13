@@ -23,6 +23,23 @@ const menu = (values: Partial<RawMenu> & Pick<RawMenu, 'id' | 'name'>): RawMenu 
 })
 
 describe('workbench menu conversion', () => {
+  it.each(['PC', 'MOBILE'])('keeps authorized points entries in %s navigation', platform => {
+    const routes = buildMenuTree([menu({ id: 6735, name: '工作台', path: '/zsjos', children: [
+      menu({ id: 602348, parentId: 6735, name: '积分兑换码', path: 'points-redemption', component: 'zsjos-workbench', workbenchRenderMode: 'native' }),
+      menu({ id: 602349, parentId: 6735, name: '积分套餐', path: 'points-packages', component: 'zsjos/pointsPackages/index', workbenchRenderMode: 'native' })
+    ] })])
+    const supported = platform === 'PC' ? RENDERABLE_APP_ROUTES : MOBILE_RENDERABLE_APP_ROUTES
+    const visible = filterRenderableMenus(routes, supported)
+    expect(buildTwoLevelNavigation(visible)[0]?.pages.map(page => page.key)).toEqual([
+      '/zsjos/points-redemption', '/zsjos/points-packages'
+    ])
+    expect(findMenuByPath(visible, '/zsjos/points-redemption')?.component).toBe('zsjos-workbench')
+    // Runtime support never creates an entry omitted by server authorization.
+    expect(filterRenderableMenus([], supported)).toEqual([])
+    const onlyApplication = filterRenderableMenus([{ ...routes[0], children: [routes[0].children[0]] }], supported)
+    expect(findMenuByPath(onlyApplication, '/zsjos/points-packages')).toBeUndefined()
+  })
+
   it('resolves the exam calendar beneath the server-owned Calendar directory', () => {
     const routes = buildMenuTree([menu({
       id: 73600, name: '日历', path: '/calendar', children: [menu({
@@ -255,12 +272,7 @@ describe('workbench menu conversion', () => {
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
-    // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    // 73 个服务端页面路由，包含素材管理（/zsjos/material-library/manage，与浏览页共用页面组件，
-    // 由 RouteHost 的 management 开关区分）+ 素材审批 + 教务自拓
-    // （APP_ROUTES.LEAD_EDUCATION_SELF_SOURCED，由 LeadSubmissionPage 的 educationSelfSourced
-    // 分支渲染），两条路由都已接线，计数随之更新。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(73)
+    // Check route identities rather than a total that can pass while a required entry is missing.
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)

@@ -87,6 +87,18 @@ class CourseCalendarVersionTest {
         assertEquals(5, saved.getValue().getCalendarVersion());
     }
 
+    @Test void colorOnlyPreservesNotificationVersionAndOldClientColor() {
+        var original = current().setBackgroundColor("#112233");
+        when(mapper.selectById(1L)).thenReturn(original);
+        assertEquals("#112233", service.previewSave(1L, request()).getBackgroundColor());
+        var req = request(); req.setBackgroundColor("#aabbcc");
+        var changed = service.previewSave(1L, req);
+        assertEquals("#AABBCC", changed.getBackgroundColor());
+        assertEquals(4, changed.getCalendarVersion());
+        req.setBackgroundColor("");
+        assertNull(service.previewSave(1L, req).getBackgroundColor());
+    }
+
     private CourseCalendarEventDO current() {
         return new CourseCalendarEventDO().setId(1L).setCalendarVersion(4).setCourseName("课程")
                 .setCourseFormValue("LIVE").setCourseFormLabelSnapshot("历史直播")

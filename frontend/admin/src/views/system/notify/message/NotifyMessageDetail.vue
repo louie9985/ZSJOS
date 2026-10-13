@@ -23,6 +23,7 @@
       <el-descriptions-item label="消息摘要">{{ detailData.templateSummary }}</el-descriptions-item>
       <el-descriptions-item label="完整正文">
         {{ detailData.templateContent }}
+        <PmsShareMessageLinks :params="detailData.templateParams" />
       </el-descriptions-item>
       <el-descriptions-item label="业务场景">{{
         detailData.sceneCode || '-'
@@ -57,6 +58,7 @@
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
+import PmsShareMessageLinks from '../my/PmsShareMessageLinks.vue'
 import { formatDate } from '@/utils/formatTime'
 import * as EmployeeApi from '@/api/hrm/employee'
 import * as NotifyMessageApi from '@/api/system/notify/message'

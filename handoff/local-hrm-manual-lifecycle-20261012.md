@@ -29,3 +29,15 @@
 - Shared development DB read-only inspection: ruoyi-vue-pro has 46 employee rows, all tenant 1; 0 new lifecycle columns; HRM versions V001/V002. No shared DB writes, job enablement, service restart, role grants, commits or deployment. V003 and coordinated service/frontend release remain necessary for runtime acceptance.
 - Historical unrelated dirty changes preserved, including points-redemption branches in notifyMessageAction.ts.
 - Ownership released; target/integration: None.
+
+## Registration update — 2026-10-13 readable legacy labels
+- Environment local; branch main; worktree D:/ZSJ-OS; base 40ec4b41be4f51dda93ad612ebfc2dc5bde1e17a; same owner and workstream.
+- User-approved scope: employee list, employee detail, portal post information; shared HRM dictionary-label display component; existing isolated browser fixture and focused label browser check; docs/api/hrm-manual-lifecycle.md; this record.
+- Missing historical snapshots may display the current System dictionary label with an explicit source tooltip. Existing snapshot wins; no dictionary match retains historical code; no database writes or inferred historical labels.
+- Verification: scoped diff, Admin typecheck, actual Vue component browser cases for snapshot priority, current dictionary fallback, unknown/empty values, asynchronously loaded dictionaries at desktop/mobile widths. No branch integration.
+
+## Delivery — 2026-10-13 readable legacy labels
+- Employee list, management detail and employee portal use one HRM display component. Stored snapshot wins; missing snapshot displays current System dictionary label with focus/hover tooltip identifying its current-dictionary origin; missing dictionary uses historical code, missing value uses a dash. No backend, migration or database changes.
+- Updated the directly affected documentation to replace the former historical-code-only fallback, based on the user's explicit approval.
+- Verification: actual Vue component in Chrome at 1440/390 passed asynchronous dictionary loading, snapshot priority, three code-1 labels, unknown/empty values, reactive value changes, tooltip and no-write assertions; screenshots visually inspected. Scoped ESLint and diff checks passed. Admin vue-tsc reports only the same 12 pre-existing withdrawal duplicate-field diagnostics; no changed-file diagnostics.
+- No production deployment or shared service restart performed. Ownership released.

@@ -39,6 +39,17 @@ class PersonalCalendarEventServiceTest {
         verify(mapper, never()).deleteOwned(anyLong(), anyLong(), any());
     }
 
+    @Test void oldClientPreservesColorAndExplicitEmptyClears() {
+        when(mapper.selectById(9L)).thenReturn(new PersonalCalendarEventDO().setId(9L).setOwnerUserId(20L).setBackgroundColor("#112233"));
+        service.update(9L, saveReq(), 20L);
+        var req = saveReq(); req.setBackgroundColor("");
+        service.update(9L, req, 20L);
+        var values = ArgumentCaptor.forClass(PersonalCalendarEventDO.class);
+        verify(mapper, times(2)).updateOwned(values.capture(), eq(20L));
+        assertEquals("#112233", values.getAllValues().get(0).getBackgroundColor());
+        assertNull(values.getAllValues().get(1).getBackgroundColor());
+    }
+
     @Test
     void listAlwaysUsesCurrentUserAsOwner() {
         PersonalCalendarEventListReqVO req = listReq();

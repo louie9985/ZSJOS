@@ -7618,6 +7618,7 @@ CREATE TABLE IF NOT EXISTS zsjos_media_account_profile_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号档案维护与复盘追加记录';
 
 CREATE TABLE IF NOT EXISTS `zsjos_personal_calendar_event` (
+  background_color varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '日程自选底色',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日程编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
   `owner_user_id` bigint NOT NULL COMMENT '所属 ADMIN 用户编号',
@@ -7641,6 +7642,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_personal_calendar_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='个人日程';
 
 CREATE TABLE IF NOT EXISTS `zsjos_course_calendar_event` (
+  background_color varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '课程自选底色',
   `calendar_version` int NOT NULL DEFAULT 1 COMMENT '通知内容版本',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '课程安排编号',
   `tenant_id` bigint NOT NULL COMMENT '租户编号',
@@ -8142,3 +8144,14 @@ CREATE TABLE IF NOT EXISTS `zsjos_points_request` (
     KEY idx_due(tenant_id,approval_status,issue_status,notified,next_attempt_at),
     KEY idx_applicant(tenant_id,applicant_user_id,id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分兑换码申请';
+
+-- V314 final structure; upgrade remains the numbered migration, with no historical backfill.
+CREATE TABLE IF NOT EXISTS zsjos_calendar_palette (
+  id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, user_id bigint NOT NULL,
+  calendar_type varchar(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  colors_json json NOT NULL,
+  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY(id), UNIQUE KEY uk_calendar_palette_owner(tenant_id,user_id,calendar_type)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='员工日历快捷色';

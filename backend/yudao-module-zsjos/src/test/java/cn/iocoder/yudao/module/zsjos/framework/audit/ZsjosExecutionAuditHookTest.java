@@ -1,12 +1,17 @@
 package cn.iocoder.yudao.module.zsjos.framework.audit;
 
 import cn.iocoder.yudao.framework.audit.ExecutionAuditContext;
+import cn.iocoder.yudao.framework.audit.ExecutionAuditRunner;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.service.TenantFrameworkService;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.List;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -14,7 +19,8 @@ import static org.mockito.Mockito.*;
 
 class ZsjosExecutionAuditHookTest {
     private final BusinessAuditService service = mock(BusinessAuditService.class);
-    private final ZsjosExecutionAuditHook hook = new ZsjosExecutionAuditHook(service);
+    private final TenantFrameworkService tenants = mock(TenantFrameworkService.class);
+    private final ZsjosExecutionAuditHook hook = new ZsjosExecutionAuditHook(service, tenants);
 
     @AfterEach
     void cleanUp() { TenantContextHolder.clear(); }
@@ -60,5 +66,91 @@ class ZsjosExecutionAuditHookTest {
 
     private ExecutionAuditContext context(String tenant) {
         return new ExecutionAuditContext("ASYNC", "test", null, null, null, null, tenant, Map.of());
+    }
+
+    private ExecutionAuditContext jobContext() {
+        return new ExecutionAuditContext("SYSTEM_JOB", "pointsIssuanceJob", null, null, null, null, null, Map.of());
+    }
+
+    @Test
+    void quartzCompletionAfterTenantJobRestoresConfiguredTenant() throws Exception {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        TenantContextHolder.setIgnore(true);
+        doAnswer(call -> {
+            assertEquals(1L, TenantContextHolder.getRequiredTenantId());
+            assertFalse(TenantContextHolder.isIgnore());
+            assertEquals("SUCCESS", ((Map<?, ?>) call.getArgument(5)).get("resultStatus"));
+            return null;
+        }).when(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        String result = ExecutionAuditRunner.run(jobContext(), List.of(hook), () -> {
+            String value = TenantUtils.execute(1L, () -> "processed");
+            assertNull(TenantContextHolder.getTenantId());
+            return value;
+        });
+        assertEquals("processed", result);
+        verify(tenants).validTenant(1L);
+        verify(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertNull(TenantContextHolder.getTenantId());
+        assertTrue(TenantContextHolder.isIgnore());
+    }
+
+    @Test
+    void quartzFailureAuditsTenantAndRethrowsOriginalBusinessError() {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        IllegalStateException failure = new IllegalStateException("synthetic");
+        doAnswer(call -> {
+            assertEquals(1L, TenantContextHolder.getRequiredTenantId());
+            assertEquals("FAILURE", ((Map<?, ?>) call.getArgument(5)).get("resultStatus"));
+            return null;
+        }).when(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertSame(failure, assertThrows(IllegalStateException.class, () ->
+                ExecutionAuditRunner.run(jobContext(), List.of(hook), () -> { throw failure; })));
+        verify(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertNull(TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void auditInsertFailureDoesNotChangeQuartzResultOrLeakTenant() throws Exception {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        doThrow(new IllegalStateException("synthetic insert failure")).when(service)
+                .record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertEquals("processed", ExecutionAuditRunner.run(jobContext(), List.of(hook), () -> "processed"));
+        assertNull(TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void missingOrAmbiguousTenantRefusesPersistence() {
+        for (List<Long> ids : Arrays.<List<Long>>asList(null, List.of(), List.of(1L, 2L), Arrays.asList((Long) null))) {
+            when(tenants.getTenantIds()).thenReturn(ids);
+            assertThrows(IllegalStateException.class, () -> hook.onSuccess(jobContext(), 1));
+        }
+        verifyNoInteractions(service);
+        assertNull(TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void invalidConfiguredTenantRefusesPersistence() {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        doThrow(new IllegalStateException("disabled")).when(tenants).validTenant(1L);
+        assertThrows(IllegalStateException.class, () -> hook.onSuccess(jobContext(), 1));
+        verifyNoInteractions(service);
+        assertNull(TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void explicitOrAmbientJobTenantDoesNotUseSingletonFallback() {
+        hook.onSuccess(new ExecutionAuditContext("SYSTEM_JOB", "job", null, null, null, null, "1", Map.of()), 1);
+        TenantContextHolder.setTenantId(1L);
+        hook.onSuccess(jobContext(), 1);
+        verifyNoInteractions(tenants);
+        verify(service, times(2)).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void nonJobWithoutTenantDoesNotAcquireDefaultTenant() {
+        doAnswer(call -> { assertNull(TenantContextHolder.getTenantId()); return null; }).when(service)
+                .record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        hook.onSuccess(context(null), 1);
+        verifyNoInteractions(tenants);
     }
 }

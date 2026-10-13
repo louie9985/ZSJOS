@@ -35,6 +35,37 @@ import static cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVari
 
 class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
 
+    @Test
+    void consecutiveDeduplicationRequiresSystemSnapshotAndHistoricalDefinition() {
+        var task = historicTask("chairman", 2, 2000L, "233");
+        when(task.getProcessDefinitionId()).thenReturn("historical-v3");
+        String actorKey = cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.ACTOR;
+        String reasonKey = cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants.TASK_VARIABLE_REASON;
+        String reason = cn.iocoder.yudao.module.bpm.enums.definition.BpmAutoApproveTypeEnum.APPROVE_SEQUENT.getName();
+        var systemActor = Map.of("subjectType", "SYSTEM", "action", "approve");
+        when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, 2, actorKey, systemActor, reasonKey, reason));
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("process-1"))).thenReturn(List.of());
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1"))).thenReturn(List.of(task));
+        when(adminUserApi.getUserMap(Set.of(233L))).thenReturn(Map.of());
+        var definition = new cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO();
+        definition.setAutoApprovalType(2);
+        when(processDefinitionService.getProcessDefinitionInfo("historical-v3")).thenReturn(definition);
+        var result = processTaskApi.getProcessNodeStatuses("process-1", Set.of("chairman")).getFirst();
+        assertEquals(true, result.getConsecutiveApprovalDeduplicated());
+        org.junit.jupiter.api.Assertions.assertNull(result.getActionUserId());
+        assertEquals(233L, result.getReviewerUserId());
+        definition.setAutoApprovalType(0);
+        assertEquals(false, processTaskApi.getProcessNodeStatuses("process-1", Set.of("chairman")).getFirst().getConsecutiveApprovalDeduplicated());
+        definition.setAutoApprovalType(2);
+        when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, 2, actorKey,
+                Map.of("subjectType", "ADMIN", "action", "approve", "userId", 233L), reasonKey, reason));
+        assertEquals(false, processTaskApi.getProcessNodeStatuses("process-1", Set.of("chairman")).getFirst().getConsecutiveApprovalDeduplicated());
+        when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, 2, actorKey, systemActor, reasonKey, "审批超时自动通过"));
+        assertEquals(false, processTaskApi.getProcessNodeStatuses("process-1", Set.of("chairman")).getFirst().getConsecutiveApprovalDeduplicated());
+        when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, 2, reasonKey, reason));
+        assertEquals(false, processTaskApi.getProcessNodeStatuses("process-1", Set.of("chairman")).getFirst().getConsecutiveApprovalDeduplicated());
+    }
+
     private static final Long USER_ID = 233L;
 
     @InjectMocks

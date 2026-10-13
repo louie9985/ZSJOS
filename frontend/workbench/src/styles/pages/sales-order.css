@@ -562,6 +562,15 @@
   }
 }
 
+.sales-order-detail-main .lead-profile-meta > .sales-order-partner-owner {
+  grid-column: 1 / -1;
+}
+
+.sales-order-detail-main .sales-order-partner-owner .lead-field-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .sales-order-supervisor-detail {
   display: flex;
   min-width: 0;

@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeContentPermiss
 import cn.iocoder.yudao.module.system.api.notify.NotifyMessageSendApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendSingleToUserReqDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -115,6 +116,8 @@ public class PmsKnowledgeDocumentShareServiceImplTest extends BaseDbUnitTest {
         // mock 数据
         Long userId = randomLongId();
         Long memberUserId = randomLongId();
+        when(adminUserApi.getUser(userId)).thenReturn(new AdminUserRespDTO().setId(userId)
+                .setNickname("分享老师").setUsername("share-test"));
         PmsKnowledgeLibraryDO library = randomLibraryDO();
         libraryMapper.insert(library);
         PmsKnowledgeDocumentDO document = randomDocumentDO(library.getId());
@@ -135,9 +138,17 @@ public class PmsKnowledgeDocumentShareServiceImplTest extends BaseDbUnitTest {
         assertEquals(memberUserId, captor.getValue().getUserId());
         assertEquals(KNOWLEDGE_DOCUMENT_SHARED, captor.getValue().getTemplateCode());
         assertEquals(document.getTitle(), captor.getValue().getTemplateParams().get("documentTitle"));
+        assertEquals("分享老师", captor.getValue().getTemplateParams().get("operatorName"));
+        assertEquals("/pms/kb/library/" + library.getId() + "/document/" + document.getId(),
+                captor.getValue().getTemplateParams().get("documentRoute"));
         String shareToken = documentShareMapper.selectByDocumentId(document.getId()).getToken();
         assertEquals("/pms/kb/document/share/" + shareToken,
                 captor.getValue().getTemplateParams().get("route"));
+        assertEquals("https://public.example.com/public-api/pms/kb/document-share/page?token=" + shareToken,
+                captor.getValue().getTemplateParams().get("publicUrl"));
+        org.mockito.Mockito.clearInvocations(notifyMessageSendApi);
+        documentShareService.updateShareMemberList(document.getId(), List.of(memberUserId, userId), userId);
+        org.mockito.Mockito.verifyNoInteractions(notifyMessageSendApi);
     }
 
     @Test

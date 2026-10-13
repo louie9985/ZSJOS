@@ -17,6 +17,43 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PointsIssuanceServiceTest {
+    private static BpmProcessNodeStatusRespDTO consecutiveDecision(String key, Long reviewer) {
+        var d = decision(key, null); d.setReviewerUserId(reviewer); d.setConsecutiveApprovalDeduplicated(true);
+        d.setEndTime(java.time.LocalDateTime.of(2026, 1, 1, 10, 1)); return d;
+    }
+
+    @Test void consecutiveSameApproverIssuesWithoutInventingHumanActor() {
+        row.setApproverIdsJson("[2,2]");
+        var manual = decision("supervisor", 2L); manual.setEndTime(java.time.LocalDateTime.of(2026, 1, 1, 10, 0));
+        var automatic = consecutiveDecision("chairman", 2L);
+        when(tasks.getProcessNodeStatuses(anyString(), any())).thenReturn(List.of(automatic, manual));
+        service.issue(9L);
+        assertEquals("issued", row.getIssueStatus()); verify(platform).issue(row);
+        assertNull(automatic.getActionUserId());
+    }
+
+    @Test void deduplicationCannotReplaceDifferentFrozenApprover() {
+        var manual = decision("supervisor", 2L); manual.setEndTime(java.time.LocalDateTime.of(2026, 1, 1, 10, 0));
+        when(tasks.getProcessNodeStatuses(anyString(), any())).thenReturn(List.of(manual, consecutiveDecision("chairman", 3L)));
+        service.issue(9L);
+        assertEquals("failed", row.getIssueStatus()); verify(platform, never()).issue(any());
+    }
+
+    @Test void deduplicationNeedsPriorManualDecisionAndMatchingReviewer() {
+        var manual = decision("supervisor", 2L); manual.setEndTime(java.time.LocalDateTime.of(2026, 1, 1, 10, 0));
+        var automatic = consecutiveDecision("chairman", 2L);
+        assertTrue(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(manual, automatic), 1L));
+        assertFalse(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(consecutiveDecision("supervisor", 2L), automatic), 1L));
+        automatic.setReviewerUserId(3L);
+        assertFalse(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(manual, automatic), 1L));
+        automatic.setReviewerUserId(2L); automatic.setConsecutiveApprovalDeduplicated(false);
+        assertFalse(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(manual, automatic), 1L));
+        automatic.setConsecutiveApprovalDeduplicated(true); automatic.setEndTime(manual.getEndTime().minusSeconds(1));
+        assertFalse(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(manual, automatic), 1L));
+        automatic.setEndTime(null);
+        assertFalse(PointsIssuanceService.validApprovalDecisions(List.of("supervisor", "chairman"), List.of(2L, 2L), List.of(manual, automatic), 1L));
+    }
+
     PointsIssuanceService service;
     PointsRequestDO row;
     PointsPlatformClient platform;

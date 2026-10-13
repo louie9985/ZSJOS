@@ -44,6 +44,7 @@ public class CourseCalendarEventService {
         CourseCalendarEventDO row = prepareSave(current, req);
         notificationSnapshots.captureCourse(current, "MANUAL", "ACTIVE");
         mapper.update(row, new LambdaUpdateWrapper<CourseCalendarEventDO>().eq(CourseCalendarEventDO::getId, id)
+                .set(CourseCalendarEventDO::getBackgroundColor, row.getBackgroundColor())
                 .set(CourseCalendarEventDO::getRemark, row.getRemark()));
         notificationSnapshots.captureCourse(row, "UPDATED", "ACTIVE");
     }
@@ -68,6 +69,7 @@ public class CourseCalendarEventService {
         var row = BeanUtils.toBean(req, CourseCalendarEventDO.class).setId(current == null ? null : current.getId())
                 .setCourseName(req.getCourseName().trim()).setCourseFormLabelSnapshot(formLabel)
                 .setAttachmentIdsJson(JsonUtils.toJsonString(validateFiles(req.getAttachmentIds())));
+        row.setBackgroundColor(cn.iocoder.yudao.module.zsjos.service.calendar.CalendarColors.resolve(req.getBackgroundColor(), current == null ? null : current.getBackgroundColor()));
         int version = current == null || current.getCalendarVersion() == null ? 1 : current.getCalendarVersion();
         row.setCalendarVersion(current == null || sameNotificationContent(current, row) ? version : version + 1);
         return row;

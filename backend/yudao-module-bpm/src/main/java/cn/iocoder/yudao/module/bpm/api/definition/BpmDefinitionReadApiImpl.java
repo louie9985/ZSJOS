@@ -12,11 +12,17 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
 import jakarta.annotation.Resource;
 import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.bpmn.model.BpmnModel;
+import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.EndEvent;
 import org.flowable.bpmn.model.FlowElement;
 import org.flowable.bpmn.model.SequenceFlow;
 import org.flowable.bpmn.model.StartEvent;
 import org.flowable.bpmn.model.UserTask;
+import org.flowable.bpmn.model.TimerEventDefinition;
+import cn.iocoder.yudao.module.bpm.enums.definition.BpmBoundaryEventTypeEnum;
+import cn.iocoder.yudao.module.bpm.enums.definition.BpmAutoApproveTypeEnum;
+import cn.iocoder.yudao.module.bpm.enums.definition.BpmUserTaskTimeoutHandlerTypeEnum;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnModelConstants;
 import org.flowable.common.engine.impl.db.SuspensionState;
 import org.springframework.stereotype.Service;
 
@@ -90,14 +96,13 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
         result.setOrderedUserTaskKeys(chain);
         result.setMandatoryHumanChain(!chain.isEmpty() && info != null
                 && Objects.equals(info.getAutoApprovalType(), 0));
+        result.setConsecutiveApprovalDeduplicationChain(!chain.isEmpty() && info != null
+                && Objects.equals(info.getAutoApprovalType(), BpmAutoApproveTypeEnum.APPROVE_SEQUENT.getType()));
         result.setUserTasks(userTasks.stream().map(task -> {
                     BpmUserTaskMetadataRespDTO userTask = new BpmUserTaskMetadataRespDTO();
                     userTask.setCandidateStrategy(BpmnModelUtils.parseCandidateStrategy(task));
                     userTask.setCandidateParam(BpmnModelUtils.parseCandidateParam(task));
-                    userTask.setMandatoryHumanApproval(Objects.equals(BpmnModelUtils.parseApproveType(task), 1)
-                            && Objects.equals(BpmnModelUtils.parseAssignEmptyHandlerType(task), 2)
-                            && Objects.equals(BpmnModelUtils.parseAssignStartUserHandlerType(task), 1)
-                            && (task.getSkipExpression() == null || task.getSkipExpression().isBlank()));
+                    userTask.setMandatoryHumanApproval(isMandatoryHumanTask(task));
                     userTask.setKey(task.getId());
                     userTask.setName(task.getName());
                     userTask.setStartUserSelectAssignees(Objects.equals(
@@ -154,7 +159,8 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
         if (model == null || model.getMainProcess() == null) return List.of();
         var elements = model.getMainProcess().getFlowElements();
         if (elements.stream().anyMatch(e -> !(e instanceof StartEvent) && !(e instanceof EndEvent)
-                && !(e instanceof UserTask) && !(e instanceof SequenceFlow))) return List.of();
+                && !(e instanceof UserTask) && !(e instanceof SequenceFlow)
+                && !(e instanceof BoundaryEvent event && isPureReminder(event, tasks, elements)))) return List.of();
         var starts = elements.stream().filter(StartEvent.class::isInstance).map(StartEvent.class::cast).toList();
         var ends = elements.stream().filter(EndEvent.class::isInstance).map(EndEvent.class::cast).toList();
         if (starts.size() != 1 || ends.size() != 1) return List.of();
@@ -173,6 +179,33 @@ public class BpmDefinitionReadApiImpl implements BpmDefinitionReadApi {
         }
         return cursor != null && result.size() == tasks.size() && outgoing.size() == tasks.size() + 1
                 ? result : List.of();
+    }
+
+    private boolean isMandatoryHumanTask(UserTask task) {
+        return Objects.equals(BpmnModelUtils.parseApproveType(task), 1)
+                && Objects.equals(BpmnModelUtils.parseAssignEmptyHandlerType(task), 2)
+                && Objects.equals(BpmnModelUtils.parseAssignStartUserHandlerType(task), 1)
+                && (task.getSkipExpression() == null || task.getSkipExpression().isBlank());
+    }
+
+    private boolean isPureReminder(BoundaryEvent event, List<UserTask> tasks, Collection<FlowElement> elements) {
+        // BPM reminder timers only notify: they must neither interrupt nor introduce another execution path.
+        return !event.isCancelActivity()
+                && event.getEventDefinitions().size() == 1
+                && event.getEventDefinitions().getFirst() instanceof TimerEventDefinition
+                && event.getExecutionListeners().isEmpty()
+                && event.getIncomingFlows().isEmpty() && event.getOutgoingFlows().isEmpty()
+                && elements.stream().filter(SequenceFlow.class::isInstance).map(SequenceFlow.class::cast)
+                .noneMatch(flow -> Objects.equals(event.getId(), flow.getSourceRef())
+                        || Objects.equals(event.getId(), flow.getTargetRef()))
+                && tasks.stream().anyMatch(task -> Objects.equals(task.getId(), event.getAttachedToRefId())
+                        && isMandatoryHumanTask(task))
+                && Objects.equals(BpmnModelUtils.parseBoundaryEventExtensionElement(event,
+                        BpmnModelConstants.BOUNDARY_EVENT_TYPE),
+                        String.valueOf(BpmBoundaryEventTypeEnum.USER_TASK_TIMEOUT.getType()))
+                && Objects.equals(BpmnModelUtils.parseBoundaryEventExtensionElement(event,
+                        BpmnModelConstants.USER_TASK_TIMEOUT_HANDLER_TYPE),
+                        String.valueOf(BpmUserTaskTimeoutHandlerTypeEnum.REMINDER.getType()));
     }
 
     private String onlyTarget(Map<String, List<String>> outgoing, String source) {

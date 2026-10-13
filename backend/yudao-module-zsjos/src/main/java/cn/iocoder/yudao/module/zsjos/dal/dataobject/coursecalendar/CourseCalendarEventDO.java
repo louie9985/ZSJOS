@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class CourseCalendarEventDO extends TenantBaseDO {
+    private String backgroundColor;
     @TableId private Long id;
     private String courseName;
     private String courseFormValue;

@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeContentPermiss
 import cn.iocoder.yudao.module.system.api.notify.NotifyMessageSendApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendSingleToUserReqDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +93,7 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
         }
 
         // 3. 通知内部分享成员
-        sendKnowledgeDocumentSharedNotify(normalizedShareUserIds, userId, share.getToken(), document.getTitle());
+        sendKnowledgeDocumentSharedNotify(normalizedShareUserIds, userId, share.getToken(), document);
         return share;
     }
 
@@ -118,7 +119,7 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
         if (CollUtil.isNotEmpty(share.getShareUserIds())) {
             share.getShareUserIds().forEach(addedUserIds::remove);
         }
-        sendKnowledgeDocumentSharedNotify(addedUserIds, userId, share.getToken(), document.getTitle());
+        sendKnowledgeDocumentSharedNotify(addedUserIds, userId, share.getToken(), document);
     }
 
     @Override
@@ -226,15 +227,35 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
      * 发送知识文档分享站内信。通知配置异常不能阻断文档分享主业务
      */
     private void sendKnowledgeDocumentSharedNotify(Collection<Long> receiverUserIds, Long operatorUserId,
-                                                   String shareToken, String documentTitle) {
+                                                   String shareToken, PmsKnowledgeDocumentDO document) {
         if (CollUtil.isEmpty(receiverUserIds)) {
             return;
         }
         Set<Long> uniqueReceiverUserIds = new LinkedHashSet<>(receiverUserIds);
         uniqueReceiverUserIds.remove(null);
         uniqueReceiverUserIds.remove(operatorUserId);
-        Map<String, Object> templateParams = Maps.newHashMapWithExpectedSize(2);
-        templateParams.put("documentTitle", documentTitle);
+        if (uniqueReceiverUserIds.isEmpty()) return;
+        Map<String, Object> templateParams = Maps.newHashMapWithExpectedSize(5);
+        try {
+            AdminUserRespDTO operator = adminUserApi.getUser(operatorUserId);
+            // Persist the actor's display name at sharing time, not a later directory lookup.
+            String operatorName = operator == null ? null : operator.getNickname();
+            if (operatorName == null || operatorName.isBlank()) {
+                operatorName = operator == null ? null : operator.getUsername();
+            }
+            if (operatorName == null || operatorName.isBlank()) {
+                log.warn("[sendKnowledgeDocumentSharedNotify][分享人信息不可用，跳过通知]");
+                return;
+            }
+            templateParams.put("operatorName", operatorName);
+            templateParams.put("publicUrl", shareUrl.build(shareToken));
+        } catch (RuntimeException ex) {
+            log.warn("[sendKnowledgeDocumentSharedNotify][通知参数生成失败]", ex);
+            return;
+        }
+        templateParams.put("documentTitle", document.getTitle());
+        templateParams.put("documentRoute", "/pms/kb/library/" + document.getLibraryId()
+                + "/document/" + document.getId());
         templateParams.put("route", "/pms/kb/document/share/" + shareToken);
         uniqueReceiverUserIds.forEach(receiverUserId -> {
             try {
@@ -242,8 +263,7 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
                         .setUserId(receiverUserId).setTemplateCode(KNOWLEDGE_DOCUMENT_SHARED)
                         .setTemplateParams(templateParams));
             } catch (RuntimeException ex) {
-                log.warn("[sendKnowledgeDocumentSharedNotify][向用户({})发送知识文档分享站内信失败，参数为({})]",
-                        receiverUserId, templateParams, ex);
+                log.warn("[sendKnowledgeDocumentSharedNotify][知识文档分享站内信发送失败]", ex);
             }
         });
     }

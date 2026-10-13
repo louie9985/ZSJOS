@@ -17,6 +17,8 @@ public class BpmProcessDefinitionMetadataRespDTO {
     private String description;
     /** Strict unconditional chain including the Simple submission task. */
     private Boolean mandatoryHumanChain;
+    /** Unconditional chain using BPM's consecutive-same-approver deduplication policy. */
+    private Boolean consecutiveApprovalDeduplicationChain;
     private List<String> orderedUserTaskKeys;
     private Boolean simpleSequentialApproval;
     private List<BpmUserTaskMetadataRespDTO> userTasks;

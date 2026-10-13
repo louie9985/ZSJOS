@@ -20,6 +20,7 @@
       </el-descriptions-item>
       <el-descriptions-item label="完整正文">
         {{ detailData.templateContent }}
+        <PmsShareMessageLinks :params="detailData.templateParams" />
       </el-descriptions-item>
     </el-descriptions>
     <el-button v-if="isFeedbackUrgeNotification(detailData)" type="primary" :loading="taskLoading" class="mt-16px" @click="openTask">
@@ -29,6 +30,7 @@
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
+import PmsShareMessageLinks from './PmsShareMessageLinks.vue'
 import { formatDate } from '@/utils/formatTime'
 import * as NotifyMessageApi from '@/api/system/notify/message'
 import { feedbackUrgeTaskTarget, isFeedbackUrgeNotification } from '@/utils/feedbackUrgeNotification'

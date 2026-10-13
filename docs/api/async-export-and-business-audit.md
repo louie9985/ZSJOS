@@ -19,3 +19,14 @@ tasks, models, or timeout actions. Their async execution adapter carries that te
 the execution audit hook and restores the worker thread afterward. A failed notification
 or automatic timeout action is recorded as `FAILURE` while Flowable retains its normal job
 retry behavior; a missing HTTP request tenant is never replaced with a default tenant.
+
+Quartz completion auditing runs outside the `@TenantJob` business scope. When a
+`SYSTEM_JOB` audit has neither an explicit execution tenant nor an ambient tenant,
+the ZSJOS audit hook resolves and validates the single tenant returned by
+`TenantFrameworkService`, writes inside `TenantUtils.execute`, and restores the
+worker context afterward. Empty, invalid or ambiguous tenant configuration rejects
+the audit write. Explicit execution tenants retain precedence; other execution
+types keep their existing behavior. Audit callback failures remain isolated from
+the Quartz business result and retry policy. The outer Quartz result still follows
+the existing tenant-job aggregation behavior and does not prove individual issuance
+success. No historical audit backfill or business-job replay is performed.

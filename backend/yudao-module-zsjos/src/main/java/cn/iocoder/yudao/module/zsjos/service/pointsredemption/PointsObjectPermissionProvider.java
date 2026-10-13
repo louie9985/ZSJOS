@@ -16,7 +16,7 @@ import java.util.Objects;
         if (row == null || userId == null) return false;
         boolean owner = Objects.equals(row.getApplicantUserId(), userId);
         return switch(action) {
-            case "reveal", "cancel" -> owner;
+            case "reveal", "cancel", "urge" -> owner;
             case "manage" -> permissions.hasAnyPermissions(userId, PointsRequestService.PERM + "manage");
             case "read", "refresh" -> owner || permissions.hasAnyPermissions(userId, PointsRequestService.PERM + "manage")
                     || progress.isParticipant(row.getProcessInstanceId(), userId);

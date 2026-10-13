@@ -54,6 +54,9 @@
       <el-table-column v-if="showOrderIdentity" label="成交归属身份" width="120">
         <template #default="{ row }">{{ row.formalOwnerIdentityLabel || '未记录' }}</template>
       </el-table-column>
+      <el-table-column v-if="showOrderIdentity" label="兼职归属新媒体员工" width="190" show-overflow-tooltip>
+        <template #default="{ row }">{{ orderPartnerOwnerText(row.leadSourceType, row.partnerOwnerSnapshot) }}</template>
+      </el-table-column>
       <el-table-column label="时间" width="180"
         ><template #default="{ row }">{{
           formatTime(row.submittedAt || row.createTime)
@@ -91,6 +94,7 @@
 <script setup lang="ts">
 import type { AdvancedFilterGroup, AdvancedFilterScene } from '@/api/zsjos/advancedFilter'
 import request from '@/config/axios'
+import { orderPartnerOwnerText } from '@/api/zsjos/orderPartnerOwner'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import ZsjosAdvancedFilter from './ZsjosAdvancedFilter.vue'
 const props = withDefaults(

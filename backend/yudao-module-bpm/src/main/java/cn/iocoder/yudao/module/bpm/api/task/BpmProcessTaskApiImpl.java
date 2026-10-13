@@ -2,6 +2,11 @@ package cn.iocoder.yudao.module.bpm.api.task;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
+import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO;
+import cn.iocoder.yudao.module.bpm.enums.definition.BpmAutoApproveTypeEnum;
+import cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskReasonUtils;
 import org.flowable.bpmn.model.BpmnModel;
 
@@ -75,6 +80,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         if (processInstanceIds == null || processInstanceIds.isEmpty()
                 || taskDefinitionKeys == null || taskDefinitionKeys.isEmpty()) return Map.of();
         Map<String, Map<String, BpmProcessNodeStatusRespDTO>> grouped = new HashMap<>();
+        Map<String, BpmProcessDefinitionInfoDO> definitions = new HashMap<>();
         for (String processInstanceId : processInstanceIds) grouped.put(processInstanceId, new HashMap<>());
         for (Task task : bpmTaskService.getTasksByProcessInstanceIds(List.copyOf(processInstanceIds))) {
             if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getParentTaskId() != null) continue;
@@ -105,6 +111,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                 value.setReviewerUserId(NumberUtil.parseLong(task.getAssignee(), null));
                 value.setActionUserId(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.userId(task.getTaskLocalVariables()));
                 value.setActionUserNameSnapshot(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
+                value.setConsecutiveApprovalDeduplicated(isConsecutiveApprovalDeduplicated(task, definitions));
                 value.setCreateTime(toLocalDateTime(task.getCreateTime())); value.setEndTime(taskEndTime);
                 result.put(task.getTaskDefinitionKey(), value);
             }
@@ -123,6 +130,22 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         grouped.forEach((processInstanceId, result) -> response.put(processInstanceId, result.values().stream()
                 .sorted(Comparator.comparing(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey)).toList()));
         return response;
+    }
+
+    private boolean isConsecutiveApprovalDeduplicated(HistoricTaskInstance task,
+            Map<String, BpmProcessDefinitionInfoDO> definitions) {
+        var variables = task.getTaskLocalVariables();
+        var actor = BpmTaskActorSnapshot.read(variables);
+        // A human-entered reason or a current model setting cannot establish historical automatic approval.
+        if (variables == null || !"SYSTEM".equals(actor.get("subjectType"))
+                || !"approve".equals(actor.get("action")) || actor.get("userId") != null
+                || !java.util.Objects.equals(variables.get(BpmnVariableConstants.TASK_VARIABLE_STATUS), BpmTaskStatusEnum.APPROVE.getStatus())
+                || !BpmAutoApproveTypeEnum.APPROVE_SEQUENT.getName().equals(variables.get(BpmnVariableConstants.TASK_VARIABLE_REASON))
+                || task.getProcessDefinitionId() == null) return false;
+        var definition = definitions.computeIfAbsent(task.getProcessDefinitionId(),
+                processDefinitionService::getProcessDefinitionInfo);
+        return definition != null && java.util.Objects.equals(definition.getAutoApprovalType(),
+                BpmAutoApproveTypeEnum.APPROVE_SEQUENT.getType());
     }
 
     private int statusRank(String status) {

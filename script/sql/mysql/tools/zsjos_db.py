@@ -98,6 +98,15 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def applied_checksum_matches(migration: Migration, recorded_checksum: str) -> bool:
+    if recorded_checksum == migration.checksum:
+        return True
+    # Windows checkouts can expand the LF bytes originally recorded by the runner.
+    # Preserve the ledger and reject every difference except CRLF-to-LF conversion.
+    normalized = migration.path.read_bytes().replace(b"\r\n", b"\n")
+    return recorded_checksum == hashlib.sha256(normalized).hexdigest()
+
+
 def load_manifests() -> dict[str, dict]:
     manifests: dict[str, dict] = {}
     for path in sorted(MODULE_ROOT.glob("*.json")):
@@ -539,12 +548,13 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
                          "use the reviewed notice-version recovery procedure before migration")
                 skip_checksum = os.environ.get("ZSJOS_DB_SKIP_CHECKSUM", "false").lower() in ("1", "true", "yes")
                 # `zsjos_module_schema_version` rows the runner wrote are validated against
-                # the file-bytes hash. Rows carrying release `legacy`/`baseline` are exempt:
+                # the file-bytes hash, with the narrow CRLF checkout fallback above.
+                # Rows carrying release `legacy`/`baseline` are exempt:
                 # they are provenance records from the bootstrap and older migrations, whose
                 # seeds and verifiers agree on a filename or literal tag rather than the file
                 # bytes. `reconcile --include-seed-rows` rewrites them only on request.
                 if (not skip_checksum and release not in ("legacy", "baseline")
-                        and recorded_checksum != migration.checksum):
+                        and not applied_checksum_matches(migration, recorded_checksum)):
                     fail(
                         f"Applied migration checksum changed: {code}/{migration.path.name}; "
                         "restore the applied file and create a new migration"

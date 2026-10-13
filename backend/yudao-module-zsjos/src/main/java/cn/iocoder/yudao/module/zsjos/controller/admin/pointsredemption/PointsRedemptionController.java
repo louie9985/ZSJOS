@@ -19,6 +19,13 @@ public class PointsRedemptionController {
     @Resource private PointsRequestService service;
     @Resource private PointsIssuanceService issuance;
     @Resource private PointsRequestRateLimit rateLimit;
+    @Resource private PointsApprovalProgressService approvalProgress;
+    @GetMapping("/approval") @PreAuthorize("@ss.hasAnyPermissions('zsjos:points-redemption:query','bpm:task:query')")
+    public CommonResult<PointsApprovalRespVO> approval(@RequestParam Long id) { return success(approvalProgress.get(id, getLoginUserId())); }
+    @PostMapping("/urge") @PreAuthorize("@ss.hasPermission('zsjos:points-redemption:urge')")
+    public CommonResult<Boolean> urge(@RequestParam Long id, @Valid @RequestBody PointsUrgeReqVO req) {
+        approvalProgress.urge(id, req.getIdempotencyKey(), getLoginUserId()); return success(true);
+    }
     @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:points-redemption:query')")
     public CommonResult<PageResult<PointsRequestRespVO>> page(@Valid PageParam page,
             @RequestParam(defaultValue="false") boolean management) { return success(service.page(page, getLoginUserId(), management)); }

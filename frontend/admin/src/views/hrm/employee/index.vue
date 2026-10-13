@@ -269,22 +269,29 @@
       <el-table-column label="直属上级" align="center" prop="leaderEmployeeName" min-width="120" />
       <el-table-column label="聘用形式" align="center" prop="type" width="100">
         <template #default="{ row }">
-          <span v-if="row.type != null">{{ row.typeLabel || `历史代码 ${row.type}` }}</span>
-          <span v-else>-</span>
+          <HrmEmployeeDictionaryLabel
+            :dict-type="DICT_TYPE.HRM_EMPLOYEE_TYPE"
+            :value="row.type"
+            :snapshot-label="row.typeLabel"
+          />
         </template>
       </el-table-column>
       <el-table-column label="员工状态" align="center" prop="status" width="100">
         <template #default="{ row }">
-          <span v-if="row.status != null">{{ row.statusLabel || `历史代码 ${row.status}` }}</span>
-          <span v-else>-</span>
+          <HrmEmployeeDictionaryLabel
+            :dict-type="DICT_TYPE.HRM_EMPLOYEE_STATUS"
+            :value="row.status"
+            :snapshot-label="row.statusLabel"
+          />
         </template>
       </el-table-column>
       <el-table-column label="入职状态" align="center" prop="entryStatus" width="100">
         <template #default="{ row }">
-          <span v-if="row.entryStatus != null">{{
-            row.entryStatusLabel || `历史代码 ${row.entryStatus}`
-          }}</span>
-          <span v-else>-</span>
+          <HrmEmployeeDictionaryLabel
+            :dict-type="DICT_TYPE.HRM_EMPLOYEE_ENTRY_STATUS"
+            :value="row.entryStatus"
+            :snapshot-label="row.entryStatusLabel"
+          />
         </template>
       </el-table-column>
       <el-table-column
@@ -398,6 +405,7 @@
 </template>
 
 <script lang="ts" setup>
+import HrmEmployeeDictionaryLabel from '@/views/hrm/employee/components/HrmEmployeeDictionaryLabel.vue'
 import { ElMessageBox, type FormInstance, type TabsPaneContext } from 'element-plus'
 import { DICT_TYPE, getDictLabel, getIntDictOptions } from '@/utils/dict'
 import download from '@/utils/download'

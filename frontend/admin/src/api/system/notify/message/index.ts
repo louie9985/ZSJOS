@@ -12,7 +12,7 @@ export interface NotifyMessageVO {
   templateSummary: string
   templateContent: string
   templateType: number
-  templateParams: string
+  templateParams: Record<string, unknown>
   readStatus: boolean
   readTime: Date
   createTime: Date

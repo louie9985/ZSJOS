@@ -198,3 +198,12 @@ Vue Admin 的 `ExternalRepurchaseDialog.vue` 直接调用外部复购订单接�
 商品历史读取统一通过 `LeadProductSnapshot.readHistorical`：`spuUnknown/skuUnknown` 缺失或显式 `null` 归一为 `false`，布尔值保持原义，其他类型及损坏 JSON 拒绝。兼容不补造商品名称、规格、价格，也不查询当前目录替换历史。金额保持 BigDecimal 精度和小数位；展示入口沿用降级策略，补正入口沿用无效快照拒绝语义。
 
 先发布兼容性新增字段的后端，再发布两个前端消费者。旧字段本次保留，不迁移或回写历史数据。回滚前用对象数组和旧字符串数组样本验证目标包的读取能力；能够读取新格式不等于修复后的补正行为仍成立。验收证据与待验项见 [运行问题修复记录](../operations/runtime-issues-20261008.md)。
+
+
+## 兼职归属新媒体员工快照（2026-10-13）
+
+新订单提交（首购、复购及修订产生的后继订单）在审批轮次 `order_snapshot.leadProfile.partnerOwnerSnapshot` 保存提交时的兼职归属。仅 `sourceType=partner` 采集，以 `partnerId` 查询 `PartnerOwnershipService` 当前关系；保存 ADMIN 员工 `employeeUserId` 和 System 当前姓名 `employeeName`。账号已不存在时保留归属记录中的姓名快照，不用编号或其他身份推断员工。现有 Lead 归属、来源和业绩口径不变。
+
+对象缺失或 null 表示历史未记录；存在但 employeeUserId 为空表示提交时未分配；有员工 ID 但无姓名时展示姓名未记录。历史订单不补数据，读取不查询当前关系。兼职后续转归属、员工改名不改变原订单；新后继订单重新采集，原审批轮次不重写。
+
+详情通过 `leadProfile.partnerOwnerSnapshot` 返回，列表通过 `partnerOwnerSnapshot` 返回同一快照，并补充 `leadSourceType` 供客户端按来源判断。Workbench 列表卡片、订单表格、详情及 Admin 既有订单表格和详情显示“兼职归属新媒体员工”；非兼职来源列表显示“—”，详情隐藏。仅复用既有 JSON 存储，无数据库列、迁移、回填或权限变更。

@@ -1,0 +1,56 @@
+.points-package-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--crm-sp-5);
+}
+
+.points-package-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-sp-6);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-lg);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.points-package-card:hover {
+  border-color: var(--crm-color-primary-border);
+  box-shadow: var(--crm-shadow-raised);
+}
+
+.points-package-card h5.ant-typography {
+  margin: var(--crm-sp-2) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.points-package-card .ant-tag { margin-inline-end: 0; }
+.points-package-card .points-amount { padding: var(--crm-sp-2) var(--crm-sp-4); }
+.points-amount strong { font-size: var(--crm-font-display); }
+.points-package-card .ant-btn { margin-top: auto; color: var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.points-package-hint { margin-top: var(--crm-sp-5); }
+.points-package-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-card-pad);
+  margin-block: var(--crm-sp-5);
+  background: var(--crm-fill-quaternary);
+  border-radius: var(--crm-radius-md);
+}
+.points-package-summary > div { min-width: 0; }
+.points-package-summary .ant-typography { display: block; margin-bottom: var(--crm-sp-2); overflow-wrap: anywhere; }
+.points-reason { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--crm-card-pad); background: var(--crm-fill-quaternary); border-radius: var(--crm-radius-md); }
+.points-attachment-list { display: grid; gap: var(--crm-gap); }
+.points-dialog .ant-descriptions-item-content { overflow-wrap: anywhere; }
+.points-dialog .ant-typography h5, .points-dialog h5.ant-typography { margin-block: var(--crm-sp-5) var(--crm-sp-3); }
+.points-detail-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--crm-border); padding-top: var(--crm-sp-5); margin-block: var(--crm-sp-5); }
+@media (max-width: 560px) {
+  .points-package-grid { grid-template-columns: 1fr; }
+  .points-package-card { padding: var(--crm-card-pad); }
+  .points-dialog .attachment-upload-actions { flex-wrap: wrap; }
+}

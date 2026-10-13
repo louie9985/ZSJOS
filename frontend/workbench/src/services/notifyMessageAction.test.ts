@@ -175,6 +175,19 @@ describe('notify message business actions', () => {
     expect(navigate).toHaveBeenCalledWith('/bpm/task/todo?taskId=task-7')
   })
 
+  it('checks a points urge task before opening approval and falls back when reassigned', async () => {
+    const lookup = vi.spyOn(api, 'bpmBusinessTaskTarget').mockResolvedValue({} as never)
+    const navigate = vi.fn(), warn = vi.fn()
+    const item = message({ bizType: 'points-redemption', bizId: 42, sceneCode: 'zsjos.points-redemption.approval_urged', templateParams: { taskId: 'task/42' } })
+    await executeNotifyMessageAction(item, { navigate, warn, refreshUnreadCount: vi.fn() })
+    expect(lookup).toHaveBeenCalledWith('task/42', 'todo')
+    expect(navigate).toHaveBeenCalledWith('/bpm/task/todo?taskId=task%2F42')
+    lookup.mockRejectedValue(new ApiError(403, 'forbidden')); navigate.mockClear()
+    await executeNotifyMessageAction(item, { navigate, warn, refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+    expect(warn).toHaveBeenCalled()
+  })
+
   it('keeps stale or reassigned urge messages readable without selecting another task', async () => {
     vi.spyOn(feedbackApi, 'approvalTask').mockRejectedValue(new ApiError(403, 'forbidden'))
     const navigate = vi.fn(), warn = vi.fn()

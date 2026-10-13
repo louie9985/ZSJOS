@@ -1,4 +1,4 @@
-import type { CollectionMode, DictData, SalesOrder, SalesOrderListItem } from './api'
+import type { CollectionMode, DictData, SalesOrder, SalesOrderListItem, SalesOrderPartnerOwnerSnapshot } from './api'
 
 export function validateSalesOrderAmounts(
   items: Array<{ courseKey?: string; actualAmount?: number }> | undefined,
@@ -79,6 +79,13 @@ export function mergeSalesOrderListItems(
   return [...values.values()]
 }
 
+export function orderPartnerOwnerText(sourceType: string | undefined, snapshot?: SalesOrderPartnerOwnerSnapshot | null): string {
+  if (sourceType !== 'partner') return '—'
+  if (snapshot == null) return '历史未记录'
+  if (snapshot.employeeUserId == null) return '提交时未分配'
+  return snapshot.employeeName || '姓名未记录'
+}
+
 export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListItem {
   return {
     id: order.id,
@@ -110,6 +117,8 @@ export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListIte
     productSummary: (order.items || []).map(item => `${item.productName} / ${item.skuName}`).join('；'),
     leadNo: order.leadProfile?.leadNo,
     leadSourceLabel: order.leadProfile?.sourceLabel,
+    leadSourceType: order.leadProfile?.sourceType,
+    partnerOwnerSnapshot: order.leadProfile?.partnerOwnerSnapshot,
     leadSourceUserName: order.leadProfile?.sourceUserName,
     leadOwnerUserName: order.leadProfile?.ownerUserName,
     leadCategoryLabelSnapshot: order.leadProfile?.leadCategoryLabelSnapshot,

@@ -100,6 +100,8 @@ public class SalesOrderRespVO {
         private String sourceType;
         private String sourceLabel;
         private String sourceUserName;
+        // Absent on historical orders; an empty object records no owner at submission.
+        private PartnerOwnerSnapshotVO partnerOwnerSnapshot;
         private String sourceChannel;
         private String sourceChannelLabelSnapshot;
         private String provinceName;
@@ -110,6 +112,12 @@ public class SalesOrderRespVO {
         private String ownerUserName;
         private String ownerIdentity;
         private String ownerIdentityLabel;
+    }
+
+    @Data
+    public static class PartnerOwnerSnapshotVO {
+        private Long employeeUserId;
+        private String employeeName;
     }
 
     @Data

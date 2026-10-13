@@ -44,6 +44,8 @@ public class SalesOrderListItemRespVO {
     private String productSummary;
     private String leadNo;
     private String leadSourceLabel;
+    private String leadSourceType;
+    private SalesOrderRespVO.PartnerOwnerSnapshotVO partnerOwnerSnapshot;
     private String leadSourceUserName;
     private String leadOwnerUserName;
     private String formalOwnerIdentity;

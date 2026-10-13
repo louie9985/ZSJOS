@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class PersonalCalendarEventDO extends TenantBaseDO {
+    private String backgroundColor;
     @TableId private Long id;
     private Long ownerUserId;
     private String title;

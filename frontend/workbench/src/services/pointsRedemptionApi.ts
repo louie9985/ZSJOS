@@ -1,7 +1,8 @@
 import { http, unwrap, type PageResult } from './api'
 import type { Timestamp } from './time'
-export const POINTS_ROUTE = '/zsjos/points-redemption'
-export const POINTS_PACKAGE_ROUTE = '/zsjos/points-packages'
+import { APP_ROUTES } from '../constants'
+export const POINTS_ROUTE = APP_ROUTES.POINTS_REDEMPTION
+export const POINTS_PACKAGE_ROUTE = APP_ROUTES.POINTS_PACKAGES
 const BASE = '/zsjos/points-redemption'
 export type PointsPackage = { id: number; name: string; creditsAmount: number; validDays?: number | null; enabled: boolean }
 export type PointsAttachment = { id: number; name: string; type?: string; size?: number; url?: string }
@@ -10,7 +11,16 @@ export type PointsRequest = { id: number; requestNo: string; applicantName: stri
   codeStatus?: string; lastError?: string; canReveal: boolean; submittedAt: Timestamp; expiresAt?: Timestamp;
   redeemedAt?: Timestamp; syncedAt?: Timestamp; attachments?: PointsAttachment[] }
 export type PointsCreate = { packageId: number; reason: string; attachmentIds: number[]; submissionKey: string }
+export type PointsApproval = {
+  availability: 'AVAILABLE' | 'UNAVAILABLE'; unavailableReason?: string; canUrge: boolean; nextUrgeAt?: number
+  progress?: { status: number; currentTasks: Array<{ id: string; name: string; assigneeName?: string }>; nodes: Array<{
+    id: string; name: string; status?: number; candidates: Array<{ id: number; name?: string }>
+    tasks: Array<{ id: string; status?: number; assigneeName?: string; ownerName?: string; createTime?: Timestamp; endTime?: Timestamp; reason?: string }>
+  }> }
+}
 export const pointsApi = {
+  approval: async (id: number) => unwrap<PointsApproval>(await http.get(`${BASE}/approval`, { params: { id } })),
+  urge: async (id: number, idempotencyKey: string) => unwrap<boolean>(await http.post(`${BASE}/urge`, { idempotencyKey }, { params: { id } })),
   page: async (pageNo: number, management: boolean) => unwrap<PageResult<PointsRequest>>(await http.get(`${BASE}/page`, { params: { pageNo, pageSize: 20, management } })),
   get: async (id: number) => unwrap<PointsRequest>(await http.get(`${BASE}/get`, { params: { id } })),
   packages: async (management = false) => unwrap<PointsPackage[]>(await http.get(`${BASE}/${management ? 'package-list' : 'packages'}`)),

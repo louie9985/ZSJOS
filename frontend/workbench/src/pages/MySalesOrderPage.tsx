@@ -10,7 +10,7 @@ import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LA
 import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/SalesOrderEntryModal'
 import SubjectAvatar from '../components/SubjectAvatar'
 import { formatTimestamp } from '../services/time'
-import { mergeSalesOrderListItems, salesOrderDetailToListItem } from '../services/salesOrder'
+import { mergeSalesOrderListItems, salesOrderDetailToListItem, orderPartnerOwnerText } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import { useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
@@ -170,7 +170,7 @@ export default function MySalesOrderPage() {
         }
         <div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false, listVersion.current) }}>
           {!loading && !items.length && !error ? <Empty description="暂无订单"/> : items.map(item => <button key={item.id} type="button" className={`sales-order-list-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
-            <div className="sales-order-list-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · 第 {item.approvalRoundNo || 1} 轮</span></div></div>
+            <div className="sales-order-list-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · 第 {item.approvalRoundNo || 1} 轮</span><span>兼职归属新媒体员工：{orderPartnerOwnerText(item.leadSourceType, item.partnerOwnerSnapshot)}</span></div></div>
             <div className="sales-order-list-meta">{formatTimestamp(item.submittedAt)}</div>
           </button>)}
           {loading && <div className="sales-order-list-loading"><Spin size="small"/> 加载中</div>}

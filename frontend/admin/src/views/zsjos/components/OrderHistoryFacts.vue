@@ -3,10 +3,16 @@
     <el-descriptions-item v-for="field in fields" :key="field.key" :label="field.label">
       {{ order[field.key] || '历史未记录' }}
     </el-descriptions-item>
+    <el-descriptions-item v-if="leadProfile?.sourceType === 'partner'" label="兼职归属新媒体员工">
+      {{ orderPartnerOwnerText(leadProfile.sourceType, leadProfile.partnerOwnerSnapshot) }}
+    </el-descriptions-item>
   </el-descriptions>
 </template>
 <script setup lang="ts">
-defineProps<{ order: Record<string, unknown> }>()
+import { computed } from 'vue'
+import { orderPartnerOwnerText, type OrderPartnerOwnerSnapshot } from '@/api/zsjos/orderPartnerOwner'
+const props = defineProps<{ order: Record<string, unknown> }>()
+const leadProfile = computed(() => props.order.leadProfile as { sourceType?: string; partnerOwnerSnapshot?: OrderPartnerOwnerSnapshot | null } | undefined)
 const fields = [
   { key: 'submitterUserName', label: '实际提交人' },
   { key: 'formalSalesUserName', label: '成交负责人' },

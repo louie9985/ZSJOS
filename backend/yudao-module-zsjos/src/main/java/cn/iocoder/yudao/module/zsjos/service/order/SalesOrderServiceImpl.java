@@ -106,6 +106,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private PersonMapper personMapper;
     @Resource private PartnerMapper partnerMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
     @Resource private ZsjosProductSkuService skuService;
     @Resource private SalesOrderObjectPermissionService permissionService;
     @Resource private AdvancedFilterService advancedFilterService;
@@ -1707,6 +1708,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         } else if (!selfSourcedWithoutProvider) {
             result.setSourceUserName(userName(users, lead.getSourceUserId()));
         }
+        if (SOURCE_PARTNER.equals(lead.getSourceType())) {
+            // Capture only on submission; reads must never reconstruct historical ownership.
+            SalesOrderRespVO.PartnerOwnerSnapshotVO owner = new SalesOrderRespVO.PartnerOwnerSnapshotVO();
+            var ownership = lead.getPartnerId() == null ? null : partnerOwnershipService.getByPartnerId(lead.getPartnerId());
+            if (ownership != null && ownership.getEmployeeUserId() != null) {
+                owner.setEmployeeUserId(ownership.getEmployeeUserId());
+                AdminUserRespDTO employee = adminUserApi.getUser(ownership.getEmployeeUserId());
+                owner.setEmployeeName(employee == null ? ownership.getEmployeeNameSnapshot() : employee.getNickname());
+            }
+            result.setPartnerOwnerSnapshot(owner);
+        }
         result.setSourceChannel(lead.getSourceChannelId());
         result.setSourceChannelLabelSnapshot(lead.getSourceChannelLabelSnapshot());
         result.setProvinceName(lead.getProvinceName());
@@ -1838,6 +1850,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (leadHistory != null) {
             result.setLeadNo(leadHistory.getLeadNo());
             result.setLeadSourceLabel(leadHistory.getSourceLabel());
+            result.setLeadSourceType(leadHistory.getSourceType());
+            result.setPartnerOwnerSnapshot(leadHistory.getPartnerOwnerSnapshot());
             result.setLeadSourceUserName(leadHistory.getSourceUserName());
             result.setLeadOwnerUserName(leadHistory.getOwnerUserName());
             result.setLeadCategoryLabelSnapshot(leadHistory.getLeadCategoryLabelSnapshot());
