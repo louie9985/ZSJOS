@@ -85,3 +85,11 @@
 
 ## Integration registration update
 - User requested merge into main. Owner remains Codex /root; environment local; worktree D:/ZSJ-OS; base unchanged. Target main; order: stage only this feature, commit on codex/order-void, fast-forward main, retain unrelated worktree changes. No push/deploy or real database/permission changes. Verification: inspect staged patch, compare working file hashes, verify ancestry and branch HEAD.
+
+## Integration delivery — 2026-10-14 17:48:33 +0800 (Beijing)
+
+- User goal: merge the order-void feature into main. Environment local; owner Codex /root; worktree D:/ZSJ-OS.
+- Result: feature-only commit `0d53e1a513f43227c24fbcabce3adfa7a04be994` created on codex/order-void, main fast-forwarded from e07efc9d6baa5d40b5ec07b78f6743b0d1b2915e, and checkout switched to main. Main was advanced with an ancestry check and compare-and-swap ref update while the feature branch was checked out, avoiding a stash or checkout rewrite of overlapping dirty files.
+- Scope: 53 feature paths, 860 additions/30 deletions. Mixed files were staged from HEAD plus only order-void changes; existing approval keyword fixes, gift revision UI, registration item tasks, subordinate changes and unrelated documentation remain uncommitted. No unrelated changes were committed.
+- Verification: cached diff/content checks passed; main and feature HEAD matched immediately after integration; SHA-256 comparisons verified all 353 pre-integration changed/untracked files retained identical bytes. Initial direct index staging retained temporary Windows CRLF; corrected index blobs to Git LF normalization before commit without modifying working files. No executable change in this turn, so previous workspace runtime test evidence is reused; it does not claim an isolated build without the existing local work.
+- This delivery-record append is committed separately on main. Feature branch retained. No push, database migration, role assignment or deployment. Existing V317/V318 and other work remains uncommitted; previously documented runtime/deployment prerequisites still apply. Ownership released.
