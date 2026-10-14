@@ -63,6 +63,30 @@ import static org.mockito.Mockito.*;
 @Import(AdminUserServiceImpl.class)
 public class AdminUserServiceImplTest extends BaseDbUnitTest {
 
+    @Test
+    public void importRejectsPrefixesAndMalformedMobilesPerRowWithoutRewritingThem() {
+        List<UserImportExcelVO> rows = new java.util.ArrayList<>();
+        String[] mobiles = {"+8613800000000", "008613800000000", "1380000000", "138000000000", "1380000000x"};
+        for (int i = 0; i < mobiles.length; i++) {
+            rows.add(UserImportExcelVO.builder().username("bad_mobile_" + i).nickname("导入测试")
+                    .mobile(mobiles[i]).sex(0).status(0).build());
+        }
+        rows.add(UserImportExcelVO.builder().username("valid_mobile").nickname("有效测试")
+                .mobile("13800000000").sex(0).status(0).build());
+        when(passwordEncoder.encode(anyString())).thenReturn("fixture-hash");
+
+        UserImportRespVO result = userService.importUserList(rows, false);
+
+        assertEquals(List.of("valid_mobile"), result.getCreateUsernames());
+        assertEquals(mobiles.length, result.getFailureUsernames().size());
+        for (int i = 0; i < mobiles.length; i++) {
+            assertTrue(result.getFailureUsernames().get("bad_mobile_" + i).contains("11"));
+            assertEquals(mobiles[i], rows.get(i).getMobile());
+            assertNull(userMapper.selectByUsername("bad_mobile_" + i));
+        }
+        assertEquals("13800000000", userMapper.selectByUsername("valid_mobile").getMobile());
+    }
+
     @Resource
     private AdminUserServiceImpl userService;
 

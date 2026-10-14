@@ -115,6 +115,23 @@
       >
         <el-input-number v-model="item.actualAmount" :disabled="revision.transactionLocked !== false" :min="0" :precision="2" class="w-100%" />
       </el-form-item>
+      <el-form-item label="礼品">
+        <div style="width: 100%">
+          <el-select v-model="revision.giftItems" multiple filterable clearable style="width: 100%"
+            :loading="revisionGiftLoading" :disabled="revisionGiftLoading"
+            placeholder="请选择礼品" no-data-text="暂无可选礼品" aria-label="礼品">
+            <el-option v-for="option in revisionGiftChoices" :key="option.value" :value="option.value" :label="option.label" />
+          </el-select>
+          <el-alert v-if="revisionGiftError" :title="revisionGiftError" type="warning" :closable="false" show-icon>
+            <el-button link :loading="revisionGiftLoading" @click="loadRevisionGifts">重试加载礼品</el-button>
+          </el-alert>
+          <div v-else-if="!revisionGiftLoading && !revisionGiftChoices.length" style="color: var(--el-text-color-secondary)">暂无可选礼品</div>
+        </div>
+      </el-form-item>
+      <el-form-item label="礼品邮寄地址" :required="Boolean(revision.giftItems?.length)">
+        <el-input v-model="revision.giftShippingAddress" type="textarea" :rows="2" maxlength="1000" show-word-limit
+          placeholder="选择礼品后必填" aria-label="礼品邮寄地址" />
+      </el-form-item>
       <el-form-item label="备注"
         ><el-input
           v-model="revision.remark"
@@ -126,7 +143,7 @@
     </el-form>
     <template #footer
       ><el-button @click="revisionOpen = false">取消</el-button
-      ><el-button type="primary" :loading="revising" @click="resubmit"
+      ><el-button type="primary" :loading="revising" :disabled="revisionGiftLoading" @click="resubmit"
         >重新提交</el-button
       ></template
     >
@@ -137,7 +154,10 @@
 import { getSimpleDictDataList } from '@/api/system/dict/dict.data'
 import OrderProductSummary from '../components/OrderProductSummary.vue'
 import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
-import { reactive, ref, toRaw } from 'vue'
+import { reactive, ref, toRaw, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { getGiftConfigList, type GiftSnapshot } from '@/api/zsjos/gift'
+import { readRevisionGifts, revisionGiftOptions, revisionGiftPayload, type RevisionGiftOption } from './orderRevisionGifts'
 import * as Api from '@/api/zsjos/workbenchMenus'
 import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
@@ -160,6 +180,29 @@ const terminating = ref(false)
 const revisionOpen = ref(false)
 const revising = ref(false)
 const revision = reactive<any>({ items: [] })
+const revisionGiftHistory = ref<GiftSnapshot[]>([])
+const revisionGiftChoices = ref<RevisionGiftOption[]>([])
+const revisionGiftLoading = ref(false)
+const revisionGiftError = ref('')
+let giftLoadVersion = 0
+const loadRevisionGifts = async () => {
+  const version = ++giftLoadVersion
+  revisionGiftLoading.value = true
+  revisionGiftError.value = ''
+  revisionGiftChoices.value = revisionGiftOptions([], revisionGiftHistory.value)
+  try {
+    const catalog = await getGiftConfigList(0)
+    if (version === giftLoadVersion) revisionGiftChoices.value = revisionGiftOptions(catalog, revisionGiftHistory.value)
+  } catch (error: unknown) {
+    if (version !== giftLoadVersion) return
+    const failure = error as { code?: number; response?: { status?: number } }
+    revisionGiftError.value = failure?.code === 403 || failure?.response?.status === 403
+      ? '无权访问礼品目录，可保留或移除原礼品。'
+      : '礼品目录加载失败，可保留或移除原礼品，新增礼品请重试。'
+  } finally {
+    if (version === giftLoadVersion) revisionGiftLoading.value = false
+  }
+}
 let reloadList = async () => {}
 const loadDetail = async () => {
   if (!selectedId.value) return
@@ -216,11 +259,14 @@ const refreshedDictionaryFields = ref<string[]>([])
 const revisionOptions = ref<Record<string, Array<{ value: string; label: string }>>>({})
 const openRevision = async () => {
   if (!detail.value || detailLoading.value || detailError.value) return
+  try { revisionGiftHistory.value = readRevisionGifts(detail.value) }
+  catch (error) { return message.warning((error as Error).message) }
   if (!['offline_paid', 'online_link'].includes(detail.value.collectionMode)
       || typeof detail.value.transactionLocked !== 'boolean') return message.warning('订单收款状态未加载，请刷新后重试')
   if (detail.value.collectionMode === 'online_link' && detail.value.paymentStatus !== 'paid')
     return message.warning('线上支付尚未确认到账，请核实收款记录')
   Object.assign(revision, structuredClone(toRaw(detail.value)))
+  revision.giftItems = revisionGiftHistory.value.map(item => item.code)
   revision.studentMobile = revision.studentMobile?.trim() || detail.value.leadProfile?.submittedMobile?.trim()
   revision.studentWechatId = revision.studentWechatId?.trim() || detail.value.leadProfile?.submittedWechatId?.trim()
   refreshedDictionaryFields.value = revisionDictionaryFields.filter(field => !detail.value[field.key + 'LabelSnapshot']).map(field => field.key)
@@ -231,6 +277,7 @@ const openRevision = async () => {
     if (refreshedDictionaryFields.value.includes(field.key)) revision[field.key] = undefined
   }
   revisionOpen.value = true
+  void loadRevisionGifts()
 }
 const resubmit = async () => {
   if (!detail.value || !revision.studentName?.trim()) return message.warning('请填写学员姓名')
@@ -239,6 +286,12 @@ const resubmit = async () => {
   if (!revision.studentWechatId?.trim()) return message.warning('请填写微信号')
   if (revision.studentWechatId.trim().length > 64) return message.warning('微信号最多64个字符')
   if (refreshedDictionaryFields.value.some(key => !revision[key])) return message.warning('请重新选择历史未记录的字典项')
+  if (revisionGiftLoading.value) return
+  let gifts: ReturnType<typeof revisionGiftPayload>
+  try {
+    readRevisionGifts(detail.value)
+    gifts = revisionGiftPayload(revision.giftItems, revision.giftShippingAddress, revisionGiftChoices.value)
+  } catch (error) { return message.warning((error as Error).message) }
   revising.value = true
   try {
     await Api.resubmitSalesOrder(detail.value.id, {
@@ -262,6 +315,7 @@ const resubmit = async () => {
       remark: revision.remark?.trim() || undefined,
       studentSpecialRequirements: revision.studentSpecialRequirements,
       materialDeliveryContact: revision.materialDeliveryContact,
+      ...gifts,
       items: revision.items.map((item: any) => ({
         spuRef: item.productRef,
         skuRef: item.skuRef,

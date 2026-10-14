@@ -191,7 +191,7 @@ Vue Admin 的 `ExternalRepurchaseDialog.vue` 直接调用外部复购订单接�
 
 提交和补正的 `giftItems` 仍为编码数组，例如 `["gift-code"]`。省略、`null`、`[]` 均表示无礼品；清空选择显式发送 `[]`。JSON 字符串不能替代数组，类型或格式错误返回参数错误，不回显原始请求值。
 
-订单列表、详情新增 `giftItemCodes: string[]`、`giftItemSnapshots: {code,name?,path?,snapshotAt?}[]` 和 `giftItemsInvalid: boolean`；原 `giftItems` 字符串兼容保留。礼品采购响应保留 `giftItemsJson` 并新增 `giftItemSnapshots`、`giftItemsInvalid`。损坏历史返回无效标志，编码/快照不可作为可提交的空选择；Workbench 阻止补正并提示核对，Admin 展示“历史礼品信息无法读取”。
+订单列表、详情新增 `giftItemCodes: string[]`、`giftItemSnapshots: {code,name?,path?,snapshotAt?}[]` 和 `giftItemsInvalid: boolean`；原 `giftItems` 字符串兼容保留。礼品采购响应保留 `giftItemsJson` 并新增 `giftItemSnapshots`、`giftItemsInvalid`。损坏历史返回无效标志，编码/快照不可作为可提交的空选择；Workbench 和 Admin 均阻止补正并提示核对，Admin 礼品采购展示“历史礼品信息无法读取”。
 
 统一读取对象数组 JSON 与旧版“JSON 快照字符串数组”；新写入为对象数组 JSON，数据库列不变。历史缺失名称、路径、时间不从当前目录补造，显示名称未记录。Workbench 以编码回填、快照展示，并核对两者一致；旧服务响应可从兼容字段提取编码。Admin 礼品采购使用相同历史语义，不展示原始 JSON。
 
@@ -201,6 +201,14 @@ Vue Admin 的 `ExternalRepurchaseDialog.vue` 直接调用外部复购订单接�
 
 先发布兼容性新增字段的后端，再发布两个前端消费者。旧字段本次保留，不迁移或回写历史数据。回滚前用对象数组和旧字符串数组样本验证目标包的读取能力；能够读取新格式不等于修复后的补正行为仍成立。验收证据与待验项见 [运行问题修复记录](../operations/runtime-issues-20261008.md)。
 
+
+## 异常日志补充修复（2026-10-14，本地交付）
+
+Admin 订单补正显示可编辑的礼品及邮寄地址。未修改的选择以编码数组回传，名称沿用历史快照；删除、停用或改名的原礼品仍可保留。新增礼品只来自既有 `/zsjos/gift-config/list?status=0` 返回的叶子项，不扩大目录权限。目录失败或无权访问时显示提示与重试，仅允许保留或移除可读取的原礼品；损坏历史阻止整个补正。选中礼品必须填写不超过 1000 字符的地址，显式清空发送 `[]`。这些修改不回写原订单或审批快照。
+
+订单审批所有查询分支在进入 BPM 前排除 null、空白流程实例 ID 并去重；关键词 SQL 同时排除无流程的历史轮次。公共 BPM 待办/已办 API 区分 null（未指定该筛选）与空集合（无匹配结果），全无效集合直接返回空，不触发无筛选查询。流程实例 ID 是不透明值，有效 ID 不进行 trim 改写。此边界不改变任务所有权、中心权限和历史无流程的存储语义。
+
+回归入口：`BpmTaskProcessFilterTest`、`SalesOrderServiceImplTest`，Admin `node --test test/order-revision-gifts.test.mjs` 与 `test/order-revision-gifts-browser.py`。浏览器使用实际补正页面及隔离请求夹具；本地验证不是部署或真实账号验收。
 
 ## 兼职归属新媒体员工快照（2026-10-13）
 

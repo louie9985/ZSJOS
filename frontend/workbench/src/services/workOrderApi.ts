@@ -16,7 +16,12 @@ export type WorkOrderAccount = { id: number; accountNo?: string; nickname?: stri
 const action = async (id: number, path: string, version: number, body: Record<string, unknown> = {}) => unwrap<boolean>(await http.post(`/zsjos/work-order/${id}/${path}`, { version, idempotencyKey: createIdempotencyKey(), ...body }))
 
 export const workOrderApi = {
-  upload: async (file: File) => { const data = new FormData(); data.append('file', file); return unwrap<WorkOrderFile>(await http.post('/zsjos/work-order/file/upload', data)) },
+  upload: async (file: File) => {
+    if (file.size <= 0 || file.size > 100 * 1024 * 1024) throw new Error('附件不能为空且不能超过100MB')
+    const data = new FormData()
+    data.append('file', file)
+    return unwrap<WorkOrderFile>(await http.post('/zsjos/work-order/file/upload', data))
+  },
   templates: async () => unwrap<PageResult<WorkOrderTemplate>>(await http.get('/zsjos/work-order/catalog', { params: { pageNo: 1, pageSize: 100 } })),
   template: async (code: string) => {
     const page = unwrap<PageResult<WorkOrderTemplate>>(await http.get('/zsjos/work-order/catalog', { params: { pageNo: 1, pageSize: 100 } }))

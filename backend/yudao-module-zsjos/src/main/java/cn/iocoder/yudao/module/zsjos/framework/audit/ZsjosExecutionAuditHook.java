@@ -34,12 +34,13 @@ public class ZsjosExecutionAuditHook implements ExecutionAuditHook {
         if (c.tenantId() != null && !c.tenantId().isBlank()) {
             // Completion may run after the business tenant scope has already been restored.
             TenantUtils.execute(Long.valueOf(c.tenantId()), () -> persist(c, status, duration, error));
-        } else if ("SYSTEM_JOB".equals(c.executionType()) && TenantContextHolder.getTenantId() == null) {
-            // Quartz audits the whole invocation after @TenantJob has restored its scope.
-            // ZSJOS has one tenant; never guess ownership if the configured population differs.
+        } else if (("SYSTEM_JOB".equals(c.executionType()) || "ASYNC".equals(c.executionType()))
+                && TenantContextHolder.getTenantId() == null) {
+            // System async work (including Quartz log updates) may have no tenant scope.
+            // Resolve ownership only for audit persistence; never default the business task's tenant.
             List<Long> tenantIds = tenantFrameworkService.getTenantIds();
             if (tenantIds == null || tenantIds.size() != 1 || tenantIds.getFirst() == null) {
-                throw new IllegalStateException("Quartz execution audit requires one configured tenant");
+                throw new IllegalStateException("System execution audit requires one configured tenant");
             }
             Long tenantId = tenantIds.getFirst();
             tenantFrameworkService.validTenant(tenantId);

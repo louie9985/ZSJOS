@@ -1,14 +1,35 @@
 <template>
-  <Dialog v-model="dialogVisible" default-fullscreen fullscreen title="编辑文档">
+  <Dialog
+    v-model="dialogVisible"
+    :before-close="beforeClose"
+    default-fullscreen
+    fullscreen
+    width="min(1400px, calc(100vw - 24px))"
+    title="编辑文档"
+  >
     <template #title>
-      <div class="w-full flex items-center justify-between pr-64px">
+      <div class="w-full flex flex-wrap items-center justify-between gap-8px pr-64px">
         <span>编辑文档</span>
-        <div class="flex items-center gap-12px">
-          <el-button :loading="formLoading" type="primary" @click="submitForm">保存</el-button>
-          <el-button class="!ml-0" @click="previewing = !previewing">
+        <div class="flex flex-wrap items-center gap-8px">
+          <el-button
+            :loading="formLoading"
+            :disabled="attachmentBlocked"
+            type="primary"
+            @click="submitForm"
+            >保存</el-button
+          >
+          <el-button class="!ml-0" :disabled="attachmentBlocked" @click="previewing = !previewing">
             {{ previewing ? '返回编辑' : '预览' }}
           </el-button>
-          <el-button class="!ml-0" @click="dialogVisible = false">取消</el-button>
+          <el-button
+            class="!ml-0"
+            @click="
+              beforeClose(() => {
+                dialogVisible = false
+              })
+            "
+            >取消</el-button
+          >
         </div>
       </div>
     </template>
@@ -37,7 +58,7 @@
           v-dompurify-html="formData.content || '<p>暂无内容</p>'"
         ></div>
         <div v-else class="w-full min-w-0">
-          <Editor class="w-full" v-model="formData.content" height="calc(100vh - 120px)" />
+          <Editor class="w-full" v-model="formData.content" height="min(55vh, 520px)" />
         </div>
       </el-form-item>
       <el-form-item v-else class="!mb-0" prop="content">
@@ -49,11 +70,27 @@
           @update:file-size="handleFileSizeChange"
         />
       </el-form-item>
+      <template v-if="formData.type === PmsKnowledgeDocumentType.RICH_TEXT && formData.id">
+        <KnowledgeAttachments
+          v-if="previewing"
+          :files="formData.attachments"
+          :document-id="formData.id"
+        />
+        <KnowledgeAttachmentPicker
+          v-else
+          v-model="formData.attachments"
+          :document-id="formData.id"
+          :disabled="formLoading"
+          @blocked="attachmentBlocked = $event"
+        />
+      </template>
     </el-form>
   </Dialog>
 </template>
 
 <script lang="ts" setup>
+import KnowledgeAttachmentPicker from './KnowledgeAttachmentPicker.vue'
+import KnowledgeAttachments from './KnowledgeAttachments.vue'
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import {
   PmsKnowledgeDocumentType,
@@ -67,6 +104,14 @@ const message = useMessage() // 消息弹窗
 const dialogVisible = ref(false) // 弹窗是否显示
 const formLoading = ref(false) // 表单提交中
 const previewing = ref(false) // 富文本只读预览
+const attachmentBlocked = ref(false)
+function beforeClose(done: () => void) {
+  if (formLoading.value || attachmentBlocked.value) {
+    message.info('请先等待上传完成或移除失败项')
+    return
+  }
+  done()
+}
 const formData = ref(getDefaultFormData()) // 表单数据
 const formRules = reactive({
   content: [{ required: true, message: '请输入文档内容', trigger: 'blur' }]
@@ -87,6 +132,7 @@ async function open(id: number) {
     // 2. 初始化文档表单
     formData.value = {
       id: document.id,
+      attachments: document.attachments || [],
       title: document.title,
       content: document.content || document.previewUrl || '',
       type: document.type,
@@ -103,7 +149,7 @@ defineExpose({ open }) // 提供 open 方法，用于打开弹窗
 /** 提交表单 */
 async function submitForm() {
   // 校验表单
-  if (!formRef.value) return
+  if (!formRef.value || attachmentBlocked.value || formLoading.value) return
   const valid = await formRef.value.validate()
   if (!valid) return
   // 提交请求
@@ -111,6 +157,10 @@ async function submitForm() {
   try {
     await KnowledgeDocumentApi.updateKnowledgeDocument({
       id: formData.value.id!,
+      attachmentFileIds:
+        formData.value.type === PmsKnowledgeDocumentType.RICH_TEXT
+          ? formData.value.attachments.map((file) => file.fileId)
+          : undefined,
       title: formData.value.title,
       content: formData.value.content,
       labelIds: formData.value.labelIds,
@@ -129,6 +179,7 @@ async function submitForm() {
 function getDefaultFormData() {
   return {
     id: undefined as number | undefined,
+    attachments: [] as KnowledgeDocumentApi.KnowledgeAttachment[],
     title: '',
     content: '',
     type: PmsKnowledgeDocumentType.RICH_TEXT as number,

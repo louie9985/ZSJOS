@@ -59,6 +59,17 @@ public class PmsKnowledgeDocumentShareServiceImpl implements PmsKnowledgeDocumen
     private AdminUserApi adminUserApi;
     @Resource
     private PmsKnowledgeShareUrl shareUrl;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public PmsKnowledgeDocumentShareDO saveSettings(Long documentId, List<Long> members, List<Long> files, Long userId, boolean opening) {
+        attachments.authorize(documentId, userId, true);
+        attachments.selectPublic(documentId, files);
+        if (opening) return openShare(documentId, members, userId);
+        updateShareMemberList(documentId, members, userId);
+        return getActiveDocumentShare(documentId);
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

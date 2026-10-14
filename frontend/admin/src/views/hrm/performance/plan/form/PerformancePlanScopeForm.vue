@@ -80,6 +80,7 @@
 </template>
 
 <script lang="ts" setup>
+import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import type { PerformanceScopeVO } from '@/api/hrm/performance/plan'
 import HrmEmployeeSelect from '@/views/hrm/employee/components/HrmEmployeeSelect.vue'
 import DeptSelect from '@/views/system/dept/components/DeptSelect.vue'
@@ -147,20 +148,12 @@ function createScope(type: number = HrmPerformancePlanScopeType.EMPLOYEE_DEPT): 
 
 /** 获得员工状态选项 */
 function getEmployeeStatusOptions(employType?: number) {
-  if (employType === HrmEmployeeType.INFORMAL) {
-    const labelMap: Record<number, string> = {
-      [HrmEmployeeStatus.INTERN]: '实习',
-      [HrmEmployeeStatus.PART_TIME]: '兼职',
-      [HrmEmployeeStatus.LABOR]: '劳务',
-      [HrmEmployeeStatus.CONSULTANT]: '顾问',
-      [HrmEmployeeStatus.REHIRE]: '返聘',
-      [HrmEmployeeStatus.OUTSOURCE]: '外包'
-    }
-    return HRM_EMPLOYEE_NON_FORMAL_STATUSES.map((value) => ({ value, label: labelMap[value] }))
-  }
-  return [
-    { label: '正式', value: HrmEmployeeStatus.REGULAR },
-    { label: '试用', value: HrmEmployeeStatus.PROBATION }
-  ]
+  const allowed: readonly number[] =
+    employType === HrmEmployeeType.INFORMAL
+      ? HRM_EMPLOYEE_NON_FORMAL_STATUSES
+      : [HrmEmployeeStatus.REGULAR, HrmEmployeeStatus.PROBATION]
+  return getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
+    allowed.includes(Number(item.value))
+  )
 }
 </script>

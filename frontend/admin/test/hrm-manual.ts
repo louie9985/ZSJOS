@@ -23,6 +23,15 @@ const employee = {
   regularTime: null,
   leaveTime: null
 }
+if (new URLSearchParams(location.search).has('trial')) {
+  Object.assign(employee, {
+    type: 2,
+    status: 9,
+    trialDays: 3,
+    companyAge: 0.27,
+    entryTime: new Date(2026, 0, 14).getTime()
+  })
+}
 const calls: unknown[] = []
 const mode = new URLSearchParams(location.search).get('view')
 const rule = () => ({
@@ -49,7 +58,7 @@ const pendingPlan = {
 }
 const dictionaries = [
   ['hrm_employee_type', ['正式', '非正式']],
-  ['hrm_employee_status', ['正式', '试用', '实习', '兼职', '劳务', '顾问', '返聘', '外包']],
+  ['hrm_employee_status', ['正式', '试用', '实习', '兼职', '劳务', '顾问', '返聘', '外包', '试岗']],
   ['hrm_employee_entry_status', ['在职', '待入职', '待离职', '离职']]
 ].flatMap(([type, labels]) =>
   (labels as string[]).map((label, i) => ({ dictType: type, value: String(i + 1), label }))

@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": [], "rootDir": ".." },
+  "include": [
+    "../src/views/pms/kb/document/KnowledgeLibraryWorkspace.vue",
+    "../src/views/pms/kb/document/KnowledgeLibrarySidebar.vue",
+    "../src/views/pms/kb/document/KnowledgeTreeLabel.vue"
+  ]
+}

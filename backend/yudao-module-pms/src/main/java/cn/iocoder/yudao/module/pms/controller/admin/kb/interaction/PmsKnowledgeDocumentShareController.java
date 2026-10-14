@@ -47,15 +47,23 @@ public class PmsKnowledgeDocumentShareController {
     private FileApi fileApi;
     @Resource
     private PmsKnowledgeShareUrl shareUrl;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @PostMapping("/open")
     @Operation(summary = "开启文档分享")
     @PreAuthorize("@ss.hasPermission('pms:kb:library:update')")
     public CommonResult<PmsKnowledgeDocumentShareRespVO> openShare(
             @Valid @RequestBody PmsKnowledgeDocumentShareSaveReqVO reqVO) {
-        PmsKnowledgeDocumentShareDO share = documentShareService.openShare(reqVO.getDocumentId(),
-                reqVO.getShareUserIds(), getLoginUserId());
+        PmsKnowledgeDocumentShareDO share = documentShareService.saveSettings(reqVO.getDocumentId(),
+                reqVO.getShareUserIds(), reqVO.getAttachmentFileIds(), getLoginUserId(), true);
         return success(shareResponse(share));
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize("@ss.hasPermission('pms:kb:library:update')")
+    public CommonResult<Boolean> settings(@Valid @RequestBody PmsKnowledgeDocumentShareSaveReqVO reqVO) {
+        documentShareService.saveSettings(reqVO.getDocumentId(), reqVO.getShareUserIds(), reqVO.getAttachmentFileIds(), getLoginUserId(), false);
+        return success(true);
     }
 
     @PutMapping("/update-member-list")
@@ -95,6 +103,7 @@ public class PmsKnowledgeDocumentShareController {
             if (!cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.KNOWLEDGE_DOCUMENT_SHARE_CONFIG_INVALID
                     .getCode().equals(ex.getCode())) throw ex;
         }
+        response.setAttachmentFileIds(attachments.selected(share.getDocumentId()));
         return response;
     }
 
@@ -112,6 +121,7 @@ public class PmsKnowledgeDocumentShareController {
             documentVO.setContent(null).setPreviewUrl(
                     fileApi.presignGetUrl(document.getContent(), null));
         }
+        documentVO.setAttachments(attachments.publicList(document.getId(), token));
         return success(documentVO);
     }
 

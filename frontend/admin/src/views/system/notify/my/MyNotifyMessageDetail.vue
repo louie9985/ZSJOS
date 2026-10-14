@@ -23,12 +23,16 @@
         <PmsShareMessageLinks :params="detailData.templateParams" />
       </el-descriptions-item>
     </el-descriptions>
+    <el-button v-if="isStudentServiceNotification(detailData)" type="primary" :loading="taskLoading" @click="openStudent">查看课程服务</el-button>
+    <el-button v-if="isCourseNotification(detailData)" type="primary" :loading="taskLoading" @click="openCourse">查看课程</el-button>
     <el-button v-if="isFeedbackUrgeNotification(detailData)" type="primary" :loading="taskLoading" class="mt-16px" @click="openTask">
       查看审批任务
     </el-button>
   </Dialog>
 </template>
 <script lang="ts" setup>
+import { isStudentServiceNotification, openStudentServiceNotification } from "@/utils/studentServiceNotification"
+import { isCourseNotification, openCourseNotification } from '@/utils/courseNotification'
 import { DICT_TYPE } from '@/utils/dict'
 import PmsShareMessageLinks from './PmsShareMessageLinks.vue'
 import { formatDate } from '@/utils/formatTime'
@@ -43,6 +47,18 @@ const detailData = ref({} as NotifyMessageApi.NotifyMessageVO) // 详情数据
 const router = useRouter()
 const message = useMessage()
 const taskLoading = ref(false)
+const openStudent = async () => {
+  taskLoading.value = true
+  try { await openStudentServiceNotification(router, detailData.value); dialogVisible.value = false }
+  catch (cause) { message.warning(cause instanceof Error ? cause.message : "服务加载失败") }
+  finally { taskLoading.value = false }
+}
+const openCourse = async () => {
+  taskLoading.value = true
+  try { await openCourseNotification(router, detailData.value); dialogVisible.value = false }
+  catch (cause) { message.warning(cause instanceof Error ? cause.message : '课程加载失败，请重试') }
+  finally { taskLoading.value = false }
+}
 const openTask = async () => {
   taskLoading.value = true
   try {

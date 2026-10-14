@@ -1,0 +1,26 @@
+# Workstream local-pms-folder-import-20261014
+
+- Owner: Codex /root; environment: local (ZSJOS_AGENT_ENV unset, environment marker absent).
+- Branch: main; worktree: D:/ZSJ-OS; base: 3264cdeb4c0466a654c8c8cd0692d3a9f08fa871; target branch/integration: None.
+- Goal: implement the user-approved folder import plan for new/existing PMS libraries, persisted retries and folder reselection recovery.
+- Non-goals: archive extraction, overwrite, AI parsing, dependency additions, grants, production writes, service lifecycle, commits/push.
+- Ownership: PMS kb importing controllers/VO/service/DO/mappers/tests; kb content folder/document services and library mapper for shared creation serialization; PMS import error constants; frontend/admin PMS kb importing API/components/tests and library/document entrypoints; PMS V003 migration and scoped verification; docs/api/pms-knowledge-folder-import.md; this record. Existing changes outside this scope remain untouched.
+- Dependencies: PMS existing library/member/content permission services, Infra FileApi, current ADMIN authentication and tenant context. No other active owner found for these files.
+- Verification: focused Java tests/compile, frontend types/build and real-browser fixture flows, controlled MySQL initial/replay/partial failure and prerequisite failure checks; report live deployment/authenticated acceptance separately.
+- Delivery pending. This registration does not authorize shared service lifecycle or production database changes.
+
+## Scope update
+- Include PMS desired-schema snapshot and read-only module verification for the two new tables; frontend/admin/test/pms-folder-import* fixtures and standalone test configuration. No changes to existing table definitions or bootstrap ordering.
+
+## Delivery — 2026-10-14
+- Implemented new-library and existing-library folder import in the existing Vue PMS surface. Existing-library imports preserve the selected root; new-library imports use it as the default library name. Directory merge, file-title collision skipping, original-format storage, bounded browser queue, pause/end, owner task history and folder-reselection recovery are wired.
+- Backend: typed endpoints, persistent task/item records, exact request-key binding, path/size/hash checks, current feature/object permission checks, lease-token fencing and a stored-file checkpoint before transactional document registration. Normal creation and import registration share a library-row lock; storage is outside that lock/transaction. Completed state/counts derive from durable item outcomes.
+- SQL: new PMS V003, desired schema and read-only verification updated; V001/V002 unchanged; no role assignments or dependencies changed.
+- Java verification: Maven focused suite PASS, 35 tests = 16 import service + 4 folder service + 15 document service; no failures/errors. Includes permission revocation, new-mode feature permission, owner/item binding, idempotent response-loss retry, stored-file registration failure, active/expired lease, unchanged existing content and preserved outer folder.
+- MySQL verification PASS: initial, replay, UTF-8 HEX, unique request, missing-prerequisite no ledger, partial table recovery, incompatible-schema no ledger, repaired-schema recovery, actual PMS V001→V003 chain, desired schema column shape comparison. Final retained schemas: pms_import_20261014181910_{broken,chain,fresh,missing,partial,snapshot}. These are synthetic schemas only.
+- Browser PASS: real Chrome at 1440/390 widths using production component/HTTP client with synthetic transport. New/existing imports, SHA-256 across multiple chunks, skipped files, max-three queue, partial failure, reload/history/reselection with only failed-file reupload, and iframe hosting verified. Screenshots: C:/Users/EDY/AppData/Local/Temp/pms-folder-browser-ekaaqp8g. Desktop and mobile screenshots visually reviewed.
+- Frontend: scoped ESLint PASS; final Admin production build PASS in 45.14 s to task-owned dist-pms-folder-import. Full vue-tsc ran with 8 GB after initial default-heap exhaustion; blocked solely by 12 pre-existing duplicate identifiers in src/api/zsjos/withdrawal/index.ts (applicantName, partnerName, paidByName, cashbackCount, availableBalanceSnapshot, approvedAmount). No PMS diagnostics. Scope does not include that unrelated file.
+- Scoped diff whitespace check PASS. Documentation: docs/api/pms-knowledge-folder-import.md.
+- Runtime boundary: read-only local ruoyi-vue-pro preflight found the existing knowledge-library table and zero new import tables. V003 was NOT applied to the business database; no shared backend/service restart, deployment, live account/grant change, production operation, commit, or push. Authenticated Admin/Workbench and real object-storage acceptance remain deployment checks. Browser iframe fixture is not authenticated Workbench acceptance.
+- Known boundary: file-level recovery, no chunk-level resume. Lease expires after 15 minutes. An abrupt process exit between successful external storage and DB checkpoint can leave an unreferenced object; no destructive automatic bulk cleanup is introduced. End task preserves all successful content.
+- Ownership released on delivery; other concurrent work remains untouched.

@@ -39,7 +39,6 @@ onMounted(load)
     <van-empty v-else-if="completed||confirmation?.state==='processed'" :description="completed==='request_changes'?'修改意见已提交':'学员已确认，待运营上传确认凭证'" />
     <template v-else-if="confirmation?.state==='ready'">
       <section class="positioning-share-heading">
-        <h1>{{ confirmation.serviceLabel || '课程服务定位卡' }}</h1>
         <p>{{ confirmation.cardNo || '定位卡' }} · 提交于 {{ confirmation.submittedAt ? dayjs(confirmation.submittedAt).format('YYYY-MM-DD HH:mm') : '历史时间未记录' }}</p>
       </section>
       <van-cell-group inset title="定位内容">
@@ -70,7 +69,6 @@ onMounted(load)
 .positioning-share-page{min-height:100vh;padding-bottom:96px;background:transparent;color:var(--h5-text-primary)}
 .positioning-share-state{padding-top:96px}
 .positioning-share-heading{padding:24px 20px 16px;border-bottom:1px solid var(--h5-glass-border);background:var(--h5-glass-surface-strong);box-shadow:var(--h5-glass-shadow);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur))}
-.positioning-share-heading h1{margin:0 0 8px;font-size:22px;letter-spacing:0}
 .positioning-share-heading p{margin:0;color:#646a73;font-size:14px;letter-spacing:0}
 .positioning-share-actions{position:sticky;bottom:0;display:grid;gap:10px;padding:16px 20px;border-top:1px solid var(--h5-glass-border);background:var(--h5-glass-surface-strong);box-shadow:0 -8px 24px rgba(31,35,48,.08);backdrop-filter:saturate(160%) blur(var(--h5-glass-blur-strong));-webkit-backdrop-filter:saturate(160%) blur(var(--h5-glass-blur-strong))}
 .positioning-share-revision{padding:20px 20px 28px}

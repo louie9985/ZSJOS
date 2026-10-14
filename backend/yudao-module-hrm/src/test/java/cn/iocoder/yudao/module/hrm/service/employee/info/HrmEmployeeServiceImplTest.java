@@ -287,7 +287,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         assertEquals(reqVO.getStatus(), employee.getStatus());
         assertNull(employee.getRegularTime());
         assertEquals(entryTime, employee.getCompanyAgeStartTime());
-        assertEquals(0, employee.getCompanyAge());
+        assertEquals(java.math.BigDecimal.valueOf(java.time.temporal.ChronoUnit.DAYS.between(entryTime.toLocalDate(), LocalDate.now())).divide(java.math.BigDecimal.valueOf(365), 2, java.math.RoundingMode.HALF_UP), employee.getCompanyAge());
     }
 
     @Test
@@ -453,7 +453,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         assertEquals(reqVO.getStatus(), employee.getStatus());
         assertEquals(reqVO.getProbation(), employee.getProbation());
         assertEquals(reqVO.getRegularTime(), employee.getRegularTime());
-        assertEquals(2, employee.getCompanyAge());
+        assertEquals(HrmCompanyAge.calculate(employee.getCompanyAgeStartTime().toLocalDate(), employee.getLeaveTime() == null ? LocalDate.now() : employee.getLeaveTime().toLocalDate()), employee.getCompanyAge());
     }
 
     @Test
@@ -1253,6 +1253,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
     private static HrmEmployeeSaveReqVO randomEmployeeSaveReqVO(Consumer<HrmEmployeeSaveReqVO>... consumers) {
         Consumer<HrmEmployeeSaveReqVO> consumer = o -> o.setId(null).setName(randomString())
                 .setJobNumber("HRM" + randomLongId()).setUserId(null).setMobile(randomMobile())
+                .setTrialDays(null).setPlannedTrialEndTime(null).setActualTrialEndTime(null)
                 .setCountry("中国").setNation("汉族").setIdType(HrmEmployeeIdTypeEnum.OTHER.getType())
                 .setIdNumber(randomString()).setSex(1).setEmail(randomEmail()).setNativePlace("浙江杭州")
                 .setBirthday(LocalDate.now().minusYears(30).atStartOfDay()).setAge(null)
@@ -1275,6 +1276,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
     private static HrmEmployeeDO randomEmployeeDO(Consumer<HrmEmployeeDO>... consumers) {
         Consumer<HrmEmployeeDO> consumer = o -> o.setName(randomString())
                 .setJobNumber("HRM" + randomLongId()).setUserId(null).setMobile(randomMobile())
+                .setTrialDays(null).setPlannedTrialEndTime(null).setActualTrialEndTime(null)
                 .setCountry("中国").setNation("汉族").setIdType(HrmEmployeeIdTypeEnum.OTHER.getType())
                 .setIdNumber(randomString()).setSex(1).setEmail(randomEmail()).setNativePlace("浙江杭州")
                 .setBirthday(LocalDate.now().minusYears(30).atStartOfDay()).setAge(30)
@@ -1287,7 +1289,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setRegularTime(LocalDate.now().minusYears(1).atStartOfDay()).setLeaveTime(null)
                 .setPostName(randomString()).setPostLevel("P6").setWorkCity("杭州").setWorkAddress("西湖区")
                 .setWorkDetailAddress("文三路").setChannelId(null)
-                .setCompanyAgeStartTime(LocalDate.now().minusYears(1).atStartOfDay()).setCompanyAge(1)
+                .setCompanyAgeStartTime(LocalDate.now().minusYears(1).atStartOfDay()).setCompanyAge(new java.math.BigDecimal("1.00"))
                 .setCandidateId(null).setRemark(randomString())
                 .setVersion(0L).setPlannedRegularTime(null).setPlannedLeaveTime(null).setTypeLabel(null).setStatusLabel(null).setEntryStatusLabel(null).setDeleted(false);
         return randomPojo(HrmEmployeeDO.class, ArrayUtils.append(consumer, consumers));
@@ -1298,6 +1300,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
             Consumer<HrmEmployeeImportExcelVO>... consumers) {
         Consumer<HrmEmployeeImportExcelVO> consumer = o -> o.setName(randomString())
                 .setJobNumber("IMPORT" + randomLongId()).setMobile(randomMobile())
+                .setTrialDays(null).setPlannedTrialEndTime(null).setActualTrialEndTime(null)
                 .setCountry("中国").setNation("汉族").setIdType(HrmEmployeeIdTypeEnum.OTHER.getType())
                 .setIdNumber(randomString()).setSex(1).setEmail(randomEmail()).setNativePlace("浙江杭州")
                 .setBirthday(LocalDate.now().minusYears(30).atStartOfDay())

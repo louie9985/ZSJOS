@@ -19,6 +19,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -46,6 +47,39 @@ import static org.mockito.Mockito.*;
  */
 @Import(FileConfigServiceImpl.class)
 public class FileConfigServiceImplTest extends BaseDbUnitTest {
+
+    @BeforeEach
+    void resetClientCache() {
+        fileConfigService.getClientCache().invalidateAll();
+    }
+
+    @Test
+    void missingMasterConfigurationReturnsActionableError() {
+        fileConfigService.getClientCache().invalidateAll();
+        cn.iocoder.yudao.framework.common.exception.ServiceException error = assertThrows(
+                cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> fileConfigService.getMasterFileClient());
+        assertEquals("尚未配置默认文件存储，请联系管理员设置", error.getMessage());
+        verifyNoInteractions(fileClientFactory);
+    }
+
+    @Test
+    void missingMasterFailureIsNotCachedAndConfigurationCanRecover() {
+        fileConfigService.getClientCache().invalidateAll();
+        assertServiceException(() -> fileConfigService.getMasterFileClient(), FileStorageErrorCodes.MASTER_NOT_CONFIGURED);
+        FileConfigDO config = randomFileConfigDO().setMaster(true);
+        fileConfigMapper.insert(config);
+        FileClient client = mock(FileClient.class);
+        when(fileClientFactory.getFileClient(config.getId())).thenReturn(client);
+        assertSame(client, fileConfigService.getMasterFileClient());
+    }
+
+    @Test
+    void missingMasterClientHasADistinctError() {
+        fileConfigService.getClientCache().invalidateAll();
+        fileConfigMapper.insert(randomFileConfigDO().setMaster(true));
+        assertServiceException(() -> fileConfigService.getMasterFileClient(), FileStorageErrorCodes.MASTER_CLIENT_UNAVAILABLE);
+    }
 
     @Resource
     private FileConfigServiceImpl fileConfigService;

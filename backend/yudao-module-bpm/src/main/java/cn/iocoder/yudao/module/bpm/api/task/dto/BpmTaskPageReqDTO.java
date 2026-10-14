@@ -18,6 +18,13 @@ public class BpmTaskPageReqDTO extends PageParam {
 
     private List<String> processInstanceIds;
 
+    /** null means no filter; an explicitly empty filter must never become an unrestricted query. */
+    public BpmTaskPageReqDTO setProcessInstanceIds(List<String> ids) {
+        this.processInstanceIds = ids == null ? null : ids.stream()
+                .filter(id -> id != null && !id.isBlank()).distinct().toList();
+        return this;
+    }
+
     private String processVariableName;
 
     private List<String> processVariableValues;

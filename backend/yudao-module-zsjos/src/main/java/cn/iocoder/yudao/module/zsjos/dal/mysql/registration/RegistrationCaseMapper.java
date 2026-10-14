@@ -14,8 +14,13 @@ import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationCon
 
 @Mapper
 public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> {
-    default RegistrationCaseDO selectByOrderId(Long orderId) {
-        return selectOne(new LambdaQueryWrapperX<RegistrationCaseDO>().eq(RegistrationCaseDO::getOrderId, orderId));
+    default java.util.List<RegistrationCaseDO> selectListByOrderId(Long orderId) {
+        return selectList(new LambdaQueryWrapperX<RegistrationCaseDO>()
+                .eq(RegistrationCaseDO::getOrderId, orderId).orderByAsc(RegistrationCaseDO::getId));
+    }
+
+    default RegistrationCaseDO selectByOrderItemId(Long orderItemId) {
+        return selectOne(new LambdaQueryWrapperX<RegistrationCaseDO>().eq(RegistrationCaseDO::getOrderItemId, orderItemId));
     }
 
     @Select("SELECT * FROM zsjos_registration_case WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
@@ -29,7 +34,7 @@ public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> 
         if ("pending".equals(pageParam.getStatusGroup())) {
             query.in(RegistrationCaseDO::getStatus, STATUS_PENDING, STATUS_PROCESSING);
         } else if ("processed".equals(pageParam.getStatusGroup())) {
-            query.in(RegistrationCaseDO::getStatus, STATUS_COMPLETED, STATUS_CANCELLED);
+            query.in(RegistrationCaseDO::getStatus, STATUS_COMPLETED, STATUS_CANCELLED, STATUS_ENDED);
         }
         if (orderIds != null) {
             if (orderIds.isEmpty()) query.eq(RegistrationCaseDO::getOrderId, -1L);

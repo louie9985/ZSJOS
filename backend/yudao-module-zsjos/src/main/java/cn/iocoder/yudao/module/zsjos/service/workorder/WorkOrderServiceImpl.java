@@ -59,6 +59,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     @Override
     public WorkOrderFileRespVO upload(byte[] content, String name, String contentType, Long userId) {
+        WorkOrderUploadHandler.validateSize(content == null ? 0 : content.length);
         FileInfoRespDTO file = fileApi.createFileInfo(content, name, "zsjos/work-order/" + userId, contentType);
         WorkOrderFileRespVO result = BeanUtils.toBean(file, WorkOrderFileRespVO.class);
         result.setUrl(fileApi.presignGetUrl(file.getId(), 300));

@@ -62,6 +62,7 @@ class ZsjosExecutionAuditHookTest {
         }).when(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
         hook.onSuccess(context(null), 10);
         verify(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        verifyNoInteractions(tenants);
     }
 
     private ExecutionAuditContext context(String tenant) {
@@ -147,10 +148,69 @@ class ZsjosExecutionAuditHookTest {
     }
 
     @Test
-    void nonJobWithoutTenantDoesNotAcquireDefaultTenant() {
+    void redisWithoutTenantDoesNotAcquireDefaultTenant() {
         doAnswer(call -> { assertNull(TenantContextHolder.getTenantId()); return null; }).when(service)
                 .record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
-        hook.onSuccess(context(null), 1);
+        hook.onSuccess(new ExecutionAuditContext("SYSTEM_REDIS_STREAM", "stream", null, null, null, null, null, Map.of()), 1);
         verifyNoInteractions(tenants);
+    }
+
+    @Test
+    void tenantlessAsyncAuditsConfiguredTenantOnlyAfterBusinessAndRestoresIgnore() throws Exception {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        TenantContextHolder.setIgnore(true);
+        doAnswer(call -> {
+            assertEquals(1L, TenantContextHolder.getRequiredTenantId());
+            assertFalse(TenantContextHolder.isIgnore());
+            assertEquals("SUCCESS", ((Map<?, ?>) call.getArgument(5)).get("resultStatus"));
+            return null;
+        }).when(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertEquals("processed", ExecutionAuditRunner.run(context(null), List.of(hook), () -> {
+            assertNull(TenantContextHolder.getTenantId());
+            return "processed";
+        }));
+        verify(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        verify(tenants).validTenant(1L);
+        assertNull(TenantContextHolder.getTenantId());
+        assertTrue(TenantContextHolder.isIgnore());
+    }
+
+    @Test
+    void tenantlessAsyncFailureRetainsOriginalErrorAndRecordsFailure() {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        var failure = new IllegalStateException("synthetic business failure");
+        doAnswer(call -> {
+            assertEquals(1L, TenantContextHolder.getRequiredTenantId());
+            assertEquals("FAILURE", ((Map<?, ?>) call.getArgument(5)).get("resultStatus"));
+            return null;
+        }).when(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertSame(failure, assertThrows(IllegalStateException.class, () ->
+                ExecutionAuditRunner.run(context(null), List.of(hook), () -> { throw failure; })));
+        verify(service).record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertNull(TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void tenantlessAsyncAuditFailureDoesNotChangeResultOrLeakContext() throws Exception {
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        TenantContextHolder.setIgnore(true);
+        doThrow(new IllegalStateException("synthetic insert failure")).when(service)
+                .record(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
+        assertEquals("processed", ExecutionAuditRunner.run(context(null), List.of(hook), () -> "processed"));
+        assertNull(TenantContextHolder.getTenantId());
+        assertTrue(TenantContextHolder.isIgnore());
+    }
+
+    @Test
+    void tenantlessAsyncRefusesMissingAmbiguousOrDisabledTenant() {
+        for (List<Long> ids : Arrays.<List<Long>>asList(null, List.of(), List.of(1L, 2L), Arrays.asList((Long) null))) {
+            when(tenants.getTenantIds()).thenReturn(ids);
+            assertThrows(IllegalStateException.class, () -> hook.onSuccess(context(null), 1));
+        }
+        when(tenants.getTenantIds()).thenReturn(List.of(1L));
+        doThrow(new IllegalStateException("disabled")).when(tenants).validTenant(1L);
+        assertThrows(IllegalStateException.class, () -> hook.onSuccess(context(null), 1));
+        verifyNoInteractions(service);
+        assertNull(TenantContextHolder.getTenantId());
     }
 }

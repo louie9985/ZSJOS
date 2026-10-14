@@ -33,6 +33,7 @@ import java.util.Map;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_TIME_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,6 +62,7 @@ class LeadFollowUpServiceImplTest {
     @Mock private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Mock private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Mock private LeadCollaborationService collaborationService;
+    @Mock private LeadPublicSeaTaskCleanupService taskCleanupService;
 
     @Test
     void createRejectsLeadOutsideOwnedSubmittedCycle() {
@@ -245,7 +247,7 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void collaboratorCannotCompleteOwnersFirstFollowUp() {
+    void collaboratorConsumesOldPendingRemindersWithoutInventingOwnersFirstFollowUp() {
         LeadDO lead = validLead(); lead.setOwnerUserId(21L); lead.setStatus("valid");
         stubSuccessfulCreate(lead);
         when(opportunityMapper.selectByLeadId(1L)).thenReturn(new OpportunityDO().setId(30L).setStatus("open"));
@@ -254,6 +256,10 @@ class LeadFollowUpServiceImplTest {
         withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
         assertNull(lead.getCurrentAssignmentFirstFollowUpAt());
         verify(lifecycleTaskService, never()).completeFirstFollowUpTask(any(), any());
+        var order = org.mockito.Mockito.inOrder(taskCleanupService, lifecycleTaskService);
+        order.verify(taskCleanupService).cancelObsolete(eq(1L), any(LocalDateTime.class));
+        order.verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L),
+                eq(FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY), eq(50L), any(LocalDateTime.class), any(LocalDateTime.class));
     }
 
     @Test

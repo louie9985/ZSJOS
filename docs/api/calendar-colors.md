@@ -26,3 +26,7 @@ ADMIN API /zsjos/calendar-colors/{type} 支持 GET、POST；/{type}/{id} 支持 
 - CalendarPalettePermissionTest及CalendarPaletteServiceTest：查询/维护拒绝、课程manage授权、输入约束。
 - calendar-views-browser.py、course-shared-palette-browser.py：真实组件日/周/月及初始色可编辑/删除、图例同步、空色板不补回；测试为隔离传输，实际跨设备登录仍需部署后验收。
 - 日程视图详见 [日／周／月视图](calendar-views.md)。
+
+
+### 2026-10-14 审查修复
+附件按需读取、批量元数据、并发颜色更新与通知兼容的范围及验证见 [修复记录](../operations/review-fixes-20261014.md)。

@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmActivityB
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.behavior.BpmAuditedAsyncRunnable;
 import cn.iocoder.yudao.framework.audit.ExecutionAuditHook;
 import org.flowable.job.service.impl.asyncexecutor.AbstractAsyncExecutor;
+import org.flowable.job.service.impl.asyncexecutor.ExecuteAsyncRunnableFactory;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateInvoker;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.BpmTaskCandidateStrategy;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.event.BpmProcessInstanceEventPublisher;
@@ -74,10 +75,18 @@ public class BpmFlowableConfiguration {
             configuration.setActivityBehaviorFactory(bpmActivityBehaviorFactory);
             // 设置自定义的函数
             configuration.setCustomFlowableFunctionDelegates(ListUtil.toList(customFlowableFunctionDelegates.stream().iterator()));
-            configuration.setAsyncExecutorExecuteAsyncRunnableFactory((job, jobConfiguration) ->
+            ExecuteAsyncRunnableFactory factory = (job, jobConfiguration) ->
                     new BpmAuditedAsyncRunnable(job, jobConfiguration,
                             (AbstractAsyncExecutor) configuration.getAsyncExecutor(),
-                            executionAuditHooks.orderedStream().toList()));
+                            executionAuditHooks.orderedStream().toList());
+            configuration.setAsyncExecutorExecuteAsyncRunnableFactory(factory);
+            // Flowable only copies the configuration factory when it creates the executor itself.
+            // Spring Boot supplies an executor earlier, so bind that same factory before engine startup.
+            if (configuration.getAsyncExecutor() instanceof AbstractAsyncExecutor executor) {
+                executor.setExecuteAsyncRunnableFactory(factory);
+            } else if (configuration.getAsyncExecutor() != null) {
+                throw new IllegalStateException("Flowable execution auditing requires AbstractAsyncExecutor");
+            }
         };
     }
 

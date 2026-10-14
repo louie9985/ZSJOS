@@ -60,6 +60,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Resource private LeadCollaborationService collaborationService;
+    @Resource private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
@@ -360,6 +361,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         if (reqVO.getNextFollowUpAt() == null) {
             opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>()
                     .eq(OpportunityDO::getId, opportunity.getId()).set(OpportunityDO::getNextFollowUpAt, null));
+        }
+        if (!Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+            // Cancel obsolete A/previous-B reminders; never complete them as the current B's work.
+            taskCleanupService.cancelObsolete(lead.getId(), occurredAt);
         }
         lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),

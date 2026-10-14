@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { isStudentServiceNotification, openStudentServiceNotification } from "@/utils/studentServiceNotification"
+import { isCourseNotification, openCourseNotification } from '@/utils/courseNotification'
 import { formatDate } from '@/utils/formatTime'
 import * as HrmEmployeeApi from '@/api/hrm/employee'
 import * as NotifyMessageApi from '@/api/system/notify/message'
@@ -95,6 +97,14 @@ const showPersistedNotification = async (messageId: number) => {
         notification.close()
         if (!detail.readStatus) await NotifyMessageApi.updateNotifyMessageRead(detail.id)
         emitter.emit(NOTIFY_MESSAGE_CHANGED_EVENT)
+        if (isStudentServiceNotification(detail)) {
+          try { await openStudentServiceNotification(router, detail); return }
+          catch (cause) { message.warning(cause instanceof Error ? cause.message : "服务不可访问") }
+        }
+        if (isCourseNotification(detail)) {
+          try { await openCourseNotification(router, detail); return }
+          catch (cause) { message.warning(cause instanceof Error ? cause.message : '课程不可访问，已打开消息详情') }
+        }
         if (isFeedbackUrgeNotification(detail)) {
           try {
             await router.push(await feedbackUrgeTaskTarget(detail))

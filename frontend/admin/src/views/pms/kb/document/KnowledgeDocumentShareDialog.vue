@@ -26,6 +26,16 @@
           <el-button :disabled="!qrCodeDataUrl" @click="downloadQrCode">下载二维码</el-button>
         </div>
       </el-form-item>
+      <el-form-item v-if="attachments.length" label="公开附件">
+        <div>
+          <el-checkbox-group v-model="attachmentFileIds">
+            <el-checkbox v-for="file in attachments" :key="file.fileId" :value="file.fileId">{{
+              file.fileName
+            }}</el-checkbox>
+          </el-checkbox-group>
+          <el-text type="info">仅勾选的附件对外公开；新增附件不会自动公开。</el-text>
+        </div>
+      </el-form-item>
       <el-form-item label="分享给成员">
         <UserSelectV2 v-model="shareUserIds" :multiple="true" placeholder="请选择内部分享成员" />
       </el-form-item>
@@ -44,7 +54,7 @@
         </template>
       </el-popconfirm>
       <el-button :disabled="formLoading || loadError" type="primary" @click="submitShare">
-        {{ share ? '保存成员' : '开启分享' }}
+        {{ share ? '保存分享设置' : '开启分享' }}
       </el-button>
       <el-button @click="dialogVisible = false">取 消</el-button>
     </template>
@@ -52,6 +62,9 @@
 </template>
 
 <script lang="ts" setup>
+import { getKnowledgeDocument, type KnowledgeAttachment } from '@/api/pms/kb/content/document'
+const attachments = ref<KnowledgeAttachment[]>([])
+const attachmentFileIds = ref<number[]>([])
 import * as KnowledgeDocumentShareApi from '@/api/pms/kb/interaction/share'
 import { Qrcode } from '@/components/Qrcode'
 import download from '@/utils/download'
@@ -84,7 +97,13 @@ async function open(id: number) {
   formLoading.value = true
   loadError.value = false
   try {
-    share.value = await KnowledgeDocumentShareApi.getKnowledgeDocumentShare(id)
+    const [config, document] = await Promise.all([
+      KnowledgeDocumentShareApi.getKnowledgeDocumentShare(id),
+      getKnowledgeDocument(id)
+    ])
+    share.value = config
+    attachments.value = document.attachments || []
+    attachmentFileIds.value = config?.attachmentFileIds || []
     shareUserIds.value = share.value?.shareUserIds || []
   } catch {
     loadError.value = true
@@ -99,15 +118,17 @@ async function submitShare() {
   formLoading.value = true
   try {
     if (share.value) {
-      await KnowledgeDocumentShareApi.updateKnowledgeDocumentShareMemberList({
+      await KnowledgeDocumentShareApi.updateKnowledgeShareSettings({
         documentId: documentId.value,
+        attachmentFileIds: attachmentFileIds.value,
         shareUserIds: shareUserIds.value
       })
-      message.success('分享成员已更新')
+      message.success('分享设置已更新')
       dialogVisible.value = false
     } else {
       share.value = await KnowledgeDocumentShareApi.openKnowledgeDocumentShare({
         documentId: documentId.value,
+        attachmentFileIds: attachmentFileIds.value,
         shareUserIds: shareUserIds.value
       })
       message.success('分享已开启')

@@ -31,6 +31,15 @@ public final class PmsKnowledgeSharePage {
         } else {
             article.appendElement("div").addClass("content").html(content.isBlank() ? "<p>暂无内容</p>" : content);
         }
+        if (document.getAttachments() != null && !document.getAttachments().isEmpty()) {
+            var section = article.appendElement("section");
+            section.appendElement("h2").text("附件");
+            for (var attachment : document.getAttachments()) {
+                section.appendElement("p").appendElement("a")
+                        .attr("href", "attachment?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8) + "&fileId=" + attachment.getFileId())
+                        .attr("target", "_blank").attr("rel", "noopener noreferrer").text(attachment.getFileName());
+            }
+        }
         return page.outerHtml();
     }
 

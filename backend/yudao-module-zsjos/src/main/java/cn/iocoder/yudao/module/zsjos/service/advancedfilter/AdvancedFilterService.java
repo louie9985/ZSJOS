@@ -149,6 +149,10 @@ public class AdvancedFilterService {
         AdvancedFilterQuery query = buildIfPresent(group, "registration", Map.of());
         return query == null ? null : mapper.selectRegistrationCaseIds(query);
     }
+    public AdvancedFilterQuery buildStudentServiceQuery(AdvancedFilterGroupReqVO group) {
+        return buildIfPresent(group, "student_service", Map.of());
+    }
+
     public List<Long> matchStudentPersonIds(AdvancedFilterGroupReqVO group, Long userId) {
         return matchStudentPersonIds(group, userId, false);
     }

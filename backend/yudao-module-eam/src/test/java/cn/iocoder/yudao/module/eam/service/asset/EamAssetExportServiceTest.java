@@ -27,6 +27,7 @@ class EamAssetExportServiceTest {
         when(fields.getEffectiveFieldList(1L)).thenReturn(List.of(sn, color));
         EamAssetRespVO asset = new EamAssetRespVO();
         asset.setCategoryId(1L);
+        asset.setFileUrls(List.of("https://example.invalid/asset-a.pdf", "https://example.invalid/asset-b.png"));
         asset.setExtFields(Map.of("sn", "SN-001", "color", "black"));
         asset.setExtFieldLabels(Map.of("color", "历史黑色"));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -36,6 +37,7 @@ class EamAssetExportServiceTest {
         assertEquals("sn:序列号", rows.get(0).get(14));
         assertEquals("SN-001", rows.get(1).get(14));
         assertEquals("历史黑色", rows.get(1).get(15));
+        assertEquals("https://example.invalid/asset-a.pdf\nhttps://example.invalid/asset-b.png", rows.get(1).get(13));
         assertFalse(rows.get(0).containsValue("品牌型号"));
         assertFalse(rows.get(0).containsValue("原值"));
     }

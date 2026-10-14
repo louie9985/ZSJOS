@@ -8,15 +8,16 @@ public final class PerformanceReportSql {
         return column + " &gt;= #{start} AND " + column + " &lt; #{" + end + "}";
     }
     private static final String MANUAL = "NOT (group_key IN ('lead_first_follow_up','lead_qualification') AND COALESCE(generation_source,'') IN ('sales_self_sourced_auto','education_self_sourced_auto'))";
-    private static final String SOURCE = "CASE WHEN BINARY order_type='repurchase' THEN 'self' WHEN BINARY group_key IN ('inbound','self') THEN group_key ELSE 'unknown' END";
+    // CAST preserves case-sensitive historical grouping while remaining compatible with the tenant SQL parser.
+    private static final String SOURCE = "CASE WHEN CAST(order_type AS BINARY)='repurchase' THEN 'self' WHEN CAST(group_key AS BINARY) IN ('inbound','self') THEN group_key ELSE 'unknown' END";
 
     public static String amounts(PerformanceReportQuery q) {
         boolean product = "product".equals(q.getGrouping());
         String dimension = switch (q.getGrouping()) {
             case "source" -> SOURCE;
             case "user" -> "CAST(user_id AS CHAR)";
-            case "contributor" -> "BINARY CONCAT(COALESCE(CAST(user_id AS CHAR),'unknown'),'|',COALESCE(user_name,'历史姓名缺失'))";
-            case "product" -> "BINARY CONCAT(COALESCE(group_key,'unknown'),'|',COALESCE(label,'历史产品名称缺失'))";
+            case "contributor" -> "CAST(CONCAT(COALESCE(CAST(user_id AS CHAR),'unknown'),'|',COALESCE(user_name,'历史姓名缺失')) AS BINARY)";
+            case "product" -> "CAST(CONCAT(COALESCE(group_key,'unknown'),'|',COALESCE(label,'历史产品名称缺失')) AS BINARY)";
             default -> "'total'";
         };
         String labels = product ? "MAX(label)" : "NULL";

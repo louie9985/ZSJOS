@@ -66,7 +66,8 @@ public class HrmPortalEmployeeController {
             respVO.setAge(getYearsBetween(employee.getBirthday().toLocalDate(), today));
         }
         if (employee.getCompanyAgeStartTime() != null) {
-            respVO.setCompanyAge(getYearsBetween(employee.getCompanyAgeStartTime().toLocalDate(), today));
+            respVO.setCompanyAge(cn.iocoder.yudao.module.hrm.service.employee.info.HrmCompanyAge.calculate(
+                    employee.getCompanyAgeStartTime().toLocalDate(), employee.getLeaveTime() == null ? today : employee.getLeaveTime().toLocalDate()));
         }
         respVO.setEntryDay(employee.getEntryTime() == null ? 0L
                 : Math.max(0L, ChronoUnit.DAYS.between(employee.getEntryTime().toLocalDate(), today) + 1));

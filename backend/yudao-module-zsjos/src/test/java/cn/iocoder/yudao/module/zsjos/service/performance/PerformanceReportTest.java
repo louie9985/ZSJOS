@@ -17,6 +17,17 @@ import static org.mockito.ArgumentMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class PerformanceReportTest {
+ @Test void overviewSharesLastWeekAcrossCardsAndTarget(){
+  var batch=mock(PerformanceTargetService.Batch.class);
+  when(targets.batch(anyCollection(),anyCollection())).thenReturn(batch);
+  when(batch.resolve(anyString(),anyLong(),anyString(),any())).thenReturn(new Target(null,"USER",1L,"test","month",LocalDate.now(),null,null,null,null,false,false,0,null));
+  when(reports.missingAttribution(any())).thenReturn(sum("missing","total","0",0,"0",0));
+  var result=service.overview(query);
+  assertEquals(List.of("today","week","lastWeek","month","lastMonth","quarter","year","last7","last30","last60","last90"),result.performance().stream().map(Metric::key).toList());
+  assertEquals(List.of("lastWeek","month","lastMonth","last7","last30","last60","last90"),result.conversion().stream().map(Metric::key).toList());
+  assertSame(result.performance().get(2),result.conversion().getFirst());
+  assertSame(result.targets().getFirst().actual(),result.conversion().getFirst());
+ }
  @InjectMocks PerformanceStatisticsService service;
  // Preserve the existing detail fixtures as the oracle; SQL equivalence is tested in PerformanceDetailMySqlTest.
  @InjectMocks PerformanceDetailReference reference;

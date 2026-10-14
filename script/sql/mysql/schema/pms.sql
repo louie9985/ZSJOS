@@ -628,3 +628,71 @@ CREATE TABLE IF NOT EXISTS `pms_work_item_work_log` (
   KEY `idx_work_item_id_create_time` (`work_item_id`,`create_time`) USING BTREE,
   KEY `idx_project_id` (`project_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='PMS 工作项工时记录';
+
+-- Folder import persistence, introduced by PMS V003.
+CREATE TABLE IF NOT EXISTS pms_knowledge_import_task (
+    id bigint NOT NULL AUTO_INCREMENT,
+    owner_id bigint NOT NULL,
+    library_id bigint NOT NULL,
+    folder_id bigint DEFAULT NULL,
+    root_name varchar(255) NOT NULL,
+    request_key varchar(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    manifest_hash char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    mode varchar(255) NOT NULL,
+    status varchar(255) NOT NULL,
+    tenant_id bigint NOT NULL DEFAULT 1,
+    creator varchar(64) DEFAULT '',
+    create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '',
+    update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_import_request (tenant_id,owner_id,request_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pms_knowledge_import_item (
+    id bigint NOT NULL AUTO_INCREMENT,
+    task_id bigint NOT NULL,
+    relative_path varchar(2048) NOT NULL,
+    path_hash char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    title varchar(255) NOT NULL,
+    file_type varchar(255) NOT NULL,
+    file_size bigint NOT NULL,
+    last_modified bigint NOT NULL,
+    digest char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    status varchar(255) NOT NULL,
+    reason varchar(500) DEFAULT NULL,
+    folder_id bigint DEFAULT NULL,
+    document_id bigint DEFAULT NULL,
+    file_id bigint DEFAULT NULL,
+    file_url varchar(2048) DEFAULT NULL,
+    lease_token varchar(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    lease_until datetime DEFAULT NULL,
+    version int NOT NULL,
+    tenant_id bigint NOT NULL DEFAULT 1,
+    creator varchar(64) DEFAULT '',
+    create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '',
+    update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_import_path (tenant_id,task_id,path_hash)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pms_knowledge_attachment (
+ id bigint NOT NULL AUTO_INCREMENT,
+ document_id bigint NOT NULL,
+ file_id bigint NOT NULL,
+ file_name varchar(512) NOT NULL,
+ mime_type varchar(255) DEFAULT NULL,
+ file_size bigint NOT NULL,
+ sort int NOT NULL DEFAULT 0,
+ shared bit(1) NOT NULL DEFAULT b'0',
+ tenant_id bigint NOT NULL DEFAULT 1,
+ creator varchar(64) DEFAULT '',
+ create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '',
+ update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY (id),
+ KEY idx_attachment_document (tenant_id, document_id, deleted, sort)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档附件';

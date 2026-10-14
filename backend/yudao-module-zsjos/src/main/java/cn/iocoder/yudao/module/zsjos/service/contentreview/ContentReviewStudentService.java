@@ -69,4 +69,13 @@ public class ContentReviewStudentService {
         return files.getFileContent(fileId);
     }
 
+    /** MIME metadata is upload-controlled; only detected non-executable media may render inline. */
+    public static String previewContentType(byte[] content) {
+        String type = cn.iocoder.yudao.module.infra.framework.file.core.utils.FileTypeUtils.getMineType(content);
+        return java.util.Set.of("application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp",
+                "audio/mpeg", "audio/wav", "audio/x-wav", "audio/ogg", "audio/mp4", "audio/flac",
+                "video/mp4", "video/webm", "video/quicktime").contains(type == null ? "" : type)
+                ? type : "application/octet-stream";
+    }
+
 }

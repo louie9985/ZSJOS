@@ -70,9 +70,13 @@ public class CourseAttachmentService {
   }
   return JsonUtils.toJsonString(requested);
  }
- public List<CourseAttachmentRespVO> describe(String json) {
+ public Map<Long, FileInfoRespDTO> metadata(List<String> references) {
+  var distinct = references.stream().flatMap(json -> ids(json).stream()).distinct().toList();
+  return distinct.isEmpty() ? Map.of() : fileApi.getFileInfoMap(distinct);
+ }
+ public List<CourseAttachmentRespVO> describe(String json, Map<Long, FileInfoRespDTO> metadata) {
   return ids(json).stream().map(id -> {
-   var file=fileApi.getFileInfo(id);
+   var file=metadata.get(id);
    return file==null || file.getPath()==null || !file.getPath().startsWith(directory())
     ? new CourseAttachmentRespVO().setFileId(id).setName("附件已不可用").setType("") : response(file,false);
   }).toList();

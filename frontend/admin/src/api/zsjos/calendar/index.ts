@@ -20,6 +20,7 @@ export interface CalendarNotifyResult { batchId: number; acceptedCount: number; 
 export interface CalendarNotifyPreview { calendarVersion: number; title: string; time?: string; remark?: string; recipientCount: number; notifiedCount: number; newRecipientCount: number; previewToken: string; contentHash: string }
 export interface CalendarNotifyUser { id: number; nickname: string; deptId?: number | null }
 export const getCourseCalendar = (params: { rangeStart: string; rangeEnd: string }) => request.get<CourseCalendarEvent[]>({ url: '/zsjos/course-calendar/page', params })
+export const getCourseCalendarEvent = (id: number) => request.get<CourseCalendarEvent>({ url: `/zsjos/course-calendar/${id}` })
 export const createCourseCalendar = (data: CourseCalendarInput) => request.post<number>({ url: '/zsjos/course-calendar', data })
 export const updateCourseCalendar = (id: number, data: CourseCalendarInput) => request.put({ url: `/zsjos/course-calendar/${id}`, data })
 export const deleteCourseCalendar = (id: number) => request.delete({ url: `/zsjos/course-calendar/${id}` })

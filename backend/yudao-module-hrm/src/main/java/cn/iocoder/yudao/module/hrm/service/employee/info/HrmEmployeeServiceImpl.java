@@ -1022,7 +1022,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         normalizeEmployeePersonalInfo(employee);
         employee.setVersion(0L).setLegacyDateSource("人工维护");
         if (employee.getCompanyAgeStartTime() == null) employee.setCompanyAgeStartTime(employee.getEntryTime());
-        employee.setCompanyAge(getYearsBetween(employee.getCompanyAgeStartTime().toLocalDate(),
+        employee.setCompanyAge(HrmCompanyAge.calculate(employee.getCompanyAgeStartTime().toLocalDate(),
                 employee.getLeaveTime() == null ? LocalDate.now() : employee.getLeaveTime().toLocalDate()));
         return employee;
     }

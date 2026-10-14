@@ -45,6 +45,10 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.system.enums.SocialAuthErrorCodes.SOURCE_CONFIGURATION_INVALID;
+import static cn.iocoder.yudao.module.system.enums.SocialAuthErrorCodes.SOURCE_UNSUPPORTED;
+
 // TODO @芋艿：等官方发布 1.4.1！！！
 /**
  * <p>
@@ -74,11 +78,12 @@ public class AuthRequestFactory {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public List<String> oauthList() {
         // 默认列表
-        List<String> defaultList = new ArrayList<>(properties.getType().keySet());
+        List<String> defaultList = properties.getType() == null ? new ArrayList<>()
+                : new ArrayList<>(properties.getType().keySet());
         // 扩展列表
         List<String> extendList = new ArrayList<>();
         ExtendProperties extend = properties.getExtend();
-        if (null != extend) {
+        if (extend != null && extend.getEnumClass() != null && extend.getConfig() != null) {
             Class enumClass = extend.getEnumClass();
             List<String> names = EnumUtil.getNames(enumClass);
             // 扩展列表
@@ -109,19 +114,25 @@ public class AuthRequestFactory {
      */
     public AuthRequest get(String source, Consumer<AuthConfig> configurer) {
         if (StrUtil.isBlank(source)) {
-            throw new AuthException(AuthResponseStatus.NO_AUTH_SOURCE);
+            throw exception(SOURCE_UNSUPPORTED);
         }
 
         // 获取 JustAuth 中已存在的
-        AuthRequest authRequest = getDefaultRequest(source, configurer);
+        AuthRequest authRequest;
+        try {
+            authRequest = getDefaultRequest(source, configurer);
 
-        // 如果获取不到则尝试取自定义的
-        if (authRequest == null) {
-            authRequest = getExtendRequest(properties.getExtend().getEnumClass(), source);
+            ExtendProperties extend = properties.getExtend();
+            if (authRequest == null && extend != null && extend.getEnumClass() != null) {
+                authRequest = getExtendRequest(extend.getEnumClass(), source);
+            }
+        } catch (AuthException ex) {
+            // Construction validates credentials locally; never expose its configuration payload.
+            throw exception(SOURCE_CONFIGURATION_INVALID);
         }
 
         if (authRequest == null) {
-            throw new AuthException(AuthResponseStatus.UNSUPPORTED);
+            throw exception(SOURCE_UNSUPPORTED);
         }
 
         return authRequest;
@@ -145,6 +156,9 @@ public class AuthRequestFactory {
         }
 
         Map<String, ExtendProperties.ExtendRequestConfig> extendConfig = properties.getExtend().getConfig();
+        if (extendConfig == null) {
+            throw exception(SOURCE_CONFIGURATION_INVALID);
+        }
 
         // key 转大写
         Map<String, ExtendProperties.ExtendRequestConfig> upperConfig = new HashMap<>(6);
@@ -164,7 +178,7 @@ public class AuthRequestFactory {
             }
         }
 
-        return null;
+        throw exception(SOURCE_CONFIGURATION_INVALID);
     }
 
 
@@ -184,13 +198,14 @@ public class AuthRequestFactory {
             return null;
         }
 
-        AuthConfig config = properties.getType().get(authDefaultSource.name());
-        // 找不到对应关系，直接返回空
-        if (config == null) {
-            return null;
+        AuthConfig config = properties.getType() == null ? null : properties.getType().get(authDefaultSource.name());
+        if (config == null && configurer == null) {
+            throw exception(SOURCE_CONFIGURATION_INVALID);
         }
         AuthConfig effectiveConfig = new AuthConfig();
-        BeanUtil.copyProperties(config, effectiveConfig);
+        if (config != null) {
+            BeanUtil.copyProperties(config, effectiveConfig);
+        }
         if (configurer != null) {
             configurer.accept(effectiveConfig);
         }

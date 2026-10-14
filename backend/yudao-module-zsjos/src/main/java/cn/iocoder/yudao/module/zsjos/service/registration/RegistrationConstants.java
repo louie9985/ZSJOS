@@ -5,6 +5,7 @@ public interface RegistrationConstants {
     String STATUS_PROCESSING = "processing";
     String STATUS_COMPLETED = "completed";
     String STATUS_CANCELLED = "cancelled";
+    String STATUS_ENDED = "ended";
     String COMMAND_CLOSE = "close";
     String ITEM_TYPE_CHECKBOX = "checkbox";
     String ITEM_TYPE_STUDY_PLANNER = "study_planner";

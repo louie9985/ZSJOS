@@ -15,6 +15,20 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ExamScheduleMapper extends BaseMapperX<ExamScheduleDO> {
 
+    default PageResult<ExamScheduleDO> selectExportPage(
+            cn.iocoder.yudao.module.zsjos.controller.admin.examcalendar.vo.ExamScheduleExportReqVO req,
+            boolean manager, LocalDateTime now) {
+        var query = base(new ExamSchedulePageReqVO(), manager, now)
+                .eqIfPresent(ExamScheduleDO::getRecordStatus, req.getRecordStatus())
+                .and(q -> q.eq(ExamScheduleDO::getScheduleType, "EXACT")
+                        .between(ExamScheduleDO::getExactDate, req.getRangeStart(), req.getRangeEnd())
+                        .or(multi -> multi.eq(ExamScheduleDO::getScheduleType, "MULTI_DAY")
+                                .le(ExamScheduleDO::getStartDate, req.getRangeEnd())
+                                .ge(ExamScheduleDO::getEndDate, req.getRangeStart())))
+                .last("ORDER BY COALESCE(exact_date, start_date), id");
+        return selectPage(req, query);
+    }
+
     // Creation replay must survive logical deletion; only the original tenant/operator digest matches.
     @Select("SELECT id, create_request_hash FROM zsjos_exam_schedule "
             + "WHERE tenant_id=#{tenantId} AND create_request_key=#{requestKey}")

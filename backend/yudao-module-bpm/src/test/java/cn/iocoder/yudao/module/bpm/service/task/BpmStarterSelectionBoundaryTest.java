@@ -35,4 +35,29 @@ class BpmStarterSelectionBoundaryTest {
         assertDoesNotThrow(()->ReflectionTestUtils.invokeMethod(service,"validateStartUserSelectAssignees",1L,definition,Map.of("review",List.of(2L)),Map.of()));
         verify(policy).validate("7",List.of(2L));
     }
+
+    @Test void downstreamSelectionChecksRolesBeforeWritingVariables() {
+        var service = new BpmTaskServiceImpl();
+        var policy = mock(BpmStarterSelectionPolicy.class);
+        ReflectionTestUtils.setField(service, "starterSelectionPolicy", policy);
+        var model = new BpmnModel(); var process = new org.flowable.bpmn.model.Process();
+        process.setId("test"); model.addProcess(process);
+        var current = new UserTask(); current.setId("current"); process.addFlowElement(current);
+        var next = new UserTask(); next.setId("next"); process.addFlowElement(next);
+        BpmnModelUtils.addExtensionElement(next, "candidateStrategy", "35");
+        BpmnModelUtils.addExtensionElement(next, "candidateParam", "7");
+        var flow = new SequenceFlow("current", "next"); flow.setId("flow"); process.addFlowElement(flow);
+        current.setOutgoingFlows(List.of(flow)); next.setIncomingFlows(List.of(flow));
+        var instance = mock(org.flowable.engine.runtime.ProcessInstance.class);
+        when(instance.getProcessVariables()).thenReturn(new HashMap<>());
+        Map<String,Object> variables = new HashMap<>();
+        doThrow(new IllegalArgumentException("out of scope")).when(policy).validate("7", List.of(99L));
+        assertThrows(IllegalArgumentException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "validateAndSetNextAssignees", "current", variables, model, Map.of("next",List.of(99L)), instance));
+        assertTrue(variables.isEmpty());
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(service,
+                "validateAndSetNextAssignees", "current", variables, model, Map.of("next",List.of(2L)), instance));
+        verify(policy).validate("7",List.of(2L));
+        assertFalse(variables.isEmpty());
+    }
 }

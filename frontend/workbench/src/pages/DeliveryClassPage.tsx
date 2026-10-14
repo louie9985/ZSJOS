@@ -90,8 +90,8 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
         <div className="delivery-class-grid">{orderedRows.map(row => <Card key={row.id} className={`delivery-class-card${row.systemClass ? ' delivery-class-pending' : ''}`} hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}>
           <div className="delivery-class-card-head"><Typography.Title level={5} ellipsis={{ tooltip: row.className }}>{row.className}</Typography.Title>{row.systemClass ? <Tag color="blue">系统班</Tag> : <Tag color={row.status === 'SERVING' ? 'green' : 'default'}>{row.status === 'SERVING' ? '服务中' : '已结课'}</Tag>}</div>
           <div className="delivery-class-card-meta"><span>{row.systemClass ? '当前状态' : '创建时间'}</span><strong>{row.systemClass ? '待分班' : row.createTime ? formatTimestamp(row.createTime) : '未记录'}</strong></div>
-          <div className="delivery-class-card-meta"><span>{row.systemClass ? '学员人数' : '考期'}</span><strong>{row.systemClass ? `${row.studentCount} 名` : row.examScheduleSnapshot || row.exactDate || '未设置'}</strong></div>
-          <div className="delivery-class-card-foot"><span>{row.systemClass ? '点击查看待分班学员' : `${row.studentCount} 名学员`}</span><span>{row.classNo}</span></div>
+          <div className="delivery-class-card-meta"><span>{row.systemClass ? '服务学员数' : '考期'}</span><strong>{row.systemClass ? `${row.studentCount} 条` : row.examScheduleSnapshot || row.exactDate || '未设置'}</strong></div>
+          <div className="delivery-class-card-foot"><span>{row.systemClass ? '点击查看待分班学员' : `${row.studentCount} 条服务`}</span><span>{row.classNo}</span></div>
           {manage && !row.systemClass && <Space onClick={event => event.stopPropagation()}>{has(permissions, 'zsjos:delivery-class:update') && row.status === 'SERVING' && <Button type="text" icon={<EditOutlined />} aria-label="编辑班级" onClick={() => void openEditor(row)} />}{has(permissions, 'zsjos:delivery-class:complete') && row.status === 'SERVING' && <Popconfirm title="确认结课该班级？" onConfirm={() => void complete(row)}><Button type="link" danger>结课</Button></Popconfirm>}</Space>}
         </Card>)}</div>
       </>}

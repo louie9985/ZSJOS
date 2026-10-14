@@ -36,7 +36,10 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
     public List<AdvancedFilterTemplateRespVO> visibleList(String scene, String pageKey, Long userId) {
         checkMediaScene(scene, userId);
         validateScenePage(scene, pageKey);
-        List<AdvancedFilterTemplateDO> templates = mapper.selectVisibleList(scene, pageKey, userId);
+        List<AdvancedFilterTemplateDO> templates = new java.util.ArrayList<>(mapper.selectVisibleList(scene, pageKey, userId));
+        if ("student_service".equals(scene)) {
+            templates.addAll(mapper.selectVisibleList("student", pageKey, userId));
+        }
         Long effectiveId = resolveEffectiveDefaultId(templates);
         return templates.stream().map(item -> toResp(item, effectiveId)).toList();
     }

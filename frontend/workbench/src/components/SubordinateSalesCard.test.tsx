@@ -12,6 +12,15 @@ const render = (fields: Partial<SubordinateSales>) => renderToStaticMarkup(
   <SubordinateSalesCard sales={{ ...row, ...fields }} selected={false} onSelect={() => {}} />)
 
 describe('subordinate daily card', () => {
+  it('hides sales dispatch controls and metrics for delivery employees', () => {
+    const html = render({ salesDispatchSupported: false });
+    expect(html).not.toContain('接单开启');
+    expect(html).not.toContain('可接收');
+    expect(html).not.toContain('分配客资数');
+    expect(html).not.toContain('漏接数');
+    expect(html).toContain('今日成交额');
+    expect(html).toContain('跟单记录数');
+  });
   it('shows remaining / total rather than completed / total', () => {
     const html = render({ todayFollowUpRemainingCount: 2, todayFollowUpTotalCount: 8 })
     expect(html).toContain('2 / 8')

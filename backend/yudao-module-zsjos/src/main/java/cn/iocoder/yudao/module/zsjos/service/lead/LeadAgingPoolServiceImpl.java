@@ -45,6 +45,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private LeadMapper leadMapper;
     @Resource private LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
+    @Resource private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
     @Resource private SalesOrderMapper orderMapper;
@@ -140,6 +141,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         LocalDateTime now = LocalDateTime.now();
         cycle.setCollaboratorUserId(target.getId()); cycle.setAssignedAt(now); cycle.setStatus(AGING_POOL_ASSIGNED);
         updateCycle(cycle);
+        taskCleanupService.cancelObsolete(cycle.getLeadId(), now);
         leadMapper.touchActivity(cycle.getLeadId(), now);
         String eventType = previous == null ? AGING_POOL_EVENT_ASSIGNED : AGING_POOL_EVENT_REASSIGNED;
         addEvent(cycle, eventType, userId, previous, target.getId(), null, reqVO.getIdempotencyKey(), now);
@@ -165,9 +167,11 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (owner == null || !CommonStatusEnum.ENABLE.getStatus().equals(owner.getStatus())) throw exception(LEAD_AGING_POOL_OWNER_INVALID);
         LocalDateTime now = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(cycle.getLeadId(), TenantContextHolder.getRequiredTenantId());
+        taskCleanupService.cancelObsolete(lead.getId(), now);
         lead.setOwnershipStartedAt(now); LeadMapper.advanceActivity(lead, now); leadMapper.updateById(lead);
         cycle.setStatus(AGING_POOL_EXITED); cycle.setExitedAt(now); cycle.setExitReason(reqVO.getReason().trim());
         updateCycle(cycle);
+        lifecycleTaskService.reassignPendingSalesTasks(lead.getId(), lead.getOwnerUserId());
         addEvent(cycle, AGING_POOL_EVENT_EXITED, userId, cycle.getCollaboratorUserId(), null,
                 cycle.getExitReason(), reqVO.getIdempotencyKey(), now);
         publish(AGING_POOL_EXITED_NOTICE, cycle, "aging-pool-exited:" + reqVO.getIdempotencyKey(), userId,
@@ -237,6 +241,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
             cycle.setStatus(AGING_POOL_ASSIGNED);
         }
         cycleMapper.insert(cycle);
+        taskCleanupService.cancelObsolete(leadId, now);
         leadMapper.touchActivity(leadId, now);
         addEvent(cycle, AGING_POOL_EVENT_ENTERED, operatorUserId, null, null,
                 reason, idempotencyKey + ":entered", now);
@@ -291,6 +296,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                     && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId()) && isEligibleSales(user.getId())) continue;
             Long previous = cycle.getCollaboratorUserId(); cycle.setCollaboratorUserId(null);
             cycle.setAssignedAt(null); cycle.setStatus(AGING_POOL_WAITING_ASSIGNMENT); updateCycle(cycle);
+            taskCleanupService.cancelObsolete(cycle.getLeadId(), now);
             leadMapper.touchActivity(cycle.getLeadId(), now);
             String key = "aging-pool-collaborator-cleared:" + cycle.getId() + ":" + now;
             addEvent(cycle, AGING_POOL_EVENT_COLLABORATOR_CLEARED, 0L, previous, null,
@@ -365,14 +371,15 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override public boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
         if (operatorUserId == null) return false;
-        if (Objects.equals(formalOwnerUserId, operatorUserId)) return true;
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);
         if (cycle != null) {
-            return Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
+            return publicSeaRecordMapper.selectByLeadId(leadId) == null
+                    && Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
                     && Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus());
         }
         var manual = publicSeaRecordMapper.selectByLeadId(leadId);
-        return manual != null && Objects.equals(manual.getOwnerUserId(), formalOwnerUserId)
+        return manual == null ? Objects.equals(formalOwnerUserId, operatorUserId)
+                : Objects.equals(manual.getOwnerUserId(), formalOwnerUserId)
                 && Objects.equals(manual.getCollaboratorUserId(), operatorUserId);
     }
     @Override public boolean canRequestTransfer(LeadAgingPoolCycleDO cycle, Long userId) {
@@ -385,13 +392,9 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 && Objects.equals(cycle.getCollaboratorUserId(), userId);
     }
     @Override public void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
-        if (Objects.equals(formalOwnerUserId, operatorUserId)) {
-            cycleMapper.selectActiveByLeadIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-            return;
-        }
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(
                 leadId, TenantContextHolder.getRequiredTenantId());
-        if (cycle == null || !Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
+        if (operatorUserId == null || cycle == null || !Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
                 || !Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
@@ -594,6 +597,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         try { cycleMapper.insert(cycle); } catch (DuplicateKeyException ignored) {
             return cycleMapper.selectActiveByLeadId(lead.getId()) != null;
         }
+        taskCleanupService.cancelObsolete(lead.getId(), now);
         leadMapper.touchActivity(lead.getId(), now);
         addEvent(cycle, AGING_POOL_EVENT_ENTERED, 0L, null, null, null, cycle.getIdempotencyKey(), now);
         publish(AGING_POOL_DUE, cycle, cycle.getIdempotencyKey(), 0L, null, now);

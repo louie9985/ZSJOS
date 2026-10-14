@@ -85,6 +85,7 @@ const list = ref<ExportApi.ExportTaskVO[]>([])
 const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, exportType: undefined as string | undefined })
 const types = [
+  { value: 'exam_calendar', label: '考期日历' },
   { value: 'lead', label: '客资' },
   { value: 'order', label: '订单' },
   { value: 'cashback', label: '返现' },

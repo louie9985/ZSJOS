@@ -26,7 +26,7 @@ public class PerformanceStatisticsService {
  private Long tenant(){return TenantContextHolder.getRequiredTenantId();}
  private LocalDateTime now(){return LocalDateTime.now(clock);}
  private PerformanceReportQuery request(Query q,LocalDateTime n) {
-  access.authorize(q,false);var scope=access.historicalScope(q);
+  access.authorize(q,false);var scope=access.reportScope(q);
   var r=new PerformanceReportQuery();r.setTenant(tenant());r.setType(q.getScopeType());r.setId(q.getScopeId());
   r.setAllDepartments(scope.allDepartments());r.setMissingDepartment(scope.missingDepartment());r.setDepartments(scope.departments());
   r.setNow(n);r.setToday(n.toLocalDate().atStartOfDay());r.setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay());return r;
@@ -62,14 +62,14 @@ public class PerformanceStatisticsService {
  }
  public Overview overview(Query q) {
   var n=now();var r=request(q,n);
-  var keys=List.of("today","week","month","lastMonth","quarter","year","last7","last30","last60","last90","lastWeek");
+  var keys=List.of("today","week","lastWeek","month","lastMonth","quarter","year","last7","last30","last60","last90");
   var windows=keys.stream().map(k->window(k,n)).toList();
   r.setStart(windows.stream().map(Window::start).min(Comparator.naturalOrder()).orElseThrow());r.setEnd(n);
   var orders=detailQueries.conversionOrders(r);var population=new PerformanceConversion.Population(orders,conversionReceipts(r,orders));
   var sums=amounts(r,windows,"total");Map<String,Metric> metrics=new HashMap<>();
   for(var w:windows)metrics.put(w.key(),metric(w,amount(sums,w,"total"),population));
-  var performance=keys.subList(0,10).stream().map(metrics::get).toList();
-  var conversion=List.of("month","lastMonth","last7","last30","last60","last90").stream().map(metrics::get).toList();
+  var performance=keys.stream().map(metrics::get).toList();
+  var conversion=List.of("lastWeek","month","lastMonth","last7","last30","last60","last90").stream().map(metrics::get).toList();
   var targetKeys=List.of("lastWeek","week","month","quarter","year");
   var batch=targets.batch(targetKeys.stream().map(k->new PerformanceTargetService.Period("lastWeek".equals(k)?"week":k,window(k,n).start().toLocalDate())).toList(),List.of(q.getScopeId()));
   List<TargetProgress> progress=new ArrayList<>();
@@ -192,7 +192,7 @@ public class PerformanceStatisticsService {
  public PageResult<Detail> details(Query q){
   if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
   access.authorize(q,false);
-  var scope=access.historicalScope(q);
+  var scope=access.reportScope(q);
   var n=now();
   var request=new PerformanceDetailQuery().setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
     .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());

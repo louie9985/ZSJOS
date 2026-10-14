@@ -82,4 +82,14 @@ class CourseAttachmentServiceTest {
   verify(access,times(3)).check(5L,"read-attachment",7L);
   verify(fileApi,never()).getFileInfo(12L);
  }
+
+ @Test void batchMetadataDeduplicatesAndMissingFileOnlyBecomesPlaceholder() {
+  when(fileApi.getFileInfoMap(List.of(11L,12L))).thenReturn(java.util.Map.of(11L,file("zsjos/course-attachment/1/7/a.pdf","7")));
+  var metadata=service.metadata(java.util.Arrays.asList("[11,12]","[11]",null));
+  var result=service.describe("[11,12]",metadata);
+  assertEquals(2,result.size());assertEquals("附件已不可用",result.get(1).getName());
+  verify(fileApi).getFileInfoMap(List.of(11L,12L));verify(fileApi,never()).getFileInfo(anyLong());
+  when(fileApi.getFileInfoMap(List.of(11L))).thenThrow(new IllegalStateException("database unavailable"));
+  assertThrows(IllegalStateException.class,()->service.metadata(List.of("[11]")));
+ }
 }

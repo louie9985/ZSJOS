@@ -26,7 +26,7 @@
   </ContentWrap>
 
   <ZsjosAdvancedFilter
-    scene="student"
+    scene="student_service"
     placeholder="姓名 / 手机号 / 客资编号"
     :keyword="query.keyword"
     page-key="student_my"
@@ -45,7 +45,7 @@
   />
 
   <ContentWrap>
-    <el-table v-loading="loading" :data="list" row-key="personId" stripe>
+    <el-table v-loading="loading" :data="list" row-key="serviceRelationId" stripe>
       <el-table-column label="学员姓名" prop="name" min-width="130" fixed="left" />
       <el-table-column label="手机号" min-width="130">
         <template #default="{ row }">{{ row.mobile || '-' }}</template>
@@ -57,12 +57,14 @@
         <template #default="{ row }">{{ row.leadNo || '客资编号暂未生成' }}</template>
       </el-table-column>
       <el-table-column label="在服务课程" min-width="220">
-        <template #default="{ row }">{{ serviceSummary(row.services) }}</template>
+        <template #default="{ row }">{{ serviceCourseName(row.service) }}</template>
       </el-table-column>
-      <el-table-column label="转为学员时间" prop="activatedAt" min-width="170" />
+      <el-table-column label="班级" prop="service.className" min-width="150" />
+      <el-table-column label="负责人" prop="service.ownerUserName" min-width="120" />
+      <el-table-column label="服务激活时间" prop="activatedAt" min-width="170" />
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row.personId)">详情</el-button>
+          <el-button link type="primary" @click="openDetail(row.serviceRelationId)">详情</el-button>
         </template>
       </el-table-column>
       <template #empty><el-empty description="暂无学员" /></template>
@@ -110,7 +112,7 @@
           :student-mobile="detail.mobile"
         />
         <div class="section-heading">课程服务</div>
-        <el-table :data="detail.services" row-key="serviceRelationId" border>
+        <el-table :data="[detail.service]" row-key="serviceRelationId" border>
           <el-table-column label="订单编号" prop="orderNo" min-width="190" />
           <el-table-column label="课程权益" min-width="320">
             <template #default="{ row }">
@@ -150,26 +152,20 @@ import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
 defineOptions({ name: 'ZsjosMyStudents' })
 
 const loading = ref(false)
+const route = useRoute()
 const userStore = useUserStore()
 const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
 const error = ref('')
-const list = ref<RegistrationApi.MyStudent[]>([])
+const list = ref<RegistrationApi.StudentServiceSubject[]>([])
 const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, keyword: '', advancedFilter: undefined as any })
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
-const detail = ref<RegistrationApi.MyStudent>()
-const detailPersonId = ref<number>()
+const detail = ref<RegistrationApi.StudentServiceSubject>()
+const detailServiceId = ref<number>()
 let detailRequest = 0
 
-const serviceSummary = (services: RegistrationApi.StudentService[]) => {
-  if (!services?.length) return '暂无课程服务'
-  const names = services.map(serviceCourseName).filter(Boolean)
-  return names.length > 2
-    ? `${names.slice(0, 2).join('、')} 等 ${names.length} 项`
-    : names.join('、')
-}
 const serviceCourseName = (service: RegistrationApi.StudentService) =>
   [service.courseName || service.skuName || '课程服务', productSpecText(service)]
     .filter(Boolean)
@@ -186,8 +182,9 @@ const load = async () => {
   error.value = ''
   try {
     if (readScope.value.readScope === 'USER' && !readScope.value.targetUserId) return
-    const data = await RegistrationApi.getMyStudentPage({
+    const data = await RegistrationApi.getMyStudentServicePage({
       ...query,
+      personId: Number(route.query.personId) || undefined,
       ...(userStore.dataAccess.tenantReadAll ? readScope.value : {}),
       keyword: query.keyword.trim() || undefined
     })
@@ -213,15 +210,15 @@ const resetQuery = () => {
   query.advancedFilter = undefined
   void load()
 }
-const openDetail = async (personId: number) => {
+const openDetail = async (relationId: number) => {
   const run = ++detailRequest
   detail.value = undefined
-  detailPersonId.value = personId
+  detailServiceId.value = relationId
   detailOpen.value = true
   detailLoading.value = true
   detailError.value = ''
   try {
-    const value = await RegistrationApi.getMyStudent(personId)
+    const value = await RegistrationApi.getMyStudentService(relationId)
     if (run === detailRequest) detail.value = value
   } catch (cause: any) {
     if (run !== detailRequest) return
@@ -231,10 +228,16 @@ const openDetail = async (personId: number) => {
     if (run === detailRequest) detailLoading.value = false
   }
 }
-const reloadDetail = () => detailPersonId.value && openDetail(detailPersonId.value)
+const reloadDetail = () => detailServiceId.value && openDetail(detailServiceId.value)
 watch(readScope, () => { detailRequest++; detailOpen.value = false; detail.value = undefined; handleQuery() }, { deep: true })
 
-onMounted(load)
+watch(() => route.fullPath, async () => {
+  detailRequest++; detail.value = undefined; detailOpen.value = false
+  await load()
+  const id = Number(route.query.serviceRelationId)
+  if (id > 0) await openDetail(id)
+  else if (Number(route.query.personId) > 0 && total.value === 1) await openDetail(list.value[0].serviceRelationId)
+}, { immediate: true })
 </script>
 
 <style scoped>

@@ -3,7 +3,7 @@ import request from '@/config/axios'
 export interface ExportTaskVO {
   id: number
   taskNo: string
-  exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal'
+  exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal' | 'exam_calendar'
   status: 'queued' | 'prechecking' | 'generating' | 'ready' | 'failed' | 'cancelled' | 'expired'
   attemptCount: number
   resultFileName?: string

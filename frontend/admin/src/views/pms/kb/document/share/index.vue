@@ -24,11 +24,13 @@
           <el-empty v-else description="文件未上传" />
         </div>
       </div>
+      <KnowledgeAttachments :files="document.attachments || []" :document-id="document.id" />
     </el-card>
   </div>
 </template>
 
 <script lang="ts" setup>
+import KnowledgeAttachments from '../KnowledgeAttachments.vue'
 import * as KnowledgeDocumentShareApi from '@/api/pms/kb/interaction/share'
 import { FilePreview } from '@/components/FilePreview'
 import { PmsKnowledgeDocumentType } from '@/views/pms/kb/utils/constants'

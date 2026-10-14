@@ -1,4 +1,5 @@
 import CalendarSearch from '../components/CalendarSearch'
+import ExamCalendarExport from '../components/ExamCalendarExport'
 import { useCalendarHighlight } from '../components/useCalendarHighlight'
 import { calendarSearchApi, searchPresentation, locationDate, CalendarResultExpired, findCalendarPage } from '../services/calendarSearch'
 import { LinkedText, REMARK_LINK_HINT } from '../components/ResourceLink'
@@ -431,6 +432,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
           }} />
         <Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => { setNoteRefreshVersion(version => version + 1); void reloadVisible() }} />
         <Button icon={<EyeOutlined />} onClick={() => setMultiDayOpen(true)}>多日考试安排</Button>
+        <ExamCalendarExport anchor={anchor} recordStatus={recordStatus} permissions={permissions} />
         {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>新增考期</Button>}
       </Space>
     </div>

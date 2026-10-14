@@ -38,8 +38,8 @@ class PerformanceSourceReviewTest {
             assertEquals(amount.equals("1280") ? 1 : 0,assessment.sourceReviewCount());
         }
     }
-    @Test void bothConfirmedUnlinkedSourcesAreExcludedInAllSixWindowsAndUnknownsAreDeduplicated() {
-        for (String key : List.of("month","lastMonth","last7","last30","last60","last90")) {
+    @Test void bothConfirmedUnlinkedSourcesAreExcludedInAllSevenWindowsAndUnknownsAreDeduplicated() {
+        for (String key : List.of("lastWeek","month","lastMonth","last7","last30","last60","last90")) {
             var w = PerformancePeriods.window(key,now); String at=w.start().plusHours(1).toString();
             var sales=receipt(1,"sales_self_sourced",true,at); var education=receipt(2,"education_self_sourced",true,at);
             var unknown=receipt(3,"education_self_sourced",false,at);

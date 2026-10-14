@@ -584,4 +584,13 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         assertTrue(path.matches("\\d{8}/\\d+/test\\.jpg"));
     }
 
+
+    @Test void batchMetadataOmitsMissingFilesAndPreservesSingletonException() {
+        var file = randomPojo(FileDO.class, row -> row.setDeleted(false));
+        fileMapper.insert(file);
+        var result = fileService.getFiles(List.of(file.getId(), Long.MAX_VALUE));
+        assertEquals(1, result.size()); assertEquals(file.getId(), result.getFirst().getId());
+        assertTrue(fileService.getFiles(List.of()).isEmpty());
+        assertServiceException(() -> fileService.getFile(Long.MAX_VALUE), FILE_NOT_EXISTS);
+    }
 }

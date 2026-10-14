@@ -227,6 +227,10 @@ const statusItems = [
     label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.REHIRE)
   },
   {
+    status: HrmEmployeeStatus.TRIAL,
+    label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.TRIAL)
+  },
+  {
     status: HrmEmployeeStatus.OUTSOURCE,
     label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.OUTSOURCE)
   },

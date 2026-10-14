@@ -4,6 +4,7 @@ import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.config.FileConfigPageReqVO;
@@ -17,6 +18,7 @@ import cn.iocoder.yudao.module.infra.framework.file.core.client.FileClientFactor
 import cn.iocoder.yudao.module.infra.framework.file.core.enums.FileStorageEnum;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import lombok.Getter;
@@ -58,10 +60,17 @@ public class FileConfigServiceImpl implements FileConfigService {
                 public FileClient load(Long id) {
                     FileConfigDO config = Objects.equals(CACHE_MASTER_ID, id) ?
                             fileConfigMapper.selectByMaster() : fileConfigMapper.selectById(id);
+                    if (config == null && Objects.equals(CACHE_MASTER_ID, id)) {
+                        throw exception(FileStorageErrorCodes.MASTER_NOT_CONFIGURED);
+                    }
                     if (config != null) {
                         fileClientFactory.createOrUpdateFileClient(config.getId(), config.getStorage(), config.getConfig());
                     }
-                    return fileClientFactory.getFileClient(null == config ? id : config.getId());
+                    FileClient client = fileClientFactory.getFileClient(null == config ? id : config.getId());
+                    if (client == null && Objects.equals(CACHE_MASTER_ID, id)) {
+                        throw exception(FileStorageErrorCodes.MASTER_CLIENT_UNAVAILABLE);
+                    }
+                    return client;
                 }
 
             });
@@ -202,7 +211,15 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public FileClient getMasterFileClient() {
-        return clientCache.getUnchecked(CACHE_MASTER_ID);
+        try {
+            return clientCache.getUnchecked(CACHE_MASTER_ID);
+        } catch (UncheckedExecutionException error) {
+            // Guava wraps cache-load failures; preserve the business error at the HTTP boundary.
+            if (error.getCause() instanceof ServiceException serviceException) {
+                throw serviceException;
+            }
+            throw error;
+        }
     }
 
 }

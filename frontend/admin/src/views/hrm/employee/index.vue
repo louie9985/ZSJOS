@@ -489,6 +489,10 @@ const statusItems = [
     label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.REHIRE)
   },
   {
+    status: HrmEmployeeStatus.TRIAL,
+    label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.TRIAL)
+  },
+  {
     status: HrmEmployeeStatus.OUTSOURCE,
     label: getDictLabel(DICT_TYPE.HRM_EMPLOYEE_STATUS, HrmEmployeeStatus.OUTSOURCE)
   },
@@ -671,7 +675,7 @@ function getEmployeeMoreActions(employee: EmployeeApi.HrmEmployeeVO) {
         { command: 'promotion', label: '晋升' },
         { command: 'demotion', label: '降级' }
       )
-      if ([3, 4, 5, 6, 7, 8].includes(employee.status || 0)) {
+      if ([3, 4, 5, 6, 7, 8, 9].includes(employee.status || 0)) {
         actions.push({ command: 'full-time', label: '转为全职' })
       }
       if (employee.entryStatus === HrmEmployeeEntryStatus.ACTIVE) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Image, Modal, Spin, Typography } from 'antd'
 import { DownloadOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
 
-export type AttachmentResource = { name: string; url?: string; type?: string; size?: number }
+export type AttachmentResource = { name: string; url?: string; type?: string; size?: number; loadContent?: () => Promise<AttachmentResource>; previewSafe?: boolean }
 export function attachmentKind(name: string, mime = '') {
   const ext = name.split('.').pop()?.toLowerCase() || ''
   if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp'].includes(ext)) return 'image'
@@ -42,24 +42,33 @@ export default function AttachmentCard({ name, load }: { name: string; load: () 
   const [file, setFile] = useState<AttachmentResource>(), [error, setError] = useState(''), [busy, setBusy] = useState(false), [preview, setPreview] = useState(false)
   const request = useRef(0)
   const [previewRevision, setPreviewRevision] = useState(0)
-  const fetchFile = async () => {
+  const pending = useRef<Promise<AttachmentResource | undefined> | undefined>(undefined)
+  const fetchFile = async (content = false): Promise<AttachmentResource | undefined> => {
+    if (pending.current) return pending.current
+    const operation = performFetch(content)
+    pending.current = operation
+    try { return await operation } finally { if (pending.current === operation) pending.current = undefined }
+  }
+  const performFetch = async (content: boolean) => {
     const version = ++request.current; setBusy(true); setError('')
     try {
-      const result = await load()
-      if (!result.url || !['http:', 'https:', 'blob:'].includes(new URL(result.url).protocol)) throw new Error('附件地址不可用')
-      if (version === request.current) { releaseBlob(); if (result.url.startsWith('blob:')) blobUrl.current = result.url; setFile(result); setPreviewRevision(version) }
-      else if (result.url.startsWith('blob:')) URL.revokeObjectURL(result.url)
+      const metadata = await load()
+      const result = content && metadata.loadContent ? await metadata.loadContent() : metadata
+      if (!result.loadContent && (!result.url || !['http:', 'https:', 'blob:'].includes(new URL(result.url).protocol))) throw new Error('附件地址不可用')
+      if (version === request.current) { releaseBlob(); if (result.url?.startsWith('blob:')) blobUrl.current = result.url; setFile(result); setPreviewRevision(version) }
+      else if (result.url?.startsWith('blob:')) URL.revokeObjectURL(result.url)
       return version === request.current ? result : undefined
     } catch (cause) { if (version === request.current) { releaseBlob(); setFile(undefined); setError(cause instanceof Error ? cause.message : '附件读取失败') } }
     finally { if (version === request.current) setBusy(false) }
   }
-  useEffect(() => { void fetchFile(); return () => { request.current++ } }, [])
+  useEffect(() => { void fetchFile(); return () => { request.current++; pending.current = undefined } }, [])
   const kind = attachmentKind(name, file?.type)
-  const canPreview = ['image', 'video', 'audio', 'pdf'].includes(kind)
-  const openPreview = async () => { if (await fetchFile()) setPreview(true) }
+  const canPreview = file?.previewSafe !== false && ['image', 'video', 'audio', 'pdf'].includes(kind)
+  const closePreview = () => { setPreview(false); request.current++; pending.current = undefined; setBusy(false); releaseBlob(); setFile(current => current?.loadContent ? { ...current, url: undefined } : current) }
+  const openPreview = async () => { const result = await fetchFile(true); if (result && result.previewSafe !== false) setPreview(true); else if (result) setError("该文件类型不支持在线预览，请下载查看") }
   const download = async () => {
-    const result = await fetchFile(); if (!result?.url) return
-    const anchor = document.createElement('a'); anchor.href = result.url; anchor.download = name; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.click()
+    const result = await fetchFile(true); if (!result?.url) return
+    const anchor = document.createElement('a'); anchor.href = result.url; anchor.download = name; if (!result.url.startsWith('blob:')) anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.click()
   }
   const size = file?.size == null ? '' : file.size < 1024 ? `${file.size} B` : file.size < 1024 ** 2 ? `${(file.size / 1024).toFixed(1)} KB` : `${(file.size / 1024 ** 2).toFixed(1)} MB`
   return <article className="attachment-card">
@@ -68,18 +77,18 @@ export default function AttachmentCard({ name, load }: { name: string; load: () 
         : <AttachmentTypeIcon kind={kind} extension={name.includes('.') ? name.split('.').pop()! : ''} />}
       <div className="attachment-card-copy"><Typography.Text className="attachment-card-name" title={name}>{name}</Typography.Text><div className="attachment-card-meta">{captions[kind]}{size && ` · ${size}`}{busy && <Spin size="small" />}</div></div>
     </div>
-    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void fetchFile()}>重试附件</Button>} />}
+    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void fetchFile(preview)}>重试附件</Button>} />}
     <div className="attachment-card-actions">
       {canPreview && <Button type="text" size="small" icon={<EyeOutlined />} disabled={busy || !file} onClick={() => void openPreview()}>预览</Button>}
       <Button type="text" size="small" icon={<DownloadOutlined />} disabled={busy || !file} onClick={() => void download()}>下载</Button>
-      {error && <Button type="text" size="small" icon={<ReloadOutlined />} disabled={busy} onClick={() => void fetchFile()}>重新加载</Button>}
+      {error && <Button type="text" size="small" icon={<ReloadOutlined />} disabled={busy} onClick={() => void fetchFile(preview)}>重新加载</Button>}
     </div>
-    <Modal title={name} open={preview} onCancel={() => setPreview(false)} footer={<><Button icon={<DownloadOutlined />} disabled={busy || !file} onClick={() => void download()}>下载原文件</Button><Button onClick={() => setPreview(false)}>关闭</Button></>} width="min(960px, 94vw)" destroyOnHidden>
-      {error && <Alert type="error" message={error} action={<Button onClick={() => void fetchFile()}>重试附件</Button>} />}
+    <Modal title={name} open={preview} onCancel={closePreview} footer={<><Button icon={<DownloadOutlined />} disabled={busy || !file} onClick={() => void download()}>下载原文件</Button><Button onClick={closePreview}>关闭</Button></>} width="min(960px, 94vw)" destroyOnHidden>
+      {error && <Alert type="error" message={error} action={<Button onClick={() => void fetchFile(preview)}>重试附件</Button>} />}
       {kind === 'image' ? <Image key={previewRevision} preview={false} src={file?.url} alt={name} style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain' }} onError={() => setError('图片加载失败，请重试附件')} />
         : kind === 'audio' ? <audio controls src={file?.url} style={{ width: '100%' }} onError={() => setError('音频加载失败，请重试附件')} />
         : kind === 'video' ? <video controls src={file?.url} style={{ width: '100%', maxHeight: '65vh' }} onError={() => setError('视频加载失败，请重试附件')} />
-        : <iframe title={name} src={file?.url} style={{ width: '100%', height: '65vh', border: 0 }} />}
+        : <iframe sandbox="allow-same-origin allow-downloads" title={name} src={file?.url} style={{ width: '100%', height: '65vh', border: 0 }} />}
     </Modal>
   </article>
 }

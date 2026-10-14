@@ -144,6 +144,9 @@ class ContentReviewBatchServiceTest {
         batch.setContextSnapshotJson("{\"accountSnapshots\":[{\"id\":90,\"nickname\":\"本轮名称\",\"productGoal\":\"旧目标\",\"publishFrequency\":\"旧节奏\"}]}");
         account.setDetailValuesJson("{\"product_goal\":\"提交时目标\",\"work_format\":\"产品形式\"}");
         account.setPrimaryProblemCodeLabelSnapshot("当前诊断瓶颈");
+        account.setNickname("当前账号名称").setPlatformAccountId("current-platform-account");
+        account.setSStage("S3").setSStageLabelSnapshot("保存的阶段");
+        account.setCurrentStatusValue("active").setCurrentStatusLabelSnapshot("保存的状态");
         service.submit(batch.getId(),request,OPERATOR_ID);
         var submittedContext = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(batchMapper).markSubmitted(eq(batch),eq(0),anyString(),eq("def2"),eq("content"),eq(2),anyString(),eq(22L),anyString(),submittedContext.capture(),any());
@@ -151,7 +154,11 @@ class ContentReviewBatchServiceTest {
         Map<?,?> profile = (Map<?,?>)((List<?>)frozen.get("accountSnapshots")).getFirst();
         assertEquals("提交时目标", profile.get("productGoal"));
         assertEquals("当前诊断瓶颈", profile.get("bottleneckLabel"));
-        assertEquals("本轮名称", profile.get("nickname"));
+        assertEquals(account.getNickname(), profile.get("nickname"));
+        assertEquals("current-platform-account", profile.get("platformAccountId"));
+        assertEquals("保存的阶段", profile.get("sStageLabel"));
+        assertEquals("保存的状态", profile.get("currentStatusLabel"));
+        assertEquals("当前账号名称", ((Map<?, ?>) frozen.get("account")).get("nickname"));
         assertFalse(profile.containsKey("publishFrequency"));
         var capture=org.mockito.ArgumentCaptor.forClass(cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO.class);
         verify(processInstanceApi).createProcessInstance(eq(OPERATOR_ID),capture.capture());
@@ -387,59 +394,51 @@ class ContentReviewBatchServiceTest {
         verifyNoInteractions(accountMapper);
     }
 
-    /**
-     * 运营发起审核时填写的账号档案必须写入快照。这些字段曾因不在 editable 白名单里被静默丢弃，
-     * 导致审核页头部区始终空白。
-     */
+    /** 账号资料由服务端当前记录产生，旧客户端字段不能覆盖。 */
     @Test
-    void draftAccountSnapshotKeepsOperatorSuppliedProfileText() {
-        stubProfileDictionaries();
+    void draftAccountSnapshotIgnoresOperatorSuppliedProfileText() {
         MediaAccountDO account = profileAccount();
 
         Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
                 account, Map.of("productGoal", "私域成交", "publishFrequency", "3条/周",
                         "productFormLabel", "短视频", "bottleneckLabel", "B3 内容同质化"));
 
-        assertEquals("私域成交", snapshot.get("productGoal"));
-        assertEquals("3条/周", snapshot.get("publishFrequency"));
-        assertEquals("短视频", snapshot.get("productFormLabel"));
-        assertEquals("B3 内容同质化", snapshot.get("bottleneckLabel"));
+        assertFalse(snapshot.containsKey("productGoal"));
+        assertFalse(snapshot.containsKey("publishFrequency"));
+        assertFalse(snapshot.containsKey("productFormLabel"));
+        assertFalse(snapshot.containsKey("bottleneckLabel"));
     }
 
-    /** 字典字段只接受 value，label 由服务端解析，避免客户端伪造展示文案。 */
+    /** 保存的标签不因客户端输入或当前字典重命名而改变。 */
     @Test
-    void draftAccountSnapshotResolvesDictionaryLabelsOnServer() {
-        stubProfileDictionaries();
+    void draftAccountSnapshotUsesStoredDictionaryLabels() {
         MediaAccountDO account = profileAccount();
+        account.setSStageLabelSnapshot("保存的期段");
+        account.setCurrentStatusLabelSnapshot("保存的状态");
 
         Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
                 account, Map.of("stageValue", "S3", "currentStatusLabel", "伪造的状态"));
 
-        assertEquals("S3", snapshot.get("stageValue"));
-        assertEquals("内容验证期", snapshot.get("sStageLabel"));
-        // 客户端直接传 label 不生效，仍是服务端按原值解析出的文案。
-        assertEquals("状态B", snapshot.get("currentStatusLabel"));
+        assertEquals("S2", snapshot.get("sStage"));
+        assertEquals("保存的期段", snapshot.get("sStageLabel"));
+        // 客户端直接传 label 不生效。
+        assertEquals("保存的状态", snapshot.get("currentStatusLabel"));
     }
 
-    /** 字典外的取值必须拒绝，不能写进历史快照。 */
+    /** 兼容旧请求字段，但不采用客户端字典值。 */
     @Test
-    void draftAccountSnapshotRejectsValueOutsideDictionary() {
-        // platform 先于 stage 解析，两个字典都要 stub。
-        when(dictDataApi.getDictDataList("zsjos_account_platform")).thenReturn(List.of(
-                dictData("douyin", "抖音")));
-        when(dictDataApi.getDictDataList("zsjos_media_account_stage")).thenReturn(List.of(
-                dictData("S2", "冷启动期")));
+    void draftAccountSnapshotIgnoresClientDictionaryValues() {
         MediaAccountDO account = profileAccount();
 
-        assertServiceCode(CONTENT_DICTIONARY_INVALID, () ->
-                ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
-                        account, Map.of("stageValue", "S99")));
+        Map<String, Object> snapshot = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot",
+                account, Map.of("stageValue", "S99"));
+        assertEquals("S2", snapshot.get("sStage"));
+        verifyNoInteractions(dictDataApi);
     }
 
     /** 责任运营姓名由服务端按归属解析，不接受前端传入。 */
     @Test
     void draftAccountSnapshotResolvesOperatorNameFromOwnership() {
-        stubProfileDictionaries();
         when(adminUserApi.getUserMap(Set.of(OPERATOR_ID))).thenReturn(Map.of(
                 OPERATOR_ID, new AdminUserRespDTO().setId(OPERATOR_ID).setNickname("运营甲")));
         MediaAccountDO account = profileAccount();
@@ -833,13 +832,43 @@ class ContentReviewBatchServiceTest {
         Map<String, Object> result = ReflectionTestUtils.invokeMethod(service, "reviewAccountSnapshot", account,
                 Map.of("accountSnapshots", List.of(stored)), Map.of("nickname", "本轮标题", "platformLabel", "伪造平台",
                         "operatorName", "伪造运营", "stageValue", "current"));
-        assertEquals("本轮标题", result.get("nickname"));
-        assertEquals("历史平台", result.get("platformLabel"));
-        assertEquals("历史期段", result.get("sStageLabel"));
-        assertEquals("历史状态", result.get("currentStatusLabel"));
-        assertEquals("历史运营", result.get("operatorName"));
+        assertEquals("当前改名", result.get("nickname"));
+        assertEquals(null, result.get("platformLabel"));
+        assertEquals(null, result.get("sStageLabel"));
+        assertEquals(null, result.get("currentStatusLabel"));
+        assertEquals(null, result.get("operatorName"));
         assertEquals("历史账号", stored.get("nickname"));
         verifyNoInteractions(dictDataApi, adminUserApi);
+    }
+
+    @Test
+    void previewValidatesAllAccountsBeforeResolvingProfiles() {
+        var account = profileAccount().setStudentPersonId(50L);
+        account.setTenantId(TENANT_ID);
+        when(accountMapper.selectById(3L)).thenReturn(account);
+        assertServiceCode(CONTENT_ACCOUNT_SCOPE_CHANGED,
+                () -> service.previewAccounts(null, 50L, List.of(3L, 4L), OPERATOR_ID));
+        verifyNoInteractions(adminUserApi);
+        account.setOwnerOperatorUserId(99L);
+        assertServiceCode(CONTENT_ACCOUNT_SCOPE_CHANGED,
+                () -> service.previewAccounts(null, 50L, List.of(3L), OPERATOR_ID));
+    }
+
+    @Test
+    void previewRequiresBatchSubmitPermission() {
+        assertServiceCode(CONTENT_REVIEW_PERMISSION_DENIED,
+                () -> service.previewAccounts(10L, 50L, List.of(3L), OPERATOR_ID));
+        verifyNoInteractions(accountMapper, adminUserApi);
+    }
+
+    @Test
+    void previewReturnsCurrentStoredLabelsWithoutDictionaryLookup() {
+        var account = profileAccount().setStudentPersonId(50L).setSStageLabelSnapshot("stored-stage");
+        account.setTenantId(TENANT_ID);
+        when(accountMapper.selectById(3L)).thenReturn(account);
+        var result = service.previewAccounts(null, 50L, List.of(3L), OPERATOR_ID);
+        assertEquals("stored-stage", result.getFirst().getSStageLabel());
+        verifyNoInteractions(dictDataApi);
     }
 
     private void mockLockedBatch(ContentReviewBatchDO batch) {

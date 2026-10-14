@@ -1,0 +1,14 @@
+# 异常日志本地修复与验证
+
+## Registration — 2026-10-14 (Beijing)
+- Environment: local (environment variable/file absent); workstream: local-exception-repairs-20261014; owner: Codex /root.
+- Goal: implement the approved 451-log repair plan and Admin revision gift editing; distinguish local verification from deployment.
+- Non-goals: real business database writes, deployment/service operations, permissions, dependencies, historical data repair, Git branch/commit/push operations.
+- Branch/worktree/base: main; D:/ZSJ-OS; e07efc9d6baa5d40b5ec07b78f6743b0d1b2915e. Target branch/integration: None.
+- Ownership / audit_orders: PerformanceReportSql; SalesOrderApprovalRoundMapper; SalesOrderServiceImpl and focused order/performance/SQL tests; BPM task request normalization DTO/API and focused tests (BpmTaskServiceImpl remains owned by local-review-fixes-20261014); Admin mySalesOrder page, its gift API/helper/test/browser fixture; directly related order/performance documentation.
+- Ownership / audit_files: WorkOrderController, WorkOrderService interface/implementation and new upload budget/configuration helpers/tests; work-order-specific Admin/Workbench upload callers/helpers; SelectSheetWriteHandler, AreaConvert and Excel tests; FileConfigServiceImpl and its tests; EamAssetExportServiceTest; attachment-upload-limits documentation. Existing Infra FileApi/FileService files and AttachmentCard are excluded because another workstream owns them.
+- Ownership / audit_core: System OAuth2TokenServiceImpl, AuthRequestFactory, SocialUserServiceImpl, AdminUserServiceImpl and their focused tests; LeadComplaintService, LeadAppealServiceImpl and evidence tests; GiftConfigServiceImpl and focused tests; distinct new error-code holder per module if existing shared constants would conflict; authentication/import documentation.
+- Ownership / root: this handoff, docs/operations/exception-repairs-20261014.md; new controlled SQL verification/diagnostic tooling under script/sql/mysql/tools/exception_repair_*; cross-group verification and final integration. Shared error-code and configuration files require coordination before edits.
+- Dependencies: existing public APIs, approved business rules, existing concurrent review fixes. Preserve all current changes; no ownership of the active review workstream's files. Contributors report to root and do not append handoff entries.
+- Verification: regression-first focused tests, isolated/shared-output-serialized Maven and frontend checks, desktop/mobile browser fixtures, retained isolated MySQL schemas only (no existing business schema mutations), bounded upload JVM exercise, full 451-record status reconciliation and environment evidence checklist. No live acceptance claim.
+- Execution order: independent disjoint source edits; coordinate verification only after inputs stable; root serializes shared Maven output or uses private filesystem snapshots.

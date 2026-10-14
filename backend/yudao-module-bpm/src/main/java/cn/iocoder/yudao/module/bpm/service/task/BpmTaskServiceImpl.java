@@ -93,6 +93,8 @@ import static cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModel
 @Service
 public class BpmTaskServiceImpl implements BpmTaskService {
 
+    @Resource private BpmStarterSelectionPolicy starterSelectionPolicy;
+
     @Resource
     private TaskService taskService;
     @Resource
@@ -958,6 +960,8 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                 if (CollUtil.isEmpty(assignees)) {
                     throw exception(PROCESS_INSTANCE_START_USER_SELECT_ASSIGNEES_NOT_CONFIG, nextFlowNode.getName());
                 }
+
+                starterSelectionPolicy.validate(parseCandidateParam(nextFlowNode), assignees);
 
                 // 设置 PROCESS_INSTANCE_VARIABLE_START_USER_SELECT_ASSIGNEES
                 if (startUserSelectAssignees == null) {

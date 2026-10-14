@@ -2,6 +2,7 @@ import request from '@/config/axios'
 
 // PMS 知识库文档 VO
 export interface PmsKnowledgeDocumentVO {
+  attachments?: KnowledgeAttachment[]
   id: number // 文档编号
   libraryId: number // 知识库编号
   permissionId: number // 协作权限编号
@@ -33,6 +34,7 @@ export interface PmsKnowledgeDocumentVO {
 
 // PMS 知识库文档新增 VO
 export interface PmsKnowledgeDocumentCreateReqVO {
+  attachmentFileIds?: number[]
   libraryId: number // 知识库编号
   folderId: number // 文件夹编号，0 表示不在文件夹中
   parentId: number // 父文档编号，0 表示根文档
@@ -45,6 +47,7 @@ export interface PmsKnowledgeDocumentCreateReqVO {
 
 // PMS 知识库文档修改 VO
 export interface PmsKnowledgeDocumentUpdateReqVO {
+  attachmentFileIds?: number[]
   id: number // 文档编号
   title?: string // 文档标题
   content?: string // 文档内容或文件地址
@@ -108,3 +111,38 @@ export const getKnowledgeDocumentSearchPage = (params: PageParam) => {
     params
   })
 }
+
+export interface KnowledgeAttachment {
+  fileId: number
+  fileName: string
+  fileSize: number
+  mimeType?: string
+  url?: string
+}
+export const uploadKnowledgeAttachment = (
+  documentId: number,
+  file: File,
+  progress: (percent: number) => void
+) => {
+  const data = new FormData()
+  data.append('documentId', String(documentId))
+  data.append('file', file)
+  return request.post<KnowledgeAttachment>({
+    url: '/pms/kb/document/attachment/upload',
+    data,
+    headersType: 'multipart/form-data',
+    timeout: 600000,
+    preserveBusinessError: true,
+    onUploadProgress: (event: { loaded: number; total?: number }) =>
+      progress(event.total ? Math.round((event.loaded / event.total) * 100) : 0)
+  })
+}
+export const knowledgeAttachmentUrl = (documentId: number, fileId: number, recordId?: number) =>
+  request.get<string>({
+    url:
+      recordId == null
+        ? '/pms/kb/document/attachment/url'
+        : '/pms/kb/document/attachment/recycle-url',
+    params: { documentId, fileId, recordId },
+    preserveBusinessError: true
+  })

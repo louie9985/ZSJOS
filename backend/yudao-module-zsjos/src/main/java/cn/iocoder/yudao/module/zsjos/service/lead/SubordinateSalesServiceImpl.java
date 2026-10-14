@@ -43,6 +43,9 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DictDataApi dictDataApi;
     @Resource private PostApi postApi;
+    @Resource private cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
+    @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private LeadObjectPermissionService permissionService;
     @Resource private LeadAssignmentService assignmentService;
@@ -61,7 +64,10 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
 
     @Override
     public PageResult<SubordinateSalesRespVO> getPage(SubordinateSalesPageReqVO reqVO, Long managerUserId) {
-        List<AdminUserRespDTO> users = readableSales(managerUserId);
+        String initialKeyword=trimToNull(reqVO.getKeyword());
+        List<AdminUserRespDTO> users = readableSales(managerUserId).stream()
+            .filter(user -> reqVO.getAccountStatus()==null||Objects.equals(reqVO.getAccountStatus(),user.getStatus()))
+            .filter(user -> initialKeyword==null||contains(user.getNickname(),initialKeyword)||contains(user.getUsername(),initialKeyword)||contains(user.getMobile(),initialKeyword)).toList();
         String keyword = trimToNull(reqVO.getKeyword());
         List<SubordinateSalesRespVO> rows = buildRows(users).stream()
                 .filter(row -> keyword == null || contains(row.getName(), keyword)
@@ -160,6 +166,52 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     }
 
     @Override
+    public List<LeadAssignmentUserRespVO> getTransferCandidates(Long managerUserId, Long leadId) {
+        if (leadId == null) return getTransferCandidates(managerUserId);
+        commandService.validateManagedLeads(List.of(leadId), managerUserId);
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        Long excluded = lead.getOwnerUserId() == null ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
+        if (!teamTransferPolicy.isEducation(lead)) return getTransferCandidates(managerUserId).stream()
+                .filter(user -> !Objects.equals(user.getId(), excluded)).toList();
+        Set<Long> managed = permissionService.getManagedUserIds(managerUserId);
+        List<AdminUserRespDTO> employees=managed.isEmpty()?List.of():adminUserApi.getUserList(managed);
+        Set<Long> eligible=teamTransferPolicy.eligibleTargets(employees);
+        return employees.stream()
+                .filter(user -> !Objects.equals(user.getId(), excluded))
+                .filter(user -> eligible.contains(user.getId()))
+                .map(user -> {
+                    var result = new LeadAssignmentUserRespVO();
+                    result.setId(user.getId()); result.setNickname(user.getNickname()); result.setAvatar(user.getAvatar());
+                    result.setDeptId(user.getDeptId()); result.setStatus(user.getStatus());
+                    return result;
+                }).toList();
+    }
+
+    @Override
+    public List<LeadAssignmentUserRespVO> getBatchTransferCandidates(Long managerUserId, List<Long> leadIds) {
+        List<Long> ids = leadIds.stream().distinct().toList();
+        if (ids.isEmpty() || ids.size() > 200) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
+        Set<Long> managed=permissionService.getManagedUserIds(managerUserId);
+        var leads=leadMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(LeadDO::getId,Function.identity()));
+        List<AdminUserRespDTO> employees=managed.isEmpty()?List.of():adminUserApi.getUserList(managed);
+        Set<Long> education=teamTransferPolicy.eligibleTargets(employees);
+        Set<Long> sales=assignmentService.getEligibleSalesUsers().stream().map(LeadAssignmentUserRespVO::getId).filter(managed::contains).collect(Collectors.toSet());
+        Set<Long> intersection=new LinkedHashSet<>(managed);
+        for (Long id : ids) {
+            LeadDO lead=leads.get(id);if(lead==null)throw exception(LEAD_NOT_EXISTS);
+            Long owner=lead.getOwnerUserId()==null?lead.getRecycleSourceOwnerUserId():lead.getOwnerUserId();
+            if(owner==null||!managed.contains(owner))throw exception(SUBORDINATE_LEAD_OWNER_CHANGED);
+            SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER,lead);
+            intersection.retainAll(teamTransferPolicy.isEducation(lead)?education:sales);
+            intersection.remove(owner);
+        }
+        return employees.stream().filter(user->intersection.contains(user.getId())).map(user->{
+            var row=new LeadAssignmentUserRespVO();row.setId(user.getId());row.setNickname(user.getNickname());row.setDeptId(user.getDeptId());row.setAvatar(user.getAvatar());row.setStatus(user.getStatus());return row;
+        }).toList();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateAccountStatus(Long salesUserId, SubordinateAccountStatusReqVO reqVO, Long managerUserId) {
         AdminUserRespDTO user = requireSalesSubordinate(salesUserId, managerUserId);
@@ -217,7 +269,6 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Override
     public void transferLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
         String reason = requireReason(reqVO.getReason());
-        requireEligibleTarget(reqVO.getTargetUserId(), managerUserId);
         commandService.transferOne(leadId, reqVO.getTargetUserId(), managerUserId, reason, reqVO.getIdempotencyKey());
     }
 
@@ -248,16 +299,18 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     public SubordinateBatchResultVO batchLeadAction(String action, SubordinateBatchLeadActionReqVO reqVO,
                                                      Long managerUserId) {
         String reason = requireReason(reqVO.getReason());
-        if ("transfer".equals(action)) requireEligibleTarget(reqVO.getTargetUserId(), managerUserId);
-        if ("release-public-sea".equals(action) && reqVO.getCollaboratorUserId() != null) {
-            requireEligibleTarget(reqVO.getCollaboratorUserId(), managerUserId);
-        }
         String fingerprint = SubordinateSalesCommandService.fingerprint(action, reqVO.getLeadIds(),
                 reqVO.getTargetUserId(), reqVO.getCollaboratorUserId(), reason);
-        SubordinateBatchResultVO replay = commandService.beginBatch(
+        SubordinateBatchResultVO replay = commandService.replayBatch(
                 "batch-" + action, managerUserId, reqVO.getIdempotencyKey(), fingerprint);
         if (replay != null) return replay;
         commandService.validateManagedLeads(reqVO.getLeadIds(), managerUserId);
+        if ("transfer".equals(action)) {
+            for (Long id : reqVO.getLeadIds()) requireTransferTarget(id, reqVO.getTargetUserId(), managerUserId);
+        }
+        if ("release-public-sea".equals(action) && reqVO.getCollaboratorUserId() != null) requireEligibleTarget(reqVO.getCollaboratorUserId(), managerUserId);
+        replay = commandService.beginBatch("batch-" + action, managerUserId, reqVO.getIdempotencyKey(), fingerprint);
+        if (replay != null) return replay;
         SubordinateBatchResultVO result = executeBatch(reqVO.getLeadIds(), leadId -> {
             String itemKey = reqVO.getIdempotencyKey() + ":" + leadId;
             switch (action) {
@@ -296,10 +349,22 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         var followUps = followUpRecordMapper.selectTodayByUserIds(ids, start, end);
         var opportunityFollowUps = opportunityFollowUpRecordMapper.selectTodayByUserIds(ids, start, end);
         var qualifications = eventMapper.selectTodayByUserIds(ids, start, end);
+        Set<Long> deptIds = users.stream().map(AdminUserRespDTO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var departments = deptIds.isEmpty() ? Map.<Long,cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO>of() : deptApi.getDeptMap(deptIds);
+        Set<Long> postIds = users.stream().filter(user -> user.getPostIds()!=null).flatMap(user -> user.getPostIds().stream()).collect(Collectors.toSet());
+        var posts = postApi.getPostMap(postIds);
+        var salesPost = postApi.getPostByCode(SALES_POST_CODE);
+        Set<Long> educationEligible = identityService.getEligibleEducationOwners(users);
         return users.stream().map(user -> {
             var row = buildRow(user, leads.getOrDefault(user.getId(), List.of()),
                 tasks.getOrDefault(user.getId(), List.of()), orders.getOrDefault(user.getId(), List.of()),
                 categories, eligible.contains(user.getId()), start, end, now);
+            row.setDeptId(user.getDeptId());
+            var department=user.getDeptId()==null?null:departments.get(user.getDeptId());row.setDepartmentName(department==null?null:department.getName());
+            row.setPostNames(user.getPostIds()==null?List.of():user.getPostIds().stream().map(posts::get).filter(Objects::nonNull).map(PostRespDTO::getName).toList());
+            row.setSalesDispatchSupported(salesPost!=null&&user.getPostIds()!=null&&user.getPostIds().contains(salesPost.getId()));
+            row.setEducationOwnershipSupported(educationEligible.contains(user.getId()));
+            row.setOrderCreationSupported(permissionApi.hasAnyPermissions(user.getId(), "zsjos:sales-order:create", "zsjos:sales-order:student-repurchase"));
             // Event-time attribution survives later ownership changes; never infer daily activity from current ownership.
             var history = assignments.stream().filter(item -> Objects.equals(item.getCandidateUserId(), row.getUserId())).toList();
             row.setTodayAssignedCount(history.stream().filter(item -> ACTION_DISPATCH.equals(item.getActionType()))
@@ -379,9 +444,13 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     }
 
     private List<AdminUserRespDTO> readableSales(Long userId) {
-        if (!permissionApi.hasTenantReadAllAccess(userId)) return salesSubordinates(userId);
-        PostRespDTO salesPost = postApi.getPostByCode(SALES_POST_CODE);
-        return salesPost == null ? List.of() : adminUserApi.getUserListByPostIds(Set.of(salesPost.getId()));
+        if (!permissionApi.hasTenantReadAllAccess(userId)) {
+            Set<Long> managed = permissionService.getManagedUserIds(userId);
+            return managed.isEmpty() ? List.of() : adminUserApi.getUserList(managed);
+        }
+        List<AdminUserRespDTO> users = new ArrayList<>(adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()));
+        users.addAll(adminUserApi.getUserListByStatus(CommonStatusEnum.DISABLE.getStatus()));
+        return users;
     }
 
     private AdminUserRespDTO requireReadableSales(Long userId, Long readerId) {
@@ -407,6 +476,14 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     private void requireEligibleTarget(Long userId, Long managerUserId) {
         boolean valid = getTransferCandidates(managerUserId).stream().anyMatch(user -> Objects.equals(user.getId(), userId));
         if (!valid) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
+    }
+
+    private void requireTransferTarget(Long leadId, Long target, Long manager) {
+        commandService.validateManagedLeads(List.of(leadId), manager);
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (teamTransferPolicy.isEducation(lead)) teamTransferPolicy.requireTarget(lead, target, manager);
+        else requireEligibleTarget(target, manager);
     }
 
     private SubordinateBatchResultVO executeBatch(List<Long> ids, BatchAction action) {

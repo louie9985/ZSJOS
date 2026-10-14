@@ -35,6 +35,19 @@ import static cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleObj
 @Service
 public class ExamScheduleService {
 
+    public PageResult<ExamScheduleRespVO> exportPage(ExamScheduleExportReqVO req, Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId, "zsjos:exam-calendar:query")
+                || !permissionApi.hasAnyPermissions(userId, "zsjos:exam-calendar:export")) {
+            throw exception(EXAM_SCHEDULE_PERMISSION_DENIED);
+        }
+        cn.iocoder.yudao.framework.common.util.validation.ValidationUtils.validate(req);
+        boolean manager = hasManagePermission(userId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        var page = mapper.selectExportPage(req, manager, now);
+        return new PageResult<>(page.getList().stream()
+                .map(row -> toResponse(row, userId, manager, now)).toList(), page.getTotal());
+    }
+
     public PageResult<ExamScheduleRespVO> search(ExamCalendarSearchReqVO req, Long userId) {
         boolean manager = hasManagePermission(userId);
         LocalDateTime now = LocalDateTime.now(clock);

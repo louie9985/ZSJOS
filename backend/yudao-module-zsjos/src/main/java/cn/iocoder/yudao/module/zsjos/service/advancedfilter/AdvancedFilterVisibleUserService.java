@@ -32,8 +32,21 @@ public class AdvancedFilterVisibleUserService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService deliveryScope;
 
     public Resolution resolve(String scene, Long userId) {
+        if ("student_service".equals(scene)) {
+            if (permissionApi.hasTenantReadAllAccess(userId)) return Resolution.supported(options(adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus())));
+            if (permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query", "zsjos:delivery-class:query-managed")) {
+                var scope = deliveryScope.resolve(userId);
+                if (scope.allDepartments()) return Resolution.supported(options(adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus())));
+                var ids = new java.util.LinkedHashSet<Long>(); ids.add(userId);
+                if (!scope.deptIds().isEmpty()) adminUserApi.getUserListByDeptIds(scope.deptIds()).forEach(u -> ids.add(u.getId()));
+                return Resolution.supported(enabledOptions(ids));
+            }
+            return Resolution.supported(enabledOptions(Set.of(userId)));
+        }
         if (Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales")
                 .contains(scene) && leadObjectPermissionService.hasTenantReadAll(userId)) {
             if ("subordinate_sales".equals(scene)) {

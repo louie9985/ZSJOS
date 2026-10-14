@@ -43,7 +43,7 @@ class CalendarCreatorNamesTest {
         var result=service.get(2L);
         assertEquals("创建员工",result.getCreatorName()); assertEquals("课程名称",result.getCourseName());
         assertEquals(List.of(11L),result.getAttachmentIds()); assertEquals(3,result.getCalendarVersion());
-        verify(attachments).describe("[11]");
+        verify(attachments).describe(org.mockito.ArgumentMatchers.eq("[11]"), org.mockito.ArgumentMatchers.anyMap());
     }
     @Test void personalProjectionKeepsCreatorDistinctFromOwner() {
         var service=new cn.iocoder.yudao.module.zsjos.service.personalcalendar.PersonalCalendarEventService();

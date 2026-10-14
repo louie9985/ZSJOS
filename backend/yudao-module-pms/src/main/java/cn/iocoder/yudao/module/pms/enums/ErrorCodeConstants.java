@@ -79,6 +79,8 @@ public interface ErrorCodeConstants {
     ErrorCode KNOWLEDGE_FOLDER_MOVE_INVALID = new ErrorCode(1_053_130_008, "文件夹不能移动到自身或其子文件夹中");
     ErrorCode KNOWLEDGE_DOCUMENT_NOT_EXISTS = new ErrorCode(1_053_130_009, "知识库文档不存在");
     ErrorCode KNOWLEDGE_DOCUMENT_PARENT_INVALID = new ErrorCode(1_053_130_010, "父文档与知识库不匹配");
+    ErrorCode KNOWLEDGE_ATTACHMENT_INVALID = new ErrorCode(1_053_130_090, "附件格式、数量或归属无效");
+    ErrorCode KNOWLEDGE_ATTACHMENT_UNAVAILABLE = new ErrorCode(1_053_130_091, "附件不存在或已移除");
     ErrorCode KNOWLEDGE_DOCUMENT_FOLDER_INVALID = new ErrorCode(1_053_130_011, "文档文件夹与知识库不匹配");
     ErrorCode KNOWLEDGE_DOCUMENT_MOVE_INVALID = new ErrorCode(1_053_130_012, "文档不能移动到自身或其子文档中");
     ErrorCode KNOWLEDGE_DOCUMENT_STATUS_INVALID = new ErrorCode(1_053_130_013, "文档状态无效");

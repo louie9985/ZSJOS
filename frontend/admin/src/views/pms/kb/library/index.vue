@@ -24,6 +24,14 @@
           新建知识库
         </el-button>
         <el-button
+          v-if="checkPermi(['pms:kb:library:create']) && checkPermi(['pms:kb:library:update'])"
+          @click="folderImportRef?.open()"
+          >从文件夹创建</el-button
+        >
+        <el-button v-hasPermi="['pms:kb:library:query']" @click="folderImportRef?.history()"
+          >我的导入记录</el-button
+        >
+        <el-button
           v-hasPermi="['pms:kb:library:update']"
           plain
           type="primary"
@@ -156,6 +164,7 @@
     />
   </ContentWrap>
 
+  <KnowledgeFolderImport ref="folderImportRef" @success="getList" />
   <!-- 新建或修改知识库 -->
   <KnowledgeLibraryForm ref="formRef" @success="getList" />
   <!-- 新建知识库分组 -->
@@ -172,6 +181,8 @@ import * as KnowledgeLibraryMemberApi from '@/api/pms/kb/library/member'
 import { getCurrentUserId } from '@/utils/auth'
 import { dateFormatter } from '@/utils/formatTime'
 import KnowledgeLibraryForm from './KnowledgeLibraryForm.vue'
+import KnowledgeFolderImport from '../importing/KnowledgeFolderImport.vue'
+import { checkPermi } from '@/utils/permission'
 import KnowledgeGroupForm from './KnowledgeGroupForm.vue'
 import KnowledgeGroupManageDialog from './KnowledgeGroupManageDialog.vue'
 import { PmsKnowledgeGroupType, PmsKnowledgeObjectType } from '@/views/pms/kb/utils/constants'
@@ -192,6 +203,7 @@ const queryParams = reactive({
   groupId: undefined as number | undefined
 }) // 查询参数
 const queryFormRef = ref() // 查询表单 Ref
+const folderImportRef = ref<InstanceType<typeof KnowledgeFolderImport>>()
 const formRef = ref<InstanceType<typeof KnowledgeLibraryForm>>() // 表单 Ref
 const groupFormRef = ref<InstanceType<typeof KnowledgeGroupForm>>() // 分组表单 Ref
 const groupManageRef = ref<InstanceType<typeof KnowledgeGroupManageDialog>>() // 分组管理 Ref

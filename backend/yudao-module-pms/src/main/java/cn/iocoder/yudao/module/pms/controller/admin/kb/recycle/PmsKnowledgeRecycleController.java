@@ -48,6 +48,7 @@ public class PmsKnowledgeRecycleController {
 
     @Resource
     private PmsKnowledgeDocumentService documentService;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @GetMapping("/library-list")
     @Operation(summary = "获得已删除知识库列表")
@@ -86,7 +87,7 @@ public class PmsKnowledgeRecycleController {
             @RequestParam(value = "entityId", required = false) Long entityId) {
         PmsKnowledgeDocumentDO document = recycleService.getContentRecyclePreview(id, entityId, getLoginUserId());
         return success(BeanUtils.toBean(document, PmsKnowledgeRecyclePreviewRespVO.class,
-                o -> o.setName(document.getTitle())));
+                o -> o.setName(document.getTitle()).setAttachments(attachments.list(document.getId()))));
     }
 
     @PutMapping("/restore")

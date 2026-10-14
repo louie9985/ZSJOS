@@ -37,8 +37,9 @@ public class CourseCalendarEventService {
     private List<CourseCalendarRespVO> toResponses(List<CourseCalendarEventDO> rows) {
         if (rows.isEmpty()) return List.of();
         var names = creatorNames.resolve(rows);
+        var metadata = attachments.metadata(rows.stream().map(CourseCalendarEventDO::getAttachmentIdsJson).toList());
         return rows.stream().map(row -> {
-            var response = toResp(row);
+            var response = toResp(row, metadata);
             response.setCreatorName(names.get(row.getCreator()));
             return response;
         }).toList();
@@ -101,5 +102,5 @@ public class CourseCalendarEventService {
     private void validate(CourseCalendarSaveReqVO req) { if (req.getEndTime().isBefore(req.getStartTime())) throw exception(COURSE_CALENDAR_TIME_INVALID); }
     private String resolveDict(String value) { return dictDataApi.getDictDataList(DICT_TYPE).stream().filter(x -> Objects.equals(x.getValue(), value)).findFirst().map(x -> x.getLabel()).orElseThrow(() -> exception(COURSE_CALENDAR_FORM_INVALID)); }
     private CourseCalendarEventDO require(Long id) { CourseCalendarEventDO row=mapper.selectById(id); if(row==null) throw exception(COURSE_CALENDAR_NOT_EXISTS); return row; }
-    private CourseCalendarRespVO toResp(CourseCalendarEventDO row) { CourseCalendarRespVO v=BeanUtils.toBean(row, CourseCalendarRespVO.class); v.setAttachmentIds(row.getAttachmentIdsJson()==null?List.of():JsonUtils.parseArray(row.getAttachmentIdsJson(), Long.class)); v.setAttachments(attachments.describe(row.getAttachmentIdsJson())); v.setCalendarVersion(row.getCalendarVersion() == null ? 1 : row.getCalendarVersion()); return v; }
+    private CourseCalendarRespVO toResp(CourseCalendarEventDO row, Map<Long, cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO> metadata) { CourseCalendarRespVO v=BeanUtils.toBean(row, CourseCalendarRespVO.class); v.setAttachmentIds(row.getAttachmentIdsJson()==null?List.of():JsonUtils.parseArray(row.getAttachmentIdsJson(), Long.class)); v.setAttachments(attachments.describe(row.getAttachmentIdsJson(), metadata)); v.setCalendarVersion(row.getCalendarVersion() == null ? 1 : row.getCalendarVersion()); return v; }
 }

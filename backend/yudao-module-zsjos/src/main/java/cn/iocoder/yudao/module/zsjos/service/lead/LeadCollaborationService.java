@@ -28,10 +28,7 @@ public class LeadCollaborationService {
     @Resource private LeadMapper leadMapper;
 
     public OperationContext requireCanOperateForUpdate(LeadDO lead, Long operatorUserId) {
-        if (Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
-            lockCollaborationRows(lead.getId(), operatorUserId, lead.getOwnerUserId());
-            return OperationContext.owner(lead.getOwnerUserId());
-        }
+        if (operatorUserId == null) throw exception(LEAD_PERMISSION_DENIED);
         var cycle = agingPoolService.getActiveCycle(lead.getId());
         var manual = publicSeaRecordMapper.selectByLeadIdForUpdate(
                 lead.getId(), TenantContextHolder.getRequiredTenantId());
@@ -45,6 +42,9 @@ public class LeadCollaborationService {
         if (manual != null && Objects.equals(manual.getOwnerUserId(), lead.getOwnerUserId())
                 && Objects.equals(manual.getCollaboratorUserId(), operatorUserId)) {
             return new OperationContext(true, "manual_public_sea", lead.getOwnerUserId());
+        }
+        if (manual == null && Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
+            return OperationContext.owner(lead.getOwnerUserId());
         }
         throw exception(LEAD_PERMISSION_DENIED);
     }
@@ -66,13 +66,4 @@ public class LeadCollaborationService {
         throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT);
     }
 
-    private void lockCollaborationRows(Long leadId, Long operatorUserId, Long ownerUserId) {
-        var cycle = agingPoolService.getActiveCycle(leadId);
-        if (cycle != null) {
-            agingPoolService.requireCanOperateForUpdate(leadId, ownerUserId, operatorUserId);
-        }
-        var manual = publicSeaRecordMapper.selectByLeadIdForUpdate(
-                leadId, TenantContextHolder.getRequiredTenantId());
-        if (cycle != null && manual != null) throw exception(LEAD_COLLABORATION_POOL_CONFLICT);
-    }
 }

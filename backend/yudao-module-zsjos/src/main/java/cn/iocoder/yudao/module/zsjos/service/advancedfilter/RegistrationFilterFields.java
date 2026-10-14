@@ -10,7 +10,7 @@ final class RegistrationFilterFields {
     private RegistrationFilterFields() {}
 
     static void register(Map<String, Field> result) {
-        add(result, select(Sensitivity.STANDARD, "registration.status", STATUS, "履约状态", options(RegistrationConstants.STATUS_PENDING, "待处理", RegistrationConstants.STATUS_PROCESSING, "处理中", RegistrationConstants.STATUS_COMPLETED, "已完成", RegistrationConstants.STATUS_CANCELLED, "已取消"), bind("registration", "rc.status", null)));
+        add(result, select(Sensitivity.STANDARD, "registration.status", STATUS, "履约状态", options(RegistrationConstants.STATUS_PENDING, "待处理", RegistrationConstants.STATUS_PROCESSING, "处理中", RegistrationConstants.STATUS_COMPLETED, "已完成", RegistrationConstants.STATUS_CANCELLED, "已取消", RegistrationConstants.STATUS_ENDED, "已结束（无需交付）"), bind("registration", "rc.status", null)));
         add(result, selectSource(Sensitivity.PERSONAL, "registration.plannerUserId", PEOPLE, "学习规划师", "visible-users", bind("registration", "rc.study_planner_user_id", null)));
         add(result, date(Sensitivity.STANDARD, "registration.approvedAt", TIME, "报名审核时间", bind("registration", "rc.registration_approved_at", null)));
         add(result, date(Sensitivity.STANDARD, "registration.completedAt", TIME, "履约完成时间", bind("registration", "rc.completed_at", null)));

@@ -32,6 +32,15 @@
       <el-descriptions-item label="入职时间">
         {{ formatHrmDateTime(employee.entryTime) }}
       </el-descriptions-item>
+      <el-descriptions-item label="试岗期">
+        {{ employee.trialDays != null ? `${employee.trialDays} 天` : '-' }}
+      </el-descriptions-item>
+      <el-descriptions-item label="试岗结束日期">{{
+        formatHrmDateTime(employee.plannedTrialEndTime)
+      }}</el-descriptions-item>
+      <el-descriptions-item label="实际结束试岗日期">{{
+        formatHrmDateTime(employee.actualTrialEndTime)
+      }}</el-descriptions-item>
       <el-descriptions-item label="试用期">
         {{ employee.probation != null ? `${employee.probation} 个月` : '-' }}
       </el-descriptions-item>
@@ -64,7 +73,7 @@
         {{ formatHrmDateTime(employee.companyAgeStartTime) }}
       </el-descriptions-item>
       <el-descriptions-item label="司龄">
-        {{ employee.companyAge != null ? `${employee.companyAge} 年` : '-' }}
+        {{ employee.companyAge != null ? `${Number(employee.companyAge).toFixed(2)} 年` : '-' }}
       </el-descriptions-item>
     </el-descriptions>
   </ContentWrap>

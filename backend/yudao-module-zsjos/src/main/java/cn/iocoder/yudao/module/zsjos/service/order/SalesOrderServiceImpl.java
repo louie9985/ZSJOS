@@ -704,7 +704,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                         StrUtil.blankToDefault(reqVO.getKeyword(), null))
                 : searchProcessIds(reqVO.getKeyword());
         }
-        if (processIds != null && processIds.isEmpty()) return PageResult.empty();
+        // Imported approval rounds may have no BPM instance. An empty match is not an absent filter.
+        if (processIds != null) {
+            processIds = processIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList();
+            if (processIds.isEmpty()) return PageResult.empty();
+        }
         List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
         List<OrderTaskContext> contexts = new ArrayList<>();
         for (BpmTaskRespDTO task : tasks) {

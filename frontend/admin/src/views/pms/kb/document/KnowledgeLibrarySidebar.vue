@@ -53,18 +53,23 @@
       @node-click="emit('node-click', $event)"
     >
       <template #default="{ data }">
-        <div class="group flex min-w-0 items-center gap-6px">
-          <Icon :icon="getKnowledgeTreeNodeIcon(data)" />
-          <span class="min-w-0 flex-1 truncate">{{ data.label }}</span>
+        <div class="knowledge-tree-row group flex min-w-0 flex-1 items-center gap-6px">
+          <Icon class="shrink-0" :icon="getKnowledgeTreeNodeIcon(data)" />
+          <KnowledgeTreeLabel :label="data.label" />
           <el-dropdown
             v-if="
               canEditKnowledgeContent(data.currentUserLevel) ||
               canDeleteKnowledgeContent(data.currentUserLevel)
             "
             trigger="click"
+            class="knowledge-tree-actions shrink-0"
             @command="emit('node-action', data, $event)"
           >
-            <el-button class="!h-24px !w-24px opacity-0 group-hover:opacity-100" link @click.stop
+            <el-button
+              class="knowledge-tree-action !h-24px !w-24px"
+              aria-label="内容操作"
+              link
+              @click.stop
               ><Icon icon="ep:more-filled"
             /></el-button>
             <template #dropdown>
@@ -137,7 +142,9 @@
 </template>
 
 <script lang="ts" setup>
+import { computed, nextTick, ref, watch } from 'vue'
 import type { ElTree } from 'element-plus'
+import KnowledgeTreeLabel from './KnowledgeTreeLabel.vue'
 import {
   getKnowledgeTreeNodeIcon,
   type KnowledgeContentView,
@@ -179,6 +186,24 @@ watch([() => props.currentNodeKey, () => props.treeData], () => {
 .knowledge-sidebar-tree {
   padding-right: 8px;
   background-color: transparent;
+}
+
+.knowledge-tree-row {
+  overflow: hidden;
+}
+
+.knowledge-tree-actions {
+  width: 24px;
+}
+
+.knowledge-tree-action {
+  opacity: 0;
+}
+
+.knowledge-tree-row:hover .knowledge-tree-action,
+.knowledge-tree-row:focus-within .knowledge-tree-action,
+:deep(.el-tree-node:focus > .el-tree-node__content .knowledge-tree-action) {
+  opacity: 1;
 }
 
 :deep(.el-tree-node__content) {

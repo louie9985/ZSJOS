@@ -669,12 +669,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     private List<LeadAppealRespVO.EvidenceVO> toEvidenceVO(String json) {
         List<EvidenceRef> refs = parseEvidence(json);
-        Map<Long, String> urls = refs.isEmpty() ? Map.of() : fileApi.presignGetUrls(
-                refs.stream().map(EvidenceRef::getInfraFileId).filter(Objects::nonNull).toList(),
-                ATTACHMENT_URL_EXPIRATION_SECONDS);
+        List<Long> ids = refs.stream().map(EvidenceRef::getInfraFileId).filter(Objects::nonNull).toList();
+        Map<Long, String> urls = ids.isEmpty() ? Map.of()
+                : fileApi.presignGetUrls(ids, ATTACHMENT_URL_EXPIRATION_SECONDS);
         return refs.stream().map(ref -> {
             LeadAppealRespVO.EvidenceVO vo = new LeadAppealRespVO.EvidenceVO();
-            vo.setInfraFileId(ref.getInfraFileId()); vo.setFileUrl(urls.getOrDefault(ref.getInfraFileId(), ref.getFileUrl()));
+            vo.setInfraFileId(ref.getInfraFileId());
+            // Historical URLs cannot establish that a file is still available to the current caller.
+            vo.setFileUrl(ref.getInfraFileId() == null ? null : urls.get(ref.getInfraFileId()));
             vo.setOriginalName(ref.getOriginalName()); vo.setContentType(ref.getContentType());
             vo.setFileSize(ref.getFileSize()); vo.setSort(ref.getSort()); return vo;
         }).toList();

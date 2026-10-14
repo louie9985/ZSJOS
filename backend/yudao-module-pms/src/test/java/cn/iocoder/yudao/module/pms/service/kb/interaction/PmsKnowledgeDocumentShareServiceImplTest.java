@@ -44,6 +44,7 @@ import static org.mockito.Mockito.when;
 @Import({PmsKnowledgeDocumentShareServiceImpl.class, PmsKnowledgeShareUrl.class})
 @org.springframework.test.context.TestPropertySource(properties = "pms.knowledge-share.public-base-url=https://public.example.com")
 public class PmsKnowledgeDocumentShareServiceImplTest extends BaseDbUnitTest {
+    @MockitoBean private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @Resource
     private PmsKnowledgeDocumentShareServiceImpl documentShareService;

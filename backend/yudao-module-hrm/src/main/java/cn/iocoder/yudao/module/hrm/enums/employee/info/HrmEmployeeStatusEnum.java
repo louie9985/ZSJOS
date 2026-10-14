@@ -25,7 +25,8 @@ public enum HrmEmployeeStatusEnum implements ArrayValuable<Integer> {
     LABOR(5, HrmEmployeeTypeEnum.INFORMAL.getType(), "劳务"),
     CONSULTANT(6, HrmEmployeeTypeEnum.INFORMAL.getType(), "顾问"),
     REHIRE(7, HrmEmployeeTypeEnum.INFORMAL.getType(), "返聘"),
-    OUTSOURCE(8, HrmEmployeeTypeEnum.INFORMAL.getType(), "外包");
+    OUTSOURCE(8, HrmEmployeeTypeEnum.INFORMAL.getType(), "外包"),
+    TRIAL(9, HrmEmployeeTypeEnum.INFORMAL.getType(), "试岗");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(HrmEmployeeStatusEnum::getStatus).toArray(Integer[]::new);
@@ -41,14 +42,14 @@ public enum HrmEmployeeStatusEnum implements ArrayValuable<Integer> {
      */
     public static final Set<Integer> INFORMAL_STATUSES = SetUtils.asSet(
             INTERN.getStatus(), PART_TIME.getStatus(), LABOR.getStatus(),
-            CONSULTANT.getStatus(), REHIRE.getStatus(), OUTSOURCE.getStatus());
+            CONSULTANT.getStatus(), REHIRE.getStatus(), OUTSOURCE.getStatus(), TRIAL.getStatus());
 
     /**
      * 可转为全职的员工状态集合
      */
     public static final Set<Integer> CONVERTIBLE_TO_FULL_TIME_STATUSES = SetUtils.asSet(
             INTERN.getStatus(), PART_TIME.getStatus(), LABOR.getStatus(),
-            CONSULTANT.getStatus(), REHIRE.getStatus(), OUTSOURCE.getStatus());
+            CONSULTANT.getStatus(), REHIRE.getStatus(), OUTSOURCE.getStatus(), TRIAL.getStatus());
 
     /**
      * 状态

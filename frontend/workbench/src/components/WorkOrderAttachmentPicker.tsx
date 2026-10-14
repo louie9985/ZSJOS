@@ -1,6 +1,6 @@
 import AttachmentCard from './AttachmentCard'
 import { DeleteOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
-import { Button, List, Space, Upload, message, type UploadProps } from 'antd'
+import { Button, List, Space, Typography, Upload, message, type UploadProps } from 'antd'
 import { useRef } from 'react'
 import { workOrderApi, type WorkOrderFile } from '../services/workOrderApi'
 import { useClipboardPasteTarget } from './ClipboardPasteTarget'
@@ -49,6 +49,7 @@ export default function WorkOrderAttachmentPicker({ value = [], onChange = () =>
       </Upload>
       <Button {...pasteButtonProps} icon={<PictureOutlined />}>上传剪贴板截图</Button>
     </div>
+    <Typography.Text type="secondary">单个附件不超过100MB；上传繁忙时请稍后重试</Typography.Text>
     {value.length > 0 && <List size="small" dataSource={value} renderItem={file => <List.Item actions={[<Button key="remove" type="text" danger icon={<DeleteOutlined />} aria-label={`删除 ${file.name}`} onClick={() => { filesRef.current = filesRef.current.filter(item => item.id !== file.id); onChange(filesRef.current) }} />]}><AttachmentCard key={file.id} name={file.name} load={async () => file} /></List.Item>} />}
   </Space></div>
 }

@@ -414,7 +414,8 @@ public class HrmEmployeeController {
                 vo.setAge(getYearsBetween(vo.getBirthday().toLocalDate(), today));
             }
             if (vo.getCompanyAgeStartTime() != null) {
-                vo.setCompanyAge(getYearsBetween(vo.getCompanyAgeStartTime().toLocalDate(), today));
+                vo.setCompanyAge(cn.iocoder.yudao.module.hrm.service.employee.info.HrmCompanyAge.calculate(
+                        vo.getCompanyAgeStartTime().toLocalDate(), vo.getLeaveTime() == null ? today : vo.getLeaveTime().toLocalDate()));
             }
         });
     }

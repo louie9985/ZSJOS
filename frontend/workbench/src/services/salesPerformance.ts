@@ -25,8 +25,7 @@ export type OrderDetailResponse = { list: OrderDetailRow[]; total: number; asOf:
 export type ConversionRow = { leadId: number; leadNo: string | null; categoryKey: string; categoryLabel: string; channelKey: string; channelLabel: string; populationKind: string; receivedAt: string | null; converted: boolean; order: { id: number; number: string | null; submittedAt: string; amount: number; products: { key: string; ref: string | null; label: string; snapshot: string | null }[] } | null }
 export type ConversionResponse = { list: ConversionRow[]; total: number; asOf: string; start: string; end: string; summary: Pick<Metric, 'converted' | 'denominator' | 'rate' | 'sourceStatus' | 'sourceReviewCount'>; options: { conversionStatus: ConversionOption[]; populationKind: ConversionOption[]; categories: ConversionOption[]; channels: ConversionOption[]; products: ConversionOption[] } }
 export type HistoryMonth = { month: number; amount: number | null; previousAmount: number | null; start: string; end: string; previousStart: string; previousEnd: string; future: boolean }
-const BASE = '/zsjos/sales-performance'
-const TARGET = '/zsjos/sales-performance-target'
+
 const timestampFields = new Set(['start', 'end', 'asOf', 'attributionAvailableSince', 'occurredAt', 'submittedAt', 'at', 'receivedAt', 'dueAt', 'previousStart', 'previousEnd'])
 const timestampFormatter = new Intl.DateTimeFormat('en-GB', {
  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -50,7 +49,10 @@ async function get<T>(path: string, params?: object, signal?: AbortSignal): Prom
  const response = await http.get<unknown>(path, { params, signal })
  return normalizePerformanceDates(unwrap<unknown>(response)) as T
 }
-export const performanceApi = {
+export function createPerformanceApi(domain: 'sales' | 'delivery') {
+const BASE = `/zsjos/${domain}-performance`
+const TARGET = `/zsjos/${domain}-performance-target`
+return {
  tree: (targets = false, signal?: AbortSignal) => get<OrgNode[]>(`${targets ? TARGET : BASE}/tree`, undefined, signal),
  overview: (query: Query, signal?: AbortSignal) => get<Overview>(`${BASE}/overview`, query, signal),
  analysis: (query: Query, signal?: AbortSignal) => get<Analysis>(`${BASE}/analysis`, query, signal),
@@ -69,6 +71,9 @@ export const performanceApi = {
  saveOrg: async (value: { deptId: number; centerId: number; kind: string }) => unwrap<boolean>(await http.put(`${TARGET}/organization`, value)),
  revisions: (id: number) => get<{ id: number; reason: string; before: string; after: string; operatorName: string; at: string }[]>(`${TARGET}/history`, { id })
 }
+}
+export const performanceApi = createPerformanceApi('sales')
+export const deliveryPerformanceApi = createPerformanceApi('delivery')
 export const money = (value?: number | null) => value == null ? '—' : new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value)
 export const percent = (value?: number | null) => value == null ? '—' : `${(value * 100).toFixed(2)}%`
 export function dateText(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` }
@@ -84,7 +89,7 @@ export function periodRange(key: string, now = new Date()): { start: string; end
 }
 
 export function averageFormula(metric: Metric) { return `${money(metric.averageAmount)} ÷ ${metric.averageOrders} 笔 = ${money(metric.average)} / 笔（剔除整单 0 和 0.01）` }
-export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售、教务自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（当月新接有效客资中当月成交数＋往期接收60日内于当月成交数）÷（当月新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
+export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售、教务自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（本周期新接有效客资中本周期成交数＋往期接收60日内于本周期成交数）÷（本周期新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
 
 export const sourceReviewRequired = (metric: Pick<Metric, 'sourceStatus'>) => metric.sourceStatus === 'review_required'
 export const conversionSummary = (metric: Pick<Metric, 'converted' | 'denominator' | 'sourceStatus' | 'sourceReviewCount'>) => sourceReviewRequired(metric)

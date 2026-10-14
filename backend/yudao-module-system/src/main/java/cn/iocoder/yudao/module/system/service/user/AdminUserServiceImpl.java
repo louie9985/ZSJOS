@@ -616,6 +616,13 @@ public class AdminUserServiceImpl implements AdminUserService {
         AtomicInteger index = new AtomicInteger(1);
         importUsers.forEach(importUser -> {
             int currentIndex = index.getAndIncrement();
+            // The shared mobile validator accepts country prefixes; the user column stores 11 digits.
+            String mobile = importUser.getMobile();
+            if (mobile != null && !mobile.isEmpty() && !mobile.matches("[0-9]{11}")) {
+                String key = StrUtil.blankToDefault(importUser.getUsername(), "第 " + currentIndex + " 行");
+                respVO.getFailureUsernames().put(key, "手机号码必须为11位数字，不接受国家区号前缀");
+                return;
+            }
             // 2.1.1 校验字段是否符合要求
             try {
                 ValidationUtils.validate(BeanUtils.toBean(importUser, UserSaveReqVO.class).setPassword(initPassword));

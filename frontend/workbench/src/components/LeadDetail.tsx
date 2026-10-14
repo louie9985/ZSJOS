@@ -197,7 +197,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     if (!loadsCandidates) return
     setQualificationCandidatesLoading(true)
     try { setQualificationCandidates(managerMode || supervisorAction
-      ? await api.subordinateTransferCandidates()
+      ? await api.subordinateTransferCandidates(action === 'transfer' ? lead.id : undefined)
       : actions.has('OWNER_TRANSFER') ? await api.ownerTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }

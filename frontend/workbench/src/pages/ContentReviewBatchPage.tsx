@@ -109,8 +109,8 @@ export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBa
       </div>
       <div><dt>责任运营</dt><dd>{badge(snapshot.operatorName ? `${snapshot.operatorName}${snapshot.operatorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'blue')}</dd></div>
       <div><dt>责任编导</dt><dd>{badge(snapshot.directorName ? `${snapshot.directorName}${snapshot.directorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'purple')}</dd></div>
-      <div><dt>当前期段</dt><dd>{badge(snapshot.sStageLabel ?? snapshot.stageLabelSnapshot ?? snapshot.sStage, 'geekblue')}</dd></div>
-      <div><dt>账号状态</dt><dd>{badge(snapshot.currentStatusLabel ?? snapshot.currentStatusLabelSnapshot ?? snapshot.currentStatusValue, 'cyan')}</dd></div>
+      <div><dt>当前期段</dt><dd>{badge(snapshot.sStageLabel || snapshot.stageLabelSnapshot || '未记录', 'geekblue')}</dd></div>
+      <div><dt>账号状态</dt><dd>{badge(snapshot.currentStatusLabel || snapshot.currentStatusLabelSnapshot || '未记录', 'cyan')}</dd></div>
       <div className="content-review-profile-background"><details open><summary>运营背景与账号信息</summary><dl>
         <div><dt>平台账号</dt><dd>{badge(snapshot.platformAccountId, 'cyan')}</dd></div>
         <div><dt>承接产品目标</dt><dd>{badge(snapshot.productGoal, 'cyan')}</dd></div>
@@ -270,7 +270,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         </div>)} />}
       <Typography.Paragraph type="secondary">保存修改不会发起审批；点击重新提交审批会保存修改并直接发起新一轮审批。明确失败时可修正后重试；结果待确认时先查询批次状态。</Typography.Paragraph>
       {optionsError && <Alert type="error" showIcon message={optionsError} action={<Button onClick={() => void loadOptions()}>重试</Button>} />}
-      <ContentApprovalDraft optionsLoading={optionsLoading} onReloadOptions={() => void loadOptions()} disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
+      <ContentApprovalDraft batchId={batch.id} studentPersonId={batch.studentPersonId} optionsLoading={optionsLoading} onReloadOptions={() => void loadOptions()} disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
     </Form>
   </Modal>
 }

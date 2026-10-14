@@ -45,7 +45,7 @@
         prop="homeroomUserNameSnapshot"
         min-width="120"
       /><el-table-column label="归属部门" prop="deptNameSnapshot" min-width="120" /><el-table-column
-        label="人数"
+        label="服务学员数"
         prop="studentCount"
         width="80"
       />

@@ -6,6 +6,22 @@ import java.math.BigDecimal;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class PerformanceCalculationTest {
+ @Test void lastWeekCalendarBoundaries(){
+  for(String[] pair:List.of(new String[]{"2026-10-14T12:00","2026-10-05"},new String[]{"2026-10-05T00:00","2026-09-28"},new String[]{"2026-01-05T00:00","2025-12-29"})){
+   var w=PerformancePeriods.window("lastWeek",LocalDateTime.parse(pair[0]));
+   assertEquals(LocalDate.parse(pair[1]).atStartOfDay(),w.start());assertEquals(w.start().plusWeeks(1),w.end());
+   assertTrue(w.contains(w.start()));assertTrue(w.contains(w.end().minusNanos(1)));assertFalse(w.contains(w.end()));
+  }
+ }
+ @Test void lastWeekPopulationRetainsThresholdAndValidityAndExcludesThisWeek(){
+  var w=PerformancePeriods.window("lastWeek",LocalDateTime.of(2026,10,14,12,0));var fresh=w.start().plusHours(1);var old=fresh.minusDays(20);
+  var orders=List.of(order(1,"1280",fresh,fresh.plusHours(1),"first_purchase"),order(2,"1280",old,fresh.plusDays(1),"first_purchase"),order(3,"1279.99",fresh,fresh.plusDays(1),"first_purchase"),order(4,"1280",fresh,w.end(),"first_purchase"),order(5,"1280",fresh.minusDays(60),fresh,"first_purchase"));
+  var receipts=List.of(receipt(1,fresh),receipt(2,old),receipt(3,fresh),receipt(4,fresh),receipt(5,fresh.minusDays(60)));
+  var m=PerformanceStatisticsService.metric(w,orders,receipts);
+  assertEquals(2,m.converted());assertEquals(4,m.denominator());assertEquals(new BigDecimal("0.500000"),m.rate());
+  var population=PerformanceConversion.population(w,orders,receipts);assertEquals(4,population.size());assertEquals(2,population.values().stream().filter(r->r.order()!=null).count());
+  assertNull(PerformanceStatisticsService.metric(w,List.of(),List.of()).rate());
+ }
  private PerformanceFact order(long lead,String amount,LocalDateTime received,LocalDateTime submitted,String type){var f=new PerformanceFact();f.setLeadId(lead);f.setAmount(new BigDecimal(amount));f.setReceivedAt(received);f.setOccurredAt(submitted);f.setOrderType(type);return f;}
  private PerformanceFact receipt(long lead,LocalDateTime at){var f=new PerformanceFact();f.setLeadId(lead);f.setReceivedAt(at);f.setStatus("valid");return f;}
  @Test void windowBoundaries(){var n=LocalDateTime.of(2026,1,1,12,0);assertEquals(LocalDate.of(2025,12,29),PerformancePeriods.window("week",n).start().toLocalDate());assertEquals(n.toLocalDate().minusDays(6),PerformancePeriods.window("last7",n).start().toLocalDate());assertEquals(LocalDate.of(2025,12,1),PerformancePeriods.window("lastMonth",n).start().toLocalDate());assertEquals(LocalDate.of(2024,2,1),PerformancePeriods.window("month",LocalDateTime.of(2024,2,29,12,0)).start().toLocalDate());}

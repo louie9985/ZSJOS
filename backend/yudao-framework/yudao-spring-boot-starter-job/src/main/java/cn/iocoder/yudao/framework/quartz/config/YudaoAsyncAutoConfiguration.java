@@ -3,6 +3,7 @@ package cn.iocoder.yudao.framework.quartz.config;
 import com.alibaba.ttl.TtlRunnable;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -18,6 +19,16 @@ import java.util.Arrays;
 @AutoConfiguration
 @EnableAsync
 public class YudaoAsyncAutoConfiguration {
+
+    @Bean
+    public static BeanFactoryPostProcessor defaultAsyncExecutorAlias() {
+        return beanFactory -> {
+            // Run after definition registration; never replace an explicitly configured default.
+            if (beanFactory.containsBean("applicationTaskExecutor") && !beanFactory.containsBean("taskExecutor")) {
+                beanFactory.registerAlias("applicationTaskExecutor", "taskExecutor");
+            }
+        };
+    }
 
     @Bean
     public BeanPostProcessor threadPoolTaskExecutorBeanPostProcessor(ObjectProvider<ExecutionAuditHook> hookProvider) {

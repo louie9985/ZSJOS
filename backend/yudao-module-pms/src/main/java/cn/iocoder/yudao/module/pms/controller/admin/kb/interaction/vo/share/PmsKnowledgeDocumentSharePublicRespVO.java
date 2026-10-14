@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Schema(description = "PMS 知识库文档公开分享 Response VO")
 @Data
 public class PmsKnowledgeDocumentSharePublicRespVO {
+    private java.util.List<cn.iocoder.yudao.module.pms.controller.admin.kb.content.vo.document.PmsKnowledgeAttachmentRespVO> attachments;
 
     @Schema(description = "文档编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;
