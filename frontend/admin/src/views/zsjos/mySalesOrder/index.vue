@@ -24,6 +24,7 @@
         <el-option label="已通过" value="effective" />
         <el-option label="已被重提" value="superseded" />
         <el-option label="已终止" value="terminated" />
+        <el-option label="已作废" value="voided" />
       </el-select>
       <el-button type="primary" @click="reload">查询</el-button>
       <el-button @click="resetQuery(reload)">重置</el-button>
@@ -41,7 +42,7 @@
         <el-descriptions-item label="订单号">{{ detail.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
         <el-descriptions-item label="学员">{{ detail.studentName }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ detail.status === 'voided' ? '已作废' : detail.status }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ detail.totalAmount }}</el-descriptions-item>
         <el-descriptions-item label="审批轮次">{{ detail.approvalRoundNo }}</el-descriptions-item>
         <el-descriptions-item label="驳回/终止原因">{{
@@ -53,6 +54,7 @@
     </div>
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
+      <SalesOrderVoidButton v-if="detail" :order="detail" @success="loadDetail(); reloadList()" />
       <el-button
         v-if="detail?.canRevise"
         v-hasPermi="['zsjos:sales-order:create']"
@@ -134,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import SalesOrderVoidButton from '../components/SalesOrderVoidButton.vue'
 import { getSimpleDictDataList } from '@/api/system/dict/dict.data'
 import OrderProductSummary from '../components/OrderProductSummary.vue'
 import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'

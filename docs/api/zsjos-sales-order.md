@@ -209,3 +209,7 @@ Vue Admin 的 `ExternalRepurchaseDialog.vue` 直接调用外部复购订单接�
 对象缺失或 null 表示历史未记录；存在但 employeeUserId 为空表示提交时未分配；有员工 ID 但无姓名时展示姓名未记录。历史订单不补数据，读取不查询当前关系。兼职后续转归属、员工改名不改变原订单；新后继订单重新采集，原审批轮次不重写。
 
 详情通过 `leadProfile.partnerOwnerSnapshot` 返回，列表通过 `partnerOwnerSnapshot` 返回同一快照，并补充 `leadSourceType` 供客户端按来源判断。Workbench 列表卡片、订单表格、详情及 Admin 既有订单表格和详情显示“兼职归属新媒体员工”；非兼职来源列表显示“—”，详情隐藏。仅复用既有 JSON 存储，无数据库列、迁移、回填或权限变更。
+
+## 财务作废已通过订单
+
+新增 `PUT /zsjos/sales-order/{id}/void`，权限 `zsjos:sales-order:void` 且必须属于配置的财务中心。请求包含 `orderVersion/reason/idempotencyKey`。详情新增 `canVoid/voidReason/voidedByUserId/voidedAt`，列表、筛选、审批页及财务导出支持 `voided`。原审批历史保留，相关返现、礼品采购及资金分配失效，报名和服务保持不变；满足条件后销售重新录单。见[完整边界与部署](../operations/sales-order-void.md)。

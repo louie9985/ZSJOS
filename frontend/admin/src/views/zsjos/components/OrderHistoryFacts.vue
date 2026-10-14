@@ -1,4 +1,5 @@
 <template>
+  <el-alert v-if="order.status === 'voided'" type="warning" :closable="false" title="订单已作废，不计入业绩" :description="String(order.voidReason || '原报名及服务保持不变')" />
   <el-descriptions :column="1" border class="mt-12px">
     <el-descriptions-item v-for="field in fields" :key="field.key" :label="field.label">
       {{ order[field.key] || '历史未记录' }}

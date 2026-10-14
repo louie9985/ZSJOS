@@ -69,6 +69,9 @@ public class SalesOrderDO extends TenantBaseDO {
     private String submissionRequestFingerprint;
     private String repurchaseReason;
     private String terminationReason;
+    private String voidReason;
+    private Long voidedByUserId;
+    private LocalDateTime voidedAt;
     private LocalDateTime terminatedAt;
     private Integer version;
 }

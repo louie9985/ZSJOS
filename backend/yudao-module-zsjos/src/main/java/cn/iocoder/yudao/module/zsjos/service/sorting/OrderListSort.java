@@ -9,7 +9,7 @@ public final class OrderListSort {
         return new BusinessListSort<SalesOrderListItemRespVO>(SalesOrderListItemRespVO::getId)
                 .field("orderNo", SalesOrderListItemRespVO::getOrderNo)
                 .field("orderType", row -> label(Map.of("first_purchase", "首购", "repurchase", "复购"), row.getOrderType(), "未知类型"))
-                .field("status", row -> label(Map.of("pending_approval", "待审核", "revision_required", "已驳回待修改", "effective", "已通过", "superseded", "已被重提", "terminated", "已终止"), row.getStatus(), "未知状态"))
+                .field("status", row -> label(Map.of("pending_approval", "待审核", "revision_required", "已驳回待修改", "effective", "已通过", "superseded", "已被重提", "terminated", "已终止", "voided", "已作废"), row.getStatus(), "未知状态"))
                 .field("approvalRoundNo", SalesOrderListItemRespVO::getApprovalRoundNo)
                 .field("taskDefinitionKey", row -> label(Map.of("registrationReview", "报名履约中心", "financeReview", "财务结算中心"), row.getTaskDefinitionKey(), null))
                 .field("taskStatus", row -> row.getTaskStatus() == null ? null : Map.of(0,"待审批",1,"审批中",2,"已通过",3,"已拒绝",4,"已取消",5,"已退回",7,"通过中").getOrDefault(row.getTaskStatus(), "未知状态"))

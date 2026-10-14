@@ -4742,6 +4742,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_opportunity_follow_up_image` (
 
 -- zsjos_order
 CREATE TABLE IF NOT EXISTS `zsjos_order` (
+  `voided_at` datetime NULL COMMENT '作废时间',
+  `voided_by_user_id` bigint NULL COMMENT '作废操作人',
+  `void_reason` varchar(1000) NULL COMMENT '作废原因',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单编号',
   `order_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单业务编号',
   `lead_id` bigint DEFAULT NULL COMMENT '首购来源客资编号；复购为空',
@@ -4894,8 +4897,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_command` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端命令幂等键',
   `order_id` bigint NOT NULL COMMENT '订单编号',
-  `approval_round_id` bigint NOT NULL COMMENT '审批轮次编号',
-  `process_instance_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'BPM 流程实例编号',
+  `approval_round_id` bigint DEFAULT NULL COMMENT '审批轮次编号',
+  `process_instance_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'BPM 流程实例编号',
   `command_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'approve/reject/terminate',
   `task_definition_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '审批节点；终止为空',
   `bpm_task_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'BPM 任务编号；终止为空',
@@ -4955,6 +4958,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_item` (
 
 -- zsjos_order_payment_allocation
 CREATE TABLE IF NOT EXISTS `zsjos_order_payment_allocation` (
+  `voided_at` datetime NULL COMMENT '资金分配失效时间，不代表退款',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单资金分配编号',
   `order_id` bigint NOT NULL COMMENT '订单编号',
   `payment_transaction_id` bigint DEFAULT NULL COMMENT '渠道支付流水编号',

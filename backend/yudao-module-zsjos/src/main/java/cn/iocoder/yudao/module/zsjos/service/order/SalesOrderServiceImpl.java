@@ -667,7 +667,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LeadInboxFilterQuery filter;
         if (reqVO.getOrderState() != null) {
             if (!Set.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
-                    STATUS_TERMINATED, STATUS_SUPERSEDED).contains(reqVO.getOrderState())) {
+                    STATUS_TERMINATED, STATUS_SUPERSEDED, STATUS_VOIDED).contains(reqVO.getOrderState())) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
             // Only the center-pending scope excludes completed work; lifecycle tabs retain both.
@@ -799,6 +799,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_REVISION_REQUIRED, "待重提", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_EFFECTIVE, "已通过", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_TERMINATED, "已终止", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_VOIDED, "已作废", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_SUPERSEDED, "历史旧单（已重提）", null)));
     }
 
@@ -1619,6 +1620,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmitterUserId(order.getSubmitterUserId()); result.setVersion(order.getVersion());
         result.setCurrentApprovalRoundId(order.getCurrentApprovalRoundId()); result.setRepurchaseReason(order.getRepurchaseReason());
         result.setTerminationReason(order.getTerminationReason());
+        result.setVoidReason(currentOrder.getVoidReason()); result.setVoidedAt(currentOrder.getVoidedAt());
+        result.setVoidedByUserId(currentOrder.getVoidedByUserId());
         result.setSupersedesOrderId(order.getSupersedesOrderId()); result.setSupersededByOrderId(order.getSupersededByOrderId());
         result.setBuyerName(order.getBuyerName()); result.setStudentName(order.getStudentName()); result.setStudentNature(order.getStudentNature());
         result.setStudentMobile(order.getStudentMobile()); result.setStudentWechatId(order.getStudentWechatId());
@@ -1670,11 +1673,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             // 迁移进来的历史订单只有订单状态、没有审批轮次（当前 371 条生效订单一律如此）。
             // 这类订单同样查不回节点，若不管，时间线会把两个中心显示成“待处理”。
             // 与轮次已通过的分支走同一套补齐：只补状态，不编造审批人和时间。
-            if (STATUS_EFFECTIVE.equals(order.getStatus())) {
+            if (STATUS_EFFECTIVE.equals(order.getStatus()) || STATUS_VOIDED.equals(order.getStatus())) {
                 backfillCompletedCenters(result);
             }
         }
         if (task != null) { result.setTaskId(task.getId()); result.setApprovalReasonRequired(task.getReasonRequire()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
+        result.setCanVoid(STATUS_EFFECTIVE.equals(order.getStatus()) && permissionService.canVoid(order, userId));
         result.setCanRevise(Set.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED).contains(order.getStatus())
                 && permissionService.canRevise(order, userId));
         result.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus())
@@ -1999,6 +2003,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (row.getFinanceStatus() == null) row.setFinanceStatus(ROUND_APPROVED);
         }
         if (StrUtil.isBlank(row.getFinalReason())) row.setFinalReason(order.getTerminationReason());
+        if (STATUS_VOIDED.equals(order.getStatus())) row.setFinalReason(order.getVoidReason());
         return row;
     }
 

@@ -24,6 +24,8 @@ public interface SalesOrderConstants {
     String STATUS_EFFECTIVE = "effective";
     String STATUS_SUPERSEDED = "superseded";
     String STATUS_TERMINATED = "terminated";
+    String STATUS_VOIDED = "voided";
+    String PERMISSION_VOID = "zsjos:sales-order:void";
     Set<String> ACTIVE_ORDER_STATUSES = Set.of(STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED);
 
     String ROUND_PENDING = "pending";

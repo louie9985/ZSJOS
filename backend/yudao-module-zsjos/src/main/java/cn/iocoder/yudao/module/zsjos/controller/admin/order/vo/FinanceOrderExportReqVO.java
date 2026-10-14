@@ -12,7 +12,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class FinanceOrderExportReqVO extends PageParam {
     @Size(max = 64)
-    @Pattern(regexp = "pending_approval|revision_required|effective|superseded|terminated",
+    @Pattern(regexp = "pending_approval|revision_required|effective|superseded|terminated|voided",
             message = "订单状态不正确")
     private String status;
     @Size(max = 100)

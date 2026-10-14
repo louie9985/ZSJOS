@@ -49,6 +49,7 @@ public class SalesOrderObjectPermissionService {
             case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId)
                     || Objects.equals(order.getFormalSalesUserId(), userId);
             case "review" -> isApprovalPoolMember(userId);
+            case "void" -> canVoid(order, userId);
             default -> false;
         };
         if (!allowed) throw exception(SALES_ORDER_PERMISSION_DENIED);
@@ -89,6 +90,10 @@ public class SalesOrderObjectPermissionService {
         if (belongsTo(config.getRegistrationDeptId(), user.getDeptId())) result.add(TASK_REGISTRATION);
         if (belongsTo(config.getFinanceDeptId(), user.getDeptId())) result.add(TASK_FINANCE);
         return result;
+    }
+
+    public boolean canVoid(SalesOrderDO order, Long userId) {
+        return permissionApi.hasAnyPermissions(userId, PERMISSION_VOID) && isFinanceCenterMember(userId);
     }
 
     public boolean isFinanceCenterMember(Long userId) {

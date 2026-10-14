@@ -851,8 +851,8 @@ class SalesOrderServiceImplTest {
         when(inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER)).thenReturn(config);
         var result = service.getApprovalFilterProfile(20L);
         assertEquals(List.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
-                STATUS_TERMINATED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
-        assertEquals(List.of("全部", "当前中心待审核", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
+                STATUS_TERMINATED, STATUS_VOIDED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
+        assertEquals(List.of("全部", "当前中心待审核", "待审核", "待重提", "已通过", "已终止", "已作废", "历史旧单（已重提）"),
                 result.getOrderStates().stream().map(it -> it.getLabel()).toList());
         assertEquals(List.of(CENTER_REGISTRATION), result.getCenters().stream().map(it -> it.getKey()).toList());
         assertTrue(result.getGroups().isEmpty());

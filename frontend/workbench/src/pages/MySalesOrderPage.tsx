@@ -125,6 +125,7 @@ export default function MySalesOrderPage() {
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
         <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" informationLayout="table"
+          onVoided={() => { reload(); void loadDetail(detail.id) }}
           reloadVouchers={async () => (await api.managementSalesOrder(detail.id)).paymentVouchers}
           onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
           onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
@@ -141,7 +142,7 @@ export default function MySalesOrderPage() {
   return <section className={`workspace-page sales-order-inbox-page${useTableLayout ? ' sales-order-table-page' : ''}`}>
     <div className="sales-order-inbox-actions">
       {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => { setTablePage(1); setStatus(key as StatusTab) }} items={[
-        { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
+        { key: 'all', label: `全部 ${counts.total}` }, { key: 'voided', label: '已作废' }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
         { key: 'revision_required', label: `待重提 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
       ]}/>}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
     </div>

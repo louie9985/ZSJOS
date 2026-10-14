@@ -905,6 +905,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             case STATUS_EFFECTIVE -> "已生效";
             case STATUS_SUPERSEDED -> "已被替代";
             case STATUS_TERMINATED -> "已终止";
+            case cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_VOIDED -> "已作废";
             default -> "未知状态";
         };
     }
