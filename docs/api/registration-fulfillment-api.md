@@ -321,7 +321,3 @@ The media-only `/zsjos/media-students/page` response adds a required `accounts` 
 产品、SKU、分类或考期匹配。新班级可独立命名且不绑定产品，正式班仍须有效班主任；待分班、
 班级状态、租户隔离、保存/完成前的有效性复核保持原契约。WorkBench 与 Admin 调班候选也不按
 产品分类筛选；审批流程与服务归属校验保持不变，详见[班级管理](delivery-class-management.md)。
-
-## 订单作废的边界
-
-财务作废订单不自动取消、迁移原报名任务或已存在服务关系。原单非有效后沿现有校验不能完成报名，公共池可手动结束任务。重新录单按正常流程生成新任务；无需重复交付时教务手动结束新任务，不生成新服务关系。服务期限不因作废或重录自动重置。见[订单作废](../operations/sales-order-void.md)。

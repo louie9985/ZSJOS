@@ -111,7 +111,7 @@ public class FinanceTraceService {
                 source.setStudentName(order.getStudentName()); source.setOrderStatus(order.getStatus()); source.setOrderType(order.getOrderType());
                 source.setOrderStatusLabel(switch (Objects.toString(order.getStatus(), "")) {
                     case "pending_approval" -> "审批中"; case "revision_required" -> "待修改";
-                    case "effective" -> "已生效"; case "superseded" -> "已被接续"; case "terminated" -> "已终止"; case "voided" -> "已作废";
+                    case "effective" -> "已生效"; case "superseded" -> "已被接续"; case "terminated" -> "已终止";
                     default -> "状态暂不可用";
                 });
                 source.setOrderTypeLabel(switch (Objects.toString(order.getOrderType(), "")) {

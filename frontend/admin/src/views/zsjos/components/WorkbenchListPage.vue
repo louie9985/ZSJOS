@@ -48,7 +48,7 @@
           (numberField === 'leadNo' ? '未命名客资' : `记录 #${row.id}`)
         }}</template></el-table-column
       >
-      <el-table-column label="状态" prop="status" width="140"><template #default="{ row }">{{ showOrderIdentity && row.status === 'voided' ? '已作废' : row.status }}</template></el-table-column>
+      <el-table-column label="状态" prop="status" width="140" />
       <el-table-column label="负责人" prop="ownerUserName" width="140" />
       <el-table-column v-if="numberField === 'leadNo'" label="负责人身份" prop="ownerIdentityLabel" width="110" />
       <el-table-column v-if="showOrderIdentity" label="成交归属身份" width="120">

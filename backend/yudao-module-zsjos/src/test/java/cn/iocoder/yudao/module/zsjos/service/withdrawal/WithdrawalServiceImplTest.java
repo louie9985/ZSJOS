@@ -115,26 +115,6 @@ class WithdrawalServiceImplTest {
         assertNull(row.getBankTransactionNo()); assertNull(row.getProofFileId()); verifyNoInteractions(fileApi);
     }
 
-    @Test void voidedRebateCannotBePaid() {
-        WithdrawalDO row=withdrawal(50L,"approved");when(withdrawalMapper.selectByIdForUpdate(50L,9L)).thenReturn(row);
-        when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of(new WithdrawalItemDO().setCashbackId(1L).setActiveFlag(true)));
-        when(cashbackMapper.selectByIdForUpdate(1L,9L)).thenReturn(cashback(1L,"20").setStatus("cancelled"));
-        assertThrows(RuntimeException.class, () -> service.recordPayout(50L,30L,new WithdrawalPayoutReqVO()));
-        verify(withdrawalMapper,never()).updateById(any(WithdrawalDO.class));
-        verify(cashbackMapper,never()).transitionStatus(any(),any(),any(),any());
-    }
-
-    @Test void releaseDoesNotReviveVoidedRebateButReleasesOtherItems() {
-        when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of(new WithdrawalItemDO().setCashbackId(1L).setActiveFlag(true),new WithdrawalItemDO().setCashbackId(2L).setActiveFlag(true)));
-        when(cashbackMapper.selectByIdForUpdate(1L,9L)).thenReturn(cashback(1L,"20").setStatus("cancelled"));
-        when(cashbackMapper.selectByIdForUpdate(2L,9L)).thenReturn(cashback(2L,"20").setStatus("withdrawing"));
-        when(cashbackMapper.transitionStatus(2L,0,"withdrawing","available")).thenReturn(1);
-        ReflectionTestUtils.invokeMethod(service,"releaseCashbacks",50L);
-        verify(cashbackMapper,never()).transitionStatus(eq(1L),any(),any(),any());
-        verify(cashbackMapper).transitionStatus(2L,0,"withdrawing","available");
-        verify(itemMapper).deactivate(50L);
-    }
-
     @Test void ordinaryDetailRedactsFinanceFieldsAndDoesNotCreateProofUrl() {
         WithdrawalDO row = withdrawal(50L, "paid");
         row.setBankTransactionNo("TX1"); row.setProofFileId(90L); row.setPayoutRemark("已打款");

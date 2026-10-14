@@ -99,23 +99,6 @@ class SalesOrderObjectPermissionServiceTest {
                 new SalesOrderDO().setSubmitterUserId(30L), 30L));
     }
 
-    @Test
-    void voidRequiresConfiguredOperationPermissionAndEnabledFinanceMembership() {
-        var order = new SalesOrderDO();
-        org.junit.jupiter.api.Assertions.assertFalse(service.canVoid(order, 30L));
-        when(permissionApi.hasAnyPermissions(30L, "zsjos:sales-order:void")).thenReturn(true);
-        AdminUserRespDTO user = user(30L, ENABLE.getStatus()); user.setDeptId(10L);
-        when(adminUserApi.getUser(30L)).thenReturn(user);
-        var config = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalConfigDO();
-        config.setRegistrationDeptId(11L); config.setFinanceDeptId(10L);
-        when(approvalConfigMapper.selectCurrent()).thenReturn(config);
-        org.junit.jupiter.api.Assertions.assertTrue(service.canVoid(order, 30L));
-        user.setDeptId(11L);
-        org.junit.jupiter.api.Assertions.assertFalse(service.canVoid(order, 30L));
-        user.setDeptId(10L); user.setStatus(DISABLE.getStatus());
-        org.junit.jupiter.api.Assertions.assertFalse(service.canVoid(order, 30L));
-    }
-
     private cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO scope(
             boolean all, boolean self, Set<Long> deptIds) {
         var result = new cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO();

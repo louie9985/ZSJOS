@@ -1917,8 +1917,7 @@ export type SalesOrder = {
     | "revision_required"
     | "effective"
     | "superseded"
-    | "terminated"
-    | "voided";
+    | "terminated";
   submitterUserId: number;
   formalSalesUserId?: number;
   formalOwnerIdentity?: string;
@@ -1977,10 +1976,6 @@ export type SalesOrder = {
   decisionReason?: string;
   canRevise?: boolean;
   canTerminate?: boolean;
-  canVoid?: boolean;
-  voidReason?: string;
-  voidedByUserId?: number;
-  voidedAt?: number;
   version: number;
   currentApprovalRoundId: number;
   approvalRoundVersion: number;
@@ -5096,8 +5091,6 @@ export const api = {
         data,
       ),
     ),
-  voidSalesOrder: async (orderId: number, data: { reason: string; orderVersion: number; idempotencyKey: string }) =>
-    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/void`, data)),
   terminateSalesOrder: async (
     orderId: number,
     data: {

@@ -106,5 +106,3 @@ export const checkRepurchaseCustomer = (data: RepurchaseCustomerIdentity): Promi
   request.post({ url: '/zsjos/sales-order/repurchase/check-customer', data, preserveBusinessError: true })
 export const createCustomerRepurchase = (data: Record<string, unknown> & { order: SalesOrderSubmission }) =>
   request.post({ url: '/zsjos/sales-order/repurchase', data, preserveBusinessError: true })
-
-export const voidSalesOrder = (id: number, data: { reason: string; orderVersion: number; idempotencyKey: string }) => request.put({ url: `/zsjos/sales-order/${id}/void`, data })

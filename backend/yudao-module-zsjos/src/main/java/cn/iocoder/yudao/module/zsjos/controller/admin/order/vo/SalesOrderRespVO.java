@@ -73,12 +73,8 @@ public class SalesOrderRespVO {
     private String decisionReason;
     private Boolean canRevise;
     private Boolean canTerminate;
-    private Boolean canVoid;
     private String repurchaseReason;
     private String terminationReason;
-    private String voidReason;
-    private Long voidedByUserId;
-    private LocalDateTime voidedAt;
     private Integer version;
     private Long currentApprovalRoundId;
     private Integer approvalRoundVersion;

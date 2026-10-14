@@ -224,8 +224,6 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         List<WithdrawalItemDO> items = itemMapper.selectByWithdrawalId(id);
         for (WithdrawalItemDO item : items) {
             CashbackDO cashback = cashbackMapper.selectByIdForUpdate(item.getCashbackId(), TenantContextHolder.getRequiredTenantId());
-            if (cashback != null && cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.STATUS_CANCELLED.equals(cashback.getStatus()))
-                throw exception(WITHDRAWAL_SOURCE_VOIDED);
             if (cashback == null || !STATUS_WITHDRAWING.equals(cashback.getStatus())
                     || cashbackMapper.transitionStatus(cashback.getId(), cashback.getVersion(), STATUS_WITHDRAWING, STATUS_WITHDRAWN) != 1) {
                 throw exception(WITHDRAWAL_STATE_INVALID);
@@ -514,8 +512,6 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         for (WithdrawalItemDO item : itemMapper.selectByWithdrawalId(withdrawalId)) {
             if (!Boolean.TRUE.equals(item.getActiveFlag())) continue;
             CashbackDO cashback = cashbackMapper.selectByIdForUpdate(item.getCashbackId(), TenantContextHolder.getRequiredTenantId());
-            // A voided order permanently cancels its rebate; rejecting/cancelling the withdrawal must not revive it.
-            if (cashback != null && cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.STATUS_CANCELLED.equals(cashback.getStatus())) continue;
             if (cashback == null || cashbackMapper.transitionStatus(cashback.getId(), cashback.getVersion(),
                     STATUS_WITHDRAWING, STATUS_AVAILABLE) != 1) throw exception(WITHDRAWAL_STATE_INVALID);
         }

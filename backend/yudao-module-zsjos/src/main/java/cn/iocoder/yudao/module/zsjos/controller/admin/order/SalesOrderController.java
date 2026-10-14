@@ -28,7 +28,6 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/sales-order")
 public class SalesOrderController {
     @Resource private SalesOrderService orderService;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderVoidService voidService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseCustomerService repurchaseCustomers;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseSubmissionService repurchaseSubmission;
 
@@ -359,14 +358,6 @@ public class SalesOrderController {
     public CommonResult<Boolean> rejectSupervisorConfirmation(@PathVariable Long id,
                                                                @Valid @RequestBody SalesOrderSupervisorDecisionReqVO reqVO) {
         supervisorConfirmationService.decide(id, WebFrameworkUtils.getLoginUserId(), reqVO, false);
-        return success(true);
-    }
-
-    @PutMapping("/{id}/void")
-    @Operation(summary = "财务作废已通过订单")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:void')")
-    public CommonResult<Boolean> voidOrder(@PathVariable Long id, @Valid @RequestBody SalesOrderVoidReqVO reqVO) {
-        voidService.voidOrder(id, WebFrameworkUtils.getLoginUserId(), reqVO);
         return success(true);
     }
 

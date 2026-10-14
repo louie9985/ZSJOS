@@ -1,4 +1,3 @@
-import SalesOrderVoidButton from './SalesOrderVoidButton'
 import { giftSummary } from '../services/orderGifts'
 import BusinessTable from './BusinessTable'
 import ProductSpecs from './ProductSpecs'
@@ -13,10 +12,10 @@ import SalesOrderInformationTable from './SalesOrderInformationTable'
 import SalesOrderVoucherAttachments from './SalesOrderVoucherAttachments'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
-  pending_approval: '待审核', revision_required: '待重提', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止', voided: '已作废'
+  pending_approval: '待审核', revision_required: '待重提', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止'
 }
 export const SALES_ORDER_STATUS_COLORS: Record<SalesOrder['status'], string> = {
-  pending_approval: 'gold', revision_required: 'red', effective: 'green', superseded: 'default', terminated: 'default', voided: 'red'
+  pending_approval: 'gold', revision_required: 'red', effective: 'green', superseded: 'default', terminated: 'default'
 }
 export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
   registrationReview: '报名履约中心', financeReview: '财务结算中心'
@@ -115,7 +114,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
   </section>
 }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate, onVoided }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
@@ -126,7 +125,6 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
   onRequestSupervisor?: () => void
   onRevise?: () => void
   onTerminate?: () => void
-  onVoided?: () => void
 }) {
   const tableLayout = informationLayout === 'table'
   const InformationFields = tableLayout ? SalesOrderInformationTable : DetailFieldGrid
@@ -165,10 +163,6 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
     if (order.status === 'revision_required') return {
       type: 'error' as const, title: '订单已驳回，等待补正',
       description: order.decisionReason || '审批人未填写可展示的驳回原因'
-    }
-    if (order.status === 'voided') return {
-      type: 'warning' as const, title: '订单已作废，不计入业绩',
-      description: `${order.voidReason || '未记录作废原因'}${order.voidedAt ? `（${formatTimestamp(order.voidedAt)}）` : ''}。原报名及服务保持不变。`
     }
     if (order.status === 'terminated') return {
       type: 'warning' as const, title: '订单审批已终止', description: order.terminationReason || '未记录终止原因'
@@ -297,7 +291,6 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
       </main>
       <aside className="sales-order-approval-sidebar" aria-label="审批状态">
         <Alert className="sales-order-approval-status" showIcon {...statusAlert}/>
-        {onVoided && <SalesOrderVoidButton order={order} onSuccess={onVoided}/>}
         {hasApprovalActions && <Space wrap className="sales-order-approval-actions">
           {mode === 'mine' && (order.status === 'revision_required' || order.status === 'terminated') && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>修改并重新提交</Button>}
           {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止审批</Button>}

@@ -24,6 +24,5 @@ public class OrderPaymentAllocationDO extends TenantBaseDO {
     private BigDecimal allocatedAmount;
     private String currency;
     private LocalDateTime allocatedAt;
-    private LocalDateTime voidedAt;
     private String idempotencyKey;
 }

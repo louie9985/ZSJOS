@@ -368,8 +368,6 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
     ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的销售直属主管");
     ErrorCode SALES_ORDER_SUPERVISOR_LEGACY_ROUND = new ErrorCode(1_900_006_027, "该审批轮次创建于主管确认功能上线前，请沿用原流程完成");
-    ErrorCode SALES_ORDER_VOID_STATE_INVALID = new ErrorCode(1_900_006_031, "仅已通过订单可以作废，请刷新后重试");
-    ErrorCode SALES_ORDER_VOID_REASON_REQUIRED = new ErrorCode(1_900_006_032, "请填写不超过1000字的作废原因");
     ErrorCode SALES_ORDER_SUPERVISOR_REASON_REQUIRED = new ErrorCode(1_900_006_030, "请填写主管确认意见");
     ErrorCode SALES_ORDER_REJECT_REASON_REQUIRED = new ErrorCode(1_900_006_029, "请填写驳回原因");
     ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED = new ErrorCode(1_900_006_028, "订单销售直属主管未配置成交订单主管确认权限");
@@ -405,7 +403,6 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WITHDRAWAL_REVIEW_STALE = new ErrorCode(1_900_009_011, "提现记录已处理或已变更，请刷新后重试");
     ErrorCode WITHDRAWAL_REVIEW_REASON_INVALID = new ErrorCode(1_900_009_012, "驳回原因不能为空，审核意见最多500字");
     ErrorCode WITHDRAWAL_REVIEW_UNSUPPORTED = new ErrorCode(1_900_009_013, "提现审批仅支持通过或驳回，请在提现管理中办理");
-    ErrorCode WITHDRAWAL_SOURCE_VOIDED = new ErrorCode(1_900_009_015, "该提现单包含已失效返现，不能打款，请驳回后重新申请");
     ErrorCode WITHDRAWAL_REVIEW_REPAIR_INVALID = new ErrorCode(1_900_009_014, "审批历史或返现关系不完整，不能自动补同步，请联系管理员核对");
 
 
