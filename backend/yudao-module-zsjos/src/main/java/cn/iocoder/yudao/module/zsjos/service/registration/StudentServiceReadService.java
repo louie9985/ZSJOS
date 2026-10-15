@@ -29,13 +29,18 @@ public class StudentServiceReadService {
     @Resource private DeliveryClassScopeService classScope;
     @Resource private BusinessReadScopeService readScope;
     @Resource private AdvancedFilterService filters;
+    @Resource private StudentServiceSummaryReader summaryReader;
 
     @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<StudentServiceRespVO> page(Long actor, StudentServicePageReqVO req) {
         var query = query(actor, req);
         long count = pageMapper.count(query);
         if (count == 0) return PageResult.empty();
-        return new PageResult<>(pageMapper.page(query).stream().map(r -> convert(actor, r)).toList(), count);
+        var relations = pageMapper.page(query);
+        var summaries = summaryReader.read(actor, relations, (java.time.LocalDateTime) query.getParameters().get("now"));
+        return new PageResult<>(relations.stream().map(r -> {
+            var row = convert(actor, r); row.setSummary(summaries.get(r.getId())); return row;
+        }).toList(), count);
     }
 
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
@@ -48,7 +53,9 @@ public class StudentServiceReadService {
         scoped.getParameters().put("relationId", relationId);
         if (pageMapper.count(new AdvancedFilterQuery(scoped.getWhereSql()
                 + " AND sr.id=#{query.parameters.relationId}", scoped.getParameters())) == 0) throw exception(STUDENT_NOT_EXISTS);
-        return convert(actor, relation);
+        var result = convert(actor, relation);
+        result.setSummary(summaryReader.read(actor, List.of(relation), java.time.LocalDateTime.now()).get(relationId));
+        return result;
     }
 
     private StudentServiceRespVO convert(Long actor, ServiceRelationDO relation) {
@@ -65,6 +72,7 @@ public class StudentServiceReadService {
         var filter = filters.buildStudentServiceQuery(req.getAdvancedFilter());
         Map<String,Object> params = new LinkedHashMap<>(filter == null ? Map.of() : filter.getParameters());
         params.put("tenantId", TenantContextHolder.getRequiredTenantId());
+        params.put("now", java.time.LocalDateTime.now());
         List<String> clauses = new ArrayList<>();
         clauses.add(filter == null ? "1=1" : "(" + filter.getWhereSql() + ")");
         Long subject = actor;
@@ -91,6 +99,10 @@ public class StudentServiceReadService {
         if (req.getServiceStatus() != null) add(clauses,params,"sr.status","status",req.getServiceStatus());
         else if (!all || !permissionApi.hasTenantReadAllAccess(actor)) clauses.add("sr.status IN ('active','paused','completed')");
         add(clauses,params,"sr.class_id","classId",req.getClassId());
+        add(clauses,params,"sr.owner_user_id","ownerUserId",req.getOwnerUserId());
+        add(clauses,params,"sr.acceptance_status","acceptanceStatus",req.getAcceptanceStatus());
+        add(clauses,params,"COALESCE(NULLIF(sr.delivery_stage,''),'first_contact')","deliveryStage",req.getDeliveryStage());
+        add(clauses,params,StudentServiceSummarySql.TASK_STATE,"taskState",req.getTaskState());
         add(clauses,params,"sr.person_id","personId",req.getPersonId());
         add(clauses,params,"p.in_service_period","inServicePeriod",req.getInServicePeriod());
         if (req.getKeyword()!=null && !req.getKeyword().isBlank()) {
@@ -99,7 +111,21 @@ public class StudentServiceReadService {
         }
         params.put("sortField",req.getSortField()); params.put("sortOrder",req.getSortOrder());
         params.put("limit",req.getPageSize()); params.put("offset",(long)(req.getPageNo()-1)*req.getPageSize());
+        if (usesOrderHandoff(req.getAdvancedFilter())) {
+            var readable = summaryReader.readableOrders(pageMapper.matchingOrders(new AdvancedFilterQuery(String.join(" AND ", clauses), params)), actor);
+            List<String> keys = new ArrayList<>();
+            for (Long id : readable) { String key = "readableOrder" + keys.size(); params.put(key, id); keys.add("#{query.parameters." + key + "}"); }
+            clauses.add(keys.isEmpty() ? "1=0" : "sr.order_id IN (" + String.join(",", keys) + ")");
+        }
         return new AdvancedFilterQuery(String.join(" AND ",clauses),params);
+    }
+    private static boolean usesOrderHandoff(cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO group) {
+        if (group == null) return false;
+        if (group.getConditions() != null) for (var condition : group.getConditions()) {
+            for (String key : java.util.Arrays.asList(condition.getFieldKey(), condition.getStartFieldKey(), condition.getEndFieldKey()))
+                if (key != null && key.startsWith("order.") && !key.equals("order.orderNo")) return true;
+        }
+        return group.getGroups() != null && group.getGroups().stream().anyMatch(StudentServiceReadService::usesOrderHandoff);
     }
     private static void add(List<String> clauses,Map<String,Object> params,String column,String key,Object value) {
         if(value!=null) { params.put(key,value); clauses.add(column+"=#{query.parameters."+key+"}"); }

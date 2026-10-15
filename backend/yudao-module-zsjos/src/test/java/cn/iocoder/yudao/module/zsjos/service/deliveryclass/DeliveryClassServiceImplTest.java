@@ -70,6 +70,7 @@ class DeliveryClassServiceImplTest {
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "class-date-tests"), DeliveryClassDO.class);
     }
 
     @AfterEach
@@ -129,7 +130,7 @@ class DeliveryClassServiceImplTest {
         when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
         when(scheduleMapper.selectById(70L)).thenReturn(schedule);
         when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L).setNickname("新班主任"));
-        when(classMapper.updateById(current)).thenReturn(1);
+        when(classMapper.update(eq(current), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
         when(relationMapper.selectClassRelationsForUpdate(100L, 1L)).thenReturn(java.util.List.of(first, second));
         when(relationMapper.transferClass(10L, 100L, 20L, 3)).thenReturn(1);
         when(relationMapper.transferClass(12L, 100L, 20L, 5)).thenReturn(1);
@@ -172,7 +173,7 @@ class DeliveryClassServiceImplTest {
         try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
             req.setClassName("  "); req.setExamScheduleId(null);
             var fields = factory.getValidator().validate(req).stream().map(v -> v.getPropertyPath().toString()).toList();
-            org.junit.jupiter.api.Assertions.assertTrue(fields.containsAll(java.util.List.of("className", "examScheduleId")));
+            org.junit.jupiter.api.Assertions.assertTrue(fields.containsAll(java.util.List.of("className", "examDateValid")));
         }
     }
 
@@ -209,6 +210,50 @@ class DeliveryClassServiceImplTest {
         assertEquals(1,options.size());
         assertEquals("MULTI_DAY",options.getFirst().scheduleType());
         assertEquals("多日考试 · " + today.minusDays(2) + "~" + today,options.getFirst().displayName());
+        assertEquals(today.minusDays(2), options.getFirst().startDate());
+        assertEquals(today, options.getFirst().endDate());
+    }
+
+    @Test void manualDatesCreateWithoutCalendarAndOverrideReferenceId() {
+        plannerRole(20L);
+        when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
+        when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L));
+        when(numberService.next()).thenReturn("BJTEST");
+        var req = new DeliveryClassSaveReqVO(); req.setClassName("自主日期班"); req.setHomeroomUserId(20L);
+        req.setStartDate(java.time.LocalDate.of(2026, 10, 1));
+        req.setEndDate(java.time.LocalDate.of(2026, 10, 3));
+        req.setExamScheduleId(999L);
+        service.create(req, 9L);
+        var saved = org.mockito.ArgumentCaptor.forClass(DeliveryClassDO.class);
+        verify(classMapper).insert(saved.capture());
+        assertEquals("2026-10-01~2026-10-03", saved.getValue().getExamScheduleSnapshot());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getExamScheduleId());
+        verifyNoInteractions(scheduleMapper);
+    }
+
+    @Test void editingLegacyClassClearsAssociationAndReadsFrozenDates() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "class-dates"), DeliveryClassDO.class);
+        plannerRole(20L);
+        var current = deliveryClass(100L, false, null, 20L).setExamScheduleId(70L).setVersion(2);
+        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
+        when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
+        when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L));
+        when(classMapper.update(eq(current), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenAnswer(call -> {
+            var wrapper = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DeliveryClassDO>) call.getArgument(1);
+            org.junit.jupiter.api.Assertions.assertTrue(wrapper.getSqlSet().contains("exam_schedule_id="));
+            org.junit.jupiter.api.Assertions.assertTrue(wrapper.getParamNameValuePairs().containsValue(null));
+            return 1;
+        });
+        var req = new DeliveryClassSaveReqVO(); req.setClassName("调整后"); req.setHomeroomUserId(20L); req.setVersion(2);
+        req.setStartDate(java.time.LocalDate.of(2026, 11, 5));
+        service.update(100L, req, 9L);
+        org.junit.jupiter.api.Assertions.assertNull(current.getExamScheduleId());
+        assertEquals("2026-11-05", current.getExamScheduleSnapshot());
+        when(classMapper.selectById(100L)).thenReturn(current);
+        assertEquals(req.getStartDate(), service.get(100L, 9L).getStartDate());
+        current.setExamScheduleId(70L).setExamScheduleSnapshot("旧考期 · 2026-10-01~2026-10-03");
+        assertEquals(java.time.LocalDate.of(2026, 10, 3), service.get(100L, 9L).getEndDate());
+        verifyNoInteractions(scheduleMapper, relationMapper);
     }
 
     private static ServiceRelationDO relation(Long id, Long classId, Integer version) {

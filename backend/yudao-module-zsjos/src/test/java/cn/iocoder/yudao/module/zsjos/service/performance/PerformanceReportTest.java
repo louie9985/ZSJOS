@@ -22,7 +22,14 @@ class PerformanceReportTest {
   when(targets.batch(anyCollection(),anyCollection())).thenReturn(batch);
   when(batch.resolve(anyString(),anyLong(),anyString(),any())).thenReturn(new Target(null,"USER",1L,"test","month",LocalDate.now(),null,null,null,null,false,false,0,null));
   when(reports.missingAttribution(any())).thenReturn(sum("missing","total","0",0,"0",0));
+  when(access.currentFollowUpAssignees(query)).thenReturn(Set.of(1L,2L));
+  when(reports.currentFollowUps(any())).thenAnswer(call->{
+   PerformanceReportQuery q=call.getArgument(0);assertEquals(Set.of(1L,2L),q.getAssigneeIds());
+   return List.of(count("todayFollowUp",2),count("overdueFollowUp",3));
+  });
   var result=service.overview(query);
+  assertEquals(2L,result.pending().get("todayFollowUp"));
+  assertEquals(3L,result.pending().get("overdueFollowUp"));
   assertEquals(List.of("today","week","lastWeek","month","lastMonth","quarter","year","last7","last30","last60","last90"),result.performance().stream().map(Metric::key).toList());
   assertEquals(List.of("lastWeek","month","lastMonth","last7","last30","last60","last90"),result.conversion().stream().map(Metric::key).toList());
   assertSame(result.performance().get(2),result.conversion().getFirst());

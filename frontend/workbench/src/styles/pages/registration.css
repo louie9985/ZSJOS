@@ -151,6 +151,130 @@
   padding-top: var(--crm-sp-2);
 }
 
+/* The pool owns this layout; student and configuration pages keep their existing styles. */
+.registration-page .registration-detail-pane {
+  container: registration-detail / inline-size;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+}
+.registration-page .registration-detail {
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+.registration-page .registration-detail-hero {
+  flex: none;
+  padding: var(--crm-pane-pad);
+  border-bottom: 1px solid var(--crm-border);
+  overflow-wrap: anywhere;
+}
+.registration-page .registration-detail-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  flex: 1;
+  min-height: 0;
+}
+.registration-page .registration-information,
+.registration-page .registration-operation-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--crm-pane-pad);
+  scrollbar-gutter: stable;
+  overflow-wrap: anywhere;
+}
+.registration-page .registration-information {
+  border-right: 1px solid var(--crm-border);
+}
+.registration-page .registration-information h5,
+.registration-page .registration-operation-scroll > h5 { margin-top: 0; }
+.registration-page .registration-info-section {
+  padding: var(--crm-sp-5) 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+.registration-page .registration-info-section:first-of-type { padding-top: 0; }
+.registration-page .registration-info-section summary { cursor: pointer; font-weight: 600; }
+.registration-page .registration-facts { margin: 0; }
+.registration-page .registration-facts > div {
+  display: grid;
+  grid-template-columns: minmax(76px, 30%) minmax(0, 1fr);
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-2) 0;
+}
+.registration-page .registration-facts dt { color: var(--crm-text-secondary); }
+.registration-page .registration-facts dd { margin: 0; white-space: pre-wrap; }
+.registration-page .registration-delivery + .registration-delivery { margin-top: var(--crm-sp-5); }
+.registration-page .registration-operation-column { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.registration-page .registration-operation-scroll { flex: 1; }
+.registration-page .registration-step {
+  position: relative;
+  padding: 0 0 var(--crm-sp-5);
+  margin-bottom: var(--crm-sp-5);
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.registration-page .registration-step-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-4);
+}
+.registration-page .registration-step-heading h5 { margin: 0; }
+.registration-page .registration-step-number {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--crm-radius-lg);
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+  font-weight: 600;
+}
+.registration-page .registration-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  bottom: calc(-1 * var(--crm-sp-5));
+  left: 12px;
+  height: var(--crm-sp-4);
+  border-left: 1px solid var(--crm-border-strong);
+}
+.registration-page .registration-checklist-progress { margin-bottom: var(--crm-sp-3); }
+.registration-page .registration-route-row,
+.registration-page .registration-attachment-row { flex-direction: column; align-items: stretch; }
+.registration-page .registration-checklist-row { flex-wrap: wrap; }
+.registration-page .registration-checklist-row .ant-select { width: 100%; max-width: none !important; }
+.registration-page .registration-detail-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-pane-pad);
+  border-top: 1px solid var(--crm-border);
+  background: var(--crm-bg-container);
+  overflow-wrap: anywhere;
+}
+.registration-page .registration-mobile-back { display: none; }
+@container registration-detail (max-width: 759px) {
+  .registration-page .registration-detail-columns { grid-template-columns: minmax(0, 1fr); display: block; overflow: auto; }
+  .registration-page .registration-information { border-right: 0; overflow: visible; }
+  .registration-page .registration-operation-column { display: contents; }
+  .registration-page .registration-operation-scroll { overflow: visible; }
+  .registration-page .registration-detail-actions { position: sticky; bottom: 0; z-index: 2; }
+}
+@media (max-width: 768px) {
+  .registration-page.is-detail-open .lead-inbox-list-pane { display: none; }
+  .registration-page.is-detail-open .registration-detail-pane { display: block; }
+  .registration-page .registration-mobile-back { display: inline-flex; }
+  .registration-page .registration-detail-hero { flex-wrap: wrap; }
+  .registration-page .registration-detail-hero > div { flex: 1; }
+}
+
 .registration-config-item {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 160px auto auto;
@@ -254,8 +378,8 @@
 
 @media (max-width: 768px) {
   .registration-page {
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   .registration-filter-shell {

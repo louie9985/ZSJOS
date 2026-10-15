@@ -58,6 +58,8 @@ class PerformanceReportMySqlTest {
       var oldOverview=previous.overview(query(type,id,null));
       session.clearCache();clearInvocations(access);var newOverview=current.overview(query(type,id,null));
       verify(access,times(1)).historicalScope(any());verify(access,never()).historicalRowAllowed(any(),any());
+      // Current follow-up responsibility is covered separately; only historical fields retain this oracle.
+      for(var key:List.of("todayFollowUp","overdueFollowUp")){oldOverview.pending().remove(key);newOverview.pending().remove(key);}
       same(oldOverview,newOverview,type+" overview denied="+denied);comparisons++;
       for(String period:List.of("today","month","lastMonth","last90","year")){
        var analysis=current.analysis(query(type,id,period));same(previous.analysis(query(type,id,period)),analysis,type+" analysis "+period+" denied="+denied);comparisons++;

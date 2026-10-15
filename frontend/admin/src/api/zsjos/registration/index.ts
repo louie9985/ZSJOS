@@ -58,6 +58,10 @@ export interface RegistrationCase {
   cancelledAt?: string
   cancelReason?: string
   version: number
+  deliveryEstablished?: boolean
+  assignable?: boolean
+  assignmentBlockReason?: string
+  deliveries?: Array<{ serviceRelationId: number; orderItemId?: number; status: string; classId?: number; className?: string; ownerUserId?: number; ownerUserName?: string; acceptanceStatus?: string }>
   completable: boolean
   completionBlockCode?: string
   completionBlockReason?: string
@@ -94,6 +98,8 @@ export interface StudentService {
   serviceRelationId: number
   orderId: number
   orderNo: string
+  orderStatus?: string
+  orderStatusLabel?: string
   orderItemId: number
   courseName?: string
   skuName?: string

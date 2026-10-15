@@ -32,7 +32,11 @@
 .announcement-list-pane { padding: var(--crm-card-pad); }
 .announcement-load-more { display: flex; justify-content: center; min-height: 32px; padding: var(--crm-sp-3) 0; color: var(--crm-text-secondary); }
 .announcement-list-item { display: flex; width: 100%; min-height: 68px; flex-direction: column; justify-content: center; gap: var(--crm-sp-2); padding: var(--crm-sp-3); color: var(--crm-text); text-align: left; background: transparent; border: 0; border-radius: var(--crm-radius-sm); cursor: pointer; }
-.announcement-list-item:hover,.announcement-list-item.active { background: var(--crm-bg-sunken); }
+.announcement-list-item:hover { background: var(--crm-fill-secondary); }
+.announcement-list-item.active { position: relative; background: var(--crm-color-primary-bg); }
+.announcement-list-item.active::before { content: ''; position: absolute; left: 0; top: var(--crm-sp-2); bottom: var(--crm-sp-2); width: 3px; border-radius: var(--crm-radius-sm); background: var(--crm-color-primary); }
+.announcement-list-item.active .announcement-list-title { color: var(--crm-color-primary); font-weight: var(--crm-weight-semibold); }
+.announcement-list-item:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: -2px; }
 .announcement-list-item.unread .announcement-list-title { font-weight: 600; }
 .announcement-list-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .announcement-list-meta { display: flex; align-items: center; gap: var(--crm-sp-2); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }

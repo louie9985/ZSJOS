@@ -74,7 +74,10 @@ public class PerformanceStatisticsService {
   var batch=targets.batch(targetKeys.stream().map(k->new PerformanceTargetService.Period("lastWeek".equals(k)?"week":k,window(k,n).start().toLocalDate())).toList(),List.of(q.getScopeId()));
   List<TargetProgress> progress=new ArrayList<>();
   for(var k:targetKeys){var w=window(k,n);progress.add(new TargetProgress(k,w.label(),metrics.get(k),batch.resolve(q.getScopeType(),q.getScopeId(),"lastWeek".equals(k)?"week":k,w.start().toLocalDate())));}
-  Map<String,Long> pending=new LinkedHashMap<>();for(var x:reports.pending(r))pending.put(x.getKey(),x.getCount());pending.put("missingTarget",(long)progress.get(2).target().missing());
+  Map<String,Long> pending=new LinkedHashMap<>();for(var x:reports.pending(r))pending.put(x.getKey(),x.getCount());
+  r.setAssigneeIds(access.currentFollowUpAssignees(q));
+  for(var x:reports.currentFollowUps(r))pending.put(x.getKey(),x.getCount());
+  pending.put("missingTarget",(long)progress.get(2).target().missing());
   var missing=reports.missingAttribution(r);
   return new Overview(n,facts.availableSince(tenant(),q.getScopeType(),q.getScopeId()),progress,performance,conversion,pending,missing.getCount(),missing.getAmount(),access.has("zsjos:sales-performance:detail"));
  }
@@ -196,6 +199,7 @@ public class PerformanceStatisticsService {
   var n=now();
   var request=new PerformanceDetailQuery().setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
     .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());
+  if(CurrentFollowUpSql.supports(q.getMetric()))request.setAssigneeIds(access.currentFollowUpAssignees(q));
   if(q.isCumulative()){
    var first=detailQueries.firstDate(request);
    q.setStart((first==null?n:first).toLocalDate());q.setEnd(n.toLocalDate());q.setGrain("month");

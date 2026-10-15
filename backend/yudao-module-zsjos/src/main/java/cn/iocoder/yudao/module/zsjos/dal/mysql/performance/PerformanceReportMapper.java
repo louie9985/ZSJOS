@@ -16,6 +16,8 @@ public interface PerformanceReportMapper {
     List<PerformanceFact> calendarTasks(PerformanceReportQuery query);
     @SelectProvider(type = PerformanceReportSql.class, method = "pending")
     List<PerformanceAggregate> pending(PerformanceReportQuery query);
+    @SelectProvider(type = CurrentFollowUpSql.class, method = "pending")
+    List<PerformanceAggregate> currentFollowUps(PerformanceReportQuery query);
     @SelectProvider(type = PerformanceReportSql.class, method = "activity")
     List<PerformanceAggregate> activity(PerformanceReportQuery query);
     @SelectProvider(type = PerformanceReportSql.class, method = "missingAttribution")

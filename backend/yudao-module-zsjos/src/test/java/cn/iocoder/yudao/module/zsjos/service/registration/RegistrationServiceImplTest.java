@@ -73,6 +73,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGIST
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_ALREADY_DELIVERED;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -214,6 +215,7 @@ class RegistrationServiceImplTest {
         registrationCase.setStatus(STATUS_PENDING); registrationCase.setVersion(0);
         SalesOrderDO order = new SalesOrderDO();
         order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         RegistrationVersionReqVO request = new RegistrationVersionReqVO();
@@ -234,6 +236,7 @@ class RegistrationServiceImplTest {
         SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_EFFECTIVE);
         RegistrationCaseChecklistItemDO item = new RegistrationCaseChecklistItemDO();
         item.setId(101L); item.setItemType("checkbox"); item.setChecked(true);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(item));
@@ -249,6 +252,7 @@ class RegistrationServiceImplTest {
         SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_EFFECTIVE);
         RegistrationCaseChecklistItemDO item = new RegistrationCaseChecklistItemDO();
         item.setId(102L); item.setItemType("attachment"); item.setAttachmentRequired(true); item.setChecked(false);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(item));
@@ -303,6 +307,7 @@ class RegistrationServiceImplTest {
         item.setId(102L); item.setRegistrationCaseId(1L); item.setItemType("attachment"); item.setVersion(0);
         FileInfoRespDTO stored = new FileInfoRespDTO(); stored.setId(88L); stored.setName("proof.png");
         stored.setType("image/png"); stored.setSize(file.getSize()); stored.setUrl("https://files/proof.png");
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(caseItemMapper.selectById(102L)).thenReturn(item);
         when(attachmentMapper.selectByItemId(102L)).thenReturn(List.of());
@@ -331,29 +336,21 @@ class RegistrationServiceImplTest {
     }
 
     @Test
-    void unchangedStudyPlannerDoesNotPublishAnotherAssignment() {
-        RegistrationCaseDO registrationCase = editableCase(); registrationCase.setStudyPlannerUserId(30L);
-        RegistrationCaseRouteDO route = new RegistrationCaseRouteDO();
-        route.setId(201L); route.setRegistrationCaseId(1L); route.setAssigneeType("study_planner");
-        route.setDepartmentId(40L); route.setVersion(0);
-        RegistrationCaseChecklistItemDO plannerItem = new RegistrationCaseChecklistItemDO();
-        plannerItem.setId(202L); plannerItem.setItemType("study_planner"); plannerItem.setVersion(0);
-        AdminUserRespDTO planner = new AdminUserRespDTO();
-        planner.setId(30L); planner.setDeptId(40L); planner.setStatus(0); planner.setNickname("规划师");
+    void deliveredLegacyPlannerCannotBeOverwritten() {
+        RegistrationCaseDO registrationCase = editableCase();
+        SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL);
+        when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
-        when(caseRouteMapper.selectByCaseId(1L)).thenReturn(List.of(route));
-        when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(plannerItem));
-        when(adminUserApi.getUser(30L)).thenReturn(planner);
+        when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
+        when(serviceRelationMapper.selectByCaseForUpdate(1L, 1L)).thenReturn(List.of(new ServiceRelationDO()));
         RegistrationPlannerUpdateReqVO request = new RegistrationPlannerUpdateReqVO();
-        request.setVersion(0); request.setIdempotencyKey("same-planner"); request.setStudyPlannerUserId(30L);
-        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        request.setVersion(0); request.setIdempotencyKey("delivered-planner"); request.setStudyPlannerUserId(30L);
+        TenantContextHolder.setTenantId(1L);
         try {
-            service.updateStudyPlanner(1L, 9L, request);
-        } finally {
-            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
-        }
-
-        verify(registrationNotifyPublisher, never()).publishPlannerAssigned(any(), any(), any(), any(), any());
+            assertEquals(REGISTRATION_ALREADY_DELIVERED.getCode(),
+                    assertThrows(ServiceException.class, () -> service.updateStudyPlanner(1L, 9L, request)).getCode());
+        } finally { TenantContextHolder.clear(); }
+        verifyNoInteractions(caseRouteMapper, registrationNotifyPublisher);
     }
 
     @Test
@@ -373,6 +370,7 @@ class RegistrationServiceImplTest {
         SalesOrderItemDO first = new SalesOrderItemDO(); first.setId(301L);
         SalesOrderItemDO second = new SalesOrderItemDO(); second.setId(302L);
         PersonDO person = new PersonDO(); person.setId(501L); person.setVersion(0);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(item));
@@ -393,7 +391,7 @@ class RegistrationServiceImplTest {
         }
 
         verify(serviceRelationMapper, times(2)).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO.class));
-        verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 30L, 501L);
+        verify(registrationNotifyPublisher, times(2)).publishPlannerAssigned(registrationCase, order, null, 30L, 501L, null);
     }
 
     @ParameterizedTest
@@ -415,6 +413,7 @@ class RegistrationServiceImplTest {
         DeliveryClassDO formalClass = deliveryClass(202L, false, 81L, 31L);
         DeliveryClassDO pendingClass = deliveryClass(201L, true, null, null);
         PersonDO person = new PersonDO(); person.setId(501L); person.setVersion(0); person.setPersonNo("XY202609080001");
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(checklist));
@@ -447,8 +446,8 @@ class RegistrationServiceImplTest {
         if (singleItemTask) verify(registrationNotifyPublisher).publishPlannerAssigned(
                 registrationCase, order, "XY202609080001", 31L, 501L, relations.getFirst().getId());
         else verify(registrationNotifyPublisher).publishPlannerAssigned(
-                registrationCase, order, "XY202609080001", 31L, 501L);
-        verify(orderMapper).selectByIdForUpdate(10L, 1L);
+                registrationCase, order, "XY202609080001", 31L, 501L, relations.getFirst().getId());
+        verify(orderMapper, times(2)).selectByIdForUpdate(10L, 1L);
         verify(orderItemMapper).selectListByOrderIdForUpdate(10L, 1L);
         InOrder classLockOrder = inOrder(deliveryClassMapper);
         if (!singleItemTask) classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(201L, 1L);
@@ -465,6 +464,7 @@ class RegistrationServiceImplTest {
         RegistrationCaseChecklistItemDO checklist = new RegistrationCaseChecklistItemDO();
         checklist.setId(101L); checklist.setItemType("checkbox"); checklist.setChecked(true);
         SalesOrderItemDO orderItem = new SalesOrderItemDO().setId(301L).setProductId(401L);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(checklist));
@@ -484,13 +484,14 @@ class RegistrationServiceImplTest {
         } finally {
             TenantContextHolder.clear();
         }
-        verifyNoInteractions(serviceRelationMapper);
+        verify(serviceRelationMapper, never()).insert(any(ServiceRelationDO.class));
         verifyNoInteractions(registrationNotifyPublisher);
     }
 
     @Test
     void closeMarksRegistrationCancelledWithReason() {
         RegistrationCaseDO registrationCase = editableCase();
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         RegistrationCloseReqVO request = new RegistrationCloseReqVO();
         request.setVersion(0); request.setIdempotencyKey("close-registration"); request.setReason("无需服务");
@@ -512,6 +513,7 @@ class RegistrationServiceImplTest {
     void closeRejectsCompletedRegistration() {
         RegistrationCaseDO registrationCase = editableCase();
         registrationCase.setStatus(RegistrationConstants.STATUS_COMPLETED);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         RegistrationCloseReqVO request = new RegistrationCloseReqVO();
         request.setVersion(0); request.setIdempotencyKey("close-completed"); request.setReason("无需服务");
@@ -528,6 +530,7 @@ class RegistrationServiceImplTest {
     @Test
     void endingOneProductDoesNotCreateOrCancelSiblingServices() {
         RegistrationCaseDO registrationCase = editableCase(); registrationCase.setOrderItemId(301L);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         var request = new RegistrationCloseReqVO();
         request.setVersion(0); request.setIdempotencyKey("end-product"); request.setReason("本产品无需后续交付");
@@ -537,19 +540,21 @@ class RegistrationServiceImplTest {
         assertNotNull(registrationCase.getCompletedAt());
         assertEquals(9L, registrationCase.getCompletedByUserId());
         verify(caseMapper).updateById(registrationCase);
-        verifyNoInteractions(serviceRelationMapper, registrationNotifyPublisher, personMapper, classAssignmentMapper);
+        verifyNoInteractions(registrationNotifyPublisher, personMapper, classAssignmentMapper);
+        verify(serviceRelationMapper, never()).cancelDelivery(any(), any(), any(), any());
     }
 
     @Test
     void itemTaskRejectsSiblingClassAssignmentBeforeWriting() {
         var registrationCase = editableCase(); registrationCase.setOrderItemId(301L);
         registrationCase.setAssignmentMode("class_per_item");
-        var order = new SalesOrderDO(); order.setId(10L);
+        var order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL);
         var first = new SalesOrderItemDO(); first.setId(301L);
         var second = new SalesOrderItemDO(); second.setId(302L);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
-        when(orderMapper.selectById(10L)).thenReturn(order);
-        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(first, second));
+        when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
+        when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(first, second));
         var request = new RegistrationClassAssignmentsSaveReqVO(); request.setVersion(0);
         request.setIdempotencyKey("foreign-item");
         var assignment = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO();
@@ -559,7 +564,8 @@ class RegistrationServiceImplTest {
             var error = assertThrows(ServiceException.class, () -> service.updateClassAssignments(1L, 9L, request));
             assertEquals(REGISTRATION_CLASS_ASSIGNMENT_INVALID.getCode(), error.getCode());
         } finally { TenantContextHolder.clear(); }
-        verifyNoInteractions(classAssignmentMapper, deliveryClassMapper, serviceRelationMapper);
+        verifyNoInteractions(classAssignmentMapper, deliveryClassMapper);
+        verify(serviceRelationMapper, never()).insert(any(ServiceRelationDO.class));
     }
 
     private RegistrationCaseDO editableCase() {
@@ -574,16 +580,20 @@ class RegistrationServiceImplTest {
     void saveWithoutProductCategoryAcceptsFormalAndPendingAndClearsOldOwner(boolean pending) {
         RegistrationCaseDO registrationCase = editableCase();
         registrationCase.setAssignmentMode("class_per_item");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_EFFECTIVE);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL); order.setPersonId(501L);
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(301L);
         DeliveryClassDO target = deliveryClass(201L, pending, 88L, pending ? null : 31L);
         RegistrationClassAssignmentDO existing = assignment(301L, 200L);
         existing.setId(71L); existing.setVersion(0); existing.setHomeroomUserId(99L);
         existing.setHomeroomUserNameSnapshot("旧班主任"); existing.setCategoryId(77L);
+        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectById(10L)).thenReturn(order);
         when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(item));
-        when(deliveryClassMapper.selectById(201L)).thenReturn(target);
+        when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
+        when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(item));
+        when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L)).thenReturn(List.of(existing));
+        when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(target);
         when(classAssignmentMapper.selectByCaseAndItem(1L, 301L)).thenReturn(existing);
         if (!pending) when(deliveryClassService.validateHomeroom(31L))
                 .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
@@ -595,6 +605,14 @@ class RegistrationServiceImplTest {
         try { service.updateClassAssignments(1L, 9L, req); }
         finally { TenantContextHolder.clear(); }
         verify(classAssignmentMapper).updateById(existing);
+        ArgumentCaptor<ServiceRelationDO> created = ArgumentCaptor.forClass(ServiceRelationDO.class);
+        verify(serviceRelationMapper).insert(created.capture());
+        assertEquals("active", created.getValue().getStatus());
+        assertEquals("pending", created.getValue().getAcceptanceStatus());
+        assertEquals(pending ? null : 31L, created.getValue().getOwnerUserId());
+        assertEquals("processing", registrationCase.getStatus());
+        if (pending) verifyNoInteractions(registrationNotifyPublisher);
+        else verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 31L, 501L, null);
         assertEquals(201L, existing.getClassId());
         assertNull(existing.getCategoryId());
         assertEquals(pending ? null : 31L, existing.getHomeroomUserId());

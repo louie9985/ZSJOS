@@ -32,7 +32,7 @@ class RegistrationNotifyPublisherTest {
         verify(notifyBusinessEventApi).publish(capture.capture());
         assertEquals("student_service", capture.getValue().getBizType());
         assertEquals(21L, capture.getValue().getBizId());
-        assertEquals("registration-planner-activated:5:8", capture.getValue().getSourceEventKey());
+        assertEquals("registration-planner-activated:5:8:service:21", capture.getValue().getSourceEventKey());
     }
 
     @Test

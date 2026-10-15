@@ -14,6 +14,7 @@ public final class StudentServicePageSql {
         + " LEFT JOIN zsjos_delivery_class dc ON dc.id=sr.class_id AND dc.tenant_id=sr.tenant_id AND dc.deleted=0"
         + " WHERE sr.deleted=0 AND sr.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
     public static String count(Map<String,Object> args) { return "SELECT COUNT(*)" + FROM; }
+    public static String matchingOrders(Map<String,Object> args) { return "SELECT DISTINCT ro.*" + FROM + " AND ro.id IS NOT NULL"; }
     public static String page(Map<String,Object> args) {
         var q = (AdvancedFilterQuery) args.get("query");
         String field = (String) q.getParameters().get("sortField");
@@ -23,9 +24,18 @@ public final class StudentServicePageSql {
             case "courses" -> "JSON_UNQUOTE(JSON_EXTRACT(IF(JSON_VALID(COALESCE(oi.product_snapshot,sr.service_snapshot)),COALESCE(oi.product_snapshot,sr.service_snapshot),'{}'),'$.name'))";
             case "serviceStatus" -> "sr.status"; case "orderNos" -> "ro.order_no";
             case "activatedAt" -> "sr.activated_at";
+            case "personNo" -> "p.person_no";
+            case "acceptedAt" -> "sr.accepted_at";
+            case "examDate" -> "sr.exam_date";
+            case "latestContactAt" -> StudentServiceSummarySql.LAST_CONTACT;
+            case "taskDueAt" -> StudentServiceSummarySql.task("due_at");
+            case "pausedAt" -> "sr.paused_at";
+            case "completedAt" -> "sr.completed_at";
+            case "terminatedAt" -> "sr.terminated_at";
             default -> "sr.update_time";
         };
         String direction = "ascend".equals(q.getParameters().get("sortOrder")) ? " ASC" : " DESC";
-        return "SELECT sr.*" + FROM + " ORDER BY " + expression + direction + ",sr.id DESC LIMIT #{query.parameters.limit} OFFSET #{query.parameters.offset}";
+        boolean nullsLast = java.util.Set.of("acceptedAt", "examDate", "latestContactAt", "taskDueAt", "pausedAt", "completedAt", "terminatedAt").contains(field == null ? "" : field);
+        return "SELECT sr.*" + FROM + " ORDER BY " + (nullsLast ? "(" + expression + " IS NULL) ASC," : "") + expression + direction + ",sr.id DESC LIMIT #{query.parameters.limit} OFFSET #{query.parameters.offset}";
     }
 }

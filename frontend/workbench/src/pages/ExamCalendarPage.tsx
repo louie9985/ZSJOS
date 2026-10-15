@@ -87,7 +87,7 @@ export function ExamCalendarLegend() {
         {STATUS_META[status].label}
       </span>)}
     <span className="exam-calendar-legend-item"><span aria-hidden="true" className="exam-calendar-swatch is-multi-day" />多日考试</span>
-    <span>未自选颜色时使用发布状态默认底色。发布状态请查看考期安排；连续日期条包含开始日和结束日。</span>
+    <span>自选底色仅在已发布时显示；草稿和已撤销使用状态配色。已发布未选颜色时使用默认底色；连续日期条包含开始日和结束日。</span>
   </div>
 }
 
@@ -515,7 +515,7 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
               {label}
             </Button>)}
           </Space>
-          <span>单日和多日考试条使用相同底色；清除后恢复默认配色。</span>
+          <span>自选底色仅在已发布时显示；草稿和已撤销使用状态配色。清除后，已发布使用默认底色。</span>
         </Space>}
           getValueProps={(value: string) => ({ value: value || null })}
           getValueFromEvent={(color: { cleared: boolean; toHexString: () => string }) => color.cleared ? '' : color.toHexString()}>
@@ -524,8 +524,9 @@ export default function ExamCalendarPage({ permissions }: { permissions: string[
           </ColorPicker>
         </Form.Item>
         <Form.Item noStyle shouldUpdate={(before, after) => before.backgroundColor !== after.backgroundColor || before.scheduleName !== after.scheduleName}>
-          {({ getFieldValue }) => <div className="exam-calendar-events" aria-label="考期底色预览">
-            <div className="exam-calendar-event exam-status-tone tone-draft" style={examBackgroundStyle(getFieldValue('backgroundColor'))}>
+          {({ getFieldValue }) => <div className="exam-calendar-events" aria-label="发布后效果预览">
+            <span>发布后效果预览</span>
+            <div className="exam-calendar-event exam-status-tone tone-published" style={examBackgroundStyle(getFieldValue('backgroundColor'))}>
               {getFieldValue('scheduleName') || '考期底色预览'}
             </div>
           </div>}

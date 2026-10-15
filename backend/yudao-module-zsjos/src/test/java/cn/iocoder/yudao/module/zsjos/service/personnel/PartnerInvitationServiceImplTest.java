@@ -79,7 +79,7 @@ class PartnerInvitationServiceImplTest {
 
         var result = service.create(reqVO, 1L);
 
-        assertTrue(result.getInviteCode().matches("^[A-Z]{4}\\d{4}$"));
+        assertTrue(result.getInviteCode().matches("^[A-HJKMNP-Z]{4}[2-9]{4}$"));
         assertEquals("张三", result.getName());
         verify(invitationMapper).voidActiveByMobile(org.mockito.ArgumentMatchers.eq("13800138000"), any());
         verify(invitationMapper).insert(org.mockito.ArgumentMatchers.<PartnerInvitationDO>argThat(row ->
@@ -88,12 +88,13 @@ class PartnerInvitationServiceImplTest {
                         && row.getExpiresAt().isAfter(LocalDateTime.now().plusDays(6))));
     }
 
-    @Test
-    void activateCreatesPartnerAccountOwnershipAndConsumesInvitation() {
+    @ParameterizedTest
+    @ValueSource(strings = {"abcd1234", "iolo0101"})
+    void activateCreatesPartnerAccountOwnershipAndConsumesInvitation(String legacyCode) {
         stubTransaction();
         mockOperator();
-        PartnerInvitationDO invitation = invitation();
-        when(invitationMapper.selectActiveByMobileAndCodeForUpdate("13800138000", "ABCD1234"))
+        PartnerInvitationDO invitation = invitation().setInviteCode(legacyCode.toUpperCase());
+        when(invitationMapper.selectActiveByMobileAndCodeForUpdate("13800138000", legacyCode.toUpperCase()))
                 .thenReturn(invitation);
         when(partnerAccountService.create(any(), org.mockito.ArgumentMatchers.eq("13800138000"),
                 org.mockito.ArgumentMatchers.eq("Password123"))).thenReturn(account());
@@ -101,7 +102,7 @@ class PartnerInvitationServiceImplTest {
 
         PartnerAccountDO account = service.activate(new PartnerActivateReqVO()
                 .setMobile("13800138000").setPassword("Password123")
-                .setConfirmPassword("Password123").setInviteCode("abcd1234"));
+                .setConfirmPassword("Password123").setInviteCode(legacyCode));
 
         assertEquals(20L, account.getId());
         verify(partnerMapper).insert(org.mockito.ArgumentMatchers.<PartnerDO>argThat(row ->
@@ -124,6 +125,7 @@ class PartnerInvitationServiceImplTest {
         var result = service.createStudentInvitation(new PartnerStudentInvitationCreateReqVO()
                 .setStudentPersonId(88L).setAssignedOperatorUserId(9L).setName("兼职注册名").setMobile(" 13800138000 "), 7L);
 
+        assertTrue(result.getInviteCode().matches("^[A-HJKMNP-Z]{4}[2-9]{4}$"));
         assertEquals(PARTNER_INVITATION_SCENE_STUDENT, result.getInvitationScene());
         assertEquals("学员原姓名", result.getStudentNameSnapshot());
         assertEquals("13900000000", result.getStudentMobileSnapshot());

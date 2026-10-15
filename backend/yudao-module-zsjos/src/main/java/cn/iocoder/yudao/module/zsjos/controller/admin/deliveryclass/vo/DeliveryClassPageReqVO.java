@@ -15,4 +15,16 @@ public class DeliveryClassPageReqVO extends PageParam {
     private Long categoryId;
     private Long examScheduleId;
     private Long homeroomUserId;
+    @jakarta.validation.constraints.Positive
+    private Long projectCategoryId;
+    @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+    private java.time.LocalDate examDateStart;
+    @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+    private java.time.LocalDate examDateEnd;
+    private Boolean excludeSystemClass;
+
+    @jakarta.validation.constraints.AssertTrue(message = "结束日期不能早于开始日期")
+    public boolean isExamDateRangeValid() {
+        return examDateStart == null || examDateEnd == null || !examDateEnd.isBefore(examDateStart);
+    }
 }

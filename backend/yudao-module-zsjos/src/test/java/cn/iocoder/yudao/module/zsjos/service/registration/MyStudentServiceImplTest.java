@@ -131,7 +131,7 @@ class MyStudentServiceImplTest {
         relation.setActivatedAt(LocalDateTime.of(2026, 8, 17, 12, 0));
         PersonDO person = new PersonDO(); person.setId(2L); person.setPersonNo("XS202608240001"); person.setName("测试学员");
         LeadDO lead = new LeadDO(); lead.setId(5L); lead.setLeadNo("KZ202608170001");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(3L); order.setLeadId(5L); order.setOrderNo("OD202608170001");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(3L); order.setLeadId(5L); order.setOrderNo("OD202608170001"); order.setStatus("pending_approval");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(4L); item.setOrderId(3L);
         LeadProductSnapshot snapshot = new LeadProductSnapshot("course-1", "营养课程", 10L, "基础课程",
                 List.of(new ZsjosProductCategoryPathNodeVO(7L, "中医营养学"),
@@ -150,6 +150,8 @@ class MyStudentServiceImplTest {
         MyStudentRespVO student = service.getMyStudent(8L, 2L);
         MyStudentRespVO.ServiceVO result = student.getServices().getFirst();
 
+        assertEquals("pending_approval", student.getServices().getFirst().getOrderStatus());
+        assertEquals("待财务审核", student.getServices().getFirst().getOrderStatusLabel());
         assertEquals(5L, student.getLeadId());
         assertEquals("XS202608240001", student.getPersonNo());
         assertEquals("营养课程", result.getCourseName());

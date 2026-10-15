@@ -1,4 +1,10 @@
 import type { CSSProperties } from 'react'
+import type { ExamSchedule } from '../services/api'
+
+/** Saved colors describe active arrangements; drafts and revoked records retain status styling. */
+export function examScheduleBackgroundStyle(schedule: Pick<ExamSchedule, 'recordStatus' | 'backgroundColor'>): CSSProperties | undefined {
+  return schedule.recordStatus === 'PUBLISHED' ? examBackgroundStyle(schedule.backgroundColor) : undefined
+}
 
 /** Only opaque RGB values from the exam contract become CSS; text stays readable in either theme. */
 export function examBackgroundStyle(value?: string | null): CSSProperties | undefined {

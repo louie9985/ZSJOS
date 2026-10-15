@@ -1,0 +1,21 @@
+# Class quick filters — 2026-10-15
+
+- Environment: local (ZSJOS_AGENT_ENV and /etc/zsjos/agent-environment absent).
+- Workstream / owner: local-class-filters-20261015 / Codex.
+- Branch: main; worktree: D:/ZSJ-OS; base: 315efd729f2e049fc2639194567d86077ae91184; target branch / integration order: None.
+- Goal: approved Workbench class filter preview; project from service order-item category snapshots, frozen class-date range, homeroom, status, keyword, separate pending entry.
+- Non-goals: schema/data migrations, permission grants, class creation/date changes, Admin UI redesign, dependencies, Git publication, shared-service changes.
+- Ownership: deliveryclass query/controller/service/interface/mapper and new focused filter helpers/VOs/tests; only filter/project additions in existing response VO, ServiceImpl, Workbench DeliveryClassPage, delivery-class CSS and services/api.ts delivery-class section; new filter component/hooks/tests; docs/api/delivery-class-management.md filter section; this record; task-specific temporary verification outputs.
+- Dependencies: existing System permissions/data scope, order product snapshots, service relations, existing Workbench primitives. Prior class-free-dates work released ownership; preserve its uncommitted single-date form/calendar/VO changes. Preserve concurrent registration and all unrelated changes.
+- Contract adjustment: current approved class-free-dates contract supersedes plan's calendar-date source. Filter frozen class snapshots using the same supported single/range formats; never resolve mutable reference-calendar dates.
+- Verification: focused backend scope/projection/date SQL tests and isolated Java compilation, Workbench focused tests/typecheck, desktop/mobile browser fixtures and Admin old-query compatibility, scoped diff checks. Distinguish fixture evidence from authenticated deployment.
+
+## Delivery
+
+- Implemented Workbench project/homeroom/keyword filters, quick/custom date ranges, all-status choice, server total, snapshot project labels and separate pending entry. New requests supersede stale responses; pagination and retry retain their query/page. Preserved uncommitted single-date creation/calendar work and unrelated registration/API additions.
+- Backend adds optional service-project/date/exclude-system filters before pagination, frozen date SQL, batched project snapshot projection and scoped read-only filter contexts. Controller permissions exactly match existing managed/personal page endpoints; contexts use the same scope resolver. No permission grants, database changes, dependencies, Git operations or shared-service changes.
+- Contract adaptation: date filters use frozen class snapshots in accordance with delivered class-free-dates contract, not mutable calendar rows. API documentation updated.
+- Verification: isolated javac compilation of affected backend classes; 19 JUnit tests passed including actual local MySQL mapper pagination with tenant and pagination interceptors. MySQL read-only CTE checks passed for invalid dates/JSON, leap day, date ranges, duplicate projects, tenant/status exclusions. Database was read-only; no fixture tables or business data written.
+- Workbench full typecheck passed and 7 focused Vitest checks passed. Browser fixtures passed at 1440/390 widths for pagination, project/homeroom intersections, quick/custom dates, status, reset, empty results, delayed stale replies, list/context errors and retry, pending navigation and denied access. No horizontal document overflow or browser runtime errors. Temporary screenshots/logs under frontend/workbench/tmp/class-filters/.
+- Admin compatibility: inspected existing getDeliveryClassPage consumer; no new mandatory params or changed legacy category/exam behavior; verified omitted new params through actual mapper. Admin browser was not rerun because its UI is unchanged; this is API compatibility evidence, not authenticated Admin acceptance.
+- Limits: browser transport is fixture-backed, not authenticated target-backend acceptance. No application restart/deployment or live endpoint verification. Isolated Java checks reuse existing dependency outputs; no full reactor build claimed. Deploy backend before Workbench. Scoped diff checks passed. Ownership released.

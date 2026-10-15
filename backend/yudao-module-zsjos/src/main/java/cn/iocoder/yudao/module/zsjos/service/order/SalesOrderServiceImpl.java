@@ -1121,6 +1121,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
+        if (!BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
+            registrationService.cancelEarlyDeliveryByOrderId(order.getId(),
+                    StrUtil.isBlank(reason) ? "订单审批未通过，提前交付已停止" : reason.trim(), now);
+        }
         if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
             createRevisionTask(order, round, reason);
         }

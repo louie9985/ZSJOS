@@ -62,6 +62,7 @@
       <el-table-column label="班级" prop="service.className" min-width="150" />
       <el-table-column label="负责人" prop="service.ownerUserName" min-width="120" />
       <el-table-column label="服务激活时间" prop="activatedAt" min-width="170" />
+      <el-table-column label="订单审核" min-width="120"><template #default="{ row }">{{ row.service?.orderStatusLabel || '独立服务' }}</template></el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.serviceRelationId)">详情</el-button>
@@ -114,6 +115,7 @@
         <div class="section-heading">课程服务</div>
         <el-table :data="[detail.service]" row-key="serviceRelationId" border>
           <el-table-column label="订单编号" prop="orderNo" min-width="190" />
+          <el-table-column label="订单审核" prop="orderStatusLabel" min-width="120" />
           <el-table-column label="课程权益" min-width="320">
             <template #default="{ row }">
               <div class="course-rights-cell">

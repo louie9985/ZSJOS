@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
-import { canOpenPersonalCalendar, canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
+import { canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
 import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const source = readFileSync(new URL('../pages/TodayTasksPage.tsx', import.meta.url), 'utf8')
+const calendarSource = readFileSync(new URL('../components/HomeCalendarPanel.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../styles/pages/today-tasks.css', import.meta.url), 'utf8')
 
 describe('today task permissions', () => {
@@ -27,16 +28,14 @@ describe('today task permissions', () => {
   it('loads optional home panels only when their backend permissions are granted', () => {
     expect(canReadAnnouncements(['system:notice:read'])).toBe(true)
     expect(canReadAnnouncements(['zsjos:business-task:query'])).toBe(false)
-    expect(canOpenPersonalCalendar(['zsjos:personal-calendar:query'])).toBe(true)
-    expect(canOpenPersonalCalendar(['zsjos:media-calendar:query'])).toBe(false)
   })
 
   it('keeps the four dashboard regions and server-owned destinations', () => {
     expect(source).toContain('home-summary-region')
-    expect(source).toContain('home-calendar-panel')
+    expect(calendarSource).toContain('home-calendar-panel')
     expect(source).toContain('home-business-panel')
     expect(source).toContain('HomeAnnouncementPanel')
-    expect(source).toContain('APP_ROUTES.PERSONAL_CALENDAR')
+    expect(calendarSource).not.toContain('APP_ROUTES.PERSONAL_CALENDAR')
     expect(readFileSync(new URL('../components/HomeAnnouncementPanel.tsx', import.meta.url), 'utf8')).toContain('APP_ROUTES.ANNOUNCEMENTS')
     expect(source).toContain('const bucketOrder: BusinessTaskBucket[]')
     expect(source).toContain("'overdue'")
@@ -51,19 +50,20 @@ describe('today task permissions', () => {
   })
 
   it('keeps the home calendar month and weekday labels in Chinese', () => {
-    const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
-    expect(source).toContain("import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'")
-    expect(source).toContain('const homeCalendarLocale = {')
-    expectSourceToContainTokens(source, "shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']")
-    expectSourceToContainTokens(source, "shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']")
+    const calendarPanel = calendarSource
+    expect(calendarSource).toContain("import zhCN from 'antd/es/calendar/locale/zh_CN'")
+    expect(calendarSource).toContain('const homeCalendarLocale = {')
+    expectSourceToContainTokens(calendarSource, "shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']")
+    expectSourceToContainTokens(calendarSource, "shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']")
     expect(calendarPanel).toContain('locale={homeCalendarLocale}')
   })
 
-  it('uses the home calendar only as a current-month preview', () => {
-    const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
+  it('keeps the homepage calendar independent with local date selection', () => {
+    const calendarPanel = calendarSource
     expect(calendarPanel).toContain('headerRender={() => null}')
-    expect(calendarPanel).toContain('APP_ROUTES.PERSONAL_CALENDAR')
-    expectSourceToContainTokens(calendarPanel, "if (info.source === 'date') openCalendar()")
+    expect(calendarPanel).not.toContain('useNavigate')
+    expect(calendarPanel).not.toContain('zsjos:personal-calendar:query')
+    expectSourceToContainTokens(calendarPanel, "if (info.source === 'date') setMonth(date)")
     expect(calendarPanel).not.toContain('onPanelChange')
   })
 

@@ -183,15 +183,17 @@ describe('BPM 通用审批组件', () => {
     expect(detail).toContain("decisionOnly={detail?.processInstance?.businessKey?.startsWith('content-review-batch:')}")
     expect(actions).toContain('!onlyDecisions && childrenTasks.length > 0')
     expect(actions).toContain('!onlyDecisions && allowDecision')
-    expectSourceToContainTokens(actions, '!onlyDecisions && <Button icon={<CommentOutlined/>}')
+    expectSourceToContainTokens(actions, '!onlyDecisions && !inline && <Button icon={<CommentOutlined/>}')
     expect(admin).toContain("props.processInstance?.businessKey?.startsWith('content-review-batch:')")
     expect(admin).toContain('btnType !== OperationButtonType.APPROVE && btnType !== OperationButtonType.REJECT')
     expect(admin).toContain('!decisionOnly && runningTask?.children?.length > 0')
   })
 
-  it('审批详情提供审批记录、流转记录与评论', () => {
-    for (const tab of ['审批详情', '审批记录', '流转记录', '流程评论']) {
-      expect(detail, tab).toContain(tab)
-    }
+  it('审批详情同页展示流程记录与评论，不再分页签', () => {
+    expect(detail).not.toContain('<Tabs')
+    expect(detail).toContain('<ApprovalHistory')
+    expect(detail).toContain('<CommentList')
+    expect(detail).toContain('bpm-unified-action-dock')
+    expect(detail).toContain('useApprovalResource')
   })
 })

@@ -23,6 +23,29 @@ import org.apache.ibatis.mapping.BoundSql;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PerformanceReportParserTest {
+    @Test void currentFollowUpsBindAndParseWithEmptyAndPopulatedScopes() throws Exception {
+        var interceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {
+            @Override public Expression getTenantId() { return new LongValue(1); }
+        });
+        for (var ids : List.of(Set.<Long>of(), Set.of(1L,2L))) {
+            var q=new PerformanceReportQuery();q.setTenant(1L);q.setAssigneeIds(ids);
+            q.setNow(LocalDateTime.of(2026,10,15,12,0));q.setToday(q.getNow().toLocalDate().atStartOfDay());
+            q.setTomorrow(q.getToday().plusDays(1));q.setSize(20);
+            for (var metric : List.of("todayFollowUp","overdueFollowUp")) {
+                q.setMetric(metric);
+                var sources=List.of(CurrentFollowUpSql.pending(),PerformanceDetailSql.count(q),PerformanceDetailSql.page(q));
+                for(int i=0;i<sources.size();i++){
+                    var config=new Configuration();
+                    var bound=new XMLLanguageDriver().createSqlSource(config,sources.get(i),PerformanceReportQuery.class).getBoundSql(q);
+                    String parsed=assertDoesNotThrow(()->interceptor.parserSingle(bound.getSql(),null));
+                    assertDoesNotThrow(()->CCJSqlParserUtil.parse(parsed));
+                    assertFalse(parsed.contains("zsjos_performance_attribution"));
+                    if(ids.isEmpty())assertTrue(parsed.contains("1 = 0"));
+                    export("current-followup-"+metric+"-"+ids.size()+"-"+i,config,bound,parsed,q);
+                }
+            }
+        }
+    }
     @Test
     void everyAmountGroupingParsesThroughActualTenantInterceptor() throws Exception {
         var interceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {

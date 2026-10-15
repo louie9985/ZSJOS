@@ -337,3 +337,32 @@
   width: 100%;
   margin-bottom: var(--crm-sp-2);
 }
+
+/* The approval center owns its scrolling panes; shared BPM consumers retain their layout. */
+.bpm-unified-detail { height: 100%; min-height: 0; overflow: hidden; }
+.bpm-unified-detail .bpm-approval-detail-hero { justify-content: space-between; padding: var(--crm-sp-3); box-shadow: none; }
+.bpm-unified-detail .business-inbox-detail-heading { flex: 1; }
+.bpm-unified-detail .bpm-unified-columns { display: grid; grid-template-columns: minmax(0, 9fr) minmax(0, 3fr); flex: 1; min-height: 0; gap: var(--crm-gap); overflow: hidden; }
+.bpm-unified-detail .bpm-unified-content { min-width: 0; min-height: 0; overflow-y: auto; padding: var(--crm-sp-3); }
+.bpm-unified-detail .bpm-unified-sidebar { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--crm-border); padding: var(--crm-sp-3); background: var(--crm-bg-container); }
+.bpm-unified-detail .bpm-unified-history { flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; padding: var(--crm-sp-2); }
+.bpm-unified-detail .bpm-unified-action-dock { flex: none; border-top: 1px solid var(--crm-border); padding-top: var(--crm-sp-3); max-height: 55%; overflow-y: auto; }
+.bpm-unified-detail .bpm-approval-actions { position: static; display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: var(--crm-sp-2); box-shadow: none; }
+.bpm-unified-detail .bpm-unified-mobile-action { display: none; }
+.bpm-unified-detail .bpm-approval-timeline-task { white-space: normal; overflow-wrap: anywhere; }
+.bpm-unified-detail .bpm-approval-comments { margin-top: var(--crm-sp-3); padding-top: var(--crm-sp-3); border-top: 1px solid var(--crm-border); }
+.bpm-unified-detail .bpm-approval-card, .bpm-unified-detail .detail-field { box-shadow: none; }
+.bpm-unified-detail .feedback-approval-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.bpm-unified-detail .bpm-signature-preview { max-width: 100%; object-fit: contain; }
+.bpm-unified-detail.is-narrow { overflow-y: auto; }
+.bpm-unified-detail.is-narrow .bpm-unified-columns { display: flex; flex-direction: column; flex: none; overflow: visible; }
+.bpm-unified-detail.is-narrow .feedback-approval-panel { flex: none; overflow: visible; }
+.bpm-unified-detail.is-narrow .bpm-unified-content, .bpm-unified-detail.is-narrow .bpm-unified-history { overflow: visible; flex: none; }
+.bpm-unified-detail.is-narrow .bpm-unified-sidebar { overflow: visible; border-left: 0; border-top: 1px solid var(--crm-border); }
+.bpm-unified-detail.is-narrow .bpm-unified-action-dock { display: none; }
+.bpm-unified-detail.is-narrow .bpm-unified-action-dock.is-open { display: block; position: fixed; z-index: 1050; bottom: 0; right: 0; width: min(100%, 520px); max-height: 75dvh; padding: var(--crm-sp-3); border: 1px solid var(--crm-border); background: var(--crm-bg-container); box-shadow: var(--crm-shadow-md); }
+.bpm-unified-detail.is-narrow .bpm-unified-mobile-action { display: flex; justify-content: flex-end; position: sticky; bottom: 0; background: var(--crm-bg-container); padding: var(--crm-sp-3); }
+.bpm-approval-page .business-inbox-detail-pane:has(.bpm-unified-detail) { overflow: hidden; }
+.ant-drawer-body:has(> .bpm-unified-detail) { overflow: hidden; }
+.bpm-unified-detail.is-narrow .bpm-unified-action-dock:has(.bpm-unified-result) { display: block; position: static; max-height: none; }
+.bpm-unified-detail .bpm-unified-action-dock:empty { display: none; }

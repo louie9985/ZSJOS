@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ExamProductScopeRespVO;
 
 public interface DeliveryClassService {
+    DeliveryClassFilterContextRespVO filterContext(Long userId, DeliveryClassPageReqVO req, boolean managed);
     String BIZ_TYPE = "delivery-class";
     String PERMISSION_QUERY_MANAGED = "zsjos:delivery-class:query-managed";
     String PERMISSION_QUERY_MY = "zsjos:delivery-class:query-my";

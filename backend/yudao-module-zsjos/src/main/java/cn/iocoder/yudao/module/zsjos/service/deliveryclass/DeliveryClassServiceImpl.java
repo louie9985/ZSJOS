@@ -71,20 +71,52 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     @Override
     public PageResult<DeliveryClassRespVO> getManagedPage(Long userId, DeliveryClassPageReqVO req) {
-        if (req.getReadScope() != null || req.getTargetUserId() != null) return getMyPage(userId, req);
-        DeliveryClassScopeService.Scope scope = permissionApi.hasTenantReadAllAccess(userId)
-                ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolve(userId);
-        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.deptIds(), null,
-                scope.allDepartments(), true);
+        ReadScope scope = resolveReadScope(userId, req, true);
+        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
         return toPageResult(page);
     }
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
-        Long subject = req.getReadScope() != null || req.getTargetUserId() != null
-                ? readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId) : userId;
-        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, Set.of(), subject, subject == null, subject == null);
+        ReadScope scope = resolveReadScope(userId, req, false);
+        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
         return toPageResult(page);
+    }
+
+    private record ReadScope(Set<Long> departments, Long subject, boolean all, boolean system) {}
+
+    private ReadScope resolveReadScope(Long userId, DeliveryClassPageReqVO req, boolean managed) {
+        if (!managed || req.getReadScope() != null || req.getTargetUserId() != null) {
+            Long subject = req.getReadScope() != null || req.getTargetUserId() != null
+                    ? readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId) : userId;
+            return new ReadScope(Set.of(), subject, subject == null, subject == null);
+        }
+        DeliveryClassScopeService.Scope scope = permissionApi.hasTenantReadAllAccess(userId)
+                ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolve(userId);
+        return new ReadScope(scope.deptIds(), null, scope.allDepartments(), true);
+    }
+
+    @Override
+    public DeliveryClassFilterContextRespVO filterContext(Long userId, DeliveryClassPageReqVO req, boolean managed) {
+        ReadScope scope = resolveReadScope(userId, req, managed);
+        var query = mapper.classQuery(new DeliveryClassPageReqVO(), scope.departments(), scope.subject(), scope.all(), scope.system());
+        query.in(DeliveryClassDO::getStatus, List.of("SERVING", "COMPLETED"));
+        List<DeliveryClassDO> rows = mapper.selectList(query);
+        Map<Long, List<DeliveryClassProjectRespVO>> byClass = DeliveryClassProjects.load(mapper, rows);
+        Map<Long, DeliveryClassProjectRespVO> projects = new LinkedHashMap<>();
+        Map<Long, DeliveryClassFilterContextRespVO.Homeroom> homerooms = new LinkedHashMap<>();
+        DeliveryClassRespVO pending = null;
+        for (DeliveryClassDO row : rows) {
+            if (Boolean.TRUE.equals(row.getSystemClass())) { pending = toVO(row); continue; }
+            byClass.getOrDefault(row.getId(), List.of()).forEach(project -> projects.putIfAbsent(project.id(), project));
+            if (row.getHomeroomUserId() != null) homerooms.putIfAbsent(row.getHomeroomUserId(),
+                    new DeliveryClassFilterContextRespVO.Homeroom(row.getHomeroomUserId(),
+                            row.getHomeroomUserNameSnapshot() == null ? "班主任姓名未记录" : row.getHomeroomUserNameSnapshot(), row.getDeptNameSnapshot()));
+        }
+        return new DeliveryClassFilterContextRespVO(projects.values().stream()
+                .sorted(Comparator.comparing(DeliveryClassProjectRespVO::path).thenComparing(DeliveryClassProjectRespVO::id)).toList(),
+                homerooms.values().stream().sorted(Comparator.comparing(DeliveryClassFilterContextRespVO.Homeroom::name)
+                        .thenComparing(DeliveryClassFilterContextRespVO.Homeroom::id)).toList(), pending);
     }
 
     @Override
@@ -93,18 +125,17 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     private PageResult<DeliveryClassRespVO> toPageResult(PageResult<DeliveryClassDO> page) {
         List<DeliveryClassDO> rows = page.getList();
-        Map<Long, ExamScheduleDO> schedules = new HashMap<>();
-        Set<Long> scheduleIds = rows.stream().map(DeliveryClassDO::getExamScheduleId)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        if (!scheduleIds.isEmpty()) scheduleMapper.selectBatchIds(scheduleIds)
-                .forEach(schedule -> schedules.put(schedule.getId(), schedule));
         Map<Long, Integer> studentCounts = new HashMap<>();
         Map<Long, List<Long>> idsByTenant = rows.stream().collect(Collectors.groupingBy(
                 DeliveryClassDO::getTenantId, Collectors.mapping(DeliveryClassDO::getId, Collectors.toList())));
         idsByTenant.forEach((tenantId, classIds) -> mapper.countStudentsByClassIds(tenantId, classIds).forEach(item ->
                 studentCounts.put(((Number) item.get("classId")).longValue(), ((Number) item.get("studentCount")).intValue())));
-        return new PageResult<>(rows.stream().map(row -> toVO(row, schedules.get(row.getExamScheduleId()),
-                studentCounts.getOrDefault(row.getId(), 0))).toList(), page.getTotal());
+        Map<Long, List<DeliveryClassProjectRespVO>> projects = DeliveryClassProjects.load(mapper, rows);
+        return new PageResult<>(rows.stream().map(row -> {
+            DeliveryClassRespVO vo = toVO(row, studentCounts.getOrDefault(row.getId(), 0));
+            vo.setProjects(projects.getOrDefault(row.getId(), List.of()));
+            return vo;
+        }).toList(), page.getTotal());
     }
 
     @Override
@@ -175,7 +206,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
                 .stream().filter(this::isUnended)
                 .map(row -> new DeliveryClassExamOptionRespVO(row.getId(), row.getScheduleType(),
                         cn.iocoder.yudao.module.zsjos.service.examcalendar.ExamScheduleService.displayName(row) + " · " + scheduleDate(row), row.getProductId(),
-                        row.getCategoryId(), parseSkus(row.getFrozenSkusJson()))).toList();
+                        row.getCategoryId(), parseSkus(row.getFrozenSkusJson()), row.getExactDate(), row.getStartDate(), row.getEndDate())).toList();
     }
 
     public List<DeliveryClassExamOptionRespVO> examOptions(Long categoryId, Long productId, String selectedAttrsJson) {
@@ -193,7 +224,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             String classNo = numberService.next();
             DeliveryClassDO row = new DeliveryClassDO().setClassNo(classNo)
                     .setClassName(req.getClassName().trim()).setSystemClass(false)
-                    .setExamScheduleId(req.getExamScheduleId()).setExamScheduleSnapshot(snapshot)
+                    .setExamScheduleId(req.getStartDate() == null ? req.getExamScheduleId() : null).setExamScheduleSnapshot(snapshot)
                     .setHomeroomUserId(homeroom.getId()).setHomeroomUserNameSnapshot(homeroom.getNickname())
                     .setDeptId(homeroom.getDeptId()).setDeptNameSnapshot(dept == null ? null : dept.getName())
                     .setStatus("SERVING").setVersion(0);
@@ -219,10 +250,14 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         requireSameDepartment(userId, homeroom);
         if (!Objects.equals(homeroom.getDeptId(), current.getDeptId())) throw exception(DELIVERY_CLASS_USER_INVALID);
         Long oldOwner = current.getHomeroomUserId();
-        current.setClassName(req.getClassName().trim()).setExamScheduleId(req.getExamScheduleId())
+        current.setClassName(req.getClassName().trim()).setExamScheduleId(req.getStartDate() == null ? req.getExamScheduleId() : null)
                 .setExamScheduleSnapshot(snapshot).setHomeroomUserId(homeroom.getId())
                 .setHomeroomUserNameSnapshot(homeroom.getNickname()).setVersion(current.getVersion() + 1);
-        if (mapper.updateById(current) != 1) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
+        // updateById ignores nulls; independent dates must explicitly clear the previous calendar association.
+        if (mapper.update(current, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DeliveryClassDO>()
+                .eq(DeliveryClassDO::getId, id).set(DeliveryClassDO::getExamScheduleId, current.getExamScheduleId())) != 1) {
+            throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
+        }
         if (!Objects.equals(oldOwner, homeroom.getId())) {
             for (ServiceRelationDO relation : relationMapper.selectClassRelationsForUpdate(id, current.getTenantId())) {
                 transferLocked(relation, current, homeroom.getId(), "班主任变更",
@@ -350,6 +385,12 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private String validate(DeliveryClassSaveReqVO req) {
+        if (!req.isExamDateValid()) throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
+        if (req.getStartDate() != null) {
+            return new DeliveryClassDates(req.getStartDate(),
+                    req.getEndDate() == null ? req.getStartDate() : req.getEndDate()).snapshot();
+        }
+        // Older clients may still submit only an existing schedule ID.
         ExamScheduleDO schedule = scheduleMapper.selectById(req.getExamScheduleId());
         if (schedule == null || !"PUBLISHED".equals(schedule.getRecordStatus()) || !isUnended(schedule)) {
             throw exception(DELIVERY_CLASS_SCHEDULE_INVALID);
@@ -369,15 +410,17 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private DeliveryClassRespVO toVO(DeliveryClassDO row) {
-        ExamScheduleDO schedule = row.getExamScheduleId() == null ? null : scheduleMapper.selectById(row.getExamScheduleId());
-        return toVO(row, schedule, mapper.countStudents(row.getTenantId(), row.getId()));
+        return toVO(row, mapper.countStudents(row.getTenantId(), row.getId()));
     }
 
-    private DeliveryClassRespVO toVO(DeliveryClassDO row, ExamScheduleDO schedule, int studentCount) {
+    private DeliveryClassRespVO toVO(DeliveryClassDO row, int studentCount) {
         DeliveryClassRespVO vo = BeanUtils.toBean(row, DeliveryClassRespVO.class);
-        if (schedule != null) {
-            vo.setScheduleType(schedule.getScheduleType());
-            vo.setExactDate(schedule.getExactDate());
+        DeliveryClassDates dates = DeliveryClassDates.fromSnapshot(row.getExamScheduleSnapshot());
+        if (dates != null) {
+            vo.setStartDate(dates.start());
+            vo.setEndDate(dates.end());
+            vo.setScheduleType(dates.start().equals(dates.end()) ? "EXACT" : "MULTI_DAY");
+            vo.setExactDate(dates.start().equals(dates.end()) ? dates.start() : null);
         }
         vo.setSelectedAttrs(row.getSelectedAttrsJson() == null ? Map.of() : JsonUtils.parseObject(row.getSelectedAttrsJson(), Map.class));
         vo.setSelectedSpecs(row.getSelectedSpecsJson() == null ? List.of() : JsonUtils.parseArray(row.getSelectedSpecsJson(), cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO.class));

@@ -692,6 +692,10 @@ export type RegistrationCase = {
   cancelledAt?: Timestamp;
   cancelReason?: string;
   version: number;
+  deliveryEstablished?: boolean;
+  assignable?: boolean;
+  assignmentBlockReason?: string;
+  deliveries?: Array<{ serviceRelationId: number; orderItemId?: number; status: string; classId?: number; className?: string; ownerUserId?: number; ownerUserName?: string; acceptanceStatus?: string }>;
   completable?: boolean;
   completionBlockCode?: string;
   completionBlockReason?: string;
@@ -763,7 +767,19 @@ export type StudentTaskStage = {
   status: "done" | "current" | "pending";
   detail: string;
 };
-export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: MyStudent["services"][number] };
+export type StudentServiceSummary = {
+  deliveryStage?: string; deliveryStageLabel?: string; examDate?: string;
+  currentTask?: { id: number; type: string; status: string; dueAt?: Timestamp; overdue?: boolean };
+  latestContact?: StudentContactRecord;
+  classNo?: string; systemClass?: boolean; classDepartment?: string; classExamSchedule?: string;
+  pausedAt?: Timestamp; pauseReason?: string; completedAt?: Timestamp; terminatedAt?: Timestamp; terminationReason?: string;
+  orderHandoff?: { access: 'readable' | 'denied' | 'absent'; orderType?: string; status?: string;
+    formalSalesUserName?: string; submitterUserName?: string; formalOwnerIdentity?: string;
+    submittedAt?: Timestamp; effectiveAt?: Timestamp; studentNatureLabel?: string; studentSourceLabel?: string;
+    classType?: string; servicePeriodLabel?: string; agreedExamTime?: string; studentSpecialRequirements?: string; remark?: string; materialDeliveryContact?: string };
+  infoSubmission?: { access: 'readable' | 'denied' | 'absent'; status?: string; submittedAt?: Timestamp };
+};
+export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: MyStudent["services"][number]; summary?: StudentServiceSummary };
 export type MyStudent = {
   inServicePeriod?: boolean;
   personId: number;
@@ -780,6 +796,8 @@ export type MyStudent = {
     leadNo?: string;
     orderId?: number;
     orderNo?: string;
+    orderStatus?: string;
+    orderStatusLabel?: string;
     classId?: number;
     className?: string;
     courseName?: string;
@@ -3454,6 +3472,7 @@ export function buildMenuTree(
 }
 
 export type DeliveryClass = {
+  projects?: DeliveryClassProject[];
   id: number; classNo: string; className: string; systemClass: boolean;
   categoryId?: number; categoryNameSnapshot?: string; categoryPathSnapshot?: string;
   examScheduleId?: number; examScheduleSnapshot?: string; homeroomUserId?: number;
@@ -3461,7 +3480,7 @@ export type DeliveryClass = {
   status: string; studentCount: number; version: number;
   productId?: number; productNameSnapshot?: string; selectedAttrs?: Record<string, string>;
   selectedSpecs?: import('./productSpecs').ProductSpec[]; selectedSkus?: ExamProductOption['skus'];
-  scheduleType?: string; exactDate?: string; createTime?: Timestamp;
+  scheduleType?: string; exactDate?: string; startDate?: string; endDate?: string; createTime?: Timestamp;
 }
 export type DeliveryClassStudent = {
   serviceRelationId: number; personId: number; personNo?: string; studentName?: string;
@@ -3471,14 +3490,18 @@ export type DeliveryClassStudent = {
 }
 export type DeliveryClassOption = { id: number; classNo: string; className: string; systemClass: boolean; categoryId?: number; categoryName?: string; examScheduleId?: number; examScheduleName?: string; homeroomUserId?: number; homeroomUserName?: string }
 export type HomeroomCandidate = { id: number; name: string; deptId?: number; deptName?: string }
+export type DeliveryClassProject = { id: number; name: string; path: string }
+export type DeliveryClassFilterContext = { projects: DeliveryClassProject[]; homerooms: HomeroomCandidate[]; pendingClass?: DeliveryClass | null }
+export type DeliveryClassPageQuery = { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number; projectCategoryId?: number; examDateStart?: string; examDateEnd?: string; excludeSystemClass?: boolean }
 export type DeliveryClassCategoryOption = { id: number; parentId: number; name: string }
-export type DeliveryClassExamOption = { id: number; scheduleType: string; displayName: string }
+export type DeliveryClassExamOption = { id: number; scheduleType: string; displayName: string; exactDate?: string; startDate?: string; endDate?: string }
 export type DeliveryClassProductOption = ExamProductOption
 export type ClassTransfer = { id: number; serviceRelationId: number; fromClassName: string; targetClassName: string; status: string; reason: string; processInstanceId?: string; submittedAt: string; resolutionReason?: string }
 
 export const api = {
   deliveryClasses: {
-    page: async (params: { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number }, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
+    page: async (params: DeliveryClassPageQuery, manage = false) => unwrap<PageResult<DeliveryClass>>(await http.get(manage ? '/zsjos/delivery-class/page' : '/zsjos/delivery-class/my-page', { params })),
+    filterContext: async (manage = false) => unwrap<DeliveryClassFilterContext>(await http.get(manage ? '/zsjos/delivery-class/filter-context' : '/zsjos/delivery-class/my-filter-context')),
     get: async (id: number) => unwrap<DeliveryClass>(await http.get(`/zsjos/delivery-class/${id}`)),
     students: async (id: number, pageNo = 1, pageSize = 50) => unwrap<PageResult<DeliveryClassStudent>>(await http.get(`/zsjos/delivery-class/${id}/students`, { params: { pageNo, pageSize } })),
     options: async (categoryId?: number, includePending = true) => unwrap<DeliveryClassOption[]>(await http.get('/zsjos/delivery-class/options', { params: { categoryId, includePending } })),
@@ -3486,8 +3509,8 @@ export const api = {
     products: async () => unwrap<DeliveryClassProductOption[]>(await http.get('/zsjos/delivery-class/product-options')),
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
       exams: async (categoryId?: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
-    create: async (data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId: number; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
-    update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId: number; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
+    create: async (data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
+    update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
     directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
     requestTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<number>(await http.post(`/zsjos/class-transfer/service/${relationId}`, data)),
@@ -5941,7 +5964,7 @@ export const api = {
     data: { version: number; idempotencyKey: string; reason: string },
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
-  myStudentServices: async (params: BusinessSort & { pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+  myStudentServices: async (params: BusinessSort & { ownerUserId?: number; acceptanceStatus?: string; deliveryStage?: string; taskState?: string; pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
     ? unwrap<PageResult<StudentServiceSubject>>(await http.post("/zsjos/student/my-service/search-page", params))
     : unwrap<PageResult<StudentServiceSubject>>(await http.get("/zsjos/student/my-service-page", { params })),
   myStudentService: async (id: number) => unwrap<StudentServiceSubject>(await http.get(`/zsjos/student/my-service/${id}`)),

@@ -34,6 +34,16 @@ class PerformanceDetailServiceTest {
  }
  @Test void pastLastPageDoesNotQueryRows(){allowed();when(detailQueries.count(any())).thenReturn(12L);var result=service.details(query());assertTrue(result.getList().isEmpty());assertEquals(12L,result.getTotal());verify(detailQueries,never()).page(any());verifyNoInteractions(facts);}
  @Test void deniedDetailsDoNotReadSql(){assertThrows(RuntimeException.class,()->service.details(query()));verifyNoInteractions(detailQueries,facts);}
+ @Test void currentFollowUpsPassAuthorizedAssigneesToCountAndPage(){
+  allowed();var q=query();q.setMetric("overdueFollowUp");q.setPageNo(1);
+  when(access.currentFollowUpAssignees(q)).thenReturn(Set.of(12L,13L));
+  when(detailQueries.count(any())).thenReturn(2L);
+  service.details(q);
+  var count=ArgumentCaptor.forClass(PerformanceDetailQuery.class);var page=ArgumentCaptor.forClass(PerformanceDetailQuery.class);
+  verify(detailQueries).count(count.capture());verify(detailQueries).page(page.capture());
+  assertSame(count.getValue(),page.getValue());assertEquals(Set.of(12L,13L),count.getValue().getAssigneeIds());
+  assertNotNull(count.getValue().getNow());verifyNoInteractions(facts);
+ }
  @Test void cumulativeUsesScopedMinimumAndTasksKeepFullDueDay(){
   allowed();var q=query();q.setPeriodKey(null);q.setCumulative(true);q.setMetric("tasks");
   var first=LocalDate.of(2025,1,2).atStartOfDay();when(detailQueries.firstDate(any())).thenReturn(first);

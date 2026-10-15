@@ -726,7 +726,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     </span>
                   </div>}
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">负责人</span>
+                    <span className="lead-field-label">{student ? '客资负责人' : '负责人'}</span>
                     <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}{lead.ownerIdentity && ` · ${lead.ownerIdentityLabel}`}</span>
                   </div>
                   <div className="lead-profile-row">

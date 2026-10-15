@@ -39,6 +39,13 @@ final class AdvancedFilterMetadata {
                 field.optionSource(), field.options(), field.bindings().keySet(), field.sensitivity(),
                 sourceType(field.optionSource(), field.options()));
     }
+    static AdvancedFilterCatalogRespVO.FieldVO describe(Field field, String scene) {
+        if ("student_service".equals(scene) && "service.ownerUserId".equals(field.key())) {
+            return describe(field.key(), field.group(), "学习规划师（班主任）", field.type(), field.operators(),
+                    field.optionSource(), field.options(), field.bindings().keySet(), field.sensitivity(), sourceType(field.optionSource(), field.options()));
+        }
+        return describe(field);
+    }
 
     static AdvancedFilterCatalogRespVO.FieldVO duration(String scene, List<String> operators,
                                                         List<AdvancedFilterCatalogRespVO.OptionVO> dateFields) {

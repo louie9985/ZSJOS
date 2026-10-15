@@ -84,6 +84,19 @@ public class PerformanceAccess {
   userApi.getUserList(ids).stream().filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus())).forEach(u->enabled.add(u.getId()));
   return enabled;
  }
+ /** Current task responsibility is authorized against current organization, never historical attribution. */
+ public Set<Long> currentFollowUpAssignees(Query q) {
+  authorize(q,false);
+  if("SELF".equals(q.getScopeType()))return Set.of(q.getScopeId());
+  var people=sales();
+  if("USER".equals(q.getScopeType()))return people.stream().filter(u->Objects.equals(u.getId(),q.getScopeId()))
+    .map(AdminUserRespDTO::getId).collect(java.util.stream.Collectors.toSet());
+  Set<Long> departments=new HashSet<>();
+  if("DEPT".equals(q.getScopeType()))departments.add(q.getScopeId());
+  else orgs().stream().filter(o->Objects.equals(o.getCenterId(),q.getScopeId())).forEach(o->departments.add(o.getDeptId()));
+  return people.stream().filter(u->departments.contains(u.getDeptId())).map(AdminUserRespDTO::getId)
+    .collect(java.util.stream.Collectors.toSet());
+ }
  public PerformanceOrgDO mapping(Long deptId) {
   return orgs().stream().filter(x->Objects.equals(x.getDeptId(),deptId)).findFirst().orElse(null);
  }

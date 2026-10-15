@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, App, Button, Form, Input, Modal, Select, Space, Typography } from 'antd'
 import {
   CheckOutlined,
@@ -104,7 +104,12 @@ export default function BpmApprovalActions({
   decisionHint,
   extraActions,
   extraHint,
-  onSuccess
+  onSuccess,
+  inline = false,
+  onState,
+  onFailure,
+  initialDraft,
+  onDraft
 }: {
   /** 当前待办任务；来自审批详情的 todoTask。 */
   task?: BpmTask
@@ -124,16 +129,30 @@ export default function BpmApprovalActions({
   extraActions?: ReactNode
   /** 业务侧动作的补充说明，例如逐条结论的完成进度。 */
   extraHint?: ReactNode
-  onSuccess: () => void
+  onSuccess: (taskCompleted?: boolean) => void
+  inline?: boolean
+  onState?: (dirty: boolean, busy: boolean) => void
+  onFailure?: () => void
+  initialDraft?: { reason?: string; signPicUrl?: string }
+  onDraft?: (draft: { reason: string; signPicUrl?: string }) => void
 }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm<ActionFormValues>()
   const [action, setAction] = useState<ActionKind>()
   const [submitting, setSubmitting] = useState(false)
-  const [signPicUrl, setSignPicUrl] = useState<string>()
+  const [signPicUrl, setSignPicUrl] = useState<string | undefined>(initialDraft?.signPicUrl)
   const [signOpen, setSignOpen] = useState(false)
   const [returnNodes, setReturnNodes] = useState<Array<{ key: string; name: string }>>([])
   const [returnNodesLoading, setReturnNodesLoading] = useState(false)
+  const [inlineReason, setInlineReason] = useState(initialDraft?.reason ?? '')
+  const [moreOpen, setMoreOpen] = useState(false)
+  const busy = useRef(false)
+  const currentTask = useRef(task)
+  currentTask.current = task
+  const authorized = useRef(canUpdate)
+  authorized.current = canUpdate
+  useEffect(() => { onState?.(!!inlineReason.trim() || !!signPicUrl || !!action || signOpen, submitting) }, [inlineReason, signPicUrl, action, signOpen, submitting, onState])
+  useEffect(() => { if (inline) onDraft?.({ reason: inlineReason, signPicUrl }) }, [inlineReason, signPicUrl, inline, onDraft])
 
   const actionable = isBpmTaskActionable(task) && canUpdate
   const reasonRequired = task?.reasonRequire === true
@@ -152,12 +171,12 @@ export default function BpmApprovalActions({
 
   useEffect(() => {
     // 切换任务时清空上一条任务残留的签名与候选数据。
-    setSignPicUrl(undefined)
+    setSignPicUrl(inline ? initialDraft?.signPicUrl : undefined)
     setReturnNodes([])
   }, [task?.id])
 
   const openAction = useCallback(async (kind: ActionKind) => {
-    if (!task) return
+    if (!task || busy.current) return
     form.resetFields()
     setAction(kind)
 
@@ -186,23 +205,31 @@ export default function BpmApprovalActions({
     form.resetFields()
   }
 
-  const submit = async () => {
-    if (!task || !action) return
+  const submit = async (decision?: 'approve' | 'reject') => {
+    const command = decision ?? action
+    if (!task || !command || busy.current || !actionable) return
     let values: ActionFormValues
-    try {
+    if (decision) {
+      if (reasonRequired && !inlineReason.trim()) { message.warning('请输入审批意见'); return }
+      values = { reason: inlineReason }
+    } else try {
       values = await form.validateFields()
     } catch {
       return
     }
-    if (action === 'approve' && signRequired && !signPicUrl) {
+    if (command === 'approve' && signRequired && !signPicUrl) {
       message.warning('该节点要求签名，请先完成签名')
       return
     }
 
+    if (busy.current) return
+    busy.current = true
     setSubmitting(true)
     try {
+      if (decision && !await modal.confirm({ title: '确认' + ACTION_TITLES[decision] + '？', content: '提交后将推进当前审批。', okText: '确认提交', cancelText: '继续编辑' })) return
+      if (!authorized.current || currentTask.current?.id !== task.id || !isBpmTaskActionable(currentTask.current)) return
       const reason = values.reason?.trim() ?? ''
-      switch (action) {
+      switch (command) {
         case 'approve':
           await api.approveBpmTask({ id: task.id, reason, signPicUrl })
           break
@@ -241,20 +268,22 @@ export default function BpmApprovalActions({
           await api.createBpmComment({ taskId: task.id, message: reason })
           break
       }
-      message.success(`${ACTION_TITLES[action]}成功`)
+      message.success(`${ACTION_TITLES[command]}成功`)
       closeAction()
-      setSignPicUrl(undefined)
-      onSuccess()
+      if (decision || !inline) { setInlineReason(''); setSignPicUrl(undefined) }
+      onSuccess(['approve', 'reject', 'return', 'transfer', 'delegate'].includes(command))
     } catch (error) {
+      onFailure?.()
       if (error instanceof AuthenticationError) {
         message.error('登录已失效，请重新登录')
-      } else if (error instanceof ApiError) {
+      } else if (error instanceof Error) {
         // 后端已返回明确的业务原因（如任务已被处理、无权限），直接透出。
         message.error(error.message)
       } else {
-        message.error(`${ACTION_TITLES[action]}失败，请重试`)
+        message.error(`${ACTION_TITLES[command]}失败，请重试`)
       }
     } finally {
+      busy.current = false
       setSubmitting(false)
     }
   }
@@ -270,11 +299,11 @@ export default function BpmApprovalActions({
     <Typography.Text type="secondary">{hint}</Typography.Text>
   </div>
 
-  if (!canUpdate) {
+  if (!canUpdate && !inline) {
     return businessOnly(onlyDecisions ? '' : '当前账号没有 bpm:task:update 权限，无法使用加签、转办等流程动作。')
   }
 
-  if (!isBpmTaskActionable(task)) {
+  if (!isBpmTaskActionable(task) && !inline) {
     return businessOnly('该任务已处理完成，流程动作仅可查看。')
   }
 
@@ -285,6 +314,15 @@ export default function BpmApprovalActions({
     || reasonRequired
 
   return <div className="bpm-approval-actions">
+    {inline && <>
+      <Typography.Text strong>{task.name}</Typography.Text>
+      {allowDecision && <><label htmlFor={'approval-reason-' + task.id}>审批意见{reasonRequired ? '（必填）' : ''}</label>
+        <Input.TextArea id={'approval-reason-' + task.id} value={inlineReason} rows={3} maxLength={500} showCount
+          readOnly={!actionable || submitting} onChange={event => setInlineReason(event.target.value)}/>
+        {signRequired && <Space wrap><Button disabled={!actionable || submitting} onClick={() => setSignOpen(true)}>{signPicUrl ? '重新签名' : '点击签名'}</Button>
+          {signPicUrl && <img src={signPicUrl} alt="签名" className="bpm-signature-preview"/>}</Space>}</>}
+      {!actionable && <Typography.Text type="secondary">当前任务不可处理，已填写意见保留供复制。</Typography.Text>}
+    </>}
     {!allowDecision && decisionHint && <Alert
       type="info"
       showIcon
@@ -301,16 +339,20 @@ export default function BpmApprovalActions({
         type="primary"
         icon={<CheckOutlined/>}
         disabled={!actionable}
-        onClick={() => void openAction('approve')}
+        loading={submitting}
+        onClick={() => void (inline ? submit('approve') : openAction('approve'))}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.APPROVE)}</Button>}
 
       {allowDecision && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.REJECT) && <Button
         danger
         icon={<CloseOutlined/>}
         disabled={!actionable}
-        onClick={() => void openAction('reject')}
+        loading={submitting}
+        onClick={() => void (inline ? submit('reject') : openAction('reject'))}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.REJECT)}</Button>}
 
+      {inline && !onlyDecisions && <Button disabled={submitting || !actionable} onClick={() => setMoreOpen(!moreOpen)} aria-expanded={moreOpen}>更多操作</Button>}
+      <Space wrap className="bpm-more-actions" style={inline && !moreOpen ? { display: 'none' } : undefined}>
       {!onlyDecisions && isBpmButtonVisible(task, BPM_OPERATION_BUTTON.TRANSFER) && <Button
         icon={<SwapOutlined/>}
         disabled={!actionable}
@@ -349,17 +391,18 @@ export default function BpmApprovalActions({
         onClick={() => void openAction('copy')}
       >{bpmButtonName(task, BPM_OPERATION_BUTTON.COPY)}</Button>}
 
-      {!onlyDecisions && <Button
+      {!onlyDecisions && !inline && <Button
         icon={<CommentOutlined/>}
         disabled={!actionable}
         onClick={() => void openAction('comment')}
       >评论</Button>}
+      </Space>
     </Space>
 
     <Modal
       open={action !== undefined}
       title={ACTION_TITLES[action ?? 'approve']}
-      onCancel={closeAction}
+      onCancel={() => { if (!submitting) closeAction() }}
       onOk={() => void submit()}
       confirmLoading={submitting}
       okText="提交"

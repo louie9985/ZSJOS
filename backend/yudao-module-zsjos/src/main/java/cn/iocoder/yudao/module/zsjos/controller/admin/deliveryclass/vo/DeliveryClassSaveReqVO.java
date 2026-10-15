@@ -13,7 +13,16 @@ public class DeliveryClassSaveReqVO {
     private Map<String, String> selectedAttrs;
     private Set<Long> selectedSkuIds;
     private Long categoryId;
-    @NotNull private Long examScheduleId;
+    private Long examScheduleId;
+    private java.time.LocalDate startDate;
+    private java.time.LocalDate endDate;
+
+    @jakarta.validation.constraints.AssertTrue(message = "请选择考期日期，结束日期不能早于开始日期")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isExamDateValid() {
+        if (startDate == null) return endDate == null && examScheduleId != null;
+        return endDate == null || !endDate.isBefore(startDate);
+    }
     @NotNull private Long homeroomUserId;
     private Integer version;
 }

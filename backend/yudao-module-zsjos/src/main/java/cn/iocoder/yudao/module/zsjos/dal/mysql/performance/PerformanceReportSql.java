@@ -50,9 +50,7 @@ public final class PerformanceReportSql {
     public static String pending(PerformanceReportQuery q) {
         return "<script>WITH facts AS (" + scoped(PerformanceFactSql.TASKS) + "), manual AS (SELECT * FROM facts WHERE " + MANUAL + ") "
                 + "SELECT 'accept' `key`,COUNT(*) count FROM manual WHERE status='pending' AND group_key='lead_assignment_accept' UNION ALL "
-                + "SELECT 'qualification',COUNT(*) FROM manual WHERE current_qualification=TRUE AND (status='pending' OR outcome='overdue') AND group_key='lead_qualification' AND due_at &lt;= #{now} UNION ALL "
-                + "SELECT 'todayFollowUp',COUNT(*) FROM manual WHERE status='pending' AND group_key IN ('lead_first_follow_up','lead_follow_up_reminder') AND due_at &gt;= #{today} AND due_at &lt; #{tomorrow} UNION ALL "
-                + "SELECT 'overdueFollowUp',COUNT(*) FROM manual WHERE status='pending' AND group_key IN ('lead_first_follow_up','lead_follow_up_reminder') AND due_at &lt; #{now}</script>";
+                + "SELECT 'qualification',COUNT(*) FROM manual WHERE current_qualification=TRUE AND (status='pending' OR outcome='overdue') AND group_key='lead_qualification' AND due_at &lt;= #{now}</script>";
     }
     public static String activity(PerformanceReportQuery q) {
         return "<script>WITH assignments AS (" + scoped(PerformanceFactSql.ASSIGNMENTS) + "), followups AS (" + scoped(PerformanceFactSql.FOLLOW_UPS)

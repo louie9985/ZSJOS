@@ -25,5 +25,6 @@ public interface RegistrationService {
                                              RegistrationAttachmentDeleteReqVO reqVO);
     void complete(Long caseId, Long userId, RegistrationVersionReqVO reqVO);
     void close(Long caseId, Long userId, RegistrationCloseReqVO reqVO);
+    void cancelEarlyDeliveryByOrderId(Long orderId, String reason, LocalDateTime now);
     void cancelByOrderId(Long orderId, String reason, LocalDateTime now);
 }

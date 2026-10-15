@@ -164,14 +164,8 @@
       <el-form-item label="班级名称" prop="className"
         ><el-input v-model="editor.className" maxlength="100" placeholder="请填写班级名称"
       /></el-form-item>
-      <el-form-item label="考期" prop="examScheduleId"
-        ><el-alert v-if="examError" :title="examError" type="error" show-icon :closable="false"><template #default><el-button link type="primary" @click="reloadExams()">重试</el-button></template></el-alert><el-select v-model="editor.examScheduleId" :loading="examLoading" :disabled="examLoading || Boolean(examError)"
-          ><el-option
-            v-for="item in exams"
-            :key="item.id"
-            :label="item.displayName"
-            :value="item.id" /></el-select
-        ><el-empty v-if="!examLoading && !examError && !exams.length" description="暂无可用考期" :image-size="60" /></el-form-item>
+      <el-form-item label="考期日期" prop="startDate"><el-date-picker v-model="editor.startDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" /></el-form-item>
+      <el-form-item><el-button @click="calendarOpen = true">选择已有考期</el-button></el-form-item>
       <el-form-item label="班主任" prop="homeroomUserId"
         ><el-select v-model="editor.homeroomUserId" filterable
           ><el-option
@@ -233,12 +227,14 @@
       ></template
     >
   </Dialog>
+  <ClassExamCalendar v-model="calendarOpen" :initial-date="editor.startDate" @select="selectExamDates" />
 </template>
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Api from '@/api/zsjos/deliveryClass'
+import ClassExamCalendar from './ClassExamCalendar.vue'
 import { checkPermi } from '@/utils/permission'
 
 defineOptions({ name: 'ZsjosClassManagement' })
@@ -262,18 +258,16 @@ const editing = ref<Api.DeliveryClass>()
 const editorRef = ref<FormInstance>()
 const referenceLoading = ref(false)
 const saving = ref(false)
-const exams = ref<Api.ExamOption[]>([])
-const examLoading = ref(false)
-const examError = ref('')
+const calendarOpen = ref(false)
 const candidates = ref<Api.HomeroomCandidate[]>([])
 const editor = reactive({
   className: '',
-  examScheduleId: undefined as number | undefined,
+  startDate: undefined as string | undefined,
   homeroomUserId: undefined as number | undefined
 })
 const rules: FormRules = {
   className: [{ required: true, whitespace: true, message: '请填写班级名称' }],
-  examScheduleId: [{ required: true, message: '请选择考期' }],
+  startDate: [{ required: true, message: '请选择考期日期' }],
   homeroomUserId: [{ required: true, message: '请选择班主任' }]
 }
 const transferOpen = ref(false)
@@ -347,15 +341,13 @@ const openEditor = async (row?: Api.DeliveryClass) => {
   editing.value = row
   editorOpen.value = true
   referenceLoading.value = true
-  exams.value = []
-  examError.value = ''
   Object.assign(editor, {
     className: row?.className || '',
-    examScheduleId: row?.examScheduleId,
+    startDate: row?.startDate,
     homeroomUserId: row?.homeroomUserId
   })
   try {
-    const [candidateRows] = await Promise.all([Api.getHomeroomCandidates(), reloadExams()])
+    const candidateRows = await Api.getHomeroomCandidates()
     candidates.value = candidateRows
   } catch (cause: any) {
     ElMessage.error(cause?.msg || cause?.message || '基础选项加载失败')
@@ -364,11 +356,9 @@ const openEditor = async (row?: Api.DeliveryClass) => {
     referenceLoading.value = false
   }
 }
-const reloadExams = async () => {
-  examLoading.value = true; examError.value = ''
-  try { exams.value = await Api.getExamOptions() }
-  catch (cause: any) { exams.value = []; examError.value = cause?.msg || cause?.message || '考期加载失败' }
-  finally { examLoading.value = false }
+const selectExamDates = (date: string) => {
+  editor.startDate = date
+  calendarOpen.value = false
 }
 const save = async () => {
   if (!(await editorRef.value?.validate())) return
@@ -376,7 +366,7 @@ const save = async () => {
   try {
     const value = {
       className: editor.className.trim(),
-      examScheduleId: editor.examScheduleId!,
+      startDate: editor.startDate!,
       homeroomUserId: editor.homeroomUserId!
     }
     if (editing.value)

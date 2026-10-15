@@ -26,7 +26,9 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES, FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 import DateTimeText from '../components/DateTimeText'
-import BpmApprovalDetail from '../components/bpm/BpmApprovalDetail'
+import BpmApprovalDetail, { type ApprovalDraft } from '../components/bpm/BpmApprovalDetail'
+import { approvalStatus } from '../components/bpm/approvalHistoryModel'
+import { useApprovalLeaveGuard } from '../components/bpm/useApprovalLeaveGuard'
 import { feedbackApi } from '../services/feedbackApi'
 import { bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from '../components/bpm/bpmStatus'
 import {
@@ -49,7 +51,7 @@ const SALES_ORDER_PERMISSION_DENIED = 1_900_006_011
 const LEAD_APPEAL_PERMISSION_DENIED = 1_900_003_041
 
 /** 状态文案与颜色统一来自 @/components/bpm/bpmStatus，避免两处各维护一份。 */
-const taskStatusLabel = bpmStatusLabel
+const taskStatusLabel = (status?: number) => approvalStatus(status, bpmStatusLabel)
 const taskStatusColor = bpmStatusColor
 
 function taskSubject(task: BpmTask) {
@@ -176,7 +178,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const navigate = useNavigate()
   const location = useLocation()
   const linkedTaskId = new URLSearchParams(location.search).get('taskId')
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const screens = Grid.useBreakpoint()
   const resolvedInitialView = initialView || (location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo')
   const [view, setView] = useState<BpmTaskView>(resolvedInitialView)
@@ -204,12 +206,34 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const loadingMoreRef = useRef(false)
 
+  const draft = useRef({ dirty: false, busy: false })
+  const draftValues = useRef<ApprovalDraft>({})
+  const saveDraft = useCallback((value: Partial<ApprovalDraft>) => { draftValues.current = { ...draftValues.current, ...value } }, [])
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  const [heldTask, setHeldTask] = useState<BpmTask>()
+  const heldRef = useRef<BpmTask | undefined>(undefined)
+  const [completed, setCompleted] = useState(false)
+  const setDraftState = useCallback((dirty: boolean, busy: boolean) => { draft.current = { dirty, busy } }, [])
+  const confirmLeave = useCallback(async () => {
+    if (draft.current.busy) { message.info('正在提交，请稍候'); return false }
+    if (!draft.current.dirty) return true
+    return !!await modal.confirm({ title: '放弃未提交内容？', content: '审批意见、签名或评论尚未提交。', okText: '放弃修改', cancelText: '继续编辑' })
+  }, [message, modal])
+  useApprovalLeaveGuard(confirmLeave, () => draft.current.dirty || draft.current.busy)
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => { if (draft.current.dirty || draft.current.busy) { event.preventDefault(); event.returnValue = '' } }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
+  const clearHeld = () => { heldRef.current = undefined; setHeldTask(undefined); setCompleted(false); draft.current = { dirty: false, busy: false }; draftValues.current = {} }
+  const closeDetail = async () => { if (await confirmLeave()) { clearHeld(); setDrawerOpen(false) } }
+
   const canQuery = permissions.includes('bpm:task:query')
   const canUpdate = permissions.includes('bpm:task:update')
 
   const selectedTask = useMemo(
-    () => tasks.find(item => item.id === selectedId),
-    [selectedId, tasks]
+    () => heldTask ?? tasks.find(item => item.id === selectedId),
+    [heldTask, selectedId, tasks]
   )
 
   const businessEntry = useBusinessEntry(selectedTask, view)
@@ -276,13 +300,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       setTotal(result.total)
       setLoadedPage(useTableLayout ? tablePage : 1)
       setCounts(current => ({ ...current, [view]: result.total }))
-      setSelectedId(current => linkedTask?.id ?? (preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
+      setSelectedId(current => heldRef.current?.id ?? linkedTask?.id ?? (preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
       if (linkedTask) setDrawerOpen(true)
     } catch (loadError) {
       if (seq !== requestSeq.current) return
       console.error('[BpmApprovalCenter] loadFirstPage - error:', loadError)
       setTasks([])
-      setSelectedId(undefined)
+      if (!heldRef.current) setSelectedId(undefined)
       setTotal(0)
       setLoadedPage(0)
       setUnauthorized(loadError instanceof AuthenticationError)
@@ -353,23 +377,27 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [loadMore, loadMoreError, loading, tasks.length, total, useTableLayout])
-  useEffect(() => {
-    if (screens.md) setDrawerOpen(false)
-  }, [screens.md])
 
-  const changeView = (next: string) => {
+  const changeView = async (next: string) => {
+    if (!await confirmLeave()) return
+    clearHeld()
     const nextView = next as BpmTaskView
     setView(nextView)
     navigate(nextView === 'done' ? APP_ROUTES.BPM_DONE : APP_ROUTES.BPM_TODO)
   }
 
   const reload = () => {
+    if (draft.current.busy) return
+    if (selectedTask) { heldRef.current = selectedTask; setHeldTask(selectedTask) }
+    setRefreshVersion(value => value + 1)
     void loadCounts()
     listRef.current?.scrollTo({ top: 0 })
     void loadFirstPage(true)
   }
 
-  const selectTask = (task: BpmTask) => {
+  const selectTask = async (task: BpmTask) => {
+    if (task.id !== selectedTask?.id || completed) { if (!await confirmLeave()) return; clearHeld() }
+    else if (draft.current.busy) return
     if (task.processDefinitionKey === 'zsjos_partner_withdrawal') {
       void api.bpmBusinessTaskTarget(task.id, view).then(target => {
         if (!target.supported) { message.error(target.message || '提现任务定位失败'); return }
@@ -389,8 +417,12 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     </section>
   }
 
-  const detail = <BpmApprovalDetail key={selectedTask?.id}
+  const nextTask = tasks.find(item => item.id !== selectedTask?.id)
+  const detail = <><>{completed && <Alert type="success" message="本次操作已完成" action={nextTask ? <Button onClick={() => void selectTask(nextTask)}>下一条待办</Button> : <span>暂无下一条待办</span>}/>}</><BpmApprovalDetail key={(selectedTask?.id ?? "") + view}
     task={selectedTask}
+    onState={setDraftState} refreshVersion={refreshVersion} completed={completed}
+    initialDraft={draftValues.current} onDraft={saveDraft}
+    confirmLeave={confirmLeave}
     view={view}
     canUpdate={canUpdate && selectedTask?.processDefinitionKey !== 'zsjos_partner_withdrawal'}
     users={users}
@@ -401,17 +433,19 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     businessEntry={businessEntry.supported
       ? { loading: businessEntry.loading, onOpen: () => void businessEntry.open() }
       : undefined}
-    onActionSuccess={() => {
+    onActionSuccess={taskCompleted => {
+      if (selectedTask) { heldRef.current = selectedTask; setHeldTask(selectedTask) }
+      setCompleted(!!taskCompleted)
       void loadCounts()
       void loadFirstPage(true)
     }}
-  />
+  /></>
 
   return <section className={`workspace-page business-inbox-page bpm-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar bpm-approval-header">
       <div className="bpm-approval-title">
         <Typography.Title level={4}>审批中心</Typography.Title>
-        <Typography.Text type="secondary">工作流程中的待办、已办统一在这里查看；具体审批动作回到 BPM 或对应业务页完成。</Typography.Text>
+        <Typography.Text type="secondary">查看申请内容、审批进度并处理当前待办。</Typography.Text>
       </div>
       <Space wrap>
         <div className="bpm-approval-count-card">
@@ -433,7 +467,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         message={countError}
         action={<Button type="link" size="small" onClick={() => void loadCounts()}>重试</Button>}
       />}
-      <Input.Search allowClear value={keyword} placeholder="搜索任务名称" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/>
+      <Input.Search allowClear placeholder="搜索任务名称" onSearch={async value => { if (!await confirmLeave()) return; clearHeld(); setKeyword(value); setTablePage(1) }} onChange={async event => { if (!event.target.value && await confirmLeave()) { clearHeld(); setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/>
       <Tabs
         className="bpm-approval-tabs"
         activeKey={view}
@@ -454,7 +488,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         columnsState={{ persistenceKey: 'crm-bpm-approval-table-columns', persistenceType: 'localStorage' }}
         loading={loading}
         dataSource={tasks}
-        pagination={{ current: tablePage, pageSize: tablePageSize, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
+        pagination={{ current: tablePage, pageSize: tablePageSize, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: async (page, size) => { if (!await confirmLeave()) return; clearHeld(); setTablePage(page); setTablePageSize(size) } }}
         scroll={{ x: 1560 }}
         locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
         columns={[
@@ -537,21 +571,21 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
               </>}
           </div>
         </aside>
-        <main className="business-inbox-detail-pane">{detail}</main>
+        <main className="business-inbox-detail-pane">{screens.md && !drawerOpen ? detail : null}</main>
       </div>}
 
     {selectedTask && briefs[selectedTask.id]?.bizType === 'feedback' ? <ResizableDrawer
-      title="需求审批" open={drawerOpen} onClose={() => setDrawerOpen(false)} width="100vw"
+      title="需求审批" open={drawerOpen} onClose={() => void closeDetail()} width="100vw"
       defaultSize="min(1400px, 92vw)" minSize={1000} storageKey={FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY}
-    >{detail}</ResizableDrawer> : <ResizableDetailDrawer
+    >{drawerOpen ? detail : null}</ResizableDrawer> : <ResizableDetailDrawer
       desktopResizable={useTableLayout}
       title="审批任务"
       open={drawerOpen}
-      onClose={() => setDrawerOpen(false)}
+      onClose={() => void closeDetail()}
       width="100%"
       placement="right"
     >
-      {detail}
+      {drawerOpen ? detail : null}
     </ResizableDetailDrawer>}
   </section>
 }
