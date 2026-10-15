@@ -18,8 +18,9 @@ public final class PerformanceConversion {
         private final Map<ReceiptKey, PerformanceFact> byReceipt = new HashMap<>();
         private final Map<Window, Assessment> windows = new HashMap<>();
         public Population(List<PerformanceFact> orders, List<PerformanceFact> receipts) {
-            this.orders = orders; this.receipts = receipts;
-            for (var r : receipts) byReceipt.putIfAbsent(new ReceiptKey(r.getLeadId(), r.getUserId(), r.getReceivedAt()), r);
+            this.orders = orders.stream().filter(PerformanceConversion::currentlyOwned).toList();
+            this.receipts = receipts.stream().filter(PerformanceConversion::currentlyOwned).toList();
+            for (var r : this.receipts) byReceipt.putIfAbsent(new ReceiptKey(r.getLeadId(), r.getUserId(), r.getReceivedAt()), r);
         }
         public Map<Long, Row> at(Window window) {
             return assessment(window).eligible();
@@ -27,6 +28,11 @@ public final class PerformanceConversion {
         public Assessment assessment(Window window) {
             return windows.computeIfAbsent(window, w -> classify(calculate(w, orders, receipts, byReceipt)));
         }
+    }
+    // Apply before source review and both population paths; an old order must not reintroduce a transferred lead.
+    private static boolean currentlyOwned(PerformanceFact fact) {
+        return fact.getUserId() != null && fact.getUserId().equals(fact.getOwnerUserId())
+                && Boolean.TRUE.equals(fact.getCurrentAssignment());
     }
 
     public record Assessment(Map<Long, Row> eligible, Map<Long, Row> review) {

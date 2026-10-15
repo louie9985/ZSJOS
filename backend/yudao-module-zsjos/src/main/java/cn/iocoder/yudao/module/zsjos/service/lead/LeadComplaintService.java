@@ -54,11 +54,13 @@ public class LeadComplaintService {
     @Resource private FileApi fileApi;
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交投诉", target="complaint-create", id=0, actor=1, actorType="ADMIN")
     public Long create(Long leadId, Long userId, LeadComplaintCreateReqVO req) {
         return createInternal(leadId, userId, null, userId, req);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交投诉", target="complaint-create", id=0, actor=2, actorType="PARTNER")
     public Long createForPartner(Long leadId, Long accountId, Long partnerId, LeadComplaintCreateReqVO req) {
         return createInternal(leadId, null, partnerId, accountId, req);
     }
@@ -143,6 +145,7 @@ public class LeadComplaintService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="投诉处理结果", target="complaint", id=0, actor=1, actorType="ADMIN")
     public void decide(Long id, Long handler, LeadComplaintDecisionReqVO req) {
         LeadComplaintDO replay = complaintMapper.selectByDecisionKey(req.getIdempotencyKey());
         if (replay != null) return;

@@ -47,6 +47,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper eventMapper;
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private PersonMapper personMapper;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
@@ -235,9 +236,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         boolean automatic = selfSourced && isSelfSourced(sourceType(identity)) && reqVO.getNewMediaProviderUserId() == null;
         if (automatic) selfSourcedAutomation.validate(reqVO, actorUserId, sourceType(identity));
         LeadCreateRespVO created = createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
-                requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
+                requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()), automatic);
         if (!automatic) return created;
         selfSourcedAutomation.complete(created.getLeadId(), actorUserId, reqVO.getSelfSourcedNextFollowUpAt());
+        recordSubmission(created.getLeadId(), actorUserId, identity);
         return response(leadMapper.selectById(created.getLeadId()), "created");
     }
 
@@ -276,7 +278,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 ? selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), submitterUserId)
                 : submitterUserId;
         return createApproved(reqVO, submitterUserId, sourceUserId, reusePersonId, products, region, attachments, identity,
-                category, sourceChannelLabel);
+                category, sourceChannelLabel, false);
     }
 
     private LeadCreateRespVO duplicateReviewResponse(LeadDuplicateReviewDO review) {
@@ -347,7 +349,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                                             List<LeadProductSnapshot> products, RegionSnapshot region,
                                             Map<Long, FileInfoRespDTO> attachments,
                                             LeadSubmissionIdentityService.Resolution identity,
-                                            LeadCategorySnapshotService.Selection category, String sourceChannelLabel) {
+                                            LeadCategorySnapshotService.Selection category, String sourceChannelLabel, boolean deferFlowRecord) {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         PersonDO person = reusePersonId == null
@@ -365,7 +367,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), actorUserId,
                 lead.getSubmittedAt(), eventContext(lead, actorUserId, identity));
         dispatchService.start(lead, reqVO.getSpecifiedSalesUserId(), actorUserId);
+        if (!deferFlowRecord) recordSubmission(lead.getId(), actorUserId, identity);
         return response(leadMapper.selectById(lead.getId()), "created");
+    }
+
+    private void recordSubmission(Long leadId, Long actorId, LeadSubmissionIdentityService.Resolution identity) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        flowRecorder.record(leadId, new cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder.State(Map.of(), Set.of(), false),
+                "客资提交", identity.partnerId() == null ? "ADMIN" : "PARTNER",
+                identity.partnerId() == null ? actorId : identity.partnerId(), "lead", leadId, lead.getLeadNo(),
+                "已提交", null, true, "submission:" + leadId);
     }
 
     private LeadCreateRespVO findIdempotent(String key, LeadSubmissionIdentityService.Resolution identity) {

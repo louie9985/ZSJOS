@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LeadQualificationServiceImplTest {
     @InjectMocks private LeadQualificationServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private LeadMapper leadMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;

@@ -45,6 +45,7 @@ public class LeadSubmitterFeedbackService {
 
     @ZsjosPermission(bizType = "lead-submitter-feedback", bizId = "#leadId", action = "create")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="向提交人反馈", target="feedback-create", id=0, actor=1, actorType="ADMIN")
     public Long create(Long leadId, Long userId, LeadSubmitterFeedbackReqVO request) {
         LeadDO lead = lockedLead(leadId);
         // Recheck ownership under the Lead lock so a concurrent transfer cannot authorize the former owner.

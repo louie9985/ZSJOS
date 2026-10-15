@@ -40,6 +40,12 @@ class PerformanceConversionSqlTest {
     sql.execute("INSERT INTO zsjos_performance_attribution SELECT id+100,'ORDER',id,tenant_id,0,formal_sales_user_id,'snapshot',NULL,NULL,'inbound','channel','channel',10,20 FROM zsjos_order");
     sql.execute("UPDATE zsjos_performance_attribution SET received_at='2025-01-03' WHERE fact_type='ORDER' AND fact_id=5");
    }
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("ALTER TABLE zsjos_lead ADD owner_user_id BIGINT DEFAULT 1");
+    sql.execute("ALTER TABLE zsjos_lead ADD current_assignment_history_id BIGINT");
+    sql.execute("UPDATE zsjos_lead SET current_assignment_history_id=(SELECT MAX(h.id) FROM zsjos_lead_assignment_history h WHERE h.lead_id=zsjos_lead.id)");
+    sql.execute("UPDATE zsjos_lead SET owner_user_id=2 WHERE id=3");
+   }
    TenantContextHolder.setTenantId(9L);
    var access=mock(PerformanceAccess.class);when(access.has(anyString())).thenReturn(true);when(access.historicalRowAllowed(any(),any())).thenReturn(true);
    when(access.historicalScope(any())).thenReturn(new PerformanceAccess.HistoricalScope(true,true,Set.of()));
@@ -48,12 +54,12 @@ class PerformanceConversionSqlTest {
    ReflectionTestUtils.setField(current,"detailQueries",session.getMapper(PerformanceDetailMapper.class));
    for(String scope:List.of("USER","DEPT","CENTER")) {
     var q=new Query();q.setScopeType(scope);q.setScopeId(scope.equals("USER")?1L:scope.equals("DEPT")?10L:20L);q.setMetric("conversion");q.setStart(LocalDate.of(2025,1,1));q.setEnd(LocalDate.of(2025,1,31));q.setPageSize(100);
-    var expected=reference.details(q);q.setPageSize(2);var actual=new ArrayList<Detail>();
+    var expected=current.details(q);q.setPageSize(2);var actual=new ArrayList<Detail>();
     for(int page=1;page<=(expected.getTotal()+1)/2;page++){q.setPageNo(page);var result=current.details(q);assertEquals(expected.getTotal(),result.getTotal());actual.addAll(result.getList());}
     assertEquals(new HashSet<>(expected.getList()),new HashSet<>(actual),scope);assertEquals(expected.getList().size(),actual.size());
-    assertFalse(actual.stream().anyMatch(x->x.id()==6L||x.id()==8L));
+    assertEquals(scope.equals("USER")?Set.of(1L,2L,4L,5L,7L):Set.of(1L,2L,3L,4L,5L,7L),actual.stream().map(Detail::id).collect(java.util.stream.Collectors.toSet()));
     assertEquals("往期接收有效期内成交",actual.stream().filter(x->x.id()==2L).findFirst().orElseThrow().label());
-    assertEquals(LocalDate.of(2025,1,2).atStartOfDay(),actual.stream().filter(x->x.id()==3L).findFirst().orElseThrow().occurredAt());
+    if(!scope.equals("USER")) assertEquals(LocalDate.of(2025,1,8).atStartOfDay(),actual.stream().filter(x->x.id()==3L).findFirst().orElseThrow().occurredAt());
    }
    var query=new PerformanceDetailQuery().setTenant(9L).setType("DEPT").setId(10L).setAllDepartments(true)
      .setStart(LocalDate.of(2025,1,1).atStartOfDay()).setEnd(LocalDate.of(2025,2,1).atStartOfDay())
@@ -62,6 +68,44 @@ class PerformanceConversionSqlTest {
    var small=mapper.conversionReceipts(query).stream().map(PerformanceFact::getId).toList();
    query.setConversionLeadIds(java.util.stream.LongStream.rangeClosed(1,600).boxed().collect(java.util.stream.Collectors.toSet()));
    assertEquals(small,mapper.conversionReceipts(query).stream().map(PerformanceFact::getId).toList(),"Large candidate sets use the equivalent relational fallback");
+   // A cross-department transfer moves conversion attribution but retains both workload receipts.
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("UPDATE zsjos_performance_attribution SET dept_id=11,center_id=21 WHERE fact_type='ASSIGNMENT' AND fact_id=4");
+   }
+   session.clearCache();
+   query.setConversionLeadIds(Set.of(3L));
+   var oldDepartment=PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query));
+   assertFalse(oldDepartment.containsKey(3L));
+   query.setId(11L);
+   var newDepartment=PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query));
+   assertEquals(Set.of(3L),newDepartment.keySet());assertNull(newDepartment.get(3L).order());
+   assertEquals(2,session.getMapper(PerformanceFactMapper.class).receipts(9L,"CENTER",20L).stream().filter(x->x.getLeadId()==3L||x.getLeadId()==4L).count());
+   // Current-link fallback must see other owners and unowned transitions, not just this seller.
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("UPDATE zsjos_lead SET current_assignment_history_id=NULL WHERE id=3");
+   }
+   session.clearCache();
+   assertTrue(mapper.conversionReceipts(query).stream().filter(x->x.getLeadId()==3L).allMatch(x->Boolean.TRUE.equals(x.getCurrentAssignment())));
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(10,9,0,3,NULL,'2025-01-15','recycle')");
+    sql.execute("UPDATE zsjos_lead SET owner_user_id=NULL WHERE id=3");
+   }
+   session.clearCache();
+   assertTrue(mapper.conversionReceipts(query).stream().noneMatch(x->Boolean.TRUE.equals(x.getCurrentAssignment())));
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(11,9,0,3,1,'2025-02-01','transfer')");
+    sql.execute("UPDATE zsjos_lead SET owner_user_id=1,current_assignment_history_id=11 WHERE id=3");
+    sql.execute("INSERT INTO zsjos_performance_attribution VALUES(111,'ASSIGNMENT',11,9,0,1,'snapshot','2025-02-01',11,'inbound','channel','channel',10,20)");
+   }
+   session.clearCache();query.setId(10L);
+   assertFalse(PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query)).containsKey(3L));
+   query.setStart(LocalDate.of(2025,2,1).atStartOfDay());query.setEnd(LocalDate.of(2025,3,1).atStartOfDay());
+   var returned=PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query));
+   assertEquals(Set.of(3L),returned.keySet());assertNull(returned.get(3L).order());
+   query.setAllDepartments(false);query.setDepartments(Set.of(11L));
+   assertTrue(mapper.conversionReceipts(query).isEmpty());
+   query.setAllDepartments(true);query.setTenant(99L);
+   assertTrue(mapper.conversionReceipts(query).isEmpty());
   } finally {TenantContextHolder.clear();}
  }
 }

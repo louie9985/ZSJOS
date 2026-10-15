@@ -1685,7 +1685,15 @@ export type LeadFlowAttachment = {
   previewable: boolean;
   available: boolean;
 };
+export type LeadFlowFieldValue = { state: 'EMPTY' | 'VALUE' | 'UNRECORDED'; text?: string | null };
+export type LeadFlowFieldChange = { field: string; label: string; before: LeadFlowFieldValue; after: LeadFlowFieldValue };
 export type LeadFlowHistory = {
+  snapshotVersion?: number;
+  operationResult?: string;
+  relatedType?: string;
+  relatedId?: number;
+  relatedNo?: string;
+  changes?: LeadFlowFieldChange[];
   id: string;
   occurredAt: Timestamp;
   businessObject: string;

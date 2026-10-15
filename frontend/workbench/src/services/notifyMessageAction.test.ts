@@ -165,6 +165,33 @@ describe('notify message business actions', () => {
     expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
   })
 
+  it.each(['admin_replied', 'completed', 'survey_requested'])('opens the exact feedback for %s without a template link', async scene => {
+    const item = message({ bizType: 'feedback', bizId: 73, sceneCode: `zsjos.feedback.${scene}`, templateParams: {} })
+    const navigate = vi.fn()
+    expect(isNotifyBusinessActionCandidate(item)).toBe(true)
+    await executeNotifyMessageAction(item, { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith('/zsjos/feedback?feedbackId=73')
+  })
+
+  it.each([undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('keeps feedback with invalid ID %s in message details', async bizId => {
+    const item = message({ bizType: 'feedback', bizId, sceneCode: 'zsjos.feedback.completed' })
+    const navigate = vi.fn()
+    expect(isNotifyBusinessActionCandidate(item)).toBe(false)
+    await executeNotifyMessageAction(item, { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith('/messages/all?messageId=11')
+  })
+
+  it('respects feedback message-only actions and ignores template link overrides', async () => {
+    const item = message({ bizType: 'feedback', actionType: 'message_detail', sceneCode: 'zsjos.feedback.completed' })
+    const navigate = vi.fn()
+    expect(isNotifyBusinessActionCandidate(item)).toBe(false)
+    await executeNotifyMessageAction(item, { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenCalledWith('/messages/all?messageId=11')
+    await executeNotifyMessageAction({ ...item, actionType: 'business_detail', templateParams: { deepLink: '/zsjos/feedback?feedbackId=999' } },
+      { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
+    expect(navigate).toHaveBeenLastCalledWith('/zsjos/feedback?feedbackId=29')
+  })
+
   it('opens the exact urged task only after checking current ownership', async () => {
     const lookup = vi.spyOn(feedbackApi, 'approvalTask').mockResolvedValue({ id: 'task-7' } as never)
     const navigate = vi.fn()

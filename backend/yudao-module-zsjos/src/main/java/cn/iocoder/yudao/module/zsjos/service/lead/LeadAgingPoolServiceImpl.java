@@ -40,6 +40,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     private static final String NOTIFY_PENDING = "pending";
     private static final String NOTIFY_SENT = "sent";
     private static final String NOTIFY_FAILED = "failed";
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private LeadAgingPoolCycleMapper cycleMapper;
     @Resource private LeadAgingPoolEventMapper eventMapper;
     @Resource private LeadMapper leadMapper;
@@ -123,6 +124,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="分配公海协作人", target="cycle", id=0, actor=1, actorType="ADMIN")
     public void assign(Long cycleId, Long userId, LeadAgingPoolAssignReqVO reqVO) {
         LeadAgingPoolEventDO replay = eventMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
         if (replay != null) {
@@ -151,6 +153,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="退出公海", target="cycle", id=0, actor=1, actorType="ADMIN")
     public void exit(Long cycleId, Long userId, LeadAgingPoolExitReqVO reqVO) {
         LeadAgingPoolEventDO replay = eventMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
         if (replay != null) {
@@ -201,6 +204,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Override
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-aging.emit-advance-reminders", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="手动进入公海", target="lead", id=0, actor=2, actorType="ADMIN")
     public void enterManually(Long leadId, Long collaboratorUserId, Long operatorUserId, String reason,
                               String idempotencyKey) {
         LeadAgingPoolCycleDO replay = cycleMapper.selectByIdempotencyKey(idempotencyKey);
@@ -294,6 +298,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
             AdminUserRespDTO user = adminUserApi.getUser(cycle.getCollaboratorUserId());
             if (user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
                     && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId()) && isEligibleSales(user.getId())) continue;
+            var flowBefore = flowRecorder.capture(cycle.getLeadId());
             Long previous = cycle.getCollaboratorUserId(); cycle.setCollaboratorUserId(null);
             cycle.setAssignedAt(null); cycle.setStatus(AGING_POOL_WAITING_ASSIGNMENT); updateCycle(cycle);
             taskCleanupService.cancelObsolete(cycle.getLeadId(), now);
@@ -301,7 +306,9 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
             String key = "aging-pool-collaborator-cleared:" + cycle.getId() + ":" + now;
             addEvent(cycle, AGING_POOL_EVENT_COLLABORATOR_CLEARED, 0L, previous, null,
                     "协同销售已停用、调离冻结部门或不再具备销售资格", key, now);
-            publish(AGING_POOL_REASSIGN_REQUIRED_NOTICE, cycle, key, 0L, previous, now); changed++;
+            publish(AGING_POOL_REASSIGN_REQUIRED_NOTICE, cycle, key, 0L, previous, now);
+            flowRecorder.record(cycle.getLeadId(), flowBefore, "清除失效公海协作人", "SYSTEM", null, "lead", cycle.getLeadId(), null, "待重新分配", "协作人资格失效", false, key);
+            changed++;
         }
         return changed;
     }
@@ -588,6 +595,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (progressAt == null || progressAt.plusDays(rule.getAgingPoolTimeoutDays()).isAfter(now)) return false;
         AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
         if (owner == null || owner.getDeptId() == null) return false;
+        var flowBefore = flowRecorder.capture(leadId);
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
         cycle.setLeadId(lead.getId()); cycle.setCycleNo(cycleMapper.selectNextCycleNo(lead.getId()));
         cycle.setOriginalOwnerUserId(lead.getOwnerUserId()); cycle.setFrozenDeptId(owner.getDeptId());
@@ -601,6 +609,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         leadMapper.touchActivity(lead.getId(), now);
         addEvent(cycle, AGING_POOL_EVENT_ENTERED, 0L, null, null, null, cycle.getIdempotencyKey(), now);
         publish(AGING_POOL_DUE, cycle, cycle.getIdempotencyKey(), 0L, null, now);
+        flowRecorder.record(leadId, flowBefore, "自动进入公海", "SYSTEM", null, "lead", leadId, lead.getLeadNo(), "待分配协作人", null, false, cycle.getIdempotencyKey());
         return true;
     }
     private void addEvent(LeadAgingPoolCycleDO cycle, String type, Long operator, Long previous, Long collaborator, String reason, String key, LocalDateTime now) { LeadAgingPoolEventDO event = new LeadAgingPoolEventDO(); event.setCycleId(cycle.getId()); event.setLeadId(cycle.getLeadId()); event.setEventType(type); event.setOperatorUserId(operator); event.setPreviousCollaboratorUserId(previous); event.setCollaboratorUserId(collaborator); event.setReason(reason); event.setIdempotencyKey(key); event.setOccurredAt(now); eventMapper.insert(event); }

@@ -66,6 +66,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Override
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="新增跟进", target="lead", id=0, actor=1, actorType="ADMIN")
     public LeadFollowUpRespVO create(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO) {
         return createInternal(leadId, operatorUserId, reqVO, false);
     }
@@ -73,6 +74,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Override
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="自拓自动跟进", target="lead", id=0, actor=1, actorType="ADMIN")
     public LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, LocalDateTime nextFollowUpAt) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null || !LeadSourceInterpretation.resolve(lead).unlinked() || !DISPATCH_SELF.equals(lead.getDispatchMode())

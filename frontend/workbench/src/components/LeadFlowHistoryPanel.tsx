@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Empty, Image, Modal, Spin, Tag, Typography } from 'antd'
 import { ArrowRightOutlined, FilePdfOutlined, FileUnknownOutlined } from '@ant-design/icons'
-import { api, type LeadFlowAttachment, type LeadFlowHistory } from '../services/api'
+import { api, type LeadFlowAttachment, type LeadFlowHistory, type LeadFlowFieldValue } from '../services/api'
 import { formatTimestamp } from '../services/time'
+
+export function flowFieldText(value: LeadFlowFieldValue | undefined, after = false): string {
+  if (!value || value.state === 'UNRECORDED') return '历史未记录'
+  if (value.state === 'EMPTY') return after ? '已清空' : '原值为空'
+  return value.text || '历史标签未记录'
+}
 
 function ChangeLine({ label, before, after }: { label: string; before?: string; after?: string }) {
   if (!before && !after) return null
@@ -63,6 +69,7 @@ function FlowItem({ item }: { item: LeadFlowHistory }) {
             <Typography.Text strong>{item.flowNode}</Typography.Text>
             <Tag>{item.businessObject || '客资'}</Tag>
             {item.source && <Tag color="blue">{item.source}</Tag>}
+            {item.operationResult && <Tag>{item.operationResult}</Tag>}
           </div>
           <Typography.Text type="secondary" className="flow-history-operator">
             操作人：{item.operator || '系统'}
@@ -80,6 +87,14 @@ function FlowItem({ item }: { item: LeadFlowHistory }) {
           <ChangeLine label="分配状态" before={item.assignmentStatusBefore} after={item.assignmentStatusAfter}/>
         </div>}
 
+        {Boolean(item.changes?.length) && <details className="flow-history-field-details">
+          <summary>查看 {item.changes!.length} 项数据变化</summary>
+          <div className="flow-history-changes">
+            {item.changes!.map(change => <ChangeLine key={change.field} label={change.label}
+              before={flowFieldText(change.before)} after={flowFieldText(change.after, true)}/>)}
+          </div>
+        </details>}
+        {item.relatedNo && <Typography.Paragraph type="secondary">关联单据：{item.relatedNo}</Typography.Paragraph>}
         {(item.reason || item.remark) && <div className="flow-history-notes">
           {item.reason && <Typography.Paragraph className="flow-history-note" ellipsis={{ rows: 2, expandable: 'collapsible' }}>
             原因：{item.reason}
@@ -101,7 +116,7 @@ function FlowItem({ item }: { item: LeadFlowHistory }) {
   </div>
 }
 
-export default function LeadFlowHistoryPanel({ leadId }: { leadId: number }) {
+export default function LeadFlowHistoryPanel({ leadId, refreshVersion = 0 }: { leadId: number; refreshVersion?: number }) {
   const [items, setItems] = useState<LeadFlowHistory[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -110,7 +125,7 @@ export default function LeadFlowHistoryPanel({ leadId }: { leadId: number }) {
     try { setItems(await api.leadFlowHistory(leadId)) }
     catch (loadError) { setError(loadError instanceof Error ? loadError.message : '流转记录加载失败') }
     finally { setLoading(false) }
-  }, [leadId])
+  }, [leadId, refreshVersion])
   useEffect(() => { void load() }, [load])
 
   const panelState = flowPanelState(loading, error, items.length)

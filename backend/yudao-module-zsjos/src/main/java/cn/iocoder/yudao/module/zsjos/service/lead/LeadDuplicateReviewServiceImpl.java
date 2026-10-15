@@ -61,6 +61,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = BIZ_TYPE_LEAD_DUPLICATE_REVIEW, bizId = "#id", action = "process")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="重复客资复核", target="review", id=0, actor=2, actorType="ADMIN")
     public void decide(Long id, LeadDuplicateReviewDecisionReqVO request, Long reviewerUserId) {
         LeadDuplicateReviewDO review = reviewMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (review == null) throw exception(LEAD_DUPLICATE_REVIEW_NOT_EXISTS);
@@ -104,6 +105,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="重复客资自动复核", target="review", id=0, actor=-1, actorType="SYSTEM")
     public LeadCreateRespVO resolveAutomatically(Long id, Long matchedLeadId, Long actorUserId) {
         LeadDuplicateReviewDO review = reviewMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (review == null) throw exception(LEAD_DUPLICATE_REVIEW_NOT_EXISTS);

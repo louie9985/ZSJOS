@@ -36,20 +36,45 @@ public final class PerformanceDetailSql {
         };
     }
     public static String conversionOrders(PerformanceDetailQuery q) {
-        return "<script>WITH " + orderDefinitions(q) + " SELECT * FROM orders WHERE " + interval("occurred_at", "end")
-                + " ORDER BY occurred_at DESC,id DESC</script>";
+        return "<script>WITH " + orderDefinitions(q) + " SELECT " + conversionColumns(true)
+                + " FROM orders r " + conversionOwnershipJoin() + " WHERE " + interval("r.occurred_at", "end")
+                + " ORDER BY r.occurred_at DESC,r.id DESC</script>";
+    }
+    private static String conversionColumns(boolean order) {
+        return "r.*,cl.owner_user_id,(cl.owner_user_id=r.user_id AND ch.id IS NOT NULL AND "
+                + (order ? "COALESCE(r.assignment_id,(SELECT oh.id FROM zsjos_lead_assignment_history oh "
+                         + "WHERE oh.tenant_id=cl.tenant_id AND oh.lead_id=cl.id AND oh.deleted=0 "
+                         + "AND oh.action_type IN ('accept','claim','transfer','recycle','release_to_claim_pool','public_pool') "
+                         + "AND oh.occurred_at &lt;= r.occurred_at ORDER BY oh.occurred_at DESC,oh.id DESC LIMIT 1))=ch.id "
+                         + "AND r.received_at=COALESCE(ca.received_at,ch.occurred_at) AND r.occurred_at &gt;= ch.occurred_at"
+                         : "r.assignment_id=ch.id") + ") current_assignment";
+    }
+    private static String conversionOwnershipJoin() {
+        // Only conversion resolves current ownership. Shared receipt facts must retain actual historical workload.
+        // With no explicit link, use the latest ownership transition across ALL owners, including unowned intervals.
+        return "LEFT JOIN zsjos_lead cl ON cl.id=r.lead_id AND cl.tenant_id=#{tenant} AND cl.deleted=0 "
+                + "LEFT JOIN zsjos_lead_assignment_history ch ON ch.tenant_id=cl.tenant_id AND ch.lead_id=cl.id AND ch.deleted=0 "
+                + "AND ch.id=COALESCE(cl.current_assignment_history_id,(SELECT h.id FROM zsjos_lead_assignment_history h "
+                + "WHERE h.tenant_id=cl.tenant_id AND h.lead_id=cl.id AND h.deleted=0 "
+                + "AND h.action_type IN ('accept','claim','transfer','recycle','release_to_claim_pool','public_pool') "
+                + "ORDER BY h.occurred_at DESC,h.id DESC LIMIT 1)) "
+                + "AND ch.to_owner_user_id=cl.owner_user_id AND ch.action_type IN ('accept','claim','transfer') "
+                + "LEFT JOIN zsjos_performance_attribution ca ON ca.tenant_id=cl.tenant_id AND ca.deleted=0 "
+                + "AND ca.fact_type='ASSIGNMENT' AND ca.fact_id=ch.id ";
     }
     public static String conversionReceipts(PerformanceDetailQuery q) {
         // Retain out-of-period histories for candidate leads without re-running the order query for normal pages.
         if(q.getConversionLeadIds().size() <= 512) {
-            return "<script>WITH receipts AS (" + scoped(PerformanceFactSql.RECEIPTS) + ") SELECT r.* FROM receipts r WHERE ("
+            return "<script>WITH receipts AS (" + scoped(PerformanceFactSql.RECEIPTS) + ") SELECT " + conversionColumns(false)
+                    + " FROM receipts r " + conversionOwnershipJoin() + " WHERE ("
                     + interval("r.received_at", "end") + ") <if test=\"!conversionLeadIds.isEmpty()\"> OR r.lead_id IN "
                     + "<foreach collection=\"conversionLeadIds\" item=\"lead\" open=\"(\" separator=\",\" close=\")\">#{lead}</foreach></if> "
                     + "ORDER BY r.occurred_at DESC,r.id DESC</script>";
         }
         // Large periods use a relational predicate instead of an unbounded IN list.
         return "<script>WITH " + orderDefinitions(q) + ", receipts AS (" + scoped(PerformanceFactSql.RECEIPTS) + ") "
-                + "SELECT r.* FROM receipts r WHERE (" + interval("r.received_at", "end") + ") OR EXISTS "
+                + "SELECT " + conversionColumns(false) + " FROM receipts r " + conversionOwnershipJoin()
+                + " WHERE (" + interval("r.received_at", "end") + ") OR EXISTS "
                 + "(SELECT 1 FROM orders o WHERE o.lead_id=r.lead_id AND " + interval("o.occurred_at", "end") + ") "
                 + "ORDER BY r.occurred_at DESC,r.id DESC</script>";
     }

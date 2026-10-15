@@ -73,6 +73,8 @@
 
 四个场景为 `zsjos.feedback.employee_replied`、`zsjos.feedback.admin_replied`、`zsjos.feedback.completed` 和 `zsjos.feedback.survey_requested`。消息动作使用受控业务详情，深链为 `/zsjos/feedback?feedbackId={id}`，进入详情时仍重新校验菜单权限和本人数据范围。
 
+员工工作台点击消息及消息详情中的“查看业务”均按 `bizType=feedback` 和有效正整数 `bizId` 打开对应反馈详情，不依赖模板正文包含链接；缺失或非法业务 ID 不提供业务入口。`zsjos.feedback.approval_urged` 优先保留指定审批任务跳转。
+
 ## 当前租户管理员读取
 
 个人列表新增可选 readScope=SELF|ALL|USER、targetUserId，默认本人。管理员 ALL/USER 为只读投影；查看他人不标记已读、不回复或重提。ADMIN 与 PARTNER 同号用户不能获得对方的本人动作。基础功能权限保留，详见 tenant-admin-read-all.md。

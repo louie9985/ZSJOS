@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Retained MySQL fixtures for V319; optional scoped, additive local apply. No grants."""
+"""Retained MySQL fixtures for V318; optional scoped, additive local apply. No grants."""
 import datetime
 import hashlib
 import sys
 from test_calendar_notifications import query, table, SQL
 
-MIGRATION = (SQL / 'migrations/V319__exam_calendar_export_permission.sql').read_text(encoding='utf-8')
+MIGRATION = (SQL / 'migrations/V318__exam_calendar_export_permission.sql').read_text(encoding='utf-8')
 PREFIX = 'exam_export_' + datetime.datetime.now().strftime('%m%d%H%M%S')
 PARENT = "INSERT INTO system_menu(id,name,permission,type,parent_id) VALUES (73610,'考期日历','zsjos:exam-calendar:query',2,73600);"
 
 
 def versions(db):
-    return query(db, "SELECT version,checksum FROM zsjos_schema_version WHERE version='V319'; SELECT version,checksum FROM zsjos_module_schema_version WHERE module_code='core' AND version='V319';")[0]
+    return query(db, "SELECT version,checksum FROM zsjos_schema_version WHERE version='V318'; SELECT version,checksum FROM zsjos_module_schema_version WHERE module_code='core' AND version='V318';")[0]
 
 
 def verify(db):

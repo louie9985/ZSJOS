@@ -10,12 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class PerformanceSourceReviewTest {
     private final LocalDateTime now = LocalDateTime.parse("2026-10-10T12:00:00");
     private PerformanceFact receipt(long id, String source, boolean recorded, String at) {
-        var r = new PerformanceFact(); r.setLeadId(id); r.setUserId(17L); r.setStatus("valid");
+        var r = new PerformanceFact(); r.setLeadId(id); r.setUserId(17L); r.setOwnerUserId(17L); r.setCurrentAssignment(true); r.setStatus("valid");
         r.setReceivedAt(LocalDateTime.parse(at)); r.setOccurredAt(r.getReceivedAt());
         r.setSourceType(source); r.setSourceProviderRecorded(recorded); return r;
     }
     private PerformanceFact order(PerformanceFact receipt, String amount, String at) {
-        var o = new PerformanceFact(); o.setLeadId(receipt.getLeadId()); o.setUserId(receipt.getUserId());
+        var o = new PerformanceFact(); o.setLeadId(receipt.getLeadId()); o.setUserId(receipt.getUserId()); o.setOwnerUserId(receipt.getOwnerUserId()); o.setCurrentAssignment(receipt.getCurrentAssignment());
         o.setSourceType(receipt.getSourceType()); o.setSourceProviderRecorded(receipt.getSourceProviderRecorded());
         o.setReceivedAt(receipt.getReceivedAt()); o.setOccurredAt(LocalDateTime.parse(at));
         o.setOrderType("first_purchase"); o.setAmount(new BigDecimal(amount)); return o;

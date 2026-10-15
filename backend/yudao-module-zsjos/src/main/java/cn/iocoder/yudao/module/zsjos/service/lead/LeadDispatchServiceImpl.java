@@ -44,6 +44,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
 
     private static final int MAX_POOL_SCAN_ROUNDS = 3;
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
@@ -212,6 +213,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="接单", target="lead", id=0, actor=1, actorType="ADMIN")
     public void accept(Long leadId, Long userId) {
         accept(leadId, userId, null);
     }
@@ -219,6 +221,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="接单", target="lead", id=0, actor=1, actorType="ADMIN")
     public void accept(Long leadId, Long userId, Long expectedAssignmentHistoryId) {
         // Hold the Lead row across round validation and ownership update; history uses a current read.
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
@@ -273,6 +276,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "reject")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="拒单", target="lead", id=0, actor=1, actorType="ADMIN")
     public void reject(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) throw exception(LEAD_ASSIGNMENT_REJECT_FORBIDDEN);
@@ -296,6 +300,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "claim")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="抢单", target="lead", id=0, actor=1, actorType="ADMIN")
     public void claim(Long leadId, Long userId) {
         requireSalesUser(userId);
         RuleConfig config = readConfig(requireRule().getConfigJson());
@@ -350,6 +355,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="管理员转派", target="lead", id=0, actor=2, actorType="ADMIN")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId) {
         adminTransfer(leadId, salesUserId, operatorUserId, "管理员转派");
     }
@@ -357,6 +363,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="管理员转派", target="lead", id=0, actor=2, actorType="ADMIN")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason) {
         adminTransfer(leadId, salesUserId, operatorUserId, reason, null);
     }
@@ -364,6 +371,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="管理员转派", target="lead", id=0, actor=2, actorType="ADMIN")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason,
                               String idempotencyKey) {
         requireSalesUser(salesUserId);
@@ -378,6 +386,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-dispatch.process-expired", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="本人转派", target="lead", id=0, actor=3, actorType="ADMIN")
     public void transferOwned(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                               Long operatorUserId, String reason, String idempotencyKey) {
         requireSalesUser(salesUserId);
@@ -395,6 +404,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-dispatch.process-unassigned-retries", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="审核转派", target="lead", id=0, actor=3, actorType="ADMIN")
     public TransferAttemptResult tryAdminTransfer(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                                                   Long operatorUserId, String reason) {
         if (assignmentService.getEligibleSalesUsers().stream().noneMatch(user -> salesUserId.equals(user.getId()))) {
@@ -469,6 +479,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         for (LeadDO lead : leadMapper.selectExpiredPending(LocalDateTime.now())) {
             Long candidate = lead.getPendingAssigneeUserId();
             if (candidate == null || DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) continue;
+            var flowBefore = flowRecorder.capture(lead.getId());
             LocalDateTime expiredAt = LocalDateTime.now();
             if (leadMapper.updatePendingResult(lead.getId(), candidate, ASSIGNMENT_UNASSIGNED, null, expiredAt) == 0) continue;
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_TIMEOUT, candidate, 0L, null,
@@ -481,6 +492,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             notifyEventPublisher.publish(EXPIRED, lead.getId(), "lead-expired:" + history.getId(), 0L,
                     expiredAt, eventContext(lead, candidate, lead.getOwnerUserId(), "接单超时"));
             dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, ACTION_TIMEOUT, expiredAt);
+            flowRecorder.record(lead.getId(), flowBefore, "接单超时重新分配", "SYSTEM", null, "lead", lead.getId(), lead.getLeadNo(), "已处理", null, false, "dispatch-timeout:" + history.getId());
             count++;
         }
         return count;
@@ -491,7 +503,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     public int processUnassignedRetries() {
         int count = 0;
         for (LeadDO lead : leadMapper.selectRetryableUnassignedAuto()) {
+            var flowBefore = flowRecorder.capture(lead.getId());
             dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, null, LocalDateTime.now());
+            flowRecorder.record(lead.getId(), flowBefore, "自动重新派单", "SYSTEM", null, "lead", lead.getId(), lead.getLeadNo(), "已处理", null, false, null);
             if (!ASSIGNMENT_UNASSIGNED.equals(lead.getAssignmentStatus())) {
                 count++;
             }

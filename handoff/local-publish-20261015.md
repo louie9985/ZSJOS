@@ -28,3 +28,15 @@
 - Files: docs/api/exam-calendar.md; exam-export migration renamed V320 to V319; tools/test_exam_export_permission.py; handoff/local-migration-renumber-20261015.md; this append.
 - Verification/limits: scoped staged diff check and remote identity verification; no full runtime/database acceptance. Migration chain missing V318, and previously applied old-number databases require separate ledger/checksum rollout review.
 - Integration: commit then normal push; final hash/result reported after command completion. Local caches/probes/reports retained unstaged; no database/service operation. Ownership released after publication.
+
+## Registration update — subsequent main publication / 2026-10-15 Beijing
+- Context: local/main/D:/ZSJ-OS; owner /root; base 8df3f65eb379b142c0ce0cb84b21e621e59b79b9. User requests committing local main and pushing origin/main again.
+- Scope: pending Lead flow snapshots/history, current-owner conversion population, transfer/feedback notification entries, exam migration V319 -> V318, associated tests/docs/handoffs and this record. Preserve delivery-feature isolation.
+- Verification: reviewed feature handoffs; static DB check PASS, Core source continuity restored through V318. Existing old-number environments still need separately reviewed ledger/checksum mapping. Feature runtime evidence and known failures remain in their handoffs; publication does not add runtime/database acceptance.
+- Non-goals unchanged: no business edits, feature-branch publication, database/ledger/service/deployment operations or artifact cleanup.
+
+## Delivery preparation — subsequent main publication / 2026-10-15 Beijing
+- Snapshot: 74 files including the existing exam-export V318 rename, Lead flow/history, conversion ownership and notification fixes. No additional business source changes during publication.
+- Verification: staged diff check passed; no conflict markers or high-confidence private-key/token matches in prior staged scan. Rechecked staging and upstream after user continuation: main and origin/main remain at 8df3f65eb3, with only caches and temporary artifacts outside the staged snapshot. Static database consistency passed during preparation.
+- Integration: user reiterated commit and push authorization; commit staged snapshot then normal push to origin/main and verify remote identity. Final hash/result reported in conversation.
+- Limits: no runtime/deployment or database operation; feature handoff acceptance limits and old-number database rollout review still apply. Temporary files and caches retained; publication ownership released after completion.

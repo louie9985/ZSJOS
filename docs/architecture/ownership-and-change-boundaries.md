@@ -8,6 +8,8 @@ See [the API contract](../api/lead-submitter-feedback.md).
 
 ## Ownership matrix
 
+Lead operation history belongs to `yudao-module-zsjos`: future business operations append versioned snapshots to the existing business event store in the business transaction. Workbench applies current object visibility and identity masking to stored values. Related orders, complaints and requests retain their own data and permissions; BPM owns task history. Old events and missing values are not reconstructed. See [Lead flow history](../api/zsjos-lead-flow-history.md).
+
 Student information collection is owned by the ZSJOS Lead domain, with Admin-only
 configuration, Workbench Lead/student projections and public H5 token access. It consumes
 System dictionary/area APIs and framework encryption; it does not change Lead or order

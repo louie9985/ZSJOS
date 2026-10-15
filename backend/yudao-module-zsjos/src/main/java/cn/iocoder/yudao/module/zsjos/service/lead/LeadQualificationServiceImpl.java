@@ -39,6 +39,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadQualificationServiceImpl implements LeadQualificationService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private LeadMapper leadMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
@@ -61,6 +62,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualify")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="判定有效", target="lead", id=0, actor=1, actorType="ADMIN")
     public void judgeValid(Long leadId, Long userId, LeadJudgeValidReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
@@ -111,6 +113,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualify")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="判定无效", target="lead", id=0, actor=1, actorType="ADMIN")
     public void judgeInvalid(Long leadId, Long userId, LeadJudgeInvalidReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
@@ -201,6 +204,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管恢复客资", target="lead", id=0, actor=1, actorType="ADMIN")
     public void restore(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -227,6 +231,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管转派", target="lead", id=0, actor=1, actorType="ADMIN")
     public void transfer(Long leadId, Long userId, LeadTransferReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -268,6 +273,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管回收", target="lead", id=0, actor=1, actorType="ADMIN")
     public void recycle(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -298,6 +304,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="释放到抢单池", target="lead", id=0, actor=1, actorType="ADMIN")
     public void releaseToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -331,6 +338,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-qualification.process-expired", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管回收", target="lead", id=0, actor=1, actorType="ADMIN")
     public void supervisorRecycleOwned(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -361,6 +369,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="释放到抢单池", target="lead", id=0, actor=1, actorType="ADMIN")
     public void supervisorReleaseOwnedToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
@@ -400,6 +409,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                     || lead.getQualificationDeadlineAt() == null || lead.getQualificationDeadlineAt().isAfter(now)) {
                 continue;
             }
+            var flowBefore = flowRecorder.capture(lead.getId());
             Long qualificationTaskId = lifecycleTaskService.getQualificationTaskId(
                     lead.getId(), lead.getQualificationRoundNo());
             if (qualificationTaskId != null) taskReminderService.emitDueForTask(qualificationTaskId, now);
@@ -415,6 +425,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                     "有效性判定超时", "lead-suspended:" + lead.getId() + ":" + lead.getQualificationRoundNo(),
                     Map.of("roundNo", lead.getQualificationRoundNo(),
                             "deadlineAt", lead.getQualificationDeadlineAt().toString()));
+            flowRecorder.record(lead.getId(), flowBefore, "超时自动挂起", "SYSTEM", null, "lead", lead.getId(), lead.getLeadNo(),
+                    "已挂起", "有效性判定超时", false, "suspend:" + lead.getId() + ":" + lead.getQualificationRoundNo());
             processed++;
         }
         return processed;

@@ -169,12 +169,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交申诉", target="appeal-create", id=0, actor=1, actorType="ADMIN")
     public Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO) {
         return submitInternal(leadId, userId, null, null, reqVO);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交申诉", target="appeal-create", id=0, actor=2, actorType="PARTNER")
     public Long submitForPartner(Long leadId, Long accountId, Long partnerId, LeadAppealSubmitReqVO reqVO) {
         return submitInternal(leadId, null, accountId, partnerId, reqVO);
     }
@@ -418,12 +420,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="申诉改判有效", target="appeal", id=0, actor=1, actorType="ADMIN")
     public void overturn(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO) {
         decide(appealId, userId, reqVO, true);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="申诉维持原判", target="appeal", id=0, actor=1, actorType="ADMIN")
     public void uphold(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO) {
         decide(appealId, userId, reqVO, false);
     }

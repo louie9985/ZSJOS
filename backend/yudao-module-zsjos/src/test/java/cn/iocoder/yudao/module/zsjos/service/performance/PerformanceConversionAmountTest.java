@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PerformanceConversionAmountTest {
  private PerformanceFact receipt(long id, LocalDateTime at) {
-  var f=new PerformanceFact();f.setLeadId(id);f.setReceivedAt(at);f.setStatus("valid");return f;
+  var f=new PerformanceFact();f.setLeadId(id);f.setUserId(1L);f.setOwnerUserId(1L);f.setCurrentAssignment(true);f.setReceivedAt(at);f.setStatus("valid");return f;
  }
  private PerformanceFact order(long id,String amount,LocalDateTime received,LocalDateTime submitted) {
   var f=receipt(id,received);f.setAmount(amount==null?null:new BigDecimal(amount));f.setOccurredAt(submitted);f.setOrderType("first_purchase");return f;

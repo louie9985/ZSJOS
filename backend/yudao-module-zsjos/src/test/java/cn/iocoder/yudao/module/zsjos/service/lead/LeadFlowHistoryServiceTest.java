@@ -320,6 +320,27 @@ class LeadFlowHistoryServiceTest {
         assertEquals("跟进备注", result.get(1).getRemark());
     }
 
+    @Test
+    void newSnapshotMergesOnlyReferencedChildrenAndRetainsOldSuspension() {
+        var projection = org.mockito.Mockito.mock(cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowProjection.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"flowProjection",projection);
+        var old = event(80L,"lead_suspended",submittedAt.plusHours(1),"submitted","suspended");
+        var child = event(81L,"lead_restored",submittedAt.plusHours(2),"suspended","submitted");
+        var aggregate = event(82L,"lead_flow_operation",submittedAt.plusHours(2),null,null);
+        var snapshot = new cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot(1,"restore-key","主管恢复客资","SYSTEM",null,"系统","已恢复",null,
+                "lead",7L,null,List.of(),List.of("event:81"));
+        aggregate.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("flowSnapshot",snapshot,"flowRemark","本次恢复")));
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(aggregate,child,old));
+        var projected = new LeadFlowHistoryRespVO(); projected.setId("event:82"); projected.setOccurredAt(aggregate.getOccurredAt());
+        when(projection.project(org.mockito.ArgumentMatchers.eq(aggregate),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(99L),org.mockito.ArgumentMatchers.any())).thenReturn(projected);
+        when(projection.canReadRelated(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(99L))).thenReturn(true);
+        var rows=service.getHistory(7L,99L);
+        assertEquals(List.of("event:82","event:80","lead:7"),rows.stream().map(LeadFlowHistoryRespVO::getId).toList());
+        assertEquals("本次恢复",rows.getFirst().getRemark());
+        assertEquals("suspended",old.getToStatus());
+        org.mockito.Mockito.verify(eventMapper,org.mockito.Mockito.never()).updateById(org.mockito.ArgumentMatchers.any(BusinessEventDO.class));
+    }
+
     private BusinessEventDO event(Long id, String type, LocalDateTime at, String from, String to) {
         BusinessEventDO event = new BusinessEventDO();
         event.setId(id); event.setAggregateId(7L); event.setEventType(type); event.setOccurredAt(at);

@@ -47,6 +47,7 @@ import org.mockito.ArgumentCaptor;
 class LeadAgingPoolServiceImplTest {
 
     @InjectMocks private LeadAgingPoolServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private LeadAgingPoolCycleMapper cycleMapper;
     @Mock private LeadAgingPoolEventMapper eventMapper;
     @Mock private LeadMapper leadMapper;

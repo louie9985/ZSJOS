@@ -65,6 +65,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class LeadSubmissionServiceImplTest {
     @InjectMocks private LeadSubmissionServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PersonMapper personMapper;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;

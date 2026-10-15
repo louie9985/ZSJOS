@@ -49,6 +49,7 @@ public class SupervisorLeadOverturnService {
 
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = OBJECT_ACTION)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管直接改判有效", target="lead", id=0, actor=1, actorType="ADMIN")
     public void overturn(Long leadId, Long userId, @Valid LeadOverturnValidReqVO request) {
         if (!securityFrameworkService.hasPermission(PERMISSION)) throw exception(LEAD_PERMISSION_DENIED);
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());

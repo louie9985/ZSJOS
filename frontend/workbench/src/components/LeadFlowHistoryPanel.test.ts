@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { flowAttachmentState, flowPanelState } from './LeadFlowHistoryPanel'
+import { flowAttachmentState, flowPanelState, flowFieldText } from './LeadFlowHistoryPanel'
 import flowHistorySource from './LeadFlowHistoryPanel.tsx?raw'
 import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
@@ -45,5 +45,14 @@ describe('Lead flow-history attachment presentation', () => {
     expect(flowHistoryStyles).toMatch(/\.flow-history-marker::after\s*\{[^}]*background: var\(--crm-border-strong\)/s)
     expect(flowHistoryStyles).toMatch(/\.flow-history-card\s*\{[^}]*box-shadow: var\(--crm-shadow-card\)/s)
     expect(flowHistoryStyles).toMatch(/\.flow-history-change\s*\{[^}]*background: var\(--crm-bg-sunken\)/s)
+  })
+})
+
+describe('Lead field history', () => {
+  it('distinguishes cleared, empty and unrecorded values', () => {
+    expect(flowFieldText({ state: 'EMPTY' })).toBe('原值为空')
+    expect(flowFieldText({ state: 'EMPTY' }, true)).toBe('已清空')
+    expect(flowFieldText({ state: 'UNRECORDED' })).toBe('历史未记录')
+    expect(flowFieldText({ state: 'VALUE', text: '历史类别' })).toBe('历史类别')
   })
 })

@@ -142,6 +142,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "enter-deal")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交成交", target="order-create", id=0, actor=1, actorType="ADMIN")
     public Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO) {
         Long duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
@@ -179,6 +180,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "enter-deal")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交复购成交", target="order-create", id=0, actor=1, actorType="ADMIN")
     public Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
         LeadDO lead = requireRepurchaseLead(leadId, userId);
         return createRepurchase(lead.getPersonId(), null, userId, userId,
@@ -330,6 +332,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "revise")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="修订并重新提交成交", target="order", id=0, actor=1, actorType="ADMIN")
     public Long reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO) {
         SalesOrderApprovalRoundDO duplicate = roundMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
         if (duplicate != null) {
@@ -920,6 +923,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "review")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="成交审批办理", target="order", id=0, actor=1, actorType="ADMIN")
     public void approve(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO) {
         decide(orderId, userId, reqVO, true);
     }
@@ -927,6 +931,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "review")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="成交审批驳回", target="order", id=0, actor=1, actorType="ADMIN")
     public void reject(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO) {
         decide(orderId, userId, reqVO, false);
     }
@@ -994,6 +999,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="终止成交", target="order", id=0, actor=1, actorType="ADMIN")
     public void terminate(Long orderId, Long userId, SalesOrderTerminateReqVO reqVO) {
         SalesOrderDO order = requireOrderForUpdate(orderId);
         SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(reqVO.getApprovalRoundId(),
@@ -1070,6 +1076,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "sales-order.process-result", targetType = "sales-order")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="成交审批结果", target="order-process", id=0, actor=-1, actorType="SYSTEM")
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
         SalesOrderApprovalRoundDO locatedRound = roundMapper.selectByProcessInstanceId(processInstanceId);
