@@ -57,6 +57,7 @@ import static org.mockito.Mockito.when;
  */
 @Import({PmsKnowledgeDocumentServiceImpl.class, PmsKnowledgeRecycleServiceImpl.class})
 public class PmsKnowledgeDocumentServiceImplTest extends BaseDbUnitTest {
+    @MockitoBean private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @Resource
     private PmsKnowledgeDocumentServiceImpl documentService;

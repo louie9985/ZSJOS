@@ -15,6 +15,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LeadContactActivationServiceTest {
     @InjectMocks private LeadContactActivationService service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PersonMapper personMapper;
     @Mock private LeadMapper leadMapper;
     @Mock private LeadActivationMapper activationMapper;

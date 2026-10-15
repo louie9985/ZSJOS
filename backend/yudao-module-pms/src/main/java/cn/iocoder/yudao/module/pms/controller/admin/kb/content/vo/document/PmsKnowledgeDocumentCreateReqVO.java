@@ -39,6 +39,9 @@ public class PmsKnowledgeDocumentCreateReqVO {
     @Schema(description = "文档内容或文件地址")
     private String content;
 
+    @jakarta.validation.constraints.Size(max = 10)
+    private java.util.List<@jakarta.validation.constraints.NotNull Long> attachmentFileIds;
+
     @Schema(description = "文件类型", example = "pdf")
     @Size(max = 50, message = "文件类型不能超过 50 个字符")
     private String fileType;

@@ -12,6 +12,7 @@ import java.util.List;
  * @author 芋道源码
  */
 public interface PmsKnowledgeDocumentShareService {
+    PmsKnowledgeDocumentShareDO saveSettings(Long documentId, List<Long> members, List<Long> files, Long userId, boolean opening);
 
     /**
      * 开启文档分享，重新开启时生成新的外部令牌，并通知内部分享成员

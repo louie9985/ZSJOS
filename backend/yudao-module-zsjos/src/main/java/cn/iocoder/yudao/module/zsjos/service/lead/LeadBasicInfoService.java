@@ -44,6 +44,7 @@ public class LeadBasicInfoService {
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "basic-info-update")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="修改基础信息", target="lead", id=0, actor=1, actorType="ADMIN")
     public void update(Long leadId, Long userId, LeadBasicInfoUpdateReqVO req) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
@@ -95,6 +96,7 @@ public class LeadBasicInfoService {
             opportunity.setExpectedProductSummary(productSummary(productsAfter));
             opportunityMapper.updateById(opportunity);
         }
+        if (changedFields.isEmpty()) return;
         BusinessEventDO event = new BusinessEventDO();
         event.setEventType("lead_basic_info_updated"); event.setAggregateType(BIZ_TYPE_LEAD);
         event.setAggregateId(leadId); event.setOperatorUserId(userId); event.setReason(req.getReason().trim());

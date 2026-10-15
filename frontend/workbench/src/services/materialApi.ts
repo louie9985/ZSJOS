@@ -356,11 +356,22 @@ export const materialApi = {
 }
 
 export type ContentReviewSelection = { directorUserId: number; processDefinitionId: string }
+export type ContentReviewAccountProfile = {
+  id: number; accountNo?: string; nickname?: string; platformAccountId?: string
+  platformValue?: string; platformLabel?: string; sStage?: string; sStageLabel?: string
+  currentStatusValue?: string; currentStatusLabel?: string; ownerOperatorUserId?: number; directorUserId?: number
+  operatorName?: string; directorName?: string; productGoal?: string; productFormLabel?: string
+  publishFrequency?: string; bottleneckLabel?: string
+}
 export type ContentReviewSubmitContext = {
   processDefinitionId: string; processDefinitionVersion: number; directorTaskKey: string; roleIds: number[]
   candidates: Array<{ id: number; nickname: string }>; previousDirectorUserId?: number
 }
 export const contentReviewApi = {
+  accountProfilePreview: async (params: { batchId?: number; studentPersonId?: number; accountIds?: number[] }) =>
+    unwrap<ContentReviewAccountProfile[]>(await http.get('/zsjos/content-review/account-profile-preview', {
+      params: { ...params, accountIds: params.accountIds?.join(',') }
+    })),
   submitContext: async (id: number) => unwrap<ContentReviewSubmitContext>(
     await http.get(`/zsjos/content-review/batch/${id}/submit-context`)),
   candidates: async (params: { pageNo: number; pageSize: number; keyword?: string }) =>

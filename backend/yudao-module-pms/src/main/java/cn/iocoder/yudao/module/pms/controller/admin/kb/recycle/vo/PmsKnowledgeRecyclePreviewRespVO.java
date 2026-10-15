@@ -6,6 +6,7 @@ import lombok.Data;
 @Schema(description = "管理后台 - PMS 知识库回收站内容预览 Response VO")
 @Data
 public class PmsKnowledgeRecyclePreviewRespVO {
+    private java.util.List<cn.iocoder.yudao.module.pms.controller.admin.kb.content.vo.document.PmsKnowledgeAttachmentRespVO> attachments;
 
     @Schema(description = "内容编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;

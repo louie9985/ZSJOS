@@ -50,4 +50,13 @@ class ContentReviewStudentFilesTest {
         assertThrows(IllegalArgumentException.class,()->service.fileContent(10L,40L,"profile",null,99L,20L));
         verify(files,times(1)).getFileContent(99L);
     }
+
+    @Test void previewTypeRejectsExecutableBytesAndAcceptsPdf() {
+        assertEquals("application/octet-stream", ContentReviewStudentService.previewContentType(
+                "<!doctype html><html><script>parent.marker=true</script></html>".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertEquals("application/octet-stream", ContentReviewStudentService.previewContentType(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"/>".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertEquals("application/pdf", ContentReviewStudentService.previewContentType(
+                "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
 }

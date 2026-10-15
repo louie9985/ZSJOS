@@ -58,6 +58,7 @@ public class PmsKnowledgeDocumentController {
 
     @Resource
     private PmsKnowledgeDocumentService documentService;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
     @Resource
     private PmsKnowledgeContentPermissionService contentPermissionService;
     @Resource
@@ -165,6 +166,7 @@ public class PmsKnowledgeDocumentController {
                             likeUser.setNickname(user.getNickname()).setAvatar(user.getAvatar()));
                     return likeUser;
                 }));
+        documentVO.setAttachments(attachments.list(document.getId()));
         return documentVO;
     }
 

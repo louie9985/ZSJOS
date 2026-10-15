@@ -42,6 +42,9 @@ export interface HrmEmployeeVO {
   status?: number // 员工状态
   type?: number // 聘用形式
   entryTime?: number // 入职时间
+  trialDays?: number // 试岗期（天）
+  plannedTrialEndTime?: number // 试岗结束日期
+  actualTrialEndTime?: number // 实际结束试岗日期
   probation?: number // 试用期，单位月
   regularTime?: number // 转正时间
   leaveTime?: number // 离职时间

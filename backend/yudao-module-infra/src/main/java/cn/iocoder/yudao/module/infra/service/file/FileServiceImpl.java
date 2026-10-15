@@ -261,6 +261,11 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public java.util.List<FileDO> getFiles(java.util.Collection<Long> ids) {
+        return ids.isEmpty() ? java.util.List.of() : fileMapper.selectByIds(ids);
+    }
+
+    @Override
     public FileDO getFile(Long id) {
         return validateFileExists(id);
     }

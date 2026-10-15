@@ -9,6 +9,7 @@ import java.util.List;
 @Schema(description = "管理后台 - PMS 知识库文档 Response VO")
 @Data
 public class PmsKnowledgeDocumentRespVO {
+    private java.util.List<cn.iocoder.yudao.module.pms.controller.admin.kb.content.vo.document.PmsKnowledgeAttachmentRespVO> attachments;
 
     @Schema(description = "文档编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;

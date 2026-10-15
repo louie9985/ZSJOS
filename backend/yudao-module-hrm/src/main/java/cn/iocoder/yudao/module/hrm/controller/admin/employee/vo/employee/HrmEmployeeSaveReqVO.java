@@ -122,6 +122,15 @@ public class HrmEmployeeSaveReqVO {
     @Max(value = 6, message = "试用期不能超过 6 个月")
     private Integer probation;
 
+    /** 试岗期，单位天；日期以入职时间为起点。 */
+    @Min(value = 0, message = "试岗期不能小于 0 天")
+    private Integer trialDays;
+    /** 计划试岗结束日期，允许人工调整。 */
+    private LocalDateTime plannedTrialEndTime;
+    /** 实际结束试岗日期，不自动驱动状态变化。 */
+    private LocalDateTime actualTrialEndTime;
+
+
     @Schema(description = "转正时间")
     private LocalDateTime regularTime;
 
@@ -155,7 +164,7 @@ public class HrmEmployeeSaveReqVO {
     private LocalDateTime companyAgeStartTime;
 
     @Schema(description = "司龄，单位年", example = "2")
-    private Integer companyAge;
+    private java.math.BigDecimal companyAge;
 
     @Schema(description = "关联招聘候选人编号", example = "200")
     private Long candidateId;
@@ -164,11 +173,19 @@ public class HrmEmployeeSaveReqVO {
     @Size(max = 500, message = "备注不能超过 500 个字符")
     private String remark;
 
-    @AssertTrue(message = "实际转正、离职日期不能在未来，请填写计划日期")
+    @AssertTrue(message = "实际试岗结束、转正、离职日期不能在未来，请填写计划日期")
     @JsonIgnore
     public boolean isActualDatesValid() {
         LocalDateTime now = LocalDateTime.now();
-        return (regularTime == null || !regularTime.isAfter(now)) && (leaveTime == null || !leaveTime.isAfter(now));
+        return (actualTrialEndTime == null || !actualTrialEndTime.isAfter(now))
+                && (regularTime == null || !regularTime.isAfter(now)) && (leaveTime == null || !leaveTime.isAfter(now));
+    }
+
+    @AssertTrue(message = "试岗结束日期不能早于入职日期")
+    @JsonIgnore
+    public boolean isTrialDatesValid() {
+        return entryTime == null || ((plannedTrialEndTime == null || !plannedTrialEndTime.isBefore(entryTime))
+                && (actualTrialEndTime == null || !actualTrialEndTime.isBefore(entryTime)));
     }
 
     @AssertTrue(message = "身份证号码格式不正确")

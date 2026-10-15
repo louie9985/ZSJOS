@@ -263,7 +263,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         return new ArrayList<>(result.values());
     }
 
-    private MyStudentRespVO convert(Long userId, Long personId, List<ServiceRelationDO> relations) {
+    MyStudentRespVO convert(Long userId, Long personId, List<ServiceRelationDO> relations) {
         relations = relations == null ? List.of() : relations;
         PersonDO person = personMapper.selectById(personId);
         if (person == null) throw exception(STUDENT_NOT_EXISTS);

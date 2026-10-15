@@ -27,6 +27,7 @@ import static cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.*;
 public class PmsKnowledgeSharePageController {
     @Resource private PmsKnowledgeDocumentShareService shareService;
     @Resource private FileApi fileApi;
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @RequestMapping(value = "/page", method = {RequestMethod.GET, RequestMethod.HEAD}, produces = "text/html;charset=UTF-8")
     @PermitAll @TenantIgnore
@@ -35,6 +36,7 @@ public class PmsKnowledgeSharePageController {
         headers(response);
         var document = shareService.getDocumentByShareToken(token);
         var projection = BeanUtils.toBean(document, PmsKnowledgeDocumentSharePublicRespVO.class);
+        projection.setAttachments(attachments.publicList(document.getId(), token));
         return body(request, response, PmsKnowledgeSharePage.document(projection, token));
     }
 
@@ -50,6 +52,18 @@ public class PmsKnowledgeSharePageController {
             throw exception(KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE);
         }
         String location = fileApi.presignGetUrl(document.getContent(), 600);
+        if (!PmsKnowledgeShareUrl.safeUrl(location)) throw exception(KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE);
+        response.setStatus(HttpServletResponse.SC_FOUND);
+        response.setHeader("Location", location);
+    }
+
+    @GetMapping("/attachment")
+    @PermitAll @TenantIgnore
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public void attachment(@RequestParam String token, @RequestParam Long fileId, HttpServletResponse response) {
+        headers(response);
+        var document = shareService.getDocumentByShareToken(token);
+        String location = attachments.boundUrl(document.getId(), fileId, true);
         if (!PmsKnowledgeShareUrl.safeUrl(location)) throw exception(KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE);
         response.setStatus(HttpServletResponse.SC_FOUND);
         response.setHeader("Location", location);
@@ -73,7 +87,8 @@ public class PmsKnowledgeSharePageController {
         if (error instanceof ServiceException business && KNOWLEDGE_DOCUMENT_SHARE_INVALID.getCode().equals(business.getCode())) {
             response.setStatus(HttpServletResponse.SC_GONE);
             html = PmsKnowledgeSharePage.error("分享内容已失效", "该链接可能已关闭，或文档已移入回收站。请联系分享人。", false);
-        } else if (error instanceof ServiceException business && KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE.getCode().equals(business.getCode())) {
+        } else if (error instanceof ServiceException business && (KNOWLEDGE_DOCUMENT_SHARE_FILE_UNAVAILABLE.getCode().equals(business.getCode())
+                || KNOWLEDGE_ATTACHMENT_UNAVAILABLE.getCode().equals(business.getCode()))) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             html = PmsKnowledgeSharePage.error("分享文件不可用", "文件暂时不可用，请重试或联系分享人。", true);
         } else {

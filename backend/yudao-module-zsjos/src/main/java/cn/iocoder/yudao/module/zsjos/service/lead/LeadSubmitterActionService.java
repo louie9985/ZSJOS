@@ -52,11 +52,13 @@ public class LeadSubmitterActionService {
     @Resource private PartnerMapper partnerMapper;
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交人补充资料", target="lead", id=0, actor=1, actorType="ADMIN")
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
         supplementInternal(leadId, userId, null, req);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交人补充资料", target="lead", id=0, actor=1, actorType="PARTNER")
     public void supplementForPartner(Long leadId, Long partnerId, LeadSubmitterSupplementReqVO req) {
         supplementInternal(leadId, null, partnerId, req);
     }
@@ -152,6 +154,7 @@ public class LeadSubmitterActionService {
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = BIZ_TYPE_LEAD, bizId = "#leadId", action = "request-submitter-assist")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="请求提交人协助", target="assist-create", id=0, actor=1, actorType="ADMIN")
     public Long requestAssist(Long leadId, Long userId, LeadSubmitterAssistRequestReqVO req) {
         objectPermissionService.check(leadId, "request-submitter-assist");
         List<LeadAttachmentReqVO> attachments = req.getAttachments() == null ? List.of() : req.getAttachments();
@@ -233,6 +236,7 @@ public class LeadSubmitterActionService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="回复协助请求", target="assist", id=1, actor=2, actorType="ADMIN")
     public void replyAssist(Long leadId, Long requestId, Long userId, LeadSubmitterAssistReplyReqVO req) {
         LeadSubmitterAssistRequestDO row = assistRequestMapper.selectById(requestId);
         if (row == null || !Objects.equals(row.getLeadId(), leadId) || !"pending".equals(row.getStatus()))

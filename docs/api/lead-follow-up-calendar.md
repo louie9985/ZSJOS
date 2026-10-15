@@ -9,7 +9,8 @@
 - `GET /admin-api/zsjos/lead-follow-up-calendar/cards`：返回 `{list,total}`，每项包含
   `lead`（现有客资详情投影）、`deadline`、`lastFollowUp`、`canReadFollowUp`。
 - 两接口都要求 `zsjos:lead-follow-up-calendar:query` 和 `zsjos:lead:query`。
-  当前实现为本人日历：使用登录用户与当前租户，不接受目标用户参数；Lead 当前负责人和待办执行人都必须为本人。
+  当前实现为本人日历：使用登录用户与当前租户，不接受目标用户参数；非公海时 Lead 正式负责人和待办执行人都必须为本人；活动公海时改为当前协助人 B，
+  待指派时不计入任何个人日历。旧待办仍记录 A 时也按当前 B 投影，正式归属不变。
 - 客资来自未删除的 Lead 和未删除、未完成的 `lead_first_follow_up` /
   `lead_follow_up_reminder` 业务待办。取消、完成、其他任务类型、已转移客资不计入。
   每个客资只计一次，按全部未完成跟进任务中最早的截止日期归档；历史逾期保留在原截止日。

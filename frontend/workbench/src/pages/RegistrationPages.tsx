@@ -102,6 +102,7 @@ function LoadState({
 }
 
 function withCompletionState(value: RegistrationCase): RegistrationCase {
+  if (!["pending", "processing"].includes(value.status)) return value;
   if (value.assignmentMode === "class_per_item") return value;
   if (value.orderStatus !== "effective") return value;
   const allChecked =
@@ -347,7 +348,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const saveClasses = async () => {
     if (!selected?.classAssignments) return;
     const assignments = selected.classAssignments.map(row => ({ orderItemId: row.orderItemId, classId: classDraft[row.orderItemId] }));
-    if (assignments.some(row => !row.classId)) { message.warning("请为每个订单商品选择班级"); return; }
+    if (assignments.some(row => !row.classId)) { message.warning("请为当前任务的产品选择班级"); return; }
     setClassSaving(true);
     try { applyCase(await api.updateRegistrationClassAssignments(selected.id, { version: selected.version, idempotencyKey: key(), assignments })); message.success("分班已保存"); }
     catch (requestError) { message.error(errorMessage(requestError)); await loadCase(selected.id); }
@@ -403,7 +404,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         idempotencyKey: key(),
         reason: values.reason.trim(),
       });
-      message.success("报名履约已关闭");
+      message.success(selected.orderItemId ? "本产品已结束，无需后续交付" : "报名履约已关闭");
       setCloseOpen(false);
       closeForm.resetFields();
       await load(1);
@@ -431,10 +432,11 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           <Typography.Text type="secondary">
             {selected.orderNo || `订单 ${selected.orderId}`}
           </Typography.Text>
+          <div><Typography.Text strong>{selected.productName || (selected.orderItemId ? "历史产品信息缺失" : "历史整单任务")}</Typography.Text><ProductSpecs product={selected} /></div>
         </div>
         <Tag
           color={
-            selected.status === "completed"
+            ["completed", "ended"].includes(selected.status)
               ? "success"
               : selected.status === "cancelled"
                 ? "default"
@@ -444,12 +446,12 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           {selected.statusLabel || "未知状态"}
         </Tag>
       </div>
-      {selected.status === "cancelled" && (
+      {["cancelled", "ended"].includes(selected.status) && (
         <Alert
           className="registration-block-alert"
           type="info"
           showIcon
-          title="报名履约已关闭"
+          title={selected.status === "ended" ? "本产品已结束，无需后续交付" : "报名履约已关闭"}
           description={selected.cancelReason || selected.cancelledAt ? `关闭时间：${formatTimestamp(selected.cancelledAt)}${selected.cancelReason ? ` · 原因：${selected.cancelReason}` : ""}` : undefined}
         />
       )}
@@ -470,7 +472,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         />
       )}
       <section className="registration-checklist-card">
-        <Space style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? "逐商品分班" : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && canAssignClass && !["completed", "cancelled"].includes(selected.status) && <Button type="primary" loading={classSaving} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
+        <Space style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? (selected.orderItemId ? "本产品分班" : "逐商品分班") : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && canAssignClass && !["completed", "cancelled", "ended"].includes(selected.status) && <Button type="primary" loading={classSaving} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
         {selected.assignmentMode === "class_per_item" && classOptionsError && <Alert type="error" showIcon title="班级加载失败" description={classOptionsError} action={<Button size="small" loading={classOptionsLoading} onClick={() => void loadClassOptions()}>重试</Button>} />}
         {classesDirty && <Alert type="info" showIcon title="分班选择尚未保存，请先保存分班再完成履约" />}
         <div className="registration-checklist">
@@ -481,13 +483,13 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
             }
             return <div className="registration-checklist-row registration-route-row" key={assignment.orderItemId}>
               <div className="registration-checklist-copy"><strong>{assignment.productName || '历史产品信息缺失'}</strong><ProductSpecs product={assignment} /><span>{assignment.categoryName || "产品分类"}{assignment.errorReason ? ` · ${assignment.errorReason}` : ""}</span></div>
-              <Select style={{ width: "100%", maxWidth: 420 }} showSearch optionFilterProp="label" value={classDraft[assignment.orderItemId]} placeholder="选择班级（含待分班）" loading={classOptionsLoading} disabled={!canAssignClass || classSaving || ["completed", "cancelled"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions()} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} options={options} notFoundContent={classOptionsLoading ? <Spin size="small" /> : classOptionsError ? "班级加载失败，请重试" : "暂无未结课班级，请联系班级管理员"} />
+              <Select style={{ width: "100%", maxWidth: 420 }} showSearch optionFilterProp="label" value={classDraft[assignment.orderItemId]} placeholder="选择班级（含待分班）" loading={classOptionsLoading} disabled={!canAssignClass || classSaving || ["completed", "cancelled", "ended"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions()} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} options={options} notFoundContent={classOptionsLoading ? <Spin size="small" /> : classOptionsError ? "班级加载失败，请重试" : "暂无未结课班级，请联系班级管理员"} />
             </div>;
           }) : selected.routes?.map((route) => (
             <div className="registration-checklist-row registration-route-row" key={route.id}>
               <Checkbox
                 checked={route.selected}
-                disabled={routeSaving || ["completed", "cancelled"].includes(selected.status)}
+                disabled={routeSaving || ["completed", "cancelled", "ended"].includes(selected.status)}
                 onChange={(event) => void toggleRoute(route, event.target.checked)}
               >
                 {route.departmentName}
@@ -497,7 +499,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   value={route.assigneeUserId}
                   placeholder={`选择${route.assigneeTypeLabel}`}
                   loading={routeSaving || !routeCandidates[route.id]}
-                  disabled={routeSaving || ["completed", "cancelled"].includes(selected.status)}
+                  disabled={routeSaving || ["completed", "cancelled", "ended"].includes(selected.status)}
                   options={(routeCandidates[route.id] || (route.assigneeUserId ? [{ id: route.assigneeUserId, nickname: route.assigneeUserName || "已分配负责人" }] : [])).map((candidate) => ({ value: candidate.id, label: candidate.nickname }))}
                   onOpenChange={(open) => open && void loadRouteCandidates(route)}
                   onChange={(value) => void assignRoute(route, value)}
@@ -528,7 +530,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                     {item.attachments?.map((attachment) => (
                       <div className="registration-attachment-entry" key={attachment.id}>
                         <RegistrationAttachmentPreview attachment={attachment} />
-                        {! ["completed", "cancelled"].includes(selected.status) && (
+                        {! ["completed", "cancelled", "ended"].includes(selected.status) && (
                           <Button type="text" danger size="small" icon={<DeleteOutlined />} aria-label={`删除 ${attachment.originalName}`}
                             onClick={() => void deleteAttachment(item.id, attachment.id)} />
                         )}
@@ -536,8 +538,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                     ))}
                   </div>
                 </div>
-                <ClipboardUploadButtons disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled"].includes(selected.status)} canPaste={() => !attachmentSavingIds.has(item.id) && (item.attachments?.length || 0) < 9 && !["completed", "cancelled"].includes(selected.status)} onFiles={files => { const file = files[0]; if (file) void uploadAttachment(item, file) }}><Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
-                  disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled"].includes(selected.status)}
+                <ClipboardUploadButtons disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)} canPaste={() => !attachmentSavingIds.has(item.id) && (item.attachments?.length || 0) < 9 && !["completed", "cancelled", "ended"].includes(selected.status)} onFiles={files => { const file = files[0]; if (file) void uploadAttachment(item, file) }}><Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                  disabled={attachmentSavingIds.has(item.id) || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)}
                   beforeUpload={(file) => { void uploadAttachment(item, file); return Upload.LIST_IGNORE; }}>
                   <Button icon={<UploadOutlined />} loading={attachmentSavingIds.has(item.id)}>上传附件</Button>
                 </Upload></ClipboardUploadButtons>
@@ -548,7 +550,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   checked={item.checked}
                   disabled={
                     savingItemIds.has(item.id) ||
-                    ["completed", "cancelled"].includes(selected.status)
+                    ["completed", "cancelled", "ended"].includes(selected.status)
                   }
                   onChange={(event) =>
                     void updateItem(item, event.target.checked)
@@ -569,7 +571,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         </div>
       </section>
       <div className="registration-detail-actions">
-        {selected.status !== "completed" && selected.status !== "cancelled" ? <>
+        {["pending", "processing"].includes(selected.status) ? <>
           <Button
             type="primary"
             disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || completing || classSaving || Boolean(classesDirty)}
@@ -577,7 +579,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
             onClick={() => void complete()}
           >完成报名履约</Button>
           {hasPermission(permissions, "zsjos:registration:close") && (
-            <Button danger onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>关闭服务</Button>
+            <Button danger onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>{selected.orderItemId ? "结束本产品（无需交付）" : "关闭服务"}</Button>
           )}
         </> : null}
       </div>
@@ -664,6 +666,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                         <strong>{row.studentName || "未填写姓名"}</strong>
                         <Tag>{row.statusLabel || "未知状态"}</Tag>
                       </div>
+                      <span>{row.productName || (row.orderItemId ? "历史产品信息缺失" : "历史整单任务")}</span>
+                      <ProductSpecs product={row} />
                       <span>{row.orderNo || `订单 ${row.orderId}`}</span>
                       <span>{row.leadNo || "暂无客资编号"}</span>
                     </div>
@@ -699,19 +703,20 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>
       <Modal
-        title="关闭服务"
+        title={selected?.orderItemId ? "结束本产品（无需后续交付）" : "关闭服务"}
         open={closeOpen}
         confirmLoading={closing}
-        okText="确认关闭"
+        okText={selected?.orderItemId ? "确认结束" : "确认关闭"}
         cancelText="取消"
         onCancel={() => { setCloseOpen(false); closeForm.resetFields(); }}
         onOk={() => void closeForm.submit()}
         destroyOnHidden
       >
         <Form form={closeForm} layout="vertical" onFinish={closeService}>
+          {selected?.orderItemId && <Alert type="info" showIcon title="仅结束当前产品，不创建交付服务，不影响同单其他产品。" />}
           <Form.Item
             name="reason"
-            label="关闭原因"
+            label={selected?.orderItemId ? "结束原因" : "关闭原因"}
             rules={[{ required: true, message: "请填写关闭原因" }, { max: 500, message: "关闭原因不能超过 500 个字符" }]}
           >
             <Input.TextArea rows={4} placeholder="例如：订单审批后不需要继续服务" />
@@ -725,17 +730,19 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope';
 
 export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { permissions?: string[]; tenantReadAll?: boolean }) {
+  type ServiceStudent = MyStudent & { serviceRelationId: number };
+  const asServiceStudent = (value: import("../services/api").StudentServiceSubject): ServiceStudent => ({ ...value, services: [value.service] });
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' });
   const readOnly = readScope.readScope !== 'SELF';
-  const { useTableLayout } = useInboxTableLayout();
+  const { useTableLayout, isDesktop } = useInboxTableLayout();
   const avatarRail = useInboxAvatarRail('zsjos.my-students.list-collapsed');
   const location = useLocation();
   const taskTarget = location.state as { personId?: number; serviceRelationId?: number; classId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedPersonId = Number(taskTarget?.personId) || undefined;
   const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
   const requestedClassId = Number(taskTarget?.classId) || undefined;
-  const [rows, setRows] = useState<MyStudent[]>([]),
-    [selected, setSelected] = useState<MyStudent>();
+  const [rows, setRows] = useState<ServiceStudent[]>([]),
+    [selected, setSelected] = useState<ServiceStudent>();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [studentSort, setStudentSort] = useState<BusinessSort>({});
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
@@ -771,15 +778,16 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     setRows([]); setSelected(undefined); setSelectedServiceId(undefined); setLeadDetail(undefined);
     setStudentContactContext(undefined); setStudentContactRecords([]); setDetailError("");
   };
-  const loadStudent = useCallback(async (personId: number, preferredServiceId?: number) => {
+  const loadStudent = useCallback(async (relationId: number) => {
     const generation = ++detailGeneration.current;
+    setSelectedServiceId(relationId);
     setDetailLoading(true);
     setDetailError("");
     try {
-      const student = await api.myStudent(personId);
+      const student = asServiceStudent(await api.myStudentService(relationId));
       if (generation !== detailGeneration.current) return;
       setSelected(student);
-      const service = student.services.find(item => item.serviceRelationId === (preferredServiceId || selectedServiceId)) || student.services[0];
+      const service = student.services[0];
       setSelectedServiceId(service?.serviceRelationId);
       const leadId = service?.leadId;
       const [leadResult, context, records] = await Promise.all([
@@ -801,21 +809,12 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     } finally {
       if (generation === detailGeneration.current) setDetailLoading(false);
     }
-  }, [selectedServiceId]);
+  }, []);
   const targetNavigationKey = location.key;
   useEffect(() => {
     setClassId(requestedClassId);
-    const targetKey = requestedPersonId ? `person:${requestedPersonId}`
-      : requestedServiceId ? `service:${requestedServiceId}` : "";
-    if (!targetKey) return;
-    if (requestedPersonId) {
-      void loadStudent(requestedPersonId);
-      return;
-    }
-    void api.myStudentByService(requestedServiceId!).then(student => {
-      setSelectedServiceId(requestedServiceId);
-      return loadStudent(student.personId, requestedServiceId);
-    }).catch(requestError => setDetailError(errorMessage(requestError)));
+    if (requestedServiceId) { void loadStudent(requestedServiceId); setDrawerOpen(true); }
+    else if (requestedPersonId) setSelected(undefined);
   }, [loadStudent, requestedClassId, requestedPersonId, requestedServiceId, targetNavigationKey]);
   const loadDictionaries = useCallback(async () => {
     const generation = ++dictionaryGeneration.current;
@@ -856,10 +855,12 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         : baseRequestKey;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
+      const detailAtRequest = detailGeneration.current;
       setLoading(true);
       setError("");
       try {
-        const page = await api.myStudents({
+        const page = await api.myStudentServices({
+          personId: requestedPersonId,
           ...studentSort,
           ...(tenantReadAll ? readScope : {}),
           pageNo: targetPage,
@@ -870,13 +871,13 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
           advancedFilter,
         });
         if (generation !== listGeneration.current) return;
-        setRows(page.list);
+        setRows(page.list.map(asServiceStudent));
         setTotal(page.total);
         setPageNo(targetPage);
-        if (options.reloadDetail !== false && !requestedPersonId) {
-          const target = selected && page.list.some((item) => item.personId === selected.personId)
-            ? selected.personId
-            : page.list[0]?.personId;
+        if (options.reloadDetail !== false && !requestedServiceId && detailAtRequest === detailGeneration.current) {
+          const target = selected && page.list.some((item) => item.serviceRelationId === selected.serviceRelationId)
+            ? selected.serviceRelationId
+            : (requestedPersonId && page.total !== 1 ? undefined : page.list[0]?.serviceRelationId);
           if (target) await loadStudent(target);
           else setSelected(undefined);
         }
@@ -900,37 +901,20 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     }
     await Promise.all([
       load(pageNo, { force: true, reloadDetail: false }),
-      loadStudent(selected.personId, selectedService?.serviceRelationId),
+      loadStudent(selected.serviceRelationId),
     ]);
   }, [load, loadStudent, pageNo, selected, selectedService?.serviceRelationId]);
   const canStudentRepurchase = Boolean(selectedService && hasPermission(permissions, 'zsjos:sales-order:student-repurchase')
     && selectedService.owner && selectedService.acceptanceStatus === 'accepted'
     && ['active', 'paused', 'completed'].includes(selectedService.status));
-  const selectService = async (relationId: number) => {
-    const service = selected?.services.find(item => item.serviceRelationId === relationId);
-    if (!service) return;
-    setSelectedServiceId(relationId);
-    setDetailLoading(true);
-    setDetailError("");
-    try {
-      const [lead, context, records] = await Promise.all([
-        service.leadId ? api.managedLead(service.leadId) : Promise.resolve(undefined),
-        api.studentContactContext(service.serviceRelationId),
-        api.studentContactRecords(service.serviceRelationId, 1, 100),
-      ]);
-      setLeadDetail(lead); setStudentContactContext(context); setStudentContactRecords(records.list);
-    }
-    catch (requestError) { setLeadDetail(undefined); setStudentContactContext(undefined); setStudentContactRecords([]); setDetailError(errorMessage(requestError)); }
-    finally { setDetailLoading(false); }
-  };
   const detailContent = detailLoading ? (
     <Skeleton active paragraph={{ rows: 10 }} />
   ) : detailError ? (
     <LoadState
       error={detailError}
       retry={() => {
-        const personId = selected?.personId || requestedPersonId;
-        if (personId) void loadStudent(personId);
+        const relationId = selected?.serviceRelationId || requestedServiceId;
+        if (relationId) void loadStudent(relationId);
       }}
     />
   ) : selected && selectedService && studentContactContext ? (
@@ -950,7 +934,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       contactContext={studentContactContext}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
-      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${productSpecText(service)} · ${service.orderNo || (service.orderId ? `订单 ${service.orderId}` : '独立服务')}` }))}/></div>}
+      contextHeader={<Typography.Text strong>当前服务：{selectedService.courseName || selectedService.skuName} · {selectedService.className}</Typography.Text>}
       overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
@@ -1008,7 +992,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   ) : (
     <Empty description="从左侧选择一名学员" />
   );
-  const studentTableColumnSource: ProColumns<MyStudent>[] = [
+  const studentTableColumnSource: ProColumns<ServiceStudent>[] = [
     { title: "学员姓名", dataIndex: "name", width: 170, render: (_, row) => <Space><NameAvatar name={row.name || "学员"} seed={row.personNo} size={30} subjectType="student" /><Typography.Text strong>{row.name || "未填写姓名"}</Typography.Text></Space> },
     { title: "客资编号", dataIndex: "leadNo", width: 150, render: value => value || "暂无客资编号" },
     { title: "手机号", dataIndex: "mobile", width: 140, render: value => value || "-" },
@@ -1035,11 +1019,11 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
       {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
-      {useTableLayout ? <BusinessTable<MyStudent> tableKey="registration-pages-1" widthPersistenceKey="crm-student-management-table-widths" error={error} onReload={() => { void load(1, { force: true }); void loadDictionaries() }}
+      {useTableLayout ? <BusinessTable<ServiceStudent> tableKey="registration-pages-1" widthPersistenceKey="crm-student-management-table-widths" error={error} onReload={() => { void load(1, { force: true }); void loadDictionaries() }}
         className="lead-management-table"
-        rowKey="personId"
+        rowKey="serviceRelationId"
 
-        filters={<>{[<Space key="student-filters" wrap>{studentSortMenu}<Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
+        filters={<>{[<Space key="student-filters" wrap>{studentSortMenu}<Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、手机号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
 
         columnsState={{ persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
         loading={loading}
@@ -1047,7 +1031,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: value => void load(value) }}
         scroll={{ x: 1400 }}
         locale={{ emptyText: error ? "学员列表加载失败" : "当前筛选下暂无学员" }}
-        onRow={row => ({ onClick: () => { void loadStudent(row.personId); setDrawerOpen(true); } })}
+        onRow={row => ({ onClick: () => { void loadStudent(row.serviceRelationId); setDrawerOpen(true); } })}
         columns={studentTableColumns}
         onChange={(_, __, sorter, extra) => { if (extra.action === "sort") changeStudentSort(readTableSort(sorter)); }}
       /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
@@ -1055,7 +1039,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
           <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
             <AdvancedFilterToolbar
-              scene="student"
+              scene="student_service"
               pageKey="student_my"
               placeholder="搜索姓名、手机号或客资编号"
               keyword={keyword}
@@ -1094,12 +1078,12 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
               avatarRail.collapsed ? <span className="inbox-avatar-empty" role="status">暂无学员</span> : <Empty description="当前筛选下暂无学员" />
             ) : (
               rows.map((row) => (
-                <Tooltip key={row.personId} title={avatarRail.collapsed ? `${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}><button
+                <Tooltip key={row.serviceRelationId} title={avatarRail.collapsed ? `${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}><button
                   type="button"
                   aria-label={`${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}`}
-                  aria-current={selected?.personId === row.personId ? 'true' : undefined}
-                  className={`lead-inbox-item${selected?.personId === row.personId ? " active" : ""}`}
-                  onClick={() => void loadStudent(row.personId)}
+                  aria-current={selected?.serviceRelationId === row.serviceRelationId ? 'true' : undefined}
+                  className={`lead-inbox-item${selected?.serviceRelationId === row.serviceRelationId ? " active" : ""}`}
+                  onClick={() => { void loadStudent(row.serviceRelationId); if (!isDesktop) setDrawerOpen(true); }}
                 >
                   <div className="lead-inbox-item-main">
                     <NameAvatar name={row.name || "学员"} seed={row.personNo} size={36} subjectType="student" />
@@ -1108,7 +1092,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
                         <strong>{row.name || "未填写姓名"}</strong>
                         <Tag color="success">学员</Tag>
                       </div>
-                      <span>{row.leadNo || "暂无客资编号"}</span>
+                      <span>{row.services[0]?.courseName || row.services[0]?.skuName}</span><ProductSpecs product={row.services[0]} /><span>{row.services[0]?.orderNo}</span>
                       <span>
                         {row.mobile || "无手机号"} ·{" "}
                         {row.wechatId || "无微信号"}
@@ -1136,7 +1120,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>}
-      {useTableLayout && <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="学员详情" placement="right" width="860px">{detailContent}</ResizableDetailDrawer>}
+      {(useTableLayout || !isDesktop) && <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="学员详情" placement="right" width="860px">{detailContent}</ResizableDetailDrawer>}
       {repurchaseOpen && selected && <SalesOrderEntryModal
         lead={{ id: selected.personId, submittedName: selected.name || '', submittedMobile: selected.mobile, submittedWechatId: selected.wechatId,
           provinceCode: leadDetail?.provinceCode, provinceName: leadDetail?.provinceName, cityCode: leadDetail?.cityCode, cityName: leadDetail?.cityName }}
@@ -1433,6 +1417,7 @@ export function StudentPlannerOperations({ student, service, context, permission
     </Modal>
     <Modal title="修改学员信息" open={basicInfoOpen} confirmLoading={basicInfoSaving} okText="保存" onCancel={() => setBasicInfoOpen(false)} onOk={() => basicInfoForm.submit()} destroyOnHidden>
       <Form form={basicInfoForm} layout="vertical" onFinish={saveBasicInfo}>
+        <Alert type="info" showIcon title="修改基础资料将同步该学员的其他课程服务。" />
         <Form.Item name="name" label="姓名" rules={[{ required: true, whitespace: true, max: 100 }]}><Input /></Form.Item>
         <Form.Item name="mobile" label="手机号" rules={[{ pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号" }]}><Input maxLength={32} /></Form.Item>
         <Form.Item name="wechatId" label="微信号" rules={[{ max: 64 }]}><Input /></Form.Item>

@@ -1,0 +1,25 @@
+# 客资流转历史补全
+
+## Registration — 2026-10-15 Beijing
+- Workstream: local-lead-flow-completion-20261015; owner: /root; environment: local (environment variable unset; environment file absent).
+- Branch: main; worktree: D:/ZSJ-OS; base: 5b56fa071e (registration base); target branch/integration: None.
+- Goal: implement the user-approved complete future-operation timeline with immutable business snapshots, key Lead field changes, related business outcomes and permission-aware Workbench projection.
+- Non-goals: historical backfill, guessed historical values, order form diffs, BPM task-history duplication, dependency/schema/role-grant changes, runtime deployment, branch/commit/push operations.
+- Ownership: backend/yudao-module-zsjos Lead flow capture/projection and related lead/order command integration, flow response VO and focused tests; frontend/workbench LeadFlowHistoryPanel, typed flow API, scoped styles/tests/browser fixture; docs/api/zsjos-lead-flow-history.md and directly affected architecture contract; this handoff record. Other existing changes are preserved.
+- Dependencies: existing BusinessEvent JSON storage, business transactions/idempotency, System/Infra/BPM public APIs, existing Lead and related object permission providers.
+- Verification plan: command coverage inventory, focused service/mapper transaction and projection tests (legacy, rollback, replay, permissions, rename/deletion), module compile, Workbench typecheck and focused tests, desktop/mobile browser fixture, scoped diff checks. No shared service lifecycle or real business-data mutation.
+
+- Context update: current main advanced externally to 8df3f65eb3; preserved that integration and all unrelated working changes. Implementation scope also includes explicit per-item capture in LeadContactActivationService and automatic lifecycle commands.
+
+- Ownership update: LeadDetail.tsx flow-history child refresh wiring only, after local-lead-transfer-entry-20261015 delivery released ownership; preserve its transfer-toolbar changes. Add LeadFlowEvidence and isolated browser fixtures under frontend/workbench/test/lead-flow-history*.
+
+## Delivery — 2026-10-15
+
+- Implemented future-operation snapshots in the existing business event JSON store. Explicit command annotations cover basic information, qualification/restore, ownership, follow-up, appeals, complaints, feedback, assistance, transfers and linked sales orders. Per-item capture covers submission, contact activation, assignment timeout/retry, qualification timeout and aging-pool processing. Old events are retained; new operation cards reference and merge their own child events. No historical backfill or database migration.
+- Workbench renders actual field before/after values, distinguishes empty/cleared/unrecorded values, preserves snapshot names under current masking, gates related reasons/evidence/references and refreshes on parent refreshVersion. Self-sourced submission consolidates generated events into its submission card. Related order form differences remain excluded.
+- Final focused backend verification: 124 tests passed, zero failures/errors/skips, including existing Mapper clearing tests, actual recorder tests, H2 transaction rollback, replay, snapshot identity masking and legacy/new event merging. Log: D:/ZSJ-OS/.tmp_drift/lead-flow-verified.log.
+- Expanded checks: 214 tests executed, 212 passed; two existing LeadSubmitterActionServiceTest cases concerning historical recipient fallback failed. This change only adds annotations to that service; the direct Mockito tests do not activate this aspect. Earlier order regression executed 81 tests with one existing keywordMixedProcessIdsAreNormalizedBeforeTaskLoading failure (expected one task query, actual two). No unrelated business rule/test fixes made. Logs: lead-flow-acceptance.log and lead-flow-tests.log in .tmp_drift.
+- Frontend verification: typecheck passed; 5 focused component tests passed; existing local Vite plus isolated Playwright/Chrome transport passed at 1440px and 390px: new/old cards, expanded field differences, long text/no horizontal overflow, error/retry and empty states. Screenshots: C:/Users/EDY/AppData/Local/Temp/lead-flow-history-browser. No real business requests or service lifecycle changes.
+- Documentation updated: docs/api/zsjos-lead-flow-history.md; docs/architecture/ownership-and-change-boundaries.md. Scoped diff whitespace check passed. Concurrent transfer-entry, feedback notification, performance and exam migration changes preserved.
+- Limits: source and isolated test verification only. No authenticated end-to-end command/API acceptance, production deployment, restart or target-MySQL runtime acceptance performed. Full application startup/aspect wiring across actual BPM callbacks remains unverified; no claim that running services already use this implementation. Transfer-request form/detail links remain suppressed because no existing Lead-detail read contract exists. Direct SQL changes are not captured.
+- No Git branch/worktree operations, commits or pushes. Implementation ownership released on this local delivery; remaining runtime acceptance is a separate operation.

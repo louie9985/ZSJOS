@@ -46,6 +46,44 @@ import static org.mockito.Mockito.when;
 @Import(SocialUserServiceImpl.class)
 public class SocialUserServiceImplTest extends BaseDbUnitTest {
 
+    @Resource private javax.sql.DataSource dataSource;
+
+    @Test
+    public void orphanWecomProjectionConflictRollsBackExistingBindingAndReturnsBusinessError() {
+        var jdbcTemplate = new org.springframework.jdbc.core.JdbcTemplate(dataSource);
+        jdbcTemplate.execute("CREATE UNIQUE INDEX uk_tenant_wecom_user_id ON system_users(tenant_id, wecom_user_id)");
+        try {
+            Integer type = SocialTypeEnum.WECHAT_ENTERPRISE.getType();
+            Integer userType = UserTypeEnum.ADMIN.getValue();
+            SocialUserDO previous = randomPojo(SocialUserDO.class).setType(type).setOpenid("fixture-old");
+            SocialUserDO requested = randomPojo(SocialUserDO.class).setType(type).setOpenid("fixture-orphan")
+                    .setCode("fixture-code").setState("fixture-state");
+            socialUserMapper.insert(previous);
+            socialUserMapper.insert(requested);
+            adminUserMapper.insert(new AdminUserDO().setId(101L).setUsername("fixture-current")
+                    .setNickname("Current").setPassword("fixture-hash").setWecomUserId("fixture-old"));
+            adminUserMapper.insert(new AdminUserDO().setId(102L).setUsername("fixture-orphan-owner")
+                    .setNickname("Orphan").setPassword("fixture-hash").setWecomUserId("fixture-orphan"));
+            SocialUserBindDO existing = randomPojo(SocialUserBindDO.class).setUserId(101L).setUserType(userType)
+                    .setSocialType(type).setSocialUserId(previous.getId());
+            socialUserBindMapper.insert(existing);
+
+            cn.iocoder.yudao.framework.common.exception.ServiceException error = org.junit.jupiter.api.Assertions.assertThrows(
+                    cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> socialUserService.bindSocialUser(new SocialUserBindReqDTO().setUserId(101L)
+                            .setUserType(userType).setSocialType(type).setCode("fixture-code").setState("fixture-state")));
+
+            assertEquals(1_002_018_004, error.getCode());
+            assertEquals("fixture-old", adminUserMapper.selectById(101L).getWecomUserId());
+            assertEquals("fixture-orphan", adminUserMapper.selectById(102L).getWecomUserId());
+            assertEquals(previous.getId(), socialUserBindMapper
+                    .selectByUserIdAndUserTypeAndSocialType(101L, userType, type).getSocialUserId());
+            assertNull(socialUserBindMapper.selectByUserTypeAndSocialUserId(userType, requested.getId()));
+        } finally {
+            jdbcTemplate.execute("DROP INDEX uk_tenant_wecom_user_id");
+        }
+    }
+
     @Resource
     private SocialUserServiceImpl socialUserService;
 

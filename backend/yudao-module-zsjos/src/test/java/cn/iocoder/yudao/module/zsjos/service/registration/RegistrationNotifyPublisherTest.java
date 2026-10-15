@@ -23,6 +23,18 @@ class RegistrationNotifyPublisherTest {
     @InjectMocks private RegistrationNotifyPublisher publisher;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
 
+    @Test void itemAssignmentTargetsExactService() {
+        var task = new RegistrationCaseDO(); task.setId(5L);
+        TenantContextHolder.setTenantId(1L);
+        try { publisher.publishPlannerAssigned(task, null, "TEST", 8L, 9L, 21L); }
+        finally { TenantContextHolder.clear(); }
+        var capture = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi).publish(capture.capture());
+        assertEquals("student_service", capture.getValue().getBizType());
+        assertEquals(21L, capture.getValue().getBizId());
+        assertEquals("registration-planner-activated:5:8", capture.getValue().getSourceEventKey());
+    }
+
     @Test
     void plannerAssignmentPublishesStudentNumberAndPlannerRecipient() {
         RegistrationCaseDO registrationCase = new RegistrationCaseDO();

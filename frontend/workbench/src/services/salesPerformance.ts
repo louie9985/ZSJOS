@@ -84,7 +84,7 @@ export function periodRange(key: string, now = new Date()): { start: string; end
 }
 
 export function averageFormula(metric: Metric) { return `${money(metric.averageAmount)} ÷ ${metric.averageOrders} 笔 = ${money(metric.average)} / 笔（剔除整单 0 和 0.01）` }
-export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售、教务自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（当月新接有效客资中当月成交数＋往期接收60日内于当月成交数）÷（当月新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
+export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售、教务自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（本周期新接有效客资中本周期成交数＋往期接收60日内于本周期成交数）÷（本周期新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
 
 export const sourceReviewRequired = (metric: Pick<Metric, 'sourceStatus'>) => metric.sourceStatus === 'review_required'
 export const conversionSummary = (metric: Pick<Metric, 'converted' | 'denominator' | 'sourceStatus' | 'sourceReviewCount'>) => sourceReviewRequired(metric)

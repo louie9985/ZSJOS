@@ -267,6 +267,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SUBORDINATE_SALES_NOT_MANAGED = new ErrorCode(1_900_003_053, "该销售不在当前主管管理范围内");
     ErrorCode SUBORDINATE_SALES_REASON_REQUIRED = new ErrorCode(1_900_003_054, "操作原因不能为空且不能超过 500 个字符");
     ErrorCode SUBORDINATE_SALES_STATUS_INVALID = new ErrorCode(1_900_003_055, "账号或接单状态无效");
+    ErrorCode LEAD_RECYCLED_IDENTITY_UNKNOWN = new ErrorCode(1_900_003_139, "回收客资归属身份缺少可靠记录，请联系管理员核实");
     ErrorCode SUBORDINATE_SALES_TARGET_INVALID = new ErrorCode(1_900_003_056, "目标销售无效、已停用或不在管理范围内");
     ErrorCode SUBORDINATE_LEAD_OWNER_CHANGED = new ErrorCode(1_900_003_057, "客资归属已变化，请刷新后重试");
     ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058,

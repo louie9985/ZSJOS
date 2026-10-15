@@ -14,7 +14,7 @@ class ConversionDetailsTest {
     final LocalDateTime now = LocalDateTime.of(2026,10,10,12,0);
     PerformanceFact receipt(long id, LocalDateTime time) {
         var row=new PerformanceFact();row.setLeadId(id);row.setId(id);row.setNumber("KZ-"+id);
-        row.setUserId(1L);row.setReceivedAt(time);row.setStatus("valid");return row;
+        row.setUserId(1L);row.setOwnerUserId(1L);row.setCurrentAssignment(true);row.setReceivedAt(time);row.setStatus("valid");return row;
     }
     PerformanceFact order(long id, long lead, LocalDateTime received, LocalDateTime submitted, String amount) {
         var row=receipt(lead,received);row.setId(id);row.setNumber("DD-"+id);row.setOccurredAt(submitted);

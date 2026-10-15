@@ -87,6 +87,14 @@ public class HrmPortalEmployeeRespVO {
     @Schema(description = "试用期，单位月；0 表示无试用期", example = "3")
     private Integer probation;
 
+    /** 试岗期，单位天；日期以入职时间为起点。 */
+    private Integer trialDays;
+    /** 计划试岗结束日期，允许人工调整。 */
+    private LocalDateTime plannedTrialEndTime;
+    /** 实际结束试岗日期，不自动驱动状态变化。 */
+    private LocalDateTime actualTrialEndTime;
+
+
     @Schema(description = "转正时间")
     private LocalDateTime regularTime;
 
@@ -112,7 +120,7 @@ public class HrmPortalEmployeeRespVO {
     private LocalDateTime companyAgeStartTime;
 
     @Schema(description = "司龄，单位年", example = "2")
-    private Integer companyAge;
+    private java.math.BigDecimal companyAge;
 
 
     private LocalDateTime plannedRegularTime;

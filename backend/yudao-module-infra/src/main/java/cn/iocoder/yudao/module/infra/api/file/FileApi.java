@@ -68,6 +68,9 @@ public interface FileApi {
     /**
      * 获得文件元数据。
      */
+    /** Batch metadata; missing IDs are omitted, storage URLs are not signed. */
+    Map<Long, FileInfoRespDTO> getFileInfoMap(Collection<Long> fileIds);
+
     FileInfoRespDTO getFileInfo(@NotNull(message = "文件编号不能为空") Long fileId);
 
     /**

@@ -38,6 +38,8 @@ Selecting an in-scope Lead reuses the Workbench owned-Lead detail. Read tabs ret
 permissions and live object checks. The detail exposes only server-projected `SUPERVISOR_*` Lead
 commands; it never turns the manager view into the owner-sales write surface.
 
+Workbench 客资详情同时收到 `QUALIFICATION_TRANSFER` 与 `SUPERVISOR_TRANSFER` 时，仅展示一个“转派”按钮。优先使用可用的主管转派命令；主管命令不可用而异常客资转派可用时，使用异常客资转派命令。只有禁用命令时显示禁用按钮，没有命令时不显示。候选销售查询和提交沿用选中命令的原有 API；权限与对象范围仍由后端独立校验，销售本人转派语义不变。
+
 - `GET /zsjos/lead/get?id={leadId}`: complete Lead overview.
 - `GET /zsjos/lead/{leadId}/follow-ups/page`: paged follow-up history.
 - `GET /zsjos/lead/appeal/lead/{leadId}/list`: appeal history.

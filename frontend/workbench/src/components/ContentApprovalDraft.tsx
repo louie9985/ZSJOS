@@ -1,3 +1,4 @@
+import ContentReviewAccountPreview from './ContentReviewAccountPreview'
 import { httpsLinkError, plannedTimeError } from '../services/contentReviewErrors'
 import { restoreDraftReferences } from '../services/contentReviewDraft'
 import ContentReviewAttachments from './ContentReviewAttachments'
@@ -60,13 +61,6 @@ export type ContentApprovalDraftValues = {
 type Option = { value: string; label: string }
 
 const accountLabel = (account: ContentApprovalAccount) => account.nickname?.trim() || account.accountNo || `账号 ${account.id}`
-const accountSnapshotFields = [
-  ['nickname', '账号名称'],
-  ['platformLabel', '发布平台'],
-  ['stageLabelSnapshot', '当前期段'],
-  ['currentStatusLabelSnapshot', '账号状态'],
-] as const
-
 /** 只把审批展示需要的字段传给后端，避免把整个素材对象塞进请求体。 */
 const toReferenceMaterials = (materials: Material[]): ContentApprovalReferenceMaterial[] => materials.map(material => ({
   materialId: material.id,
@@ -80,12 +74,16 @@ const toReferenceMaterials = (materials: Material[]): ContentApprovalReferenceMa
 export default function ContentApprovalDraft({
   disabled = false,
   lockAccounts = false,
+  batchId,
+  studentPersonId,
   accounts = [],
   purposeOptions,
   formatOptions,
   optionsLoading = false,
   onReloadOptions,
 }: {
+  batchId?: number
+  studentPersonId?: number
   optionsLoading?: boolean
   onReloadOptions?: () => void
   disabled?: boolean
@@ -109,21 +107,7 @@ export default function ContentApprovalDraft({
     <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, max: 20, message: '请选择 1 至 20 个发布账号' }]}>
       <Select maxCount={20} disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />
     </Form.Item>
-    {selectedAccountIds.length > 0 && <Card size="small" title="账号资料快照">
-      <Space direction="vertical" size="small" style={{ width: '100%' }}>
-        {accounts.filter(account => selectedAccountIds.includes(account.id)).map(account => <div key={account.id} style={{ borderBottom: '1px solid var(--crm-border)', paddingBottom: 10 }}>
-          <Typography.Text strong>{accountLabel(account)}</Typography.Text>
-          <Typography.Text type="secondary" style={{ marginLeft: 8 }}>{account.platformLabel || '平台未记录'} · {account.accountNo}</Typography.Text>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 8 }}>
-            {accountSnapshotFields.map(([key, label]) => <Form.Item key={key} name={['accountSnapshots', String(account.id), key]} label={label} initialValue={key === 'nickname' ? account.nickname : key === 'platformLabel' ? account.platformLabel : key === 'stageLabelSnapshot' ? account.stageLabelSnapshot || account.stage : key === 'currentStatusLabelSnapshot' ? account.currentStatusLabelSnapshot || account.currentStatusValue : undefined}>
-              <Input readOnly={key !== 'nickname'} maxLength={200} showCount={key === 'nickname'} />
-            </Form.Item>)}
-          </div>
-          <Typography.Text type="secondary">账号名称可编辑；平台、期段和状态保留账号资料快照。</Typography.Text>
-          {account.primaryProblems?.length ? <Typography.Text type="secondary">当前瓶颈：{account.primaryProblems.map(problem => problem.labelSnapshot).join('、')}</Typography.Text> : null}
-        </div>)}
-      </Space>
-    </Card>}
+    {selectedAccountIds.length > 0 && <ContentReviewAccountPreview batchId={batchId} studentPersonId={studentPersonId} accountIds={selectedAccountIds} />}
     <Form.List name="works" initialValue={[{}]} rules={[{ validator: (_, value) => Array.isArray(value) && value.length >= 1 && value.length <= 20 ? Promise.resolve() : Promise.reject(new Error("每批次必须包含 1 至 20 件作品")) }]}>
       {(fields, { add, remove, move }, { errors }) => <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {fields.map((field, index) => {

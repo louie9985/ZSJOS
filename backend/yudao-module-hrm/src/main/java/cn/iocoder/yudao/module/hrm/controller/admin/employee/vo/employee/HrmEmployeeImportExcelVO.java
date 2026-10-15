@@ -126,6 +126,15 @@ public class HrmEmployeeImportExcelVO {
     @Schema(description = "试用期（月）")
     private Integer probation;
 
+    @ExcelProperty("试岗期（天）")
+    private Integer trialDays;
+
+    @ExcelProperty("试岗结束日期")
+    private LocalDateTime plannedTrialEndTime;
+
+    @ExcelProperty("实际结束试岗日期")
+    private LocalDateTime actualTrialEndTime;
+
     @ExcelProperty("实际转正日期")
     @Schema(description = "实际转正日期")
     private LocalDateTime regularTime;

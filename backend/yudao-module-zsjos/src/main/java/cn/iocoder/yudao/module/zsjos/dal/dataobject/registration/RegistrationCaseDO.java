@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 public class RegistrationCaseDO extends TenantBaseDO {
     @TableId private Long id;
     private Long orderId;
+    /** Null only for retained historical order-level tasks. */
+    private Long orderItemId;
     private String status;
     private Long checklistVersionId;
     private String assignmentMode;

@@ -104,12 +104,16 @@ const legacyMediaRoute = (detail: NotifyMessage) => {
   return null
 }
 
+const isFeedbackDetail = (detail: NotifyMessage) =>
+  detail.bizType === 'feedback' && Number.isSafeInteger(detail.bizId) && isPositiveId(detail.bizId)
+
 export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
   detail.actionType === 'business_detail' && (
     (detail.bizType === 'calendar' && detail.sceneCode === 'zsjos.calendar.course' && Number.isSafeInteger(detail.bizId) && isPositiveId(detail.bizId)) ||
     (detail.bizType === 'hrm_employee' && isPositiveId(detail.bizId))
     || (detail.bizType === 'points-redemption' && isPositiveId(detail.bizId))
     || detail.sceneCode === 'zsjos.feedback.approval_urged'
+    || isFeedbackDetail(detail)
     ||
     isNotifyLeadActionCandidate(detail)
     || detail.sceneCode === 'zsjos.registration.task_created'
@@ -177,6 +181,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
       deps.warn('该审批已处理、已转办或当前账号无权处理，已打开消息详情')
       deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
     }
+    return
+  }
+  if (isFeedbackDetail(detail)) {
+    deps.navigate(`${APP_ROUTES.FEEDBACK}?feedbackId=${detail.bizId}`)
     return
   }
   if (detail.bizType === 'hrm_employee' && isPositiveId(detail.bizId)) {

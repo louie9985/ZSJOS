@@ -34,6 +34,9 @@ export interface HrmPortalEmployeeVO {
   type?: number // 聘用形式
   entryTime?: Date // 入职时间
   entryDay: number // 入职天数
+  trialDays?: number // 试岗期（天）
+  plannedTrialEndTime?: number // 试岗结束日期
+  actualTrialEndTime?: number // 实际结束试岗日期
   probation?: number // 试用期，单位月
   regularTime?: Date // 转正时间
   leaveTime?: Date // 离职时间

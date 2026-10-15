@@ -57,6 +57,30 @@ class BusinessTaskReminderServiceTest {
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Test
+    void currentCollaboratorReceivesReminderInsteadOfStoredOwner() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 13, 12, 0);
+        BusinessTaskDO task = task("pending", now.minusMinutes(1));
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(rule(2L, "due", 0)));
+        doAnswer(invocation -> { task.setAssigneeId(30L); return null; }).when(taskMapper).applyCurrentFollowUpAssignees(anyList());
+        assertEquals(1, service.emitDueForTask(8L, now));
+        ArgumentCaptor<Map<String,Object>> context = ArgumentCaptor.forClass(Map.class);
+        verify(publisher).publish(eq(NEXT_FOLLOW_UP_REMINDER),eq(20L),anyString(),eq(2L),isNull(),eq(now),context.capture());
+        assertEquals(30L, context.getValue().get("ownerUserId"));
+    }
+
+    @Test
+    void waitingPublicSeaDoesNotEmitOrConsumeReminderStage() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 13, 12, 0);
+        BusinessTaskDO task = task("pending", now.minusMinutes(1));
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(rule(2L, "due", 0)));
+        doAnswer(invocation -> { task.setAssigneeId(null); return null; }).when(taskMapper).applyCurrentFollowUpAssignees(anyList());
+        assertEquals(0, service.emitDueForTask(8L, now));
+        verifyNoInteractions(publisher, stageMapper);
+    }
+
+    @Test
     void downtimeAcrossStagesEmitsOnlyMostUrgentStage() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 11, 20, 0);
         BusinessTaskDO task = task("pending", now.minusMinutes(10));

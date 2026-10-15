@@ -13,7 +13,7 @@ import java.util.List;
 public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApprovalRoundDO> {
     @Select("<script>SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
             + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.tenant_id = o.tenant_id AND r.deleted = FALSE "
-            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL "
+            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL AND TRIM(r.process_instance_id) != '' "
             + "<if test='status != null'>AND o.status = #{status} </if>"
             + "<if test='keyword != null'>AND (o.order_no LIKE CONCAT('%', #{keyword}, '%') "
             + "OR o.student_name LIKE CONCAT('%', #{keyword}, '%') OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%')) </if>"
@@ -25,7 +25,7 @@ public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApp
 
     @Select("<script>SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
             + "JOIN zsjos_order_approval_round r ON r.id = o.current_approval_round_id AND r.order_id = o.id AND r.tenant_id = o.tenant_id AND r.deleted = FALSE "
-            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL "
+            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL AND TRIM(r.process_instance_id) != '' "
             + "AND o.status = 'pending_approval' "
             + "<if test='keyword != null'>AND (o.order_no LIKE CONCAT('%', #{keyword}, '%') "
             + "OR o.student_name LIKE CONCAT('%', #{keyword}, '%') OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%')) </if>"
@@ -53,8 +53,9 @@ public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApp
     SalesOrderApprovalRoundDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     @Select("SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
-            + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0' "
+            + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.tenant_id = o.tenant_id AND r.deleted = b'0' "
             + "WHERE o.tenant_id = #{tenantId} AND o.deleted = b'0' "
+            + "AND r.process_instance_id IS NOT NULL AND TRIM(r.process_instance_id) != '' "
             + "AND (o.order_no LIKE CONCAT('%', #{keyword}, '%') "
             + "OR o.student_name LIKE CONCAT('%', #{keyword}, '%') "
             + "OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%'))")

@@ -33,6 +33,7 @@
     <el-table v-loading="loading" :data="list" row-key="id" stripe>
       <el-table-column label="订单编号" prop="orderNo" min-width="190" fixed="left" />
       <el-table-column label="学员" prop="studentName" min-width="120" />
+      <el-table-column label="履约产品" min-width="220"><template #default="{ row }">{{ row.productName || (row.orderItemId ? '历史产品信息缺失' : '历史整单任务') }}<ProductSpecs :product="row" /></template></el-table-column>
       <el-table-column label="手机号" prop="studentMobile" min-width="130" />
       <el-table-column label="客资编号" min-width="210">
         <template #default="{ row }">{{ row.leadNo || '客资编号暂未生成' }}</template>
@@ -78,6 +79,7 @@
       <template v-else-if="detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="订单编号">{{ detail.orderNo }}</el-descriptions-item>
+          <el-descriptions-item label="履约产品">{{ detail.productName || (detail.orderItemId ? '历史产品信息缺失' : '历史整单任务') }}<ProductSpecs :product="detail" /></el-descriptions-item>
           <el-descriptions-item label="订单状态">{{
             detail.orderStatusLabel || '未知状态'
           }}</el-descriptions-item>
@@ -102,7 +104,7 @@
           class="mt-16px"
         />
 
-        <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? '逐商品分班' : '历史学习规划师分配' }}</div>
+        <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? (detail.orderItemId ? '本产品分班' : '逐商品分班') : '历史学习规划师分配' }}</div>
         <div v-if="detail.assignmentMode === 'class_per_item'" class="checklist">
           <el-alert v-if="classOptionsError" type="error" :closable="false" title="班级加载失败" :description="classOptionsError" show-icon />
           <el-button v-if="classOptionsError" :loading="classOptionsLoading" @click="loadClassOptions">重试加载班级</el-button>
@@ -211,6 +213,7 @@
     </div>
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
+      <el-button v-if="canClose && detail && isEditable(detail.status)" :loading="closing" @click="closeService">{{ detail.orderItemId ? '结束本产品（无需交付）' : '关闭服务' }}</el-button>
       <el-button
         v-if="canComplete && detail && isEditable(detail.status)"
         type="primary"
@@ -224,6 +227,7 @@
 </template>
 
 <script lang="ts" setup>
+import { ElMessageBox } from 'element-plus'
 import ProductSpecs from './components/ProductSpecs.vue'
 import * as RegistrationApi from '@/api/zsjos/registration'
 import * as DeliveryClassApi from '@/api/zsjos/deliveryClass'
@@ -262,17 +266,20 @@ const statusOptions = [
   { value: 'pending', label: '待办理' },
   { value: 'processing', label: '办理中' },
   { value: 'completed', label: '已完成' },
-  { value: 'cancelled', label: '已取消' }
+  { value: 'cancelled', label: '已取消' },
+  { value: 'ended', label: '已结束（无需交付）' }
 ]
 const hasPermission = (permission: string) =>
   userStore.getPermissions.has('*:*:*') || userStore.getPermissions.has(permission)
 const canUpdate = computed(() => hasPermission('zsjos:registration:update'))
+const closing = ref(false)
+const canClose = computed(() => hasPermission('zsjos:registration:close'))
 const canComplete = computed(() => hasPermission('zsjos:registration:complete'))
 const statusLabel = (status: string) =>
   statusOptions.find((item) => item.value === status)?.label || '未知状态'
 const isEditable = (status: string) => status === 'pending' || status === 'processing'
 const statusTag = (status: string): 'success' | 'info' | 'warning' =>
-  status === 'completed' ? 'success' : status === 'cancelled' ? 'info' : 'warning'
+  ['completed', 'ended'].includes(status) ? 'success' : status === 'cancelled' ? 'info' : 'warning'
 
 const load = async () => {
   loading.value = true
@@ -470,6 +477,26 @@ const deleteAttachment = async (itemId: number, attachmentId: number) => {
     savingItemId.value = undefined
   }
 }
+const closeService = async () => {
+  const current = detail.value
+  if (!current || closing.value) return
+  try {
+    const { value } = await ElMessageBox.prompt(current.orderItemId
+      ? '仅结束当前产品，不创建交付服务，不影响同单其他产品。请填写结束原因。' : '请填写关闭原因。',
+      current.orderItemId ? '结束本产品（无需后续交付）' : '关闭服务', {
+        inputType: 'textarea', confirmButtonText: '确认', cancelButtonText: '取消',
+        inputValidator: value => Boolean(value?.trim()) && value.trim().length <= 500 || '请填写不超过500字的原因'
+      })
+    closing.value = true
+    await RegistrationApi.closeRegistration(current.id, current.version, value.trim())
+    message.success(current.orderItemId ? '本产品已结束，无需后续交付' : '报名履约已关闭')
+    await load()
+    if (detailId.value === current.id) await reloadDetail()
+  } catch (cause: any) {
+    if (cause !== 'cancel' && cause !== 'close') message.error(cause?.msg || cause?.message || '结束失败，请重试')
+  } finally { closing.value = false }
+}
+
 const complete = async () => {
   if (!detail.value) return
   try {

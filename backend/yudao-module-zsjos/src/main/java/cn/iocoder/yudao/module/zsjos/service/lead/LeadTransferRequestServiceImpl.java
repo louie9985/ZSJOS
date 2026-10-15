@@ -52,6 +52,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交转派申请", target="transfer-create", id=0, actor=1, actorType="ADMIN")
     public Long create(Long cycleId, Long requesterUserId, LeadTransferRequestCreateReqVO request) {
         LeadAgingPoolCycleDO cycleSnapshot = cycleMapper.selectById(cycleId);
         if (cycleSnapshot == null) {
@@ -143,6 +144,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
     @Override
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-transfer.process-result", targetType = "lead-transfer")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="转派申请处理结果", target="transfer-process", id=0, actor=-1, actorType="SYSTEM")
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
         LeadTransferRequestDO request = requestMapper.selectByProcessInstanceIdForUpdate(

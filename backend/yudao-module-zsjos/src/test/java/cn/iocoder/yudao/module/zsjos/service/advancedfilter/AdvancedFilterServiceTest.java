@@ -23,6 +23,17 @@ class AdvancedFilterServiceTest {
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(7L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Test void serviceSubjectConditionsCannotMatchSiblingCourses() {
+        var query = service.buildStudentServiceQuery(group("AND", condition("orderItem.productRef", "in", List.of("p-1")),
+                condition("service.ownerUserId", "in", List.of("7"))));
+        assertFalse(query.getWhereSql().contains("EXISTS"));
+        assertTrue(query.getWhereSql().contains("oi.product_ref"));
+        assertTrue(query.getWhereSql().contains("sr.owner_user_id"));
+        var history = service.buildStudentServiceQuery(group("AND", condition("lead.lastFollowUpAt", "is_empty", null)));
+        assertTrue(history.getWhereSql().contains("cr.service_relation_id=sr.id"));
+        assertFalse(history.getWhereSql().contains("rl.last_follow_up_at"));
+    }
+
     @Test void productAndSkuConditionsMustMatchTheSameItem() {
         service.matchOrderIds(group("AND", condition("orderItem.productRef", "in", List.of("p-1")),
                 condition("orderItem.skuRef", "in", List.of("sku-1"))));

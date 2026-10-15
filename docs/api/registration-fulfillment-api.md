@@ -24,7 +24,7 @@ disabled, or renamed. New cases snapshot the published version and never follow 
 
 - `GET /zsjos/registration/pool-page?keyword=`：按订单号、学员姓名或手机号分页查询公共池。
 - `POST /zsjos/registration/pool/search-page`：在报名履约公共池固定权限范围内组合关键词与 `advancedFilter`，先筛选再分页。
-- 两种公共池查询均支持可选 `statusGroup`：`pending` 包含 `pending/processing`，`processed` 包含 `completed/cancelled`，`all` 或省略参数不限制状态。非法值校验失败；分类与原 `status`、关键词、高级筛选取交集后分页，权限范围不变。
+- 两种公共池查询均支持可选 `statusGroup`：`pending` 包含 `pending/processing`，`processed` 包含 `completed/cancelled/ended`，`all` 或省略参数不限制状态。非法值校验失败；分类与原 `status`、关键词、高级筛选取交集后分页，权限范围不变。
 - Workbench 顶部提供“待处理、已处理、全部”，默认待处理；切换分类重置分页和选择，完成或关闭后刷新第一页。卡片仍展示具体履约状态。管理端未传分类参数时保留原查询行为。
 - `GET /zsjos/registration/{id}`
 - `GET /zsjos/registration/study-planner-candidates`
@@ -46,11 +46,18 @@ display. Stable errors distinguish finance pending, finance revision required, s
 reused keys, incomplete checklists, ineffective orders, invalid planners, terminal cases and
 object authorization failures.
 
-`close` is the explicit user action for an approved order that does not need further service. It
-requires a close reason and marks the registration case `cancelled` with `cancelledAt` and
-`cancelReason`. The command is only valid while the case is still `pending` or `processing`; it
-does not create service relations, does not change the order status, and does not affect already
-completed cases.
+新履约任务按 `orderItemId` 独立生成，返回 `orderItemId`、`productName` 和 `specs`。
+同一 Person 可拥有多个任务、课程服务主体和班级；同产品的不同订单明细不合并。审批仍按整单，
+完成仍要求订单生效，财务待审限制未放开。每个任务独立保存清单、附件、分班和完成状态。
+
+`close` 在 pending/processing 的商品任务上表示“结束本产品，无需后续交付”，保存 `ended`、
+完成时间及操作人，原因沿用 `cancelReason`，操作时间兼容 `cancelledAt`。它不创建服务关系，
+不要求分班，不更改订单和其他商品任务。历史整单任务仍按旧语义置为 cancelled。
+自动订单终止使用 cancelled，不改写已完成或已结束任务的处理事实。
+
+V317 将未完成的历史整单任务按商品拆分，首项保留旧任务 ID，其余复制原清单、附件引用和路由，
+分班记录按商品迁移。历史终态任务和已有服务关系保留，不重新生成。部署须先在写入维护窗口执行
+迁移再发布匹配代码，旧后端不兼容新结构。详见[运维说明](../operations/registration-item-tasks.md)。
 
 Existing `legacy_planner` cases still require one snapshotted planner route. Study-planner candidates are enabled users holding
 role code `study_planner` inside the selected department subtree; content-director candidates are
@@ -60,9 +67,9 @@ Excel formats; required attachment items must contain at least one file. Departm
 are stored as completion-time snapshots on the case routes.
 
 New cases use `assignmentMode=class_per_item`. The detail response returns one `classAssignments` projection
-for every order item, including product/category facts, the saved class and homeroom snapshots, and a stable
+for the task's order item (historical aggregate cases retain all items), including product/category facts, the saved class and homeroom snapshots, and a stable
 per-item error when the current selection is no longer usable. `PUT .../class-assignments` replaces the complete
-set in one versioned, idempotent command: every order item must occur exactly once and select a tenant-owned
+set in one versioned, idempotent command: every item belonging to this task must occur exactly once and select a tenant-owned
 `SERVING` class, including the system pending class. Registration requests options without `categoryId` and
 both frontends show a flat searchable list of all serving classes, with loading, empty and retryable error states.
 Product/category/SKU/exam metadata does not filter candidates or block saving/completion, even when absent.
@@ -86,13 +93,13 @@ does not physically delete the Infra file.
 Workbench previews JPG/PNG/WebP images and PDF files in the registration detail. Word and Excel
 attachments remain downloadable/openable but are not rendered in the application.
 
-When `registrationReview` first passes, the service creates the order-unique case and publishes
+When `registrationReview` first passes, the service creates one item-unique case per order item and publishes
 `zsjos.registration.task_created`. The default in-app rule resolves the intersection of enabled
 users who hold `zsjos:registration:query-pool` and enabled users in the configured registration
 approval department subtree (including the configured root department). System persists the message and emits the existing post-commit
 WebSocket hint.
 
-When registration completion has created the student's service relations, each order item produces one service
+When registration completion has created the student's service relations, only the task's order item produces one service
 relation with the selected `classId`. A formal class derives `ownerUserId` from its current homeroom; an explicitly
 pending assignment leaves owner null. Completion locks the registration, order, ordered order-item rows, assignment
 rows and target classes, then reuses that locked item set to create relations. A concurrent order-item change, class
@@ -109,6 +116,23 @@ When completion assigns a content director, `zsjos.registration.director_assigne
 in-app message and the standard post-commit WebSocket hint for that director.
 
 ## My Students
+
+### 单产品服务主体（学生交付中心）
+
+Workbench 与 Admin 使用新增 `GET /zsjos/student/my-service-page`、
+`POST /zsjos/student/my-service/search-page`、`GET /zsjos/student/my-service/{relationId}`。
+分页响应每行包含 serviceRelationId、Person 基础信息及单个 service，不返回兄弟课程数组。
+新旧记录直接使用现有服务关系，无历史数据回填；同一自然人可以有多条课程服务和不同班级。
+数据库按服务执行权限、筛选、排序、计数和分页；权限继续使用 query-my 和服务对象授权。
+可选 personId 用于旧通知选择服务，classId 只命中当前服务。student_service 高级筛选复用原字段
+标识，关联订单/商品/客资只来自当前服务；最近联系及下次联系使用当前服务记录和待办。
+旧 student_my 模板仍可读取，原按人聚合接口保留给兼容消费者，新媒体不切换。
+详情及接收/联系/调班保持当前服务身份；基础资料修改影响同 Person 的其他课程服务。
+新商品任务分班通知使用 student_service + 服务 ID；历史 Person 通知多服务时先选服务。
+班级数量展示为服务学员数，同一自然人在同班拥有两条服务计为两条。
+
+### 兼容的按人聚合接口
+
 
 - `GET /zsjos/student/my-page`（可选 `classId`）
 - `POST /zsjos/student/my/search-page`

@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import cn.hutool.core.io.IoUtil;
+import cn.iocoder.yudao.module.zsjos.service.workorder.WorkOrderUploadHandler;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
@@ -21,7 +21,11 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class WorkOrderController {
     @Resource private WorkOrderService service;
     @Resource private ProductionTicketService productionTicketService;
-    @PostMapping("/file/upload") @Operation(summary = "上传工单附件") @PreAuthorize("@ss.hasAnyPermissions('zsjos:work-order:create','zsjos:work-order:complete')") public CommonResult<WorkOrderFileRespVO> upload(@RequestParam("file") MultipartFile file) throws Exception { return success(service.upload(IoUtil.readBytes(file.getInputStream()), file.getOriginalFilename(), file.getContentType(), getLoginUserId())); }
+    @Resource private WorkOrderUploadHandler uploadHandler;
+    @PostMapping("/file/upload") @Operation(summary = "上传工单附件") @PreAuthorize("@ss.hasAnyPermissions('zsjos:work-order:create','zsjos:work-order:complete')")
+    public CommonResult<WorkOrderFileRespVO> upload(@RequestParam("file") MultipartFile file) throws Exception {
+        return success(uploadHandler.upload(file, getLoginUserId()));
+    }
     @PostMapping("/scene/create") @Operation(summary = "创建工单场景") @PreAuthorize("@ss.hasPermission('zsjos:work-order-scene:create')") public CommonResult<Long> createScene(@Valid @RequestBody WorkOrderSceneCreateReqVO req) { return success(service.createScene(req, getLoginUserId())); }
     @PutMapping("/scene/update") @Operation(summary = "更新工单场景") @PreAuthorize("@ss.hasPermission('zsjos:work-order-scene:update')") public CommonResult<Boolean> updateScene(@Valid @RequestBody WorkOrderSceneUpdateReqVO req) { service.updateScene(req, getLoginUserId()); return success(true); }
     @GetMapping("/scene/page") @Operation(summary = "工单场景分页") @PreAuthorize("@ss.hasPermission('zsjos:work-order-scene:query')") public CommonResult<PageResult<WorkOrderSceneRespVO>> scenePage(@Valid WorkOrderScenePageReqVO req) { return success(service.scenePage(req.getPageNo(), req.getPageSize())); }

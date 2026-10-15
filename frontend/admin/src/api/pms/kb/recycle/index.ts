@@ -30,6 +30,7 @@ export interface PmsKnowledgeRecycleDetailVO {
 }
 
 export interface PmsKnowledgeRecyclePreviewVO {
+  attachments?: import('../content/document').KnowledgeAttachment[]
   id: number
   type: number
   name: string

@@ -17,6 +17,17 @@ import static org.mockito.ArgumentMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class PerformanceReportTest {
+ @Test void overviewSharesLastWeekAcrossCardsAndTarget(){
+  var batch=mock(PerformanceTargetService.Batch.class);
+  when(targets.batch(anyCollection(),anyCollection())).thenReturn(batch);
+  when(batch.resolve(anyString(),anyLong(),anyString(),any())).thenReturn(new Target(null,"USER",1L,"test","month",LocalDate.now(),null,null,null,null,false,false,0,null));
+  when(reports.missingAttribution(any())).thenReturn(sum("missing","total","0",0,"0",0));
+  var result=service.overview(query);
+  assertEquals(List.of("today","week","lastWeek","month","lastMonth","quarter","year","last7","last30","last60","last90"),result.performance().stream().map(Metric::key).toList());
+  assertEquals(List.of("lastWeek","month","lastMonth","last7","last30","last60","last90"),result.conversion().stream().map(Metric::key).toList());
+  assertSame(result.performance().get(2),result.conversion().getFirst());
+  assertSame(result.targets().getFirst().actual(),result.conversion().getFirst());
+ }
  @InjectMocks PerformanceStatisticsService service;
  // Preserve the existing detail fixtures as the oracle; SQL equivalence is tested in PerformanceDetailMySqlTest.
  @InjectMocks PerformanceDetailReference reference;
@@ -36,7 +47,7 @@ class PerformanceReportTest {
  static PerformanceAggregate count(String key,long count){var a=new PerformanceAggregate();a.setKey(key);a.setCount(count);return a;}
  static PerformanceAggregate sum(String key,String group,String amount,long count,String average,long averageCount){var a=count(key,count);a.setGroupKey(group);a.setAmount(new BigDecimal(amount));a.setAverageAmount(new BigDecimal(average));a.setAverageOrders(averageCount);return a;}
  PerformanceFact order(long id,String source,String type,String amount){
-  var f=new PerformanceFact();f.setId(id);f.setGroupKey(source);f.setOrderType(type);f.setAmount(new BigDecimal(amount));f.setOccurredAt(LocalDateTime.now(PerformancePeriods.ZONE).minusMinutes(1));return f;
+  var f=new PerformanceFact();f.setUserId(1L);f.setOwnerUserId(1L);f.setCurrentAssignment(true);f.setId(id);f.setGroupKey(source);f.setOrderType(type);f.setAmount(new BigDecimal(amount));f.setOccurredAt(LocalDateTime.now(PerformancePeriods.ZONE).minusMinutes(1));return f;
  }
  @Test void nonInboundAveragesSourcesAndDetailsIncludeAllRepurchases(){
   when(facts.orders(991L,"USER",1L)).thenReturn(List.of(order(1,"inbound","first_purchase","100"),order(2,"inbound","repurchase","300"),order(3,"self","first_purchase","0.01"),order(4,null,"first_purchase","50")));
@@ -106,7 +117,7 @@ class PerformanceReportTest {
   var received=LocalDateTime.now(PerformancePeriods.ZONE).minusHours(3);
   var excluded=order(1,"self","first_purchase","1280");excluded.setLeadId(1L);excluded.setReceivedAt(received);excluded.setSourceType("sales_self_sourced");excluded.setSourceProviderRecorded(true);
   var included=order(2,"self","first_purchase","1280");included.setLeadId(2L);included.setReceivedAt(received);included.setSourceType("sales_self_sourced");included.setSourceProviderUserId(99L);included.setSourceProviderRecorded(true);included.setProviderOwnerType("system_user");included.setProviderOwnerId(99L);
-  var unconverted=new PerformanceFact();unconverted.setLeadId(3L);unconverted.setReceivedAt(received);unconverted.setStatus("valid");unconverted.setSourceType("sales_self_sourced");unconverted.setSourceProviderRecorded(true);
+  var unconverted=new PerformanceFact();unconverted.setUserId(1L);unconverted.setOwnerUserId(1L);unconverted.setCurrentAssignment(true);unconverted.setLeadId(3L);unconverted.setReceivedAt(received);unconverted.setStatus("valid");unconverted.setSourceType("sales_self_sourced");unconverted.setSourceProviderRecorded(true);
   when(facts.orders(991L,"USER",1L)).thenReturn(List.of(excluded,included));
   when(facts.receipts(991L,"USER",1L)).thenReturn(List.of(unconverted));
   query.setStart(received.toLocalDate());query.setEnd(received.toLocalDate().plusDays(1));query.setMetric("conversion");
@@ -122,7 +133,7 @@ class PerformanceReportTest {
   var exact=order(2,"inbound","first_purchase","1280");exact.setLeadId(2L);exact.setReceivedAt(received);exact.setOccurredAt(received.plusHours(1));
   var old=order(3,"inbound","first_purchase","1000");old.setLeadId(3L);old.setReceivedAt(received.minusDays(10));old.setOccurredAt(received.plusHours(1));
   var receipts=new ArrayList<PerformanceFact>();
-  for(long id=1;id<=2;id++){var r=new PerformanceFact();r.setLeadId(id);r.setNumber("KZ-TEST-"+id);r.setReceivedAt(received);r.setStatus("valid");receipts.add(r);}
+  for(long id=1;id<=2;id++){var r=new PerformanceFact();r.setUserId(1L);r.setOwnerUserId(1L);r.setCurrentAssignment(true);r.setLeadId(id);r.setNumber("KZ-TEST-"+id);r.setReceivedAt(received);r.setStatus("valid");receipts.add(r);}
   when(detailQueries.conversionOrders(any())).thenReturn(List.of(low,exact,old));
   when(detailQueries.conversionReceipts(any())).thenReturn(receipts);
   var result=service.details(query);

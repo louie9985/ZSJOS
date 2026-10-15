@@ -12,6 +12,24 @@ final class ContentReviewAccountProfile {
 
     private ContentReviewAccountProfile() {}
 
+    static Map<String, Object> snapshot(MediaAccountDO account) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", account.getId());
+        result.put("accountNo", account.getAccountNo());
+        result.put("nickname", account.getNickname());
+        result.put("platformAccountId", account.getPlatformAccountId());
+        result.put("platformValue", account.getPlatformValue());
+        result.put("platformLabel", account.getPlatformLabelSnapshot());
+        result.put("sStage", account.getSStage());
+        result.put("sStageLabel", account.getSStageLabelSnapshot());
+        result.put("currentStatusValue", account.getCurrentStatusValue());
+        result.put("currentStatusLabel", account.getCurrentStatusLabelSnapshot());
+        result.put("ownerOperatorUserId", account.getOwnerOperatorUserId());
+        result.put("directorUserId", account.getDirectorUserId());
+        result.putAll(read(account));
+        return result;
+    }
+
     static Map<String, Object> read(MediaAccountDO account) {
         Map<?, ?> values = account.getDetailValuesJson() == null ? Map.of()
                 : JsonUtils.parseObject(account.getDetailValuesJson(), Map.class);

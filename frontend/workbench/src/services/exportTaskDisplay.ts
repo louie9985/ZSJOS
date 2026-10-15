@@ -3,6 +3,7 @@ import type { ExportTask } from './api'
 // Fixed export commands owned by the async-export API, not business dictionaries.
 const types: Record<ExportTask['exportType'], string> = {
   lead: '客资', order: '订单', finance_order: '财务订单', cashback: '返现', withdrawal: '提现',
+  exam_calendar: '考期日历',
 }
 const statuses: Record<ExportTask['status'], string> = {
   queued: '排队中', prechecking: '校验中', generating: '生成中', ready: '可下载',

@@ -44,6 +44,9 @@ import static cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.KNOWLEDGE_FOL
 public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService {
 
     @Resource
+    private cn.iocoder.yudao.module.pms.dal.mysql.kb.library.PmsKnowledgeLibraryMapper importLibraryMapper;
+
+    @Resource
     private PmsKnowledgeFolderMapper folderMapper;
 
     @Resource
@@ -66,6 +69,7 @@ public class PmsKnowledgeFolderServiceImpl implements PmsKnowledgeFolderService 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createFolder(PmsKnowledgeFolderSaveReqVO saveReqVO, Long userId) {
+        importLibraryMapper.lockContentCreation(saveReqVO.getLibraryId());
         // 1.1 校验知识库读取权限
         libraryMemberService.validateLibraryInteraction(saveReqVO.getLibraryId(), userId);
         // 1.2 校验父文件夹存在

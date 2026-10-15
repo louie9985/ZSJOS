@@ -76,7 +76,7 @@ export const decideSalesOrder = (
 ) => request.put({ url: `/zsjos/sales-order/${id}/${decision}`, data })
 export const terminateSalesOrder = (id: number, data: Record<string, unknown>) =>
   request.put({ url: `/zsjos/sales-order/${id}/terminate`, data })
-export type SalesOrderSubmission = Record<string, unknown> & { studentMobile: string; studentWechatId: string }
+export type SalesOrderSubmission = Record<string, unknown> & { studentMobile: string; studentWechatId: string; giftItems?: string[]; giftShippingAddress?: string }
 export const resubmitSalesOrder = (id: number, data: SalesOrderSubmission) =>
   request.put({ url: `/zsjos/sales-order/${id}/resubmit`, data })
 export const bpmTodoPage = (params: Record<string, unknown>): Promise<WorkbenchListResult> =>

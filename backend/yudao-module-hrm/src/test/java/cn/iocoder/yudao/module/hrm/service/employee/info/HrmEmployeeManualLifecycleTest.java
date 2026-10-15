@@ -33,6 +33,7 @@ class HrmEmployeeManualLifecycleTest extends BaseDbUnitTest {
         lenient().when(dictionaries.getDictDataList(anyString())).thenReturn(List.of(
                 new DictDataRespDTO().setValue("1").setLabel("正式"),
                 new DictDataRespDTO().setValue("2").setLabel("试用"),
+                new DictDataRespDTO().setValue("9").setLabel("试岗"),
                 new DictDataRespDTO().setValue("4").setLabel("离职")));
     }
     private HrmEmployeeDO employee() {
@@ -44,6 +45,30 @@ class HrmEmployeeManualLifecycleTest extends BaseDbUnitTest {
     private HrmEmployeeSaveReqVO request(HrmEmployeeDO e) {
         return BeanUtils.toBean(e,HrmEmployeeSaveReqVO.class).setChangeMode("CORRECTION")
                 .setOperationKey(UUID.randomUUID().toString()).setChangeReason("核实后纠正");
+    }
+    @Test void trialRoundTripSnapshotAndExplicitClearing() {
+        var e = employee();
+        var r = request(e).setType(2).setStatus(9).setTrialDays(3)
+                .setPlannedRegularTime(null).setPlannedTrialEndTime(e.getEntryTime().plusDays(3))
+                .setActualTrialEndTime(e.getEntryTime().plusDays(4));
+        lifecycle.write(r, e, BeanUtils.toBean(r, HrmEmployeeDO.class));
+        var saved = employees.selectById(e.getId());
+        assertEquals(9, saved.getStatus());
+        assertEquals("试岗", saved.getStatusLabel());
+        assertEquals(3, saved.getTrialDays());
+        assertEquals(r.getPlannedTrialEndTime(), saved.getPlannedTrialEndTime());
+        assertEquals(r.getActualTrialEndTime(), saved.getActualTrialEndTime());
+        assertEquals(1, records.selectList().size());
+        assertTrue(records.selectList().getFirst().getAfterSnapshot().contains("trialDays"));
+        var copied = new HrmEmployeeSaveReqVO();
+        HrmEmployeeLifecycleValues.of(saved).apply(copied);
+        assertEquals(3, copied.getTrialDays());
+        var clear = request(saved).setTrialDays(null).setPlannedTrialEndTime(null).setActualTrialEndTime(null);
+        lifecycle.write(clear, saved, BeanUtils.toBean(clear, HrmEmployeeDO.class));
+        var cleared = employees.selectById(e.getId());
+        assertNull(cleared.getTrialDays()); assertNull(cleared.getPlannedTrialEndTime()); assertNull(cleared.getActualTrialEndTime());
+        assertEquals(9, cleared.getStatus());
+        verifyNoInteractions(events, candidates);
     }
     @Test void correctionPreservesManualStatusAndClearsDatesWithoutEvents() {
         var e=employee(); var r=request(e).setProbation(0).setPlannedRegularTime(null);

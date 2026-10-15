@@ -3,11 +3,11 @@
 -- Every check returns a row whose `result` column is either 'OK' or a FAIL description.
 
 SELECT 'pms tables' AS check_name,
-       CASE WHEN COUNT(*) = 33 THEN 'OK'
-            ELSE CONCAT('FAIL: expected 33 PMS tables, found ', COUNT(*)) END AS result
+       CASE WHEN COUNT(*) = 36 THEN 'OK'
+            ELSE CONCAT('FAIL: expected 36 PMS tables, found ', COUNT(*)) END AS result
 FROM information_schema.tables
 WHERE table_schema = DATABASE()
-  AND table_name IN ('pms_iteration',
+  AND table_name IN ('pms_knowledge_attachment', 'pms_knowledge_import_task', 'pms_knowledge_import_item', 'pms_iteration',
                      'pms_knowledge_content_permission',
                      'pms_knowledge_content_permission_member',
                      'pms_knowledge_document',

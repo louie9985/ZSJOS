@@ -263,15 +263,17 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     }).catch(error => message.error(error instanceof Error ? error.message : '协助请求发送失败'))
   }
 
+  // Both server actions transfer recycled/suspended leads; keep one entry and prefer an enabled command.
+  const transferActions = [actions.get('SUPERVISOR_TRANSFER'), actions.get('QUALIFICATION_TRANSFER')]
+  const transferAction = transferActions.find(action => action?.enabled) || transferActions.find(Boolean)
   const qualificationAlertActions: ToolbarAction[] = [
     actions.has('QUALIFICATION_RESTORE') && { key: 'qualification-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('QUALIFICATION_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore') },
-    actions.has('QUALIFICATION_TRANSFER') && { key: 'qualification-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('QUALIFICATION_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
+    transferAction && { key: 'transfer', icon: <SwapOutlined/>, label: '转派', disabled: !transferAction.enabled, onClick: () => void openQualificationAction('transfer', transferAction.code === 'SUPERVISOR_TRANSFER') },
     actions.has('QUALIFICATION_RECYCLE') && { key: 'qualification-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('QUALIFICATION_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
     actions.has('QUALIFICATION_RELEASE') && { key: 'qualification-release', icon: <ExportOutlined/>, label: '释放', danger: true, disabled: !actions.get('QUALIFICATION_RELEASE')?.enabled, onClick: () => void openQualificationAction('release') },
     actions.has('OWNER_TRANSFER') && { key: 'owner-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('OWNER_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
     actions.has('OWNER_RELEASE_PUBLIC_SEA') && { key: 'owner-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海', danger: true, disabled: !actions.get('OWNER_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea') },
     actions.has('SUPERVISOR_RESTORE') && { key: 'supervisor-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('SUPERVISOR_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore', true) },
-    actions.has('SUPERVISOR_TRANSFER') && { key: 'supervisor-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('SUPERVISOR_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer', true) },
     actions.has('SUPERVISOR_RECYCLE') && { key: 'supervisor-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('SUPERVISOR_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle', true) },
     actions.has('SUPERVISOR_RELEASE_CLAIM_POOL') && { key: 'supervisor-release-claim-pool', icon: <ExportOutlined/>, label: '释放至抢单池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_CLAIM_POOL')?.enabled, onClick: () => void openQualificationAction('release', true) },
     actions.has('SUPERVISOR_RELEASE_PUBLIC_SEA') && { key: 'supervisor-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea', true) },
@@ -305,7 +307,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={refreshVersion + followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={handleStandaloneFollowUpSuccess} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: isLeadAppealPending(lead) ? '申诉记录 · 处理中' : '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged} readOnly={readOnly} review={appealReview} onDirtyChange={setAppealDirty}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
-    if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
+    if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id} refreshVersion={refreshVersion + followUpRefreshVersion}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }
   }); tabItems.push(...extraTabs)
   const validTabKeys = new Set(tabItems.map(item => item.key))

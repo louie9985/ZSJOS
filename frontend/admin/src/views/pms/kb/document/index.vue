@@ -1,28 +1,48 @@
 <template>
   <doc-alert title="【PMS】文档与协作" url="https://doc.iocoder.cn/pms/kb/document/" />
 
+  <div class="mb-12px flex gap-8px">
+    <el-button
+      v-if="
+        activeView === 'home'
+          ? Boolean(tree?.writeStatus)
+          : activeView === 'folder' && canEditKnowledgeContent(selectedFolder?.currentUserLevel)
+      "
+      v-hasPermi="['pms:kb:library:update']"
+      @click="
+        folderImportRef?.open({
+          libraryId,
+          folderId: selectedFolder?.id || 0,
+          label: `${library?.name || ''} / ${selectedFolder?.title || '根目录'}`
+        })
+      "
+      >上传文件夹</el-button
+    >
+    <el-button v-hasPermi="['pms:kb:library:query']" @click="folderImportRef?.history()"
+      >我的导入记录</el-button
+    >
+  </div>
+  <KnowledgeFolderImport ref="folderImportRef" @success="handleContentChanged" />
   <!-- 知识库工作区 -->
-  <div
-    v-loading="loading"
-    class="knowledge-library-workspace grid min-h-[calc(100vh-120px)] grid-cols-[240px_minmax(0,1fr)] gap-16px max-[900px]:grid-cols-1"
-  >
-    <!-- 左侧导航与目录 -->
-    <ContentWrap :body-style="{ padding: '0' }" class="!mb-0">
-      <KnowledgeLibrarySidebar
-        :active-view="activeView"
-        :can-create-document="canCreateDocument"
-        :can-create-folder="canCreateFolder"
-        :current-node-key="currentNodeKey"
-        :tree-data="treeData"
-        :write-status="Boolean(tree?.writeStatus)"
-        @create="handleCreateCommand"
-        @home="handleHome"
-        @node-click="handleNodeClick"
-        @node-action="handleNodeAction"
-        @recycle="handleRecycle"
-      />
-    </ContentWrap>
-
+  <KnowledgeLibraryWorkspace v-loading="loading">
+    <template #sidebar>
+      <!-- 左侧导航与目录 -->
+      <ContentWrap :body-style="{ padding: '0' }" class="!mb-0">
+        <KnowledgeLibrarySidebar
+          :active-view="activeView"
+          :can-create-document="canCreateDocument"
+          :can-create-folder="canCreateFolder"
+          :current-node-key="currentNodeKey"
+          :tree-data="treeData"
+          :write-status="Boolean(tree?.writeStatus)"
+          @create="handleCreateCommand"
+          @home="handleHome"
+          @node-click="handleNodeClick"
+          @node-action="handleNodeAction"
+          @recycle="handleRecycle"
+        />
+      </ContentWrap>
+    </template>
     <!-- 右侧业务内容 -->
     <ContentWrap :body-style="{ padding: '24px 32px' }" class="knowledge-library-main !mb-0">
       <KnowledgeRecyclePanel
@@ -69,7 +89,7 @@
         @tab-change="handleLibraryTabChange"
       />
     </ContentWrap>
-  </div>
+  </KnowledgeLibraryWorkspace>
 
   <!-- 内容管理弹窗 -->
   <KnowledgeFolderForm ref="folderFormRef" @success="handleContentChanged" />
@@ -94,6 +114,7 @@ import KnowledgeContentMoveDialog from './KnowledgeContentMoveDialog.vue'
 import KnowledgeContentPermissionForm from './KnowledgeContentPermissionForm.vue'
 import KnowledgeDocumentCreateForm from './KnowledgeDocumentCreateForm.vue'
 import KnowledgeFileUploadForm from './KnowledgeFileUploadForm.vue'
+import KnowledgeFolderImport from '../importing/KnowledgeFolderImport.vue'
 import KnowledgeDocumentShareDialog from './KnowledgeDocumentShareDialog.vue'
 import KnowledgeDocumentUpdateForm from './KnowledgeDocumentUpdateForm.vue'
 import KnowledgeFolderForm from './KnowledgeFolderForm.vue'
@@ -102,6 +123,7 @@ import KnowledgeDocumentDetail from './KnowledgeDocumentDetail.vue'
 import KnowledgeFolderDetail from './KnowledgeFolderDetail.vue'
 import KnowledgeLibraryHome from './KnowledgeLibraryHome.vue'
 import KnowledgeLibrarySidebar from './KnowledgeLibrarySidebar.vue'
+import KnowledgeLibraryWorkspace from './KnowledgeLibraryWorkspace.vue'
 import KnowledgeRecyclePanel from './KnowledgeRecyclePanel.vue'
 import type { KnowledgeContentView, KnowledgeTreeNode } from './types'
 import { PmsKnowledgeObjectType, PmsKnowledgeRootId } from '@/views/pms/kb/utils/constants'
@@ -125,6 +147,7 @@ const favoriteLoading = ref(false) // 关注内容加载中
 const favoriteTabActive = ref(false) // 是否正在查看关注页签
 const folderFormRef = ref<InstanceType<typeof KnowledgeFolderForm>>() // 文件夹表单 Ref
 const documentCreateFormRef = ref<InstanceType<typeof KnowledgeDocumentCreateForm>>() // 文档新增表单 Ref
+const folderImportRef = ref<InstanceType<typeof KnowledgeFolderImport>>()
 const fileUploadFormRef = ref<InstanceType<typeof KnowledgeFileUploadForm>>() // 文件上传表单 Ref
 const documentUpdateFormRef = ref<InstanceType<typeof KnowledgeDocumentUpdateForm>>() // 文档编辑表单 Ref
 const memberFormRef = ref<InstanceType<typeof KnowledgeMemberForm>>() // 成员表单 Ref

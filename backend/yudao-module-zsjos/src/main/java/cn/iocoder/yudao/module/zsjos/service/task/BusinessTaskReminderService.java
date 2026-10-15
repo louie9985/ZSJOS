@@ -91,6 +91,8 @@ public class BusinessTaskReminderService {
     private int emitForTask(Long taskId, LocalDateTime now, List<NotifyTimingRuleRespDTO> rules) {
         BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
         if (task == null || !TASK_STATUS_PENDING.equals(task.getStatus()) || task.getDueAt() == null) return 0;
+        taskMapper.applyCurrentFollowUpAssignees(List.of(task));
+        if (task.getAssigneeId() == null) return 0;
         String scene = sceneFor(task.getTaskType());
         List<NotifyTimingRuleRespDTO> applicable = rules.stream()
                 .filter(rule -> scene.equals(rule.getSceneCode()))

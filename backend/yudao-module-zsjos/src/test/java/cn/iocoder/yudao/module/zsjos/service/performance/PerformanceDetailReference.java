@@ -39,8 +39,8 @@ class PerformanceDetailReference {
  }
  public Overview overview(Query q) {
   var o=orders(q);var r=receipts(q);var n=now();
-  var performance=List.of("today","week","month","lastMonth","quarter","year","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
-  var conversion=List.of("month","lastMonth","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
+  var performance=List.of("today","week","lastWeek","month","lastMonth","quarter","year","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
+  var conversion=List.of("lastWeek","month","lastMonth","last7","last30","last60","last90").stream().map(k->metric(window(k,n),o,r)).toList();
   List<TargetProgress> progress=new ArrayList<>();
   for(String k:List.of("lastWeek","week","month","quarter","year")){var w=window(k,n);String period="lastWeek".equals(k)?"week":k;progress.add(new TargetProgress(k,w.label(),metric(w,o,r),targets.resolve(q.getScopeType(),q.getScopeId(),period,w.start().toLocalDate())));}
   var t=tasks(q).stream().filter(this::manualTask).toList();Map<String,Long> pending=new LinkedHashMap<>();

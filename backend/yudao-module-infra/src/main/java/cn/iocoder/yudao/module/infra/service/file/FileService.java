@@ -81,6 +81,7 @@ public interface FileService {
      */
     Long createFile(FileCreateReqVO createReqVO);
     FileDO getFile(Long id);
+    List<FileDO> getFiles(Collection<Long> ids);
 
     /**
      * 幂等删除文件；文件不存在时返回 false。

@@ -9,6 +9,7 @@ import java.util.List;
 @Schema(description = "管理后台 - PMS 知识库文档分享 Response VO")
 @Data
 public class PmsKnowledgeDocumentShareRespVO {
+    private List<Long> attachmentFileIds;
 
     @Schema(description = "分享编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;

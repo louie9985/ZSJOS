@@ -116,7 +116,8 @@ export const HrmEmployeeStatus = {
   LABOR: 5, // 劳务
   CONSULTANT: 6, // 顾问
   REHIRE: 7, // 返聘
-  OUTSOURCE: 8 // 外包
+  OUTSOURCE: 8, // 外包
+  TRIAL: 9 // 试岗
 } as const
 
 /** 团队工作台年龄区间类型（对齐后端 HrmHomeAgeRangeEnum） */
@@ -153,7 +154,8 @@ export const HRM_EMPLOYEE_NON_FORMAL_STATUSES = [
   HrmEmployeeStatus.LABOR,
   HrmEmployeeStatus.CONSULTANT,
   HrmEmployeeStatus.REHIRE,
-  HrmEmployeeStatus.OUTSOURCE
+  HrmEmployeeStatus.OUTSOURCE,
+  HrmEmployeeStatus.TRIAL
 ] as const
 
 /** 无试用期的月数 */

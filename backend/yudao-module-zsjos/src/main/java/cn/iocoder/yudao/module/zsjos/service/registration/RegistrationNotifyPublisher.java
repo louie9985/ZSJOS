@@ -33,6 +33,11 @@ public class RegistrationNotifyPublisher {
 
     public void publishPlannerAssigned(RegistrationCaseDO registrationCase, SalesOrderDO order,
                                        String studentNo, Long plannerUserId, Long personId) {
+        publishPlannerAssigned(registrationCase, order, studentNo, plannerUserId, personId, null);
+    }
+
+    public void publishPlannerAssigned(RegistrationCaseDO registrationCase, SalesOrderDO order,
+                                       String studentNo, Long plannerUserId, Long personId, Long serviceRelationId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("registrationCaseId", registrationCase.getId());
         payload.put("orderNo", order == null ? "" : order.getOrderNo());
@@ -43,7 +48,8 @@ public class RegistrationNotifyPublisher {
                 .tenantId(TenantContextHolder.getRequiredTenantId())
                 .sceneCode(NOTIFY_SCENE_PLANNER_ASSIGNED)
                 .sourceEventKey("registration-planner-activated:" + registrationCase.getId() + ":" + plannerUserId)
-                .bizType("student").bizId(personId)
+                .bizType(serviceRelationId == null ? "student" : "student_service")
+                .bizId(serviceRelationId == null ? personId : serviceRelationId)
                 .occurredAt(java.time.LocalDateTime.now()).payload(payload).build());
     }
 

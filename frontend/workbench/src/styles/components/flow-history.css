@@ -255,3 +255,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.flow-history-field-details { margin-block: var(--crm-sp-2); }
+.flow-history-field-details > summary { cursor: pointer; color: var(--crm-color-primary); }
+.flow-history-field-details[open] > summary { margin-bottom: var(--crm-sp-2); }
+.flow-history-field-details .flow-history-changes { display: grid; }
+.flow-history-field-details .flow-history-change { display: grid; grid-template-columns: minmax(5em, .5fr) minmax(0, 1fr) auto minmax(0, 1fr); }
+@media (max-width: 600px) {
+  .flow-history-field-details .flow-history-change { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .flow-history-field-details .flow-history-change-label { grid-column: 1 / -1; }
+}

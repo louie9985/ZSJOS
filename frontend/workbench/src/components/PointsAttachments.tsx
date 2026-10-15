@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { message } from 'antd'
 import AttachmentCard from './AttachmentCard'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
@@ -29,12 +30,22 @@ export function PointsAttachmentPicker({ value, onChange, disabled }: {
 }
 
 export function PointsAttachments({ requestId, files }: { requestId: number; files: PointsAttachment[] }) {
-  return <div className="points-attachment-list">{files.map(file => <AttachmentCard key={file.id} name={file.name}
-    load={async () => {
-      // Re-read through the request's authorization boundary, including preview/download retries.
-      const detail = await pointsApi.get(requestId)
-      const current = detail.attachments?.find(item => item.id === file.id)
-      if (!current) throw new Error('附件不存在或无权访问')
-      return current
-    }} />)}</div>
+  const loaders = useMemo(() => {
+    let pending: ReturnType<typeof pointsApi.get> | undefined
+    const refresh = () => {
+      if (!pending) pending = pointsApi.get(requestId).finally(() => { pending = undefined })
+      return pending
+    }
+    return files.map(file => {
+      let initial = true
+      return { file, load: async () => {
+        if (initial) { initial = false; return file }
+        const current = (await refresh()).attachments?.find(item => item.id === file.id)
+        if (!current) throw new Error('附件不存在或无权访问')
+        return current
+      } }
+    })
+  }, [requestId, files])
+  return <div className="points-attachment-list">{loaders.map(({file, load}) =>
+    <AttachmentCard key={`${requestId}:${file.id}:${file.url}`} name={file.name} load={load} />)}</div>
 }

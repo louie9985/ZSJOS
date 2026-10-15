@@ -673,6 +673,9 @@ export type RegistrationRoute = {
 export type RegistrationCase = {
   id: number;
   orderId: number;
+  orderItemId?: number;
+  productName?: string;
+  specs?: import('./productSpecs').ProductSpec[];
   orderNo?: string;
   orderStatus?: string;
   orderStatusLabel?: string;
@@ -760,6 +763,7 @@ export type StudentTaskStage = {
   status: "done" | "current" | "pending";
   detail: string;
 };
+export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: MyStudent["services"][number] };
 export type MyStudent = {
   inServicePeriod?: boolean;
   personId: number;
@@ -1181,6 +1185,7 @@ export type AdvancedFilterScene =
   | "duplicate_review"
   | "registration"
   | "student"
+  | "student_service"
   | "media_student"
   | "subordinate_sales"
   | "cashback"
@@ -1680,7 +1685,15 @@ export type LeadFlowAttachment = {
   previewable: boolean;
   available: boolean;
 };
+export type LeadFlowFieldValue = { state: 'EMPTY' | 'VALUE' | 'UNRECORDED'; text?: string | null };
+export type LeadFlowFieldChange = { field: string; label: string; before: LeadFlowFieldValue; after: LeadFlowFieldValue };
 export type LeadFlowHistory = {
+  snapshotVersion?: number;
+  operationResult?: string;
+  relatedType?: string;
+  relatedId?: number;
+  relatedNo?: string;
+  changes?: LeadFlowFieldChange[];
   id: string;
   occurredAt: Timestamp;
   businessObject: string;
@@ -2441,7 +2454,7 @@ export type SalesOrderSupervisorApproval = SalesOrderSupervisorConfirmation & {
 export type ExportTask = {
   id: number;
   taskNo: string;
-  exportType: "lead" | "order" | "finance_order" | "cashback" | "withdrawal";
+  exportType: "lead" | "order" | "finance_order" | "cashback" | "withdrawal" | "exam_calendar";
   status:
     | "queued"
     | "prechecking"
@@ -5928,6 +5941,10 @@ export const api = {
     data: { version: number; idempotencyKey: string; reason: string },
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
+  myStudentServices: async (params: BusinessSort & { pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+    ? unwrap<PageResult<StudentServiceSubject>>(await http.post("/zsjos/student/my-service/search-page", params))
+    : unwrap<PageResult<StudentServiceSubject>>(await http.get("/zsjos/student/my-service-page", { params })),
+  myStudentService: async (id: number) => unwrap<StudentServiceSubject>(await http.get(`/zsjos/student/my-service/${id}`)),
   myStudents: async (params: BusinessSort & {
     readScope?: "SELF" | "ALL" | "USER";
     targetUserId?: number;

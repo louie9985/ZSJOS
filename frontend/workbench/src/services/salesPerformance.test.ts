@@ -50,9 +50,11 @@ describe('performance calculation presentation',()=>{
 })
 
 it('states the inclusive per-order conversion threshold for every period',()=>{
- for(const key of ['month','lastMonth','last7','last30','last60','last90']) {
+ for(const key of ['lastWeek','month','lastMonth','last7','last30','last60','last90']) {
   expect(conversionRule(key)).toContain('≥1280元')
   expect(conversionRule(key)).toContain('不跨订单累计')
   expect(conversionRule(key)).toContain('未达标的期间有效客资仍在分母')
  }
 })
+
+it("last week uses the natural-period formula",()=>{expect(conversionRule("lastWeek")).toBe(conversionRule("month"));expect(conversionRule("lastWeek")).toContain("本周期");expect(conversionRule("lastWeek")).not.toContain("当月")})

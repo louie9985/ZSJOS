@@ -268,6 +268,45 @@
                 />
               </el-form-item>
             </el-col>
+            <el-col v-if="isFieldVisible('trialDays')" :span="12">
+              <el-form-item label="试岗期（天）" prop="trialDays">
+                <el-input-number
+                  v-model="formData.trialDays"
+                  :min="0"
+                  :precision="0"
+                  class="!w-1/1"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col v-if="isFieldVisible('plannedTrialEndTime')" :span="12">
+              <el-form-item label="试岗结束日期" prop="plannedTrialEndTime">
+                <el-date-picker
+                  v-model="formData.plannedTrialEndTime"
+                  type="datetime"
+                  value-format="x"
+                  class="!w-1/1"
+                  clearable
+                />
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!formData.entryTime || formData.trialDays == null"
+                  @click="calculatePlannedTrialEnd"
+                  >按试岗期计算</el-button
+                >
+              </el-form-item>
+            </el-col>
+            <el-col v-if="isFieldVisible('actualTrialEndTime')" :span="12">
+              <el-form-item label="实际结束试岗日期" prop="actualTrialEndTime" label-width="140px">
+                <el-date-picker
+                  v-model="formData.actualTrialEndTime"
+                  type="datetime"
+                  value-format="x"
+                  class="!w-1/1"
+                  clearable
+                />
+              </el-form-item>
+            </el-col>
             <el-col v-if="isFieldVisible('probation')" :span="12">
               <el-form-item label="试用期（月）" prop="probation">
                 <div class="w-full">
@@ -339,7 +378,13 @@
             </el-col>
             <el-col v-if="isFieldVisible('companyAge')" :span="12">
               <el-form-item label="司龄（年）" prop="companyAge">
-                <el-input-number v-model="formData.companyAge" :min="0" disabled class="!w-1/1" />
+                <el-input-number
+                  v-model="formData.companyAge"
+                  :min="0"
+                  :precision="2"
+                  disabled
+                  class="!w-1/1"
+                />
               </el-form-item>
             </el-col>
           </el-row>
@@ -559,6 +604,9 @@ const lifecycleKeys = [
   'status',
   'entryStatus',
   'probation',
+  'trialDays',
+  'plannedTrialEndTime',
+  'actualTrialEndTime',
   'entryTime',
   'regularTime',
   'leaveTime',
@@ -578,6 +626,12 @@ const showChangeMeta = computed(
       formData.value.changeMode !== 'CORRECTION' ||
       !!formData.value.planId)
 )
+const calculatePlannedTrialEnd = () => {
+  if (formData.value.entryTime && formData.value.trialDays != null)
+    formData.value.plannedTrialEndTime = dayjs(Number(formData.value.entryTime))
+      .add(formData.value.trialDays, 'day')
+      .valueOf()
+}
 const calculatePlannedRegular = () => {
   if (formData.value.entryTime)
     formData.value.plannedRegularTime = dayjs(Number(formData.value.entryTime))
@@ -774,6 +828,9 @@ async function submitForm() {
       return
     }
     for (const key of [
+      'trialDays',
+      'plannedTrialEndTime',
+      'actualTrialEndTime',
       'plannedRegularTime',
       'plannedLeaveTime',
       'regularTime',
@@ -831,6 +888,9 @@ function buildSubmitData() {
       visibleFields.has(name) ||
       [
         'status',
+        'trialDays',
+        'plannedTrialEndTime',
+        'actualTrialEndTime',
         'plannedRegularTime',
         'plannedLeaveTime',
         'regularTime',

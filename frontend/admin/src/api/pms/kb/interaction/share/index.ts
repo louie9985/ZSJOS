@@ -1,7 +1,14 @@
 import request from '@/config/axios'
 
+export const updateKnowledgeShareSettings = (data: {
+  documentId: number
+  shareUserIds: number[]
+  attachmentFileIds: number[]
+}) => request.put({ url: '/pms/kb/document-share/settings', data })
+
 // PMS 知识库文档分享 VO
 export interface PmsKnowledgeDocumentShareVO {
+  attachmentFileIds?: number[]
   id: number // 分享编号
   documentId: number // 文档编号
   shareUserIds: number[] // 内部分享成员用户编号列表
@@ -15,6 +22,7 @@ export interface PmsKnowledgeDocumentShareVO {
 
 // PMS 知识库文档公开分享 VO
 export interface PmsKnowledgeDocumentSharePublicVO {
+  attachments?: import('../../content/document').KnowledgeAttachment[]
   id: number // 文档编号
   title: string // 文档标题
   content?: string // 富文本文档内容
@@ -34,6 +42,7 @@ export const getKnowledgeDocumentShare = (documentId: number) => {
 
 // 开启文档分享
 export const openKnowledgeDocumentShare = (data: {
+  attachmentFileIds?: number[]
   documentId: number
   shareUserIds: number[]
 }) => {

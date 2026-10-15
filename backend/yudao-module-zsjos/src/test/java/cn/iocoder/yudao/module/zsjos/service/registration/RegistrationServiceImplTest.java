@@ -396,10 +396,12 @@ class RegistrationServiceImplTest {
         verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 30L, 501L);
     }
 
-    @Test
-    void classModeCompletesEachOrderItemIntoItsSelectedClass() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void classModeCompletesEachOrderItemIntoItsSelectedClass(boolean singleItemTask) {
         RegistrationCaseDO registrationCase = editableCase();
         registrationCase.setAssignmentMode("class_per_item");
+        if (singleItemTask) registrationCase.setOrderItemId(301L);
         SalesOrderDO order = new SalesOrderDO();
         order.setId(10L); order.setStatus(STATUS_EFFECTIVE); order.setPersonId(501L);
         RegistrationCaseChecklistItemDO checklist = new RegistrationCaseChecklistItemDO();
@@ -418,9 +420,9 @@ class RegistrationServiceImplTest {
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(checklist));
         when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(formalItem, pendingItem));
         when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L))
-                .thenReturn(List.of(formalAssignment, pendingAssignment));
+                .thenReturn(singleItemTask ? List.of(formalAssignment) : List.of(formalAssignment, pendingAssignment));
         when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(999L));
-        when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(pendingClass);
+        if (!singleItemTask) when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(pendingClass);
         when(deliveryClassMapper.selectByIdForUpdate(202L, 1L)).thenReturn(formalClass);
         when(deliveryClassService.validateHomeroom(31L))
                 .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
@@ -436,18 +438,21 @@ class RegistrationServiceImplTest {
         }
 
         ArgumentCaptor<ServiceRelationDO> relationCaptor = ArgumentCaptor.forClass(ServiceRelationDO.class);
-        verify(serviceRelationMapper, times(2)).insert(relationCaptor.capture());
+        verify(serviceRelationMapper, times(singleItemTask ? 1 : 2)).insert(relationCaptor.capture());
         List<ServiceRelationDO> relations = relationCaptor.getAllValues();
         assertEquals(202L, relations.get(0).getClassId());
         assertEquals(31L, relations.get(0).getOwnerUserId());
-        assertEquals(201L, relations.get(1).getClassId());
-        assertNull(relations.get(1).getOwnerUserId());
-        verify(registrationNotifyPublisher).publishPlannerAssigned(
+        if (!singleItemTask) assertEquals(201L, relations.get(1).getClassId());
+        if (!singleItemTask) assertNull(relations.get(1).getOwnerUserId());
+        if (singleItemTask) verify(registrationNotifyPublisher).publishPlannerAssigned(
+                registrationCase, order, "XY202609080001", 31L, 501L, relations.getFirst().getId());
+        else verify(registrationNotifyPublisher).publishPlannerAssigned(
                 registrationCase, order, "XY202609080001", 31L, 501L);
         verify(orderMapper).selectByIdForUpdate(10L, 1L);
         verify(orderItemMapper).selectListByOrderIdForUpdate(10L, 1L);
         InOrder classLockOrder = inOrder(deliveryClassMapper);
-        classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(201L, 1L);
+        if (!singleItemTask) classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(201L, 1L);
+        else verify(deliveryClassMapper, never()).selectByIdForUpdate(201L, 1L);
         classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(202L, 1L);
         verify(orderItemMapper, never()).selectListByOrderId(10L);
     }
@@ -518,6 +523,43 @@ class RegistrationServiceImplTest {
         } finally {
             cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
         }
+    }
+
+    @Test
+    void endingOneProductDoesNotCreateOrCancelSiblingServices() {
+        RegistrationCaseDO registrationCase = editableCase(); registrationCase.setOrderItemId(301L);
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        var request = new RegistrationCloseReqVO();
+        request.setVersion(0); request.setIdempotencyKey("end-product"); request.setReason("本产品无需后续交付");
+        TenantContextHolder.setTenantId(1L);
+        try { service.close(1L, 9L, request); } finally { TenantContextHolder.clear(); }
+        assertEquals("ended", registrationCase.getStatus());
+        assertNotNull(registrationCase.getCompletedAt());
+        assertEquals(9L, registrationCase.getCompletedByUserId());
+        verify(caseMapper).updateById(registrationCase);
+        verifyNoInteractions(serviceRelationMapper, registrationNotifyPublisher, personMapper, classAssignmentMapper);
+    }
+
+    @Test
+    void itemTaskRejectsSiblingClassAssignmentBeforeWriting() {
+        var registrationCase = editableCase(); registrationCase.setOrderItemId(301L);
+        registrationCase.setAssignmentMode("class_per_item");
+        var order = new SalesOrderDO(); order.setId(10L);
+        var first = new SalesOrderItemDO(); first.setId(301L);
+        var second = new SalesOrderItemDO(); second.setId(302L);
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        when(orderMapper.selectById(10L)).thenReturn(order);
+        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(first, second));
+        var request = new RegistrationClassAssignmentsSaveReqVO(); request.setVersion(0);
+        request.setIdempotencyKey("foreign-item");
+        var assignment = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO();
+        assignment.setOrderItemId(302L); assignment.setClassId(201L); request.setAssignments(List.of(assignment));
+        TenantContextHolder.setTenantId(1L);
+        try {
+            var error = assertThrows(ServiceException.class, () -> service.updateClassAssignments(1L, 9L, request));
+            assertEquals(REGISTRATION_CLASS_ASSIGNMENT_INVALID.getCode(), error.getCode());
+        } finally { TenantContextHolder.clear(); }
+        verifyNoInteractions(classAssignmentMapper, deliveryClassMapper, serviceRelationMapper);
     }
 
     private RegistrationCaseDO editableCase() {

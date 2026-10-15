@@ -128,6 +128,11 @@
     <el-empty v-else description="文件未上传" />
   </div>
 
+  <KnowledgeAttachments
+    v-if="document.type === PmsKnowledgeDocumentType.RICH_TEXT"
+    :files="document.attachments || []"
+    :document-id="document.id"
+  />
   <!-- 仅富文本支持点赞和评论；文件类型不支持互动 -->
   <div
     v-if="document.type === PmsKnowledgeDocumentType.RICH_TEXT"
@@ -156,6 +161,7 @@
 </template>
 
 <script lang="ts" setup>
+import KnowledgeAttachments from './KnowledgeAttachments.vue'
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import type { PmsKnowledgeDocumentLabelVO } from '@/api/pms/kb/content/document/label'
 import { FilePreview } from '@/components/FilePreview'

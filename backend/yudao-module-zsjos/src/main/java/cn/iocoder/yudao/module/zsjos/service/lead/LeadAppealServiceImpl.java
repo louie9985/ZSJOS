@@ -169,12 +169,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交申诉", target="appeal-create", id=0, actor=1, actorType="ADMIN")
     public Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO) {
         return submitInternal(leadId, userId, null, null, reqVO);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交申诉", target="appeal-create", id=0, actor=2, actorType="PARTNER")
     public Long submitForPartner(Long leadId, Long accountId, Long partnerId, LeadAppealSubmitReqVO reqVO) {
         return submitInternal(leadId, null, accountId, partnerId, reqVO);
     }
@@ -418,12 +420,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="申诉改判有效", target="appeal", id=0, actor=1, actorType="ADMIN")
     public void overturn(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO) {
         decide(appealId, userId, reqVO, true);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="申诉维持原判", target="appeal", id=0, actor=1, actorType="ADMIN")
     public void uphold(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO) {
         decide(appealId, userId, reqVO, false);
     }
@@ -669,12 +673,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     private List<LeadAppealRespVO.EvidenceVO> toEvidenceVO(String json) {
         List<EvidenceRef> refs = parseEvidence(json);
-        Map<Long, String> urls = refs.isEmpty() ? Map.of() : fileApi.presignGetUrls(
-                refs.stream().map(EvidenceRef::getInfraFileId).filter(Objects::nonNull).toList(),
-                ATTACHMENT_URL_EXPIRATION_SECONDS);
+        List<Long> ids = refs.stream().map(EvidenceRef::getInfraFileId).filter(Objects::nonNull).toList();
+        Map<Long, String> urls = ids.isEmpty() ? Map.of()
+                : fileApi.presignGetUrls(ids, ATTACHMENT_URL_EXPIRATION_SECONDS);
         return refs.stream().map(ref -> {
             LeadAppealRespVO.EvidenceVO vo = new LeadAppealRespVO.EvidenceVO();
-            vo.setInfraFileId(ref.getInfraFileId()); vo.setFileUrl(urls.getOrDefault(ref.getInfraFileId(), ref.getFileUrl()));
+            vo.setInfraFileId(ref.getInfraFileId());
+            // Historical URLs cannot establish that a file is still available to the current caller.
+            vo.setFileUrl(ref.getInfraFileId() == null ? null : urls.get(ref.getInfraFileId()));
             vo.setOriginalName(ref.getOriginalName()); vo.setContentType(ref.getContentType());
             vo.setFileSize(ref.getFileSize()); vo.setSort(ref.getSort()); return vo;
         }).toList();

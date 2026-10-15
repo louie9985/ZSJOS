@@ -9,6 +9,9 @@ import java.util.List;
 public class RegistrationCaseRespVO {
     private Long id;
     private Long orderId;
+    private Long orderItemId;
+    private String productName;
+    private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
     private String orderNo;
     private String orderStatus;
     private String orderStatusLabel;

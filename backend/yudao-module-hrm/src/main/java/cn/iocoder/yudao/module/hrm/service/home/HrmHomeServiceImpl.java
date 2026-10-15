@@ -297,7 +297,7 @@ public class HrmHomeServiceImpl implements HrmHomeService {
         for (HrmEmployeeDO employee : teamEmployees) {
             long companyAgeDays = employee.getCompanyAgeStartTime() != null
                     ? ChronoUnit.DAYS.between(employee.getCompanyAgeStartTime().toLocalDate(), LocalDate.now())
-                    : employee.getCompanyAge() == null ? -1L : employee.getCompanyAge() * 365L;
+                    : employee.getCompanyAge() == null ? -1L : employee.getCompanyAge().multiply(java.math.BigDecimal.valueOf(365)).longValue();
             countMap.merge(HrmHomeCompanyAgeRangeEnum.getType(companyAgeDays), 1L, Long::sum);
         }
         return countMap;

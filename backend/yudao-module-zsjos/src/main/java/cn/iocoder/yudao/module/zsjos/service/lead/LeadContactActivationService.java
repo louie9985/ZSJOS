@@ -27,6 +27,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadContactActivationService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private PersonMapper personMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadActivationMapper activationMapper;
@@ -59,6 +60,7 @@ public class LeadContactActivationService {
             matched = true;
             String key = "contact:" + operation + ":" + id;
             if (activationMapper.selectByIdempotencyKey(key) != null) continue;
+            var flowBefore = flowRecorder.capture(id);
             LeadActivationDO activation = new LeadActivationDO();
             activation.setPersonId(lead.getPersonId());
             activation.setLeadId(id);
@@ -79,6 +81,8 @@ public class LeadContactActivationService {
             context.put("submitterUserId", lead.getSourceUserId());
             notifyEventPublisher.publish(ACTIVATED, id, key, actorId, activation.getActivatedAt(), context);
             dispatchService.notifyActivation(lead);
+            flowRecorder.record(id, flowBefore, "重复提交激活提醒", partnerId == null ? "ADMIN" : "PARTNER", partnerId == null ? actorId : partnerId,
+                    "lead", id, lead.getLeadNo(), "已提醒负责人", null, true, key);
         }
         return matched;
     }

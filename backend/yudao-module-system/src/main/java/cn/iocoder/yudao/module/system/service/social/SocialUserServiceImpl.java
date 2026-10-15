@@ -20,6 +20,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import me.zhyd.oauth.model.AuthUser;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -30,6 +31,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_NOT_FOUND;
+import static cn.iocoder.yudao.module.system.enums.SocialAuthErrorCodes.WECOM_BINDING_CONFLICT;
 
 /**
  * 社交用户 Service 实现类
@@ -117,7 +119,18 @@ public class SocialUserServiceImpl implements SocialUserService {
                 || !SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)) {
             return;
         }
-        adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(openid));
+        try {
+            adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(openid));
+        } catch (DuplicateKeyException ex) {
+            // Preserve the transaction: neither a racing bind nor an orphan projection authorizes cleanup.
+            for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+                if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT)
+                        .contains("uk_tenant_wecom_user_id")) {
+                    throw exception(WECOM_BINDING_CONFLICT);
+                }
+            }
+            throw ex;
+        }
     }
 
     private void clearAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid,

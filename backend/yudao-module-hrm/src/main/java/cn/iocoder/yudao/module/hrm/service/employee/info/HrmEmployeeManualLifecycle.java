@@ -80,7 +80,8 @@ public class HrmEmployeeManualLifecycle {
             throw exception(INVALID, "请选择变更类别");
         }
         if (mode.equals("BUSINESS")) validateBusiness(r, before, after);
-        if (!mode.equals("PLAN") && ((after.getRegularTime() != null && after.getRegularTime().isAfter(LocalDateTime.now()))
+        if (!mode.equals("PLAN") && ((after.getActualTrialEndTime() != null && after.getActualTrialEndTime().isAfter(LocalDateTime.now()))
+                || (after.getRegularTime() != null && after.getRegularTime().isAfter(LocalDateTime.now()))
                 || (after.getLeaveTime() != null && after.getLeaveTime().isAfter(LocalDateTime.now())))) {
             throw exception(INVALID, "实际日期不能在未来，请填写计划日期");
         }
@@ -145,6 +146,9 @@ public class HrmEmployeeManualLifecycle {
                 .set(after.getPlannedRegularTime() == null, HrmEmployeeDO::getPlannedRegularTime, null)
                 .set(after.getPlannedLeaveTime() == null, HrmEmployeeDO::getPlannedLeaveTime, null)
                 .set(after.getRegularTime() == null, HrmEmployeeDO::getRegularTime, null).set(after.getLeaveTime() == null, HrmEmployeeDO::getLeaveTime, null)
+                .set(after.getTrialDays() == null, HrmEmployeeDO::getTrialDays, null)
+                .set(after.getPlannedTrialEndTime() == null, HrmEmployeeDO::getPlannedTrialEndTime, null)
+                .set(after.getActualTrialEndTime() == null, HrmEmployeeDO::getActualTrialEndTime, null)
                 .set(after.getProbation() == null, HrmEmployeeDO::getProbation, null)
                 .set(after.getDeptId() == null, HrmEmployeeDO::getDeptId, null)
                 .set(after.getLeaderEmployeeId() == null, HrmEmployeeDO::getLeaderEmployeeId, null)

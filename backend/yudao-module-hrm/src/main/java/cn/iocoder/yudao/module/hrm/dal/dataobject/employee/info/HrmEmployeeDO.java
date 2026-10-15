@@ -157,6 +157,14 @@ public class HrmEmployeeDO extends BaseDO {
      * 0 表示无试用期
      */
     private Integer probation;
+
+    /** 试岗期，单位天；日期以入职时间为起点。 */
+    private Integer trialDays;
+    /** 计划试岗结束日期，允许人工调整。 */
+    private LocalDateTime plannedTrialEndTime;
+    /** 实际结束试岗日期，不自动驱动状态变化。 */
+    private LocalDateTime actualTrialEndTime;
+
     /**
      * 转正时间
      */
@@ -198,7 +206,7 @@ public class HrmEmployeeDO extends BaseDO {
     /**
      * 司龄，单位：年
      */
-    private Integer companyAge;
+    private java.math.BigDecimal companyAge;
     /**
      * 招聘候选人编号
      *

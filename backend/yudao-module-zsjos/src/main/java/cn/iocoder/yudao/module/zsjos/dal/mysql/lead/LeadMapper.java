@@ -260,8 +260,14 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
             applyLeadKeyword(query, reqVO.getKeyword());
         }
+        applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
         if (visibleUserId != null) {
-            if ("submitter".equals(reqVO.getAudience())) {
+            if (isFollowUpView(reqVO, inboxFilter) && !"submitter".equals(reqVO.getAudience())) {
+                java.util.List<Long> followUsers = new java.util.ArrayList<>();
+                followUsers.add(visibleUserId);
+                if (managedOwnerUserIds != null) followUsers.addAll(managedOwnerUserIds);
+                applyFollowUpScope(query, followUsers);
+            } else if ("submitter".equals(reqVO.getAudience())) {
                 query.eq(LeadDO::getSourceUserId, visibleUserId);
             } else if ("owner".equals(reqVO.getAudience())) {
                 query.eq(LeadDO::getOwnerUserId, visibleUserId);
@@ -311,7 +317,12 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
         if (!queryAll) {
-            applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds);
+            if (isFollowUpView(reqVO, inboxFilter) && !"submitted".equals(reqVO.getRelationScope())
+                    && !"submitter".equals(reqVO.getAudience())) {
+                applyFollowUpScope(query, visibleOwnerUserIds);
+            } else {
+                applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds);
+            }
         }
         if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
             query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
@@ -320,6 +331,21 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         applyManagementOrder(query, reqVO);
         return selectPage(reqVO, query);
+    }
+
+    private static boolean isFollowUpView(LeadManagementPageReqVO req, LeadInboxFilterQuery filter) {
+        return FOLLOW_UP_FOLLOWING.equals(req.getSimpleStatus()) || filter != null && (
+                filter.values(INBOX_FILTER_FIELD_SALES_PROGRESS).contains(FOLLOW_UP_FOLLOWING)
+                || filter.values(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION).contains(FOLLOW_UP_CONDITION_TODAY)
+                || filter.values(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION).contains(FOLLOW_UP_CONDITION_OVERDUE));
+    }
+
+    private static void applyFollowUpScope(LambdaQueryWrapperX<LeadDO> query, List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) { query.eq(LeadDO::getId, -1L); return; }
+        String placeholders = java.util.stream.IntStream.range(0, userIds.size())
+                .mapToObj(i -> "{" + i + "}").collect(java.util.stream.Collectors.joining(","));
+        query.apply(LeadFollowUpResponsibilitySql.responsible("zsjos_lead") + " IN (" + placeholders + ")",
+                userIds.toArray());
     }
 
     private static void applyManagementScope(LambdaQueryWrapperX<LeadDO> query,

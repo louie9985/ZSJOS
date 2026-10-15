@@ -80,8 +80,8 @@ public class PersonalCalendarEventService {
         var current = requireOwned(id, userId);
         PersonalCalendarEventDO update = BeanUtils.toBean(req, PersonalCalendarEventDO.class)
                 .setId(id).setTitle(req.getTitle().trim());
-        update.setBackgroundColor(cn.iocoder.yudao.module.zsjos.service.calendar.CalendarColors.resolve(req.getBackgroundColor(), current.getBackgroundColor()));
-        mapper.updateOwned(update, userId);
+        update.setBackgroundColor(cn.iocoder.yudao.module.zsjos.service.calendar.CalendarColors.resolve(req.getBackgroundColor(), null));
+        mapper.updateOwned(update, userId, req.getBackgroundColor() != null);
     }
 
     @Transactional(rollbackFor = Exception.class)

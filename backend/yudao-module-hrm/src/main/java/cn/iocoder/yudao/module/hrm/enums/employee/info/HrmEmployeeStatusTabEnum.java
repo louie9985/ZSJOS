@@ -24,6 +24,7 @@ public enum HrmEmployeeStatusTabEnum implements ArrayValuable<Integer> {
     CONSULTANT(HrmEmployeeStatusEnum.CONSULTANT.getStatus(), "顾问"),
     REHIRE(HrmEmployeeStatusEnum.REHIRE.getStatus(), "返聘"),
     OUTSOURCE(HrmEmployeeStatusEnum.OUTSOURCE.getStatus(), "外包"),
+    TRIAL(HrmEmployeeStatusEnum.TRIAL.getStatus(), "试岗"),
     ACTIVE(11, "在职"),
     FULL_TIME(12, "全职"),
     PENDING_ENTRY(13, "待入职"),

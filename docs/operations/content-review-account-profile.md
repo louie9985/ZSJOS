@@ -13,3 +13,7 @@ V316 在 Core V315 之后执行，只补租户 1 未删除审批批次与未删�
 验证入口：`python script/sql/mysql/tools/test_content_review_profile.py` 使用本地 MySQL 容器的独立保留测试库，覆盖首次、重复、部分恢复、前置失败、登记失败回滚及中文 HEX。Java 测试为 `ContentReviewAccountProfileTest,ContentReviewBatchServiceTest`。
 
 2026-10-13 本地 `yudao-mysql / ruoyi-vue-pro` 验证并执行：203 个未删除批次中 179 个补全，产品目标 226、产品形式 230、发布节奏 227，共 683 项；无新增瓶颈值。状态及非空快照对比、重复执行零变化、中文 HEX、两份 V316 版本记录均通过。备份：`backups/mysql/content-review-profile-20261013-171134/before.sql`。第一次执行曾因业务库排序规则与测试库不同报错，核实数据和版本登记全部回滚为零后，显式统一比较排序规则并在业务库相同规则下完成四组验证再执行。远程环境尚未执行，后端未重启，真实提交验收仍待部署。
+
+## 2026-10-14 后续完整刷新
+
+新的提交规则见 docs/api/content-review-batch.md 的完整账号快照规则。正式提交现刷新全部账号展示资料，包含名称、平台账号、平台、期段、状态及责任人。此变更不执行 V316 或其他历史补全；此前 V316 的执行记录仍是历史记录，不代表本次新增数据操作。

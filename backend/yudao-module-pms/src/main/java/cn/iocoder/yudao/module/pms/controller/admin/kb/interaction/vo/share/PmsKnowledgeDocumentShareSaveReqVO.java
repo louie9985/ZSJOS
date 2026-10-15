@@ -9,6 +9,8 @@ import java.util.List;
 @Schema(description = "管理后台 - PMS 知识库文档分享保存 Request VO")
 @Data
 public class PmsKnowledgeDocumentShareSaveReqVO {
+    @jakarta.validation.constraints.Size(max = 10)
+    private List<@NotNull Long> attachmentFileIds;
 
     @Schema(description = "文档编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     @NotNull(message = "文档编号不能为空")

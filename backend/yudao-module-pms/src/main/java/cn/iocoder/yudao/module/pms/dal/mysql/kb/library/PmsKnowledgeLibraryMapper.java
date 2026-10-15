@@ -16,6 +16,12 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 
 @Mapper
 public interface PmsKnowledgeLibraryMapper extends BaseMapperX<PmsKnowledgeLibraryDO> {
+    /** Serialize short content-registration transactions; never hold during file storage. */
+    default PmsKnowledgeLibraryDO lockContentCreation(Long id) {
+        return selectOne(new LambdaQueryWrapperX<PmsKnowledgeLibraryDO>()
+                .eq(PmsKnowledgeLibraryDO::getId, id).last("FOR UPDATE"));
+    }
+
 
     default List<Long> selectIdList(Boolean openStatus, Integer status) {
         return convertList(selectList(new LambdaQueryWrapperX<PmsKnowledgeLibraryDO>()

@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpResponsibilitySql;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Collection;
@@ -20,6 +21,28 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FOLLOW
 
 @Mapper
 public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
+    @lombok.Data
+    class EffectiveTaskAssignee {
+        private Long id;
+        private Long assigneeId;
+    }
+
+    @org.apache.ibatis.annotations.SelectProvider(type = LeadFollowUpResponsibilitySql.class, method = "taskAssignees")
+    List<EffectiveTaskAssignee> selectEffectiveTaskAssignees(
+            @Param("ids") List<Long> ids, @Param("tenantId") Long tenantId);
+
+    default void applyCurrentFollowUpAssignees(List<BusinessTaskDO> tasks) {
+        List<BusinessTaskDO> following = tasks.stream().filter(t -> BIZ_TYPE_LEAD.equals(t.getBizType())
+                && TASK_STATUS_PENDING.equals(t.getStatus())
+                && List.of("lead_first_follow_up", TASK_TYPE_FOLLOW_UP_REMINDER).contains(t.getTaskType())).toList();
+        if (following.isEmpty()) return;
+        var resolved = selectEffectiveTaskAssignees(following.stream().map(BusinessTaskDO::getId).toList(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        java.util.Map<Long, Long> assignees = new java.util.HashMap<>();
+        resolved.forEach(row -> assignees.put(row.getId(), row.getAssigneeId()));
+        following.forEach(task -> task.setAssigneeId(assignees.get(task.getId())));
+    }
+
     @org.apache.ibatis.annotations.Update("UPDATE zsjos_business_task SET status='cancelled', cancelled_at=#{now}, cancel_reason=#{reason}, version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND status='pending' AND ((biz_type='media_account_diagnosis' AND biz_id=#{accountId}) OR JSON_UNQUOTE(JSON_EXTRACT(payload,'$.accountId'))=CAST(#{accountId} AS CHAR))")
     int cancelByAccountId(@Param("accountId") Long accountId, @Param("now") LocalDateTime now, @Param("reason") String reason);
     @Select("SELECT * FROM zsjos_business_task WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
@@ -109,9 +132,7 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     }
 
     default List<BusinessTaskDO> selectMyPending(Long assigneeId) {
-        return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
-                .eq(BusinessTaskDO::getAssigneeId, assigneeId)
-                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+        return selectList(buildMyQuery(assigneeId, TASK_STATUS_PENDING, null, LocalDateTime.now())
                 .orderByAsc(BusinessTaskDO::getDueAt)
                 .orderByAsc(BusinessTaskDO::getId));
     }
@@ -135,7 +156,9 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
         } else {
             query.orderByDesc(BusinessTaskDO::getUpdateTime).orderByDesc(BusinessTaskDO::getId);
         }
-        return selectPage(reqVO, query);
+        PageResult<BusinessTaskDO> page = selectPage(reqVO, query);
+        applyCurrentFollowUpAssignees(page.getList());
+        return page;
     }
 
     private static LambdaQueryWrapperX<BusinessTaskDO> buildMyQuery(Long assigneeId, String status,
@@ -150,8 +173,14 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
 
     private static LambdaQueryWrapperX<BusinessTaskDO> buildReadQuery(Long assigneeId, String status,
                                                                      String bucket, LocalDateTime now) {
-        LambdaQueryWrapperX<BusinessTaskDO> query = new LambdaQueryWrapperX<BusinessTaskDO>()
-                .eqIfPresent(BusinessTaskDO::getAssigneeId, assigneeId);
+        LambdaQueryWrapperX<BusinessTaskDO> query = new LambdaQueryWrapperX<>();
+        if (TASK_STATUS_PENDING.equals(status)) {
+            String assignee = LeadFollowUpResponsibilitySql.taskAssignee("zsjos_business_task");
+            query.apply(assignee + " IS NOT NULL");
+            if (assigneeId != null) query.apply(assignee + " = {0}", assigneeId);
+        } else {
+            query.eqIfPresent(BusinessTaskDO::getAssigneeId, assigneeId);
+        }
         if ("done".equals(status)) {
             query.in(BusinessTaskDO::getStatus, List.of("completed", "cancelled"));
         } else {
@@ -175,8 +204,13 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
         if (assigneeIds == null || assigneeIds.isEmpty()) {
             return List.of();
         }
-        return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
-                .in(BusinessTaskDO::getAssigneeId, assigneeIds));
+        String placeholders = java.util.stream.IntStream.range(0, assigneeIds.size())
+                .mapToObj(i -> "{" + i + "}").collect(java.util.stream.Collectors.joining(","));
+        List<BusinessTaskDO> tasks = selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
+                .apply(LeadFollowUpResponsibilitySql.taskAssignee("zsjos_business_task")
+                        + " IN (" + placeholders + ")", assigneeIds.toArray()));
+        applyCurrentFollowUpAssignees(tasks);
+        return tasks;
     }
 
     default List<BusinessTaskDO> selectPendingReminderCandidates(List<String> taskTypes,
@@ -184,6 +218,7 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
         return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
                 .in(BusinessTaskDO::getTaskType, taskTypes)
                 .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .apply(LeadFollowUpResponsibilitySql.taskAssignee("zsjos_business_task") + " IS NOT NULL")
                 .isNotNull(BusinessTaskDO::getDueAt)
                 .le(BusinessTaskDO::getDueAt, latestDueAt)
                 .orderByAsc(BusinessTaskDO::getDueAt)
@@ -234,11 +269,15 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     }
 
     default int reassignPending(Collection<String> taskTypes, Long bizId, Long assigneeId) {
+        boolean salesFollowUp = !taskTypes.isEmpty() && taskTypes.stream().allMatch(type ->
+                List.of("lead_first_follow_up", TASK_TYPE_FOLLOW_UP_REMINDER).contains(type));
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .in(BusinessTaskDO::getTaskType, taskTypes)
+                .eq(salesFollowUp, BusinessTaskDO::getBizType, BIZ_TYPE_LEAD)
                 .eq(BusinessTaskDO::getBizId, bizId)
                 .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
-                .set(BusinessTaskDO::getAssigneeId, assigneeId));
+                .set(BusinessTaskDO::getAssigneeId, assigneeId)
+                .setSql(salesFollowUp, "version = version + 1"));
     }
 
     default int completeBirthdayCare(Long id, Long assigneeId, LocalDateTime completedAt) {

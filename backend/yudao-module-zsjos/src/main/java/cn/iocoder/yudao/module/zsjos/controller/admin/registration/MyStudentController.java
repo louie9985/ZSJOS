@@ -21,6 +21,28 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/student")
 public class MyStudentController {
     @Resource private MyStudentService studentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceReadService serviceReads;
+
+    @GetMapping("/my-service-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    public CommonResult<PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServiceRespVO>> servicePage(
+            @Valid cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServicePageReqVO req) {
+        return success(serviceReads.page(SecurityFrameworkUtils.getLoginUserId(), req));
+    }
+
+    @PostMapping("/my-service/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    public CommonResult<PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServiceRespVO>> searchServicePage(
+            @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServicePageReqVO req) {
+        return success(serviceReads.page(SecurityFrameworkUtils.getLoginUserId(), req));
+    }
+
+    @GetMapping("/my-service/{relationId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServiceRespVO> serviceDetail(@PathVariable Long relationId) {
+        return success(serviceReads.detail(SecurityFrameworkUtils.getLoginUserId(), relationId));
+    }
 
     @GetMapping("/my-page")
     @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")

@@ -31,6 +31,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_N
 
 @Service
 public class LeadFlowHistoryService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowProjection flowProjection;
     @Resource private LeadMapper leadMapper;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadAssignmentHistoryMapper assignmentMapper;
@@ -78,10 +79,29 @@ public class LeadFlowHistoryService {
         var remarks = LeadRemarkHistoryService.project(lead, events, null, true);
         if (remarks.hasLegacy()) submitted.setRemark(null);
         result.add(submitted);
-        events.forEach(event -> result.add(fromEvent(event, users, followUps, assignmentsById, identityContext)));
+        Set<String> covered = new HashSet<>();
+        Map<Long, cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot> snapshots = new HashMap<>();
+        for (var event : events) {
+            var snapshot = cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowProjection.snapshot(event);
+            if (snapshot != null) { snapshots.put(event.getId(), snapshot); covered.addAll(snapshot.coveredRecords()); }
+        }
+        for (var event : events) {
+            if (covered.contains("event:" + event.getId())) continue;
+            var snapshot = snapshots.get(event.getId());
+            if (snapshot == null) result.add(fromEvent(event, users, followUps, assignmentsById, identityContext));
+            else {
+                var row = flowProjection.project(event, snapshot, lead, viewerId, identityContext);
+                if (flowProjection.canReadRelated(snapshot, lead, viewerId)) {
+                    row.setAttachments(attachments(event.getEvidenceRefs()));
+                    row.setRemark(optionalText(event.getRelatedObjectRefs(), "flowRemark").orElse(null));
+                }
+                result.add(row);
+            }
+        }
         assignments.stream().filter(item -> !referencedAssignments.contains(item.getId()))
                 .forEach(item -> result.add(fromAssignment(item, users, identityContext)));
         agingEvents.forEach(item -> result.add(fromAging(item, users, identityContext)));
+        result.removeIf(item -> covered.contains(item.getId()));
         result.sort(Comparator.comparing(LeadFlowHistoryRespVO::getOccurredAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparingInt(LeadFlowHistoryService::sameTimeOrder)

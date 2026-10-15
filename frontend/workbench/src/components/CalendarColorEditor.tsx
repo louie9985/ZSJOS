@@ -1,5 +1,5 @@
 import { Alert, Button, ColorPicker, Empty, Input, Modal, Popconfirm, Space, Spin, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { calendarColors, type CalendarColor, type CalendarColorType, type CalendarPalette } from '../services/calendarColors'
 import { examBackgroundStyle } from '../pages/examCalendarColor'
 import '../styles/components/calendar-colors.css'
@@ -9,6 +9,16 @@ export function useCalendarPalette(type: CalendarColorType) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  const generation = useRef(0)
+  const mutate = async (operation: () => Promise<CalendarPalette>) => {
+    const seq = ++generation.current
+    setLoading(true)
+    try {
+      const result = await operation()
+      if (seq === generation.current) { setPalette(result); setError('') }
+      else reload()
+    } finally { if (seq === generation.current) setLoading(false) }
+  }
   const reload = useCallback(() => setRevision(v => v + 1), [])
   useEffect(() => {
     const refresh = () => reload()
@@ -16,14 +26,15 @@ export function useCalendarPalette(type: CalendarColorType) {
     return () => window.removeEventListener('focus', refresh)
   }, [reload])
   useEffect(() => {
+    const seq = ++generation.current
     let active = true
     setLoading(true); setError(''); setPalette({ presets: [], colors: [] })
-    calendarColors.get(type).then(data => { if (active) setPalette(data) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : '快捷色加载失败') })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+    calendarColors.get(type).then(data => { if (active && seq === generation.current) setPalette(data) })
+      .catch(e => { if (active && seq === generation.current) setError(e instanceof Error ? e.message : '快捷色加载失败') })
+      .finally(() => { if (active && seq === generation.current) setLoading(false) })
+    return () => { active = false; if (seq === generation.current) ++generation.current }
   }, [type, revision])
-  return { palette, setPalette, loading, error, reload }
+  return { palette, mutate, loading, error, reload }
 }
 
 export function CalendarColorLegend({ state }: { state: ReturnType<typeof useCalendarPalette> }) {
@@ -49,13 +60,13 @@ export default function CalendarColorEditor({ value, onChange, type, canManage, 
     if (!name.trim() || Array.from(name.trim()).length > 20) { setError('名称须为1至20字'); return }
     if (!/^#[\da-f]{6}$/i.test(color)) { setError('请选择有效颜色'); return }
     setBusy(true); setError('')
-    try { state.setPalette(await calendarColors.save(type, { name: name.trim(), color }, editing?.id)); setDialog(undefined) }
+    try { await state.mutate(() => calendarColors.save(type, { name: name.trim(), color }, editing?.id)); setDialog(undefined) }
     catch (e) { setError(e instanceof Error ? e.message : '快捷色保存失败，请重试') }
     finally { setBusy(false) }
   }
   const remove = async (id: string) => {
     setBusy(true); setError('')
-    try { state.setPalette(await calendarColors.remove(type, id)) }
+    try { await state.mutate(() => calendarColors.remove(type, id)) }
     catch (e) { setError(e instanceof Error ? e.message : '删除失败，请重试') }
     finally { setBusy(false) }
   }

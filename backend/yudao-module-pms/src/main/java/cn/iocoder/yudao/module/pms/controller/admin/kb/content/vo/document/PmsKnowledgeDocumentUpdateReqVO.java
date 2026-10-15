@@ -24,6 +24,9 @@ public class PmsKnowledgeDocumentUpdateReqVO {
     @Schema(description = "文档内容或文件地址")
     private String content;
 
+    @jakarta.validation.constraints.Size(max = 10)
+    private java.util.List<@jakarta.validation.constraints.NotNull Long> attachmentFileIds;
+
     @Schema(description = "标签编号列表；传空集合表示清空标签")
     private List<Long> labelIds;
 

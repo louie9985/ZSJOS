@@ -1,60 +1,120 @@
--- =============================================================================
--- 史辉文 / 史政凯 服务关系补全
---   person 8150 史辉文 ; lead 6606 史政凯 ; order 8822 ; case 1019 ; relation 1016
---
--- 目标终态:
---   relation 1016 -> 正式班(班主任=400 周老师【梁颖】), owner=400,
---                    acceptance_status='accepted', delivery_stage='first_contact',
---                    content_director_user_id=47  (邓穆祺),
---                    operator_user_id=525        (余红红),
---                    + 首联待办 + 协作群 + 协作者分配日志
---
--- 写入口径对齐应用代码:
---   DeliveryClassServiceImpl.create()              -> 建班字段/编号
---   DeliveryClassServiceImpl.transferLocked()      -> class_id + owner_user_id + version
---   StudentContactServiceImpl.accept()             -> accepted_* + delivery_stage + 首联任务
---   StudentContactServiceImpl.assignCollaborator() -> 协作者字段 + assignment_log
---
--- 幂等: 全部以 id / idempotency_key 为守卫, 重复执行不产生新行.
--- 回滚: 见文末 ROLLBACK 段.
--- =============================================================================
-
--- 库表排序规则是 utf8mb4_unicode_ci, 而客户端连接默认 utf8mb4_0900_ai_ci.
--- 不做这一步, 所有 "字符串字面量 = unicode_ci 列" 的比较都会报
--- ERROR 1267 Illegal mix of collations. 必须在任何语句之前执行.
+-- UTF-8. Controlled repair of tenant 1 service relation 1016 only.
+-- Requires existing InnoDB business tables and zsjos_data_repair_backup.old_value LONGTEXT.
+-- Before first application: export scoped tables, review the full relation JSON produced by
+-- the same ordered information_schema columns, then explicitly set @repair_1016_expected_sha
+-- (SHA2(CAST(JSON_OBJECT(...) AS CHAR),256)) and @repair_1016_expected_version in this session.
+-- No inferred before-state is accepted. Missing/mismatched approval fails without business writes.
+-- Dependency order: class -> relation -> assignment logs -> first-contact task -> collaboration group.
+-- Full before/after row JSON and newly created row IDs remain under repair_key relation-1016-v2.
+-- Exact completed replay is zero-write; partial evidence and later edits fail closed.
+-- No version ledger or role assignments. Procedure/temporary-table DDL is outside business DML.
+-- Recovery: see docs/operations/review-fixes-20261014.md; never restore hardcoded previous values.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
-
+DROP PROCEDURE IF EXISTS zsjos_repair_1016_apply;
+DELIMITER $$
+CREATE PROCEDURE zsjos_repair_1016_apply()
+apply_body: BEGIN
+ DECLARE g INT DEFAULT 0;
+ DECLARE v INT DEFAULT 0;
+ DECLARE locked_id BIGINT;
+ DECLARE phase INT DEFAULT 0;
+ DECLARE table_index INT;
+ DECLARE target_table VARCHAR(64);
+ DECLARE predicate_text TEXT;
+ DECLARE columns_json LONGTEXT;
+ DECLARE relation_image JSON;
+ DECLARE saved_group_concat BIGINT DEFAULT @@session.group_concat_max_len;
+ DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN
+  ROLLBACK;
+  SET SESSION group_concat_max_len=saved_group_concat;
+  DO RELEASE_LOCK('zsjos:repair:relation:1016');
+  RESIGNAL;
+ END;
+ IF GET_LOCK('zsjos:repair:relation:1016',10)<>1 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Repair lock unavailable';
+ END IF;
+ SET SESSION group_concat_max_len=1048576;
 SET @tenant := 1;
 SET @relation := 1016;
 SET @person := 8150;
 SET @order := 8822;
 SET @item := 9323;
 SET @case := 1019;
-SET @homeroom := 400;                 -- 周老师【梁颖】 学习规划师 / 班主任 / 服务 owner
-SET @director := 47;                  -- 邓穆祺       编导
-SET @operator := 525;                 -- 余红红       运营
-SET @category := 13;                  -- 技能提升
-SET @exam_schedule := 30;             -- 郑州-人社 三级健康管理师等 考试时间 2026-10-31 (PUBLISHED 未结束)
-SET @first_contact_minutes := 120;    -- config id=2 (published) 的 first_contact_timeout_minutes
+SET @homeroom := 400;
+SET @director := 47;
+SET @operator := 525;
+SET @category := 13;
+SET @exam_schedule := 30;
+SET @first_contact_minutes := 120;
 SET @config_version := 2;
 
--- -----------------------------------------------------------------------------
--- 0. 前置校验: 不满足直接 SIGNAL 中断, 不做任何写入
--- -----------------------------------------------------------------------------
-DROP PROCEDURE IF EXISTS zsjos_repair_1016_guard;
-DELIMITER $$
-CREATE PROCEDURE zsjos_repair_1016_guard()
-BEGIN
-  DECLARE g INT DEFAULT 0;
-  DECLARE v INT DEFAULT 0;
+ IF (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND engine='InnoDB'
+ AND table_name IN ('zsjos_service_relation','zsjos_delivery_class','zsjos_student_collaborator_assignment_log',
+ 'zsjos_business_task','zsjos_collaboration_group','zsjos_data_repair_backup'))<>6
+ OR NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+ AND table_name='zsjos_data_repair_backup' AND column_name='old_value' AND data_type='longtext') THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Repair requires transactional tables and LONGTEXT evidence';
+ END IF;
+ DROP TEMPORARY TABLE IF EXISTS repair_1016_images;
+ CREATE TEMPORARY TABLE repair_1016_images(table_name VARCHAR(64),row_id BIGINT,image JSON,
+ PRIMARY KEY(table_name,row_id)) ENGINE=InnoDB;
+ START TRANSACTION;
+ SELECT id INTO locked_id FROM zsjos_service_relation WHERE tenant_id=1 AND id=1016 AND deleted=0 FOR UPDATE;
+ IF locked_id IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Relation missing'; END IF;
 
+ SET table_index=0;
+ WHILE table_index<5 DO
+  SET target_table=ELT(table_index+1,'zsjos_service_relation','zsjos_delivery_class',
+    'zsjos_student_collaborator_assignment_log','zsjos_business_task','zsjos_collaboration_group');
+  SET predicate_text=ELT(table_index+1,'tenant_id=1 AND id=1016',
+    'tenant_id=1 AND id=(SELECT class_id FROM zsjos_service_relation WHERE tenant_id=1 AND id=1016) AND creator=\'repair-1016\'',
+    'tenant_id=1 AND service_relation_id=1016 AND idempotency_key IN (\'repair-1016-director-1016\',\'repair-1016-operator-1016\')',
+    'tenant_id=1 AND idempotency_key=\'student-contact:accept:1016\'',
+    'tenant_id=1 AND source_service_relation_id=1016 AND deleted=0');
+  SELECT GROUP_CONCAT(CONCAT(QUOTE(column_name),',',
+     IF(data_type='bit',CONCAT('CAST(`',column_name,'` AS UNSIGNED)'),CONCAT('`',column_name,'`')))
+     ORDER BY ordinal_position SEPARATOR ',') INTO columns_json
+   FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=target_table;
+  SET @snapshot_sql=CONCAT('INSERT INTO repair_1016_images SELECT ',QUOTE(target_table),',id,JSON_OBJECT(',columns_json,') FROM `',target_table,'` WHERE ',predicate_text,' FOR UPDATE');
+  PREPARE snapshot_statement FROM @snapshot_sql; EXECUTE snapshot_statement; DEALLOCATE PREPARE snapshot_statement;
+  SET table_index=table_index+1;
+ END WHILE;
+
+ SELECT COUNT(*) INTO v FROM repair_1016_images;
+ IF EXISTS(SELECT 1 FROM zsjos_data_repair_backup WHERE repair_key='relation-1016-v2') THEN
+  IF (SELECT COUNT(*) FROM zsjos_data_repair_backup WHERE repair_key='relation-1016-v2' AND column_name='__before__')<>1
+   OR (SELECT COUNT(*) FROM zsjos_data_repair_backup WHERE repair_key='relation-1016-v2' AND column_name='__after__')<>6
+   OR v<>6
+   OR EXISTS(SELECT 1 FROM repair_1016_images i LEFT JOIN zsjos_data_repair_backup b
+     ON b.repair_key='relation-1016-v2' AND b.table_name=i.table_name AND b.row_id=i.row_id AND b.column_name='__after__'
+     WHERE b.id IS NULL OR NOT (CAST(b.old_value AS JSON)=CAST(CAST(i.image AS CHAR) AS JSON))) THEN
+   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Partial evidence or later edit: reviewed recovery required';
+  END IF;
+  ROLLBACK; SET SESSION group_concat_max_len=saved_group_concat;
+  DO RELEASE_LOCK('zsjos:repair:relation:1016');
+  SELECT 'Verified completed repair; no changes' AS result;
+  LEAVE apply_body;
+ END IF;
+ SELECT image INTO relation_image FROM repair_1016_images WHERE table_name='zsjos_service_relation';
+ IF EXISTS(SELECT 1 FROM zsjos_delivery_class c JOIN zsjos_service_relation r ON r.class_id=c.id
+ WHERE r.id=1016 AND r.tenant_id=1 AND c.system_class=0) OR @repair_1016_expected_sha IS NULL OR @repair_1016_expected_version IS NULL
+  OR NOT (SHA2(CAST(relation_image AS CHAR),256)=@repair_1016_expected_sha)
+  OR NOT (JSON_EXTRACT(relation_image,'$.version')=@repair_1016_expected_version)
+  OR NOT (JSON_UNQUOTE(JSON_EXTRACT(relation_image,'$.acceptance_status'))='pending')
+  OR JSON_TYPE(JSON_EXTRACT(relation_image,'$.owner_user_id'))<>'NULL'
+  OR JSON_TYPE(JSON_EXTRACT(relation_image,'$.content_director_user_id'))<>'NULL'
+  OR JSON_TYPE(JSON_EXTRACT(relation_image,'$.operator_user_id'))<>'NULL'
+  OR JSON_TYPE(JSON_EXTRACT(relation_image,'$.collaboration_group_id'))<>'NULL'
+  OR (SELECT COUNT(*) FROM repair_1016_images)<>1 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Approved preimage/version required; unexpected existing side effects';
+ END IF;
   SELECT COUNT(*) INTO v FROM zsjos_service_relation
    WHERE id=@relation AND person_id=@person AND order_id=@order AND order_item_id=@item
      AND registration_case_id=@case AND status='active' AND deleted=b'0' AND tenant_id=@tenant;
   SET g := g + v;
 
   SELECT COUNT(*) INTO v FROM system_users
-   WHERE id=@homeroom AND status=0 AND deleted=b'0' AND dept_id=1051;
+   WHERE tenant_id=1 AND id=@homeroom AND status=0 AND deleted=b'0' AND dept_id=1051;
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='班主任 400 不合法(需启用且在部门1051)'; END IF;
   SET g := g + v;
 
@@ -63,28 +123,28 @@ BEGIN
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='班主任 400 缺少 study_planner 角色'; END IF;
   SET g := g + v;
 
-  SELECT COUNT(*) INTO v FROM system_users WHERE id=@director AND status=0 AND deleted=b'0';
+  SELECT COUNT(*) INTO v FROM system_users WHERE tenant_id=1 AND id=@director AND status=0 AND deleted=b'0';
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='编导 47 不合法'; END IF;
   SET g := g + v;
 
-  SELECT COUNT(*) INTO v FROM system_users WHERE id=@operator AND status=0 AND deleted=b'0';
+  SELECT COUNT(*) INTO v FROM system_users WHERE tenant_id=1 AND id=@operator AND status=0 AND deleted=b'0';
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='运营 525 不合法'; END IF;
   SET g := g + v;
 
   SELECT COUNT(*) INTO v FROM zsjos_user_relation
-   WHERE scene='study_planner_content_director' AND source_user_id=@homeroom
+   WHERE tenant_id=1 AND scene='study_planner_content_director' AND source_user_id=@homeroom
      AND target_user_id=@director AND status=0 AND deleted=b'0';
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='缺协作关系 400->47 (study_planner_content_director)'; END IF;
   SET g := g + v;
 
   SELECT COUNT(*) INTO v FROM zsjos_user_relation
-   WHERE scene='content_director_operator' AND source_user_id=@director
+   WHERE tenant_id=1 AND scene='content_director_operator' AND source_user_id=@director
      AND target_user_id=@operator AND status=0 AND deleted=b'0';
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='缺协作关系 47->525 (content_director_operator)'; END IF;
   SET g := g + v;
 
   SELECT COUNT(*) INTO v FROM zsjos_exam_schedule
-   WHERE id=@exam_schedule AND record_status='PUBLISHED' AND deleted=b'0'
+   WHERE tenant_id=1 AND id=@exam_schedule AND record_status='PUBLISHED' AND deleted=b'0'
      AND (CASE WHEN schedule_type='EXACT' THEN exact_date ELSE end_date END) >= CURDATE();
   IF v = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='考试场次 30 不可用(需 PUBLISHED 且未结束)'; END IF;
   SET g := g + v;
@@ -96,17 +156,14 @@ BEGIN
 
   IF g <> 9 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='前置校验未全部通过'; END IF;
 
-  SELECT CONCAT('前置校验通过 (', g, '/9)') AS precheck;
-END$$
-DELIMITER ;
 
-CALL zsjos_repair_1016_guard();
-DROP PROCEDURE IF EXISTS zsjos_repair_1016_guard;
-
-
--- -----------------------------------------------------------------------------
--- 1. 建正式班 (班主任 = 400); 若 1016 已在正式班则复用, 不重复建
--- -----------------------------------------------------------------------------
+ SELECT first_contact_timeout_minutes INTO @first_contact_minutes FROM zsjos_student_contact_config_version
+ WHERE id=@config_version AND tenant_id=1 AND deleted=0 AND status='published';
+ IF @first_contact_minutes IS NULL OR @first_contact_minutes<=0 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Invalid contact deadline configuration';
+ END IF;
+ INSERT INTO zsjos_data_repair_backup(repair_key,table_name,row_id,column_name,old_value)
+ SELECT 'relation-1016-v2',table_name,row_id,'__before__',CAST(image AS CHAR) FROM repair_1016_images;
 SET @existing_class := (
   SELECT dc.id FROM zsjos_delivery_class dc
    WHERE dc.id = (SELECT class_id FROM zsjos_service_relation WHERE id=@relation)
@@ -115,7 +172,7 @@ SET @existing_class := (
 
 SET @class_no := CONCAT('BJ', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'), LPAD(FLOOR(RAND()*10000), 4, '0'));
 
-START TRANSACTION;
+
 
 INSERT INTO zsjos_delivery_class
   (class_no, class_name, system_class, category_id, category_name_snapshot, category_path_snapshot,
@@ -159,11 +216,12 @@ UPDATE zsjos_service_relation
        updater = 'repair-1016',
        update_time = NOW()
  WHERE id = @relation
-   AND acceptance_status = 'pending'
+   AND acceptance_status = 'pending' AND version=@repair_1016_expected_version
    AND deleted = b'0'
    AND tenant_id = @tenant;
 
 SET @rel_rows := ROW_COUNT();
+IF @rel_rows <> 1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Relation transition failed'; END IF;
 
 
 -- -----------------------------------------------------------------------------
@@ -177,7 +235,7 @@ SELECT @relation, 'content_director', NULL, @director, @homeroom,
        '补录：报名完成后分配编导', CONCAT('repair-1016-director-', @relation),
        'repair-1016', NOW(), 'repair-1016', NOW(), b'0', @tenant
  WHERE NOT EXISTS (SELECT 1 FROM zsjos_student_collaborator_assignment_log l
-                    WHERE l.idempotency_key = CONCAT('repair-1016-director-', @relation));
+                    WHERE l.tenant_id=1 AND l.idempotency_key = CONCAT('repair-1016-director-', @relation));
 
 INSERT INTO zsjos_student_collaborator_assignment_log
   (service_relation_id, collaborator_type, previous_user_id, assigned_user_id,
@@ -187,7 +245,7 @@ SELECT @relation, 'operator', NULL, @operator, @director,
        '补录：编导指定运营', CONCAT('repair-1016-operator-', @relation),
        'repair-1016', NOW(), 'repair-1016', NOW(), b'0', @tenant
  WHERE NOT EXISTS (SELECT 1 FROM zsjos_student_collaborator_assignment_log l
-                    WHERE l.idempotency_key = CONCAT('repair-1016-operator-', @relation));
+                    WHERE l.tenant_id=1 AND l.idempotency_key = CONCAT('repair-1016-operator-', @relation));
 
 
 -- -----------------------------------------------------------------------------
@@ -210,7 +268,7 @@ SELECT 'student_first_contact', 'student_service', @relation, 'pending', 'user',
   FROM zsjos_order o
  WHERE o.id=@order
    AND NOT EXISTS (SELECT 1 FROM zsjos_business_task t
-                    WHERE t.idempotency_key = CONCAT('student-contact:accept:', @relation));
+                    WHERE t.tenant_id=1 AND t.idempotency_key = CONCAT('student-contact:accept:', @relation));
 
 
 -- -----------------------------------------------------------------------------
@@ -222,64 +280,51 @@ INSERT INTO zsjos_collaboration_group
 SELECT @relation, @person, @director, @operator, 'active', 0,
        'repair-1016', NOW(), 'repair-1016', NOW(), b'0', @tenant
  WHERE NOT EXISTS (SELECT 1 FROM zsjos_collaboration_group cg
-                    WHERE cg.source_service_relation_id=@relation AND cg.deleted=b'0');
+                    WHERE cg.tenant_id=1 AND cg.source_service_relation_id=@relation AND cg.deleted=b'0');
 
 SET @group_id := (SELECT id FROM zsjos_collaboration_group
-                   WHERE source_service_relation_id=@relation AND deleted=b'0' LIMIT 1);
+                   WHERE tenant_id=1 AND source_service_relation_id=@relation AND deleted=b'0' LIMIT 1);
 
 UPDATE zsjos_service_relation
    SET collaboration_group_id = @group_id
- WHERE id = @relation AND collaboration_group_id IS NULL;
-
-COMMIT;
-
-SELECT CONCAT('事务提交完成; relation更新行数=', @rel_rows, ', class_id=', @class_id) AS result;
+ WHERE id = @relation AND tenant_id=1 AND collaboration_group_id IS NULL;
 
 
--- =============================================================================
--- 执行后核对
--- =============================================================================
-SELECT '--- 服务关系 ---' AS section;
-SELECT id, person_id, order_id, class_id, status, acceptance_status, accepted_by_user_id, accepted_at,
-       owner_user_id, content_director_user_id, operator_user_id,
-       delivery_stage, director_stage, collaboration_group_id, version
-  FROM zsjos_service_relation WHERE id=@relation\G
+ DELETE FROM repair_1016_images;
 
-SELECT '--- 正式班 ---' AS section;
-SELECT id, class_no, class_name, system_class, homeroom_user_id, homeroom_user_name_snapshot,
-       dept_id, status, category_id, exam_schedule_id, exam_schedule_snapshot
-  FROM zsjos_delivery_class WHERE id=@class_id;
+ SET table_index=0;
+ WHILE table_index<5 DO
+  SET target_table=ELT(table_index+1,'zsjos_service_relation','zsjos_delivery_class',
+    'zsjos_student_collaborator_assignment_log','zsjos_business_task','zsjos_collaboration_group');
+  SET predicate_text=ELT(table_index+1,'tenant_id=1 AND id=1016',
+    'tenant_id=1 AND id=(SELECT class_id FROM zsjos_service_relation WHERE tenant_id=1 AND id=1016) AND creator=\'repair-1016\'',
+    'tenant_id=1 AND service_relation_id=1016 AND idempotency_key IN (\'repair-1016-director-1016\',\'repair-1016-operator-1016\')',
+    'tenant_id=1 AND idempotency_key=\'student-contact:accept:1016\'',
+    'tenant_id=1 AND source_service_relation_id=1016 AND deleted=0');
+  SELECT GROUP_CONCAT(CONCAT(QUOTE(column_name),',',
+     IF(data_type='bit',CONCAT('CAST(`',column_name,'` AS UNSIGNED)'),CONCAT('`',column_name,'`')))
+     ORDER BY ordinal_position SEPARATOR ',') INTO columns_json
+   FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=target_table;
+  SET @snapshot_sql=CONCAT('INSERT INTO repair_1016_images SELECT ',QUOTE(target_table),',id,JSON_OBJECT(',columns_json,') FROM `',target_table,'` WHERE ',predicate_text,' FOR UPDATE');
+  PREPARE snapshot_statement FROM @snapshot_sql; EXECUTE snapshot_statement; DEALLOCATE PREPARE snapshot_statement;
+  SET table_index=table_index+1;
+ END WHILE;
 
-SELECT '--- 首联任务 ---' AS section;
-SELECT id, task_type, biz_type, biz_id, status, assignee_id, due_at, idempotency_key
-  FROM zsjos_business_task WHERE idempotency_key=CONCAT('student-contact:accept:', @relation);
-
-SELECT '--- 协作群 ---' AS section;
-SELECT id, source_service_relation_id, student_person_id, director_user_id, operator_user_id, status
-  FROM zsjos_collaboration_group WHERE source_service_relation_id=@relation;
-
-SELECT '--- 分配日志 ---' AS section;
-SELECT id, collaborator_type, previous_user_id, assigned_user_id, operator_user_id, idempotency_key
-  FROM zsjos_student_collaborator_assignment_log WHERE service_relation_id=@relation;
-
-
--- =============================================================================
--- ROLLBACK 段 (需要时单独执行, 默认不执行)
--- =============================================================================
--- START TRANSACTION;
--- SET @relation := 1016;
--- DELETE FROM zsjos_student_collaborator_assignment_log
---  WHERE service_relation_id=@relation AND creator='repair-1016';
--- DELETE FROM zsjos_business_task
---  WHERE idempotency_key=CONCAT('student-contact:accept:', @relation);
--- UPDATE zsjos_service_relation SET collaboration_group_id=NULL WHERE id=@relation;
--- DELETE FROM zsjos_collaboration_group
---  WHERE source_service_relation_id=@relation AND creator='repair-1016';
--- UPDATE zsjos_service_relation
---    SET class_id=1, owner_user_id=NULL, acceptance_status='pending',
---        accepted_by_user_id=NULL, accepted_at=NULL, delivery_stage=NULL,
---        content_director_user_id=NULL, operator_user_id=NULL, collaboration_group_id=NULL,
---        version=0, updater='repair-1016', update_time=NOW()
---  WHERE id=@relation;
--- DELETE FROM zsjos_delivery_class WHERE creator='repair-1016' AND system_class=b'0';
--- COMMIT;
+ IF (SELECT COUNT(*) FROM repair_1016_images)<>6 OR NOT EXISTS(
+ SELECT 1 FROM zsjos_service_relation r JOIN zsjos_delivery_class c ON c.id=r.class_id AND c.tenant_id=1
+ JOIN zsjos_collaboration_group g ON g.id=r.collaboration_group_id AND g.tenant_id=1
+ WHERE r.id=1016 AND r.tenant_id=1 AND r.acceptance_status='accepted' AND r.owner_user_id=400
+ AND r.content_director_user_id=47 AND r.operator_user_id=525 AND r.version=@repair_1016_expected_version+1
+ AND c.homeroom_user_id=400 AND g.student_person_id=8150 AND g.director_user_id=47 AND g.operator_user_id=525) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Repair postcondition failed';
+ END IF;
+ INSERT INTO zsjos_data_repair_backup(repair_key,table_name,row_id,column_name,old_value)
+ SELECT 'relation-1016-v2',table_name,row_id,'__after__',CAST(image AS CHAR) FROM repair_1016_images;
+ COMMIT;
+ SET SESSION group_concat_max_len=saved_group_concat;
+ DO RELEASE_LOCK('zsjos:repair:relation:1016');
+ SELECT 'Repair complete; evidence saved' AS result;
+END$$
+DELIMITER ;
+CALL zsjos_repair_1016_apply();
+DROP PROCEDURE zsjos_repair_1016_apply;

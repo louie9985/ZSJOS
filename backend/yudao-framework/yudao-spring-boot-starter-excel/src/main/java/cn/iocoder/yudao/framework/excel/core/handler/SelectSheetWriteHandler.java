@@ -132,7 +132,13 @@ public class SelectSheetWriteHandler implements SheetWriteHandler {
         // 1. 获取相应操作对象
         DataValidationHelper helper = writeSheetHolder.getSheet().getDataValidationHelper(); // 需要设置下拉框的 sheet 页的数据验证助手
         Workbook workbook = writeWorkbookHolder.getWorkbook(); // 获得工作簿
-        List<KeyValue<Integer, List<String>>> keyValues = convertList(selectMap.entrySet(), entry -> new KeyValue<>(entry.getKey(), entry.getValue()));
+        // Empty administrator-maintained dictionaries have no legal Excel range (row zero is invalid).
+        List<KeyValue<Integer, List<String>>> keyValues = convertList(selectMap.entrySet().stream()
+                .filter(entry -> CollUtil.isNotEmpty(entry.getValue())).toList(),
+                entry -> new KeyValue<>(entry.getKey(), entry.getValue()));
+        if (keyValues.isEmpty()) {
+            return;
+        }
         keyValues.sort(Comparator.comparing(item -> item.getValue().size())); // 升序不然创建下拉会报错
 
         // 2. 创建数据字典的 sheet 页

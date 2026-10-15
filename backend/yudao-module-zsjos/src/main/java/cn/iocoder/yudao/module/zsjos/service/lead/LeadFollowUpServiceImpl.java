@@ -60,11 +60,13 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Resource private LeadCollaborationService collaborationService;
+    @Resource private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="新增跟进", target="lead", id=0, actor=1, actorType="ADMIN")
     public LeadFollowUpRespVO create(Long leadId, Long operatorUserId, LeadFollowUpCreateReqVO reqVO) {
         return createInternal(leadId, operatorUserId, reqVO, false);
     }
@@ -72,6 +74,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Override
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, rollbackFor = Exception.class)
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="自拓自动跟进", target="lead", id=0, actor=1, actorType="ADMIN")
     public LeadFollowUpRespVO createSelfSourcedAutomatic(Long leadId, Long operatorUserId, LocalDateTime nextFollowUpAt) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null || !LeadSourceInterpretation.resolve(lead).unlinked() || !DISPATCH_SELF.equals(lead.getDispatchMode())
@@ -360,6 +363,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         if (reqVO.getNextFollowUpAt() == null) {
             opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>()
                     .eq(OpportunityDO::getId, opportunity.getId()).set(OpportunityDO::getNextFollowUpAt, null));
+        }
+        if (!Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+            // Cancel obsolete A/previous-B reminders; never complete them as the current B's work.
+            taskCleanupService.cancelObsolete(lead.getId(), occurredAt);
         }
         lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),

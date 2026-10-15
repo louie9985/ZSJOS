@@ -129,6 +129,10 @@ class MenuTaskSummaryServiceImplTest {
                     : type == LocalDateTime.class ? "TIMESTAMP" : "BIGINT");
         }
         jdbc.execute(ddl.append(")").toString());
+        jdbc.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,owner_user_id BIGINT)");
+        jdbc.execute("CREATE TABLE zsjos_lead_aging_pool_cycle(id BIGINT,lead_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR,collaborator_user_id BIGINT)");
+        jdbc.execute("CREATE TABLE zsjos_lead_public_sea_record(id BIGINT,lead_id BIGINT,tenant_id BIGINT,deleted INT,owner_user_id BIGINT,collaborator_user_id BIGINT)");
+        jdbc.execute("INSERT INTO zsjos_lead VALUES(42,1,0,7),(42,2,0,7)");
         for (int id = 1; id <= 7; id++) {
             jdbc.update("INSERT INTO zsjos_business_task(id,tenant_id,deleted,assignee_id,biz_type,biz_id,task_type,status,due_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     id, id == 3 ? 2 : 1, id == 4 ? 1 : 0, id == 2 ? 8 : 7,

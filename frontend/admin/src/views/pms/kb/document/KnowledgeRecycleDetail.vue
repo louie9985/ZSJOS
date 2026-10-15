@@ -77,6 +77,11 @@
             v-dompurify-html="preview.content || '<p>暂无内容</p>'"
             class="pms-knowledge-rich-text"
           ></div>
+          <KnowledgeAttachments
+            :files="preview.attachments || []"
+            :document-id="preview.id"
+            :record-id="detail.root.id"
+          />
         </template>
         <template
           v-else-if="preview && currentNode.type === PmsKnowledgeObjectType.FILE && preview.content"
@@ -104,6 +109,7 @@
 </template>
 
 <script lang="ts" setup>
+import KnowledgeAttachments from './KnowledgeAttachments.vue'
 import * as KnowledgeRecycleApi from '@/api/pms/kb/recycle'
 import { FilePreview } from '@/components/FilePreview'
 import { formatDate } from '@/utils/formatTime'

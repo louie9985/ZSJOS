@@ -39,19 +39,24 @@ export interface RegistrationRoute {
 export interface RegistrationCase {
   id: number
   orderId: number
+  orderItemId?: number
+  productName?: string
+  specs?: import('@/utils/productSpecs').ProductSpec[]
   orderNo: string
   orderStatus: string
   orderStatusLabel?: string
   studentName: string
   studentMobile?: string
   leadNo?: string
-  status: 'pending' | 'processing' | 'completed' | 'cancelled'
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'ended'
   statusLabel?: string
   assignmentMode?: 'legacy_planner' | 'class_per_item'
   studyPlannerUserId?: number
   studyPlannerUserName?: string
   registrationApprovedAt: string
   completedAt?: string
+  cancelledAt?: string
+  cancelReason?: string
   version: number
   completable: boolean
   completionBlockCode?: string
@@ -83,6 +88,9 @@ export interface StudyPlanner {
 }
 
 export interface StudentService {
+  classId?: number
+  className?: string
+  ownerUserName?: string
   serviceRelationId: number
   orderId: number
   orderNo: string
@@ -186,3 +194,12 @@ export const getMyStudentPage = (params: PageParam & { readScope?: 'SELF' | 'ALL
 
 export const getMyStudent = (personId: number) =>
   request.get<MyStudent>({ url: `/zsjos/student/my/${personId}` })
+
+export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: StudentService };
+export const getMyStudentServicePage = (params: PageParam & { keyword?: string; personId?: number; advancedFilter?: AdvancedFilterGroup; readScope?: string; targetUserId?: number }) => params.advancedFilter
+  ? request.post<PageResult<StudentServiceSubject[]>>({ url: "/zsjos/student/my-service/search-page", data: params })
+  : request.get<PageResult<StudentServiceSubject[]>>({ url: "/zsjos/student/my-service-page", params });
+export const getMyStudentService = (id: number) => request.get<StudentServiceSubject>({ url: `/zsjos/student/my-service/${id}` });
+
+export const closeRegistration = (id: number, version: number, reason: string) =>
+  request.post({ url: `/zsjos/registration/${id}/close`, data: { version, reason, idempotencyKey: crypto.randomUUID() } })

@@ -51,7 +51,11 @@ import static cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.KNOWLEDGE_DOC
 public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentService {
 
     @Resource
+    private cn.iocoder.yudao.module.pms.dal.mysql.kb.library.PmsKnowledgeLibraryMapper importLibraryMapper;
+
+    @Resource
     private PmsKnowledgeDocumentMapper documentMapper;
+    @Resource private PmsKnowledgeAttachmentService attachments;
 
     @Resource
     private PmsKnowledgeFolderService folderService;
@@ -74,6 +78,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createDocument(PmsKnowledgeDocumentCreateReqVO createReqVO, Long userId) {
+        importLibraryMapper.lockContentCreation(createReqVO.getLibraryId());
         // 1.1 校验知识库读取权限
         libraryMemberService.validateLibraryInteraction(createReqVO.getLibraryId(), userId);
         // 1.2 规范并校验目录位置，同时确定文档权限
@@ -87,10 +92,12 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
         document.setPermissionId(permissionId).setType(createReqVO.getType())
                 .setStatus(PmsKnowledgeDocumentStatusEnum.NORMAL.getStatus());
         documentMapper.insert(document);
+        attachments.replace(document, createReqVO.getAttachmentFileIds(), userId);
         return document.getId();
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateDocument(PmsKnowledgeDocumentUpdateReqVO updateReqVO, Long userId) {
         // 1.1 校验文档存在
         PmsKnowledgeDocumentDO document = validateDocumentExists(updateReqVO.getId());
@@ -102,6 +109,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
         documentLabelService.validateDocumentLabelList(updateReqVO.getLabelIds());
 
         // 2. 更新文档内容
+        attachments.replace(document, updateReqVO.getAttachmentFileIds(), userId);
         documentMapper.updateById(BeanUtils.toBean(updateReqVO, PmsKnowledgeDocumentDO.class));
     }
 
@@ -223,6 +231,7 @@ public class PmsKnowledgeDocumentServiceImpl implements PmsKnowledgeDocumentServ
         if (CollUtil.isEmpty(ids)) {
             return;
         }
+        attachments.deleteDocuments(ids);
         documentMapper.deleteByIds(ids);
     }
 

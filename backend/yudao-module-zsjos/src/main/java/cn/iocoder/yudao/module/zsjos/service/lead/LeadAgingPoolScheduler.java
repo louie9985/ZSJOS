@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class LeadAgingPoolScheduler {
     @Resource private TenantFrameworkService tenantFrameworkService;
     @Resource private LeadAgingPoolService service;
+    @Resource private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Resource private MaintenanceModeApi maintenanceModeApi;
     @Scheduled(fixedDelay = 60_000L)
     public void process() {
@@ -23,6 +24,7 @@ public class LeadAgingPoolScheduler {
             LocalDateTime now = LocalDateTime.now();
             runStep(tenantId, "scanDue", () -> service.scanDue(now));
             runStep(tenantId, "clearInvalidCollaborators", () -> service.clearInvalidCollaborators(now));
+            runStep(tenantId, "cancelObsoleteFollowUpTasks", () -> taskCleanupService.cancelObsolete(null, now));
             runStep(tenantId, "emitAdvanceReminders", () -> service.emitAdvanceReminders(now));
         });
     }

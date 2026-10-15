@@ -65,17 +65,22 @@ public class PositioningCardService {
         var applied = submissionMapper.selectCurrentConfirmedByAccount(accountId);
         var effective = applied == null ? null : history.stream()
                 .filter(s -> Objects.equals(s.getSubmissionId(), applied.getId())).findFirst().orElse(null);
-        var current = history.isEmpty() ? null : history.getFirst();
+        var masterId = account.getCreateServiceRelationId() == null ? null : assignmentService.masterId(account.getCreateServiceRelationId());
+        var current = history.stream().filter(s -> Objects.equals(s.getId(), masterId)).findFirst().orElse(null);
+        var serviceEffective = history.stream().filter(s -> Objects.equals(s.getId(), masterId)
+                && s.getSubmissionStatus() != null && Set.of("confirmed", "superseded", "student_agreed").contains(s.getSubmissionStatus())).findFirst().orElse(null);
         return new ReviewOverview(new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningAccountOverviewRespVO(
                 current, effective, history), new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO(
-                account.getCreateServiceRelationId(), current == null ? null : current.getId(), false, false, false,
-                List.of(), current, effective, history));
+                account.getCreateServiceRelationId(), masterId, false, false, false,
+                List.of(), current, serviceEffective, history));
     }
 
     @ZsjosPermission(bizType="content-review-student",bizId="#batchId",action="read")
     public List<PositioningCardRespVO> accountForReview(Long batchId, Long accountId, Long userId) {
         var account = reviewAccess.requireAccount(batchId, accountId, userId);
-        return submissionMapper.selectByStudentAndAccountIds(account.getStudentPersonId(), List.of(accountId)).stream()
+        if (account.getCreateServiceRelationId() == null) return List.of();
+        return submissionMapper.selectByService(account.getCreateServiceRelationId()).stream()
+                .filter(s -> Objects.equals(s.getStudentPersonId(), account.getStudentPersonId()))
                 .filter(s -> Objects.equals(s.getServiceRelationId(), account.getCreateServiceRelationId()))
                 .map(s -> {
                     var result = projectSubmission(s, userId);

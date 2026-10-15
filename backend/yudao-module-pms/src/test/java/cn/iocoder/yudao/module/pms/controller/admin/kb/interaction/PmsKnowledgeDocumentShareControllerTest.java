@@ -29,6 +29,7 @@ public class PmsKnowledgeDocumentShareControllerTest {
         var controller = new PmsKnowledgeDocumentShareController();
         ReflectionTestUtils.setField(controller, "documentShareService", service);
         ReflectionTestUtils.setField(controller, "shareUrl", urls);
+        ReflectionTestUtils.setField(controller, "attachments", mock(cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService.class));
         var share = new cn.iocoder.yudao.module.pms.dal.dataobject.kb.interaction.PmsKnowledgeDocumentShareDO()
                 .setId(1L).setDocumentId(2L).setToken("existing-token");
         when(service.getActiveDocumentShare(2L, null)).thenReturn(share);
@@ -56,6 +57,7 @@ public class PmsKnowledgeDocumentShareControllerTest {
         PmsKnowledgeDocumentShareController controller = new PmsKnowledgeDocumentShareController();
         ReflectionTestUtils.setField(controller, "documentShareService", shareService);
         ReflectionTestUtils.setField(controller, "fileApi", fileApi);
+        ReflectionTestUtils.setField(controller, "attachments", mock(cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService.class));
 
         // 调用
         PmsKnowledgeDocumentSharePublicRespVO result = controller.getDocumentByToken(token).getData();

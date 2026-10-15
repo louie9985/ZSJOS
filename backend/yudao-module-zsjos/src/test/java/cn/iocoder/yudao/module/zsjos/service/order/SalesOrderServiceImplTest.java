@@ -947,6 +947,39 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void keywordWithOnlyLegacyProcessIdsNeverQueriesAllBpmTasks() {
+        TenantContextHolder.setTenantId(1L);
+        var config = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO();
+        config.setGroups(List.of());
+        when(inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER)).thenReturn(config);
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO();
+        request.setKeyword("legacy"); request.setHandled(false); request.setCenter(CENTER_REGISTRATION);
+        when(roundMapper.selectProcessInstanceIdsByKeyword(1L, "legacy"))
+                .thenReturn(java.util.Arrays.asList(null, "", " \t"));
+        assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
+        verifyNoInteractions(processTaskApi);
+    }
+
+    @Test
+    void keywordMixedProcessIdsAreNormalizedBeforeTaskLoading() {
+        TenantContextHolder.setTenantId(1L);
+        var config = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO();
+        config.setGroups(List.of());
+        when(inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER)).thenReturn(config);
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        SalesOrderPageReqVO request = new SalesOrderPageReqVO();
+        request.setKeyword("mixed"); request.setHandled(false); request.setCenter(CENTER_REGISTRATION);
+        when(roundMapper.selectProcessInstanceIdsByKeyword(1L, "mixed"))
+                .thenReturn(java.util.Arrays.asList(null, "", "p1", "p1"));
+        when(processTaskApi.getTodoTaskPage(eq(20L), any())).thenReturn(PageResult.empty());
+        assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
+        var captor = ArgumentCaptor.forClass(BpmTaskPageReqDTO.class);
+        verify(processTaskApi).getTodoTaskPage(eq(20L), captor.capture());
+        assertEquals(List.of("p1"), captor.getValue().getProcessInstanceIds());
+    }
+
+    @Test
     void orderStateAndAdvancedFilterAreIntersectedAndEmptyMatchNeverBroadens() {
         TenantContextHolder.setTenantId(1L);
         SalesOrderPageReqVO request = new SalesOrderPageReqVO();

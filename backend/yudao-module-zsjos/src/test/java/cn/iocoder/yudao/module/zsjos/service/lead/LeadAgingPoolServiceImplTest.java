@@ -47,6 +47,7 @@ import org.mockito.ArgumentCaptor;
 class LeadAgingPoolServiceImplTest {
 
     @InjectMocks private LeadAgingPoolServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private LeadAgingPoolCycleMapper cycleMapper;
     @Mock private LeadAgingPoolEventMapper eventMapper;
     @Mock private LeadMapper leadMapper;
@@ -55,6 +56,7 @@ class LeadAgingPoolServiceImplTest {
     @Mock private LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Mock private LeadFollowUpRuleService ruleService;
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
+    @Mock private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Mock private LeadNotifyEventPublisher notifyPublisher;
     @Mock private LeadAssignmentService assignmentService;
     @Mock private AdminUserApi adminUserApi;
@@ -96,30 +98,30 @@ class LeadAgingPoolServiceImplTest {
     }
 
     @Test
-    void ownerAndConfiguredCollaboratorCanBothOperate() {
+    void onlyConfiguredCollaboratorCanOperateDuringPublicSea() {
         LeadAgingPoolCycleDO cycle = cycle(AGING_POOL_WAITING_ASSIGNMENT, null);
         when(cycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
-        assertTrue(service.canOperate(1L, 10L, 10L));
+        assertFalse(service.canOperate(1L, 10L, 10L));
         assertFalse(service.canOperate(1L, 10L, 20L));
 
         cycle.setStatus(AGING_POOL_ASSIGNED);
         cycle.setCollaboratorUserId(20L);
-        assertTrue(service.canOperate(1L, 10L, 10L));
+        assertFalse(service.canOperate(1L, 10L, 10L));
         assertTrue(service.canOperate(1L, 10L, 20L));
 
         cycle.setStatus(AGING_POOL_DEAL_PENDING);
-        assertTrue(service.canOperate(1L, 10L, 10L));
+        assertFalse(service.canOperate(1L, 10L, 10L));
         assertTrue(service.canOperate(1L, 10L, 20L));
     }
 
     @Test
-    void manualPublicSeaAllowsItsOwnerAndConfiguredCollaboratorToFollowUp() {
+    void manualPublicSeaAllowsOnlyConfiguredCollaboratorToFollowUp() {
         var manual = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO();
         manual.setOwnerUserId(10L); manual.setCollaboratorUserId(20L);
         when(cycleMapper.selectActiveByLeadId(1L)).thenReturn(null);
         when(publicSeaRecordMapper.selectByLeadId(1L)).thenReturn(manual);
 
-        assertTrue(service.canOperate(1L, 10L, 10L));
+        assertFalse(service.canOperate(1L, 10L, 10L));
         assertTrue(service.canOperate(1L, 10L, 20L));
         assertFalse(service.canOperate(1L, 10L, 30L));
     }
@@ -241,8 +243,44 @@ class LeadAgingPoolServiceImplTest {
         assertEquals(20L, captor.getValue().getCollaboratorUserId());
         assertEquals(AGING_POOL_ASSIGNED, captor.getValue().getStatus());
         assertEquals(10L, lead.getOwnerUserId());
+        verify(taskCleanupService).cancelObsolete(eq(1L), any(LocalDateTime.class));
         verify(leadMapper, never()).updateById(any(LeadDO.class));
         verify(leadMapper).touchActivity(eq(1L), any(LocalDateTime.class));
+    }
+
+    @Test
+    void writeBoundaryRejectsAAndUnassignedButAcceptsCurrentB() {
+        LeadAgingPoolCycleDO cycle = cycle(AGING_POOL_WAITING_ASSIGNMENT, null);
+        when(cycleMapper.selectActiveByLeadIdForUpdate(1L, 1L)).thenReturn(cycle);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.requireCanOperateForUpdate(1L, 10L, 10L));
+        cycle.setStatus(AGING_POOL_ASSIGNED); cycle.setCollaboratorUserId(20L);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.requireCanOperateForUpdate(1L, 10L, 10L));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.requireCanOperateForUpdate(1L, 10L, 20L));
+        cycle.setCollaboratorUserId(30L);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.requireCanOperateForUpdate(1L, 10L, 20L));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.requireCanOperateForUpdate(1L, 10L, 30L));
+    }
+
+    @Test
+    void managerExitRestoresPendingTasksToFormalOwner() {
+        LeadAgingPoolCycleDO cycle = cycle(AGING_POOL_ASSIGNED, 20L);
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(10L);
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setStatus(0);
+        when(cycleMapper.selectByIdForUpdate(100L, 1L)).thenReturn(cycle);
+        when(cycleMapper.updateWithVersion(cycle, 0)).thenReturn(1);
+        when(securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL)).thenReturn(true);
+        when(adminUserApi.getUser(10L)).thenReturn(owner);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        var req = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadAgingPoolExitReqVO();
+        req.setReason("恢复原负责人跟进"); req.setIdempotencyKey("exit-follow-up");
+        service.exit(100L, 99L, req);
+        var cleanupOrder = org.mockito.Mockito.inOrder(taskCleanupService, lifecycleTaskService);
+        cleanupOrder.verify(taskCleanupService).cancelObsolete(eq(1L), any(LocalDateTime.class));
+        cleanupOrder.verify(lifecycleTaskService).reassignPendingSalesTasks(1L, 10L);
+        assertEquals(10L, lead.getOwnerUserId()); assertEquals(AGING_POOL_EXITED, cycle.getStatus());
     }
 
     private static LeadAgingPoolCycleDO cycle(String status, Long collaboratorUserId) {

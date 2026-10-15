@@ -35,7 +35,7 @@ class PersonalCalendarEventServiceTest {
         when(mapper.selectById(9L)).thenReturn(new PersonalCalendarEventDO().setId(9L).setOwnerUserId(21L));
         assertThrows(ServiceException.class, () -> service.update(9L, saveReq(), 20L));
         assertThrows(ServiceException.class, () -> service.delete(9L, 20L));
-        verify(mapper, never()).updateOwned(any(), anyLong());
+        verify(mapper, never()).updateOwned(any(), anyLong(), anyBoolean());
         verify(mapper, never()).deleteOwned(anyLong(), anyLong(), any());
     }
 
@@ -45,8 +45,10 @@ class PersonalCalendarEventServiceTest {
         var req = saveReq(); req.setBackgroundColor("");
         service.update(9L, req, 20L);
         var values = ArgumentCaptor.forClass(PersonalCalendarEventDO.class);
-        verify(mapper, times(2)).updateOwned(values.capture(), eq(20L));
-        assertEquals("#112233", values.getAllValues().get(0).getBackgroundColor());
+        verify(mapper, times(2)).updateOwned(values.capture(), eq(20L), anyBoolean());
+        assertNull(values.getAllValues().get(0).getBackgroundColor());
+        verify(mapper).updateOwned(any(), eq(20L), eq(false));
+        verify(mapper).updateOwned(any(), eq(20L), eq(true));
         assertNull(values.getAllValues().get(1).getBackgroundColor());
     }
 
@@ -77,7 +79,7 @@ class PersonalCalendarEventServiceTest {
                 () -> service.update(9L, saveReq(), 20L)).getCode());
         assertEquals(1_900_017_002, assertThrows(ServiceException.class,
                 () -> service.delete(9L, 20L)).getCode());
-        verify(mapper, never()).updateOwned(any(PersonalCalendarEventDO.class), anyLong());
+        verify(mapper, never()).updateOwned(any(PersonalCalendarEventDO.class), anyLong(), anyBoolean());
         verify(mapper, never()).deleteOwned(anyLong(), anyLong(), any());
     }
 
@@ -89,7 +91,7 @@ class PersonalCalendarEventServiceTest {
         service.update(9L, req, 20L);
 
         ArgumentCaptor<PersonalCalendarEventDO> update = ArgumentCaptor.forClass(PersonalCalendarEventDO.class);
-        verify(mapper).updateOwned(update.capture(), eq(20L));
+        verify(mapper).updateOwned(update.capture(), eq(20L), eq(false));
         assertEquals(9L, update.getValue().getId());
         assertEquals("复盘", update.getValue().getTitle());
     }

@@ -49,9 +49,9 @@ public interface PersonalCalendarEventMapper extends BaseMapperX<PersonalCalenda
                 .set(PersonalCalendarEventDO::getDeletedTime, deletedTime));
     }
 
-    default int updateOwned(PersonalCalendarEventDO event, Long ownerUserId) {
+    default int updateOwned(PersonalCalendarEventDO event, Long ownerUserId, boolean updateColor) {
         return update(event, new LambdaUpdateWrapper<PersonalCalendarEventDO>()
-                .set(PersonalCalendarEventDO::getBackgroundColor, event.getBackgroundColor())
+                .set(updateColor, PersonalCalendarEventDO::getBackgroundColor, event.getBackgroundColor())
                 .eq(PersonalCalendarEventDO::getId, event.getId())
                 .eq(PersonalCalendarEventDO::getOwnerUserId, ownerUserId));
     }

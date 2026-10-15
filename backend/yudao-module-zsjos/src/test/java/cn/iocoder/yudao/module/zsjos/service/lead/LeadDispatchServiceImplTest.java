@@ -59,6 +59,7 @@ class LeadDispatchServiceImplTest {
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PartnerLeadAssignmentService partnerAssignmentService;
     @InjectMocks
     private LeadDispatchServiceImpl service;

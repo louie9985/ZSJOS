@@ -181,7 +181,7 @@ const changeActionOptions = computed(() => {
       icon: 'ep:circle-check'
     })
   }
-  if ([3, 4, 5, 6, 7, 8].includes(employee.value.status || 0)) {
+  if ([3, 4, 5, 6, 7, 8, 9].includes(employee.value.status || 0)) {
     actions.push({
       label: '转为全职',
       changeType: HrmEmployeeChangeType.FULL_TIME,

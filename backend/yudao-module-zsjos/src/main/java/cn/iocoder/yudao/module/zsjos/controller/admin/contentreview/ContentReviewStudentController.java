@@ -30,9 +30,12 @@ public class ContentReviewStudentController {
     @GetMapping("/accounts/{accountId}/file-content")
     public org.springframework.http.ResponseEntity<byte[]> fileContent(@PathVariable Long batchId,@PathVariable Long accountId,
             @RequestParam String kind,@RequestParam(required=false) Long submissionId,@RequestParam Long fileId) throws Exception {
+        byte[] content = service.fileContent(batchId,accountId,kind,submissionId,fileId,getLoginUserId());
         return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
-                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
-                .body(service.fileContent(batchId,accountId,kind,submissionId,fileId,getLoginUserId()));
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Disposition", "attachment")
+                .contentType(org.springframework.http.MediaType.parseMediaType(ContentReviewStudentService.previewContentType(content)))
+                .body(content);
     }
     @GetMapping public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentRespVO> student(@PathVariable Long batchId, @RequestParam Long personId) {
         return success(service.student(batchId,personId,getLoginUserId()));

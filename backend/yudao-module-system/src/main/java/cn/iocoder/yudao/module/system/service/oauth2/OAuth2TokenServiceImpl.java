@@ -155,6 +155,18 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
             throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "刷新令牌的客户端编号不正确");
         }
 
+        boolean expired = DateUtils.isExpired(refreshTokenDO.getExpiresTime());
+        boolean missingAdminUser = false;
+        Map<String, String> adminUserInfo = null;
+        if (!expired && UserTypeEnum.ADMIN.getValue().equals(refreshTokenDO.getUserType())) {
+            // Read before revocation: a database outage must not be treated as a deleted account.
+            AdminUserDO user = adminUserService.getUser(refreshTokenDO.getUserId());
+            missingAdminUser = user == null;
+            if (!missingAdminUser) {
+                adminUserInfo = adminUserInfo(user);
+            }
+        }
+
         // 移除相关的访问令牌
         List<OAuth2AccessTokenDO> accessTokenDOs = oauth2AccessTokenMapper.selectListByRefreshToken(refreshToken);
         if (CollUtil.isNotEmpty(accessTokenDOs)) {
@@ -163,13 +175,17 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         }
 
         // 已过期的情况下，删除刷新令牌
-        if (DateUtils.isExpired(refreshTokenDO.getExpiresTime())) {
+        if (expired || missingAdminUser) {
             oauth2RefreshTokenMapper.deleteById(refreshTokenDO.getId());
-            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "刷新令牌已过期");
+            // The compatibility path also caches refresh tokens as access tokens.
+            oauth2AccessTokenRedisDAO.delete(refreshToken);
+            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(),
+                    missingAdminUser ? "登录账号不存在，请重新登录" : "刷新令牌已过期");
         }
 
         // 创建访问令牌
-        return createOAuth2AccessToken(refreshTokenDO, clientDO);
+        return adminUserInfo == null ? createOAuth2AccessToken(refreshTokenDO, clientDO)
+                : createOAuth2AccessToken(refreshTokenDO, clientDO, adminUserInfo);
     }
 
     @Override
@@ -265,9 +281,15 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     }
 
     private OAuth2AccessTokenDO createOAuth2AccessToken(OAuth2RefreshTokenDO refreshTokenDO, OAuth2ClientDO clientDO) {
+        return createOAuth2AccessToken(refreshTokenDO, clientDO,
+                buildUserInfo(refreshTokenDO.getUserId(), refreshTokenDO.getUserType()));
+    }
+
+    private OAuth2AccessTokenDO createOAuth2AccessToken(OAuth2RefreshTokenDO refreshTokenDO,
+                                                       OAuth2ClientDO clientDO, Map<String, String> userInfo) {
         OAuth2AccessTokenDO accessTokenDO = new OAuth2AccessTokenDO().setAccessToken(generateAccessToken())
                 .setUserId(refreshTokenDO.getUserId()).setUserType(refreshTokenDO.getUserType())
-                .setUserInfo(buildUserInfo(refreshTokenDO.getUserId(), refreshTokenDO.getUserType()))
+                .setUserInfo(userInfo)
                 .setClientId(clientDO.getClientId()).setScopes(refreshTokenDO.getScopes())
                 .setRefreshToken(refreshTokenDO.getRefreshToken())
                 .setExpiresTime(LocalDateTime.now().plusSeconds(clientDO.getAccessTokenValiditySeconds()));
@@ -321,14 +343,21 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         }
         if (userType.equals(UserTypeEnum.ADMIN.getValue())) {
             AdminUserDO user = adminUserService.getUser(userId);
-            return MapUtil.builder(LoginUser.INFO_KEY_NICKNAME, user.getNickname())
-                    .put(LoginUser.INFO_KEY_DEPT_ID, StrUtil.toStringOrNull(user.getDeptId())).build();
+            if (user == null) {
+                throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "登录账号不存在，请重新登录");
+            }
+            return adminUserInfo(user);
         } else if (userType.equals(UserTypeEnum.MEMBER.getValue())
                 || userType.equals(UserTypeEnum.PARTNER.getValue())) {
             // MEMBER 和 PARTNER 的资料由各自业务模块持有，System 仅签发通用 Token。
             return Collections.emptyMap();
         }
         throw new IllegalArgumentException("未知用户类型：" + userType);
+    }
+
+    private Map<String, String> adminUserInfo(AdminUserDO user) {
+        return MapUtil.builder(LoginUser.INFO_KEY_NICKNAME, user.getNickname())
+                .put(LoginUser.INFO_KEY_DEPT_ID, StrUtil.toStringOrNull(user.getDeptId())).build();
     }
 
     private static String generateAccessToken() {

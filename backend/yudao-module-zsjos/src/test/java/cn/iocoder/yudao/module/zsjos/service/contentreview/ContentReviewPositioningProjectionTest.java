@@ -18,15 +18,17 @@ class ContentReviewPositioningProjectionTest {
     @Mock ContentReviewStudentAccess reviewAccess;
     @Mock PositioningCardSubmissionMapper submissionMapper;
     @Mock PositioningCardMapper mapper;
+    @Mock PositioningAssignmentService assignmentService;
     @Mock PositioningCardObjectPermissionProvider objectPermissionProvider;
     @Mock PermissionApi permissionApi;
     @Mock AdminUserApi adminUserApi;
     @Test void nonOwnerReadsOnlyBoundAccountServiceSubmissionsWithoutOriginalOwnerCheck() {
         when(reviewAccess.requireAccount(10L,40L,20L)).thenReturn(new MediaAccountDO().setId(40L).setStudentPersonId(30L).setCreateServiceRelationId(50L));
-        var row=new PositioningCardSubmissionDO();row.setId(61L);row.setCardId(60L);row.setAccountId(40L);row.setServiceRelationId(50L);
+        var row=new PositioningCardSubmissionDO();row.setId(61L);row.setCardId(60L);row.setAccountId(null);row.setStudentPersonId(30L);row.setStatus("confirmed");row.setServiceRelationId(50L);
         row.setValuesSnapshotJson("{\"goal\":\"原定位\"}");
         var other=new PositioningCardSubmissionDO();other.setId(62L);other.setServiceRelationId(51L);
-        when(submissionMapper.selectByStudentAndAccountIds(30L,List.of(40L))).thenReturn(List.of(row,other));
+        when(submissionMapper.selectByService(50L)).thenReturn(List.of(row,other));
+        when(assignmentService.masterId(50L)).thenReturn(60L);
         var result=service.accountForReview(10L,40L,20L);
         assertEquals(1,result.size());assertEquals("原定位",result.getFirst().getValuesSnapshot().get("goal"));
         assertFalse(result.getFirst().getCanUploadEvidence());assertTrue(result.getFirst().getAvailableActions().isEmpty());

@@ -40,6 +40,39 @@ import static org.mockito.Mockito.when;
 @Import({OAuth2TokenServiceImpl.class, OAuth2AccessTokenRedisDAO.class})
 public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
 
+    @Test
+    public void missingAdminRevocationCommitsDespiteUnauthorizedResponse() {
+        TenantContextHolder.setTenantId(1L);
+        try {
+            OAuth2RefreshTokenDO refresh = randomPojo(OAuth2RefreshTokenDO.class, value -> value.setId(null)
+                    .setUserId(701L).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("fixture-missing")
+                    .setRefreshToken("fixture-missing-refresh").setExpiresTime(LocalDateTime.now().plusHours(1)));
+            refresh.setTenantId(1L);
+            oauth2RefreshTokenMapper.insert(refresh);
+            OAuth2AccessTokenDO access = randomPojo(OAuth2AccessTokenDO.class, value -> value.setId(null)
+                    .setUserId(701L).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("fixture-missing")
+                    .setAccessToken("fixture-missing-access").setRefreshToken(refresh.getRefreshToken())
+                    .setExpiresTime(LocalDateTime.now().plusMinutes(5)));
+            access.setTenantId(1L);
+            oauth2AccessTokenMapper.insert(access);
+            oauth2AccessTokenRedisDAO.set(access);
+            oauth2AccessTokenRedisDAO.set(new OAuth2AccessTokenDO().setAccessToken(refresh.getRefreshToken())
+                    .setUserId(701L).setExpiresTime(LocalDateTime.now().plusMinutes(5)));
+            when(oauth2ClientService.validOAuthClientFromCache("fixture-missing"))
+                    .thenReturn(new OAuth2ClientDO().setClientId("fixture-missing").setAccessTokenValiditySeconds(60));
+
+            var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> oauth2TokenService.refreshAccessToken(refresh.getRefreshToken(), "fixture-missing"));
+            assertEquals(401, error.getCode());
+            assertNull(oauth2RefreshTokenMapper.selectById(refresh.getId()));
+            assertNull(oauth2AccessTokenMapper.selectById(access.getId()));
+            assertNull(oauth2AccessTokenRedisDAO.get(access.getAccessToken()));
+            assertNull(oauth2AccessTokenRedisDAO.get(refresh.getRefreshToken()));
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
     @Resource
     private OAuth2TokenServiceImpl oauth2TokenService;
 

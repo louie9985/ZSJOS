@@ -28,6 +28,7 @@ class PmsKnowledgeSharePageControllerTest {
     private PmsKnowledgeDocumentShareService service;
     private FileApi fileApi;
     private MockMvc mvc;
+    private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
 
     @BeforeEach void setup() {
         service = mock(PmsKnowledgeDocumentShareService.class);
@@ -35,6 +36,8 @@ class PmsKnowledgeSharePageControllerTest {
         var controller = new PmsKnowledgeSharePageController();
         ReflectionTestUtils.setField(controller, "shareService", service);
         ReflectionTestUtils.setField(controller, "fileApi", fileApi);
+        attachments = mock(cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService.class);
+        ReflectionTestUtils.setField(controller, "attachments", attachments);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -106,6 +109,20 @@ class PmsKnowledgeSharePageControllerTest {
         assertFalse(error.contains(TOKEN));
         assertTrue(error.contains("重试"));
         export("error.html", error);
+    }
+
+    @Test void attachmentNavigationRevalidatesTokenAndSelection() throws Exception {
+        when(service.getDocumentByShareToken(TOKEN)).thenReturn(document());
+        when(attachments.boundUrl(1L, 10L, true)).thenReturn("https://files.example.test/signed");
+        mvc.perform(get(ROOT + "/attachment").param("token", TOKEN).param("fileId", "10"))
+                .andExpect(status().isFound()).andExpect(header().string("Location", "https://files.example.test/signed"));
+        when(attachments.boundUrl(1L, 10L, true)).thenThrow(exception(KNOWLEDGE_ATTACHMENT_UNAVAILABLE));
+        mvc.perform(get(ROOT + "/attachment").param("token", TOKEN).param("fileId", "10"))
+                .andExpect(status().isNotFound());
+        when(service.getDocumentByShareToken(TOKEN)).thenThrow(exception(KNOWLEDGE_DOCUMENT_SHARE_INVALID));
+        mvc.perform(get(ROOT + "/attachment").param("token", TOKEN).param("fileId", "10"))
+                .andExpect(status().isGone());
+        verify(attachments, times(2)).boundUrl(1L, 10L, true);
     }
 
     private void export(String name, String html) throws Exception {

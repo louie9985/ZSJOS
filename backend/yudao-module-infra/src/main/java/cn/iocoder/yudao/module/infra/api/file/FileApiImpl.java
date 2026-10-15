@@ -55,6 +55,12 @@ public class FileApiImpl implements FileApi {
     }
 
     @Override
+    public Map<Long, FileInfoRespDTO> getFileInfoMap(Collection<Long> fileIds) {
+        return fileService.getFiles(fileIds).stream().collect(java.util.stream.Collectors.toMap(
+                file -> file.getId(), file -> BeanUtils.toBean(file, FileInfoRespDTO.class)));
+    }
+
+    @Override
     public FileInfoRespDTO getFileInfo(Long fileId) {
         return BeanUtils.toBean(fileService.getFile(fileId), FileInfoRespDTO.class);
     }

@@ -45,6 +45,39 @@ V292 在 Core V287 后执行，仅给 `zsjos_exam_schedule` 增加可空 `backgr
 
 ## 查询
 
+### 按时间区间下载 Excel（V318）
+
+工作台顶部“下载 Excel”打开日期区间选择，默认所查看月份的首日到末日，可跨月、跨年。
+开始和结束日期必填且包含首尾，结束日期不得早于开始日期。沿用当前发布状态筛选，
+合并单日与多日考期：单日日期在区间内，多日日期与区间相交即纳入；每条考期一行，
+按原始开始日期、内部主键稳定排序。跨区间记录保留完整起止日期，不裁剪、不按天重复。
+
+复用 `POST /zsjos/export-task`，新增类型 `exam_calendar`；`filterJson` 包含
+`rangeStart`、`rangeEnd`（`YYYY-MM-DD`）及可选 `recordStatus`（`DRAFT|PUBLISHED|REVOKED`）。
+服务端校验区间后创建异步任务；用户从“导出任务”查看生成状态、失败原因并下载 `.xlsx`。
+导出字段为考试名称、时间类型、开始日期、结束日期、发布状态、备注，以及统一导出设施的
+任务编号、导出人、导出时间。单日开始/结束日期相同；名称使用现有历史快照投影，备注保留换行。
+附件文件、附件下载地址和共享富文本日历说明不进入此明细表。空结果保留列标题和导出元数据。
+
+页面入口要求 `zsjos:exam-calendar:query`、`zsjos:exam-calendar:export` 和
+`zsjos:export:query`。创建、生成、下载沿用导出设施的当前导出权限检查及创建者归属检查，
+新 provider 同时复核考期查看权限；Service 独立验证查看和导出权限。查询沿用租户、逻辑删除
+及考期可见性：普通查看者只导出已发布记录，管理者另含草稿和撤销窗口内未领取重新编辑的记录。
+仅拥有导出权限不会获得管理者数据。Workbench 提供发起入口；Admin 与 Workbench 的既有
+导出任务页均识别“考期日历”类型，Admin 不新增考期页面。
+
+V318 在现有考期页面（73610）及两本版本账本存在后执行，仅新增按钮 73615“导出考期”，
+不操作角色授权、不改变业务数据。当前 main 基线已将该脚本从 V319 前移为 V318；曾执行旧编号的数据库（包括更早的 V320）须先单独审查版本身份及校验和映射，不可直接重放或覆盖历史账本。先执行迁移，再部署后端与前端；管理员通过系统角色管理
+配置导出及导出任务查看权限。重复执行保留管理员名称、启停、排序及已有账本校验值。
+菜单身份冲突或父页面缺失时失败，菜单和账本写入在同一事务内，失败不登记成功；
+修正前置条件后可重试。回退时可在菜单管理停用按钮，已生成文件沿用导出过期机制。
+本地受控验证：`python script/sql/mysql/tools/test_exam_export_permission.py`；
+`--apply-dev` 在校验通过和本地目标预检后仅追加该按钮及版本记录。
+
+验证入口：`ExamScheduleExportTest`、`ExamCalendarExportTypeProviderTest`、
+`frontend/workbench/test/exam-export-browser.py`。浏览器夹具与内存数据库测试不代表真实登录、
+后台导出调度及 Infra 文件下载链路已完成线上验收。
+
 - `GET /zsjos/exam-calendar/page`：单日考期分页。参数为 `pageNo`、`pageSize`、可选
   `rangeStart`、`rangeEnd`、`categoryId`、`displayStatus`。
 - `GET /zsjos/exam-calendar/multi-day`：多日考期分页。支持日期窗口相交和分类筛选。

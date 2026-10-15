@@ -51,6 +51,14 @@ public class ContentReviewController {
 
     @Resource private ContentReviewBatchService batchService;
 
+    @GetMapping("/account-profile-preview")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
+    public CommonResult<List<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewAccountProfileRespVO>> accountProfilePreview(
+            @RequestParam(required = false) Long batchId, @RequestParam(required = false) Long studentPersonId,
+            @RequestParam(required = false) List<Long> accountIds) {
+        return success(batchService.previewAccounts(batchId, studentPersonId, accountIds, getLoginUserId()));
+    }
+
     @PostMapping("/batch/create")
     @Operation(summary = "创建生产内容审核批次")
     @PreAuthorize("@ss.hasPermission('zsjos:content-review:create')")

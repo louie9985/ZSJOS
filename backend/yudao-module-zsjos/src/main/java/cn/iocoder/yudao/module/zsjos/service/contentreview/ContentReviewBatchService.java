@@ -102,10 +102,6 @@ public class ContentReviewBatchService {
     private static final int FILE_PREVIEW_SECONDS = 3600;
     /** SIMPLE 设计器为发起人生成的提交节点编码，由引擎自动通过，不是业务审批节点。 */
     private static final String SIMPLE_SUBMISSION_TASK_KEY = "StartUserNode";
-    private static final int ACCOUNT_PROFILE_TEXT_MAX = 200;
-    private static final String DICT_ACCOUNT_PLATFORM = "zsjos_account_platform";
-    private static final String DICT_ACCOUNT_CURRENT_STATUS = "zsjos_media_account_current_status";
-    private static final String DICT_ACCOUNT_STAGE = "zsjos_media_account_stage";
 
     @Resource private ContentReviewBatchMapper batchMapper;
     @Resource private ContentReviewObjectPermissionProvider reviewPermissionProvider;
@@ -479,64 +475,45 @@ public class ContentReviewBatchService {
         return JsonUtils.toJsonString(references);
     }
 
-    private Map<String, Object> reviewAccountSnapshot(MediaAccountDO account, Map<String, Object> sourceContext,
-                                                       Map<String, Object> overrides) {
-        if (sourceContext == null) return draftAccountSnapshot(account, overrides);
-        // A revision inherits server-stored context, never today's account or client-supplied labels.
-        Map<String, Object> snapshot = new LinkedHashMap<>(objectMapList(sourceContext.get("accountSnapshots")).stream()
-                .filter(row -> Objects.equals(longValue(row.get("id")), account.getId())).findFirst().orElseGet(() -> {
-                    if (sourceContext.get("account") instanceof Map<?, ?> legacy) {
-                        Map<String, Object> old = new LinkedHashMap<>();
-                        legacy.forEach((key, value) -> old.put(String.valueOf(key), value));
-                        if (Objects.equals(longValue(old.get("id")), account.getId())) return old;
-                    }
-                    return Map.of("id", account.getId());
-                }));
-        for (String field : List.of("nickname", "productGoal", "productFormLabel", "publishFrequency", "bottleneckLabel")) {
-            applyText(snapshot, overrides, field);
+    public List<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewAccountProfileRespVO> previewAccounts(
+            Long batchId, Long studentPersonId, List<Long> accountIds, Long userId) {
+        if (batchId != null) {
+            if (!reviewPermissionProvider.hasPermission(batchId, "submit", userId))
+                throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
+            ContentReviewBatchDO batch = requireBatch(batchId);
+            if (!Set.of(BATCH_DRAFT, BATCH_NEED_MODIFY, BATCH_REJECTED).contains(batch.getStatus()))
+                throw exception(CONTENT_BATCH_STAGE_CHANGED, "读取提交资料");
+            studentPersonId = batch.getStudentPersonId();
+            accountIds = parseLongList(batch.getAccountIdsJson());
+            if (accountIds.isEmpty()) accountIds = List.of(batch.getAccountId());
         }
-        return snapshot;
+        if (accountIds == null || accountIds.isEmpty() || accountIds.size() > 20 || accountIds.stream().anyMatch(Objects::isNull))
+            throw field(CONTENT_ACCOUNT_SELECTION_INVALID, "accountIds");
+        List<MediaAccountDO> accounts = new ArrayList<>();
+        for (Long id : accountIds.stream().distinct().toList()) {
+            MediaAccountDO account = accountMapper.selectById(id);
+            if (account == null || !Objects.equals(account.getTenantId(), tenantId())
+                    || !Objects.equals(account.getOwnerOperatorUserId(), userId)
+                    || studentPersonId == null || !Objects.equals(account.getStudentPersonId(), studentPersonId))
+                throw field(CONTENT_ACCOUNT_SCOPE_CHANGED, "accountIds");
+            accounts.add(account);
+        }
+        return accounts.stream().map(account -> JsonUtils.parseObject(JsonUtils.toJsonString(draftAccountSnapshot(account, null)),
+                cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewAccountProfileRespVO.class)).toList();
     }
 
-    private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> overrides) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("id", account.getId());
-        snapshot.put("accountNo", account.getAccountNo());
-        snapshot.put("platformValue", account.getPlatformValue());
-        snapshot.put("platformLabel", account.getPlatformLabelSnapshot());
-        snapshot.put("platformAccountId", account.getPlatformAccountId());
-        snapshot.put("nickname", account.getNickname());
-        snapshot.put("ownerOperatorUserId", account.getOwnerOperatorUserId());
-        snapshot.put("directorUserId", account.getDirectorUserId());
-        // 责任运营姓名由服务端按归属解析，不接受前端传入：归属是权限字段，不能由客户端改写。
-        Set<Long> profileUserIds = java.util.stream.Stream.of(
-                        account.getOwnerOperatorUserId(), account.getDirectorUserId())
+    private Map<String, Object> reviewAccountSnapshot(MediaAccountDO account, Map<String, Object> sourceContext,
+                                                       Map<String, Object> overrides) {
+        return draftAccountSnapshot(account, null);
+    }
+
+    private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> ignored) {
+        Map<String, Object> snapshot = ContentReviewAccountProfile.snapshot(account);
+        Set<Long> ids = java.util.stream.Stream.of(account.getOwnerOperatorUserId(), account.getDirectorUserId())
                 .filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<Long, AdminUserRespDTO> profileUsers = profileUserIds.isEmpty()
-                ? Map.of() : adminUserApi.getUserMap(profileUserIds);
-        // getUserMap 可能返回不可变 Map，get(null) 会抛 NPE；账号未绑定编导时 id 就是 null。
-        snapshot.put("operatorName", nickname(profileUsers, account.getOwnerOperatorUserId()));
-        snapshot.put("directorName", nickname(profileUsers, account.getDirectorUserId()));
-        snapshot.put("currentStatusValue", account.getCurrentStatusValue());
-        snapshot.put("currentStatusLabel", account.getCurrentStatusLabelSnapshot());
-        snapshot.put("sStage", account.getSStage());
-        snapshot.put("sStageLabel", account.getSStageLabelSnapshot());
-        snapshot.put("primaryProblems", parseJsonValue(account.getPrimaryProblemsJson()));
-        // 运营在发起审核时补充的账号档案。这些是纯文本描述、没有字典约束，接受填写；
-        // 身份、归属和编导字段仍由服务端持有，客户端无法伪造历史快照。
-        applyText(snapshot, overrides, "productGoal");
-        applyText(snapshot, overrides, "productFormLabel");
-        applyText(snapshot, overrides, "publishFrequency");
-        applyText(snapshot, overrides, "bottleneckLabel");
-        applyText(snapshot, overrides, "nickname");
-        snapshot.putAll(ContentReviewAccountProfile.read(account));
-        // 字典字段只接受 value，label 一律由服务端按字典解析后写入，避免客户端伪造展示文案。
-        applyDictionary(snapshot, overrides, "platformValue", "platformLabel", DICT_ACCOUNT_PLATFORM,
-                account.getPlatformValue());
-        applyDictionary(snapshot, overrides, "stageValue", "sStageLabel", DICT_ACCOUNT_STAGE,
-                account.getSStage());
-        applyDictionary(snapshot, overrides, "currentStatusValue", "currentStatusLabel",
-                DICT_ACCOUNT_CURRENT_STATUS, account.getCurrentStatusValue());
+        Map<Long, AdminUserRespDTO> users = ids.isEmpty() ? Map.of() : adminUserApi.getUserMap(ids);
+        snapshot.put("operatorName", nickname(users, account.getOwnerOperatorUserId()));
+        snapshot.put("directorName", nickname(users, account.getDirectorUserId()));
         return snapshot;
     }
 
@@ -544,36 +521,6 @@ public class ContentReviewBatchService {
         if (userId == null) return null;
         AdminUserRespDTO user = users.get(userId);
         return user == null ? null : user.getNickname();
-    }
-
-    /** 覆盖纯文本档案字段；空白视为未填写，保留服务端原值。 */
-    private void applyText(Map<String, Object> snapshot, Map<String, Object> overrides, String key) {
-        if (overrides == null) return;
-        String value = trimToNull(text(overrides.get(key)));
-        if (value == null) return;
-        if (value.length() > ACCOUNT_PROFILE_TEXT_MAX) throw exception(CONTENT_TEXT_TOO_LONG, "账号资料", ACCOUNT_PROFILE_TEXT_MAX);
-        snapshot.put(key, value);
-    }
-
-    /**
-     * 覆盖字典字段：只接受字典内的 value，并按字典解析 label 一起写入快照。
-     * 未填写时沿用服务端原值对应的 label，保证快照始终自带可展示文案。
-     */
-    private void applyDictionary(Map<String, Object> snapshot, Map<String, Object> overrides,
-                                 String valueKey, String labelKey, String dictType, String serverValue) {
-        Map<String, String> labels = dictionaryLabels(dictType);
-        String value = overrides == null ? null : trimToNull(text(overrides.get(valueKey)));
-        if (value == null) {
-            // 服务端原值也要补上 label，前端不必再查字典。
-            if (serverValue != null && labels.containsKey(serverValue)) {
-                snapshot.put(valueKey, serverValue);
-                snapshot.put(labelKey, labels.get(serverValue));
-            }
-            return;
-        }
-        if (!labels.containsKey(value)) throw exception(CONTENT_DICTIONARY_INVALID, "账号资料");
-        snapshot.put(valueKey, value);
-        snapshot.put(labelKey, labels.get(value));
     }
 
     private Map<String, String> dictionaryLabels(String type) {
@@ -645,14 +592,14 @@ public class ContentReviewBatchService {
         if (draftContext.containsKey("studentPersonId")) frozenContext.put("studentPersonId", draftContext.get("studentPersonId"));
         if (draftContext.containsKey("accountIds")) frozenContext.put("accountIds", draftContext.get("accountIds"));
         // Each new round freezes the current profile; existing rounds remain immutable.
-        List<Map<String, Object>> draftAccounts = objectMapList(draftContext.get("accountSnapshots"));
-        frozenContext.put("accountSnapshots", submitAccounts.stream().map(account -> {
-            Map<String, Object> snapshot = new LinkedHashMap<>(draftAccounts.stream()
-                    .filter(row -> Objects.equals(longValue(row.get("id")), account.getId()))
-                    .findFirst().orElseGet(() -> draftAccountSnapshot(account, null)));
-            ContentReviewAccountProfile.refresh(snapshot, account);
-            return snapshot;
-        }).toList());
+        frozenContext.put("accountSnapshots", submitAccounts.stream()
+                .map(account -> draftAccountSnapshot(account, null)).toList());
+        submitAccounts.stream().filter(account -> Objects.equals(account.getId(), batch.getAccountId()))
+                .findFirst().ifPresent(account -> {
+                    Map<String, Object> primary = new LinkedHashMap<>((Map<String, Object>) frozenContext.get("account"));
+                    primary.putAll(draftAccountSnapshot(account, null));
+                    frozenContext.put("account", primary);
+                });
         String contextSnapshotJson = JsonUtils.toJsonString(frozenContext);
         LocalDateTime now = LocalDateTime.now();
         Map<Long, ContentVersionDO> lockedVersionMap = versions.stream()

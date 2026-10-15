@@ -103,7 +103,7 @@
                 v-for="item in getIntDictOptions(DICT_TYPE.HRM_EMPLOYEE_STATUS).filter((item) =>
                   row.type === HrmEmployeeType.FORMAL
                     ? [1, 2].includes(Number(item.value))
-                    : [3, 4, 5, 6, 7, 8].includes(Number(item.value))
+                    : [3, 4, 5, 6, 7, 8, 9].includes(Number(item.value))
                 )"
                 :key="item.value"
                 :label="item.label"

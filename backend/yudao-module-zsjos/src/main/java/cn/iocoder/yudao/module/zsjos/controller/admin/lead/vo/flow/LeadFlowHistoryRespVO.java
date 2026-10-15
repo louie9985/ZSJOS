@@ -21,7 +21,16 @@ public class LeadFlowHistoryRespVO {
     private String assignmentStatusAfter;
     private String reason;
     private String remark;
+    private Integer snapshotVersion;
+    private String operationResult;
+    private String relatedType;
+    private Long relatedId;
+    private String relatedNo;
+    private List<FieldChangeVO> changes = List.of();
     private List<AttachmentVO> attachments = List.of();
+
+    public record FieldValueVO(String state, String text) {}
+    public record FieldChangeVO(String field, String label, FieldValueVO before, FieldValueVO after) {}
 
     @Data
     public static class AttachmentVO {
