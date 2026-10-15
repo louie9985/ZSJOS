@@ -364,14 +364,3 @@ V083 grants `content_director` only My Students. Runtime route candidates use th
 - V188 初始授权从既有菜单关系继承，不在运行时代码检查角色名：拥有报名履约管理页 73001 的
   角色继承班级管理能力，拥有原“我的学员”页 73020 的角色继承“我的班级”和调班申请能力。
   73020 变为隐藏但可路由的学员详情深链，现有 `serviceRelationId` 操作契约保持不变。
-
-
-## 交付主管团队管理（2026-10-14）
-
-`delivery_manager` 的目标职责扩展为所管部门及子部门客资、下属员工、团队订单、主管确认、申诉主管审核、无效改判、投诉、业绩与目标管理。部门关系、对象状态、BPM 指派独立累计校验；角色名不参与运行授权。
-
-配置既有查询页、详情记录读取权限及 `subordinate-sales:lead-transfer/lead-recycle/lead-restore/lead-overturn-valid`、`lead:appeal:query/review-sales-manager`、`lead-complaint:handle`、`sales-order:query-management/supervisor-confirm`、`sales-performance:query/self/department/detail`、`sales-performance-target:query/update/configure`（均有 `zsjos:` 前缀）。不配置 `lead:query-all`、`subordinate-sales:account-status` 或销售池操作；其余交付职责授权保留。通过 System 角色管理维护，迁移不自动授权。
-
-
-## 交付业绩独立权限修订（2026-10-15）
-本节取代前述交付主管配置销售业绩权限的方案。交付主管配置 delivery-performance 的 query/self/department/detail 和 delivery-performance-target 的 query/update/configure；移除 sales-performance 相关授权，中心全量读取不默认授予。其他已确认主管职责保留，账号启停仍不授予。

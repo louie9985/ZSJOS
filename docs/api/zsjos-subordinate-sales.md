@@ -1,4 +1,4 @@
-# 下属员工 API
+# 下属销售 API
 
 Base path: `/admin-api/zsjos/subordinate-sales`. All endpoints require authentication, current tenant context, the listed feature permission, and a current System department-leader relationship covering the target sales department or one of its ancestors.
 
@@ -86,20 +86,3 @@ Manual public-sea release preserves Lead owner, main status, and assignment stat
 
 This state-guidance behavior uses existing Lead columns and the supervisor permissions delivered by
 V139/V140/V142. It requires no new SQL migration, menu grant, dictionary entry, or data repair.
-
-
-## 交付团队主管能力（2026-10-14）
-
-技术路径 `/zsjos/subordinate-sales` 和原权限标识保持兼容。列表及单员工读取按当前 System 部门负责人及子部门关系覆盖全部员工，包含停用账号；租户全量读取管理员可以读取全部员工。接单、新手池等写操作仍只作用于实际销售岗位成员。
-
-响应增加 `deptId`、`departmentName`、`postNames`、`salesDispatchSupported`、`educationOwnershipSupported`、`orderCreationSupported`。前端根据服务端能力隐藏销售专属操作。账号状态继续展示，交付主管不配置账号启停权限。
-
-`GET /transfer-candidates?leadId=` 按客资归属返回团队内候选，省略参数保留原销售候选契约。教育归属客资仅转派给团队内启用且具备教育自拓配置权限的合格员工，保留教育身份、同步商机归属并沿用现有任务及通知。回收历史写入原负责人身份快照，回收后转派使用该快照。教育客资拒绝进入销售抢单池、公海。历史记录不批量改写。
-
-投诉列表在分页前按所管员工和客资当前负责人限定，投诉处理同时校验投诉记录关联员工或客资当前负责人范围，租户全量读取管理员保留全量处理。幂等重放校验目标及原处理人。
-
-菜单改名由 V318 提供；迁移仅修改元数据，不写角色菜单关系。管理员通过 System 角色管理配置权限。
-
-
-## Review 修复（2026-10-15）
-批量候选 `GET /batch-transfer-candidates?leadIds=` 对全部 1—200 个客资授权后返回交集，排除当前/回收原负责人。教育受让资格要求有效内部人员及跟进、判定、成交权限，不要求自拓创建。旧回收身份仅从同一归属周期可靠快照解析，未知身份拒绝，不默认转销售。员工客资查询支持 `recycledOnly=true`，按原负责人展示回收待处理；单条和批量重试先验证指纹并重放，首次执行再做状态及目标校验。投诉通过 SQL EXISTS 在分页前限定关系范围。

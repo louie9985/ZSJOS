@@ -2808,12 +2808,6 @@ export type SubordinateCategoryCount = {
   configured: boolean;
 };
 export type SubordinateSales = {
-  deptId?: number;
-  departmentName?: string;
-  postNames?: string[];
-  salesDispatchSupported?: boolean;
-  educationOwnershipSupported?: boolean;
-  orderCreationSupported?: boolean;
   userId: number;
   name: string;
   avatar?: string;
@@ -5591,7 +5585,6 @@ export const api = {
       pageSize: number;
       keyword?: string;
       status?: string;
-      recycledOnly?: boolean;
       advancedFilter?: AdvancedFilterGroup;
     },
   ) =>
@@ -5616,12 +5609,10 @@ export const api = {
         params,
       }),
     ),
-  subordinateTransferCandidates: async (leadId?: number) =>
+  subordinateTransferCandidates: async () =>
     unwrap<AssignmentUser[]>(
-      await http.get("/zsjos/subordinate-sales/transfer-candidates", { params: { leadId } }),
+      await http.get("/zsjos/subordinate-sales/transfer-candidates"),
     ),
-  subordinateBatchTransferCandidates: async (leadIds: number[]) => unwrap<AssignmentUser[]>(
-    await http.get('/zsjos/subordinate-sales/batch-transfer-candidates', { params: { leadIds: leadIds.join(',') } })),
   updateSubordinateAccountStatus: async (
     salesUserId: number,
     status: number,

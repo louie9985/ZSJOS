@@ -1,15 +1,13 @@
-import { usePerformanceModule } from './PerformanceModule'
 import { Alert, Button, Collapse, Drawer, Empty, Input, Select, Space, Tag, Typography } from 'antd'
 import { useRef, useState } from 'react'
 import BusinessTable from '../../components/BusinessTable'
-import { money, type ConversionOption, type OrderDetailEntry, type OrderDetailQuery, type OrderDetailRow } from '../../services/salesPerformance'
+import { money, performanceApi, type ConversionOption, type OrderDetailEntry, type OrderDetailQuery, type OrderDetailRow } from '../../services/salesPerformance'
 import { Resource, useResource } from './PerformanceShared'
 import ConversionRecordDetail, { type ConversionSelection } from './ConversionRecordDetail'
 
 export default function OrderDetailDrawer({ entry, title, permissions, onClose, onDenied }: {
  entry: OrderDetailEntry; title: string; permissions: string[]; onClose: () => void; onDenied: (error: unknown) => void
 }) {
- const {api: performanceApi} = usePerformanceModule()
  const [filters, setFilters] = useState<OrderDetailQuery>(entry.query), [page, setPage] = useState(1)
  const [keyword, setKeyword] = useState(''), [selection, setSelection] = useState<ConversionSelection>()
  const listRef = useRef<HTMLDivElement>(null)

@@ -1,4 +1,3 @@
-import { DeliveryPerformanceModule } from '../pages/performance/PerformanceModule'
 import PointsRedemptionPage from '../pages/PointsRedemptionPage'
 import PointsPackagePage from '../pages/PointsPackagePage'
 import { POINTS_ROUTE, POINTS_PACKAGE_ROUTE } from '../services/pointsRedemptionApi'
@@ -115,8 +114,6 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE) return <DeliveryPerformanceModule><SalesPerformancePage permissions={permissions}/></DeliveryPerformanceModule>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE_TARGET) return <DeliveryPerformanceModule><SalesPerformanceTargetPage permissions={permissions}/></DeliveryPerformanceModule>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE) return <SalesPerformancePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE_TARGET) return <SalesPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_LEAD_ANALYSIS) return <MediaLeadAnalysisPage permissions={permissions}/>

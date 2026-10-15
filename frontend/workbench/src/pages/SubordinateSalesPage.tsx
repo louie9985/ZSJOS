@@ -173,7 +173,7 @@ function ManagedLeadDetail({ leadId, onBack, onChanged }: { leadId: number; onBa
 
   return <div className="subordinate-lead-detail">
     <div className="subordinate-detail-heading">
-      <Button icon={<ArrowLeftOutlined/>} onClick={onBack}>返回员工详情</Button>
+      <Button icon={<ArrowLeftOutlined/>} onClick={onBack}>返回销售详情</Button>
       <div><Typography.Title level={4}>{lead?.submittedName || '客资详情'}</Typography.Title><Typography.Text type="secondary">{lead?.leadNo}</Typography.Text></div>
     </div>
     {loading ? <Skeleton active paragraph={{ rows: 10 }}/>
@@ -201,7 +201,6 @@ function SalesDetail({
   onReasonAction: (action: ReasonAction) => void;
 }) {
   const [tab, setTab] = useState("overview");
-  const [recycledOnly, setRecycledOnly] = useState(false);
   const [leads, setLeads] = useState<ManagedLead[]>([]);
   const [leadTotal, setLeadTotal] = useState(0);
   const [leadPage, setLeadPage] = useState(1);
@@ -249,7 +248,6 @@ function SalesDetail({
       const page = await api.subordinateSalesLeads(sales.userId, {
         pageNo: leadPage,
         pageSize: PAGE_SIZE,
-        recycledOnly,
         keyword: leadKeyword || undefined,
         advancedFilter,
       });
@@ -268,7 +266,7 @@ function SalesDetail({
     } finally {
       setLoading(false);
     }
-  }, [advancedFilter, leadKeyword, leadPage, recycledOnly, sales.userId]);
+  }, [advancedFilter, leadKeyword, leadPage, sales.userId]);
   const loadTasks = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -318,10 +316,7 @@ function SalesDetail({
     setBatchOpen(true);
     if (type !== "transfer" && type !== "publicSea") return;
     try {
-      setCandidates([]);
-      setCandidates(type === 'transfer'
-        ? await api.subordinateBatchTransferCandidates(selected.map(Number))
-        : await api.subordinateTransferCandidates());
+      setCandidates(await api.subordinateTransferCandidates());
     } catch (loadError) {
       message.error(
         loadError instanceof Error ? loadError.message : "销售候选加载失败",
@@ -493,7 +488,7 @@ function SalesDetail({
               onReasonAction({ type: "account", sales, value })
             }
           />
-          {sales.salesDispatchSupported !== false && <><span>接单</span>
+          <span>接单</span>
           <Switch
             checkedChildren="开启"
             unCheckedChildren="关闭"
@@ -505,7 +500,6 @@ function SalesDetail({
               onReasonAction({ type: "dispatch", sales, value })
             }
           />
-          </>}
         </Space>
       </div>
       <Tabs
@@ -537,7 +531,7 @@ function SalesDetail({
                         <span className="subordinate-field-label">页面状态</span>
                         <span className="subordinate-field-value">{sales.presence === 'online' ? '在线' : '离线'}</span>
                       </div>
-                      {sales.salesDispatchSupported !== false && <><div className="subordinate-profile-row">
+                      <div className="subordinate-profile-row">
                         <span className="subordinate-field-label">接单状态</span>
                         <span className="subordinate-field-value">{sales.accepting ? '开启' : '关闭'}</span>
                       </div>
@@ -562,11 +556,6 @@ function SalesDetail({
                             }}>配置</Button>
                           )}
                         </span>
-                      </div>
-                      </>}
-                      <div className="subordinate-profile-row">
-                        <span className="subordinate-field-label">部门 / 岗位</span>
-                        <span>{[sales.departmentName, ...(sales.postNames ?? [])].filter(Boolean).join(' · ') || '—'}</span>
                       </div>
                       <div className="subordinate-profile-row">
                         <span className="subordinate-field-label">今日跟进状态</span>
@@ -593,12 +582,11 @@ function SalesDetail({
             label: "名下客资",
             children: (
               <>
-                <Space><Button type={!recycledOnly ? 'primary' : 'default'} onClick={() => { setRecycledOnly(false); setLeadPage(1); setSelected([]); setSelectedLeadMap(new Map()); }}>名下客资</Button><Button type={recycledOnly ? 'primary' : 'default'} onClick={() => { setRecycledOnly(true); setLeadPage(1); setSelected([]); setSelectedLeadMap(new Map()); }}>回收待处理</Button></Space>
                 <AdvancedFilterToolbar scene="lead" pageKey="subordinate_sales_leads" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
                   <Space wrap>
-                    {batchActions.filter(action => sales.salesDispatchSupported !== false || !['claimPool', 'publicSea'].includes(action.type)).map(action => {
+                    {batchActions.map(action => {
                       const selection = eligibility(action.type);
                       const hasPermission = permissions.includes(action.permission);
                       const disabled = !hasPermission || !selection.allowed;
@@ -715,8 +703,8 @@ function SalesDetail({
           {batchType === "transfer" ? (
             <Form.Item
               name="targetUserId"
-              label="目标员工"
-              rules={[{ required: true, message: "请选择目标员工" }]}
+              label="目标销售"
+              rules={[{ required: true, message: "请选择目标销售" }]}
             >
               <EmployeeSelect
                 showSearch
@@ -810,7 +798,7 @@ export default function SubordinateSalesPage({
     } catch (loadError) {
       if (requestVersion !== requestVersionRef.current) return;
       setError(
-        loadError instanceof Error ? loadError.message : "下属员工加载失败",
+        loadError instanceof Error ? loadError.message : "下属销售加载失败",
       );
     } finally {
       if (requestVersion === requestVersionRef.current) setLoading(false);
@@ -841,7 +829,7 @@ export default function SubordinateSalesPage({
       setLoadedPage(nextPage);
     } catch (loadError) {
       if (requestVersion !== requestVersionRef.current) return;
-      setLoadMoreError(loadError instanceof Error ? loadError.message : "更多下属员工加载失败");
+      setLoadMoreError(loadError instanceof Error ? loadError.message : "更多下属销售加载失败");
     } finally {
       loadingMoreRef.current = false;
       if (requestVersion === requestVersionRef.current) setLoadingMore(false);
@@ -903,7 +891,7 @@ export default function SubordinateSalesPage({
       setSelectedSales(current => current?.userId === userId ? updated : current);
       setRows(current => current.map(row => row.userId === userId ? updated : row));
     } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : "员工详情刷新失败，请重试");
+      setError(refreshError instanceof Error ? refreshError.message : "销售详情刷新失败，请重试");
     }
   };
   const confirmPauseAll = () => {
@@ -1014,7 +1002,7 @@ export default function SubordinateSalesPage({
               )}
               </>
             ) : (
-              <Empty image={<TeamOutlined />} description="暂无下属员工" />
+              <Empty image={<TeamOutlined />} description="暂无下属销售" />
             )}
           </div>
         </aside>

@@ -11,7 +11,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.time.*;
 import java.util.*;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-@PerformanceDomainBoundary("sales")
 @RestController @Validated @RequestMapping("/zsjos/sales-performance-target")
 @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:query')")
 public class SalesPerformanceTargetController {

@@ -43,9 +43,6 @@ class SubordinateSalesServiceImplTest {
     @Mock private BusinessTaskMapper taskMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PostApi postApi;
-    @Mock private cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
-    @Mock private LeadSubmissionIdentityService identityService;
-    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
     @Mock private NewcomerPoolService newcomerPoolService;
 
     @Test
@@ -160,18 +157,6 @@ class SubordinateSalesServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(assignmentHistoryMapper, eventMapper, followUpRecordMapper, opportunityFollowUpRecordMapper);
     }
 
-    @Test
-    void deliveryAndDisabledEmployeesAreReadableWithoutSalesPost() {
-        var planner = subordinate(20L, 0, 7L);
-        var disabled = subordinate(30L, 1, 8L);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
-        when(adminUserApi.getUserList(Set.of(20L, 30L))).thenReturn(List.of(planner, disabled));
-        assertEquals(0L, service.getTaskPage(20L, new SubordinateTaskPageReqVO(), 10L).getTotal());
-        assertEquals(0L, service.getTaskPage(30L, new SubordinateTaskPageReqVO(), 10L).getTotal());
-        assertThrows(ServiceException.class, () -> service.getTaskPage(40L, new SubordinateTaskPageReqVO(), 10L));
-        org.mockito.Mockito.verifyNoInteractions(postApi);
-    }
-
     private static cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO task(Long leadId, String status, LocalDateTime dueAt) {
         var task = new cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO();
         task.setBizType("lead"); task.setBizId(leadId); task.setTaskType("lead_first_follow_up");
@@ -186,8 +171,9 @@ class SubordinateSalesServiceImplTest {
     @Test
     void administratorReadsDisabledSalesWithoutGainingBulkPauseAuthority() {
         when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
-        when(adminUserApi.getUserListByStatus(0)).thenReturn(List.of());
-        when(adminUserApi.getUserListByStatus(1)).thenReturn(List.of(subordinate(30L, 1, 5L)));
+        PostRespDTO post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserListByPostIds(Set.of(5L))).thenReturn(List.of(subordinate(30L, 1, 5L)));
         when(taskMapper.selectMyPending(30L)).thenReturn(List.of());
         assertEquals(0L, service.getTaskPage(30L, new SubordinateTaskPageReqVO(), 10L).getTotal());
         assertEquals(0, service.pauseAllDispatch(10L).getTotalCount());
@@ -217,8 +203,6 @@ class SubordinateSalesServiceImplTest {
 
     @Test
     void batchTransferReturnsPartialSuccessPerLead() {
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L));
-        when(leadMapper.selectById(2L)).thenReturn(new LeadDO().setId(2L));
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L)));
         when(leadMapper.selectBatchIds(Set.of(1L, 2L))).thenReturn(List.of(
@@ -264,6 +248,7 @@ class SubordinateSalesServiceImplTest {
         salesPost.setId(5L);
         AdminUserRespDTO subordinate = new AdminUserRespDTO();
         subordinate.setId(20L); subordinate.setPostIds(Set.of(5L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(subordinate));
         when(taskMapper.selectMyPending(20L)).thenReturn(List.of());
         SubordinateTaskPageReqVO request = new SubordinateTaskPageReqVO();
@@ -312,29 +297,6 @@ class SubordinateSalesServiceImplTest {
     private static LeadAssignmentUserRespVO sales(Long id) {
         LeadAssignmentUserRespVO result = new LeadAssignmentUserRespVO();
         result.setId(id); result.setNickname("销售" + id); return result;
-    }
-    @Test void mixedOwnershipCandidatesUseIntersectionAndExcludeBothOwners() {
-        Set<Long> managed=Set.of(20L,30L,40L,50L);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(managed);
-        var education=new LeadDO().setId(1L).setOwnerUserId(20L).setStatus("submitted").setAssignmentStatus("owned");
-        var salesLead=new LeadDO().setId(2L).setOwnerUserId(30L).setStatus("submitted").setAssignmentStatus("owned");
-        when(leadMapper.selectBatchIds(List.of(1L,2L))).thenReturn(List.of(education,salesLead));
-        var employees=List.of(subordinate(20L,0,7L),subordinate(30L,0,5L),subordinate(40L,0,7L),subordinate(50L,0,5L));
-        when(adminUserApi.getUserList(managed)).thenReturn(employees);
-        when(teamTransferPolicy.eligibleTargets(employees)).thenReturn(Set.of(20L,40L));
-        when(teamTransferPolicy.isEducation(education)).thenReturn(true);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L),sales(40L),sales(50L)));
-        assertEquals(List.of(40L),service.getBatchTransferCandidates(10L,List.of(1L,2L)).stream().map(LeadAssignmentUserRespVO::getId).toList());
-        verify(leadMapper).selectBatchIds(List.of(1L,2L));
-        verify(adminUserApi).getUserList(managed);
-    }
-    @Test void completedBatchReplaysWithoutRecheckingChangedOwnership() {
-        var request=new SubordinateBatchLeadActionReqVO();request.setLeadIds(List.of(1L));request.setTargetUserId(30L);request.setReason("转派");request.setIdempotencyKey("completed");
-        var result=new SubordinateBatchResultVO();result.setSuccessCount(1);result.setFailureCount(0);result.setItems(List.of());
-        when(commandService.replayBatch(org.mockito.ArgumentMatchers.eq("batch-transfer"),org.mockito.ArgumentMatchers.eq(10L),org.mockito.ArgumentMatchers.eq("completed"),org.mockito.ArgumentMatchers.anyString())).thenReturn(result);
-        assertEquals(result,service.batchLeadAction("transfer",request,10L));
-        org.mockito.Mockito.verifyNoInteractions(leadMapper,assignmentService,teamTransferPolicy);
-        verify(commandService,never()).validateManagedLeads(org.mockito.ArgumentMatchers.anyCollection(),org.mockito.ArgumentMatchers.anyLong());
     }
 
     private static AdminUserRespDTO subordinate(Long id, int status, Long postId) {

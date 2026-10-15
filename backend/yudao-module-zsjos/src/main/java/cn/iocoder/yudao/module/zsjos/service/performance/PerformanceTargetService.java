@@ -27,7 +27,7 @@ public class PerformanceTargetService {
   private final Map<String,Target> resolved=new HashMap<>();
   private Batch(Collection<Period> periods,Collection<Long> extraUsers) {
    var dates=periods.stream().map(Period::start).toList();
-   rows=dates.isEmpty()?List.of():mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getBusinessDomain,PerformanceDomain.current())
+   rows=dates.isEmpty()?List.of():mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>()
      .between(PerformanceTargetDO::getPeriodStart,Collections.min(dates),Collections.max(dates))
      .in(PerformanceTargetDO::getPeriodType,periods.stream().map(Period::type).distinct().toList()));
    organizations=access.orgs();sales=access.sales();visible=access.targetVisibility();
@@ -58,7 +58,7 @@ public class PerformanceTargetService {
  }
  public boolean readableIndividual(String type,Long id,String period,LocalDate start){if(!"USER".equals(type))return true;return rows(period,start).stream().filter(x->type.equals(x.getScopeType())&&id.equals(x.getScopeId())).allMatch(x->access.departmentAllowed(x.getDeptId()));}
  public List<PerformanceTargetDO> rows(String period,LocalDate start) {
-  return mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getBusinessDomain,PerformanceDomain.current()).eq(PerformanceTargetDO::getPeriodType,period).eq(PerformanceTargetDO::getPeriodStart,start));
+  return mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getPeriodType,period).eq(PerformanceTargetDO::getPeriodStart,start));
  }
  public Target resolve(String type,Long id,String period,LocalDate start) {
   if("SELF".equals(type))type="USER";
@@ -116,12 +116,12 @@ public class PerformanceTargetService {
    if(!req.isRestoreAutomatic()&&(req.getFloorAmount()==null||req.getSprintAmount()==null||req.getSprintAmount().compareTo(req.getFloorAmount())<0))throw PerformanceAccess.invalid("冲刺目标不得低于保底目标");
   }
   for(var req:batch.getItems()) {
-   var old=mapper.selectOne(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getBusinessDomain,PerformanceDomain.current()).eq(PerformanceTargetDO::getScopeType,req.getScopeType()).eq(PerformanceTargetDO::getScopeId,req.getScopeId()).eq(PerformanceTargetDO::getPeriodType,req.getPeriodType()).eq(PerformanceTargetDO::getPeriodStart,req.getPeriodStart()).last("FOR UPDATE"));
+   var old=mapper.selectOne(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getScopeType,req.getScopeType()).eq(PerformanceTargetDO::getScopeId,req.getScopeId()).eq(PerformanceTargetDO::getPeriodType,req.getPeriodType()).eq(PerformanceTargetDO::getPeriodStart,req.getPeriodStart()).last("FOR UPDATE"));
    if(old!=null&&!Objects.equals(old.getVersion(),req.getVersion())||old==null&&req.getVersion()!=null)throw PerformanceAccess.invalid("目标已被修改，请刷新后重试");
    if(old!=null&&!access.commandDepartmentAllowed(old.getDeptId()))throw PerformanceAccess.denied();
    String before=old==null?null:JsonUtils.toJsonString(old);
    var row=old==null?new PerformanceTargetDO():old;
-   row.setBusinessDomain(PerformanceDomain.current());row.setScopeType(req.getScopeType());row.setScopeId(req.getScopeId());row.setPeriodType(req.getPeriodType());row.setPeriodStart(req.getPeriodStart());
+   row.setScopeType(req.getScopeType());row.setScopeId(req.getScopeId());row.setPeriodType(req.getPeriodType());row.setPeriodStart(req.getPeriodStart());
    if(old==null){Long dept="USER".equals(req.getScopeType())?access.user(req.getScopeId()).getDeptId():req.getScopeId();row.setDeptId(dept);var mapping=access.mapping(dept);row.setCenterId(mapping==null?null:mapping.getCenterId());}
    row.setManual(!req.isRestoreAutomatic());row.setFloorAmount(req.isRestoreAutomatic()?null:req.getFloorAmount());row.setSprintAmount(req.isRestoreAutomatic()?null:req.getSprintAmount());row.setReason(req.getReason().trim());row.setVersion(old==null?0:old.getVersion()+1);
    if(old==null)mapper.insert(row);else mapper.updateById(row);

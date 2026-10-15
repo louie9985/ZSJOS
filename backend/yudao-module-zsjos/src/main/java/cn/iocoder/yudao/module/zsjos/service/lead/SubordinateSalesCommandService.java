@@ -34,8 +34,6 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPol
 @Service
 public class SubordinateSalesCommandService {
     @Resource private LeadMapper leadMapper;
-    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
-    @Resource private LeadAssignmentService assignmentService;
     @Resource private SubordinateSalesAuditLogMapper auditLogMapper;
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadObjectPermissionService permissionService;
@@ -59,16 +57,11 @@ public class SubordinateSalesCommandService {
         if (Objects.equals(beforeOwner, targetUserId)) {
             throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         }
-        if (teamTransferPolicy.isEducation(lead)) teamTransferPolicy.requireTarget(lead, targetUserId, managerUserId);
-        else if (!permissionService.getManagedUserIds(managerUserId).contains(targetUserId)
-                || !assignmentService.isEligibleSalesUser(targetUserId)) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             LeadTransferReqVO request = new LeadTransferReqVO();
             request.setSalesUserId(targetUserId); request.setReason(reason); request.setIdempotencyKey(idempotencyKey);
             qualificationService.transfer(leadId, managerUserId, request);
-        } else if (teamTransferPolicy.isEducation(lead)) {
-            dispatchService.transferEducation(leadId, targetUserId, managerUserId, reason, idempotencyKey);
         } else {
             dispatchService.adminTransfer(leadId, targetUserId, managerUserId, reason, idempotencyKey);
         }
@@ -125,7 +118,6 @@ public class SubordinateSalesCommandService {
         if (!beginCommand("release-claim-pool", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
         SupervisorLeadActionPolicy.requireAllowed(RELEASE_CLAIM_POOL, lead);
-        if (teamTransferPolicy.isEducation(lead)) throw exception(SUBORDINATE_LEAD_STATE_INVALID);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
@@ -150,7 +142,6 @@ public class SubordinateSalesCommandService {
         if (!beginCommand("release-public-sea", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
         SupervisorLeadActionPolicy.requireAllowed(RELEASE_PUBLIC_SEA, lead);
-        if (teamTransferPolicy.isEducation(lead)) throw exception(SUBORDINATE_LEAD_STATE_INVALID);
         agingPoolService.enterManually(leadId, collaboratorUserId, managerUserId, reason,
                 "supervisor-public-sea:" + idempotencyKey);
         addAudit("public_sea_release", managerUserId, collaboratorUserId, leadId,
@@ -160,10 +151,8 @@ public class SubordinateSalesCommandService {
 
     public void validateManagedLeads(Collection<Long> leadIds, Long managerUserId) {
         Set<Long> managed = permissionService.getManagedUserIds(managerUserId);
-        var rows=leadMapper.selectBatchIds(new java.util.LinkedHashSet<>(leadIds)).stream()
-                .collect(java.util.stream.Collectors.toMap(LeadDO::getId,java.util.function.Function.identity()));
         for (Long leadId : new java.util.LinkedHashSet<>(leadIds)) {
-            LeadDO lead = rows.get(leadId);
+            LeadDO lead = leadMapper.selectById(leadId);
             if (lead == null) throw exception(LEAD_NOT_EXISTS);
             Long scopedOwner = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
             if (scopedOwner == null || !managed.contains(scopedOwner)) throw exception(SUBORDINATE_LEAD_OWNER_CHANGED);
@@ -179,10 +168,6 @@ public class SubordinateSalesCommandService {
         if (commandMapper.insertIgnore(TenantContextHolder.getRequiredTenantId(), row) == 1) return null;
         return replay(commandMapper.selectByOperatorAndKey(managerUserId, idempotencyKey),
                 action, fingerprint, SubordinateBatchResultVO.class);
-    }
-    public SubordinateBatchResultVO replayBatch(String action, Long managerUserId, String idempotencyKey, String fingerprint) {
-        SubordinateSalesCommandDO existing = commandMapper.selectByOperatorAndKey(managerUserId,idempotencyKey);
-        return existing == null ? null : replay(existing,action,fingerprint,SubordinateBatchResultVO.class);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)

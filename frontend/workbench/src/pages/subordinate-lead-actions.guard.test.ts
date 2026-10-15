@@ -13,7 +13,7 @@ describe('subordinate Lead supervisor actions', () => {
     expectSourceToContainTokens(detailSource, 'managerMode || supervisorAction')
     expect(detailSource).toContain('api.supervisorRestoreLead')
     expect(detailSource).toContain('api.supervisorReleasePublicSeaLead')
-    expect(detailSource).toContain("api.subordinateTransferCandidates(action === 'transfer' ? lead.id : undefined)")
+    expect(detailSource).toContain('api.subordinateTransferCandidates()')
   })
 
   it('shows batch commands only from their server permission identifiers', () => {
@@ -29,8 +29,6 @@ describe('subordinate Lead supervisor actions', () => {
     expect(pageSource).toContain('title: "分配状态"')
     expect(pageSource).toContain('subordinateAssignmentStatusLabel')
     expect(pageSource).toContain('supervisorLeadSelectionEligibility')
-    expect(pageSource).toContain('subordinateBatchTransferCandidates(selected.map(Number))')
-    expect(pageSource).toContain('回收待处理')
     expect(pageSource).toContain('selection.message')
     expect(pageSource).toContain('preserveSelectedRowKeys: true')
   })

@@ -1,8 +1,8 @@
 <template>
   <WorkbenchListPage
-    title="下属员工"
+    title="下属销售"
     endpoint="/zsjos/subordinate-sales/page"
-    description="下属员工与业绩概览"
+    description="下属销售与业绩概览"
     advanced-scene="subordinate_sales"
     advanced-search-endpoint="/zsjos/subordinate-sales/search-page"
     advanced-placeholder="姓名 / 账号 / 手机号"
@@ -19,7 +19,6 @@
       <el-button
         link
         v-hasPermi="['zsjos:subordinate-sales:dispatch-mode']"
-        v-if="row.salesDispatchSupported !== false"
         @click="changeDispatch(row, reload)"
         >{{ row.accepting ? '暂停接单' : '开启接单' }}</el-button
       >
@@ -165,10 +164,9 @@ const openBatch = async (mode: 'transfer' | 'public-sea') => {
   targetUserId.value = undefined
   reason.value = ''
   batchOpen.value = true
-  candidates.value = []
-  if (mode === 'transfer') {
+  if (mode === 'transfer' && !candidates.value.length) {
     try {
-      candidates.value = await Api.subordinateBatchTransferCandidates(selected.value.map(item => item.id))
+      candidates.value = await Api.subordinateTransferCandidates()
     } catch (error: any) {
       message.error(error?.msg || error?.message || '目标销售加载失败')
     }

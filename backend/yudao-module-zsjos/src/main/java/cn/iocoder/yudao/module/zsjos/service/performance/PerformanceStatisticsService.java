@@ -26,7 +26,7 @@ public class PerformanceStatisticsService {
  private Long tenant(){return TenantContextHolder.getRequiredTenantId();}
  private LocalDateTime now(){return LocalDateTime.now(clock);}
  private PerformanceReportQuery request(Query q,LocalDateTime n) {
-  access.authorize(q,false);var scope=access.reportScope(q);
+  access.authorize(q,false);var scope=access.historicalScope(q);
   var r=new PerformanceReportQuery();r.setTenant(tenant());r.setType(q.getScopeType());r.setId(q.getScopeId());
   r.setAllDepartments(scope.allDepartments());r.setMissingDepartment(scope.missingDepartment());r.setDepartments(scope.departments());
   r.setNow(n);r.setToday(n.toLocalDate().atStartOfDay());r.setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay());return r;
@@ -192,7 +192,7 @@ public class PerformanceStatisticsService {
  public PageResult<Detail> details(Query q){
   if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
   access.authorize(q,false);
-  var scope=access.reportScope(q);
+  var scope=access.historicalScope(q);
   var n=now();
   var request=new PerformanceDetailQuery().setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
     .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());

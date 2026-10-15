@@ -70,7 +70,6 @@ class LeadManagementServiceImplTest {
     @Mock
     private LeadMapper leadMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
-    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
     @Mock
     private LeadIntendedProductMapper intendedProductMapper;
     @Mock

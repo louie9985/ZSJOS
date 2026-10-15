@@ -241,7 +241,6 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                      List<Long> managedOwnerUserIds,
                                                      LeadInboxFilterQuery inboxFilter, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
-                .eqIfPresent(LeadDO::getRecycleSourceOwnerUserId, reqVO.getRecycleSourceOwnerUserId())
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
                 .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())

@@ -34,14 +34,12 @@ export default function SubordinateSalesCard({ sales, selected, onSelect }: {
     <div className="subordinate-sales-item-status">
       <Tag color={sales.accountStatus === 0 ? 'success' : 'default'}>{sales.accountStatus === 0 ? '启用' : '停用'}</Tag>
       <Tag color={sales.presence === 'online' ? 'success' : 'default'}>{sales.presence === 'online' ? '在线' : '离线'}</Tag>
-      {sales.salesDispatchSupported !== false && <>
-        <Tag color={sales.accepting ? 'processing' : 'default'}>{sales.accepting ? '接单开启' : '接单关闭'}</Tag>
-        <Tag color={sales.canReceiveNewLeads ? 'success' : 'default'}>{receiveStatusLabel(sales)}</Tag>
-      </>}
+      <Tag color={sales.accepting ? 'processing' : 'default'}>{sales.accepting ? '接单开启' : '接单关闭'}</Tag>
+      <Tag color={sales.canReceiveNewLeads ? 'success' : 'default'}>{receiveStatusLabel(sales)}</Tag>
     </div>
     <div className="subordinate-sales-daily-heading">今日状态</div>
     <div className="subordinate-sales-daily-grid">
-      {metrics.filter(([label]) => sales.salesDispatchSupported !== false || !['分配客资数', '漏接数', '接收客资数'].includes(label)).map(([label, value, description]) => <Tooltip key={label} title={description}>
+      {metrics.map(([label, value, description]) => <Tooltip key={label} title={description}>
         <div className="subordinate-sales-daily-metric">
           <span>{label}</span><b className={(label === '今日待跟进未完成' || label === '剩余未判定') && typeof value === 'number' && value > 0 ? 'is-pending' : undefined}>{value ?? '—'}</b>
         </div>

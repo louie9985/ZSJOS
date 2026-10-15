@@ -1,4 +1,3 @@
-import { usePerformanceModule } from './performance/PerformanceModule'
 import { Alert, Button, Drawer, Input, Progress, Space, Tabs, Tooltip, Typography } from 'antd'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { PerformanceCache } from '../services/performanceCache'
@@ -10,7 +9,7 @@ import ConversionDetailDrawer from './performance/ConversionDetailDrawer'
 import OrderDetailDrawer from './performance/OrderDetailDrawer'
 import { APP_ROUTES } from '../constants'
 import BusinessTable from '../components/BusinessTable'
-import { money, percent, periodRange, averageFormula, conversionRule, conversionSummary, sourceReviewRequired, type Scope, type Query, type Metric, type CalendarDay, type Detail, type MissingTarget, type OrderDetailEntry } from '../services/salesPerformance'
+import { performanceApi, money, percent, periodRange, averageFormula, conversionRule, conversionSummary, sourceReviewRequired, type Scope, type Query, type Metric, type CalendarDay, type Detail, type MissingTarget, type OrderDetailEntry } from '../services/salesPerformance'
 import { PerformanceShell, Panel, Resource, useResource, DateFilter, GroupChart, Refresh, AverageTrend, scopeTitle, Funnel } from './performance/PerformanceShared'
 import { HistoryChart, RevenueTrend, Distribution, CategoryTrend, FollowUpCompletion } from './performance/PerformanceCharts'
 function exclusiveEnd(value:string){if(!value.includes('T00:00:00'))return value.slice(0,10);const date=new Date(value.slice(0,10)+'T12:00:00');date.setDate(date.getDate()-1);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
@@ -20,7 +19,6 @@ function CalendarRing({day}:{day:CalendarDay}){
  return <svg viewBox="0 0 64 64" role="img" aria-label={`接收${day.received}，有效${day.valid}，无效${day.invalid}，待判${day.pending}，逾期${day.overdue}，结束${day.ended}`}><circle cx="32" cy="32" r="24" fill="none" stroke="#edf0f4" strokeWidth="7"/>{segments.map((s,i)=>{const length=day.received?s.n/day.received*150.8:0;const previous=offset;offset+=length;return <circle key={i} cx="32" cy="32" r="24" fill="none" stroke={s.c} strokeWidth="7" strokeDasharray={`${length} ${150.8-length}`} strokeDashoffset={-previous} transform="rotate(-90 32 32)"/>})}<text x="32" y="37" textAnchor="middle" fill="currentColor">{day.received}</text></svg>
 }
 function Content({scope,title,permissions,onSelectUser,reloadTree,cache,treeLoading}:{cache:PerformanceCache;treeLoading:boolean;scope:Scope;title:string;permissions:string[];onSelectUser:(id:number)=>void;reloadTree:()=>void}) {
- const {api: performanceApi, permission, targetRoute} = usePerformanceModule()
  const navigate=useNavigate()
  const active=useRetainedPageActive(),location=useLocation()
  const [conversion,setConversion]=useState<{query:Query;metric:Metric}>()
@@ -40,18 +38,18 @@ function Content({scope,title,permissions,onSelectUser,reloadTree,cache,treeLoad
  const calendarQuery={...scope,start:month+'-01',end:month+'-'+monthEnd}
  const calendar=usePerformanceResource(cache,'lead-calendar',calendarQuery,tab==='leads'&&!treeLoading,signal=>performanceApi.leadCalendar(calendarQuery,signal))
  const detailState=useResource(signal=>detail?performanceApi.details({...detail,...scope,pageNo:page,pageSize:20},signal).catch(error=>{if(isPerformanceAccessDenied(error))cache.clear(error instanceof Error?error.message:'无权查看该业绩范围');throw error}):Promise.resolve(undefined),[detail,scope.scopeType,scope.scopeId,page])
- const canDetail=permissions.includes(permission('zsjos:sales-performance:detail'))
+ const canDetail=permissions.includes('zsjos:sales-performance:detail')
  function open(metric:string,start:string,end:string,periodKey?:string,dimension?:string,groupKey?:string,entry?:Omit<OrderDetailEntry,'query'>){if(canDetail){const query={...scope,metric,periodKey,dimension,groupKey,cumulative:!start,start:start.slice(0,10),end:exclusiveEnd(end)};if(metric==='orders'&&entry){setOrderDetail({...entry,query});return}setPage(1);setDetail(query)}}
  function metricCard(m:Metric,isConversion=false){return <Tooltip key={m.key} title={isConversion?conversionRule(m.key):undefined}><button className="performance-metric" key={m.key} disabled={!canDetail} onClick={()=>isConversion?setConversion({query:{...scope,periodKey:m.key},metric:m}):open('orders',m.start,m.end,m.key,undefined,undefined,{label:m.label,summary:m})}><span>{m.label}</span><strong className="performance-amount">{isConversion?percent(m.rate):money(m.amount)}</strong><span className="performance-subtle">{isConversion?conversionSummary(m):`${m.orders} 笔订单`}</span></button></Tooltip>}
  const isTask=!!detail&&['accept','qualification','todayFollowUp','overdueFollowUp','tasks'].includes(detail.metric??'')
  const dateLabel=(value?:string)=>value?.replace('T',' ')??'—'
- const targetLink=(row:MissingTarget)=>`${targetRoute}?scopeType=${row.scopeType}&scopeId=${row.scopeId}&periodStart=${row.periodStart}`
+ const targetLink=(row:MissingTarget)=>`${APP_ROUTES.SALES_PERFORMANCE_TARGET}?scopeType=${row.scopeType}&scopeId=${row.scopeId}&periodStart=${row.periodStart}`
  const overviewBody=<Resource state={overview}>{overview.data&&<>
   {(overview.data.missingAttributionOrders>0)&&<Alert type="warning" showIcon title={`历史归属缺失：${overview.data.missingAttributionOrders}笔，${money(overview.data.missingAttributionAmount)}。不按当前组织补算。`}/>}
   <Panel title="目标进度" extra={<span className="performance-subtle">实际业绩 / 生效目标</span>}><div className="performance-grid">{overview.data.targets.map(x=><div key={x.key} className="performance-target"><h4>{x.label}{x.key==='lastWeek'?' · 已结束':''}</h4><small>{x.actual.start.slice(0,10)} 起</small><strong className="performance-amount">{money(x.actual.amount)}</strong>{!x.target.complete&&<small>目标不完整，缺少 {x.target.missing} 项</small>}{(['floorAmount','sprintAmount'] as const).map((key,i)=>{const amount=x.target[key],ratio=x.target.complete&&amount?Number(x.actual.amount)/amount:null;return <div key={key}><small>{i?'冲刺':'保底'}：{money(x.actual.amount)} / {money(amount)}</small><Progress percent={ratio==null?0:Math.min(100,ratio*100)} format={()=>percent(ratio)} strokeColor={i?'#8b67d9':'#397bee'}/><small>{amount==null?'未设置':Number(x.actual.amount)>amount?`已超额 ${money(Number(x.actual.amount)-amount)}`:`还差 ${money(amount-Number(x.actual.amount))}`}</small></div>})}{x.key!=='lastWeek'&&<small>周期时间进度：{targetTimeProgress(x.actual.start,x.actual.end,x.key)}</small>}{x.target.manual&&<small>采用人工调整目标</small>}</div>)}</div></Panel>
   <Panel title="多周期业绩"><div className="performance-grid">{overview.data.performance.map(m=>metricCard(m))}</div></Panel>
   <Panel title="多周期成交率" extra={<Tooltip title="周、月自然周期补入往期60日内成交；近N日仅看期间接收批次、不限60日。按客资去重，只计单笔订单总金额≥1280元的生效首购，以订单提交时间统计。明确无新媒体引流的销售及教务自拓客资不计入成交率分子、分母及明细；成交金额、订单数和客单价不受影响。悬浮各卡片查看公式。">口径说明</Tooltip>}><div className="performance-grid">{overview.data.conversion.map(m=>metricCard(m,true))}</div></Panel>
-  <Panel title="当前待处理" extra={<span className="performance-subtle">今日与逾期跟进有交集，不可直接相加</span>}><div className="performance-grid">{Object.entries(overview.data.pending).map(([key,value])=><button className="performance-metric" key={key} disabled={key==='missingTarget'?!permissions.includes(permission('zsjos:sales-performance-target:query')):!canDetail} onClick={()=>key==='missingTarget'?setMissingOpen(true):open(key,periodRange('today').start,periodRange('today').end)}><span>{{accept:'待接收',qualification:'逾期未判定',todayFollowUp:'今日待跟进',overdueFollowUp:'逾期跟进',missingTarget:'本月目标缺失'}[key]}</span><strong className="performance-amount">{value}</strong></button>)}</div></Panel>
+  <Panel title="当前待处理" extra={<span className="performance-subtle">今日与逾期跟进有交集，不可直接相加</span>}><div className="performance-grid">{Object.entries(overview.data.pending).map(([key,value])=><button className="performance-metric" key={key} disabled={key==='missingTarget'?!permissions.includes('zsjos:sales-performance-target:query'):!canDetail} onClick={()=>key==='missingTarget'?setMissingOpen(true):open(key,periodRange('today').start,periodRange('today').end)}><span>{{accept:'待接收',qualification:'逾期未判定',todayFollowUp:'今日待跟进',overdueFollowUp:'逾期跟进',missingTarget:'本月目标缺失'}[key]}</span><strong className="performance-amount">{value}</strong></button>)}</div></Panel>
  </>}</Resource>
  return <><div className="performance-heading"><div><Typography.Title level={4} style={{margin:0}}>{title}</Typography.Title><span className="performance-subtle">业绩统计 · 数据截至 {(tab==='overview'?overview.data?.asOf:tab==='analysis'?analysis.data?.asOf:work.data?.asOf)?.replace('T',' ')??'—'}</span></div><Refresh onClick={()=>{cache.clear();reloadTree()}}/></div>
  {overview.data&&<Alert type="info" showIcon title="历史覆盖说明" description={`部门及中心仅统计可确认历史归属的记录。本范围快照起点：${overview.data?.attributionAvailableSince?.replace("T"," ")??"尚无可用归属快照"}。历史判定过程缺失单列显示。`} style={{marginBottom:12}}/>}<Typography.Paragraph type="secondary">相同条件的数据保留 10 分钟；需要最新数据时请点击刷新。</Typography.Paragraph><Tabs activeKey={tab} onChange={setTab} items={[
@@ -90,7 +88,6 @@ function SessionPage({permissions}:{permissions:string[]}) {
  return <PerformanceShell retainStatistics>{(scope,node,reload,nodes,select,treeLoading)=><Content cache={cache} treeLoading={treeLoading} scope={scope} title={scopeTitle(node,nodes)} permissions={permissions} reloadTree={reload} onSelectUser={id=>{if(nodes.some(n=>n.key===`USER:${id}`))select(`USER:${id}`)}}/>}</PerformanceShell>
 }
 export default function SalesPerformancePage({permissions}:{permissions:string[]}) {
- const {domain}=usePerformanceModule()
  const session=useSyncExternalStore(subscribePerformanceSession,performanceSessionIdentity)
- return <SessionPage key={JSON.stringify([domain,session,[...permissions].sort()])} permissions={permissions}/>
+ return <SessionPage key={JSON.stringify([session,[...permissions].sort()])} permissions={permissions}/>
 }
