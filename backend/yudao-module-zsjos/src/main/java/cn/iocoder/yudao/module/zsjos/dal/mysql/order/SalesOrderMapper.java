@@ -273,6 +273,8 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     default List<SalesOrderDO> selectEffectiveBySubmitterIds(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<SalesOrderDO>()
+                .select(SalesOrderDO::getId, SalesOrderDO::getLeadId, SalesOrderDO::getSubmitterUserId,
+                        SalesOrderDO::getEffectiveAt, SalesOrderDO::getTotalAmount)
                 .in(SalesOrderDO::getSubmitterUserId, userIds).eq(SalesOrderDO::getStatus, "effective"));
     }
 }

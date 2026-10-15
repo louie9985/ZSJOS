@@ -1,8 +1,9 @@
+import { usePerformanceModule } from './PerformanceModule'
 import { Alert, Button, Drawer, Empty, Input, Select, Space, Spin, Tree, Typography } from 'antd'
 import { MenuFoldOutlined, MenuUnfoldOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DataNode } from 'antd/es/tree'
-import { performanceApi, money, periodRange, type Group, type OrgNode, type Scope } from '../../services/salesPerformance'
+import { money, periodRange, type Group, type OrgNode, type Scope } from '../../services/salesPerformance'
 export { AverageTrend, Funnel } from './PerformanceCharts'
 import './performance.css'
 import { useRetainedPageActive } from '../../layouts/RetainedReviewRoutes'
@@ -23,6 +24,7 @@ export function Resource({state,children}:{state:{loading:boolean;error:string;r
  return <>{children}</>
 }
 export function PerformanceShell({targets=false,initialKey,retainStatistics=false,children}:{targets?:boolean;initialKey?:string;retainStatistics?:boolean;children:(scope:Scope,node:OrgNode,reloadTree:()=>void,nodes:OrgNode[],select:(key:string)=>void,treeLoading:boolean)=>ReactNode}) {
+ const {api: performanceApi} = usePerformanceModule()
  const activePage=useRetainedPageActive(),location=useLocation()
  const tree=useResource(signal=>performanceApi.tree(targets,signal),[targets],retainStatistics);const [selected,setSelected]=useState<string|undefined>(initialKey);const [keyword,setKeyword]=useState('');const [collapsed,setCollapsed]=useState(false);const [open,setOpen]=useState(false)
  useEffect(()=>setOpen(false),[activePage,location.key])

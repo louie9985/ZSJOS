@@ -1574,3 +1574,9 @@ replace the deployed order-snapshot V285.
 ## V316 — Content review account profile
 
 After Core V315, enrich missing tenant-1 approval profile fields from stored current account values/labels, with per-field provenance. Preserve nonempty snapshots and all workflow state. DML and both ledgers are transactional; replay is missing-only. Back up batches and ledgers; see [scope, recovery and verification](../../../../docs/operations/content-review-account-profile.md). No schema or permission changes.
+
+
+V318 renames canonical menu 6814 to 下属员工, retaining its route, component and permission. Requires the V036 menu and both version ledgers. Metadata-only, repeatable and failure-controlled; never writes role grants or business rows. Restore a label through System menu management when rollback is required.
+
+
+V321 adds independent delivery performance domain, target uniqueness and menu metadata. Existing sales target values and revisions are preserved. Reviewed tenant-1 organization IDs 1050/1051 are classified as delivery; no role grants or fact backfill. Isolated MySQL partial-DDL recovery, replay, prerequisite failure without ledgers and recovery verified. Current missing V319 blocks full-chain verification.

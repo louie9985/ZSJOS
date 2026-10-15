@@ -1,5 +1,7 @@
 export const WORKBENCH_COMPONENT = {
   LEAD_FOLLOW_UP_CALENDAR: 'leadFollowUpCalendar',
+  DELIVERY_PERFORMANCE: 'deliveryPerformance',
+  DELIVERY_PERFORMANCE_TARGET: 'deliveryPerformanceTarget',
   SALES_PERFORMANCE: 'salesPerformance',
   SALES_PERFORMANCE_TARGET: 'salesPerformanceTarget',
   MEDIA_LEAD_ANALYSIS: 'mediaLeadAnalysis',
@@ -19,6 +21,8 @@ export type WorkbenchComponent = typeof WORKBENCH_COMPONENT[keyof typeof WORKBEN
 
 const COMPONENT_REGISTRY: Record<string, WorkbenchComponent> = {
   'zsjos/leadFollowUpCalendar/index': WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR,
+  'zsjos/deliveryPerformance/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE,
+  'zsjos/deliveryPerformanceTarget/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE_TARGET,
   'zsjos/salesPerformance/index': WORKBENCH_COMPONENT.SALES_PERFORMANCE,
   'zsjos/salesPerformanceTarget/index': WORKBENCH_COMPONENT.SALES_PERFORMANCE_TARGET,
   'zsjos/mediaLeadAnalysis/index': WORKBENCH_COMPONENT.MEDIA_LEAD_ANALYSIS,

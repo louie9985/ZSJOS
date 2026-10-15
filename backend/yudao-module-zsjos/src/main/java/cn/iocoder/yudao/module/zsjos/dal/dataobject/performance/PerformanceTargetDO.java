@@ -6,6 +6,7 @@ import lombok.*;
 public class PerformanceTargetDO extends TenantBaseDO {
  @TableId private Long id;
  private String scopeType;
+ private String businessDomain;
  private Long scopeId;
  private Long deptId;
  private Long centerId;

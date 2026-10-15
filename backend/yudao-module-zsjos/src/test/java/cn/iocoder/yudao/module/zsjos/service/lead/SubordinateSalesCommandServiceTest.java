@@ -34,6 +34,7 @@ class SubordinateSalesCommandServiceTest {
     @Mock private LeadObjectPermissionService permissionService;
     @Mock private LeadAgingPoolService agingPoolService;
     @Mock private LeadQualificationService qualificationService;
+    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
@@ -119,6 +120,19 @@ class SubordinateSalesCommandServiceTest {
         Transactional transactional = method.getAnnotation(Transactional.class);
         assertNotNull(transactional);
         assertEquals(Propagation.REQUIRES_NEW, transactional.propagation());
+    }
+
+    @Test
+    void educationTransferUsesEducationChainAndRejectsSalesPool() {
+        LeadDO lead = lead(1L, 20L); lead.setOwnerIdentity("education");
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(teamTransferPolicy.isEducation(lead)).thenReturn(true);
+        service.transferOne(1L, 30L, 10L, "团队转派", "education-transfer");
+        verify(dispatchService).transferEducation(1L, 30L, 10L, "团队转派", "education-transfer");
+        verify(dispatchService, never()).adminTransfer(anyLong(), anyLong(), anyLong(), anyString(), anyString());
+        assertThrows(ServiceException.class, () -> service.releaseClaimPoolOne(1L, 10L, "禁止进入销售池", "education-pool"));
+        verifyNoInteractions(qualificationService);
     }
 
     private static LeadDO lead(Long id, Long owner) {

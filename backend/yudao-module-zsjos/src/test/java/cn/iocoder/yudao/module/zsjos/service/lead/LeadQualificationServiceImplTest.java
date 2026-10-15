@@ -43,6 +43,7 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadMapper leadMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
+    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
     @Mock private LeadAssignmentHistoryMapper historyMapper;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private DictDataApi dictDataApi;

@@ -22,7 +22,7 @@ public class PerformanceAccess {
  @Resource private PerformanceOrgMapper orgMapper;
  public static ServiceException denied() {return cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.SalesPerformanceConstants.PERMISSION_DENIED);}
  public static ServiceException invalid(String message) {return cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.SalesPerformanceConstants.INVALID_REQUEST,message);}
- public boolean has(String permission) {return permissionApi.hasAnyPermissions(getLoginUserId(),permission);}
+ public boolean has(String permission) {return permissionApi.hasAnyPermissions(getLoginUserId(),PerformanceDomain.permission(permission));}
  public boolean departmentAllowed(Long deptId) {
   if(deptId==null)return false;
   Long user=getLoginUserId();
@@ -59,7 +59,8 @@ public class PerformanceAccess {
     all || scope==null || scope.getDeptIds()==null?Set.of():new HashSet<>(scope.getDeptIds()));
  }
  public void targetWriteObject(String type,Long id){targetObject(type,id);Long deptId=id;if("USER".equals(type)){var u=user(id);if(u==null)throw denied();if(!CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))throw invalid("该人员已停用，请刷新后重新设置目标");deptId=u.getDeptId();var scope=permissionApi.getDeptDataPermission(getLoginUserId());if(id.equals(getLoginUserId())&&scope!=null&&Boolean.TRUE.equals(scope.getSelf()))return;}if(!commandDepartmentAllowed(deptId))throw denied();}
- public List<PerformanceOrgDO> orgs() {return orgMapper.selectList();}
+ public List<PerformanceOrgDO> orgs() {return orgMapper.selectList(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<PerformanceOrgDO>()
+   .eq(PerformanceOrgDO::getBusinessDomain, PerformanceDomain.current()));}
  public AdminUserRespDTO user(Long id) {return userApi.getUser(id);}
  public List<AdminUserRespDTO> users(Collection<Long> ids) {return ids.isEmpty()?List.of():userApi.getUserList(ids);}
  public List<DeptRespDTO> departments(Collection<Long> ids) {return ids.isEmpty()?List.of():deptApi.getDeptList(ids);}
@@ -74,9 +75,24 @@ public class PerformanceAccess {
  public DeptRespDTO dept(Long id) {return id==null?null:deptApi.getDept(id);}
  public List<DeptRespDTO> departments() {return deptApi.getChildDeptList(0L);}
  public List<AdminUserRespDTO> sales() {
-  var post=postApi.getPostByCode("sales_specialist");
+  Set<Long> domain=domainDepartments();
+  var post=postApi.getPostByCode(PerformanceDomain.delivery()?"study_planner":"sales_specialist");
   return post==null?List.of():userApi.getUserListByPostIds(List.of(post.getId())).stream()
-    .filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus())).toList();
+    .filter(u -> CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))
+    .filter(u -> u.getDeptId()!=null&&domain.contains(u.getDeptId()))
+    .filter(u -> Objects.equals(u.getId(), getLoginUserId()) || departmentAllowed(u.getDeptId())).toList();
+ }
+ public List<AdminUserRespDTO> visibleEmployees() {
+  Set<Long> domain=domainDepartments();
+  return userApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
+    .filter(u -> CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))
+    .filter(u -> u.getDeptId()!=null && domain.contains(u.getDeptId()) && departmentAllowed(u.getDeptId())).toList();
+ }
+ public Set<Long> domainDepartments() {return orgs().stream().map(PerformanceOrgDO::getDeptId).collect(java.util.stream.Collectors.toSet());}
+ public HistoricalScope reportScope(Query q) {
+  var scope=historicalScope(q);var departments=domainDepartments();
+  if(!scope.allDepartments())departments.retainAll(scope.departments());
+  return new HistoricalScope(false,false,departments);
  }
  public Set<Long> enabledUserIds(Collection<Long> ids) {
   if(ids.isEmpty())return Set.of();
@@ -87,7 +103,14 @@ public class PerformanceAccess {
  public PerformanceOrgDO mapping(Long deptId) {
   return orgs().stream().filter(x->Objects.equals(x.getDeptId(),deptId)).findFirst().orElse(null);
  }
+ public PerformanceOrgDO owningOrganization(Long deptId) {
+  return deptId==null?null:orgMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<PerformanceOrgDO>().eq(PerformanceOrgDO::getDeptId,deptId));
+ }
  public Query authorize(Query q,boolean targets) {
+  if("SELF".equals(q.getScopeType())||"USER".equals(q.getScopeType())) {
+   var person=user("SELF".equals(q.getScopeType())?getLoginUserId():q.getScopeId());
+   if(person==null||mapping(person.getDeptId())==null)throw denied();
+  }
   if("SELF".equals(q.getScopeType())){q.setScopeId(getLoginUserId()); if(!targets&&!has("zsjos:sales-performance:self"))throw denied(); return q;}
   if(q.getScopeId()==null)throw invalid("请选择统计对象");
   if(targets&&!has("zsjos:sales-performance-target:query"))throw denied();
@@ -113,7 +136,7 @@ public class PerformanceAccess {
    if(!allowed)continue;
    addDept(m.getDeptId(),true,m.getKind(),result,included);
   }
-  for(var u:sales()) {
+  for(var u:visibleEmployees()) {
    Query q=new Query();q.setScopeType("USER");q.setScopeId(u.getId());
    try{authorize(q,targets);}catch(ServiceException ex){continue;}
    if(u.getDeptId()!=null)addDept(u.getDeptId(),false,"DEPT",result,included);
@@ -128,6 +151,8 @@ public class PerformanceAccess {
   nodes.add(new Node("ORG:"+id,d.getParentId()==null||d.getParentId()==0?null:"ORG:"+d.getParentId(),d.getName(),kind,id,selectable));
  }
  public void saveOrg(OrgEdit req) {
+  var existing=owningOrganization(req.getDeptId());
+  if(existing!=null&&!PerformanceDomain.current().equals(existing.getBusinessDomain()))throw denied();
   if(!has("zsjos:sales-performance-target:configure")||!commandDepartmentAllowed(req.getDeptId())||!commandDepartmentAllowed(req.getCenterId()))throw denied();
   var d=dept(req.getDeptId());var c=dept(req.getCenterId());
   if(d==null||c==null||!Objects.equals(d.getStatus(),0)||!Objects.equals(c.getStatus(),0))throw invalid("请选择有效组织");
@@ -138,6 +163,7 @@ public class PerformanceAccess {
   }
   var row=mapping(req.getDeptId());if(row==null){row=new PerformanceOrgDO();row.setDeptId(req.getDeptId());row.setVersion(0);}
   row.setCenterId(req.getCenterId());row.setKind(req.getKind());
+  row.setBusinessDomain(PerformanceDomain.current());
   if(row.getId()==null)orgMapper.insert(row);else orgMapper.updateById(row);
  }
 }
