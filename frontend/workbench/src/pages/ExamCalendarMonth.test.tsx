@@ -37,11 +37,33 @@ describe('full-name exam month', () => {
 
   it('applies saved colors to single-day and every cross-week multi-day segment', () => {
     const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
-      exactRows={[{ ...exact(1), backgroundColor: '#ffcc00' }]}
-      multiDayRows={[{ ...multi(2), backgroundColor: '#001133' }]}
+      exactRows={[{ ...exact(1), recordStatus: 'PUBLISHED', backgroundColor: '#ffcc00' }]}
+      multiDayRows={[{ ...multi(2), recordStatus: 'PUBLISHED', backgroundColor: '#001133' }]}
       onDay={() => {}} statusLabel={scheduleStatusLabel} />)
     expect(html.match(/background-color:#ffcc00;color:#000000/g)).toHaveLength(1)
     expect(html.match(/background-color:#001133;color:#ffffff/g)).toHaveLength(2)
+  })
+  it.each(['DRAFT', 'PUBLISHED', 'REVOKED'] as const)('renders %s across month/week boundaries without losing grid placement', recordStatus => {
+    for (const backgroundColor of [undefined, '#ffcc00', 'red']) {
+      const elements = nodes(ExamCalendarMonth({ anchor: dayjs('2026-10-01'),
+        exactRows: [{ ...exact(1), recordStatus, backgroundColor }],
+        multiDayRows: [{ ...multi(2), recordStatus, backgroundColor, startDate: '2026-09-29', endDate: '2026-11-02' }],
+        onDay: () => {}, statusLabel: scheduleStatusLabel }))
+      const events = elements.filter(node => String(node.props.className).includes('exam-status-tone'))
+      expect(events).toHaveLength(6)
+      for (const event of events) {
+        expect(event.props.className).toContain('tone-' + recordStatus.toLowerCase())
+        const style = event.props.style as Record<string, unknown> | undefined
+        const custom = recordStatus === 'PUBLISHED' && backgroundColor === '#ffcc00'
+        expect(style?.backgroundColor).toBe(custom ? backgroundColor : undefined)
+        expect(style?.color).toBe(custom ? '#000000' : undefined)
+        expect(style?.borderColor).toBe(custom ? backgroundColor : undefined)
+        if (String(event.props.className).includes('exam-multiDay-bar')) {
+          expect(style?.gridColumn).toMatch(/^\d+ \/ \d+$/)
+          expect(style?.gridRow).toBe(2)
+        }
+      }
+    }
   })
   it.each([1, 3, 4, 10, 110])('renders all %i single-day records with no overflow entry or status tags', count => {
     const html = renderToStaticMarkup(<ExamCalendarMonth anchor={dayjs('2026-10-01')}
@@ -84,6 +106,7 @@ describe('full-name exam month', () => {
   it('explains only publication colors and the independent multi-day type', () => {
     const html = renderToStaticMarkup(<ExamCalendarLegend />)
     for (const label of ['已撤销', '已发布', '草稿', '多日考试']) expect(html).toContain(label)
+    expect(html).toContain('自选底色仅在已发布时显示；草稿和已撤销使用状态配色。')
     for (const status of ['revoked', 'published', 'draft']) expect(html).toContain('tone-' + status)
   })
   it.each(['PUBLISHED', 'UPCOMING', 'IN_PROGRESS', 'ENDED'] as const)('uses published color and accessible label for %s in both exam types', displayStatus => {

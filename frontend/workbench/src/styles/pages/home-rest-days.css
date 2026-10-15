@@ -1,0 +1,27 @@
+/* Date marks stay separate from Ant Design's selected/today backgrounds. */
+.home-dashboard-grid { grid-template-rows: repeat(3, minmax(108px, 1fr)) repeat(6, minmax(0, 1fr)); }
+/* Carry the card's remaining height through the loading wrapper to the date rows. */
+.home-calendar-panel .home-calendar-body,
+.home-calendar-panel .home-calendar-body > .ant-spin-container { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.home-calendar-panel .ant-picker-calendar .ant-picker-content { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.home-calendar-panel .ant-picker-content thead { display: block; flex: none; }
+.home-calendar-panel .ant-picker-content tbody { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tr { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tbody tr { flex: 1; height: auto; min-height: var(--home-calendar-cell-h); align-items: center; }
+.home-calendar-panel .home-panel-header.compact { flex-wrap: wrap; gap: 4px; }
+.home-calendar-heading { display: flex; align-items: center; gap: 8px; }
+.home-calendar-heading h4 { white-space: nowrap; }
+.home-calendar-actions { margin-inline-start: auto; }
+.home-rest-manage.ant-btn-link { color: #1677ff; }
+.home-rest-manage.ant-btn-link:not(:disabled):hover { color: #4096ff; }
+.home-rest-toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
+.home-rest-date { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 50%; line-height: 24px; }
+.home-rest-date.is-rest { background: #cf1322; color: #fff; }
+.home-rest-date.is-today { outline: 1px solid var(--ant-color-primary, #1677ff); outline-offset: 2px; }
+.home-rest-date.is-selected { box-shadow: 0 0 0 3px var(--ant-color-primary, #1677ff); }
+.home-rest-manager .home-rest-date { width: 30px; height: 30px; }
+.home-rest-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.home-rest-legend i { width: 10px; height: 10px; border-radius: 50%; background: #cf1322; }
+.home-rest-manager .ant-picker-cell { padding: 6px 0; }
+.home-rest-changes { max-height: 160px; overflow-y: auto; }
+.home-rest-changes > div { display: flex; justify-content: space-between; align-items: center; }

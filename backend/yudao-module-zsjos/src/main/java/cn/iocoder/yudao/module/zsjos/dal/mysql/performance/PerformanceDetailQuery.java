@@ -14,6 +14,7 @@ public class PerformanceDetailQuery {
     private boolean allDepartments;
     private boolean missingDepartment;
     private Set<Long> departments = Set.of();
+    private Set<Long> assigneeIds = Set.of();
     private Set<Long> conversionLeadIds = Set.of();
     private String metric;
     private String dimension;

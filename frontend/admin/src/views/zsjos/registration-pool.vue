@@ -46,6 +46,7 @@
           <el-tag :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="交付流转" width="120"><template #default="{ row }">{{ row.deliveryEstablished ? '已建立交付' : '尚未流转' }}</template></el-table-column>
       <el-table-column label="报名审核通过" prop="registrationApprovedAt" min-width="170" />
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
@@ -62,7 +63,7 @@
     />
   </ContentWrap>
 
-  <el-drawer v-model="detailOpen" title="报名履约详情" size="760px" destroy-on-close>
+  <el-drawer v-model="detailOpen" title="报名履约详情" size="min(760px, 100vw)" destroy-on-close>
     <div v-loading="detailLoading">
       <el-alert
         v-if="detailError"
@@ -104,25 +105,34 @@
           class="mt-16px"
         />
 
+        <el-alert class="mt-16px" type="info" show-icon :closable="false"
+          :title="detail.deliveryEstablished ? '已建立交付服务，报名任务仍需财务审核通过后完成' : '保存分班后将流转至学生交付中心'"
+          :description="detail.assignmentBlockReason || '已保存但尚未流转的历史分班，请再次保存。待分班暂不分配学习规划师。'" />
+        <el-descriptions v-for="delivery in detail.deliveries" :key="delivery.serviceRelationId" :column="1" border class="mt-16px">
+          <el-descriptions-item label="当前交付班级">{{ delivery.className || '待分班' }}</el-descriptions-item>
+          <el-descriptions-item label="当前学习规划师">{{ delivery.ownerUserName || '尚未分配' }}</el-descriptions-item>
+          <el-descriptions-item label="交付状态">{{ delivery.status === 'cancelled' ? '已停止交付' : delivery.acceptanceStatus === 'accepted' ? '已接收' : '待接收' }}</el-descriptions-item>
+        </el-descriptions>
+        <p v-if="detail.deliveryEstablished">下方保留首次分班记录，变更班级请通过班级管理办理转班。</p>
         <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? (detail.orderItemId ? '本产品分班' : '逐商品分班') : '历史学习规划师分配' }}</div>
         <div v-if="detail.assignmentMode === 'class_per_item'" class="checklist">
           <el-alert v-if="classOptionsError" type="error" :closable="false" title="班级加载失败" :description="classOptionsError" show-icon />
           <el-button v-if="classOptionsError" :loading="classOptionsLoading" @click="loadClassOptions">重试加载班级</el-button>
-          <el-alert v-if="classesDirty" type="info" :closable="false" title="分班选择尚未保存，请先保存分班再完成履约" />
+          <el-alert v-if="classesDirty" type="info" :closable="false" title="分班选择尚未保存，保存后将流转至学生交付中心" />
           <div v-for="assignment in detail.classAssignments" :key="assignment.orderItemId" class="checklist-item">
             <div><strong>{{ assignment.productName || '历史产品信息缺失' }}</strong><ProductSpecs :product="assignment" /><div class="checklist-meta">{{ assignment.categoryName || '产品分类' }}<span v-if="assignment.errorReason"> · {{ assignment.errorReason }}</span></div></div>
-            <el-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" filterable placeholder="选择班级（含待分班）" :disabled="!canUpdate || !isEditable(detail.status) || classSaving" :loading="classOptionsLoading" :no-data-text="classOptionsError ? '班级加载失败，请重试' : '暂无未结课班级，请联系班级管理员'" @visible-change="(visible) => visible && loadClassOptions()">
+            <el-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" filterable placeholder="选择班级（含待分班）" :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || classSaving" :loading="classOptionsLoading" :no-data-text="classOptionsError ? '班级加载失败，请重试' : '暂无未结课班级，请联系班级管理员'" @visible-change="(visible) => visible && loadClassOptions()">
               <el-option v-for="option in classOptions" :key="option.id" :value="option.id" :label="option.systemClass ? '待分班' : `${option.className} · ${option.homeroomUserName || '未配置班主任'}`" />
               <el-option v-if="assignment.classId && !classOptions.some(option => option.id === assignment.classId)" :value="assignment.classId" :label="assignment.className || '已选班级'" disabled />
             </el-select>
           </div>
-          <el-button v-if="canUpdate && isEditable(detail.status)" type="primary" :loading="classSaving" @click="saveClasses">保存分班</el-button>
+          <el-button v-if="canUpdate && detail.assignable === true && isEditable(detail.status)" type="primary" :loading="classSaving" @click="saveClasses">保存分班</el-button>
         </div>
         <div class="checklist">
           <div v-for="route in detail.assignmentMode === 'class_per_item' ? [] : detail.routes" :key="route.id" class="checklist-item">
             <el-checkbox
               :model-value="route.selected"
-              :disabled="!canUpdate || !isEditable(detail.status) || routeSaving"
+              :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || routeSaving"
               @change="(checked) => changeRouteSelection(route, Boolean(checked))"
               >{{ route.departmentName }}</el-checkbox
             >
@@ -132,7 +142,7 @@
               filterable
               :placeholder="`请选择${route.assigneeTypeLabel}`"
               :loading="routeSaving"
-              :disabled="!canUpdate || !isEditable(detail.status) || routeSaving"
+              :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || routeSaving"
               @visible-change="(visible) => visible && loadRouteCandidates(route)"
               @change="(value) => changeRouteAssignee(route, Number(value))"
             >
@@ -560,5 +570,15 @@ onMounted(load)
   align-items: flex-end;
   flex-direction: column;
   gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .checklist-item {
+    flex-wrap: wrap;
+    padding: 12px 0;
+  }
+  .checklist-item :deep(.el-select) {
+    max-width: 100%;
+  }
 }
 </style>

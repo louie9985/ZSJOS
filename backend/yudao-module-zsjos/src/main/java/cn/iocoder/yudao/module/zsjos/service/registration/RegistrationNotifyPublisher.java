@@ -47,10 +47,25 @@ public class RegistrationNotifyPublisher {
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
                 .tenantId(TenantContextHolder.getRequiredTenantId())
                 .sceneCode(NOTIFY_SCENE_PLANNER_ASSIGNED)
-                .sourceEventKey("registration-planner-activated:" + registrationCase.getId() + ":" + plannerUserId)
+                .sourceEventKey("registration-planner-activated:" + registrationCase.getId() + ":" + plannerUserId
+                        + (serviceRelationId == null ? "" : ":service:" + serviceRelationId))
                 .bizType(serviceRelationId == null ? "student" : "student_service")
                 .bizId(serviceRelationId == null ? personId : serviceRelationId)
                 .occurredAt(java.time.LocalDateTime.now()).payload(payload).build());
+    }
+
+    public void publishDeliveryCancelled(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO relation,
+                                         String reason, java.time.LocalDateTime now) {
+        if (relation.getOwnerUserId() == null) return;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("registrationCaseId", relation.getRegistrationCaseId());
+        payload.put("studyPlannerUserId", relation.getOwnerUserId());
+        payload.put("reason", reason);
+        notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
+                .tenantId(TenantContextHolder.getRequiredTenantId()).sceneCode(NOTIFY_SCENE_DELIVERY_CANCELLED)
+                .sourceEventKey("registration-delivery-cancelled:" + relation.getId())
+                .bizType("registration_case").bizId(relation.getRegistrationCaseId())
+                .occurredAt(now).payload(payload).build());
     }
 
     public void publishDirectorAssigned(RegistrationCaseDO registrationCase, SalesOrderDO order,

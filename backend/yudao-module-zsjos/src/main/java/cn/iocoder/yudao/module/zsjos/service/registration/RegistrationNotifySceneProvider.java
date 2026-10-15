@@ -32,7 +32,11 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
-        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_TASK_CREATED, "新报名履约任务", List.of(
+        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_DELIVERY_CANCELLED, "提前交付已停止", List.of(
+                new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
+                new NotifySceneVariableRespDTO("reason", "停止原因", false)),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_STUDY_PLANNER, "学习规划师")),
+                List.of(NotifyActionType.MESSAGE_DETAIL), false), new NotifySceneRespDTO(NOTIFY_SCENE_TASK_CREATED, "新报名履约任务", List.of(
                 new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                 new NotifySceneVariableRespDTO("order.id", "订单编号", false),
                 new NotifySceneVariableRespDTO("order.no", "订单号", false)),
@@ -96,6 +100,7 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("reason", payload.get("reason"));
         result.put("registration.caseId", payload.get("registrationCaseId"));
         result.put("order.id", payload.get("orderId"));
         result.put("order.no", payload.get("orderNo"));

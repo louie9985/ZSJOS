@@ -26,12 +26,15 @@ public class DeliveryClassRespVO {
     private String examScheduleSnapshot;
     private String scheduleType;
     private LocalDate exactDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Long homeroomUserId;
     private String homeroomUserNameSnapshot;
     private Long deptId;
     private String deptNameSnapshot;
     private String status;
     private Integer studentCount;
+    private List<DeliveryClassProjectRespVO> projects = List.of();
     private Integer version;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

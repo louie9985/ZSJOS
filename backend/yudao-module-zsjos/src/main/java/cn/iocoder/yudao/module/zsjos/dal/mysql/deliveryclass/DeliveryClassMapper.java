@@ -25,11 +25,20 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
     default PageResult<DeliveryClassDO> selectDeliveryClassPage(DeliveryClassPageReqVO req, Set<Long> deptIds,
                                                     Long homeroomUserId, boolean allDepartments,
                                                     boolean includeSystem) {
+        return selectPage(req, classQuery(req, deptIds, homeroomUserId, allDepartments, includeSystem));
+    }
+
+    default LambdaQueryWrapperX<DeliveryClassDO> classQuery(DeliveryClassPageReqVO req, Set<Long> deptIds,
+            Long homeroomUserId, boolean allDepartments, boolean includeSystem) {
         LambdaQueryWrapperX<DeliveryClassDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(DeliveryClassDO::getStatus, req.getStatus())
                 .eqIfPresent(DeliveryClassDO::getCategoryId, req.getCategoryId())
                 .eqIfPresent(DeliveryClassDO::getExamScheduleId, req.getExamScheduleId())
                 .eqIfPresent(DeliveryClassDO::getHomeroomUserId, req.getHomeroomUserId());
+        if (req.getProjectCategoryId() != null) query.apply(DeliveryClassFilterSql.PROJECT_EXISTS, req.getProjectCategoryId());
+        if (req.getExamDateStart() != null) query.apply(DeliveryClassFilterSql.DATE_END + " >= {0}", req.getExamDateStart().toString());
+        if (req.getExamDateEnd() != null) query.apply(DeliveryClassFilterSql.DATE_START + " <= {0}", req.getExamDateEnd().toString());
+        if (Boolean.TRUE.equals(req.getExcludeSystemClass())) query.eq(DeliveryClassDO::getSystemClass, false);
         query.and(req.getKeyword() != null && !req.getKeyword().isBlank(), q -> q
                 .like(DeliveryClassDO::getClassName, req.getKeyword().trim())
                 .or().like(DeliveryClassDO::getClassNo, req.getKeyword().trim()));
@@ -46,9 +55,18 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
             }
         }
         if (!includeSystem) query.eq(DeliveryClassDO::getSystemClass, false);
-        return selectPage(req, query.orderByDesc(DeliveryClassDO::getSystemClass)
-                .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId));
+        return query.orderByDesc(DeliveryClassDO::getSystemClass)
+                .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId);
     }
+
+    @Select({"<script>", "SELECT DISTINCT sr.class_id AS classId, oi.product_snapshot AS snapshot",
+            "FROM zsjos_service_relation sr JOIN zsjos_order_item oi ON oi.id=sr.order_item_id",
+            "AND oi.tenant_id=sr.tenant_id AND oi.deleted=0",
+            "WHERE sr.tenant_id=#{tenantId} AND sr.deleted=0 AND sr.status IN ('active','paused','completed')",
+            "AND sr.class_id IN", "<foreach collection='classIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+            "ORDER BY sr.class_id, oi.product_snapshot", "</script>"})
+    List<Map<String, Object>> selectProjectSnapshots(@Param("tenantId") Long tenantId,
+            @Param("classIds") Collection<Long> classIds);
     @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0' AND status IN ('active','paused','completed')")
     int countStudents(@Param("tenantId") Long tenantId, @Param("classId") Long classId);
     @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0'")

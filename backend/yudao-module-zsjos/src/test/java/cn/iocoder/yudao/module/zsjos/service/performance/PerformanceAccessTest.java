@@ -51,6 +51,40 @@ import static org.junit.jupiter.api.Assertions.*;
   assertTrue(ex.getMessage().contains("停用"));
  }
  PerformanceOrgDO org(long id,long center,String kind){var o=new PerformanceOrgDO();o.setDeptId(id);o.setCenterId(center);o.setKind(kind);return o;}
+ @Test void currentFollowUpUsesEnabledSalesCurrentDepartmentsAndDeduplicatesCenter(){
+  var post=new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();post.setId(7L);
+  when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+  var moved=person(3,0);moved.setDeptId(11L);
+  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(person(2,0),moved,person(4,1),person(2,0)));
+  when(orgMapper.selectList()).thenReturn(List.of(org(10,20,"DEPT"),org(11,20,"DEPT"),org(20,20,"CENTER")));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(eq(1L),anyString())).thenReturn(true);
+  assertEquals(Set.of(2L),access.currentFollowUpAssignees(q("DEPT",10)));
+  assertEquals(Set.of(3L),access.currentFollowUpAssignees(q("DEPT",11)));
+  assertEquals(Set.of(2L,3L),access.currentFollowUpAssignees(q("CENTER",20)));
+  when(userApi.getUser(4L)).thenReturn(person(4,1));
+  when(userApi.getUser(5L)).thenReturn(person(5,0));
+  assertTrue(access.currentFollowUpAssignees(q("USER",4)).isEmpty());
+  assertTrue(access.currentFollowUpAssignees(q("USER",5)).isEmpty());
+  when(userApi.getUserListByPostIds(List.of(7L))).thenThrow(new IllegalStateException("user API unavailable"));
+  assertThrows(IllegalStateException.class,()->access.currentFollowUpAssignees(q("DEPT",10)));
+ }
+ @Test void currentSelfIsBoundWithoutSalesMembership(){
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(true);
+  assertEquals(Set.of(1L),access.currentFollowUpAssignees(q("SELF",999)));
+  verifyNoInteractions(postApi,userApi);
+ }
+ @Test void currentTasksStillRejectUnauthorizedDepartment(){
+  when(orgMapper.selectList()).thenReturn(List.of(org(10,20,"DEPT")));
+  assertThrows(RuntimeException.class,()->access.currentFollowUpAssignees(q("DEPT",10)));
+  verifyNoInteractions(postApi,userApi);
+ }
+ @Test void currentDepartmentWithNoSalesPostReturnsEmpty(){
+  when(orgMapper.selectList()).thenReturn(List.of(org(10,20,"DEPT")));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);
+  assertTrue(access.currentFollowUpAssignees(q("DEPT",10)).isEmpty());
+ }
  @Test void selfCannotSpoofUser(){when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(true);assertEquals(1L,access.authorize(q("SELF",999),false).getScopeId());}
  @Test void selfNeedsViewPermission(){assertThrows(RuntimeException.class,()->access.authorize(q("SELF",1),false));}
  @Test void featurePermissionDoesNotBypassDataScope(){when(orgMapper.selectList()).thenReturn(List.of(org(10,9,"DEPT")));when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertThrows(RuntimeException.class,()->access.authorize(q("DEPT",10),false));}

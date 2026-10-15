@@ -1,9 +1,9 @@
+import HomeCalendarPanel from '../components/HomeCalendarPanel'
 import HomeAnnouncementPanel from '../components/HomeAnnouncementPanel'
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
-import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
-import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'
+import { Alert, Button, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
+import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
 import { APP_ROUTES } from '../constants'
@@ -16,7 +16,6 @@ type TaskView = 'pending' | 'done'
 
 export const canQueryBpmTasks = (permissions: readonly string[]) => permissions.includes('bpm:task:query')
 export const canReadAnnouncements = (permissions: readonly string[]) => permissions.includes('system:notice:read')
-export const canOpenPersonalCalendar = (permissions: readonly string[]) => permissions.includes('zsjos:personal-calendar:query')
 
 const errorText = (error: unknown, fallback: string) =>
   error instanceof ApiError && error.code === 403 ? '暂无权限，请联系管理员配置对应功能权限' : error instanceof Error ? error.message : fallback
@@ -30,14 +29,6 @@ const bucketLabels: Record<BusinessTaskBucket, string> = {
 
 const bucketOrder: BusinessTaskBucket[] = ['overdue', 'today', 'future', 'unscheduled']
 const workPlanActions = new Set(['OPEN_WORK_TASK', 'CONFIRM_WORK_TASK', 'SUMMARIZE_WORK_PLAN'])
-const homeCalendarLocale = {
-  ...zhCNCalendarLocale,
-  lang: {
-    ...zhCNCalendarLocale.lang,
-    shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-    shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']
-  }
-}
 const emptySummary: BusinessTaskSummary = {
   overdue: 0,
   today: 0,
@@ -340,32 +331,6 @@ function BusinessTaskPanel({
   )
 }
 
-function HomeCalendarPanel({ enabled }: { enabled: boolean }) {
-  const navigate = useNavigate()
-  const openCalendar = () => {
-    if (enabled) navigate(APP_ROUTES.PERSONAL_CALENDAR)
-  }
-
-  return (
-    <section className="home-panel home-calendar-panel" aria-label="日历">
-      <header className="home-panel-header compact">
-        <Typography.Title level={4}>
-          <CalendarOutlined /> 日历
-        </Typography.Title>
-        <Button type="text" icon={<RightOutlined />} aria-label="查看完整日历" disabled={!enabled} onClick={openCalendar} />
-      </header>
-      <Calendar
-        fullscreen={false}
-        locale={homeCalendarLocale}
-        headerRender={() => null}
-        onSelect={(_, info) => {
-          if (info.source === 'date') openCalendar()
-        }}
-      />
-    </section>
-  )
-}
-
 export default function TodayTasksPage({ permissions, onOpenAssignment, tenantReadAll = false }: { permissions: string[]; onOpenAssignment: () => void; tenantReadAll?: boolean }) {
   const showBpmTasks = canQueryBpmTasks(permissions)
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
@@ -409,7 +374,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
           bpmError={bpmError}
           onRefresh={loadSummary}
         />
-        <HomeCalendarPanel enabled={canOpenPersonalCalendar(permissions)} />
+        <HomeCalendarPanel permissions={permissions} />
         <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>

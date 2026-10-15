@@ -735,10 +735,10 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     private BusinessTaskDO currentTask(Long relationId) {
-        for (String type : List.of(TYPE_FIRST_CONTACT, TYPE_STUDY_PLAN, TYPE_CONTACT)) {
-            BusinessTaskDO value = taskMapper.selectPendingByRelationAndType(relationId, type); if (value != null) return value;
-        }
-        return null;
+        var tasks = StudentContactReadPolicy.TASK_TYPES.stream()
+                .map(type -> taskMapper.selectPendingByRelationAndType(relationId, type))
+                .filter(java.util.Objects::nonNull).toList();
+        return StudentContactReadPolicy.currentTask(tasks);
     }
 
 
@@ -892,18 +892,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     private String stageLabel(String code) {
-        return switch (code) {
-            case STAGE_FIRST_CONTACT -> "首联";
-            case STAGE_STUDY_PLAN -> "制定学习计划";
-            case STAGE_SUPERVISION -> "常规督学";
-            case STAGE_EXAM_PREPARATION -> "考前通知与冲刺";
-            case STAGE_POST_EXAM -> "考后回访";
-            case STAGE_RESULT -> "成绩通知";
-            case STAGE_CERTIFICATE -> "证书通知与邮寄";
-            case STAGE_CONTINUOUS_FOLLOW_UP -> "持续回访";
-            case STAGE_COMPLETED -> "服务完成";
-            default -> code;
-        };
+        return StudentContactReadPolicy.stageLabel(code);
     }
 
     private List<StudentContactContextRespVO.DeliveryStageVO> deliveryStages(String current, boolean canSubmit) {

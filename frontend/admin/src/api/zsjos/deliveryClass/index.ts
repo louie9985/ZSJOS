@@ -10,6 +10,8 @@ export interface DeliveryClass {
   categoryPathSnapshot?: string
   examScheduleId?: number
   examScheduleSnapshot?: string
+  startDate?: string
+  endDate?: string
   homeroomUserId?: number
   homeroomUserNameSnapshot?: string
   deptId?: number
@@ -60,6 +62,9 @@ export interface ExamOption {
   id: number
   scheduleType: string
   displayName: string
+  exactDate?: string
+  startDate?: string
+  endDate?: string
   productId?: number
   categoryId: number
   frozenSkus: ProductSku[]
@@ -109,7 +114,9 @@ export const createDeliveryClass = (data: {
   selectedAttrs?: Record<string, string>
   selectedSkuIds?: number[]
   categoryId?: number
-  examScheduleId: number
+  examScheduleId?: number
+  startDate?: string
+  endDate?: string
   homeroomUserId: number
 }) => request.post<number>({ url: '/zsjos/delivery-class/create', data })
 export const updateDeliveryClass = (
@@ -120,7 +127,9 @@ export const updateDeliveryClass = (
     selectedAttrs?: Record<string, string>
     selectedSkuIds?: number[]
     categoryId?: number
-    examScheduleId: number
+    examScheduleId?: number
+    startDate?: string
+    endDate?: string
     homeroomUserId: number
     version: number
   }

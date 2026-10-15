@@ -59,6 +59,9 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
 
     private static final int EXPIRE_DAYS = 7;
     private static final int CODE_RETRY_LIMIT = 20;
+    // 邀请码需要人工辨认和输入，排除 I/O/L 与 0/1；不改变兼职编号的字符规则。
+    private static final String INVITE_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+    private static final String INVITE_DIGITS = "23456789";
     private static final DateTimeFormatter PARTNER_NO_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -354,7 +357,7 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
 
     private String generateInviteCode() {
         for (int i = 0; i < CODE_RETRY_LIMIT; i++) {
-            String code = randomLetters(4) + randomDigits(4);
+            String code = randomCharacters(INVITE_LETTERS, 4) + randomCharacters(INVITE_DIGITS, 4);
             if (invitationMapper.selectByInviteCode(code) == null) {
                 return code;
             }
@@ -372,10 +375,10 @@ public class PartnerInvitationServiceImpl implements PartnerInvitationService {
         throw exception(PARTNER_STATE_INVALID);
     }
 
-    private String randomLetters(int count) {
+    private String randomCharacters(String alphabet, int count) {
         StringBuilder result = new StringBuilder(count);
         for (int i = 0; i < count; i++) {
-            result.append((char) ('A' + RANDOM.nextInt(26)));
+            result.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
         }
         return result.toString();
     }

@@ -58,7 +58,7 @@ public class AdvancedFilterService {
         if (!SCENES.contains(scene)) throw exception(ADVANCED_FILTER_INVALID);
         List<AdvancedFilterCatalogRespVO.FieldVO> fields = new ArrayList<>(FIELDS.values().stream()
                 .filter(field -> field.bindings().containsKey(scene))
-                .map(AdvancedFilterMetadata::describe).toList());
+                .map(field -> AdvancedFilterMetadata.describe(field, scene)).toList());
         List<AdvancedFilterCatalogRespVO.OptionVO> dateOptions = fields.stream()
                 .filter(field -> "date".equals(field.valueType()))
                 .map(field -> new AdvancedFilterCatalogRespVO.OptionVO(field.fieldKey(), field.label()))

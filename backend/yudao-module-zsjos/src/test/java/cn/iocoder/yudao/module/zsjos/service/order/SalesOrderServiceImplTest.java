@@ -488,6 +488,7 @@ class SalesOrderServiceImplTest {
         assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         assertEquals(ROUND_REJECTED, round.getStatus());
         assertEquals("资料需补正", round.getDecisionReason());
+        verify(registrationService).cancelEarlyDeliveryByOrderId(eq(100L), eq("资料需补正"), any());
         assertEquals(OPPORTUNITY_STATUS_FOLLOWING, opportunity.getStatus());
         ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
         verify(businessTaskCommandService).create(task.capture());
@@ -514,6 +515,7 @@ class SalesOrderServiceImplTest {
         assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         verify(businessTaskCommandService, never()).create(any());
         service.handleProcessResult("process-1", CANCEL.getStatus(), "流程异常取消");
+        verify(registrationService).cancelEarlyDeliveryByOrderId(eq(100L), eq("流程异常取消"), any());
         verify(notifyBusinessEventApi).publish(argThat(event ->
                 "zsjos.sales_order.cancelled".equals(event.getSceneCode())
                         && "sales-order-cancelled:200".equals(event.getSourceEventKey())
@@ -1414,6 +1416,7 @@ class SalesOrderServiceImplTest {
         assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
         verify(processInstanceApi).terminateProcessInstanceByBusiness(
                 20L, "process-1", "zsjos.sales-order.terminate", "客户取消");
+        verify(registrationService).cancelEarlyDeliveryByOrderId(eq(100L), eq("流程异常取消"), any());
         verify(notifyBusinessEventApi).publish(argThat(event ->
                 "zsjos.sales_order.cancelled".equals(event.getSceneCode())
                         && "sales-order-cancelled:200".equals(event.getSourceEventKey())

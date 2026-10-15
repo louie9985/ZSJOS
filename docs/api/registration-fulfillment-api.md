@@ -1,5 +1,17 @@
 # 报名履约与学员 API
 
+### 学员管理服务摘要（2026-10-15）
+
+`my-service-page`、`my-service/search-page`、`my-service/{relationId}` 在既有字段外增加可选 `summary`：交付阶段名称、考试日期、当前联系任务、最近联系、班级编号/部门/考期、生命周期、`orderHandoff` 和 `infoSubmission`。旧 Admin 消费者继续读取原有字段；自然人聚合和新媒体接口不变。
+
+新增摘要按本页服务 ID 批量读取；既有基础服务投影不改变。当前任务依次选择待处理首联、学习计划、普通联系，同类型最新 ID 优先；截止时间早于同次查询的服务端时间才算逾期。最近联系按提交时间、ID 倒序，均严格限定当前服务。`currentTask.dueAt` 与 `latestContact.nextContactAt` 含义独立。
+
+`orderHandoff.access` / `infoSubmission.access` 为 `readable`、`denied`、`absent`。拒绝时不返回内容。订单交接沿用订单详情功能权限及批量对象可读性；资料摘要沿用资料读取功能权限及客资对象可读性，只选表单状态和时间相关元数据，已提交版本优先，不加载字段值和令牌。订单字典及成交人员沿用审批快照，不重查当前字典拼历史标签。
+
+分页请求增加 `ownerUserId`、`acceptanceStatus`、`deliveryStage`、`taskState`，其中任务状态为 `none/pending/overdue`。高级筛选新增 `service.examDate/acceptedAt/latestContactAt/taskDueAt/acceptanceStatus/deliveryStage/taskState/contentDirectorUserId/careerPlannerUserId/operatorUserId`。选项来自服务端目录；现有字段标识和旧模板时间含义保留。使用订单交接字段的筛选同时限制到既有订单详情可读范围。
+
+工作台默认展示 16 列，扩展字段进入列设置；原列显隐、顺序、列宽偏好保留。详情明确区分当前学习规划师和客资负责人，移动端保留列表及抽屉。没有摘要的旧服务端显示“摘要未提供”；上线先部署后端再部署工作台。
+
 历史学员可保留独立服务关系，`orderId`、`orderItemId`、`registrationCaseId` 允许为空，
 不以虚拟成交单补足关联。身份、服务负责人、班级和协作者授权仍由现有 Person／服务关系决定。
 无订单商品时课程信息读取服务自身快照。V310 放开三个来源列；先部署空关联可读的后端，
@@ -48,11 +60,12 @@ object authorization failures.
 
 新履约任务按 `orderItemId` 独立生成，返回 `orderItemId`、`productName` 和 `specs`。
 同一 Person 可拥有多个任务、课程服务主体和班级；同产品的不同订单明细不合并。审批仍按整单，
-完成仍要求订单生效，财务待审限制未放开。每个任务独立保存清单、附件、分班和完成状态。
+完成仍要求订单生效；财务待审核时允许保存分班并立即建立交付服务。每个任务独立保存清单、附件、分班和完成状态。
 
 `close` 在 pending/processing 的商品任务上表示“结束本产品，无需后续交付”，保存 `ended`、
 完成时间及操作人，原因沿用 `cancelReason`，操作时间兼容 `cancelledAt`。它不创建服务关系，
-不要求分班，不更改订单和其他商品任务。历史整单任务仍按旧语义置为 cancelled。
+不要求分班；若已提前建立服务，同步取消当前任务的服务和未完成交付待办、延期审批，保留历史记录。
+不更改订单和其他商品任务。历史整单任务仍按旧语义置为 cancelled。
 自动订单终止使用 cancelled，不改写已完成或已结束任务的处理事实。
 
 V317 将未完成的历史整单任务按商品拆分，首项保留旧任务 ID，其余复制原清单、附件引用和路由，
@@ -73,7 +86,7 @@ set in one versioned, idempotent command: every item belonging to this task must
 `SERVING` class, including the system pending class. Registration requests options without `categoryId` and
 both frontends show a flat searchable list of all serving classes, with loading, empty and retryable error states.
 Product/category/SKU/exam metadata does not filter candidates or block saving/completion, even when absent.
-Save and completion revalidate the order-item set, tenant class, serving state and formal homeroom eligibility
+Initial delivery creation revalidates the order-item set, tenant class, serving state and formal homeroom eligibility
 (enabled account with the enabled `study_planner` role). Pending classes have no owner.
 Category fields on assignments are optional product metadata, not the chosen class's category; missing labels
 remain null rather than being invented. Existing historical snapshots are not rewritten by schema correction.
@@ -99,18 +112,34 @@ users who hold `zsjos:registration:query-pool` and enabled users in the configur
 approval department subtree (including the configured root department). System persists the message and emits the existing post-commit
 WebSocket hint.
 
-When registration completion has created the student's service relations, only the task's order item produces one service
-relation with the selected `classId`. A formal class derives `ownerUserId` from its current homeroom; an explicitly
-pending assignment leaves owner null. Completion locks the registration, order, ordered order-item rows, assignment
-rows and target classes, then reuses that locked item set to create relations. A concurrent order-item change, class
-completion or homeroom change therefore cannot produce a partially validated ownership result.
-For every distinct formal-class homeroom,
-`zsjos.registration.planner_assigned` sends the assigned planner the message
-`学员{{student.name}}（{{student.no}}）已分配给你。` and emits the same post-commit WebSocket refresh hint. Selecting or
-changing the planner on an incomplete legacy case does not notify. Pending assignments do not notify. One completion
-publishes one event keyed by registration case and planner even when multiple items select the same homeroom. The durable
-message uses `bizType=student` and internal `personId` as its click target, so Workbench opens the
-corresponding My Students detail independently of the current list page.
+Saving a valid class assignment immediately creates the task's item service with active status and pending acceptance,
+including while finance is pending. Formal classes derive the owner from the validated homeroom; pending classes leave
+owner null and send no planner notification. Legacy planner assignment saves also establish delivery. Existing service
+identity is never replaced: class changes go through class management after activation. Retrying the same command is
+idempotent; a new assignment command on an already delivered case returns REGISTRATION_ALREADY_DELIVERED.
+
+Completion still requires an effective order, all required checklist items and attachments. It reuses existing active,
+paused or completed services without overwriting their class, owner, acceptance or delivery progress. Cancelled or
+mismatched services block completion. Legacy saved assignments without services may be explicitly saved again to deliver;
+there is no automatic historical backfill. Completion retains creation compatibility for valid undelivered records.
+
+Order locks precede registration locks in mutations. Delivery creation locks item rows, service rows, saved assignments
+and target classes. Order rejection cancels early services but retains pending/processing registration cases for revision;
+termination and successor-order creation use existing order cancellation. Cancellation retains contact/completion history,
+cancels pending first-contact, study-plan, contact, assistance and delivery-stage tasks plus pending contact extensions.
+Successor orders create their own cases/services without moving original delivery facts.
+
+Each created service with a planner publishes zsjos.registration.planner_assigned using student_service and its service ID.
+Event keys include case, planner and service identity, including historical aggregate cases. Completing an already delivered
+case does not send another assignment notification. Planner acceptance uses existing contact workflow and deadline rules.
+Cancellation publishes zsjos.registration.delivery_cancelled for the current planner with a message-detail action;
+configure its template/rule with the scoped script documented in ../operations/registration-early-delivery.md.
+
+Registration responses add deliveryEstablished, assignable, assignmentBlockReason and deliveries (serviceRelationId,
+orderItemId, status, classId/className, ownerUserId/ownerUserName, acceptanceStatus). Original classAssignments remain the
+initial snapshot; deliveries show current class/owner after transfers. completable/completionBlockReason remain server-owned.
+Student service projections add orderStatus/orderStatusLabel; independent historical services keep these null.
+Both Workbench and Admin render delivery and task completion separately and disable assignment once delivered.
 
 When completion assigns a content director, `zsjos.registration.director_assigned` creates one durable
 in-app message and the standard post-commit WebSocket hint for that director.

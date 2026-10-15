@@ -39,7 +39,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactExtensionMapper;
 import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
@@ -103,7 +102,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Resource private FileApi fileApi;
     @Resource private RegistrationNotifyPublisher registrationNotifyPublisher;
     @Resource private AdvancedFilterService advancedFilterService;
-    @Resource private BusinessTaskMapper businessTaskMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService taskCommandService;
     @Resource private StudentContactExtensionMapper studentContactExtensionMapper;
     @Resource private BpmProcessInstanceApi processInstanceApi;
 
@@ -250,6 +249,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             return getCaseForUpdateResult(caseId);
         }
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        SalesOrderDO deliveryOrder = requireUnassigned(registrationCase);
         if ("class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
         List<RegistrationCaseRouteDO> routes = caseRouteMapper.selectByCaseId(caseId);
         Map<Long, RegistrationRoutesUpdateReqVO.RouteReqVO> requested = reqVO.getRoutes().stream()
@@ -286,6 +286,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         plannerItem.setCheckedByUserId(plannerId != null ? userId : null);
         plannerItem.setCheckedAt(plannerId != null ? now : null);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
+        establishDelivery(registrationCase, deliveryOrder, userId);
         touch(registrationCase);
         return convert(registrationCase, true);
     }
@@ -303,10 +304,11 @@ public class RegistrationServiceImpl implements RegistrationService {
             return getCaseForUpdateResult(caseId);
         }
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        SalesOrderDO deliveryOrder = requireUnassigned(registrationCase);
         if (!"class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
-        SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
+        SalesOrderDO order = deliveryOrder;
         if (order == null) throw exception(REGISTRATION_ORDER_INVALID);
-        List<SalesOrderItemDO> orderItems = caseOrderItems(registrationCase, orderItemMapper.selectListByOrderId(order.getId()));
+        List<SalesOrderItemDO> orderItems = caseOrderItems(registrationCase, orderItemMapper.selectListByOrderIdForUpdate(order.getId(), TenantContextHolder.getRequiredTenantId()));
         Map<Long, RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO> requested = reqVO.getAssignments().stream()
                 .collect(Collectors.toMap(RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO::getOrderItemId,
                         Function.identity(), (left, right) -> { throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID); }));
@@ -314,9 +316,13 @@ public class RegistrationServiceImpl implements RegistrationService {
                 || orderItems.stream().anyMatch(item -> !requested.containsKey(item.getId()))) {
             throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         }
+        Map<Long, DeliveryClassDO> lockedClasses = new HashMap<>();
+        requested.values().stream().map(RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO::getClassId)
+                .distinct().sorted().forEach(id -> lockedClasses.put(id,
+                        deliveryClassMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId())));
         for (SalesOrderItemDO orderItem : orderItems) {
             RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO value = requested.get(orderItem.getId());
-            AssignmentSnapshot snapshot = validateClassAssignment(orderItem, value.getClassId(), false);
+            AssignmentSnapshot snapshot = validateClassAssignment(orderItem, lockedClasses.get(value.getClassId()));
             RegistrationClassAssignmentDO assignment = classAssignmentMapper.selectByCaseAndItem(caseId, orderItem.getId());
             if (assignment == null) {
                 assignment = new RegistrationClassAssignmentDO();
@@ -327,6 +333,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             if (assignment.getId() == null) classAssignmentMapper.insert(assignment);
             else classAssignmentMapper.updateById(assignment);
         }
+        establishDelivery(registrationCase, deliveryOrder, userId);
         touch(registrationCase);
         return convert(registrationCase, true);
     }
@@ -441,12 +448,11 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (!beginCommand(caseId, userId, "update-planner", reqVO.getIdempotencyKey(),
                 String.valueOf(reqVO.getStudyPlannerUserId()))) return getCaseForUpdateResult(caseId);
         RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        SalesOrderDO deliveryOrder = requireUnassigned(registrationCase);
         if ("class_per_item".equals(registrationCase.getAssignmentMode())) throw exception(REGISTRATION_STATE_INVALID);
-        Long previousPlannerId = registrationCase.getStudyPlannerUserId();
         RegistrationCaseRouteDO plannerRoute = caseRouteMapper.selectByCaseId(caseId).stream()
                 .filter(route -> ASSIGNEE_STUDY_PLANNER.equals(route.getAssigneeType())).findFirst()
                 .orElseThrow(() -> exception(REGISTRATION_ROUTE_INVALID));
-        if (Objects.equals(previousPlannerId, reqVO.getStudyPlannerUserId())) return convert(registrationCase, true);
         if (resolveRouteCandidates(plannerRoute, userId).stream()
                 .noneMatch(item -> Objects.equals(item.getId(), reqVO.getStudyPlannerUserId()))) {
             throw exception(REGISTRATION_STUDY_PLANNER_INVALID);
@@ -464,6 +470,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .orElseThrow(() -> exception(REGISTRATION_CHECKLIST_CONFIG_INVALID));
         plannerItem.setChecked(true); plannerItem.setCheckedByUserId(userId); plannerItem.setCheckedAt(now);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
+        establishDelivery(registrationCase, deliveryOrder, userId);
         touch(registrationCase);
         return convert(registrationCase, true);
     }
@@ -492,6 +499,133 @@ public class RegistrationServiceImpl implements RegistrationService {
                 && Boolean.TRUE.equals(item.getAttachmentRequired())
                 && attachments.getOrDefault(item.getId(), List.of()).isEmpty())) {
             throw exception(REGISTRATION_ATTACHMENT_REQUIRED);
+        }
+        establishDelivery(registrationCase, order, userId);
+        LocalDateTime now = LocalDateTime.now();
+        for (RegistrationCaseChecklistItemDO item : items) {
+            if (ITEM_TYPE_STUDY_PLANNER.equals(item.getItemType()) && !Boolean.TRUE.equals(item.getChecked())) {
+                continue;
+            }
+            if (ITEM_TYPE_ATTACHMENT.equals(item.getItemType())
+                    && attachments.getOrDefault(item.getId(), List.of()).isEmpty()) {
+                continue;
+            }
+            RegistrationItemDO fact = new RegistrationItemDO();
+            fact.setRegistrationCaseId(caseId); fact.setChecklistItemId(item.getId()); fact.setItemType(item.getItemType());
+            fact.setItemLabelSnapshot(item.getTitleSnapshot()); fact.setOccurredAt(item.getCheckedAt());
+            fact.setRecordedAt(now); fact.setRecordedByUserId(item.getCheckedByUserId()); registrationItemMapper.insert(fact);
+        }
+        registrationCase.setStatus(STATUS_COMPLETED); registrationCase.setCompletedByUserId(userId);
+        registrationCase.setCompletedAt(now); registrationCase.setVersion(registrationCase.getVersion() + 1); caseMapper.updateById(registrationCase);
+
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = COMMAND_CLOSE)
+    public void close(Long caseId, Long userId, RegistrationCloseReqVO reqVO) {
+        String reason = normalizeCloseReason(reqVO.getReason());
+        if (!beginCommand(caseId, userId, COMMAND_CLOSE, reqVO.getIdempotencyKey(), reason)) return;
+        RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        LocalDateTime now = LocalDateTime.now();
+        registrationCase.setStatus(registrationCase.getOrderItemId() == null ? STATUS_CANCELLED : STATUS_ENDED);
+        registrationCase.setCompletedByUserId(userId);
+        if (registrationCase.getOrderItemId() != null) registrationCase.setCompletedAt(now);
+        registrationCase.setCancelledAt(now);
+        registrationCase.setCancelReason(reason);
+        registrationCase.setVersion(registrationCase.getVersion() + 1);
+        caseMapper.updateById(registrationCase);
+        cancelServices(serviceRelationMapper.selectByCaseForUpdate(caseId, TenantContextHolder.getRequiredTenantId()), reason, now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelByOrderId(Long orderId, String reason, LocalDateTime now) {
+        orderMapper.selectByIdForUpdate(orderId, TenantContextHolder.getRequiredTenantId());
+        List<RegistrationCaseDO> cases = caseMapper.selectListByOrderId(orderId);
+        for (RegistrationCaseDO registrationCase : cases) {
+            if (!Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(registrationCase.getStatus())) continue;
+            RegistrationCaseDO locked = caseMapper.selectByIdForUpdate(registrationCase.getId(), TenantContextHolder.getRequiredTenantId());
+            if (locked != null && Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(locked.getStatus())) {
+                locked.setStatus(STATUS_CANCELLED); locked.setCancelledAt(now); locked.setCancelReason(reason);
+                locked.setVersion(locked.getVersion() + 1); caseMapper.updateById(locked);
+            }
+        }
+        cancelServices(serviceRelationMapper.selectByOrderForUpdate(orderId,
+                TenantContextHolder.getRequiredTenantId()), reason, now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelEarlyDeliveryByOrderId(Long orderId, String reason, LocalDateTime now) {
+        orderMapper.selectByIdForUpdate(orderId, TenantContextHolder.getRequiredTenantId());
+        for (RegistrationCaseDO registrationCase : caseMapper.selectListByOrderId(orderId)) {
+            RegistrationCaseDO locked = caseMapper.selectByIdForUpdate(registrationCase.getId(),
+                    TenantContextHolder.getRequiredTenantId());
+            if (locked != null && Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(locked.getStatus())) {
+                cancelServices(serviceRelationMapper.selectByCaseForUpdate(locked.getId(), TenantContextHolder.getRequiredTenantId()), reason, now);
+            }
+        }
+    }
+
+    private void cancelServices(List<ServiceRelationDO> relations, String reason, LocalDateTime now) {
+        List<StudentContactExtensionDO> bpmCancellations = new ArrayList<>();
+        relations.forEach(relation -> {
+            ServiceRelationDO lockedRelation = serviceRelationMapper.selectByIdForUpdate(
+                    relation.getId(), TenantContextHolder.getRequiredTenantId());
+            if (lockedRelation == null || !Set.of("active", "paused", "completed").contains(lockedRelation.getStatus())) return;
+            String terminationReason = reason == null || reason.isBlank() ? "订单已取消" : reason.trim();
+            if (serviceRelationMapper.cancelDelivery(lockedRelation.getId(), lockedRelation.getVersion(), now,
+                    terminationReason) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+            registrationNotifyPublisher.publishDeliveryCancelled(lockedRelation, terminationReason, now);
+            for (String type : List.of(StudentContactConstants.TYPE_FIRST_CONTACT, StudentContactConstants.TYPE_STUDY_PLAN,
+                    StudentContactConstants.TYPE_CONTACT, StudentContactConstants.TYPE_ASSISTANCE, StudentContactConstants.TYPE_DELIVERY_STAGE)) {
+                taskCommandService.cancel(type, lockedRelation.getId(), null, now, "服务关系已取消");
+            }
+            studentContactExtensionMapper.selectList(new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO>()
+                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getServiceRelationId, lockedRelation.getId())
+                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getStatus, "pending"))
+                    .forEach(extension -> {
+                        if (studentContactExtensionMapper.transitionPending(extension.getId(), extension.getVersion(),
+                                "cancelled", "服务关系已取消", null, now) == 1
+                                && extension.getProcessInstanceId() != null) bpmCancellations.add(extension);
+                    });
+        });
+        if (!bpmCancellations.isEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    bpmCancellations.forEach(extension -> {
+                        try { processInstanceApi.cancelProcessInstanceByStartUser(extension.getApplicantUserId(),
+                                extension.getProcessInstanceId(), "服务关系已取消"); }
+                        catch (RuntimeException ex) {
+                            log.error("[cancelByOrderId][extensionId({}) BPM cancellation failed after commit]",
+                                    extension.getId(), ex);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    /** Order and case locks serialize delivery activation with rejection and termination. */
+    private void establishDelivery(RegistrationCaseDO registrationCase, SalesOrderDO order, Long userId) {
+        requireDeliverableOrder(order);
+        Long caseId = registrationCase.getId();
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        List<ServiceRelationDO> existing = serviceRelationMapper.selectByCaseForUpdate(registrationCase.getId(),
+                TenantContextHolder.getRequiredTenantId());
+        if (!existing.isEmpty()) {
+            List<SalesOrderItemDO> expected = caseOrderItems(registrationCase,
+                    orderItemMapper.selectListByOrderIdForUpdate(order.getId(), tenantId));
+            if (existing.size() != expected.size() || expected.stream().anyMatch(item ->
+                    existing.stream().noneMatch(relation -> Objects.equals(relation.getOrderItemId(), item.getId())
+                            && Objects.equals(relation.getOrderId(), order.getId())
+                            && Objects.equals(relation.getPersonId(), order.getPersonId())
+                            && Set.of("active", "paused", "completed").contains(relation.getStatus())))) {
+                throw exception(REGISTRATION_DELIVERY_INVALID);
+            }
+            // Class transfers own the current assignment; never replay the initial snapshot over it.
+            return;
         }
         boolean classMode = "class_per_item".equals(registrationCase.getAssignmentMode());
         Long plannerId = null;
@@ -530,20 +664,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             if (pendingClass == null) throw exception(REGISTRATION_ROUTE_INVALID);
         }
         LocalDateTime now = LocalDateTime.now();
-        for (RegistrationCaseChecklistItemDO item : items) {
-            if (ITEM_TYPE_STUDY_PLANNER.equals(item.getItemType()) && !Boolean.TRUE.equals(item.getChecked())) {
-                continue;
-            }
-            if (ITEM_TYPE_ATTACHMENT.equals(item.getItemType())
-                    && attachments.getOrDefault(item.getId(), List.of()).isEmpty()) {
-                continue;
-            }
-            RegistrationItemDO fact = new RegistrationItemDO();
-            fact.setRegistrationCaseId(caseId); fact.setChecklistItemId(item.getId()); fact.setItemType(item.getItemType());
-            fact.setItemLabelSnapshot(item.getTitleSnapshot()); fact.setOccurredAt(item.getCheckedAt());
-            fact.setRecordedAt(now); fact.setRecordedByUserId(item.getCheckedByUserId()); registrationItemMapper.insert(fact);
-        }
-        Long createdServiceId = null;
+        PersonDO person = personMapper.selectByIdForUpdate(order.getPersonId(), tenantId);
         for (SalesOrderItemDO orderItem : orderItems) {
             AssignmentSnapshot assignment = classMode ? assignments.get(orderItem.getId()) : null;
             ServiceRelationDO relation = new ServiceRelationDO();
@@ -554,92 +675,36 @@ public class RegistrationServiceImpl implements RegistrationService {
             relation.setAcceptanceStatus("pending"); relation.setServiceSnapshot(orderItem.getProductSnapshot());
             relation.setActivatedAt(now); relation.setVersion(0);
             serviceRelationMapper.insert(relation);
-            createdServiceId = relation.getId();
+            if (relation.getOwnerUserId() != null) {
+                registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
+                        person == null ? null : person.getPersonNo(), relation.getOwnerUserId(),
+                        order.getPersonId(), relation.getId());
+            }
         }
-        PersonDO person = personMapper.selectByIdForUpdate(order.getPersonId(), TenantContextHolder.getRequiredTenantId());
         if (person != null) { person.setIdentityStatus("student"); person.setLastSeenAt(now); person.setVersion(person.getVersion() + 1); personMapper.updateById(person); }
-        registrationCase.setStatus(STATUS_COMPLETED); registrationCase.setCompletedByUserId(userId);
-        registrationCase.setCompletedAt(now); registrationCase.setVersion(registrationCase.getVersion() + 1); caseMapper.updateById(registrationCase);
-        Set<Long> notifiedPlanners = classMode ? assignments.values().stream().map(AssignmentSnapshot::ownerUserId)
-                .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new))
-                : plannerId == null ? Set.of() : Set.of(plannerId);
-        for (Long notifiedPlanner : notifiedPlanners) {
-            if (registrationCase.getOrderItemId() != null) {
-                registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
-                        person == null ? null : person.getPersonNo(), notifiedPlanner, order.getPersonId(), createdServiceId);
-            } else {
-                registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
-                        person == null ? null : person.getPersonNo(), notifiedPlanner, order.getPersonId());
-            }
+    }
+
+    private List<ServiceRelationDO> caseServices(RegistrationCaseDO registrationCase) {
+        return serviceRelationMapper.selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getRegistrationCaseId, registrationCase.getId())
+                .orderByAsc(ServiceRelationDO::getId));
+    }
+
+    private void requireDeliverableOrder(SalesOrderDO order) {
+        if (order == null) throw exception(REGISTRATION_ORDER_INVALID);
+        if (STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_REVISION_REQUIRED);
+        if (!Set.of(STATUS_PENDING_APPROVAL, STATUS_EFFECTIVE).contains(order.getStatus())) {
+            throw exception(REGISTRATION_ORDER_NOT_EFFECTIVE);
         }
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = COMMAND_CLOSE)
-    public void close(Long caseId, Long userId, RegistrationCloseReqVO reqVO) {
-        String reason = normalizeCloseReason(reqVO.getReason());
-        if (!beginCommand(caseId, userId, COMMAND_CLOSE, reqVO.getIdempotencyKey(), reason)) return;
-        RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
-        LocalDateTime now = LocalDateTime.now();
-        registrationCase.setStatus(registrationCase.getOrderItemId() == null ? STATUS_CANCELLED : STATUS_ENDED);
-        registrationCase.setCompletedByUserId(userId);
-        if (registrationCase.getOrderItemId() != null) registrationCase.setCompletedAt(now);
-        registrationCase.setCancelledAt(now);
-        registrationCase.setCancelReason(reason);
-        registrationCase.setVersion(registrationCase.getVersion() + 1);
-        caseMapper.updateById(registrationCase);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void cancelByOrderId(Long orderId, String reason, LocalDateTime now) {
-        List<RegistrationCaseDO> cases = caseMapper.selectListByOrderId(orderId);
-        List<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO> bpmCancellations = new ArrayList<>();
-        for (RegistrationCaseDO registrationCase : cases) {
-            if (!Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(registrationCase.getStatus())) continue;
-            RegistrationCaseDO locked = caseMapper.selectByIdForUpdate(registrationCase.getId(), TenantContextHolder.getRequiredTenantId());
-            if (locked != null && Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(locked.getStatus())) {
-                locked.setStatus(STATUS_CANCELLED); locked.setCancelledAt(now); locked.setCancelReason(reason);
-                locked.setVersion(locked.getVersion() + 1); caseMapper.updateById(locked);
-            }
-        }
-        serviceRelationMapper.selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
-                .eq(ServiceRelationDO::getOrderId, orderId)
-                .eq(ServiceRelationDO::getStatus, "active")).forEach(relation -> {
-            ServiceRelationDO lockedRelation = serviceRelationMapper.selectByIdForUpdate(
-                    relation.getId(), TenantContextHolder.getRequiredTenantId());
-            if (lockedRelation == null || !"active".equals(lockedRelation.getStatus())) return;
-            String terminationReason = reason == null || reason.isBlank() ? "订单已取消" : reason.trim();
-            if (serviceRelationMapper.cancelActive(lockedRelation.getId(), lockedRelation.getVersion(), now,
-                    terminationReason) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
-            for (String type : List.of(StudentContactConstants.TYPE_FIRST_CONTACT, StudentContactConstants.TYPE_STUDY_PLAN,
-                    StudentContactConstants.TYPE_CONTACT, StudentContactConstants.TYPE_ASSISTANCE)) {
-                businessTaskMapper.cancelPending(type, lockedRelation.getId(), null, now, "服务关系已取消");
-            }
-            studentContactExtensionMapper.selectList(new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO>()
-                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getServiceRelationId, lockedRelation.getId())
-                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getStatus, "pending"))
-                    .forEach(extension -> {
-                        if (studentContactExtensionMapper.transitionPending(extension.getId(), extension.getVersion(),
-                                "cancelled", "服务关系已取消", null, now) == 1
-                                && extension.getProcessInstanceId() != null) bpmCancellations.add(extension);
-                    });
-        });
-        if (!bpmCancellations.isEmpty()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() {
-                    bpmCancellations.forEach(extension -> {
-                        try { processInstanceApi.cancelProcessInstanceByStartUser(extension.getApplicantUserId(),
-                                extension.getProcessInstanceId(), "服务关系已取消"); }
-                        catch (RuntimeException ex) {
-                            log.error("[cancelByOrderId][extensionId({}) BPM cancellation failed after commit]",
-                                    extension.getId(), ex);
-                        }
-                    });
-                }
-            });
-        }
+    private SalesOrderDO requireUnassigned(RegistrationCaseDO registrationCase) {
+        SalesOrderDO order = orderMapper.selectByIdForUpdate(registrationCase.getOrderId(),
+                TenantContextHolder.getRequiredTenantId());
+        requireDeliverableOrder(order);
+        if (!serviceRelationMapper.selectByCaseForUpdate(registrationCase.getId(),
+                TenantContextHolder.getRequiredTenantId()).isEmpty()) throw exception(REGISTRATION_ALREADY_DELIVERED);
+        return order;
     }
 
     private String normalizeCloseReason(String reason) {
@@ -647,6 +712,9 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     private RegistrationCaseDO lockEditable(Long caseId, Integer expectedVersion) {
+        RegistrationCaseDO located = caseMapper.selectById(caseId);
+        if (located == null) throw exception(REGISTRATION_CASE_NOT_EXISTS);
+        orderMapper.selectByIdForUpdate(located.getOrderId(), TenantContextHolder.getRequiredTenantId());
         RegistrationCaseDO registrationCase = caseMapper.selectByIdForUpdate(caseId, TenantContextHolder.getRequiredTenantId());
         if (registrationCase == null) throw exception(REGISTRATION_CASE_NOT_EXISTS);
         if (!Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(registrationCase.getStatus())) throw exception(REGISTRATION_STATE_INVALID);
@@ -800,6 +868,25 @@ public class RegistrationServiceImpl implements RegistrationService {
             AdminUserRespDTO planner = adminUserApi.getUser(registrationCase.getStudyPlannerUserId());
             result.setStudyPlannerUserName(planner == null ? null : planner.getNickname());
         }
+        List<ServiceRelationDO> deliveries = caseServices(registrationCase);
+        result.setDeliveryEstablished(!deliveries.isEmpty());
+        result.setDeliveries(deliveries.stream().map(relation -> {
+            RegistrationCaseRespVO.DeliveryVO row = new RegistrationCaseRespVO.DeliveryVO();
+            row.setServiceRelationId(relation.getId()); row.setOrderItemId(relation.getOrderItemId());
+            row.setStatus(relation.getStatus()); row.setClassId(relation.getClassId());
+            row.setOwnerUserId(relation.getOwnerUserId()); row.setAcceptanceStatus(relation.getAcceptanceStatus());
+            DeliveryClassDO currentClass = relation.getClassId() == null ? null : deliveryClassMapper.selectById(relation.getClassId());
+            row.setClassName(currentClass == null ? null : currentClass.getClassName());
+            AdminUserRespDTO owner = relation.getOwnerUserId() == null ? null : adminUserApi.getUser(relation.getOwnerUserId());
+            row.setOwnerUserName(owner == null ? null : owner.getNickname());
+            return row;
+        }).toList());
+        String assignmentBlock = !Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(registrationCase.getStatus())
+                ? "当前报名任务已结束，无法分班"
+                : order == null || !Set.of(STATUS_PENDING_APPROVAL, STATUS_EFFECTIVE).contains(order.getStatus())
+                ? "订单审批未通过或已终止，无法分班"
+                : !deliveries.isEmpty() ? "已建立交付服务，变更班级请通过班级管理办理转班" : null;
+        result.setAssignable(assignmentBlock == null); result.setAssignmentBlockReason(assignmentBlock);
         if (details) {
             List<RegistrationCaseChecklistItemDO> items = caseItemMapper.selectByCaseId(registrationCase.getId());
             List<RegistrationItemAttachmentDO> attachmentRows = attachmentMapper.selectByItemIds(
@@ -910,6 +997,15 @@ public class RegistrationServiceImpl implements RegistrationService {
                 && Boolean.TRUE.equals(item.getAttachmentRequired())
                 && (item.getAttachments() == null || item.getAttachments().isEmpty()))) {
             code = COMPLETION_BLOCK_ATTACHMENT_REQUIRED; reason = "请先上传所有必传附件";
+        } else if (Boolean.TRUE.equals(result.getDeliveryEstablished())) {
+            List<ServiceRelationDO> existing = caseServices(registrationCase);
+            List<SalesOrderItemDO> expected = caseOrderItems(registrationCase, orderItemMapper.selectListByOrderId(order.getId()));
+            if (existing.size() != expected.size() || expected.stream().anyMatch(item -> existing.stream().noneMatch(relation ->
+                    Objects.equals(relation.getOrderItemId(), item.getId()) && Objects.equals(relation.getOrderId(), order.getId())
+                    && Objects.equals(relation.getPersonId(), order.getPersonId())
+                    && Set.of("active", "paused", "completed").contains(relation.getStatus())))) {
+                code = "delivery_invalid"; reason = "交付服务已结束或与报名任务不一致，无法完成报名";
+            }
         } else if ("class_per_item".equals(result.getAssignmentMode())
                 && (result.getClassAssignments() == null || result.getClassAssignments().isEmpty()
                 || result.getClassAssignments().stream().anyMatch(item -> item.getClassId() == null

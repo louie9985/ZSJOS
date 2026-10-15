@@ -46,3 +46,7 @@
 `/zsjos/media-students` 的排序按钮位于页面顶部、刷新按钮左侧，列表收起时仍可操作；此页面是独立媒体卡片列表，不是 `/zsjos/my-students` 的表格模式。排序遵守既有编辑离开检查，回到第一批并清空已加载卡片；无限滚动、服务期/运营/高级筛选及刷新均保留排序。既有 Vue Admin 调用不传排序参数时仍走原路径、返回原响应与默认顺序。媒体页面专项验证：`test/media-student-sorting.html`、`test/media-student-sorting-browser.py`、`MediaStudentListSortTest` 与 `MediaStudentServiceTest`。
 
 验证入口：后端 `service/sorting/*Test`，前端 `src/services/businessListSort.test.ts`，真实页面浏览器夹具 `test/business-list-sorting.html` 与 `test/business-list-sorting-browser.py`。浏览器通过 `SORT_TEST_BASE` 指向任务自有 Vite 实例，数据仅为隔离测试数据，不写业务库。另验证既有 Admin 请求模块不传新增参数时仍使用原路径和响应。
+
+## 学员服务摘要排序扩展（2026-10-15）
+
+服务级学员接口新增 `personNo`、`acceptedAt`、`examDate`、`latestContactAt`、`taskDueAt`、`pausedAt`、`completedAt`、`terminatedAt`。新增日期排序空值始终置后，再以服务 ID 倒序打破平局；排序与过滤均在 SQL 分页前完成。当前任务截止排序使用与联系详情相同的任务类型优先级和同类型最新 ID。其他新展示列不声明未实现的排序。旧字段、旧自然人列表契约保持兼容。

@@ -52,7 +52,8 @@ class PerformanceDetailMySqlTest {
                     boolean missing=type.equals("SELF")||type.equals("USER");
                     when(access.historicalScope(any())).thenReturn(new PerformanceAccess.HistoricalScope(true,missing,Set.of()));
                     when(access.historicalRowAllowed(any(),any())).thenAnswer(call->missing||call.getArgument(1)!=null);
-                    for(String metric:List.of("orders","leads","valid","conversion","assigned","missed","followUps","tasks","accept","qualification","todayFollowUp","overdueFollowUp")){
+                    // Current follow-ups use current assignees, not this historical-attribution oracle.
+                    for(String metric:List.of("orders","leads","valid","conversion","assigned","missed","followUps","tasks","accept","qualification")){
                         Query q=query(type,scope,metric);q.setPageSize(1000000);
                         long before=System.nanoTime();var expected=reference.details(q);long referenceNanos=System.nanoTime()-before;
                         q.setPageSize(20);var actual=new ArrayList<Detail>();long pagedNanos=0;

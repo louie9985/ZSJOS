@@ -79,6 +79,7 @@ public final class PerformanceDetailSql {
                 + "ORDER BY r.occurred_at DESC,r.id DESC</script>";
     }
     private static String relation(PerformanceDetailQuery q) {
+        if (CurrentFollowUpSql.supports(q.getMetric())) return CurrentFollowUpSql.relation(q);
         return switch (q.getMetric()) {
             case "orders" -> orderDefinitions(q) + ", result AS (SELECT * FROM orders WHERE " + interval("occurred_at", "end") + ")";
             case "leads", "valid" -> "receipts AS (" + scoped(PerformanceFactSql.RECEIPTS) + "), ranked AS ("
@@ -112,6 +113,7 @@ public final class PerformanceDetailSql {
     }
     public static String page(PerformanceDetailQuery q) {
         String order = switch (q.getMetric()) {
+            case "todayFollowUp", "overdueFollowUp" -> "due_at,id";
             case "leads", "valid" -> "receipt_occurred_at DESC,receipt_id DESC,id";
             case "orders", "assigned", "missed", "followUps" -> "occurred_at DESC,id DESC";
             default -> "CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id,assignment_id,outcome,completed_at";

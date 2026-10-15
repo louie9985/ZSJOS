@@ -20,6 +20,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode DELIVERY_CLASS_TRANSFER_INVALID = new ErrorCode(1_900_019_009, "目标班级不可接收该课程服务");
     ErrorCode REGISTRATION_CLASS_ASSIGNMENT_INVALID = new ErrorCode(1_900_019_010, "请为每个订单商品选择同产品分类的可用班级");
     ErrorCode REGISTRATION_CLASS_ASSIGNMENT_CONFLICT = new ErrorCode(1_900_019_011, "报名分班已被其他人修改，请刷新后重试");
+    ErrorCode REGISTRATION_ALREADY_DELIVERED = new ErrorCode(1_900_019_017, "已建立交付服务，请通过班级管理办理转班");
+    ErrorCode REGISTRATION_DELIVERY_INVALID = new ErrorCode(1_900_019_018, "交付服务已结束或与报名任务不一致，无法完成报名");
     ErrorCode CLASS_TRANSFER_NOT_EXISTS = new ErrorCode(1_900_019_012, "调班申请不存在");
     ErrorCode CLASS_TRANSFER_INVALID = new ErrorCode(1_900_019_013, "当前课程服务不允许发起或执行调班");
     ErrorCode CLASS_TRANSFER_ACTIVE = new ErrorCode(1_900_019_014, "该课程服务已有待审批的调班申请");

@@ -14,4 +14,5 @@ public class StudentServiceRespVO {
     private String leadNo;
     private LocalDateTime activatedAt;
     private MyStudentRespVO.ServiceVO service;
+    private StudentServiceSummaryVO summary;
 }

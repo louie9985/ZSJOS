@@ -28,6 +28,21 @@ public class RegistrationCaseRespVO {
     private LocalDateTime cancelledAt;
     private String cancelReason;
     private Integer version;
+    private Boolean deliveryEstablished;
+    private Boolean assignable;
+    private String assignmentBlockReason;
+    private List<DeliveryVO> deliveries;
+    @Data
+    public static class DeliveryVO {
+        private Long serviceRelationId;
+        private Long orderItemId;
+        private String status;
+        private Long classId;
+        private String className;
+        private Long ownerUserId;
+        private String ownerUserName;
+        private String acceptanceStatus;
+    }
     private Boolean completable;
     private String completionBlockCode;
     private String completionBlockReason;

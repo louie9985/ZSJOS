@@ -9,17 +9,18 @@ describe('delivery class review fixes', () => {
     expect(source).toContain('delivery-class-grid')
   })
 
-  it('loads classes incrementally and places the pending class first in the same grid', () => {
+  it('loads formal classes incrementally and separates the pending entry', () => {
     expect(source).toContain('IntersectionObserver')
-    expect(source).toContain('const orderedRows = [...rows].sort((left, right) => Number(right.systemClass) - Number(left.systemClass))')
-    expect(source).toContain('delivery-class-grid">{orderedRows.map(row => <Card')
+    expect(source).toContain('excludeSystemClass: true')
+    expect(source).toContain('delivery-class-grid">{rows.map(row => <Card')
     expect(source).toContain("row.systemClass ? ' delivery-class-pending' : ''")
     expect(source).toContain('setHasMore(targetPage * CLASS_PAGE_SIZE < page.total)')
   })
 
-  it('makes the pending class a standard clickable card without management actions', () => {
+  it('keeps a pending navigation entry independent of formal filters', () => {
     expect(source).toContain('hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}')
-    expect(source).toContain('点击查看待分班学员')
+    expect(source).toContain('查看待分班学员')
+    expect(source).toContain('classId: pending.id')
     expect(source).toContain('manage && !row.systemClass')
   })
 
@@ -29,9 +30,10 @@ describe('delivery class review fixes', () => {
     expect(source).not.toContain('loadStudents')
   })
 
-  it('loads exam choices directly without a product prerequisite', () => {
-    expect(source).toContain('api.deliveryClasses.exams()')
-    expect(source).toContain('examScheduleId: row.examScheduleId')
+  it('keeps calendar lookup optional for independently editable dates', () => {
+    expect(source).toContain('DeliveryClassExamCalendar')
+    expect(source).toContain('name="startDate"')
+    expect(source).not.toContain('api.deliveryClasses.exams()')
     expect(source).not.toContain('selectedSkuIds')
   })
 })

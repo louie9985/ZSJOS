@@ -4,6 +4,46 @@
   gap: var(--crm-gap);
 }
 
+.delivery-class-filters {
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+}
+.delivery-class-filter-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  align-items: end;
+  gap: var(--crm-gap);
+}
+.delivery-class-filter-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  min-width: 0;
+  color: var(--crm-text-secondary);
+}
+.delivery-class-filter-fields .ant-select { width: 100%; }
+.delivery-class-quick-dates { margin-top: var(--crm-sp-4); }
+.delivery-class-quick-dates .ant-picker { max-width: 100%; }
+.delivery-class-pending-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  border: 1px dashed var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  padding: var(--crm-card-pad);
+}
+@media (max-width: 1000px) {
+  .delivery-class-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .delivery-class-filter-fields > .ant-btn { justify-self: start; }
+}
+@media (max-width: 576px) {
+  .delivery-class-filter-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
 .delivery-class-card {
   min-width: 0;
   border-radius: var(--crm-radius-md);

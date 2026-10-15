@@ -49,12 +49,13 @@ public class AdvancedFilterTemplateController {
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
             + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
             + " || (#scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
+            + " || (#scene == 'student_service' && @ss.hasPermission('zsjos:student:query-my'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))"
             + " || (#scene == 'cashback' && @ss.hasAnyPermissions('zsjos:cashback:my-query','zsjos:cashback:finance-query'))"
             + " || (#scene == 'withdrawal' && @ss.hasAnyPermissions('zsjos:withdrawal:my-query','zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<List<AdvancedFilterTemplateRespVO>> visibleList(
-            @RequestParam @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|media_student|subordinate_sales|cashback|withdrawal") String scene,
+            @RequestParam @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|student_service|media_student|subordinate_sales|cashback|withdrawal") String scene,
             @RequestParam @Pattern(regexp = "[a-z][a-z0-9_:-]{1,95}") String pageKey) {
         return success(service.visibleList(scene, pageKey, getLoginUserId()));
     }
@@ -106,7 +107,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "获得系统预置高级筛选模板")
     @PreAuthorize("@ss.hasPermission('zsjos:advanced-filter-template:query')")
     public CommonResult<List<AdvancedFilterTemplateRespVO>> systemList(
-            @RequestParam @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|media_student|subordinate_sales|cashback|withdrawal") String scene,
+            @RequestParam @Pattern(regexp = "lead|order|lead_appeal|duplicate_review|registration|student|student_service|media_student|subordinate_sales|cashback|withdrawal") String scene,
             @RequestParam @Pattern(regexp = "[a-z][a-z0-9_:-]{1,95}") String pageKey) {
         return success(service.systemList(scene, pageKey));
     }

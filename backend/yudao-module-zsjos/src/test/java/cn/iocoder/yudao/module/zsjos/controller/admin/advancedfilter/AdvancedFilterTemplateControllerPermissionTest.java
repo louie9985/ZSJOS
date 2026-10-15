@@ -76,14 +76,14 @@ class AdvancedFilterTemplateControllerPermissionTest {
     @Test
     void visibleListGuardIsSceneAware() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
-        assertEquals(10, guard.split("#scene").length - 1, "十个场景各需一条分支");
+        assertEquals(11, guard.split("#scene").length - 1, "每个支持场景各需一条分支");
     }
 
     @Test
     void visibleListGuardCoversEverySupportedScene() throws NoSuchMethodException {
         String guard = visibleListGuard().value();
         List<String> scenes = List.of("lead", "order", "lead_appeal", "duplicate_review",
-                "registration", "student", "media_student", "subordinate_sales", "cashback", "withdrawal");
+                "registration", "student", "student_service", "media_student", "subordinate_sales", "cashback", "withdrawal");
         for (String scene : scenes) {
             assertTrue(guard.contains("(#scene == '" + scene + "'"),
                     "场景 " + scene + " 缺少授权分支");

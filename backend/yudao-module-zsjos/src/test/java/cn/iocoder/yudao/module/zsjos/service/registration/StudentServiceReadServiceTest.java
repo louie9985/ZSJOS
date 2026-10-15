@@ -26,6 +26,7 @@ class StudentServiceReadServiceTest {
     @Mock DeliveryClassScopeService classScope;
     @Mock BusinessReadScopeService readScope;
     @Mock AdvancedFilterService filters;
+    @Mock StudentServiceSummaryReader summaryReader;
     @BeforeEach void before(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void after(){TenantContextHolder.clear();}
     @Test void twoCoursesOfSamePersonRemainTwoRowsAndDatabaseTotal(){

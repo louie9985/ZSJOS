@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   App,
@@ -9,28 +9,25 @@ import {
   Input,
   Skeleton,
   Space,
-  Tabs,
   Tag,
-  Timeline,
   Typography
 } from 'antd'
-import { AuditOutlined, CopyOutlined, LinkOutlined, SendOutlined } from '@ant-design/icons'
+import { CopyOutlined, LinkOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import DateTimeText from '../DateTimeText'
 import DetailFieldGrid from '../DetailFieldGrid'
 import {
   api,
-  ApiError,
-  AuthenticationError,
   type BpmApprovalBrief,
-  type BpmApprovalDetail as BpmApprovalDetailData,
-  type BpmApprovalDetailCard,
   type BpmComment,
   type BpmTask,
   type DictData,
   type SimpleUser
 } from '../../services/api'
 import BpmApprovalActions from './BpmApprovalActions'
+import ApprovalHistory from './ApprovalHistory'
+import { useApprovalResource } from './useApprovalResource'
+import { approvalStatus } from './approvalHistoryModel'
 import BusinessContentCard from './BusinessContentCard'
 import FeedbackBusinessContent from '../FeedbackBusinessContent'
 import BpmDynamicForm, {
@@ -39,56 +36,12 @@ import BpmDynamicForm, {
   parseBpmFormConf,
   parseBpmFormFields
 } from './BpmDynamicForm'
-import { BPM_VARIABLE_LABELS, bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from './bpmStatus'
+import { bpmStatusColor, bpmStatusLabel, bpmVariableLabel, hasChinese } from './bpmStatus'
 
 /**
  * 流程表单：字段定义存于 BPM，可由前端渲染。
  */
 const FORM_TYPE_NORMAL = 10
-
-const TIMELINE_COLORS: Record<number, string> = {
-  2: 'green',
-  3: 'red',
-  4: 'gray',
-  5: 'orange'
-}
-
-
-/** 审批记录时间线：节点顺序与状态均由后端 activityNodes 给出。 */
-function ApprovalTimeline({ detail }: { detail?: BpmApprovalDetailData }) {
-  const nodes = detail?.activityNodes ?? []
-  if (nodes.length === 0) return <Empty description="暂无审批记录"/>
-
-  return <Timeline
-    className="bpm-approval-timeline"
-    items={nodes.map(node => ({
-      color: node.status === undefined ? 'blue' : TIMELINE_COLORS[node.status] ?? 'blue',
-      children: <div className="bpm-approval-timeline-node">
-        <Space size={8} wrap>
-          <Typography.Text strong>{node.name}</Typography.Text>
-          {node.status !== undefined && <Tag color={bpmStatusColor(node.status)}>{bpmStatusLabel(node.status)}</Tag>}
-        </Space>
-        {node.tasks?.map(task => <div key={task.id} className="bpm-approval-timeline-task">
-          <Typography.Text type="secondary">
-            {task.assigneeUser?.nickname || task.ownerUser?.nickname || '待分配'}
-            {task.endTime ? ' · 已处理 ' : ' · 到达 '}
-          </Typography.Text>
-          <DateTimeText value={task.endTime ?? task.createTime}/>
-          {task.reason && <Typography.Paragraph className="bpm-approval-timeline-reason">
-            意见：{task.reason}
-          </Typography.Paragraph>}
-          {task.signPicUrl && <img src={task.signPicUrl} alt="签名" className="bpm-signature-preview"/>}
-        </div>)}
-        {/* 未生成任务的候选人，仅用于展示后续将由谁审批。 */}
-        {node.candidateUsers && node.candidateUsers.length > 0 && !node.tasks?.length && (
-          <Typography.Text type="secondary">
-            候选审批人：{node.candidateUsers.map(user => user.nickname).join('、')}
-          </Typography.Text>
-        )}
-      </div>
-    }))}
-  />
-}
 
 /**
  * 流程实例与任务编号：UUID 对审批人没有信息量，但排查问题时要拿得到。
@@ -134,49 +87,35 @@ function ProcessIdentifiers({ processInstanceId, taskId }: {
   />
 }
 
-/** 流转记录：任务级明细，含加签产生的子任务。 */
-function TaskRecords({ tasks, loading }: { tasks: BpmTask[]; loading: boolean }) {
-  if (loading) return <Skeleton active paragraph={{ rows: 4 }}/>
-  if (tasks.length === 0) return <Empty description="暂无流转记录"/>
-
-  return <div className="bpm-approval-records">
-    {tasks.map(task => <div key={task.id} className="bpm-approval-record">
-      <Space size={8} wrap>
-        <Typography.Text strong>{task.name}</Typography.Text>
-        <Tag color={bpmStatusColor(task.status)}>{bpmStatusLabel(task.status)}</Tag>
-        {task.parentTaskId && <Tag>加签</Tag>}
-      </Space>
-      <DetailFieldGrid columns={2} items={[
-        { key: 'assignee', label: '处理人', value: task.assigneeUser?.nickname || task.ownerUser?.nickname || '-' },
-        { key: 'createTime', label: '到达时间', value: <DateTimeText value={task.createTime}/> },
-        { key: 'endTime', label: '完成时间', value: <DateTimeText value={task.endTime}/> },
-        { key: 'reason', label: '审批意见', value: task.reason || '-', span: 2 as const }
-      ]}/>
-    </div>)}
-  </div>
-}
-
 /** 流程评论：与审批意见分开，任何可处理任务的人都能追加。 */
 function CommentList({
   comments,
   loading,
   canComment,
   taskId,
-  onRefresh
+  onRefresh, onState, failed, initialText = '', onDraft
 }: {
   comments: BpmComment[]
   loading: boolean
   canComment: boolean
   taskId?: string
   onRefresh: () => void
+  onState?: (dirty: boolean, busy: boolean) => void
+  failed?: boolean
+  initialText?: string
+  onDraft?: (text: string) => void
 }) {
   const { message } = App.useApp()
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   const [submitting, setSubmitting] = useState(false)
+  const lock = useRef(false)
+  useEffect(() => { onState?.(!!text.trim(), submitting) }, [text, submitting, onState])
+  useEffect(() => { onDraft?.(text) }, [text, onDraft])
 
   const submit = async () => {
     const trimmed = text.trim()
-    if (!trimmed || !taskId) return
+    if (!trimmed || !taskId || !canComment || lock.current) return
+    lock.current = true
     setSubmitting(true)
     try {
       await api.createBpmComment({ taskId, message: trimmed })
@@ -184,18 +123,20 @@ function CommentList({
       message.success('评论已提交')
       onRefresh()
     } catch (error) {
-      message.error(error instanceof ApiError ? error.message : '评论提交失败，请重试')
+      message.error(error instanceof Error ? error.message : '评论提交失败，请重试')
     } finally {
+      lock.current = false
       setSubmitting(false)
     }
   }
 
   return <div className="bpm-approval-comments">
-    {canComment && taskId && <Space.Compact className="bpm-approval-comment-input">
+    {(canComment || text) && taskId && <Space.Compact className="bpm-approval-comment-input">
       <Input.TextArea
         rows={2}
         maxLength={500}
         value={text}
+        readOnly={!canComment || submitting}
         onChange={event => setText(event.target.value)}
         placeholder="输入评论内容"
       />
@@ -203,13 +144,13 @@ function CommentList({
         type="primary"
         icon={<SendOutlined/>}
         loading={submitting}
-        disabled={!text.trim()}
+        disabled={!canComment || !text.trim()}
         onClick={() => void submit()}
       >发表</Button>
     </Space.Compact>}
     {loading
       ? <Skeleton active paragraph={{ rows: 3 }}/>
-      : comments.length === 0
+      : !failed && comments.length === 0
         ? <Empty description="暂无评论"/>
         : comments.map(comment => <div key={comment.id} className="bpm-approval-comment">
           <Space size={8}>
@@ -222,6 +163,7 @@ function CommentList({
   </div>
 }
 
+export type ApprovalDraft = { reason?: string; signPicUrl?: string; comment?: string }
 export type BpmApprovalDetailProps = {
   /** 列表选中的任务，提供 processInstanceId / taskId 作为查询入口。 */
   task?: BpmTask
@@ -241,7 +183,13 @@ export type BpmApprovalDetailProps = {
    * 自带权限校验，更可靠，因此它可用时优先。
    */
   businessRoute?: { route: string; query?: Record<string, unknown> } | null
-  onActionSuccess?: () => void
+  onActionSuccess?: (taskCompleted?: boolean) => void
+  onState?: (dirty: boolean, busy: boolean) => void
+  refreshVersion?: number
+  completed?: boolean
+  confirmLeave?: () => Promise<boolean>
+  initialDraft?: ApprovalDraft
+  onDraft?: (draft: Partial<ApprovalDraft>) => void
 }
 
 /**
@@ -260,97 +208,37 @@ export default function BpmApprovalDetail({
   businessBrief,
   businessEntry,
   businessRoute,
-  onActionSuccess
+  onActionSuccess, onState, refreshVersion = 0, completed, confirmLeave, initialDraft, onDraft
 }: BpmApprovalDetailProps) {
-  const [detail, setDetail] = useState<BpmApprovalDetailData>()
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState('')
-  const [records, setRecords] = useState<BpmTask[]>([])
-  const [recordsLoading, setRecordsLoading] = useState(false)
-  const [comments, setComments] = useState<BpmComment[]>([])
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('form')
   const navigate = useNavigate()
-  const [businessCard, setBusinessCard] = useState<BpmApprovalDetailCard | null>()
-  const [businessCardLoading, setBusinessCardLoading] = useState(false)
-
   const processInstanceId = task?.processInstanceId
   const taskId = task?.id
-
-  const loadBusinessCard = useCallback(async () => {
-    if (!taskId) {
-      setBusinessCard(null)
-      return
-    }
-    setBusinessCardLoading(true)
-    try {
-      setBusinessCard(await api.bpmApprovalBusinessDetail(taskId, view))
-    } catch {
-      // 业务内容不是审批的必要条件，解析失败就退回流程变量展示。
-      setBusinessCard(null)
-    } finally {
-      setBusinessCardLoading(false)
-    }
-  }, [taskId, view])
-
-  const loadDetail = useCallback(async () => {
-    if (!processInstanceId) {
-      setDetail(undefined)
-      return
-    }
-    setDetailLoading(true)
-    setDetailError('')
-    try {
-      setDetail(await api.bpmApprovalDetail({ processInstanceId, taskId: task?.id }))
-    } catch (error) {
-      setDetail(undefined)
-      setDetailError(error instanceof AuthenticationError
-        ? '登录已失效，请重新登录'
-        : error instanceof Error ? error.message : '审批详情加载失败')
-    } finally {
-      setDetailLoading(false)
-    }
-  }, [processInstanceId, task?.id])
-
-  const loadRecords = useCallback(async () => {
-    if (!processInstanceId) return
-    setRecordsLoading(true)
-    try {
-      setRecords(await api.bpmTaskListByProcessInstance(processInstanceId))
-    } catch {
-      setRecords([])
-    } finally {
-      setRecordsLoading(false)
-    }
-  }, [processInstanceId])
-
-  const loadComments = useCallback(async () => {
-    if (!processInstanceId) return
-    setCommentsLoading(true)
-    try {
-      setComments(await api.bpmCommentList(processInstanceId))
-    } catch {
-      setComments([])
-    } finally {
-      setCommentsLoading(false)
-    }
-  }, [processInstanceId])
-
-  useEffect(() => { void loadDetail() }, [loadDetail])
-  useEffect(() => { void loadBusinessCard() }, [loadBusinessCard])
-  useEffect(() => { setActiveTab('form') }, [processInstanceId])
+  const identity = (taskId ?? '') + view
+  const { data: detail, loading: detailLoading, error: detailError, reload: loadDetail } = useApprovalResource(identity, () => processInstanceId ? api.bpmApprovalDetail({ processInstanceId, taskId }) : Promise.resolve(undefined))
+  const { data: businessCard, loading: businessCardLoading, error: businessCardError, reload: loadBusinessCard } = useApprovalResource(identity, () => taskId ? api.bpmApprovalBusinessDetail(taskId, view) : Promise.resolve(null))
+  const { data: records = [], loading: recordsLoading, error: recordsError, reload: loadRecords } = useApprovalResource(identity, () => processInstanceId ? api.bpmTaskListByProcessInstance(processInstanceId) : Promise.resolve([]))
+  const { data: comments = [], loading: commentsLoading, error: commentsError, reload: loadComments } = useApprovalResource(identity, () => processInstanceId ? api.bpmCommentList(processInstanceId) : Promise.resolve([]))
+  const [actionDirty, setActionDirty] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [commentDirty, setCommentDirty] = useState(false)
+  const [commentBusy, setCommentBusy] = useState(false)
+  const updateAction = useCallback((dirty: boolean, busy: boolean) => { setActionDirty(dirty); setActionBusy(busy) }, [])
+  const updateComment = useCallback((dirty: boolean, busy: boolean) => { setCommentDirty(dirty); setCommentBusy(busy) }, [])
+  const saveComment = useCallback((comment: string) => onDraft?.({ comment }), [onDraft])
+  useEffect(() => { onState?.(actionDirty || commentDirty, actionBusy || commentBusy) }, [actionDirty, commentDirty, actionBusy, commentBusy, onState])
+  const containerRef = useRef<HTMLElement>(null)
+  const [narrow, setNarrow] = useState(false)
+  const [actionOpen, setActionOpen] = useState(false)
   useEffect(() => {
-    // 流转记录与评论按需加载，避免打开详情就发三个请求。
-    if (activeTab === 'record') void loadRecords()
-    if (activeTab === 'comment') void loadComments()
-  }, [activeTab, loadComments, loadRecords])
-
-  const refresh = useCallback(() => {
-    void loadDetail()
-    if (activeTab === 'record') void loadRecords()
-    if (activeTab === 'comment') void loadComments()
-    onActionSuccess?.()
-  }, [activeTab, loadComments, loadDetail, loadRecords, onActionSuccess])
+    const observer = new ResizeObserver(entries => setNarrow(entries[0].contentRect.width < 1100))
+    if (containerRef.current) observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [taskId])
+  const reloadAll = useCallback(() => { void loadDetail(); void loadBusinessCard(); void loadRecords(); void loadComments() }, [loadDetail, loadBusinessCard, loadRecords, loadComments])
+  const previousRefresh = useRef(refreshVersion)
+  useEffect(() => { if (previousRefresh.current !== refreshVersion) { previousRefresh.current = refreshVersion; reloadAll() } }, [refreshVersion, reloadAll])
+  const refresh = useCallback((taskCompleted?: boolean) => { reloadAll(); onActionSuccess?.(taskCompleted) }, [reloadAll, onActionSuccess])
+  const ready = view === 'todo' && detail?.todoTask?.status === 1 && !completed && !detailLoading && !detailError && !businessCardLoading && !businessCardError && detail?.todoTask?.id === taskId
 
   const processDefinition = detail?.processDefinition
   const processInstance = detail?.processInstance
@@ -411,7 +299,8 @@ export default function BpmApprovalDetail({
    * 业务详情卡下发 route 时的兜底跳转——补上白名单接口未覆盖的业务域。
    * 白名单可用时按钮走 businessEntry（自带权限校验），否则走这里。
    */
-  const openBusinessRoute = () => {
+  const openBusinessRoute = async () => {
+    if (confirmLeave && !await confirmLeave()) return
     if (!businessRoute?.route) return
     const params = new URLSearchParams()
     Object.entries(businessRoute.query || {}).forEach(([key, value]) => {
@@ -422,19 +311,53 @@ export default function BpmApprovalDetail({
   }
   const showBusinessButton = !!businessEntry || !!businessRoute?.route
 
+  const isFeedback = task.processDefinitionKey === 'zsjos_feedback_requirement_approval'
+    || businessBrief?.bizType === 'feedback' || businessCard?.bizType === 'feedback'
+  const sidebar = <aside className="bpm-unified-sidebar"><div className="bpm-unified-history">
+      {detailError && <Alert type="error" showIcon message="审批详情加载失败" description={detailError} action={<Button onClick={loadDetail}>重试</Button>}/>}
+          <Button disabled={actionBusy || commentBusy} size="small" onClick={reloadAll}>刷新流程</Button>
+          {recordsError && <Alert type="error" message="流转记录加载失败" description={recordsError} action={<Button onClick={loadRecords}>重试</Button>}/>}
+          {commentsError && <Alert type="error" message="评论加载失败" description={commentsError} action={<Button onClick={loadComments}>重试</Button>}/>}
+
+      <Typography.Title level={5}>审批流程</Typography.Title>
+      <p>{subject}</p><p>当前任务：{task.name}</p><p>当前处理人：{todoTask?.assigneeUser?.nickname || todoTask?.ownerUser?.nickname || task.assigneeUser?.nickname || task.ownerUser?.nickname || '待分配'}</p>
+      {detailLoading && !detail ? <Skeleton active/> : <ApprovalHistory detail={detail} records={records} incomplete={!!detailError || !!recordsError || recordsLoading}/>}
+      {recordsLoading && <Skeleton active paragraph={{ rows: 2 }}/>}
+      <ProcessIdentifiers processInstanceId={processInstanceId} taskId={task.id}/>
+      <Typography.Title level={5}>流程评论</Typography.Title>
+      <CommentList comments={comments} loading={commentsLoading} canComment={canUpdate && ready && !actionBusy} taskId={task.id} onRefresh={loadComments} onState={updateComment} failed={!!commentsError} initialText={initialDraft?.comment} onDraft={saveComment}/>
+    </div><div className={'bpm-unified-action-dock' + (actionOpen ? ' is-open' : '')}>{narrow && view === 'todo' && <Button disabled={actionBusy || commentBusy} onClick={() => setActionOpen(false)}>收起操作区</Button>}{view === 'done' && <section className="bpm-unified-result"><Typography.Title level={5}>本任务处理结果</Typography.Title><p>{approvalStatus(task.status, bpmStatusLabel)}</p><p>{task.reason || '未填写审批意见'}</p><DateTimeText value={task.endTime}/></section>}    {view === 'todo' && canUpdate && (
+      (todoTask?.id === task.id || actionDirty)
+        ? <BpmApprovalActions
+          task={todoTask?.id === task.id ? todoTask : task}
+          decisionOnly={detail?.processInstance?.businessKey?.startsWith('content-review-batch:')}
+          canUpdate={canUpdate && ready && (!isFeedback || !!businessCard?.groups?.length) && !commentBusy}
+          users={users}
+          inline onState={updateAction} onFailure={reloadAll}
+          initialDraft={initialDraft} onDraft={onDraft}
+          onSuccess={refresh}
+        />
+        : <Alert
+          type="info"
+          showIcon
+          message="当前任务不可由本人处理"
+          description="该任务已被处理或不在你的待办范围内，可刷新列表确认最新状态。"
+        />
+    )}</div>{view === 'todo' && canUpdate && <div className="bpm-unified-mobile-action"><Button type="primary" onClick={() => setActionOpen(true)}>处理审批</Button></div>}</aside>
+
   // 需求审批直接在任务详情完成；业务卡由服务端按任务所属轮次提供，不能换成最新需求。
-  if (task.processDefinitionKey === 'zsjos_feedback_requirement_approval'
-    || businessBrief?.bizType === 'feedback' || businessCard?.bizType === 'feedback') {
-    return <article className="business-inbox-detail bpm-approval-detail feedback-task-detail">
+  if (isFeedback) {
+    return <article ref={containerRef} className={'business-inbox-detail bpm-approval-detail bpm-unified-detail feedback-task-detail' + (narrow ? ' is-narrow' : '')}>
       <header className="feedback-detail-title">
         <div><Typography.Title level={4}>{businessCard?.title || businessBrief?.title || subject}</Typography.Title>
           <Typography.Text type="secondary">{task.name} · 发起人：{startUser} · 到达时间：<DateTimeText value={task.createTime}/></Typography.Text></div>
-        {processInstance?.status != null && <Tag color={bpmStatusColor(processInstance.status)}>{bpmStatusLabel(processInstance.status)}</Tag>}
+        <Tag color={bpmStatusColor(processInstance?.status)}>{approvalStatus(processInstance?.status, bpmStatusLabel)}</Tag>
       </header>
       <section className="feedback-approval-panel">
-        <div className="feedback-approval-layout">
-          <main className="feedback-approval-content">
+        <div className="bpm-unified-columns">
+          <main className="bpm-unified-content">
             {view === 'done' && <Alert type="info" showIcon message="已办任务 · 本轮内容只读"/>}
+            {businessCardError && <Alert type="error" message="业务详情未完整加载" description={businessCardError} action={<Button onClick={loadBusinessCard}>重试</Button>}/>}
             {businessCardLoading ? <Skeleton active paragraph={{ rows: 5 }}/> : businessCard?.message
               ? <Typography.Text type="secondary">{businessCard.message}</Typography.Text>
               : businessCard && <FeedbackBusinessContent fields={(businessCard.groups || [])
@@ -447,37 +370,23 @@ export default function BpmApprovalDetail({
                     name: file.name || '附件', url: file.url, type: file.contentType
                   })) : undefined
                 })))}/>}
-            {!businessCardLoading && !businessCard && <Alert type="error" showIcon message="需求内容加载失败，请重试"
+            {!businessCardLoading && !businessCard && !businessCardError && <Alert type="error" showIcon message="需求内容加载失败，请重试"
               action={<Button onClick={() => void loadBusinessCard()}>重试</Button>}/>}
           </main>
-          <aside className="feedback-approval-sidebar" aria-label="需求审批流程">
-            <Space className="feedback-approval-heading" wrap><Typography.Title level={5}>审批流程</Typography.Title>
-              <Button size="small" loading={detailLoading} onClick={refresh}>刷新流程</Button></Space>
-            {detailError && <Alert type="error" showIcon message={detailError} action={<Button onClick={refresh}>重试</Button>}/>}
-            <Tabs activeKey={activeTab === 'form' ? 'timeline' : activeTab} onChange={setActiveTab} items={[
-              { key: 'timeline', label: '流程', children: detailLoading ? <Skeleton active/> : <ApprovalTimeline detail={detail}/> },
-              { key: 'record', label: '流转记录', children: <TaskRecords tasks={records} loading={recordsLoading}/> },
-              { key: 'comment', label: '评论', children: <CommentList comments={comments} loading={commentsLoading}
-                canComment={canUpdate && todoTask?.id === task.id} taskId={todoTask?.id} onRefresh={loadComments}/> }
-            ]}/>
-            {view === 'todo' && !detailLoading && !detailError && !businessCardLoading && !!businessCard?.groups?.length && (
-              todoTask?.id === task.id ? <BpmApprovalActions task={todoTask} canUpdate={canUpdate} users={users} onSuccess={refresh}/>
-                : <Alert type="info" showIcon message="当前任务已处理、已转办或不在你的待办范围内"/>
-            )}
-          </aside>
+          {sidebar}
         </div>
       </section>
     </article>
   }
 
-  return <article className="business-inbox-detail bpm-approval-detail">
+  return <article ref={containerRef} className={'business-inbox-detail bpm-approval-detail bpm-unified-detail' + (narrow ? ' is-narrow' : '')}>
     <header className="business-inbox-detail-hero bpm-approval-detail-hero">
-      <Avatar size={44} icon={<AuditOutlined/>}/>
+
       <div className="business-inbox-detail-heading">
         <div>
           <Space size={8} wrap>
             <Typography.Title level={4}>{subject}</Typography.Title>
-            <Tag color={bpmStatusColor(task.status)}>{bpmStatusLabel(task.status)}</Tag>
+            <Tag color={bpmStatusColor(task.status)}>{approvalStatus(processInstance?.status ?? task.status, bpmStatusLabel)}</Tag>
           </Space>
           <Typography.Text type="secondary">{task.name || '流程节点'} · 发起人：{startUser}</Typography.Text>
         </div>
@@ -485,26 +394,14 @@ export default function BpmApprovalDetail({
       {showBusinessButton && <Button
         icon={<LinkOutlined/>}
         loading={businessEntry?.loading}
-        onClick={businessEntry ? businessEntry.onOpen : openBusinessRoute}
+        onClick={async () => { if (businessEntry) { if (!confirmLeave || await confirmLeave()) businessEntry.onOpen() } else void openBusinessRoute() }}
       >{view === 'todo' ? '打开业务详情' : '查看业务单据'}</Button>}
     </header>
 
-    {detailError && <Alert
-      className="business-inbox-error"
-      type="error"
-      showIcon
-      message={detailError}
-      action={<Button size="small" onClick={() => void loadDetail()}>重试</Button>}
-    />}
 
-    <Tabs
-      activeKey={activeTab}
-      onChange={setActiveTab}
-      items={[
-        {
-          key: 'form',
-          label: '审批详情',
-          children: <div className="bpm-approval-form-pane">
+
+<div className="bpm-unified-columns"><main className="bpm-unified-content"><div className="bpm-approval-form-pane">
+            {businessCardError && <Alert type="error" message="业务详情未完整加载" description={businessCardError} action={<Button onClick={loadBusinessCard}>重试</Button>}/>}
             {/* 业务内容卡：由后端按 businessKey 解析业务表得出，label/value 已中文化。 */}
             {(businessCardLoading || businessCard || businessBrief) &&
               <section className="business-inbox-card bpm-approval-card">
@@ -536,7 +433,7 @@ export default function BpmApprovalDetail({
                   />
                   : fallbackItems.length > 0
                     ? <>
-                      <Typography.Text className="bpm-approval-card-title">流程信息</Typography.Text>
+                      <Typography.Text className="bpm-approval-card-title">申请补充信息</Typography.Text>
                       <DetailFieldGrid columns={2} items={fallbackItems}/>
                     </>
                     : <Typography.Text type="secondary">
@@ -548,80 +445,6 @@ export default function BpmApprovalDetail({
                     </Typography.Text>}
             </section>
 
-            <section className="business-inbox-card bpm-approval-card bpm-approval-meta-card">
-              <Typography.Text className="bpm-approval-card-title">流程</Typography.Text>
-              <DetailFieldGrid columns={2} items={[
-                { key: 'processName', label: '流程名称', value: subject },
-                { key: 'taskName', label: '当前节点', value: task.name || '-' },
-                { key: 'startUser', label: '发起人', value: startUser },
-                {
-                  key: 'assignee',
-                  label: view === 'todo' ? '当前处理人' : '已处理人',
-                  value: task.assigneeUser?.nickname || task.ownerUser?.nickname || '-'
-                },
-                {
-                  key: 'startTime',
-                  label: '发起时间',
-                  value: <DateTimeText value={processInstance?.startTime ?? task.processInstance?.createTime}/>
-                },
-                {
-                  key: 'taskCreatedAt',
-                  label: view === 'todo' ? '到达时间' : '任务到达',
-                  value: <DateTimeText value={task.createTime}/>
-                },
-                ...(view === 'done'
-                  ? [{ key: 'taskEndedAt', label: '完成时间', value: <DateTimeText value={task.endTime}/> }]
-                  : []),
-                ...(task.reason
-                  ? [{ key: 'reason', label: '审批意见', value: task.reason, span: 2 as const }]
-                  : [])
-              ]}/>
-              {/* 流程实例与任务编号只用于排查，默认收起——审批人不需要它们占屏幕。 */}
-              <ProcessIdentifiers processInstanceId={task.processInstanceId} taskId={task.id}/>
-            </section>
-          </div>
-        },
-        {
-          key: 'timeline',
-          label: '审批记录',
-          children: detailLoading
-            ? <Skeleton active paragraph={{ rows: 6 }}/>
-            : <ApprovalTimeline detail={detail}/>
-        },
-        {
-          key: 'record',
-          label: '流转记录',
-          children: <TaskRecords tasks={records} loading={recordsLoading}/>
-        },
-        {
-          key: 'comment',
-          label: '流程评论',
-          children: <CommentList
-            comments={comments}
-            loading={commentsLoading}
-            canComment={canUpdate && todoTask !== undefined}
-            taskId={todoTask?.id}
-            onRefresh={loadComments}
-          />
-        }
-      ]}
-    />
-
-    {view === 'todo' && !detailLoading && (
-      todoTask
-        ? <BpmApprovalActions
-          task={todoTask}
-          decisionOnly={detail?.processInstance?.businessKey?.startsWith('content-review-batch:')}
-          canUpdate={canUpdate}
-          users={users}
-          onSuccess={refresh}
-        />
-        : <Alert
-          type="info"
-          showIcon
-          message="当前任务不可由本人处理"
-          description="该任务已被处理或不在你的待办范围内，可刷新列表确认最新状态。"
-        />
-    )}
+</div></main>{sidebar}</div>
   </article>
 }

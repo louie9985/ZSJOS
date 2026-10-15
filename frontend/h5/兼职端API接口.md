@@ -103,7 +103,7 @@ POST /part-api/zsjos/auth/activate
 规则：
 
 ```
-inviteCode: 四位大写英文字母 + 四位数字；前端会自动转大写
+inviteCode: 四位大写英文字母 + 四位数字；前端会自动转大写。新码字母排除 I/O/L，数字仅使用 2–9；旧码仍兼容原格式，不收紧激活输入校验
 password/confirmPassword: 8-20 位且同时包含字母和数字，必须一致
 ```
 

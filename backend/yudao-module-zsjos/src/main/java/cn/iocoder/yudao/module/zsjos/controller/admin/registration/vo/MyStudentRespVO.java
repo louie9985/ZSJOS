@@ -26,6 +26,8 @@ public class MyStudentRespVO {
         private String leadNo;
         private Long orderId;
         private String orderNo;
+        private String orderStatus;
+        private String orderStatusLabel;
         private Long orderItemId;
         /** Delivery class of this service; null only for legacy rows before class migration. */
         private Long classId;

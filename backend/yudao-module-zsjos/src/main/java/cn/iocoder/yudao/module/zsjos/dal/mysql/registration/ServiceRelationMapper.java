@@ -191,6 +191,24 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
 
+    @Select("SELECT * FROM zsjos_service_relation WHERE registration_case_id=#{caseId} AND tenant_id=#{tenantId} "
+            + "AND deleted=b'0' ORDER BY id FOR UPDATE")
+    List<ServiceRelationDO> selectByCaseForUpdate(@Param("caseId") Long caseId, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM zsjos_service_relation WHERE order_id=#{orderId} AND tenant_id=#{tenantId} "
+            + "AND deleted=b'0' ORDER BY id FOR UPDATE")
+    List<ServiceRelationDO> selectByOrderForUpdate(@Param("orderId") Long orderId, @Param("tenantId") Long tenantId);
+
+    default int cancelDelivery(Long id, Integer version, LocalDateTime now, String reason) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getStatus, "cancelled")
+                .set(ServiceRelationDO::getTerminatedAt, now)
+                .set(ServiceRelationDO::getTerminationReason, reason)
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
     default int cancelActive(Long id, Integer version, LocalDateTime now, String reason) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getId, id)

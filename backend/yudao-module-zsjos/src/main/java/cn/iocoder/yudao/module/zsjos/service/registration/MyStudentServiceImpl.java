@@ -311,6 +311,15 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());
             row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());
             row.setOrderNo(order == null ? null : order.getOrderNo());
+            row.setOrderStatus(order == null ? null : order.getStatus());
+            row.setOrderStatusLabel(order == null || order.getStatus() == null ? null : switch (order.getStatus()) {
+                case "pending_approval" -> "待财务审核";
+                case "effective" -> "已生效";
+                case "revision_required" -> "待补正";
+                case "terminated" -> "已终止";
+                case "superseded" -> "已被接续";
+                default -> "未知状态";
+            });
             row.setClassId(relation.getClassId());
             DeliveryClassDO deliveryClass = relation.getClassId() == null ? null : classes.get(relation.getClassId());
             row.setClassName(deliveryClass == null ? null : deliveryClass.getClassName());

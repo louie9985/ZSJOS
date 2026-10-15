@@ -8155,3 +8155,15 @@ CREATE TABLE IF NOT EXISTS zsjos_calendar_palette (
   deleted bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY(id), UNIQUE KEY uk_calendar_palette_owner(tenant_id,user_id,calendar_type)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='员工日历快捷色';
+
+CREATE TABLE IF NOT EXISTS zsjos_calendar_rest_day (
+ id bigint NOT NULL AUTO_INCREMENT,
+ tenant_id bigint NOT NULL,
+ date date NOT NULL,
+ rest bit(1) NOT NULL DEFAULT b'0',
+ version bigint NOT NULL DEFAULT 0,
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY(id), UNIQUE KEY uk_calendar_rest_day_date(tenant_id,date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页共享休息日';
