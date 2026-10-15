@@ -17,3 +17,14 @@
 - Checks: no staged conflict markers or high-confidence private-key/token patterns; no staged binary files. Whitespace check reports five existing EOF blank lines in tests; preserved without unrelated edits. Database migration continuity remains blocked by missing V319 as recorded above.
 - Decision: publish current source snapshot and existing revert history as explicitly requested; no deployment-readiness claim. Temporary/report/cache artifacts remain local.
 - Integration: normal commit and push to origin/main; actual outcome and commit identity reported after remote verification. No database or service operation. Ownership released on publication completion.
+
+## Registration update — main isolation publication / 2026-10-15 Beijing
+- Context: local/main/D:/ZSJ-OS; owner /root; base 5b56fa071e. User explicitly authorizes publishing the inspected local main isolation state to origin/main.
+- Scope: existing two isolation commits, pending exam-export V320 -> V319 rename, associated API documentation/test and renumber handoff, plus this record. Feature branch publication is outside this operation.
+- Verification: upstream is ancestor; reviewed source diff and isolation handoff; preserve removed delivery feature. Core baseline copies match; missing Core V318 remains a known release blocker after isolation. No migration execution, ledger reconciliation or new source-number decision.
+
+## Delivery preparation — main isolation publication / 2026-10-15 Beijing
+- Result: publish main's delivery feature removal and existing exam renumber changes. Feature branch codex/delivery-manager-feature-20261015 remains local and untouched; historical code remains reachable.
+- Files: docs/api/exam-calendar.md; exam-export migration renamed V320 to V319; tools/test_exam_export_permission.py; handoff/local-migration-renumber-20261015.md; this append.
+- Verification/limits: scoped staged diff check and remote identity verification; no full runtime/database acceptance. Migration chain missing V318, and previously applied old-number databases require separate ledger/checksum rollout review.
+- Integration: commit then normal push; final hash/result reported after command completion. Local caches/probes/reports retained unstaged; no database/service operation. Ownership released after publication.
