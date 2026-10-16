@@ -240,6 +240,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (suspended && Objects.equals(lead.getOwnerUserId(), reqVO.getSalesUserId())) {
             throw exception(LEAD_QUALIFICATION_TRANSFER_TARGET_INVALID);
         }
+        SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
         boolean education = teamTransferPolicy.isEducation(lead);
         if (education) teamTransferPolicy.requireTarget(lead, reqVO.getSalesUserId(), userId);
         else requireEligibleSales(reqVO.getSalesUserId(), userId, true);

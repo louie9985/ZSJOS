@@ -20,6 +20,8 @@ public class PerformanceAttributionDO extends TenantBaseDO {
  private java.time.LocalDateTime receivedAt;
  /** 组织快照来源：frozen=事实发生时写入；current=事后按当前组织补写，不是历史组织证据。 */
  private String orgSource;
+ /** Immutable domain recorded at fact creation; null means no proven domain. */
+ private String businessDomain;
  private String sourceGroup;
  private String channelCode;
  private String channelLabel;

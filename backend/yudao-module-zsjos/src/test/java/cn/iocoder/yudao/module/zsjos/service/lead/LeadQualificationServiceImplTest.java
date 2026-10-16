@@ -243,6 +243,7 @@ class LeadQualificationServiceImplTest {
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
         LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
+        org.springframework.test.util.ReflectionTestUtils.setField(policy, "teamTransferPolicy", new LeadTeamTransferPolicy());
         LeadSubmissionIdentityService identityService = mock(LeadSubmissionIdentityService.class);
         when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);

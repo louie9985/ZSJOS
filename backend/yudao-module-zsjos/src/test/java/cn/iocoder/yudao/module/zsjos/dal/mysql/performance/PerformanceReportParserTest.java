@@ -31,7 +31,7 @@ class PerformanceReportParserTest {
         for (String grouping : List.of("total", "source", "user", "contributor", "product")) {
             for (int scope = 0; scope < 3; scope++) {
                 var q = new PerformanceReportQuery();
-                q.setGrouping(grouping); q.setTenant(1L); q.setType("USER"); q.setId(1L);
+                q.setBusinessDomain("sales"); q.setGrouping(grouping); q.setTenant(1L); q.setType("USER"); q.setId(1L);
                 q.setStart(LocalDateTime.of(2026, 10, 1, 0, 0)); q.setEnd(LocalDateTime.of(2026, 11, 1, 0, 0));
                 q.setAllDepartments(scope == 0); q.setMissingDepartment(scope == 0);
                 q.setDepartments(scope == 1 ? Set.of(10L) : Set.of());
@@ -69,6 +69,16 @@ class PerformanceReportParserTest {
         }
     }
 
+    @Test void unclassifiedHistoryParsesWithTheSameTenantAndDomainBoundary() throws Exception {
+        var q=new PerformanceDetailQuery().setTenant(1L).setType("USER").setId(1L)
+            .setUnclassified(true).setAllDepartments(true).setMissingDepartment(true).setSize(20);
+        var config=new Configuration();
+        for(String statement:List.of(PerformanceDetailSql.unclassifiedCount(q),PerformanceDetailSql.unclassifiedPage(q))) {
+            var bound=new XMLLanguageDriver().createSqlSource(config,statement,PerformanceDetailQuery.class).getBoundSql(q);
+            assertDoesNotThrow(()->CCJSqlParserUtil.parse(bound.getSql()));
+            assertTrue(bound.getSql().contains("resolved_domain IS NULL"));
+        }
+    }
     private static void export(String name, Configuration config, BoundSql bound, String sql, Object request) throws Exception {
         String directory = System.getenv("EXCEPTION_QUERY_EXPORT_DIR");
         if (directory == null || directory.isBlank()) return;

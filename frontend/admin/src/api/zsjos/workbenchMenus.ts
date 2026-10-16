@@ -92,10 +92,11 @@ export const subordinateLeads = (
   request.get({ url: `/zsjos/subordinate-sales/${id}/leads`, params })
 export const subordinateTransferCandidates = (leadId?: number): Promise<Array<{ id: number; nickname: string }>> =>
   request.get({ url: '/zsjos/subordinate-sales/transfer-candidates', params: { leadId } })
-export const batchTransferSubordinateLeads = (data: Record<string, unknown>) =>
+export type SubordinateBatchResult = { successCount: number; failureCount: number; items: Array<{leadId: number; leadNo?: string; success: boolean; code: string; message: string}> }
+export const batchTransferSubordinateLeads = (data: Record<string, unknown>): Promise<SubordinateBatchResult> =>
   request.post({ url: '/zsjos/subordinate-sales/leads/batch-transfer', data })
-export const batchReleaseSubordinateLeads = (data: Record<string, unknown>) =>
-  request.post({ url: '/zsjos/subordinate-sales/leads/batch-public-sea', data })
+export const batchReleaseSubordinateLeads = (data: Record<string, unknown>): Promise<SubordinateBatchResult> =>
+  request.post({ url: '/zsjos/subordinate-sales/leads/batch-release-public-sea', data })
 
 export interface RepurchaseCustomerIdentity { customerName: string; customerMobile?: string; customerWechatId?: string }
 export interface RepurchaseCustomerCheck {

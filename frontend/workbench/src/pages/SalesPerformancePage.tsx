@@ -1,3 +1,4 @@
+import UnclassifiedHistory from './performance/UnclassifiedHistory'
 import { usePerformanceModule } from './performance/PerformanceModule'
 import { Alert, Button, Drawer, Input, Progress, Space, Tabs, Tooltip, Typography } from 'antd'
 import { useEffect, useState, useSyncExternalStore } from 'react'
@@ -92,5 +93,5 @@ function SessionPage({permissions}:{permissions:string[]}) {
 export default function SalesPerformancePage({permissions}:{permissions:string[]}) {
  const {domain}=usePerformanceModule()
  const session=useSyncExternalStore(subscribePerformanceSession,performanceSessionIdentity)
- return <SessionPage key={JSON.stringify([domain,session,[...permissions].sort()])} permissions={permissions}/>
+ return <><UnclassifiedHistory permissions={permissions}/><SessionPage key={JSON.stringify([domain,session,[...permissions].sort()])} permissions={permissions}/></>
 }

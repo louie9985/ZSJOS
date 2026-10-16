@@ -5653,23 +5653,27 @@ export const api = {
     targetUserId: number,
     reason: string,
     idempotencyKey: string,
+    version?: number,
   ) =>
     unwrap<boolean>(
       await http.post(`/zsjos/subordinate-sales/leads/${id}/transfer`, {
         targetUserId,
         reason,
         idempotencyKey,
+        version,
       }),
     ),
   supervisorRestoreLead: async (
     id: number,
     reason: string,
     idempotencyKey: string,
+    version?: number,
   ) =>
     unwrap<boolean>(
       await http.post(`/zsjos/subordinate-sales/leads/${id}/restore`, {
         reason,
         idempotencyKey,
+        version,
       }),
     ),
   supervisorRecycleLead: async (

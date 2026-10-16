@@ -15,6 +15,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class DeliveryPerformanceController {
  @Resource private PerformanceAccess access;
  @Resource private PerformanceStatisticsService service;
+ @GetMapping("/unclassified-history") public CommonResult<PageResult<UnclassifiedDetail>> unclassified(@Valid UnclassifiedQuery q){return success(service.unclassified(q));}
  @GetMapping("/tree") public CommonResult<List<Node>> tree(){return success(access.tree(false));}
  @GetMapping("/overview") public CommonResult<Overview> overview(@Valid Query q){return success(service.overview(q));}
  @GetMapping("/analysis") public CommonResult<Analysis> analysis(@Valid Query q){return success(service.analysis(q));}

@@ -6,10 +6,15 @@ public final class PerformanceDetailSql {
     static String scoped(String fact) {
         String body = fact.replaceFirst("(?s)\\s*ORDER BY[^<]+</script>", "</script>")
                 .replace("<script>", "").replace("</script>", "");
-        return "SELECT f.* FROM (" + body + ") f WHERE <choose>"
+        return "SELECT f.* FROM (SELECT raw.*, CASE WHEN raw.business_domain IN ('sales','delivery') THEN raw.business_domain "
+                + "WHEN raw.business_domain IS NULL AND raw.org_source='frozen' THEN "
+                + "(SELECT org.business_domain FROM zsjos_performance_org org WHERE org.tenant_id=#{tenant} AND org.deleted=0 "
+                + "AND org.dept_id=raw.dept_id AND org.create_time &lt;= raw.occurred_at AND org.update_time &lt;= raw.occurred_at) "
+                + "ELSE NULL END resolved_domain FROM (" + body + ") raw) f WHERE "
+                + "<choose><when test=\"unclassified\">f.resolved_domain IS NULL</when><otherwise>f.resolved_domain=#{businessDomain}</otherwise></choose> AND <choose>"
                 + "<when test=\"allDepartments\"><choose><when test=\"missingDepartment\">1=1</when>"
-                + "<otherwise>f.dept_id IS NOT NULL</otherwise></choose></when>"
-                + "<when test=\"departments != null and !departments.isEmpty()\">f.dept_id IN "
+                + "<otherwise>f.org_source='frozen' AND f.dept_id IS NOT NULL</otherwise></choose></when>"
+                + "<when test=\"departments != null and !departments.isEmpty()\">f.org_source='frozen' AND f.dept_id IN "
                 + "<foreach collection=\"departments\" item=\"dept\" open=\"(\" separator=\",\" close=\")\">#{dept}</foreach></when>"
                 + "<otherwise>1=0</otherwise></choose>";
     }
@@ -92,6 +97,28 @@ public final class PerformanceDetailSql {
             default -> "CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id,assignment_id,outcome,completed_at";
         };
         return "<script>WITH " + relation(q) + " SELECT * FROM result ORDER BY " + order + " LIMIT #{size} OFFSET #{offset}</script>";
+    }
+    public static String historicalPeople(PerformanceDetailQuery q) {
+        String snapshots = "<script>SELECT a.user_id,a.user_name,a.business_domain,a.org_source,a.dept_id,a.create_time occurred_at FROM zsjos_performance_attribution a WHERE a.tenant_id=#{tenant} AND a.deleted=0 AND a.user_id IS NOT NULL</script>";
+        return "<script>SELECT user_id,MAX(user_name) user_name FROM (" + scoped(snapshots) + ") visible GROUP BY user_id</script>";
+    }
+    private static String unclassifiedRelation() {
+        return "WITH orders AS (" + scoped(PerformanceFactSql.ORDERS) + "), receipts AS (" + scoped(PerformanceFactSql.RECEIPTS)
+                + "), followups AS (" + scoped(PerformanceFactSql.FOLLOW_UPS) + "), tasks AS (" + scoped(PerformanceFactSql.TASKS)
+                + "), assignments AS (" + scoped(PerformanceFactSql.ASSIGNMENTS) + "), unknown_facts AS ("
+                + "SELECT id,number,'order' kind,'成交订单' label,occurred_at,amount,dept_id,org_source,'生效' state FROM orders UNION ALL "
+                + "SELECT id,number,'receipt','接收客资',occurred_at,NULL,dept_id,org_source,status FROM receipts UNION ALL "
+                + "SELECT id,number,'followup','跟进',occurred_at,NULL,dept_id,org_source,NULL FROM followups UNION ALL "
+                + "SELECT id,number,'task',group_key,occurred_at,NULL,dept_id,org_source,status FROM tasks UNION ALL "
+                + "SELECT id,number,'assignment',group_key,occurred_at,NULL,dept_id,org_source,NULL FROM assignments) ";
+    }
+    public static String unclassifiedCount(PerformanceDetailQuery q) {
+        return "<script>" + unclassifiedRelation() + "SELECT COUNT(*) FROM unknown_facts</script>";
+    }
+    public static String unclassifiedPage(PerformanceDetailQuery q) {
+        return "<script>" + unclassifiedRelation() + "SELECT *,CASE WHEN dept_id IS NULL THEN '未记录业务域和历史部门' "
+                + "WHEN COALESCE(org_source,'') != 'frozen' THEN '未记录可靠的历史组织快照' ELSE '历史部门业务域缺少有效证据' END attribution_reason "
+                + "FROM unknown_facts ORDER BY occurred_at DESC,kind,id LIMIT #{size} OFFSET #{offset}</script>";
     }
     public static String firstDate(PerformanceDetailQuery q) {
         return "<script>WITH orders AS (" + scoped(PerformanceFactSql.ORDERS) + "), receipts AS (" + scoped(PerformanceFactSql.RECEIPTS)

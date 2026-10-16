@@ -216,8 +216,8 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     await runDisposition(async ({ idempotencyKey, complete }) => {
       const command = { reason: qualificationReason.trim(), idempotencyKey }
       if (supervisorAction) {
-        if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey)
-        if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey)
+        if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey, lead.version)
+        if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey, lead.version)
         if (action === 'recycle') await api.supervisorRecycleLead(lead.id, command.reason, idempotencyKey)
         if (action === 'release') await api.supervisorReleaseClaimPoolLead(lead.id, command.reason, idempotencyKey)
         if (action === 'releasePublicSea') await api.supervisorReleasePublicSeaLead(

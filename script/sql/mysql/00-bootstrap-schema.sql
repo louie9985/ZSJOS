@@ -7888,6 +7888,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_revision (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_attribution (
+ business_domain varchar(16) NULL DEFAULT NULL COMMENT '事实发生时业务域，未知不推定',
  id bigint NOT NULL AUTO_INCREMENT,
  outcome varchar(32) NULL, completed_at datetime NULL, fact_type varchar(16) NOT NULL, fact_id bigint NOT NULL, user_id bigint NULL, user_name varchar(100) NULL, dept_id bigint NULL, dept_name varchar(100) NULL, center_id bigint NULL, center_name varchar(100) NULL, lead_id bigint NULL, assignment_id bigint NULL, received_at datetime NULL, org_source varchar(16) NULL, source_group varchar(32) NULL, channel_code varchar(100) NULL, channel_label varchar(255) NULL,
   creator varchar(64) NOT NULL DEFAULT '',

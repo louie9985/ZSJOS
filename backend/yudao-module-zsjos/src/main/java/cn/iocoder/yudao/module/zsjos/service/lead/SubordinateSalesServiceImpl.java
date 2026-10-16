@@ -171,9 +171,11 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         commandService.validateManagedLeads(List.of(leadId), managerUserId);
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
         Long excluded = lead.getOwnerUserId() == null ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
         if (!teamTransferPolicy.isEducation(lead)) return getTransferCandidates(managerUserId).stream()
                 .filter(user -> !Objects.equals(user.getId(), excluded)).toList();
+        teamTransferPolicy.requireSupportedSource(lead);
         Set<Long> managed = permissionService.getManagedUserIds(managerUserId);
         List<AdminUserRespDTO> employees=managed.isEmpty()?List.of():adminUserApi.getUserList(managed);
         Set<Long> eligible=teamTransferPolicy.eligibleTargets(employees);
@@ -203,7 +205,9 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
             Long owner=lead.getOwnerUserId()==null?lead.getRecycleSourceOwnerUserId():lead.getOwnerUserId();
             if(owner==null||!managed.contains(owner))throw exception(SUBORDINATE_LEAD_OWNER_CHANGED);
             SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER,lead);
-            intersection.retainAll(teamTransferPolicy.isEducation(lead)?education:sales);
+            boolean educationOwner = teamTransferPolicy.isEducation(lead);
+            if (educationOwner) teamTransferPolicy.requireSupportedSource(lead);
+            intersection.retainAll(educationOwner?education:sales);
             intersection.remove(owner);
         }
         return employees.stream().filter(user->intersection.contains(user.getId())).map(user->{
@@ -269,12 +273,12 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Override
     public void transferLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
         String reason = requireReason(reqVO.getReason());
-        commandService.transferOne(leadId, reqVO.getTargetUserId(), managerUserId, reason, reqVO.getIdempotencyKey());
+        commandService.transferOne(leadId, reqVO.getTargetUserId(), managerUserId, reason, reqVO.getIdempotencyKey(), reqVO.getVersion());
     }
 
     @Override
     public void restoreLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
-        commandService.restoreOne(leadId, managerUserId, requireReason(reqVO.getReason()), reqVO.getIdempotencyKey());
+        commandService.restoreOne(leadId, managerUserId, requireReason(reqVO.getReason()), reqVO.getIdempotencyKey(), reqVO.getVersion());
     }
 
     @Override

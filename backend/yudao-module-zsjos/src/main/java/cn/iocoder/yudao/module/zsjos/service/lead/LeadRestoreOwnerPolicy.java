@@ -8,6 +8,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 
 @Service
 public class LeadRestoreOwnerPolicy {
+    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private LeadSubmissionIdentityService identityService;
 
@@ -16,14 +17,8 @@ public class LeadRestoreOwnerPolicy {
         // Restoring existing education ownership does not accept a new lead: current acceptance
         // permission and partner assignment relations must not invalidate the persisted ownership.
         // Operation permission and manager scope remain separate from retained-owner eligibility.
-        if (OWNER_EDUCATION.equals(lead.getOwnerIdentity())) {
-            boolean supportedSource = SOURCE_EDUCATION_SELF.equals(lead.getSourceType())
-                    || SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType())
-                    && SOURCE_EDUCATION_SELF.equals(lead.getSubmissionSourceType())
-                    && DISPATCH_SELF.equals(lead.getDispatchMode())
-                    || SOURCE_PARTNER.equals(lead.getSourceType())
-                    && DISPATCH_SPECIFIED.equals(lead.getDispatchMode());
-            return supportedSource && identityService.isEligibleEducationOwner(lead.getOwnerUserId());
+        if (OWNER_EDUCATION.equals(teamTransferPolicy.resolveIdentity(lead))) {
+            return EducationOwnershipPolicy.supports(lead) && identityService.isEligibleEducationOwner(lead.getOwnerUserId());
         }
         return assignmentService.isEligibleSalesUser(lead.getOwnerUserId());
     }

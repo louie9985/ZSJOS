@@ -139,4 +139,12 @@ class SubordinateSalesCommandServiceTest {
         LeadDO lead = new LeadDO(); lead.setId(id); lead.setOwnerUserId(owner);
         lead.setStatus("submitted"); lead.setAssignmentStatus("owned"); return lead;
     }
+    @Test void staleVersionRejectsBeforeBusinessWrites() {
+        var lead=lead(1L,20L);lead.setVersion(2);
+        when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        assertThrows(ServiceException.class,()->service.transferOne(1L,30L,10L,"test","stale",1));
+        verifyNoInteractions(dispatchService,qualificationService,auditLogMapper);
+        verify(leadMapper,never()).updateById(any(LeadDO.class));
+    }
 }

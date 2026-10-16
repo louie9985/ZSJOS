@@ -29,9 +29,9 @@ class LeadTeamTransferPolicyTest {
         assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> policy.requireTarget(lead, 20L, 10L));
     }
     @Test void recycledSpecifiedEducationUsesRecordedIdentity() {
-        var lead = new LeadDO().setId(1L).setAssignmentStatus("recycle_pending").setSourceType("partner").setDispatchMode("specified");
+        var lead = new LeadDO().setId(1L).setAssignmentStatus("recycle_pending").setSourceType("partner").setDispatchMode("specified").setRecycleSourceOwnerUserId(20L);
         var history = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
-        history.setActionType("recycle"); history.setOwnerIdentitySnapshot("education");
+        history.setActionType("recycle"); history.setFromOwnerUserId(20L); history.setOwnerIdentitySnapshot("education");
         when(historyMapper.selectByLeadId(1L)).thenReturn(java.util.List.of(history));
         assertTrue(policy.isEducation(lead));
     }
@@ -49,5 +49,32 @@ class LeadTeamTransferPolicyTest {
     @Test void missingIdentityNeverDefaultsToSales() {
         var lead = new LeadDO().setId(1L).setAssignmentStatus("recycle_pending");
         assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->policy.resolveIdentity(lead));
+    }
+    @Test void recycleCannotBorrowAcrossMissingOwnerOrReleaseBoundary() {
+        var lead = new LeadDO().setId(1L).setRecycleSourceOwnerUserId(20L).setAssignmentStatus("recycle_pending");
+        var recycle = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
+        recycle.setActionType("recycle"); recycle.setOwnerIdentitySnapshot("education");
+        when(historyMapper.selectByLeadId(1L)).thenReturn(java.util.List.of(recycle));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->policy.resolveIdentity(lead));
+        recycle.setFromOwnerUserId(21L);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->policy.resolveIdentity(lead));
+        recycle.setFromOwnerUserId(20L);recycle.setOwnerIdentitySnapshot(null);
+        var release = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
+        release.setActionType("release_to_claim_pool");
+        var old = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
+        old.setActionType("accept");old.setToOwnerUserId(20L);old.setOwnerIdentitySnapshot("education");
+        when(historyMapper.selectByLeadId(1L)).thenReturn(java.util.List.of(recycle,release,old));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->policy.resolveIdentity(lead));
+        release.setActionType("recycle");release.setFromOwnerUserId(20L);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->policy.resolveIdentity(lead));
+    }
+    @Test void educationSourcesRequireCompleteEvidence() {
+        var lead=new LeadDO().setSourceType("education_self_sourced");
+        assertTrue(EducationOwnershipPolicy.supports(lead));
+        lead.setSourceType("internal_new_media").setSubmissionSourceType("education_self_sourced").setDispatchMode("self");
+        assertTrue(EducationOwnershipPolicy.supports(lead));
+        lead.setDispatchMode("specified");assertFalse(EducationOwnershipPolicy.supports(lead));
+        lead.setSourceType("partner");assertTrue(EducationOwnershipPolicy.supports(lead));
+        lead.setSourceType("sales_self_sourced");assertFalse(EducationOwnershipPolicy.supports(lead));
     }
 }

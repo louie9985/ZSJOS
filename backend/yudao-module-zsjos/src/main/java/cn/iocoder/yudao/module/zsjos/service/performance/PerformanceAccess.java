@@ -20,6 +20,7 @@ public class PerformanceAccess {
  @Resource private PostApi postApi;
  @Resource private AdminUserApi userApi;
  @Resource private PerformanceOrgMapper orgMapper;
+ @Resource private PerformanceDetailMapper detailMapper;
  public static ServiceException denied() {return cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.SalesPerformanceConstants.PERMISSION_DENIED);}
  public static ServiceException invalid(String message) {return cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.SalesPerformanceConstants.INVALID_REQUEST,message);}
  public boolean has(String permission) {return permissionApi.hasAnyPermissions(getLoginUserId(),PerformanceDomain.permission(permission));}
@@ -90,9 +91,7 @@ public class PerformanceAccess {
  }
  public Set<Long> domainDepartments() {return orgs().stream().map(PerformanceOrgDO::getDeptId).collect(java.util.stream.Collectors.toSet());}
  public HistoricalScope reportScope(Query q) {
-  var scope=historicalScope(q);var departments=domainDepartments();
-  if(!scope.allDepartments())departments.retainAll(scope.departments());
-  return new HistoricalScope(false,false,departments);
+  return historicalScope(q);
  }
  public Set<Long> enabledUserIds(Collection<Long> ids) {
   if(ids.isEmpty())return Set.of();
@@ -107,7 +106,7 @@ public class PerformanceAccess {
   return deptId==null?null:orgMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<PerformanceOrgDO>().eq(PerformanceOrgDO::getDeptId,deptId));
  }
  public Query authorize(Query q,boolean targets) {
-  if("SELF".equals(q.getScopeType())||"USER".equals(q.getScopeType())) {
+  if(targets && ("SELF".equals(q.getScopeType())||"USER".equals(q.getScopeType()))) {
    var person=user("SELF".equals(q.getScopeType())?getLoginUserId():q.getScopeId());
    if(person==null||mapping(person.getDeptId())==null)throw denied();
   }
@@ -117,7 +116,9 @@ public class PerformanceAccess {
   if("USER".equals(q.getScopeType())) {
    var u=user(q.getScopeId()); if(u==null)throw denied();
    if(Objects.equals(u.getId(),getLoginUserId())&&!targets&&has("zsjos:sales-performance:self"))return q;
-   if(!departmentAllowed(u.getDeptId())||(!targets&&!has("zsjos:sales-performance:department")&&!has("zsjos:sales-performance:center")))throw denied();
+   if(targets && !departmentAllowed(u.getDeptId()))throw denied();
+   if(!targets && !has("zsjos:sales-performance:department") && !has("zsjos:sales-performance:center"))throw denied();
+   if(!targets) {var historical=historicalScope(q);if(!historical.allDepartments()&&historical.departments().isEmpty())throw denied();}
   } else {
    var m=mapping(q.getScopeId());
    if(m==null||!q.getScopeType().equals(m.getKind())||!departmentAllowed(m.getDeptId()))throw denied();
@@ -125,6 +126,16 @@ public class PerformanceAccess {
    if("CENTER".equals(q.getScopeType())&&orgs().stream().filter(x->Objects.equals(x.getCenterId(),q.getScopeId())).anyMatch(x->!departmentAllowed(x.getDeptId())))throw denied();
   }
   return q;
+ }
+ public Long authorizeUnclassified(Long requestedUser) {
+  if(!has("zsjos:sales-performance:query") || !has("zsjos:sales-performance:self") || !has("zsjos:sales-performance:detail"))throw denied();
+  Long reader=getLoginUserId(), subject=requestedUser==null?reader:requestedUser;
+  if(subject==null || !Objects.equals(reader,subject) && !permissionApi.hasTenantReadAllAccess(reader))throw denied();
+  return subject;
+ }
+ public void targetReadObject(PerformanceTargetDO row) {
+  if(row==null || !PerformanceDomain.current().equals(row.getBusinessDomain()) || !has("zsjos:sales-performance-target:query"))throw denied();
+  if(!targetVisibility().test("USER".equals(row.getScopeType())?row.getScopeId():null,row.getDeptId()))throw denied();
  }
  public void targetObject(String type,Long id) {Query q=new Query(); q.setScopeType(type);q.setScopeId(id);authorize(q,true);}
  public List<Node> tree(boolean targets) {
@@ -141,6 +152,15 @@ public class PerformanceAccess {
    try{authorize(q,targets);}catch(ServiceException ex){continue;}
    if(u.getDeptId()!=null)addDept(u.getDeptId(),false,"DEPT",result,included);
    result.add(new Node("USER:"+u.getId(),u.getDeptId()==null?null:"ORG:"+u.getDeptId(),u.getNickname(),"USER",u.getId(),true));
+  }
+  if(!targets&&(has("zsjos:sales-performance:department")||has("zsjos:sales-performance:center"))) {
+   var query=new Query();query.setScopeType("USER");query.setScopeId(-1L);var scope=historicalScope(query);
+   var request=new PerformanceDetailQuery().setTenant(cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
+     .setBusinessDomain(PerformanceDomain.current()).setAllDepartments(scope.allDepartments())
+     .setMissingDepartment(false).setDepartments(scope.departments());
+   Set<Long> present=result.stream().filter(n->"USER".equals(n.scopeType())).map(Node::scopeId).collect(java.util.stream.Collectors.toSet());
+   for(var fact:detailMapper.historicalPeople(request))if(present.add(fact.getUserId()))
+    result.add(new Node("USER:"+fact.getUserId(),null,Objects.toString(fact.getUserName(),"历史人员"),"USER",fact.getUserId(),true));
   }
   if(!targets&&has("zsjos:sales-performance:self"))result.addFirst(new Node("SELF",null,"我的业绩","SELF",getLoginUserId(),true));
   return result;

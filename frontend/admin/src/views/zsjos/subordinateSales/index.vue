@@ -56,13 +56,13 @@
     <template #footer>
       <el-button @click="leadOpen = false">关闭</el-button>
       <el-button
-        v-hasPermi="['zsjos:subordinate-sales:batch-public-sea']"
+        v-hasPermi="['zsjos:subordinate-sales:lead-release-public-sea']"
         :disabled="!selected.length"
         @click="openBatch('public-sea')"
         >释放公海</el-button
       >
       <el-button
-        v-hasPermi="['zsjos:subordinate-sales:batch-transfer']"
+        v-hasPermi="['zsjos:subordinate-sales:lead-transfer']"
         type="primary"
         :disabled="!selected.length"
         @click="openBatch('transfer')"
@@ -77,7 +77,7 @@
   >
     <el-alert :title="`已选择 ${selected.length} 条客资`" type="info" show-icon class="mb-12px" />
     <el-form label-width="90px">
-      <el-form-item v-if="batchMode === 'transfer'" label="目标销售" required
+      <el-form-item v-if="batchMode === 'transfer'" label="目标员工" required
         ><el-select v-model="targetUserId" filterable class="w-100%"
           ><el-option
             v-for="item in candidates"
@@ -119,6 +119,8 @@ const batchMode = ref<'transfer' | 'public-sea'>('transfer')
 const candidates = ref<Array<{ id: number; nickname: string }>>([])
 const targetUserId = ref<number>()
 const reason = ref('')
+const batchKey = ref('')
+const batchFingerprint = ref('')
 
 const changeAccount = async (row: any, reload: () => Promise<void>) => {
   const next = row.accountStatus === 0 ? 1 : 0
@@ -170,25 +172,26 @@ const openBatch = async (mode: 'transfer' | 'public-sea') => {
     try {
       candidates.value = await Api.subordinateBatchTransferCandidates(selected.value.map(item => item.id))
     } catch (error: any) {
-      message.error(error?.msg || error?.message || '目标销售加载失败')
+      message.error(error?.msg || error?.message || '目标员工加载失败')
     }
   }
 }
 const submitBatch = async () => {
   if (!reason.value.trim()) return message.warning('请填写操作原因')
   if (batchMode.value === 'transfer' && !targetUserId.value)
-    return message.warning('请选择目标销售')
+    return message.warning('请选择目标员工')
   batchSaving.value = true
   try {
     const leadIds = selected.value.map((item) => item.id)
-    if (batchMode.value === 'transfer')
-      await Api.batchTransferSubordinateLeads({
-        leadIds,
-        targetUserId: targetUserId.value,
-        reason: reason.value.trim()
-      })
-    else await Api.batchReleaseSubordinateLeads({ leadIds, reason: reason.value.trim() })
-    message.success('批量操作已完成')
+    const fingerprint = JSON.stringify([batchMode.value, leadIds, targetUserId.value, reason.value.trim()])
+    if (batchFingerprint.value !== fingerprint) { batchFingerprint.value = fingerprint; batchKey.value = crypto.randomUUID() }
+    const data = { leadIds, targetUserId: targetUserId.value, reason: reason.value.trim(), idempotencyKey: batchKey.value }
+    const result = batchMode.value === 'transfer'
+      ? await Api.batchTransferSubordinateLeads(data) : await Api.batchReleaseSubordinateLeads(data)
+    if (result.failureCount) message.warning(result.items.filter(item => !item.success).map(item => (item.leadNo || '客资编号未记录') + '：' + item.message).join('；'))
+    else message.success('批量操作已完成')
+    batchFingerprint.value = ''
+    batchKey.value = ''
     batchOpen.value = false
     await loadLeads()
   } finally {

@@ -16,14 +16,15 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class) class PerformanceAccessTest {
  @InjectMocks PerformanceAccess access;
+ @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailMapper detailMapper;
  @Mock PermissionApi permissionApi; @Mock AdminUserApi userApi; @Mock PerformanceOrgMapper orgMapper;
  @Mock cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
  @Mock cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
  MockedStatic<SecurityFrameworkUtils> security;
- @BeforeEach void setup(){security=mockStatic(SecurityFrameworkUtils.class);security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(1L);
+ @BeforeEach void setup(){cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);security=mockStatic(SecurityFrameworkUtils.class);security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(1L);
  lenient().when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));
  lenient().when(userApi.getUser(1L)).thenReturn(person(1,0));}
- @AfterEach void close(){security.close();}
+ @AfterEach void close(){security.close();cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();}
  Query q(String type,long id){var q=new Query();q.setScopeType(type);q.setScopeId(id);return q;}
  AdminUserRespDTO person(long id,Integer status){var u=new AdminUserRespDTO();u.setId(id);u.setStatus(status);u.setDeptId(10L);return u;}
  @Test void bothTreesExcludeDisabledAndUnknownStatusUsers(){
@@ -60,14 +61,14 @@ import static org.junit.jupiter.api.Assertions.*;
  @Test void scopedDepartmentAllowed(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);assertDoesNotThrow(()->access.authorize(q("DEPT",10),false));}
  @Test void tenantReadAllStillNeedsFeature(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("DEPT",10),false));}
  @Test void centerCannotIncludeUnauthorizedChild(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(9,9,"CENTER"),org(10,9,"DEPT")));var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(9L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:center")).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("CENTER",9),false));}
- @Test void userOutsideDataScopeRejected(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
+ @Test void userOutsideDataScopeRejected(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
  @Test void tenantReadAllNeverAuthorizesTargetWrites(){when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertFalse(access.commandDepartmentAllowed(10L));verify(permissionApi,never()).hasTenantReadAllAccess(any());}
  @Test void currentMembershipDoesNotGrantPreviousDepartmentHistory(){var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);assertTrue(access.historicalRowAllowed(q("USER",2),10L));assertFalse(access.historicalRowAllowed(q("USER",2),20L));assertFalse(access.historicalRowAllowed(q("USER",2),null));}
  @Test void tenantWideReaderCanReadUnattributedPersonalHistory(){when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertTrue(access.historicalRowAllowed(q("USER",2),null));}
  @Test void allDepartmentScopeCanReadUnattributedPersonalHistory(){var scope=new DeptDataPermissionRespDTO();scope.setAll(true);when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);assertTrue(access.historicalRowAllowed(q("USER",2),null));}
  @Test void missingScopeCannotReadUnattributedPersonalHistory(){assertFalse(access.historicalRowAllowed(q("USER",2),null));}
  @Test void tenantWideReaderCannotInventTeamAttribution(){assertFalse(access.historicalRowAllowed(q("DEPT",10),null));assertFalse(access.historicalRowAllowed(q("CENTER",9),null));}
- @Test void tenantWidePersonalQueryStillNeedsFeaturePermission(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
+ @Test void tenantWidePersonalQueryStillNeedsFeaturePermission(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
 
  @Test void sqlHistoricalScopeMatchesPerRowAuthorization() {
   for (boolean tenantAll : List.of(false,true)) for (boolean dataAll : List.of(false,true))
@@ -87,5 +88,27 @@ import static org.junit.jupiter.api.Assertions.*;
      }
     }
    }
+ }
+ @Test void transferredDisabledUserHistoryUsesFrozenScopeNotCurrentDomain() {
+  var moved=person(2,1);moved.setDeptId(999L);when(userApi.getUser(2L)).thenReturn(moved);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);
+  var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);
+  assertDoesNotThrow(()->access.authorize(q("USER",2),false));
+  assertEquals(Set.of(10L),access.reportScope(q("USER",2)).departments());
+  assertFalse(access.reportScope(q("USER",2)).missingDepartment());
+  verify(orgMapper,never()).selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+ }
+ @Test void personalKnownDomainCanRetainMissingDepartment() {
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:self")).thenReturn(true);
+  assertTrue(access.reportScope(q("USER",1)).missingDepartment());
+ }
+ @Test void unclassifiedRequiresAllThreePermissionsAndTenantPrivilegeForOthers() {
+  for(String action:List.of("query","self","detail"))when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:"+action)).thenReturn(true);
+  assertEquals(1L,access.authorizeUnclassified(null));
+  assertThrows(RuntimeException.class,()->access.authorizeUnclassified(2L));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  assertEquals(2L,access.authorizeUnclassified(2L));
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:detail")).thenReturn(false);
+  assertThrows(RuntimeException.class,()->access.authorizeUnclassified(1L));
  }
 }

@@ -40,6 +40,11 @@ class PerformanceConversionSqlTest {
     sql.execute("INSERT INTO zsjos_performance_attribution SELECT id+100,'ORDER',id,tenant_id,0,formal_sales_user_id,'snapshot',NULL,NULL,'inbound','channel','channel',10,20 FROM zsjos_order");
     sql.execute("UPDATE zsjos_performance_attribution SET received_at='2025-01-03' WHERE fact_type='ORDER' AND fact_id=5");
    }
+   try(var sql=session.getConnection().createStatement()){
+    sql.execute("ALTER TABLE zsjos_performance_attribution ADD business_domain VARCHAR DEFAULT 'sales'");
+    sql.execute("ALTER TABLE zsjos_performance_attribution ADD org_source VARCHAR DEFAULT 'frozen'");
+    sql.execute("CREATE TABLE zsjos_performance_org(tenant_id BIGINT,deleted INT,dept_id BIGINT,business_domain VARCHAR,create_time TIMESTAMP,update_time TIMESTAMP)");
+   }
    TenantContextHolder.setTenantId(9L);
    var access=mock(PerformanceAccess.class);when(access.has(anyString())).thenReturn(true);when(access.historicalRowAllowed(any(),any())).thenReturn(true);
    when(access.historicalScope(any())).thenReturn(new PerformanceAccess.HistoricalScope(true,true,Set.of()));
@@ -55,7 +60,7 @@ class PerformanceConversionSqlTest {
     assertEquals("往期接收有效期内成交",actual.stream().filter(x->x.id()==2L).findFirst().orElseThrow().label());
     assertEquals(LocalDate.of(2025,1,2).atStartOfDay(),actual.stream().filter(x->x.id()==3L).findFirst().orElseThrow().occurredAt());
    }
-   var query=new PerformanceDetailQuery().setTenant(9L).setType("DEPT").setId(10L).setAllDepartments(true)
+   var query=new PerformanceDetailQuery().setBusinessDomain("sales").setTenant(9L).setType("DEPT").setId(10L).setAllDepartments(true)
      .setStart(LocalDate.of(2025,1,1).atStartOfDay()).setEnd(LocalDate.of(2025,2,1).atStartOfDay())
      .setConversionLeadIds(java.util.stream.LongStream.rangeClosed(1,8).boxed().collect(java.util.stream.Collectors.toSet()));
    var mapper=session.getMapper(PerformanceDetailMapper.class);

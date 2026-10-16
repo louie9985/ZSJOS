@@ -56,6 +56,26 @@ public class PerformanceTargetService {
   for(var p:requested)if("quarter".equals(p.type())||"year".equals(p.type()))for(int i=0;i<("year".equals(p.type())?12:3);i++)periods.add(new Period("month",p.start().plusMonths(i)));else periods.add(p);
   return new Batch(periods,users);
  }
+ public List<Target> list(String period,LocalDate start) {
+  var snapshot=batch(List.of(new Period(period,start)),List.of());
+  Map<String,Node> nodes=new LinkedHashMap<>();
+  access.tree(true).stream().filter(Node::selectable).forEach(n->nodes.put(n.scopeType()+":"+n.scopeId(),n));
+  for(var row:snapshot.rows)if(snapshot.visible.test("USER".equals(row.getScopeType())?row.getScopeId():null,row.getDeptId())) {
+   String key=row.getScopeType()+":"+row.getScopeId();
+   nodes.putIfAbsent(key,new Node(key,null,snapshot.name(row.getScopeType(),row.getScopeId()),row.getScopeType(),row.getScopeId(),true));
+  }
+  return nodes.values().stream().filter(n->!"USER".equals(n.scopeType()) || snapshot.rows.stream()
+    .filter(x->"USER".equals(x.getScopeType())&&n.scopeId().equals(x.getScopeId()))
+    .allMatch(x->snapshot.visible.test(x.getScopeId(),x.getDeptId())))
+    .map(n->snapshot.resolve(n.scopeType(),n.scopeId(),period,start)).toList();
+ }
+ public List<Revision> revisionDetails(Long id) {
+  var rows=history(id);
+  var names=access.users(rows.stream().map(PerformanceRevisionDO::getOperatorId).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet()))
+    .stream().collect(java.util.stream.Collectors.toMap(cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO::getId,
+      cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO::getNickname,(a,b)->a));
+  return rows.stream().map(x->new Revision(x.getId(),x.getReason(),Objects.toString(x.getBeforeJson(),""),x.getAfterJson(),names.getOrDefault(x.getOperatorId(),"历史人员"),x.getCreateTime())).toList();
+ }
  public boolean readableIndividual(String type,Long id,String period,LocalDate start){if(!"USER".equals(type))return true;return rows(period,start).stream().filter(x->type.equals(x.getScopeType())&&id.equals(x.getScopeId())).allMatch(x->access.departmentAllowed(x.getDeptId()));}
  public List<PerformanceTargetDO> rows(String period,LocalDate start) {
   return mapper.selectList(new LambdaQueryWrapperX<PerformanceTargetDO>().eq(PerformanceTargetDO::getBusinessDomain,PerformanceDomain.current()).eq(PerformanceTargetDO::getPeriodType,period).eq(PerformanceTargetDO::getPeriodStart,start));
@@ -129,5 +149,5 @@ public class PerformanceTargetService {
   }
  }
  @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(bizType="sales-performance-target",bizId="#id",action="read")
- public List<PerformanceRevisionDO> history(Long id) {var row=mapper.selectById(id);if(row==null)throw PerformanceAccess.denied();access.targetObject(row.getScopeType(),row.getScopeId());return revisions.selectList(new LambdaQueryWrapperX<PerformanceRevisionDO>().eq(PerformanceRevisionDO::getTargetId,id).orderByDesc(PerformanceRevisionDO::getId));}
+ public List<PerformanceRevisionDO> history(Long id) {var row=mapper.selectById(id);if(row==null)throw PerformanceAccess.denied();access.targetReadObject(row);return revisions.selectList(new LambdaQueryWrapperX<PerformanceRevisionDO>().eq(PerformanceRevisionDO::getTargetId,id).orderByDesc(PerformanceRevisionDO::getId));}
 }

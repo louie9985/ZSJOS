@@ -7,6 +7,12 @@ import java.util.List;
 
 @Mapper
 public interface PerformanceDetailMapper {
+    @SelectProvider(type = PerformanceDetailSql.class, method = "historicalPeople")
+    List<PerformanceFact> historicalPeople(PerformanceDetailQuery query);
+    @SelectProvider(type = PerformanceDetailSql.class, method = "unclassifiedCount")
+    long unclassifiedCount(PerformanceDetailQuery query);
+    @SelectProvider(type = PerformanceDetailSql.class, method = "unclassifiedPage")
+    List<PerformanceFact> unclassifiedPage(PerformanceDetailQuery query);
     @SelectProvider(type = PerformanceDetailSql.class, method = "count")
     long count(PerformanceDetailQuery query);
     @SelectProvider(type = PerformanceDetailSql.class, method = "page")

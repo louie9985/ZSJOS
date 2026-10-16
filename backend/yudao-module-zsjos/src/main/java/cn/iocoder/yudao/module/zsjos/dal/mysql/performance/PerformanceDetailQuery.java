@@ -9,6 +9,8 @@ import java.util.Set;
 @Accessors(chain = true)
 public class PerformanceDetailQuery {
     private Long tenant;
+    private String businessDomain;
+    private boolean unclassified;
     private String type;
     private Long id;
     private boolean allDepartments;

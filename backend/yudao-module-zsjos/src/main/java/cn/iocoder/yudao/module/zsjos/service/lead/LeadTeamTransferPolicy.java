@@ -20,23 +20,40 @@ public class LeadTeamTransferPolicy {
     }
 
     public String resolveIdentity(LeadDO lead) {
-        if (OWNER_EDUCATION.equals(lead.getOwnerIdentity()) || OWNER_SALES.equals(lead.getOwnerIdentity())) return lead.getOwnerIdentity();
-        if (!ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
-        // Empty recycle snapshots may be legacy. Stop at the latest actual ownership transition;
-        // an older owner is never evidence for a newer, unrecorded ownership period.
-        for (var row : historyMapper.selectByLeadId(lead.getId())) {
-            if (ACTION_RECYCLE.equals(row.getActionType())) {
-                if (row.getFromOwnerUserId() != null && !java.util.Objects.equals(row.getFromOwnerUserId(), lead.getRecycleSourceOwnerUserId())) break;
-                if (OWNER_EDUCATION.equals(row.getOwnerIdentitySnapshot()) || OWNER_SALES.equals(row.getOwnerIdentitySnapshot())) return row.getOwnerIdentitySnapshot();
-                continue;
-            }
-            if (row.getToOwnerUserId() != null) {
-                if (java.util.Objects.equals(row.getToOwnerUserId(), lead.getRecycleSourceOwnerUserId())
-                        && (OWNER_EDUCATION.equals(row.getOwnerIdentitySnapshot()) || OWNER_SALES.equals(row.getOwnerIdentitySnapshot()))) return row.getOwnerIdentitySnapshot();
-                break;
-            }
+        if (!ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
+            if (known(lead.getOwnerIdentity())) return lead.getOwnerIdentity();
+            throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
         }
-        throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+        Long source = lead.getRecycleSourceOwnerUserId();
+        if (source == null || lead.getOwnerUserId() != null) throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+        var rows = historyMapper.selectByLeadId(lead.getId());
+        // The latest transition must prove this recycle. Never search past a newer release,
+        // recycle or ownership transition, even when an older snapshot names the same employee.
+        if (rows.isEmpty()) throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+        var recycle = rows.getFirst();
+        if (!ACTION_RECYCLE.equals(recycle.getActionType())
+                || !source.equals(recycle.getFromOwnerUserId()) || recycle.getToOwnerUserId() != null)
+            throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+        String evidence = recycle.getOwnerIdentitySnapshot();
+        if (!known(evidence)) {
+            if (evidence != null || rows.size() < 2) throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+            var owner = rows.get(1);
+            if (owner.getActionType() == null || !java.util.Set.of(ACTION_ACCEPT, ACTION_CLAIM, ACTION_TRANSFER).contains(owner.getActionType())
+                    || !source.equals(owner.getToOwnerUserId()) || !known(owner.getOwnerIdentitySnapshot()))
+                throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+            evidence = owner.getOwnerIdentitySnapshot();
+        }
+        if (lead.getOwnerIdentity() != null && !evidence.equals(lead.getOwnerIdentity()))
+            throw exception(LEAD_RECYCLED_IDENTITY_UNKNOWN);
+        return evidence;
+    }
+
+    private static boolean known(String identity) {
+        return OWNER_EDUCATION.equals(identity) || OWNER_SALES.equals(identity);
+    }
+
+    public void requireSupportedSource(LeadDO lead) {
+        if (!EducationOwnershipPolicy.supports(lead)) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
     }
 
     public boolean eligibleTarget(Long target, Long manager) {
@@ -55,10 +72,8 @@ public class LeadTeamTransferPolicy {
     }
 
     public void requireTarget(LeadDO lead, Long target, Long manager) {
-        boolean source = SOURCE_EDUCATION_SELF.equals(lead.getSourceType())
-                || SOURCE_EDUCATION_SELF.equals(lead.getSubmissionSourceType())
-                || SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode());
-        if (!isEducation(lead) || !source || !eligibleTarget(target, manager)) {
+        requireSupportedSource(lead);
+        if (!isEducation(lead) || !eligibleTarget(target, manager)) {
             throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         }
     }

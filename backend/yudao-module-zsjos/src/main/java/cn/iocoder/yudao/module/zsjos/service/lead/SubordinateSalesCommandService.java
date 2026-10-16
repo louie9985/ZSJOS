@@ -50,9 +50,15 @@ public class SubordinateSalesCommandService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void transferOne(Long leadId, Long targetUserId, Long managerUserId, String reason, String idempotencyKey) {
+        transferOne(leadId, targetUserId, managerUserId, reason, idempotencyKey, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void transferOne(Long leadId, Long targetUserId, Long managerUserId, String reason, String idempotencyKey, Integer expectedVersion) {
         String fingerprint = fingerprint("transfer", List.of(leadId), targetUserId, null, reason);
         if (!beginCommand("transfer", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
+        if (expectedVersion != null && !Objects.equals(expectedVersion, lead.getVersion())) throw exception(LEAD_FEEDBACK_VERSION_CONFLICT);
         SupervisorLeadActionPolicy.requireAllowed(TRANSFER, lead);
         Long beforeOwner = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                 ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
@@ -72,6 +78,8 @@ public class SubordinateSalesCommandService {
         } else {
             dispatchService.adminTransfer(leadId, targetUserId, managerUserId, reason, idempotencyKey);
         }
+        if (lead.getVersion() != null && leadMapper.updateVersionAndTouchActivity(leadId, lead.getVersion(), LocalDateTime.now()) != 1)
+            throw exception(LEAD_FEEDBACK_VERSION_CONFLICT);
         addAudit("lead_transfer", managerUserId, targetUserId, leadId,
                 String.valueOf(beforeOwner), String.valueOf(targetUserId), reason);
         completeCommand(managerUserId, idempotencyKey, "true");
@@ -84,12 +92,20 @@ public class SubordinateSalesCommandService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void restoreOne(Long leadId, Long managerUserId, String reason, String idempotencyKey) {
+        restoreOne(leadId, managerUserId, reason, idempotencyKey, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void restoreOne(Long leadId, Long managerUserId, String reason, String idempotencyKey, Integer expectedVersion) {
         String fingerprint = fingerprint("restore", List.of(leadId), null, null, reason);
         if (!beginCommand("restore", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
+        if (expectedVersion != null && !Objects.equals(expectedVersion, lead.getVersion())) throw exception(LEAD_FEEDBACK_VERSION_CONFLICT);
         SupervisorLeadActionPolicy.requireAllowed(RESTORE, lead);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
         qualificationService.restore(leadId, managerUserId, request);
+        if (lead.getVersion() != null && leadMapper.updateVersionAndTouchActivity(leadId, lead.getVersion(), LocalDateTime.now()) != 1)
+            throw exception(LEAD_FEEDBACK_VERSION_CONFLICT);
         addAudit("lead_restore", managerUserId, lead.getOwnerUserId(), leadId,
                 STATUS_SUSPENDED, STATUS_SUBMITTED, reason);
         completeCommand(managerUserId, idempotencyKey, "true");

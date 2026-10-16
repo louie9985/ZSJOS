@@ -14,6 +14,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LeadRestoreOwnerPolicyTest {
     @InjectMocks private LeadRestoreOwnerPolicy policy;
+    @org.mockito.Spy private LeadTeamTransferPolicy teamTransferPolicy = new LeadTeamTransferPolicy();
     @Mock private LeadAssignmentService assignmentService;
     @Mock private LeadSubmissionIdentityService identityService;
 
@@ -39,10 +40,10 @@ class LeadRestoreOwnerPolicyTest {
         verifyNoInteractions(identityService, assignmentService);
     }
 
-    @Test void salesAndLegacyOwnersRetainSalesEligibility() {
+    @Test void salesOwnersRetainEligibilityButUnknownIdentityIsRejected() {
         when(assignmentService.isEligibleSalesUser(20L)).thenReturn(true);
         assertTrue(policy.isEligible(lead("sales", "sales_self_sourced")));
-        assertTrue(policy.isEligible(lead(null, "internal_new_media")));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> policy.isEligible(lead(null, "internal_new_media")));
         when(assignmentService.isEligibleSalesUser(20L)).thenReturn(false);
         assertFalse(policy.isEligible(lead("sales", "sales_self_sourced")));
         verifyNoInteractions(identityService);

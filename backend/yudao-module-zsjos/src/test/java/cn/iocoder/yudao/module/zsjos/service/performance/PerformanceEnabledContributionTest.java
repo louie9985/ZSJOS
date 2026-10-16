@@ -27,7 +27,7 @@ class PerformanceEnabledContributionTest {
  @Mock PerformanceReportMapper reports;
  @Mock PerformanceDetailMapper detailQueries;
  PerformanceFact order(long user,String amount){var f=new PerformanceFact();f.setUserId(user);f.setUserName("销售"+user);f.setDeptId(10L);f.setAmount(new BigDecimal(amount));f.setOccurredAt(LocalDate.of(2026,1,2).atStartOfDay());return f;}
- @Test void historicalDisabledOrdersRemainInTotalsButNotContributionRows(){
+ @Test void historicalDisabledOrdersRemainInTotalsAndContributionRows(){
   TenantContextHolder.setTenantId(1L);
   try {
    var q=new Query();q.setScopeType("DEPT");q.setScopeId(10L);q.setStart(LocalDate.of(2026,1,2));q.setEnd(LocalDate.of(2026,1,3));q.setGrain("day");
@@ -46,11 +46,11 @@ class PerformanceEnabledContributionTest {
    var result=service.analysis(q);
    assertEquals(new BigDecimal("400"),result.averages().getFirst().amount());
    assertEquals(2,result.averages().getFirst().orders());
-   assertEquals(1,result.contributionMetrics().size());
+   assertEquals(2,result.contributionMetrics().size());
    assertEquals(2L,result.contributionMetrics().getFirst().userId());
    assertEquals(new BigDecimal("0.250000"),result.contributionMetrics().getFirst().share());
-   assertEquals(1,result.contributors().size());
-   assertEquals(new BigDecimal("0.250000"),result.contributors().getFirst().share());
+   assertEquals(2,result.contributors().size());
+   assertEquals(new BigDecimal("0.750000"),result.contributors().getFirst().share());
   } finally {TenantContextHolder.clear();}
  }
 }

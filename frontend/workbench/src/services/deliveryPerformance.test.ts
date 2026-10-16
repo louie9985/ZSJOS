@@ -14,3 +14,11 @@ describe('independent delivery performance API', () => {
   await performanceApi.tree();expect(mock.get.mock.calls[0][0]).toBe('/zsjos/sales-performance/tree')
  })
 })
+
+it('keeps unclassified history read-only under each domain endpoint',async()=>{
+ await performanceApi.unclassifiedHistory(2,20)
+ await deliveryPerformanceApi.unclassifiedHistory(2,20)
+ expect(mock.get.mock.calls.map(x=>x[0])).toEqual(['/zsjos/sales-performance/unclassified-history','/zsjos/delivery-performance/unclassified-history'])
+ expect(mock.get.mock.calls[0][1].params).toMatchObject({pageNo:2,pageSize:20})
+ expect(mock.put).not.toHaveBeenCalled()
+})

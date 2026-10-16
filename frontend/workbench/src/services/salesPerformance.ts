@@ -1,4 +1,5 @@
 import { http, unwrap } from './api'
+export type UnclassifiedDetail = { fact: Detail; attributionReason: string; historicalDepartmentId?: number }
 export type Scope = { scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number }
 export type Query = Scope & { start?: string; end?: string; grain?: 'day' | 'week' | 'month'; year?: number; dimension?: string; groupKey?: string; calendar?: boolean; cumulative?: boolean; metric?: string; periodKey?: string; pageNo?: number; pageSize?: number }
 export type OrgNode = Scope & { key: string; parentKey?: string; title: string; selectable: boolean }
@@ -53,6 +54,7 @@ export function createPerformanceApi(domain: 'sales' | 'delivery') {
 const BASE = `/zsjos/${domain}-performance`
 const TARGET = `/zsjos/${domain}-performance-target`
 return {
+ unclassifiedHistory: (pageNo: number, pageSize: number, signal?: AbortSignal, userId?: number) => get<{list: UnclassifiedDetail[]; total: number}>(`${BASE}/unclassified-history`, {pageNo, pageSize, userId}, signal),
  tree: (targets = false, signal?: AbortSignal) => get<OrgNode[]>(`${targets ? TARGET : BASE}/tree`, undefined, signal),
  overview: (query: Query, signal?: AbortSignal) => get<Overview>(`${BASE}/overview`, query, signal),
  analysis: (query: Query, signal?: AbortSignal) => get<Analysis>(`${BASE}/analysis`, query, signal),
